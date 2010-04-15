@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/datastore.py
+@file ion/services/util/ionservice.py
 @author Michael Meisinger
 @package ion.services.coi service for storing and retrieving stateful data objects.
 """
@@ -50,9 +50,8 @@ def receive(content, msg):
     try:
         if "method" in content:
             if content["method"] == "GET":
-                print 'Start message received'
-            if content["method"] == "GET":
                 return op_get(content['args'])
+        if "method" in content:
             if content["method"] == "PUT":
                 return op_put(content['args'])
         else:

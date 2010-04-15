@@ -4,19 +4,19 @@
 @file setup.py
 @author Paul Hubbard
 @date 4/2/10
-@brief setup file for OOI skeleton project. Modify me to suit!
+@brief setup file for OOI LCA architecture prototype project.
 """
 
 setupdict = {
     'name' : 'lcaarch',
-    'version' : '0.0.2a',
-    'description' : 'OOI LCA architecture framework',
+    'version' : '0.0.1',
+    'description' : 'OOI LCA architecture prototype',
     'url': 'http://www.oceanobservatories.org/spaces/display/CIDev/',
     'download_url' : 'http://ooici.net/packages',
     'license' : 'Apache 2.0',
     'author' : 'Michael Meisinger',
     'author_email' : 'mmeisinger@ucsd.edu',
-    'keywords': ['ooci'],
+    'keywords': ['ooci','lcar1'],
     'classifiers' : [
     'Development Status :: 3 - Alpha',
     'Environment :: Console',
