@@ -1,0 +1,2 @@
+include *.txt Doxyfile 
+recursive-include lcaarch *.ini
