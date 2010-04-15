@@ -24,6 +24,7 @@ def service_deploy_factory(package,name):
     			}
     return scv_dict
 
+
 ion_services = {
         'datastore' :service_deploy_factory ('ion.services.coi','datastore'),
         'resource_registry' :service_deploy_factory ('ion.services.coi','resource_registry'),
@@ -58,17 +59,21 @@ def op_bootstrap():
         print('Adding ' + svc_name)
         svc = ion_services[svc_name]
         
-        execcmd = "from " + svc['package'] + " import " + svc['module']
-        print('Eval ' + execcmd)
-      #  logging.info('Eval ' + execcmd)
-        exec(execcmd)
+        # Importing service module
+        svc_import = svc['package'] + "." + svc['module']
+        print('Import ' + svc_import)
+        svc_mod = __import__(svc_import, globals(), locals(), [svc['module']])
+        svc['module_import'] = svc_mod
+    
+    	# Spawn instance of a service
+        svc_id = yield spawn(svc_mod)
+        store.put(svc['name'], svc_id)
+        print "Service "+svc['name']+" ID: ",svc_id
         
-        svcid = yield spawn(svc['module'])
-        store.put(svc['name'], id)
-        
-#        to = yield store.get(svc['name'])
-#        replyto = yield store.get('bootstrap')
-#        receiver.send(to, {'method':'START','args':{'supervisor':''+replyto}})
+        # Send a start message to service instance
+        to = yield store.get(svc['name'])
+        print "Send to: ",to
+        receiver.send(to, {'method':'START','args':{}})
 
     
 #    to = yield store.get('datastore')
