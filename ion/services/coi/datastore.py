@@ -49,7 +49,7 @@ def receive(content, msg):
     print 'in receive ', content, msg
     try:
         if "method" in content:
-            if content["method"] == "GET":
+            if content["method"] == "START":
                 print 'Start message received'
             if content["method"] == "GET":
                 return op_get(content['args'])

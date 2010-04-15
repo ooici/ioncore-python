@@ -8,15 +8,14 @@
 
 from twisted.python import log
 from twisted.internet import defer
-#import logging
+import logging
 
 from magnet.spawnable import Receiver
 from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
-from ion.services.coi import datastore
-
+# Build a service properties dict
 def service_deploy_factory(package,name):
     scv_dict = {'name' : name,
     			'package' : package,
@@ -24,7 +23,10 @@ def service_deploy_factory(package,name):
     			}
     return scv_dict
 
+# Static definition of service names and message queues
+# @todo
 
+# Static definition of services and properties
 ion_services = {
         'datastore' :service_deploy_factory ('ion.services.coi','datastore'),
         'resource_registry' :service_deploy_factory ('ion.services.coi','resource_registry'),
@@ -34,10 +36,12 @@ ion_services = {
         'dataset_registry' :service_deploy_factory ('ion.services.dm','dataset_registry'),
         }
 
+logging.basicConfig(level=logging.DEBUG)
+
 #logging.basicConfig(level=logging.DEBUG, \
 #            format='%(asctime)s %(levelname)s (%(funcName)s) %(message)s')
 
-#logging.info('Starting up...')
+logging.info('Starting up...')
 
 store = Store()
 
@@ -55,7 +59,7 @@ def op_bootstrap():
     started = True
     
     for svc_name in ion_services:
-       # logging.info('Adding ' + svc_name)
+        # logging.info('Adding ' + svc_name)
         print('Adding ' + svc_name)
         svc = ion_services[svc_name]
         
@@ -68,11 +72,11 @@ def op_bootstrap():
     	# Spawn instance of a service
         svc_id = yield spawn(svc_mod)
         store.put(svc['name'], svc_id)
-        print "Service "+svc['name']+" ID: ",svc_id
+        print("Service "+svc['name']+" ID: ",svc_id)
         
         # Send a start message to service instance
         to = yield store.get(svc['name'])
-        print "Send to: ",to
+        print("Send to: ",to)
         receiver.send(to, {'method':'START','args':{}})
 
     
