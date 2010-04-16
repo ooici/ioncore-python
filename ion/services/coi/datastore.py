@@ -9,14 +9,16 @@
 from twisted.python import log
 from twisted.internet import defer
 
-import pycassa
-
 from magnet.spawnable import Receiver
 from magnet.spawnable import send
 from magnet.spawnable import spawn
+from magnet.store import Store
 
 import ion.util.procutils as pu
 
+store = Store()
+
+datastore = Store()
 
 receiver = Receiver(__name__)
 selfid = None
@@ -69,7 +71,6 @@ def start():
     id = yield spawn(receiver)
     datastore.start()
     datastore.put('datastore', id)
-    selfid = id
 
 def receive(content, msg):
     """
@@ -88,11 +89,13 @@ def receive(content, msg):
         log.err('Error parsing message!')
         return
 
-    if content['op'] == 'PUT':
+    if cmd == 'PUT':
         value = content['args']['value']
         datastore.put(key, value)
-    elif content['op'] == 'GET':
+    elif cmd == 'GET':
         log.msg(datastore.get(key))
+    elif cmd == 'START':
+        log.msg('Start command received')
     else:
         log.err('Unknown command ' + cmd)
 
@@ -106,9 +109,9 @@ def pfh_test():
 
 
 def test_put():
-    start()
-    receiver.send(selfid, {'op':'PUT','args':{'key':'key1','value':'val1'}})
-    # send(1,{'op':'PUT','args':{'key':'key1','value':'val1'}})
+	start()
+	receiver.send(selfid, {'op':'PUT','args':{'key':'key1','value':'val1'}})
+	# send(1,{'op':'PUT','args':{'key':'key1','value':'val1'}})
 
 def test_get():
     receiver.send(selfid, {'op':'GET','args':{'key':'key1'}})
