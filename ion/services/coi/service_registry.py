@@ -14,9 +14,9 @@ from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
-store = Store()
+import ion.util.procutils as pu
 
-datastore = Store()
+store = Store()
 
 receiver = Receiver(__name__)
 
@@ -27,6 +27,6 @@ def start():
 
 
 def receive(content, msg):
-    print 'in receive ', content, msg
+    pu.log_message(__name__, content, msg)
 
 receiver.handle(receive)

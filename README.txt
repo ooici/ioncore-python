@@ -5,3 +5,10 @@ external pacakges, such as Magnet, etc.
 
 Start CC shell with:
 twistd -n magnet -h amoeba.ucsd.edu shell
+
+Start system by executing within the CC shell:
+
+><> from ion.core import bootstrap
+><> spawn(bootstrap)
+><> send(1, '')
+

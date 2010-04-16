@@ -14,26 +14,32 @@ from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
+import ion.util.procutils as pu
+
 store = Store()
 
 datastore = Store()
 
 receiver = Receiver(__name__)
+selfid = None
 
 @defer.inlineCallbacks
 def start():
     id = yield spawn(receiver)
     store.put('datastore', id)
+    selfid = id
 
 def op_put(args):
     print 'in "put" with ', args
     datastore.put(args['key'],args['value'])
 
 @defer.inlineCallbacks
-def op_get(args):
-    print 'in "get" with ', args
+def op_get(args, replyto):
+    print 'in "get" with ', args, replyto
     value = yield datastore.get(args['key'])
-    receiver.send(args['reply-to'], {'from':'id', 'return-value':value})
+    print "GET '"+args['key']+"'='"+value+"'"
+
+    receiver.send(pu.get_process_id(replyto), {'from':'id', 'return-value':value})
 
 
 def receive(content, msg):
@@ -42,23 +48,32 @@ def receive(content, msg):
 
     For this implementation, 'content' will be a dictionary:
         content = {
-            "method": "method name here",
-            "args": ('arg1', 'arg2')
+            "op": "operation name here",
+            "args": {'key1':'arg1', 'key2':'arg2'}
         }
     """
-    print 'in receive ', content, msg
-    try:
-        if "method" in content:
-            if content["method"] == "START":
-                print 'Start message received'
-            if content["method"] == "GET":
-                return op_get(content['args'])
-            if content["method"] == "PUT":
-                return op_put(content['args'])
-        else:
-            raise NameError
-    except Exception:
-        log.error("Receive() failed. Method call does not match a service",
-                content)
+    pu.log_message(__name__, content, msg)
+    if "op" in content:
+		if content["op"] == "START":
+			print 'Start message received'
+			return
+		elif content["op"] == "GET":
+			return op_get(content['content'],msg.reply_to)
+		elif content["op"] == "PUT":
+			return op_put(content['content'])
+#		else:
+#		    log.error("Receive() failed. Op call does not match a service", content)    
+#	else:
+    log.error("Receive() failed. Bad message", content)    
 
 receiver.handle(receive)
+
+def test_put():
+	start()
+	receiver.send(selfid, {'op':'PUT','args':{'key':'key1','value':'val1'}})
+	# send(1,{'op':'PUT','args':{'key':'key1','value':'val1'}})
+	
+def test_get():
+    receiver.send(selfid, {'op':'GET','args':{'key':'key1'}})
+	# send(1, {'op':'GET','args':{'key':'key1'}})
+	
