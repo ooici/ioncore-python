@@ -1,0 +1,5 @@
+*.kpf
+*.pyc
+*.swp
+*.*.swp
+.*.*.swo
