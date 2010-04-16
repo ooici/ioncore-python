@@ -22,7 +22,13 @@ receiver = Receiver(__name__)
 selfid = None
 
 class Store:
+    def started(self):
+        return(hasattr(self, 'kvs'))
+
     def start(self):
+        if self.started():
+            return
+
         log.msg('Connecting to Cassandra...')
         cass_list = ['localhost:9160']
         self.client = pycassa.connect(cass_list)
@@ -30,7 +36,7 @@ class Store:
         log.msg('connected OK.')
 
     def get(self, key):
-        if not self.kvs:
+        if not self.started():
             log.err('Not connected!')
             return None
         try:
@@ -42,11 +48,11 @@ class Store:
             return(None)
 
     def put(self, key, value):
-        if not self.kvs:
+        if not self.started():
             log.err('Not connected!')
             return None
         log.msg('writing key %s value %s' % (key, value))
-        self.kvs.insert(key, {'value' : value})
+        self.kvs.insert(key, {'value' : str(value)})
 
     def query(self, regex):
         log.err('Missing code')
@@ -62,7 +68,7 @@ datastore = Store()
 def start():
     id = yield spawn(receiver)
     datastore.start()
-    store.put('datastore', id)
+    datastore.put('datastore', id)
     selfid = id
 
 def receive(content, msg):
@@ -75,9 +81,29 @@ def receive(content, msg):
             "args": {'key1':'arg1', 'key2':'arg2'}
         }
     """
+    try:
+        cmd = content['op']
+        key = content['args']['key']
+    except KeyError:
+        log.err('Error parsing message!')
+        return
+
+    if content['op'] == 'PUT':
+        value = content['args']['value']
+        datastore.put(key, value)
+    elif content['op'] == 'GET':
+        log.msg(datastore.get(key))
+    else:
+        log.err('Unknown command ' + cmd)
 
 
 receiver.handle(receive)
+
+def pfh_test():
+    start()
+    receive({'op':'PUT','args':{'key':'key1','value':'val1'}}, None)
+    receive({'op':'GET','args':{'key':'key1'}}, None)
+
 
 def test_put():
     start()
