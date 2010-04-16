@@ -24,6 +24,7 @@ class InstrumentAgent(ResourceAgent):
     def op_get(self, content, headers, msg):
         """
         """
+        print 'in get', headers
         
     def op_set(self, content, headers, msg):
         """
