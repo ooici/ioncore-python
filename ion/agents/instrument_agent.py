@@ -21,31 +21,31 @@ def start():
 
 class InstrumentAgent(ResourceAgent):
     
-    def op_get(self, param_name):
+    def op_get(self, content, headers, msg):
         """
         """
         
-    def op_set(self, param_name, value):
+    def op_set(self, content, headers, msg):
         """
         """
     
-    def op_getLifecycleState(self):
+    def op_getLifecycleState(self, content, headers, msg):
         """
         """
     
-    def op_setLifecycleState(self, state_value):
+    def op_setLifecycleState(self, content, headers, msg):
         """
         """
     
-    def op_execute(self, command):
+    def op_execute(self, content, headers, msg):
         """
         """
     
-    def op_getStatus(self):
+    def op_getStatus(self, content, headers, msg):
         """
         """
     
-    def op_getCapabilities(self):
+    def op_getCapabilities(self, content, headers, msg):
         """
         """
         
