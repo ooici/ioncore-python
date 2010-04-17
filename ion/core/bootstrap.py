@@ -48,8 +48,8 @@ receiver = Receiver(__name__)
 def start():
     id = yield spawn(receiver)
     store.put('bootstrap', id)
-    op_bootstrap()
-  
+    yield op_bootstrap()
+
 @defer.inlineCallbacks
 def op_bootstrap():
     print "Bootstrapping now"
@@ -65,10 +65,10 @@ def op_bootstrap():
         svc_mod = __import__(svc_import, globals(), locals(), [svc['module']])
         svc['module_import'] = svc_mod
     
-    	# Spawn instance of a service
+        # Spawn instance of a service
         svc_id = yield spawn(svc_mod)
         svc['instance'] = svc_id
-        store.put(svc['name'], svc_id)
+        yield store.put(svc['name'], svc_id)
         print "Service "+svc['name']+" ID: ",svc_id
         
         # Send a start message to service instance
@@ -77,24 +77,6 @@ def op_bootstrap():
 #        receiver.send(to, {'op':'START','args':{}})
 
     print "Store: ", store.kvs
- #   test_datastore()
-
-@defer.inlineCallbacks
-def test_datastore():
-    print "===================================================================="
-    print "===================================================================="
-    print "Testing datastore"
-
-    to = yield store.get('datastore')
-    
-    print "Send PUT to: ",to
-  #  receiver.send(to,{'op':'PUT','content':{'key':'key1','value':'val1'}})
-    pu.send_message(receiver, '', to, 'PUT', {'key':'obj1','value':'999'}, {'some':'header'})
-
-    print "===================================================================="
-    print "Send GET to: ",to
-  #  receiver.send(to,{'op':'GET','args':{'key':'key1'}})
-    pu.send_message(receiver, '', to, 'GET', {'key':'obj1'}, {})
 
 def receive(content, msg):
     pu.log_message(__name__, content, msg)

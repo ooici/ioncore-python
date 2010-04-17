@@ -14,14 +14,16 @@ from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
+import pycassa
 import ion.util.procutils as pu
 
+# Store for locally know process ids (names)
 store = Store()
 
+# Store 
 datastore = Store()
 
 receiver = Receiver(__name__)
-selfid = None
 
 class Store:
     def started(self):
@@ -79,18 +81,18 @@ def receive(content, msg):
     For this implementation, 'content' will be a dictionary:
         content = {
             "op": "operation name here",
-            "args": {'key1':'arg1', 'key2':'arg2'}
+            "content": {'key1':'arg1', 'key2':'arg2'}
         }
     """
     try:
         cmd = content['op']
-        key = content['args']['key']
+        key = content['content']['key']
     except KeyError:
         log.err('Error parsing message!')
         return
 
     if cmd == 'PUT':
-        value = content['args']['value']
+        value = content['content']['value']
         datastore.put(key, value)
     elif cmd == 'GET':
         log.msg(datastore.get(key))
@@ -104,15 +106,5 @@ receiver.handle(receive)
 
 def pfh_test():
     start()
-    receive({'op':'PUT','args':{'key':'key1','value':'val1'}}, None)
-    receive({'op':'GET','args':{'key':'key1'}}, None)
-
-
-def test_put():
-	start()
-	receiver.send(selfid, {'op':'PUT','args':{'key':'key1','value':'val1'}})
-	# send(1,{'op':'PUT','args':{'key':'key1','value':'val1'}})
-
-def test_get():
-    receiver.send(selfid, {'op':'GET','args':{'key':'key1'}})
-    # send(1, {'op':'GET','args':{'key':'key1'}})
+    receive({'op':'PUT','content':{'key':'key1','value':'val1'}}, None)
+    receive({'op':'GET','content':{'key':'key1'}}, None)

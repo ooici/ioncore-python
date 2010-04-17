@@ -12,9 +12,9 @@ from twisted.internet import defer
 # Build a service properties dict
 def service_deploy_factory(package,name):
     scv_dict = {'name' : name,
-    			'package' : package,
-    			'module' : name,
-    			}
+                'package' : package,
+                'module' : name,
+                }
     return scv_dict
 
 # Print an object's attributes
@@ -34,10 +34,10 @@ def log_message(proc,content,msg):
 
 # Returns the instance part of a long process id 
 def get_process_id(long_id):
-	parts = str(long_id).rpartition('.')
-	return parts[2]
+    parts = str(long_id).rpartition('.')
+    return parts[2]
 
-# Constructs a message with standard headers	
+# Constructs a message with standard headers    
 def send_message(receiver,src,to,operation,content,headers):
     msg = {}
     msg.update(headers)
