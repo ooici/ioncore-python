@@ -35,7 +35,6 @@ def op_get(args):
     value = yield datastore.get(args['key'])
     receiver.send(args['reply-to'], {'from':'id', 'return-value':value})
 
-
 def receive(content, msg):
     """
     content - content can be anything (list, tuple, dictionary, string, int, etc.)
