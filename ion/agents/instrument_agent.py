@@ -17,14 +17,21 @@ receiver = Receiver(__name__)
 @defer.inlineCallbacks
 def start():
     id = yield spawn(receiver)
+    # For now we're just storing the service id w/in an in-memory store
     store.put('instrument_agent', id)
 
 class InstrumentAgent(ResourceAgent):
+    """
+    TODO: Add class description
+    """
     
     def op_get(self, content, headers, msg):
         """
         """
-        print 'in get', headers
+        print 'in get'
+        print 'headers = ', headers
+        print 'content = ', content
+        print 'msg = ', msg
         
     def op_set(self, content, headers, msg):
         """
@@ -51,7 +58,7 @@ class InstrumentAgent(ResourceAgent):
         """
         
 def receive(content, msg):
-    instance.receive(content,msg)
+    instance.receive(content, msg)
 
 instance = InstrumentAgent()
 
