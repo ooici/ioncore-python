@@ -3,6 +3,7 @@
 """
 @file ion/services/cei/provisioner.py
 @author Michael Meisinger
+@author Stephen Pasco
 @package ion.agents service for provisioning operational units (VM instances).
 """
 
@@ -22,6 +23,7 @@ receiver = Receiver(__name__)
     
 @defer.inlineCallbacks
 def start():
+    
     id = yield spawn(receiver)
     yield store.put('test_instrument', id)
     
@@ -29,6 +31,7 @@ def start():
 
     # Spawn instance of a service
     svc_id = yield spawn(svc_mod)
+    
     yield store.put('instrument_agent', svc_id)
     
     yield pu.send_message(receiver, '', svc_id, 'get', {'key':'obj1'}, {})
