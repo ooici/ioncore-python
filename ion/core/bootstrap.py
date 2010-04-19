@@ -47,7 +47,7 @@ receiver = Receiver(__name__)
 @defer.inlineCallbacks
 def start():
     id = yield spawn(receiver)
-    store.put('bootstrap', id)
+    yield store.put('bootstrap', id)
     yield op_bootstrap()
 
 @defer.inlineCallbacks

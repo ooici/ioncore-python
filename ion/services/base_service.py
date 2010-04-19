@@ -6,6 +6,8 @@
 @package ion.services  abstract base classes for all service interfaces, implementations and provider.
 """
 
+import logging
+
 from twisted.python import log
 from twisted.internet import defer
 
@@ -13,6 +15,9 @@ from magnet.spawnable import Receiver
 from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
+
+logging.basicConfig(level=logging.DEBUG)
+logging.debug('Loaded: '+__name__)
 
 class BaseService(object):
     """
@@ -22,12 +27,9 @@ class BaseService(object):
     anywhere in the network and that provides a service.
     """
     
-    svcReceiver = None
+    receiver = None
     svcMessages = {}
-    
-    def __init__(self, rec):
-        self.svcReceiver = rec
-    
+      
     def slc_start(self):
         pass
 
@@ -43,15 +45,16 @@ class BaseService(object):
     def _add_conv_type(self):
         none
 
-class ServiceClient(object):
+    def op_noop_catch(self, content, headers, msg):
+        """The method called if operation is not defined
+        """
+        logging.info('Catch message')
+
+class BaseServiceClient(object):
     """This is the abstract base class for service client libraries.
     """
 
-class ServiceInterface(object):
-    """This is the abstract base class for all service provider messaging interface.
-    """
-
-class ServiceImplementation(object):
+class BaseServiceImplementation(object):
     """This is the abstract base class for all service provider implementations
     of a service provider interface.
     """

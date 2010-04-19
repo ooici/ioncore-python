@@ -1,18 +1,63 @@
-This is the project for the OOI Release 1 LCA architecture prototype.
+==================================================
+LCAARCH - OOI Release 1 LCA architecture prototype
+==================================================
 
-It contains the core services and their architectural dependencies, and relies on selected
-external packages, such as Magnet, etc.
+April 2010
+
+This project defines the services of the OOI release 1 system with their
+architectural dependencies.
+
+This project and relies on selected external packages, such as Magnet, etc.
 
 Get it with
+::
+    git clone git@amoeba.ucsd.edu:lcaarch.git
 
->git clone git://amoeba.ucsd.edu/lcaarch.git
+Usage
+=====
 
 Start CC ("Magnet" Python Capability Container) shell in directory with:
-
->twistd -n magnet -h amoeba.ucsd.edu shell
+::
+    twistd -n magnet -h amoeba.ucsd.edu shell
 
 Start system by executing within the CC shell:
+><>
+    from ion.core import bootstrap
+    bootstrap.start()
 
-><> from ion.core import bootstrap
-><> bootstrap.start()
+Start a test case by executing within the CC shell:
+><>
+    from ion import ts
+    ts.start()
 
+Install the dependencies: Magnet (see Magnet's Readme)
+======================================================
+Recommendation:
+    Create a virtualenv for installing Magnet and its dependencies.
+
+Twisted Python
+--------------
+::
+    easy_install twisted
+
+txAMQP
+------
+::
+    easy_install txamqp
+
+carrot (use txamqp branch)
+----------------------
+::
+    git clone git://amoeba.ucsd.edu/carrot.git
+    (cd carrot; git checkout -b txamqp origin/txamqp)
+    (cd carrot; python setup.py install)
+
+Install the Magnet package:
+---------------------------
+Get the latest version of the repository, if you haven't already.
+::
+    git clone git://amoeba.ucsd.edu/magnet.git # no ooi credential
+    # OR
+    git clone git@amoeba.ucsd.edu:magnet.git # need ooi credential
+    (cd magnet; git checkout -b space origin/space)
+    (cd magnet; python setup.py install)
