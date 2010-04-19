@@ -3,7 +3,7 @@
 """
 @file ion/core/bootstrap.py
 @author Michael Meisinger
-@package ion.core bootstrapping the system.
+@brief base class for bootstrapping the system
 """
 
 from twisted.python import log

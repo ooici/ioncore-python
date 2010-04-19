@@ -3,7 +3,7 @@
 """
 @file ion/util/procutils.py
 @author Michael Meisinger
-@package ion.util  utility helper functions for processes in capability containers
+@brief  utility helper functions for processes in capability containers
 """
 
 from twisted.python import log

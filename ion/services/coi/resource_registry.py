@@ -3,7 +3,7 @@
 """
 @file ion/services/coi/resource_registry.py
 @author Michael Meisinger
-@package ion.services.coi service for registering resources
+@brief service for registering resources
 """
 
 from twisted.python import log

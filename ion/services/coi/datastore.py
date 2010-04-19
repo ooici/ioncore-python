@@ -3,7 +3,7 @@
 """
 @file ion/services/coi/datastore.py
 @author Michael Meisinger
-@package ion.services.coi service for storing and retrieving stateful data objects.
+@brief service for storing and retrieving stateful data objects.
 """
 
 from twisted.python import log

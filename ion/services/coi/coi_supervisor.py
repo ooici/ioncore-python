@@ -3,7 +3,7 @@
 """
 @file ion/services/coi/supervisor.py
 @author Michael Meisinger
-@package ion.services  supervisor for COI services
+@brief supervisor for COI services
 """
 
 from twisted.python import log

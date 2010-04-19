@@ -3,7 +3,7 @@
 """
 @file ion/services/coi/exchange_registry.py
 @author Michael Meisinger
-@package ion.services.coi service for registering names in exchange spaces and membership
+@brief service for registering names in exchange spaces and membership
 """
 
 from twisted.python import log

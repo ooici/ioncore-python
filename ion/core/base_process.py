@@ -2,8 +2,9 @@
 
 """
 @file ion/core/base_process.py
+@author Michael Meisinger
 @author Stephen Pasco
-@package ion.core abstract superclass for all agents
+@brief abstract superclass for all processes
 """
 
 import ion.util.procutils as pu
@@ -13,17 +14,18 @@ class BaseProcess(object):
     This is the abstract superclass for all processes.
     """
     
+    def op_noop_catch(self, content, headers, msg):
+        """The method called if operation is not defined
+        """
+    
     def receive(self, content, msg):
-        
-        print 'in receive'
-        
         """
         content - content can be anything (list, tuple, dictionary, string, int, etc.)
 
         For this implementation, 'content' will be a dictionary:
         content = {
-            "method": "method name here",
-            "args": ('arg1', 'arg2')
+            "op": "operation name here",
+            "content": ('arg1', 'arg2')
         }
         """
         
@@ -36,6 +38,12 @@ class BaseProcess(object):
             # TODO: Null error check 'op'
             op = content['op']            
             # dynamically invoke the operation
-            getattr(self, 'op_' + op)(cont, content, msg)
             
-        log.error("Receive() failed. Bad message", content) 
+            opdef = getattr(self, 'op_' + op)
+            if opdef != None:
+                opdef(cont, content, msg)
+            else:
+                op_noop_catch(cont, content, msg)
+        else:
+            log.error("Receive() failed. Bad message", content)
+            

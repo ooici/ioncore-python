@@ -3,7 +3,7 @@
 """
 @file ion/services/coi/service_registry.py
 @author Michael Meisinger
-@package ion.services.coi service for registering service (types and instances).
+@brief ervice for registering service (types and instances).
 """
 
 from twisted.python import log

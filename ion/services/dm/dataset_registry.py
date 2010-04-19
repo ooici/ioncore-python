@@ -3,7 +3,7 @@
 """
 @file ion/services/dm/dataset_registry.py
 @author Michael Meisinger
-@package ion.services.cei service for provisioning operational units (VM instances).
+@brief for provisioning operational units (VM instances).
 """
 
 from twisted.python import log

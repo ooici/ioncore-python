@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/cei/provisioner.py
+@file ion/services/hello_service.py
 @author Michael Meisinger
-@brief service for provisioning operational units (VM instances).
+@package ion.services  example service definition that can be used as template
 """
 
 from twisted.python import log
@@ -14,8 +14,6 @@ from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
-from ion.services import BaseService
-
-class ProvisionerService(BaseService):
-    none
-    
+class HelloService(BaseService):
+    """Service implementation
+    """
