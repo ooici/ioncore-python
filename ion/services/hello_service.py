@@ -16,6 +16,7 @@ from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
+import ion.util.procutils as pu
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.base_svcproc import BaseServiceProcess
 
@@ -49,17 +50,13 @@ class HelloServiceClient(BaseServiceClient):
 
 
 # Direct start of the service as a process with its default name
-receiver = None
+receiver = Receiver(__name__)
+instance = HelloService()
 
-@defer.inlineCallbacks
-def start():
-    procInst = BaseServiceProcess(__name__, __name__, 'HelloService')
-    procInst.receiver.handle(procInst.receive)
-    receiver = procInst.receiver
-    id = yield spawn(receiver)
-    
 def receive(content, msg):
-    svcProc.receive(content, msg)
+    pu.dispatch_message(content, msg, instance)
+
+receiver.handle(receive)
 
 """
 from ion.services import hello_service as h

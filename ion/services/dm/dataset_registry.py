@@ -3,10 +3,10 @@
 """
 @file ion/services/dm/dataset_registry.py
 @author Michael Meisinger
-@brief for provisioning operational units (VM instances).
+@brief service for registering datasets
 """
 
-from twisted.python import log
+import logging
 from twisted.internet import defer
 
 from magnet.spawnable import Receiver
@@ -14,19 +14,27 @@ from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
-store = Store()
+import ion.util.procutils as pu
+from ion.services.base_service import BaseService, BaseServiceClient
+from ion.services.base_svcproc import BaseServiceProcess
 
-datastore = Store()
+logging.basicConfig(level=logging.DEBUG)
+logging.debug('Loaded: '+__name__)
 
+class DatasetRegistryService(BaseService):
+    """Dataset registry service interface
+    """
+    
+    def __init__(self):
+        BaseService.__init__(self)
+        logging.info('DatasetRegistryService.__init__()')
+
+        
+# Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
-
-@defer.inlineCallbacks
-def start():
-    id = yield spawn(receiver)
-    store.put('dataset_registry', id)
-
+instance = DatasetRegistryService()
 
 def receive(content, msg):
-    print 'in receive ', content, msg
+    pu.dispatch_message(content, msg, instance)
 
 receiver.handle(receive)

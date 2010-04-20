@@ -24,9 +24,9 @@ receiver = Receiver(__name__)
 @defer.inlineCallbacks
 def start():
     id = yield spawn(receiver)
-    store.put('ts', id)
+    yield store.put('ts', id)
     
-    yield bootstrap.op_bootstrap()
+    yield bootstrap.start()
     yield test_datastore()
 
 @defer.inlineCallbacks
@@ -38,11 +38,11 @@ def test_datastore():
     to = yield bootstrap.store.get('datastore')
     
     print "Send PUT to: ",to
-    pu.send_message(receiver, '', to, 'PUT', {'key':'obj1','value':'999'}, {'some':'header'})
+    yield pu.send_message(receiver, '', to, 'put', {'key':'obj1','value':'999'}, {'some':'header'})
 
     print "===================================================================="
     print "Send GET to: ",to
-    pu.send_message(receiver, '', to, 'GET', {'key':'obj1'}, {})
+    yield pu.send_message(receiver, '', to, 'get', {'key':'obj1'}, {})
 
 def receive(content, msg):
     print 'in receive ', content, msg

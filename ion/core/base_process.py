@@ -59,40 +59,9 @@ class BaseProcess(object):
         """
         logging.info('Catch message')
 
-
-    def _dispatch_message(self, content, msg, dispatchIn):
-        """
-        content - content can be anything (list, tuple, dictionary, string, int, etc.)
-
-        For this implementation, 'content' will be a dictionary:
-        content = {
-            "op": "operation name here",
-            "content": ('arg1', 'arg2')
-        }
-        """
-        
-        pu.log_message(__name__, content, msg)
-        
-        if "op" in content:
-            op = content['op']            
-            logging.info('BaseProcess._dispatch_message OP='+op)
-
-            # TODO: Null error check 'cont'
-            cont = content['content']
-
-            # dynamically invoke the operation
-            opdef = getattr(dispatchIn, 'op_' + op)
-            if opdef != None:
-                opdef(cont, content, msg)
-            elif getattr(dispatchIn,'op_noop_catch') == None:
-                log.error("Receive() failed. Cannot dispatch to catch")
-            else:
-                dispatchIn.op_noop_catch(cont, content, msg)
-        else:
-            log.error("Receive() failed. Bad message", content)
             
     def receive(self, content, msg):
-        _dispatch_message(content, msg, self)
+        pu.dispatch_message(content, msg, self)
     
     def send_message(to,operation,content,headers):
         """Send a message via the processes receiver to a

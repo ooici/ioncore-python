@@ -7,9 +7,9 @@
 """
 
 import logging
-
 from twisted.internet import defer
 
+import ion.util.procutils as pu
 from ion.core.base_process import BaseProcess
 
 logging.basicConfig(level=logging.DEBUG)
@@ -53,6 +53,7 @@ class BaseServiceProcess(BaseProcess):
         logging.info('BaseServiceProcess.__init__: from '+self.serviceModule+' import '+localMod+', '+svcName)
         
         svc_mod = __import__(self.serviceModule, globals(), locals(), [localMod,svcName])
+        self.svcModObj = svc_mod
         #logging.debug('Module: '+str(svc_mod))
 
         svc_class = getattr(svc_mod, svcName)
@@ -61,11 +62,17 @@ class BaseServiceProcess(BaseProcess):
         self.serviceInstance = svc_class()
         self.serviceInstance.receiver = self.receiver
         logging.info('BaseServiceProcess.__init__: created service instance '+str(self.serviceInstance) )
+        
+        self.receiver.handle(self.receive)
 
+    @defer.inlineCallbacks
+    def spawnService(self):
+        id = yield receiver.spawn(self.svcModObj)
+        this.serviceId = id
 
     def receive(self, content, msg):
         logging.info('BaseServiceProcess.receive()')
-        self._dispatch_message(content, msg, self.serviceInstance)
+        pu.dispatch_message(content, msg, self.serviceInstance)
 
 # Code below is for starting this base class directly as a process
 
@@ -81,8 +88,6 @@ def start(svcMod, svcName):
     
     logging.info('BaseServiceProcess.start: '+svcMod+':'+svcName+' in proc '+__name__)
     procInst = BaseServiceProcess(__name__, svcMod, svcName)
-    procInst.receiver.handle(procInst.receive)
-
     yield procInst.plc_start()
     #logging.debug('procInst: '+str(procInst.__dict__))
 

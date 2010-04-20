@@ -29,7 +29,12 @@ class BaseService(object):
     
     receiver = None
     svcMessages = {}
-      
+
+
+    def op_init(self, content, headers, msg):
+        logging.info('BaseService.op_init: '+str(content))
+        self.slc_start()
+        
     def slc_start(self):
         pass
 
