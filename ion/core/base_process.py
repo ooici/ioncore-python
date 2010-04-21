@@ -29,14 +29,14 @@ class BaseProcess(object):
     @todo tighter integration with Spawnable
     """
 
-    idStore = None
-    receiver = None
+    convIdCnt = 0
     
     def __init__(self, receiver=Receiver(__name__)):
         """Constructor using a given name for the spawnable receiver.
         """
         logging.debug('BaseProcess.__init__()')
         
+        self.procName = __name__
         self.idStore = Store()
         self.receiver = receiver
         receiver.handle(self.receive)
@@ -53,8 +53,24 @@ class BaseProcess(object):
         """
         logging.info('Catch message')
 
-    def send_message(self, to, operation, content, headers):
-        """Send a message via the processes receiver to a
+    def send_message(self, recv, operation, content, headers):
+        """Send a message via the process receiver to destination. Starts a new conversation.
         """
-        src = ""
-        pu.send_message(self.receiver, src, to, operation, content, headers)
+        send = self.receiver.spawned.id.full
+        BaseProcess.convIdCnt += 1
+        convid = "#" + str(BaseProcess.convIdCnt)
+        #convid = send + "#" + BaseProcess.convIdCnt
+        msgheaders = {}
+        msgheaders.update(headers)
+        msgheaders['conv-id'] = convid
+        pu.send_message(self.receiver, send, recv, operation, content, msgheaders)
+
+    def reply_message(self, msg, operation, content, headers):
+        ionMsg = msg.payload
+        send = self.receiver.spawned.id.full
+        recv = ionMsg.get('reply-to', None)
+        if recv == None:
+            log.error('No reply-to given for message '+str(msg))
+        else:
+            headers['conv-id'] = ionMsg.get('conv-id','')
+            self.send_message(pu.get_process_id(recv), operation, content, headers)

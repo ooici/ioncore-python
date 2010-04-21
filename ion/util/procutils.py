@@ -19,15 +19,18 @@ def log_attributes(obj):
     """
     lstr = ""
     for attr, value in obj.__dict__.iteritems():
-        if attr != 'content':
-            lstr = lstr + str(attr) + ": " +str(value) + ", "
+        lstr = lstr + str(attr) + ": " +str(value) + ", "
     logging.info(lstr)
 
 def log_message(proc,content,msg):
     """Log an incoming message with all headers
     """
     logging.info("===Message=== @" + str(proc))
-    log_attributes(msg)
+    lstr = ""
+    for attr, value in msg.__dict__.iteritems():
+        if attr != 'content':
+            lstr = lstr + str(attr) + ": " +str(value) + ", "
+    logging.info(lstr)
     logging.info("-------------")
     logging.info(content)
     logging.info("=============")
@@ -35,6 +38,8 @@ def log_message(proc,content,msg):
 def get_process_id(long_id):
     """Returns the instance part of a long process id 
     """
+    if long_id == None:
+        return None
     parts = str(long_id).rpartition('.')
     if parts[1] != '':
         procId = Id(parts[2],parts[0])
@@ -42,21 +47,30 @@ def get_process_id(long_id):
         procId = Id(long_id)
     return procId
    
-def send_message(receiver,src,to,operation,content,headers):
-    """Constructs a message with standard headers
+def send_message(receiver, send, recv, operation, content, headers):
+    """Constructs a standard message with standard headers
+    
+    @param operation the operation (performative) of the message
+    @param headers dict with headers that may override standard headers
     """
     msg = {}
+    # The following headers are FIPA ACL Message Format based
+    msg['sender'] = str(send)
+    msg['receiver'] = str(recv)
+    msg['reply-to'] = str(send)
+    msg['encoding'] = 'ion1'
+    msg['language'] = 'ion1'
+    msg['format'] = 'raw'
+    msg['ontology'] = ''
+    msg['conv-id'] = ''
+    msg['protocol'] = ''
+    #msg['reply-with'] = ''
+    #msg['in-reply-to'] = ''
+    #msg['reply-by'] = ''
     msg.update(headers)
     msg['op'] = operation
-    msg['sender'] = str(src)
-    msg['receiver'] = str(to)
-    msg['encoding'] = ''
-    msg['structure'] = ''
-    msg['semantics'] = ''
-    msg['conversation'] = ''
-    msg['intpattern'] = ''
     msg['content'] = content
-    receiver.send(to,msg)
+    return receiver.send(recv, msg)
     
 def dispatch_message(content, msg, dispatchIn):
     """

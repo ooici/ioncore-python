@@ -25,15 +25,30 @@ class Supervisor(BaseProcess):
     # Static definition of child processes
     childProcesses = []
 
+    @defer.inlineCallbacks
     def spawnChildProcesses(self):
+        logging.info("Spawning child processes")
         for child in self.childProcesses:
-            child.spawnChild()
+            yield child.spawnChild()
 
+    @defer.inlineCallbacks
+    def initChildProcesses(self):
+        logging.info("Sending init message to all processes")
+        for child in self.childProcesses:
+            to = child.procId
+            print "Send to: ",to
+            yield self.send_message(to, 'init', self._prepInitMsg(child), {})
+            
     def event_failure(self):
         return
     
-class ChildProcess(object):
+    def _prepInitMsg(self, child):
+        return {'proc-name':child.procName, 'sup-id':self.receiver.spawned.id.full}
     
+class ChildProcess(object):
+    """
+    Class that encapsulates attributes about a child process
+    """
     def __init__(self, procMod, procClass, node=None):
         self.procModule = procMod
         self.procClass = procClass
@@ -43,7 +58,7 @@ class ChildProcess(object):
     @defer.inlineCallbacks
     def spawnChild(self):
         if self.procNode == None:
-            logging.info('Spawning '+self.procClass+' on local node')
+            logging.info('Spawning '+self.procClass+' on node: local')
 
             # Importing service module
             logging.info('from ' + self.procModule + " import " + self.procClass)
@@ -60,6 +75,7 @@ class ChildProcess(object):
         else:
             logging.error('Cannot spawn '+child.procClass+' on node '+str(child.node))
 
+
 # Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
 instance = Supervisor(receiver)
@@ -73,9 +89,11 @@ def test_sup():
     instance.childProcesses = children
     sup_id = yield spawn(receiver)
     
-    instance.spawnChildProcesses()
+    yield instance.spawnChildProcesses()
+    
     logging.info('Spawning completed')
 
 """
 from ion.core import supervisor as s
+s.test_sup()
 """

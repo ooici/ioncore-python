@@ -71,7 +71,8 @@ class DatastoreService(BaseService):
     #datastore = CassandraStore()
     
     def slc_init(self):
-        self.datastore.start()
+        pass
+        #self.datastore.start()
 
     @defer.inlineCallbacks
     def op_put(self, content, headers, msg):

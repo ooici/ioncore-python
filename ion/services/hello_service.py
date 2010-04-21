@@ -33,7 +33,7 @@ class HelloService(BaseService):
         
         replyto = msg.reply_to
         if replyto != None and replyto != '':
-            yield self.send_message(pu.get_process_id(replyto), 'reply', {'value':'Hello there, '+str(content)}, {})
+            yield self.reply_message(msg, 'reply', {'value':'Hello there, '+str(content)}, {})
         else:
             logging.info('op_hello: Cannot send reply. No reply_to given')
 

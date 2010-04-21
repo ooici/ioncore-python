@@ -33,19 +33,30 @@ class BaseService(BaseProcess):
         """Constructor using a given name for the spawnable receiver.
         """
         BaseProcess.__init__(self, receiver)
+        self.svcState = "UNINITIALIZED"
      
     def op_init(self, content, headers, msg):
         """Init operation, on receive of the init message
         """
         logging.info('BaseService.op_init: '+str(content))
-        if hasattr(self,'_isInitialized'):
+        if self.svcState == "UNINITIALIZED":
+            self.procName = content.get('proc-name', __name__)
+            supId = content.get('sup-id', None)
+            self.procSupId = pu.get_process_id(supId)
+            logging.info('BaseService.op_init: proc-name='+self.procName+', sup-id='+supId)
+
             self.slc_init()
-            self._isInitialized = True
+            logging.info('===== Service '+self.procName+' INITIALIZED ============')
+            
+            # @todo send reply
+            #self.reply_message(msg,'','','')
+
+            self.svcState = "INITIALIZED"
         
     def slc_init(self):
         """Service life cycle event: on initialization of process (once)
         """
-        logging.info('BaseService.slc_start()')
+        logging.info('BaseService.slc_init()')
         pass
 
     @classmethod
@@ -82,6 +93,7 @@ class RpcClient(BaseServiceClient):
         return self.deferred
 
     def receive(self, content, msg):
+        log_message(__name__, content, msg)
         logging.info('RpcClient.receive(), calling callback in defer')
         self.deferred.callback(content)
 
