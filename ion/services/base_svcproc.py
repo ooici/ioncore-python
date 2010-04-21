@@ -8,6 +8,7 @@
 
 import logging
 from twisted.internet import defer
+from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import BaseProcess
@@ -23,9 +24,6 @@ class BaseServiceProcess(BaseProcess):
     anywhere in the network and that provides a service.
     """
     
-    # Name of the spawnable of the executed process
-    processName = None
-    
     # Fully qualified name of the service module
     serviceModule = None
     
@@ -35,17 +33,16 @@ class BaseServiceProcess(BaseProcess):
     # An instance of the service class
     serviceInstance = None
     
-    def __init__(self, procName, svcMod, svcName):
+    def __init__(self, receiver, svcMod, svcName):
         """Constructor.
         @param procName public name of the spawnable process
         @param svcMod qualified name of the module in which the service class
             is, e.g. 'ion.services.coi.resource_registry'
         @param svcName name of the service class, e.g. 'ResourceRegistryService'
         """
-        logging.info('BaseServiceProcess.__init__('+procName+','+svcMod+','+svcName+')')
-        BaseProcess.__init__(self, procName)
+        logging.info('BaseServiceProcess.__init__(receiver,'+svcMod+','+svcName+')')
+        BaseProcess.__init__(self, receiver)
 
-        self.processName = procName
         self.serviceModule = svcMod
         self.serviceName = svcName
         
@@ -59,22 +56,19 @@ class BaseServiceProcess(BaseProcess):
         svc_class = getattr(svc_mod, svcName)
         #logging.debug('Class: '+str(svc_class))
         
-        self.serviceInstance = svc_class()
+        self.serviceInstance = svc_class(self.receiver)
         self.serviceInstance.receiver = self.receiver
         logging.info('BaseServiceProcess.__init__: created service instance '+str(self.serviceInstance) )
         
-        self.receiver.handle(self.receive)
-
     @defer.inlineCallbacks
     def spawnService(self):
-        id = yield receiver.spawn(self.svcModObj)
-        this.serviceId = id
+        self.serviceId = yield self.receiver.spawn(self.receiver)
 
     def receive(self, content, msg):
         logging.info('BaseServiceProcess.receive()')
         pu.dispatch_message(content, msg, self.serviceInstance)
 
-# Code below is for starting this base class directly as a process
+# Direct start of the service as a process with its default name
 
 @defer.inlineCallbacks
 def start(svcMod, svcName):
@@ -84,11 +78,13 @@ def start(svcMod, svcName):
     @param svcMod qualified name of the module in which the service class is,
         e.g. 'ion.services.coi.resource_registry'
     @param svcName name of the service class, e.g. 'ResourceRegistryService'
-    """
+    """   
     
     logging.info('BaseServiceProcess.start: '+svcMod+':'+svcName+' in proc '+__name__)
-    procInst = BaseServiceProcess(__name__, svcMod, svcName)
-    yield procInst.plc_start()
+    receiver = Receiver(__name__)
+    procInst = BaseServiceProcess(receiver, svcMod, svcName)
+    procInst.receiver.handle(procInst.receive)
+    yield procInst.spawnService()
     #logging.debug('procInst: '+str(procInst.__dict__))
 
     

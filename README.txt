@@ -16,8 +16,10 @@ Get it with
 Usage
 =====
 
-Start CC ("Magnet" Python Capability Container) shell in directory with:
+Start CC ("Magnet" Python Capability Container) shell with:
+Note: it is important to start from the root of the lcaarch/ dir.
 ::
+    cd lcaarch
     twistd -n magnet -h amoeba.ucsd.edu shell
 
 Start system by executing within the CC shell:

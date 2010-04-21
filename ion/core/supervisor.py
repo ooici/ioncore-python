@@ -6,42 +6,76 @@
 @brief base class for processes that supervise other processes
 """
 
-from twisted.python import log
+import logging
 from twisted.internet import defer
-
 from magnet.spawnable import Receiver
-from magnet.spawnable import send
 from magnet.spawnable import spawn
-from magnet.store import Store
+
+import ion.util.procutils as pu
+from ion.core.base_process import BaseProcess
+
+logging.basicConfig(level=logging.DEBUG)
+logging.debug('Loaded: '+__name__)
 
 class Supervisor(BaseProcess):
+    """
+    Base class for a supervisor process
+    """
 
-    # Static definition of services and properties
-    dependent_services = {}
+    # Static definition of child processes
+    childProcesses = []
 
-    def spawnDependents(self):
-        for svc_name in dependent_services:
-            # logging.info('Adding ' + svc_name)
-            print('Adding ' + svc_name)
-            svc = ion_services[svc_name]
-            
-            # Importing service module
-            svc_import = svc['package'] + "." + svc['module']
-            print('Import ' + svc_import)
-            svc_mod = __import__(svc_import, globals(), locals(), [svc['module']])
-            svc['module_import'] = svc_mod
-    
-            # Spawn instance of a service
-            svc_id = yield spawn(svc_mod)
-            store.put(svc['name'], svc_id)
-            print("Service "+svc['name']+" ID: ",svc_id)
-            
-            # Send a start message to service instance
-            to = yield store.get(svc['name'])
-            print("Send to: ",to)
-            receiver.send(to, {'method':'START','args':{}})
+    def spawnChildProcesses(self):
+        for child in self.childProcesses:
+            child.spawnChild()
 
     def event_failure(self):
         return
     
+class ChildProcess(object):
     
+    def __init__(self, procMod, procClass, node=None):
+        self.procModule = procMod
+        self.procClass = procClass
+        self.procNode = node
+        self.procState = 'DEFINED'
+        
+    @defer.inlineCallbacks
+    def spawnChild(self):
+        if self.procNode == None:
+            logging.info('Spawning '+self.procClass+' on local node')
+
+            # Importing service module
+            logging.info('from ' + self.procModule + " import " + self.procClass)
+            localmod = self.procModule.rpartition('.')[2]
+            proc_mod = __import__(self.procModule, globals(), locals(), [localmod,self.procClass])
+            self.procModObj = proc_mod
+        
+            # Spawn instance of a process
+            proc_id = yield spawn(proc_mod)
+            self.procId = proc_id
+            self.procState = 'SPAWNED'
+
+            logging.info("Process "+self.procClass+" ID: "+str(proc_id))
+        else:
+            logging.error('Cannot spawn '+child.procClass+' on node '+str(child.node))
+
+# Direct start of the service as a process with its default name
+receiver = Receiver(__name__)
+instance = Supervisor(receiver)
+
+@defer.inlineCallbacks
+def test_sup():
+    children = [
+        ChildProcess('ion.services.coi.resource_registry','ResourceRegistryService',None),
+        ChildProcess('ion.services.coi.service_registry','ServiceRegistryService',None),
+    ]
+    instance.childProcesses = children
+    sup_id = yield spawn(receiver)
+    
+    instance.spawnChildProcesses()
+    logging.info('Spawning completed')
+
+"""
+from ion.core import supervisor as s
+"""
