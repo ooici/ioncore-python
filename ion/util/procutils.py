@@ -10,19 +10,24 @@ import logging
 from twisted.python import log
 from twisted.internet import defer
 
+from magnet.container import Id
+
 logging.basicConfig(level=logging.DEBUG)
 
-def print_attributes(obj):
+def log_attributes(obj):
     """Print an object's attributes
     """
+    lstr = ""
     for attr, value in obj.__dict__.iteritems():
-        logging.info(str(attr)+": "+str(value))
+        if attr != 'content':
+            lstr = lstr + str(attr) + ": " +str(value) + ", "
+    logging.info(lstr)
 
 def log_message(proc,content,msg):
     """Log an incoming message with all headers
     """
     logging.info("===Message=== @" + str(proc))
-    print_attributes(msg)
+    log_attributes(msg)
     logging.info("-------------")
     logging.info(content)
     logging.info("=============")
@@ -31,7 +36,11 @@ def get_process_id(long_id):
     """Returns the instance part of a long process id 
     """
     parts = str(long_id).rpartition('.')
-    return parts[2]
+    if parts[1] != '':
+        procId = Id(parts[2],parts[0])
+    else:
+        procId = Id(long_id)
+    return procId
    
 def send_message(receiver,src,to,operation,content,headers):
     """Constructs a message with standard headers
@@ -66,16 +75,14 @@ def dispatch_message(content, msg, dispatchIn):
         op = content['op']            
         logging.info('dispatch_message() OP='+op)
 
-        # TODO: Null error check 'cont'
-        cont = content['content']
+        cont = content.get('content','')
 
         # dynamically invoke the operation
-        opdef = getattr(dispatchIn, 'op_' + op)
-        if opdef != None:
-            opdef(cont, content, msg)
-        elif getattr(dispatchIn,'op_noop_catch') == None:
-            logging.error("Receive() failed. Cannot dispatch to catch")
-        else:
+        if hasattr(dispatchIn,'op_' + op):
+            getattr(dispatchIn, 'op_' + op)(cont, content, msg)
+        elif hasattr(dispatchIn,'op_noop_catch'):
             dispatchIn.op_noop_catch(cont, content, msg)
+        else:
+            logging.error("Receive() failed. Cannot dispatch to catch")
     else:
         logging.error("Receive() failed. Bad message", content)

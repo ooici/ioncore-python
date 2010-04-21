@@ -18,12 +18,14 @@ from magnet.store import Store
 
 import ion.util.procutils as pu
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.services.base_svcproc import BaseServiceProcess
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
 
 class CassandraStore():
+    """
+    Store interface for interacting with the Cassandra key/value store
+    """
     def started(self):
         return(hasattr(self, 'kvs'))
 
@@ -92,12 +94,8 @@ class DatastoreService(BaseService):
 
 # Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
-instance = DatastoreService()
+instance = DatastoreService(receiver)
 
-def receive(content, msg):
-    pu.dispatch_message(content, msg, instance)
-
-receiver.handle(receive)
 
 
 def pfh_test():

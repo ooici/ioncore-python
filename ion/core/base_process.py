@@ -24,47 +24,37 @@ logging.debug('Loaded: '+__name__)
 
 class BaseProcess(object):
     """
-    This is the abstract superclass for all processes.
+    This is the base class for all processes. Processes are Spawnables before
+    and after they are spawned.
+    @todo tighter integration with Spawnable
     """
 
-    store = Store()
+    idStore = None
     receiver = None
-    procName = __name__
-    procId = None
     
-    def __init__(self, procName=__name__):
+    def __init__(self, receiver=Receiver(__name__)):
         """Constructor using a given name for the spawnable receiver.
         """
-        logging.debug('BaseProcess.__init__('+procName+')')
-
-        self.procName = procName
-        self.receiver = Receiver(procName)
-        logging.info('Created receiver: '+str(self.receiver)+" for "+procName)
-
-    @defer.inlineCallbacks
-    def plc_start(self):
-        """Performs the start of the process. Creates the actual spawned
-        process.
+        logging.debug('BaseProcess.__init__()')
         
-        @return deferred
-        """
-        logging.info('Process '+self.procName+' plc_start()')
+        self.idStore = Store()
+        self.receiver = receiver
+        receiver.handle(self.receive)
 
-        self.procId = yield spawn(self.receiver)
-        logging.info('Spawned process with id='+str(self.procId))
+    def receive(self, content, msg):
+        logging.info('BaseProcess.receive()')
+        self.dispatch_message(content, msg)
+
+    def dispatch_message(self, content, msg):
+        pu.dispatch_message(content, msg, self)
         
-
     def op_noop_catch(self, content, headers, msg):
         """The method called if operation is not defined
         """
         logging.info('Catch message')
 
-            
-    def receive(self, content, msg):
-        pu.dispatch_message(content, msg, self)
-    
-    def send_message(to,operation,content,headers):
+    def send_message(self, to, operation, content, headers):
         """Send a message via the processes receiver to a
         """
-        src = procId
-        pu.send_message(receiver,src,to,operation,content,headers)
+        src = ""
+        pu.send_message(self.receiver, src, to, operation, content, headers)
