@@ -31,13 +31,9 @@ class HelloService(BaseService):
     @defer.inlineCallbacks
     def op_hello(self, content, headers, msg):
         logging.info('op_hello: '+str(content))
-        
-        replyto = msg.reply_to
-        if replyto != None and replyto != '':
-            # The following line shows how to reply to a message
-            yield self.reply_message(msg, 'reply', {'value':'Hello there, '+str(content)}, {})
-        else:
-            logging.error('op_hello: Cannot send reply. No reply_to given')
+
+        # The following line shows how to reply to a message
+        yield self.reply_message(msg, 'reply', {'value':'Hello there, '+str(content)}, {})
 
 
 class HelloServiceClient(RpcClient):

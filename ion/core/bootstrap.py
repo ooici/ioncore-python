@@ -15,17 +15,17 @@ from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
+from ion.core import ionconst as ic
 from ion.core.supervisor import Supervisor, ChildProcess
 from ion.util.config import Config
 import ion.util.procutils as pu
 
-logging.basicConfig(level=logging.DEBUG)
 
 # Static definition of message queues
 ion_queues = {}
 
 # Static definition of service names
-ion_services = Config('res/config/ionservices.cfg').getObject()
+ion_services = Config(ic.SVC_LIST_ALL).getObject()
 
 # Local process ids
 process_ids = Store()
