@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/test/test_datastore.py
-@author Michael Meisinger
-@test Protocol+factory test of datastore
+@file ion/data/test/test_datastore.py
+@author Paul Hubbard
+@test Service only test of Cassandra datastore
 """
 
 
@@ -11,7 +11,7 @@ from twisted.trial import unittest
 import logging
 from uuid import uuid4
 
-from ion.services.coi.datastore import DatastoreService, CassandraStore
+from ion.data.cassandrads import CassandraStore
 
 class DatastoreTest(unittest.TestCase):
     def setUp(self):

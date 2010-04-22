@@ -17,6 +17,7 @@ from magnet.store import Store
 
 import pycassa
 
+
 class CassandraStore():
     """
     Store interface for interacting with the Cassandra key/value store
@@ -51,18 +52,23 @@ class CassandraStore():
             logging.error('Not connected!')
             return None
         logging.info('writing key %s value %s' % (key, value))
-        self.kvs.insert(key, {'value' : str(value)})
+        self.kvs.insert(key, {'value' : value})
+        logging.info('write complete')
 
     def query(self, regex):
-        logging.error('Missing code')
-        return None
+        matched_list = []
+        try:
+            klist = self.kvs.get_range()
+            for x in klist:
+                if re.search(regex, x[0]):
+                    matched_list.append(x)
+            return(matched_list)
+        except:
+            logging.error('Unable to find any keys')
+            return None
 
     def delete(self, key):
-        logging.error('Missing code')
-        return None
-
-
-def pfh_test():
-    start()
-    receive({'op':'put','content':{'key':'key1','value':'val1'}}, None)
-    receive({'op':'get','content':{'key':'key1'}}, None)
+        try:
+            self.kvs.remove(key)
+        except:
+            logging.warn('Error removing key')
