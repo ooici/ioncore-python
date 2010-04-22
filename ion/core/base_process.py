@@ -17,10 +17,14 @@ from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
+from ion.core import ionconst as ic
 import ion.util.procutils as pu
 
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
+CONF = ic.config(__name__)
+CF_conversation_log = CONF['conversation_log']
+
+# Static store (kvs) to register process instances with names
+procRegistry = Store()
 
 class BaseProcess(object):
     """
@@ -87,6 +91,7 @@ class BaseProcess(object):
         msgheaders.update(headers)
         msgheaders['conv-id'] = convid
         pu.send_message(self.receiver, send, recv, operation, content, msgheaders)
+        self.log_conv_message()
 
     def reply_message(self, msg, operation, content, headers):
         ionMsg = msg.payload
@@ -97,7 +102,12 @@ class BaseProcess(object):
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
             self.send_message(pu.get_process_id(recv), operation, content, headers)
+            self.log_conv_message()
 
+    def log_conv_message(self):
+        if CF_conversation_log:
+            send = self.receiver.spawned.id.full
+            pu.send_message(self.receiver, send, '', 'logmsg', {}, {})
 
 class RpcClient(object):
     """Service client providing a RPC methaphor

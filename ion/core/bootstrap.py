@@ -17,18 +17,20 @@ from magnet.store import Store
 
 from ion.core import ionconst as ic
 from ion.core.supervisor import Supervisor, ChildProcess
+from ion.core.base_process import procRegistry
 from ion.util.config import Config
 import ion.util.procutils as pu
 
+CONF = ic.config(__name__)
 
 # Static definition of message queues
 ion_queues = {}
 
 # Static definition of service names
-ion_services = Config(ic.SVC_LIST_ALL).getObject()
+ion_services = Config(CONF.getValue('services_cfg')).getObject()
 
 # Local process ids
-process_ids = Store()
+process_ids = procRegistry
 
 @defer.inlineCallbacks
 def start():

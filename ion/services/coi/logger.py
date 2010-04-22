@@ -13,30 +13,16 @@ from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import RpcClient
-from ion.core.base_process import RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
 
-CONF_FILENAME = 'res/ionlogging.conf'
-logging.config.fileConfig(CONF_FILENAME)
-logserv = logging.getLogger('logServer')
-
-logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
-
-#LOG_FILENAME = 'ionsystem.log'
-#handler = logging.FileHandler(LOG_FILENAME)
-#handler.setLevel(logging.DEBUG)
-#formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-#handler.setFormatter(formatter)
-#logserv.addHandler(handler)
-#logserv.info("============================================================================")
-#logserv.info("============================================================================")
+logserv = logging.getLogger('logServer')
 
 class LoggerService(BaseService):
     """Logger service interface
     """
     
-    def slc_init():
+    def slc_init(self):
         pass
     
     def op_config(self, content, headers, msg):

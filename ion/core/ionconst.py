@@ -8,8 +8,13 @@
 import logging
 import logging.config
 
+from ion.util.config import Config
+
 LOGCONF_FILENAME = 'res/ionlogging.conf'
 logging.config.fileConfig(LOGCONF_FILENAME)
 
+ION_CONF_FILENAME = 'res/ion.config'
+ion_config = Config(ION_CONF_FILENAME)
 
-SVC_LIST_ALL = 'res/config/ionservices.cfg'
+def config(name):
+    return Config(name, ion_config)
