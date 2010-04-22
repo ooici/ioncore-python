@@ -20,12 +20,15 @@ import ion.util.procutils as pu
 # Store for locally know process ids (names)
 store = Store()
 
-# Store 
+# Store
 datastore = Store()
 
 receiver = Receiver(__name__)
 
 class Store:
+    """
+    @see http://github.com/vomjom/pycassa
+    """
     def started(self):
         return(hasattr(self, 'kvs'))
 
