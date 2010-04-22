@@ -3,28 +3,25 @@
 """
 @file ion/services/cei/provisioner.py
 @author Michael Meisinger
-@package ion.services.cei service for provisioning operational units (VM instances).
+@brief service for provisioning new VM instances
 """
 
-from twisted.python import log
+import logging
 from twisted.internet import defer
-
 from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
-from magnet.store import Store
 
-store = Store()
+import ion.util.procutils as pu
+from ion.core.base_process import RpcClient
+from ion.services.base_service import BaseService, BaseServiceClient
 
+logging.basicConfig(level=logging.DEBUG)
+logging.debug('Loaded: '+__name__)
+
+class ProvisionerService(BaseService):
+    """Provisioner service interface
+    """
+
+
+# Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
-
-@defer.inlineCallbacks
-def start():
-    id = yield spawn(receiver)
-    store.put('provisioner', id)
-
-
-def receive(content, msg):
-    print 'in receive ', content, msg
-
-receiver.handle(receive)
+instance = ProvisionerService(receiver)

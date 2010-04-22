@@ -3,31 +3,27 @@
 """
 @file ion/services/coi/resource_registry.py
 @author Michael Meisinger
-@package ion.services.coi service for registering resources
+@brief service for registering resources
 """
 
-from twisted.python import log
+import logging
 from twisted.internet import defer
-
 from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
-from magnet.store import Store
 
 import ion.util.procutils as pu
+from ion.core.base_process import RpcClient
+from ion.services.base_service import BaseService, BaseServiceClient
 
-store = Store()
+logging.basicConfig(level=logging.DEBUG)
+logging.debug('Loaded: '+__name__)
 
+class ResourceRegistryService(BaseService):
+    """Resource registry service interface
+    """
+
+
+# Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
-
-@defer.inlineCallbacks
-def start():
-    id = yield spawn(receiver)
-    store.put('resource_registry', id)
+instance = ResourceRegistryService(receiver)
 
 
-def receive(content, msg):
-    pu.log_message(__name__, content, msg)
-
-      
-receiver.handle(receive)

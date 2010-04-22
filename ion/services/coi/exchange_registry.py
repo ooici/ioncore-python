@@ -3,30 +3,24 @@
 """
 @file ion/services/coi/exchange_registry.py
 @author Michael Meisinger
-@package ion.services.coi service for registering names in exchange spaces and membership
+@brief service for registering exchange names
 """
 
-from twisted.python import log
+import logging
 from twisted.internet import defer
-
 from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
-from magnet.store import Store
 
-store = Store()
+import ion.util.procutils as pu
+from ion.core.base_process import RpcClient
+from ion.services.base_service import BaseService, BaseServiceClient
 
-datastore = Store()
+logging.basicConfig(level=logging.DEBUG)
+logging.debug('Loaded: '+__name__)
 
+class ExchangeRegistryService(BaseService):
+    """Exchange registry service interface
+    """
+    
+# Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
-
-@defer.inlineCallbacks
-def start():
-    id = yield spawn(receiver)
-    store.put('exchange_registry', id)
-
-
-def receive(content, msg):
-    print 'in receive ', content, msg
-
-receiver.handle(receive)
+instance = ExchangeRegistryService(receiver)

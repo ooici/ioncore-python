@@ -3,30 +3,33 @@
 """
 @file ion/services/coi/service_registry.py
 @author Michael Meisinger
-@package ion.services.coi service for registering service (types and instances).
+@brief service for registering service (types and instances).
 """
 
-from twisted.python import log
+import logging
 from twisted.internet import defer
-
 from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
-from magnet.store import Store
 
 import ion.util.procutils as pu
+from ion.core.base_process import RpcClient
+from ion.services.base_service import BaseService, BaseServiceClient
 
-store = Store()
+class ServiceRegistryService(BaseService):
+    """Service registry service interface
+    """
 
+    def op_register_service(self, content, headers, msg):
+        pass
+
+    def op_get_service_spec(self, content, headers, msg):
+        pass
+
+    def op_register_instance(self, content, headers, msg):
+        pass
+
+    def op_get_instance(self, content, headers, msg):
+        pass
+    
+# Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
-
-@defer.inlineCallbacks
-def start():
-    id = yield spawn(receiver)
-    store.put('service_registry', id)
-
-
-def receive(content, msg):
-    pu.log_message(__name__, content, msg)
-
-receiver.handle(receive)
+instance = ServiceRegistryService(receiver)
