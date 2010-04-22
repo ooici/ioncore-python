@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/cei/provisioner.py
-@author Michael Meisinger
+@file ion/services/cei/dtrs.py
 @author Alex Clemesha
-@brief Starts, stops, and tracks instance and context state.
+@brief Deployable Type Registry Service. Used to look up Deployable type data/metadata.
 """
 
 import logging
@@ -14,11 +13,12 @@ from ion.services.base_service import BaseService
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
 
-class ProvisionerService(BaseService):
-    """Provisioner service interface
+class DeployableTypeRegistryService(BaseService):
+    """Deployable Type Registry service interface
     """
     pass
 
+
 # Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
-instance = ProvisionerService(receiver)
+instance = DeployableTypeRegistryService(receiver)
