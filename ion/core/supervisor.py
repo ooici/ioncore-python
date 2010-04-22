@@ -12,7 +12,7 @@ from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
 import ion.util.procutils as pu
-from ion.core.base_process import BaseProcess
+from ion.core.base_process import BaseProcess, RpcClient
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
@@ -29,41 +29,43 @@ class Supervisor(BaseProcess):
     def spawnChildProcesses(self):
         logging.info("Spawning child processes")
         for child in self.childProcesses:
-            yield child.spawnChild()
+            yield child.spawnChild(self)
 
     @defer.inlineCallbacks
     def initChildProcesses(self):
         logging.info("Sending init message to all processes")
+                
         for child in self.childProcesses:
-            to = child.procId
-            print "Send to: ",to
-            yield self.send_message(to, 'init', self._prepInitMsg(child), {})
+            yield child.initChild()
             
     def event_failure(self):
         return
-    
-    def _prepInitMsg(self, child):
-        return {'proc-name':child.procName, 'sup-id':self.receiver.spawned.id.full}
+
     
 class ChildProcess(object):
     """
     Class that encapsulates attributes about a child process
     """
-    def __init__(self, procMod, procClass, node=None):
+    def __init__(self, procMod, procClass=None, node=None):
         self.procModule = procMod
         self.procClass = procClass
         self.procNode = node
         self.procState = 'DEFINED'
         
     @defer.inlineCallbacks
-    def spawnChild(self):
+    def spawnChild(self, supProc=None):
+        self.supProcess = supProc
         if self.procNode == None:
             logging.info('Spawning '+self.procClass+' on node: local')
 
             # Importing service module
             logging.info('from ' + self.procModule + " import " + self.procClass)
             localmod = self.procModule.rpartition('.')[2]
-            proc_mod = __import__(self.procModule, globals(), locals(), [localmod,self.procClass])
+            imports = []
+            imports.append(localmod)
+            if self.procClass != None:
+                imports.append(self.procClass)
+            proc_mod = __import__(self.procModule, globals(), locals(), imports)
             self.procModObj = proc_mod
         
             # Spawn instance of a process
@@ -74,7 +76,18 @@ class ChildProcess(object):
             logging.info("Process "+self.procClass+" ID: "+str(proc_id))
         else:
             logging.error('Cannot spawn '+child.procClass+' on node '+str(child.node))
+    
+    @defer.inlineCallbacks
+    def initChild(self):
+        to = self.procId
+        logging.info("Send init: " + str(to))
+        self.rpc = RpcClient()
+        yield self.rpc.attach()
 
+        res = yield self.rpc.rpc_send(to, 'init', self._prepInitMsg(), {})
+    
+    def _prepInitMsg(self):
+        return {'proc-name':self.procName, 'sup-id':self.supProcess.receiver.spawned.id.full}
 
 # Direct start of the service as a process with its default name
 receiver = Receiver(__name__)

@@ -35,11 +35,34 @@ class BaseProcess(object):
         """Constructor using a given name for the spawnable receiver.
         """
         logging.debug('BaseProcess.__init__()')
+        self.procState = "UNINITIALIZED"
         
         self.procName = __name__
         self.idStore = Store()
         self.receiver = receiver
         receiver.handle(self.receive)
+
+    def op_init(self, content, headers, msg):
+        """Init operation, on receive of the init message
+        """
+        logging.info('BaseProcess.op_init: '+str(content))
+        if self.procState == "UNINITIALIZED":
+            self.procName = content.get('proc-name', __name__)
+            supId = content.get('sup-id', None)
+            self.procSupId = pu.get_process_id(supId)
+            logging.info('BaseProcess.op_init: proc-name='+self.procName+', sup-id='+supId)
+
+            self.plc_init()
+            logging.info('===== Process '+self.procName+' INITIALIZED ============')
+            
+            self.reply_message(msg, 'inform_init', {'status':'OK'}, {})
+
+            self.procState = "INITIALIZED"
+
+    def plc_init(self):
+        """Process life cycle event: on initialization of process (once)
+        """
+        logging.info('BaseProcess.plc_init()')
 
     def receive(self, content, msg):
         logging.info('BaseProcess.receive()')
@@ -74,3 +97,30 @@ class BaseProcess(object):
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
             self.send_message(pu.get_process_id(recv), operation, content, headers)
+
+
+class RpcClient(object):
+    """Service client providing a RPC methaphor
+    """
+    
+    def __init__(self):
+        self.clientRecv = Receiver(__name__)
+        self.clientRecv.handle(self.receive)
+        self.deferred = None
+    
+    @defer.inlineCallbacks
+    def attach(self):
+        self.id = yield spawn(self.clientRecv)
+
+    def rpc_send(self, to, op, cont='', headers={}):
+        """
+        @return a deferred with the message value
+        """
+        pu.send_message(self.clientRecv, self.id, to, op, cont, headers)
+        self.deferred = defer.Deferred()
+        return self.deferred
+
+    def receive(self, content, msg):
+        pu.log_message(__name__, content, msg)
+        logging.info('RpcClient.receive(), calling callback in defer')
+        self.deferred.callback(content)

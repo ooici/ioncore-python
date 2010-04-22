@@ -11,7 +11,9 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.services.base_service import BaseService, BaseServiceClient, RpcClient
+from ion.core.base_process import RpcClient
+from ion.core.base_process import RpcClient
+from ion.services.base_service import BaseService, BaseServiceClient
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)

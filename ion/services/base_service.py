@@ -33,31 +33,14 @@ class BaseService(BaseProcess):
         """Constructor using a given name for the spawnable receiver.
         """
         BaseProcess.__init__(self, receiver)
-        self.svcState = "UNINITIALIZED"
      
-    def op_init(self, content, headers, msg):
-        """Init operation, on receive of the init message
-        """
-        logging.info('BaseService.op_init: '+str(content))
-        if self.svcState == "UNINITIALIZED":
-            self.procName = content.get('proc-name', __name__)
-            supId = content.get('sup-id', None)
-            self.procSupId = pu.get_process_id(supId)
-            logging.info('BaseService.op_init: proc-name='+self.procName+', sup-id='+supId)
+    def plc_init(self):
+        self.slc_init()
 
-            self.slc_init()
-            logging.info('===== Service '+self.procName+' INITIALIZED ============')
-            
-            # @todo send reply
-            #self.reply_message(msg,'','','')
-
-            self.svcState = "INITIALIZED"
-        
     def slc_init(self):
         """Service life cycle event: on initialization of process (once)
         """
         logging.info('BaseService.slc_init()')
-        pass
 
     @classmethod
     def _add_messages(cls):
@@ -71,31 +54,6 @@ class BaseServiceClient(object):
     """This is the abstract base class for service client libraries.
     """
 
-class RpcClient(BaseServiceClient):
-    """Service client providing a RPC methaphor
-    """
-    
-    def __init__(self):
-        self.clientRecv = Receiver(__name__)
-        self.clientRecv.handle(self.receive)
-        self.deferred = None
-    
-    @defer.inlineCallbacks
-    def spawnClient(self):
-        self.id = yield spawn(self.clientRecv)
-
-    def rpc_send(self, to, op, cont='', headers={}):
-        """
-        @return a deferred with the message value
-        """
-        pu.send_message(self.clientRecv, self.id, to, op, cont, headers)
-        self.deferred = defer.Deferred()
-        return self.deferred
-
-    def receive(self, content, msg):
-        log_message(__name__, content, msg)
-        logging.info('RpcClient.receive(), calling callback in defer')
-        self.deferred.callback(content)
 
 class BaseServiceImplementation(object):
     """This is the abstract base class for all service provider implementations
