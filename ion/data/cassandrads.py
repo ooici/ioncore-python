@@ -21,6 +21,7 @@ import pycassa
 class CassandraStore():
     """
     Store interface for interacting with the Cassandra key/value store
+    @see http://github.com/vomjom/pycassa
     """
     def started(self):
         return(hasattr(self, 'kvs'))
