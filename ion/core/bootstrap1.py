@@ -13,6 +13,7 @@ import time
 from magnet.spawnable import Receiver
 from magnet.spawnable import send
 from magnet.spawnable import spawn
+from magnet.container import Container
 from magnet.store import Store
 
 from ion.core import ionconst as ic
@@ -24,34 +25,48 @@ import ion.util.procutils as pu
 CONF = ic.config(__name__)
 
 # Static definition of message queues
-ion_queues = {}
+ion_messaging = Config(CONF.getValue('messaging_cfg')).getObject()
 
 # Static definition of service names
 ion_services = Config(CONF.getValue('services_cfg')).getObject()
 
 # Local process ids
 process_ids = procRegistry
+# TODO: create nameRegsitry in Cassandra
+nameRegistry = Store()
+
 
 @defer.inlineCallbacks
 def start():
     """Main function of bootstrap. Starts system with static config
     """
-    yield _bootstrap(ion_queues,ion_services)
+    yield _bootstrap(ion_messaging,ion_services)
 
 @defer.inlineCallbacks
 def _bootstrap(queues, procs):
     """Bootstraps the system from a configuration 
     """
     logging.info("ION SYSTEM bootstrapping now...")
+    yield bs_messaging(queues)
     yield bs_processes(procs)
-
+    
+@defer.inlineCallbacks
+def bs_messaging(messagingCfg):
+    """Bootstraps the messaging resources 
+    """
+    # for each messaging resource call Magnet to define a resource
+    for name, msgResource in messagingCfg.__dict__.iteritems():
+        # wait until this is completed
+        yield Container.configure_messaging(name, msgResource)
+        # save name is the name registry
+        yield nameRegistry.put(name, msgResource)
+        
 @defer.inlineCallbacks
 def bs_processes(procs):
     """Bootstraps a set of processes 
     """
     sup = bs_prepSupervisor(procs)
 
-    # Makes the boostrap a process
     logging.info("Spawning bootstrap supervisor")
     supId = yield spawn(sup.receiver)
     yield process_ids.put("bootstrap", supId)
