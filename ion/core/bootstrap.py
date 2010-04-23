@@ -51,6 +51,7 @@ def bs_processes(procs):
     """
     sup = bs_prepSupervisor(procs)
 
+    # Makes the boostrap a process
     logging.info("Spawning bootstrap supervisor")
     supId = yield spawn(sup.receiver)
     yield process_ids.put("bootstrap", supId)
