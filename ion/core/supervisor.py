@@ -11,6 +11,7 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
+from ion.core import ionconst as ic
 import ion.util.procutils as pu
 from ion.core.base_process import BaseProcess, RpcClient
 

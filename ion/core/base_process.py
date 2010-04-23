@@ -9,9 +9,7 @@
 
 import logging
 
-from twisted.python import log
 from twisted.internet import defer
-
 from magnet.spawnable import Receiver
 from magnet.spawnable import send
 from magnet.spawnable import spawn
@@ -98,7 +96,7 @@ class BaseProcess(object):
         send = self.receiver.spawned.id.full
         recv = ionMsg.get('reply-to', None)
         if recv == None:
-            log.error('No reply-to given for message '+str(msg))
+            logging.error('No reply-to given for message '+str(msg))
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
             self.send_message(pu.get_process_id(recv), operation, content, headers)
@@ -107,7 +105,7 @@ class BaseProcess(object):
     def log_conv_message(self):
         if CF_conversation_log:
             send = self.receiver.spawned.id.full
-            pu.send_message(self.receiver, send, '', 'logmsg', {}, {})
+            #pu.send_message(self.receiver, send, '', 'logmsg', {}, {})
 
 class RpcClient(object):
     """Service client providing a RPC methaphor

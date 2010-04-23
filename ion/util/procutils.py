@@ -9,10 +9,9 @@
 import logging
 from twisted.python import log
 from twisted.internet import defer
-
 from magnet.container import Id
 
-logging.basicConfig(level=logging.DEBUG)
+from ion.core import ionconst as ic
 
 def log_attributes(obj):
     """Print an object's attributes
@@ -90,10 +89,11 @@ def dispatch_message(content, msg, dispatchIn):
         logging.info('dispatch_message() OP='+op)
 
         cont = content.get('content','')
+        opname = 'op_' + str(op)
 
         # dynamically invoke the operation
-        if hasattr(dispatchIn,'op_' + op):
-            getattr(dispatchIn, 'op_' + op)(cont, content, msg)
+        if hasattr(dispatchIn, opname):
+            getattr(dispatchIn, opname)(cont, content, msg)
         elif hasattr(dispatchIn,'op_noop_catch'):
             dispatchIn.op_noop_catch(cont, content, msg)
         else:

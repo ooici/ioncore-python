@@ -10,6 +10,7 @@ import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
+from ion.core import ionconst as ic
 import ion.util.procutils as pu
 from ion.core.base_process import RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
