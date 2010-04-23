@@ -17,7 +17,8 @@ class DatastoreTest(unittest.TestCase):
     def setUp(self):
         logging.basicConfig(level=logging.DEBUG, \
                 format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
-        self.ds = CassandraStore()
+        clist = ['amoeba.ucsd.edu:9160']
+        self.ds = CassandraStore(cass_host_list=clist)
         self.ds.start()
 
     def tearDown(self):
@@ -34,7 +35,6 @@ class DatastoreTest(unittest.TestCase):
         self.ds.put(self._mkey(), self._mkey())
 
     def test_putget(self):
-        raise unittest.SkipTest('Waiting for write to work')
         key = self._mkey()
         value = 'val1'
         self.ds.put(key, value)

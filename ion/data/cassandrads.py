@@ -23,16 +23,18 @@ class CassandraStore():
     Store interface for interacting with the Cassandra key/value store
     @see http://github.com/vomjom/pycassa
     """
+    def __init__(self, cass_host_list=None):
+        self.start(cass_host_list)
+
     def started(self):
         return(hasattr(self, 'kvs'))
 
-    def start(self):
+    def start(self, cass_host_list=None):
         if self.started():
             return
 
-        logging.info('Connecting to Cassandra...')
-        cass_list = ['localhost:9160']
-        self.client = pycassa.connect(cass_list)
+        logging.info('Connecting to Cassandra at "%s"...' % str(cass_host_list))
+        self.client = pycassa.connect(cass_host_list)
         self.kvs = pycassa.ColumnFamily(self.client, 'Datasets', 'Catalog')
         logging.info('connected OK.')
 
