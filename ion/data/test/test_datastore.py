@@ -15,42 +15,39 @@ from ion.data.cassandrads import CassandraStore
 
 class DatastoreTest(unittest.TestCase):
     def setUp(self):
-        logging.basicConfig(level=logging.DEBUG, \
+        logging.basicConfig(level=logging.WARN, \
                 format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
         clist = ['amoeba.ucsd.edu:9160']
         self.ds = CassandraStore(cass_host_list=clist)
         self.ds.start()
+        self.key = self._mkey()
+        self.value = self._mkey()
 
     def tearDown(self):
+        self.ds.delete(self.key)
         del self.ds
 
     def _mkey(self):
+        # Generate a pseudo-random string. handy, that.
         return str(uuid4())
 
     def test_get_404(self):
-        rc = self.ds.get(self._mkey())
+        # Make sure we can't read the not-written
+        rc = self.ds.get(self.key)
         self.failUnlessEqual(rc, None)
 
-    def test_write_only(self):
-        self.ds.put(self._mkey(), self._mkey())
+    def test_write_and_delete(self):
+        # Hmm, simplest op, just looking for exceptions
+        self.ds.put(self.key, self.value)
 
-    def test_put_and_get(self):
-        key = self._mkey()
-        value = self._mkey()
-        self.ds.put(key, value)
-        b = self.ds.get(key)
-        self.failUnlessEqual(value, b)
-
-    def test_delete(self):
-        # Deletes take an unknown amount of time, so hard to test!
-        key = self._mkey()
-        value = self._mkey()
-        self.ds.put(key, value)
-        self.ds.delete(key)
+    def test_put_get_delete(self):
+        # Write, then read to verify same
+        self.ds.put(self.key, self.value)
+        b = self.ds.get(self.key)
+        self.failUnlessEqual(self.value, b)
 
     def test_query(self):
-        key = self._mkey()
-        value = self._mkey()
-        self.ds.put(key, value)
-        rl = self.ds.query(key)
-        self.failUnlessEqual(rl[0][0], key)
+        # Write a key, query for it, verify contents
+        self.ds.put(self.key, self.value)
+        rl = self.ds.query(self.key)
+        self.failUnlessEqual(rl[0][0], self.key)
