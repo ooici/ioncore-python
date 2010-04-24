@@ -9,6 +9,7 @@
 import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
+from magnet.spawnable import spawn
 
 import ion.util.procutils as pu
 from ion.core.base_process import RpcClient
@@ -21,8 +22,21 @@ class WorkerProcess(BaseService):
     """Worker process
     """
     
+    def op_hello(self, content, headers, msg):
+        logging.info('op_hello: '+str(content)+' id='+self.receiver.id.full)
+        
+    @defer.inlineCallbacks
+    def startWorker(self):
+        work_id = yield spawn(self.workReceiver)
+
 # Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
-receiver = Receiver(__name__, 'worker1')
+workReceiver = Receiver(__name__, 'worker1')
 
 instance = WorkerProcess(receiver)
+instance.workReceiver = workReceiver
+instance.startWorker()
+
+def factory(name=__name__, args={}):
+    receiver = Receiver(__name__)
+    return receiver

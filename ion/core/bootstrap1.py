@@ -56,10 +56,14 @@ def bs_messaging(messagingCfg):
     """
     # for each messaging resource call Magnet to define a resource
     for name, msgResource in messagingCfg.__dict__.iteritems():
+        scope = msgResource.get('args',{}).get('scope','global')
+        msgName = name
+        if scope == 'local':
+            msgName = Container.id + "." + msgName
         # wait until this is completed
-        yield Container.configure_messaging(name, msgResource)
+        yield Container.configure_messaging(msgName, msgResource)
         # save name is the name registry
-        yield nameRegistry.put(name, msgResource)
+        yield nameRegistry.put(msgName, msgResource)
         
 @defer.inlineCallbacks
 def bs_processes(procs):

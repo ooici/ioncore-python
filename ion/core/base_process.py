@@ -69,6 +69,7 @@ class BaseProcess(object):
     def receive(self, content, msg):
         logging.info('BaseProcess.receive()')
         self.dispatch_message(content, msg)
+        msg.ack()
 
     def dispatch_message(self, content, msg):
         pu.dispatch_message(content, msg, self)
@@ -131,4 +132,5 @@ class RpcClient(object):
     def receive(self, content, msg):
         pu.log_message(__name__, content, msg)
         logging.info('RpcClient.receive(), calling callback in defer')
+        msg.ack()
         self.deferred.callback(content)
