@@ -55,7 +55,7 @@ def bs_messaging(messagingCfg):
     """Bootstraps the messaging resources 
     """
     # for each messaging resource call Magnet to define a resource
-    for name, msgResource in messagingCfg.__dict__.iteritems():
+    for name, msgResource in messagingCfg.iteritems():
         # wait until this is completed
         yield Container.configure_messaging(name, msgResource)
         # save name is the name registry
