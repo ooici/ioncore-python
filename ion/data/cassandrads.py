@@ -8,6 +8,7 @@
 """
 
 import logging
+import re
 from twisted.internet import defer
 
 from magnet.spawnable import Receiver

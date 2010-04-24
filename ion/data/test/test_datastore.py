@@ -34,9 +34,23 @@ class DatastoreTest(unittest.TestCase):
     def test_write_only(self):
         self.ds.put(self._mkey(), self._mkey())
 
-    def test_putget(self):
+    def test_put_and_get(self):
         key = self._mkey()
-        value = 'val1'
+        value = self._mkey()
         self.ds.put(key, value)
         b = self.ds.get(key)
         self.failUnlessEqual(value, b)
+
+    def test_delete(self):
+        # Deletes take an unknown amount of time, so hard to test!
+        key = self._mkey()
+        value = self._mkey()
+        self.ds.put(key, value)
+        self.ds.delete(key)
+
+    def test_query(self):
+        key = self._mkey()
+        value = self._mkey()
+        self.ds.put(key, value)
+        rl = self.ds.query(key)
+        self.failUnlessEqual(rl[0][0], key)
