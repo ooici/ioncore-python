@@ -21,6 +21,12 @@ logging.debug('Loaded: '+__name__)
 class WorkerProcess(BaseService):
     """Worker process
     """
+
+    @defer.inlineCallbacks
+    def slc_init(self):
+        workReceiver = Receiver(__name__, 'worker1')
+        self.workReceiver = workReceiver
+        id = yield spawn(workReceiver)
     
     def op_hello(self, content, headers, msg):
         logging.info('op_hello: '+str(content)+' id='+self.receiver.id.full)
@@ -31,12 +37,4 @@ class WorkerProcess(BaseService):
 
 # Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
-workReceiver = Receiver(__name__, 'worker1')
-
 instance = WorkerProcess(receiver)
-instance.workReceiver = workReceiver
-instance.startWorker()
-
-def factory(name=__name__, args={}):
-    receiver = Receiver(__name__)
-    return receiver

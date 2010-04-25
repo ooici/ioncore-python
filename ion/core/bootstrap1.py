@@ -55,13 +55,18 @@ def bs_messaging(messagingCfg):
     """Bootstraps the messaging resources 
     """
     # for each messaging resource call Magnet to define a resource
-    for name, msgResource in messagingCfg.__dict__.iteritems():
+    for name, msgResource in messagingCfg.iteritems():
         scope = msgResource.get('args',{}).get('scope','global')
         msgName = name
         if scope == 'local':
             msgName = Container.id + "." + msgName
-        # wait until this is completed
+        if scope == 'group':
+            msgName = CONF['container_group'] + "." + msgName
+
+        # declare queues, bindings as needed
+        logging.info("Msg name config: name="+msgName+', '+str(msgResource))
         yield Container.configure_messaging(msgName, msgResource)
+        
         # save name is the name registry
         yield nameRegistry.put(msgName, msgResource)
         
