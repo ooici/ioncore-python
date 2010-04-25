@@ -86,7 +86,7 @@ def dispatch_message(content, msg, dispatchIn):
     
     if "op" in content:
         op = content['op']            
-        logging.info('dispatch_message() OP='+op)
+        logging.info('dispatch_message() OP=' + str(op))
 
         cont = content.get('content','')
         opname = 'op_' + str(op)
