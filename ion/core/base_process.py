@@ -15,10 +15,10 @@ from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
-from ion.core import ionconst as ic
+from ion.core import ioninit
 import ion.util.procutils as pu
 
-CONF = ic.config(__name__)
+CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
 
 # Static store (kvs) to register process instances with names

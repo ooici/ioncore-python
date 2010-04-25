@@ -35,7 +35,7 @@ def test_datastore():
     print "===================================================================="
     print "Testing datastore"
 
-    to = yield bootstrap.store.get('datastore')
+    to = yield bootstrap.process_ids.get('datastore')
     
     print "Send PUT to: ",to
     yield pu.send_message(receiver, '', to, 'put', {'key':'obj1','value':'999'}, {'some':'header'})

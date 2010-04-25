@@ -11,12 +11,8 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
-from ion.core import ionconst as ic
 import ion.util.procutils as pu
 from ion.core.base_process import BaseProcess, RpcClient
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
 
 class Supervisor(BaseProcess):
     """

@@ -6,6 +6,7 @@
 @brief  utility helper functions for processes in capability containers
 """
 
+import sys, traceback, re
 import logging
 from twisted.python import log
 from twisted.internet import defer
@@ -21,18 +22,32 @@ def log_attributes(obj):
         lstr = lstr + str(attr) + ": " +str(value) + ", "
     logging.info(lstr)
 
-def log_message(proc,content,msg):
+def log_message(proc, body, msg):
     """Log an incoming message with all headers
     """
-    logging.info("===Message=== @" + str(proc))
+    #mkeys = sorted(msg.__dict__.keys)
+    mkeys = msg.__dict__.keys().sort()
     lstr = ""
-    for attr, value in msg.__dict__.iteritems():
-        if attr != 'content':
-            lstr = lstr + str(attr) + ": " +str(value) + ", "
+    lstr += "===Message=== RECEIVED @" + str(proc) + "\n"
+    amqpm = str(msg._amqp_message)
+    amqpm = re.sub("body='[^']*'","*BODY*", amqpm)
+    lstr += '---AMQP--- ' + amqpm
+    lstr += "\n---CARROT--- "
+    for attr,value in msg.__dict__.iteritems():
+        if attr == '_amqp_message': pass
+        elif attr == 'body': pass
+        elif attr == '_decoded_cache': pass
+        else:
+            lstr += str(attr) + ": " +str(value) + ", "
+    lstr += "\n---HEADERS--- "
+    mbody = {}
+    mbody.update(body)
+    content = mbody.pop('content')
+    lstr += str(mbody)
+    lstr += "\n---CONTENT---\n"
+    lstr += str(content)
+    lstr += "\n============="
     logging.info(lstr)
-    logging.info("-------------")
-    logging.info(content)
-    logging.info("=============")
 
 def get_process_id(long_id):
     """Returns the instance part of a long process id 
@@ -57,7 +72,7 @@ def send_message(receiver, send, recv, operation, content, headers):
     msg['sender'] = str(send)
     msg['receiver'] = str(recv)
     msg['reply-to'] = str(send)
-    msg['encoding'] = 'ion1'
+    msg['encoding'] = 'json_1'
     msg['language'] = 'ion1'
     msg['format'] = 'raw'
     msg['ontology'] = ''
@@ -81,22 +96,28 @@ def dispatch_message(content, msg, dispatchIn):
         "content": ('arg1', 'arg2')
     }
     """
+    try:
+        log_message(__name__, content, msg)
+        
+        if "op" in content:
+            op = content['op']            
+            logging.info('dispatch_message() OP=' + str(op))
     
-    log_message(__name__, content, msg)
+            cont = content.get('content','')
+            opname = 'op_' + str(op)
     
-    if "op" in content:
-        op = content['op']            
-        logging.info('dispatch_message() OP=' + str(op))
-
-        cont = content.get('content','')
-        opname = 'op_' + str(op)
-
-        # dynamically invoke the operation
-        if hasattr(dispatchIn, opname):
-            getattr(dispatchIn, opname)(cont, content, msg)
-        elif hasattr(dispatchIn,'op_noop_catch'):
-            dispatchIn.op_noop_catch(cont, content, msg)
+            # dynamically invoke the operation
+            if hasattr(dispatchIn, opname):
+                getattr(dispatchIn, opname)(cont, content, msg)
+            elif hasattr(dispatchIn,'op_noop_catch'):
+                dispatchIn.op_noop_catch(cont, content, msg)
+            else:
+                logging.error("Receive() failed. Cannot dispatch to catch")
         else:
-            logging.error("Receive() failed. Cannot dispatch to catch")
-    else:
-        logging.error("Receive() failed. Bad message", content)
+            logging.error("Receive() failed. Bad message", content)
+    except Exception as e:
+        logging.error('Exception while dispatching: '+repr(e))
+        (type, value, trace) = sys.exc_info()
+        traceback.print_tb(trace)
+
+ #       logging.error('Traceback: '+trace.format_exc())

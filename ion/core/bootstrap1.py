@@ -16,13 +16,13 @@ from magnet.spawnable import spawn
 from magnet.container import Container
 from magnet.store import Store
 
-from ion.core import ionconst as ic
+from ion.core import ioninit
 from ion.core.supervisor import Supervisor, ChildProcess
 from ion.core.base_process import procRegistry
 from ion.util.config import Config
 import ion.util.procutils as pu
 
-CONF = ic.config(__name__)
+CONF = ioninit.config(__name__)
 
 # Static definition of message queues
 ion_messaging = Config(CONF.getValue('messaging_cfg')).getObject()

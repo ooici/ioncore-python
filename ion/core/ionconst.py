@@ -3,18 +3,12 @@
 """
 @file ion/core/ionconst.py
 @author Michael Meisinger
-@brief definitions of constants and static code that should be executed in any system run
+@brief definitions of ION packages wide constants
 """
-import logging
-import logging.config
 
-from ion.util.config import Config
+LOGCONF_FILENAME = 'res/logging/ionlogging.conf'
 
-LOGCONF_FILENAME = 'res/ionlogging.conf'
-logging.config.fileConfig(LOGCONF_FILENAME)
+ION_CONF_FILENAME = 'res/config/ion.config'
 
-ION_CONF_FILENAME = 'res/ion.config'
-ion_config = Config(ION_CONF_FILENAME)
-
-def config(name):
-    return Config(name, ion_config)
+# @todo use magnet version system
+VERSION = "ion 0.1.0"

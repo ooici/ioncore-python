@@ -16,21 +16,30 @@ Get it with
 Usage
 =====
 
+(all subsequent steps assume start from lcaarch/ dir)
+
 Start CC ("Magnet" Python Capability Container) shell with:
-Note: it is important to start from the root of the lcaarch/ dir.
 ::
-    cd lcaarch
-    twistd -n magnet -h amoeba.ucsd.edu shell
+    twistd -n magnet -h amoeba.ucsd.edu
 
 Start system by executing within the CC shell:
 ><>
     from ion.core import bootstrap
     bootstrap.start()
 
+Alternatively from shell executing a script:
+::
+    twistd -n magnet -h amoeba.ucsd.edu res/scripts/bootstrap.py
+
 Start a test case by executing within the CC shell:
 ><>
     from ion import ts
     ts.start()
+    
+Run all test cases
+::
+    trial ion
+
 
 Install the dependencies: Magnet (see Magnet's Readme)
 ======================================================

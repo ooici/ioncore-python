@@ -43,10 +43,7 @@ class DatastoreService(BaseService):
 
         value = yield self.datastore.get(key)
         logging.info('Datastore.get('+key+') = '+str(value))
-        replyto = msg.reply_to
-        logging.info('Datastore.get() replyto='+replyto)
-        yield pu.send_message(receiver, '', pu.get_process_id(replyto),
-                              'result', {'value':value}, {})
+        yield self.reply_message(msg, 'result', {'value':value}, {})
 
 
 # Direct start of the service as a process with its default name
