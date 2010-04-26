@@ -9,15 +9,8 @@
 
 import logging
 import re
-from twisted.internet import defer
-
-from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
-from magnet.store import Store
 
 import pycassa
-
 
 class CassandraStore():
     """
@@ -25,24 +18,17 @@ class CassandraStore():
     @see http://github.com/vomjom/pycassa
     """
     def __init__(self, cass_host_list=None):
-        self.start(cass_host_list)
-
-    def started(self):
-        return(hasattr(self, 'kvs'))
-
-    def start(self, cass_host_list=None):
-        if self.started():
-            return
-
+        """
+        @brief Constructor, safe to use no arguments
+        @param cass_host_list List of hostname:ports for cassandra host or cluster
+        @retval Connected object instance
+        """
         logging.info('Connecting to Cassandra at "%s"...' % str(cass_host_list))
         self.client = pycassa.connect(cass_host_list)
         self.kvs = pycassa.ColumnFamily(self.client, 'Datasets', 'Catalog')
         logging.info('connected OK.')
 
     def get(self, key):
-        if not self.started():
-            logging.error('Not connected!')
-            return None
         try:
             val = self.kvs.get(key)
             logging.info('Key "%s":"%s"' % (key, val))
@@ -52,9 +38,6 @@ class CassandraStore():
             return(None)
 
     def put(self, key, value):
-        if not self.started():
-            logging.error('Not connected!')
-            return None
         logging.info('writing key %s value %s' % (key, value))
         self.kvs.insert(key, {'value' : value})
         logging.info('write complete')

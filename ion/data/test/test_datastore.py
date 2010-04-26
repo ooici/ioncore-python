@@ -19,7 +19,6 @@ class DatastoreTest(unittest.TestCase):
                 format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
         clist = ['amoeba.ucsd.edu:9160']
         self.ds = CassandraStore(cass_host_list=clist)
-        self.ds.start()
         self.key = self._mkey()
         self.value = self._mkey()
 
