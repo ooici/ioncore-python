@@ -5,6 +5,7 @@
 @author Michael Meisinger
 @author Paul Hubbard
 @brief client interface for storing and retrieving stateful data objects.
+@note Depends on pycassa being installed and the instance on amoeba being up.
 """
 
 import logging
