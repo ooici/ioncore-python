@@ -50,7 +50,7 @@ def log_message(proc, body, msg):
     logging.info(lstr)
 
 def get_process_id(long_id):
-    """Returns the instance part of a long process id 
+    """Returns the instance part of a long process id
     """
     if long_id == None:
         return None
@@ -60,10 +60,10 @@ def get_process_id(long_id):
     else:
         procId = Id(long_id)
     return procId
-   
+
 def send_message(receiver, send, recv, operation, content, headers):
     """Constructs a standard message with standard headers
-    
+
     @param operation the operation (performative) of the message
     @param headers dict with headers that may override standard headers
     """
@@ -85,7 +85,7 @@ def send_message(receiver, send, recv, operation, content, headers):
     msg['op'] = operation
     msg['content'] = content
     return receiver.send(recv, msg)
-    
+
 def dispatch_message(content, msg, dispatchIn):
     """
     content - content can be anything (list, tuple, dictionary, string, int, etc.)
@@ -98,14 +98,14 @@ def dispatch_message(content, msg, dispatchIn):
     """
     try:
         log_message(__name__, content, msg)
-        
+
         if "op" in content:
-            op = content['op']            
+            op = content['op']
             logging.info('dispatch_message() OP=' + str(op))
-    
+
             cont = content.get('content','')
             opname = 'op_' + str(op)
-    
+
             # dynamically invoke the operation
             if hasattr(dispatchIn, opname):
                 getattr(dispatchIn, opname)(cont, content, msg)
@@ -115,7 +115,7 @@ def dispatch_message(content, msg, dispatchIn):
                 logging.error("Receive() failed. Cannot dispatch to catch")
         else:
             logging.error("Receive() failed. Bad message", content)
-    except Exception as e:
+    except Exception, e:
         logging.error('Exception while dispatching: '+repr(e))
         (type, value, trace) = sys.exc_info()
         traceback.print_tb(trace)
