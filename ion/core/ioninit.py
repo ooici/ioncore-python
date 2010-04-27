@@ -6,7 +6,6 @@
 @brief definitions and code that needs to run for any use of ion
 """
 
-import logging
 import logging.config
 
 from ion.core import ionconst as ic

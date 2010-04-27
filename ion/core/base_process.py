@@ -11,7 +11,7 @@ import logging
 
 from twisted.internet import defer
 from magnet.spawnable import Receiver
-from magnet.spawnable import send
+
 from magnet.spawnable import spawn
 from magnet.store import Store
 
@@ -32,13 +32,13 @@ class BaseProcess(object):
     """
 
     convIdCnt = 0
-    
+
     def __init__(self, receiver=Receiver(__name__)):
         """Constructor using a given name for the spawnable receiver.
         """
         logging.debug('BaseProcess.__init__()')
         self.procState = "UNINITIALIZED"
-        
+
         self.procName = __name__
         self.idStore = Store()
         self.receiver = receiver
@@ -56,7 +56,7 @@ class BaseProcess(object):
 
             self.plc_init()
             logging.info('===== Process '+self.procName+' INITIALIZED ============')
-            
+
             self.reply_message(msg, 'inform_init', {'status':'OK'}, {})
 
             self.procState = "INITIALIZED"
@@ -73,7 +73,7 @@ class BaseProcess(object):
 
     def dispatch_message(self, content, msg):
         pu.dispatch_message(content, msg, self)
-        
+
     def op_noop_catch(self, content, headers, msg):
         """The method called if operation is not defined
         """
@@ -111,12 +111,12 @@ class BaseProcess(object):
 class RpcClient(object):
     """Service client providing a RPC methaphor
     """
-    
+
     def __init__(self):
         self.clientRecv = Receiver(__name__)
         self.clientRecv.handle(self.receive)
         self.deferred = None
-    
+
     @defer.inlineCallbacks
     def attach(self):
         self.id = yield spawn(self.clientRecv)

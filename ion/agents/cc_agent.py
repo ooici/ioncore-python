@@ -7,13 +7,12 @@
 """
 
 import logging
-from twisted.internet import defer
+
 from magnet.spawnable import Receiver
 
 from ion.core.supervisor import Supervisor, ChildProcess
-from ion.core.base_process import RpcClient
-from ion.services.base_service import BaseService, BaseServiceClient
-import ion.util.procutils as pu
+from ion.services.base_service import BaseService
+
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
@@ -21,7 +20,7 @@ logging.debug('Loaded: '+__name__)
 class CCAgent(BaseService):
     """Capability Container agent service interface
     """
-    
+
     def slc_init(self):
         self.supervisor = Supervisor(self.receiver)
 
@@ -29,13 +28,13 @@ class CCAgent(BaseService):
         procMod = content['module']
         child = ChildProcess(procMod)
         pass
-    
+
     def op_getNodeId(self, content, headers, msg):
         pass
-    
+
     def op_advertise(self, content, headers, msg):
         pass
-    
+
     def op_getConfig(self, content, headers, msg):
         pass
 

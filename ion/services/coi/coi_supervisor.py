@@ -20,7 +20,7 @@ class Supervisor:
     # Static definition of services and properties
     dependent_services = {}
 
-    def spawnDependents():
+    def spawnDependents(self):
         for svc_name in dependent_services:
             # logging.info('Adding ' + svc_name)
             print('Adding ' + svc_name)
@@ -42,5 +42,5 @@ class Supervisor:
             print("Send to: ",to)
             receiver.send(to, {'method':'START','args':{}})
 
-    def event_failure():
+    def event_failure(self):
         return
