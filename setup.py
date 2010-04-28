@@ -31,7 +31,7 @@ try:
     from setuptools import setup, find_packages
     setupdict['packages'] = find_packages()
     setupdict['test_suite'] = 'lcaarch.test'
-    setupdict['install_requires'] = ['Twisted']
+    setupdict['install_requires'] = ['Twisted', 'pycassa']
     setupdict['include_package_data'] = True
     setup(**setupdict)
 

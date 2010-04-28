@@ -6,7 +6,6 @@
 @brief service backend for logging. Plays nicely with logging package
 """
 
-import logging
 import logging.config
 from twisted.internet import defer
 from magnet.spawnable import Receiver
@@ -21,19 +20,19 @@ logserv = logging.getLogger('logServer')
 class LoggerService(BaseService):
     """Logger service interface
     """
-    
+
     def slc_init(self):
         pass
-    
+
     def op_config(self, content, headers, msg):
         pass
-    
+
     def op_logmsg(self, content, headers, msg):
         level = content.get('level','info')
         logmsg = content.get('msg','#NO MESSAGE#')
         lfrom = headers.get('sender','')
         ltime = content.get('logtime')
-        
+
         if level=='debug':
             logserv.debug(logmsg)
         elif level=='info':
@@ -46,7 +45,7 @@ class LoggerService(BaseService):
             logserv.critical(logmsg)
         else:
             logging.error('Invalid log level: '+str(level))
-    
+
 # Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
 instance = LoggerService(receiver)

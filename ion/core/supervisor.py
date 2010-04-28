@@ -31,14 +31,14 @@ class Supervisor(BaseProcess):
     @defer.inlineCallbacks
     def initChildProcesses(self):
         logging.info("Sending init message to all processes")
-                
+
         for child in self.childProcesses:
             yield child.initChild()
-            
+
     def event_failure(self):
         return
 
-    
+
 class ChildProcess(object):
     """
     Class that encapsulates attributes about a child process
@@ -48,7 +48,7 @@ class ChildProcess(object):
         self.procClass = procClass
         self.procNode = node
         self.procState = 'DEFINED'
-        
+
     @defer.inlineCallbacks
     def spawnChild(self, supProc=None):
         self.supProcess = supProc
@@ -64,7 +64,7 @@ class ChildProcess(object):
                 imports.append(self.procClass)
             proc_mod = __import__(self.procModule, globals(), locals(), imports)
             self.procModObj = proc_mod
-        
+
             # Spawn instance of a process
             proc_id = yield spawn(proc_mod)
             self.procId = proc_id
@@ -72,8 +72,8 @@ class ChildProcess(object):
 
             logging.info("Process "+self.procClass+" ID: "+str(proc_id))
         else:
-            logging.error('Cannot spawn '+child.procClass+' on node '+str(child.node))
-    
+            logging.error('Cannot spawn '+self.procClass+' on node '+str(self.procNode))
+
     @defer.inlineCallbacks
     def initChild(self):
         to = self.procId
@@ -82,7 +82,7 @@ class ChildProcess(object):
         yield self.rpc.attach()
 
         res = yield self.rpc.rpc_send(to, 'init', self._prepInitMsg(), {})
-    
+
     def _prepInitMsg(self):
         return {'proc-name':self.procName, 'sup-id':self.supProcess.receiver.spawned.id.full}
 
@@ -98,9 +98,9 @@ def test_sup():
     ]
     instance.childProcesses = children
     sup_id = yield spawn(receiver)
-    
+
     yield instance.spawnChildProcesses()
-    
+
     logging.info('Spawning completed')
 
 """
