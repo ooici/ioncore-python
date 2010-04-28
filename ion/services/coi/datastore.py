@@ -17,9 +17,6 @@ from magnet.store import Store
 import ion.util.procutils as pu
 from ion.services.base_service import BaseService, BaseServiceClient
 
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
-
 
 class DatastoreService(BaseService):
     datastore = Store()

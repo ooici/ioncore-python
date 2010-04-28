@@ -121,3 +121,14 @@ def dispatch_message(content, msg, dispatchIn):
         traceback.print_tb(trace)
 
  #       logging.error('Traceback: '+trace.format_exc())
+
+id_seqs = {}
+def create_unique_id(ns):
+    """Creates a unique id for the given name space based on sequence counters.
+    """
+    if ns == None: ns = ':'
+    nss = str(ns)
+    if nss in id_seqs: nsc = int(id_seqs[nss]) +1
+    else: nsc = 1
+    id_seqs.put(nss, nsc)
+    return nss + str(nsc)

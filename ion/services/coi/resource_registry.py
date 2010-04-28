@@ -9,6 +9,7 @@
 import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
+from magnet.store import Store
 
 from ion.core.base_process import RpcClient
 from ion.data.dataobject import DataObject
@@ -18,11 +19,35 @@ import ion.util.procutils as pu
 class ResourceRegistryService(BaseService):
     """Resource registry service interface
     """
-
+    datastore = Store()
+    
+    @defer.inlineCallbacks
+    def op_register_resource(self, content, headers, msg):
+        resdesc = content['res_desc'].copy()
+        logging.info('op_register_resource: '+str(resdesc))
+        resdesc.lifecycle_state = ResourceLCState.RESLCS_NEW
+        resid = pu.create_unique_id('R:')
+        
+        yield self.datastore.put(resid,resdesc)
+        yield self.reply_message(msg, 'result', {'res_id':str(resid)}, {})        
+        
 class ResourceRegistryClient(BaseServiceClient):
     """Class for
     """
     
+    def registerResourceType(self, rt_desc):
+        pass
+
+    @defer.inlineCallbacks
+    def registerResource(self, res_desc):
+        self.rpc = RpcClient()
+        yield self.rpc.attach()
+
+        resid = yield self.rpc.rpc_send(to, 'register_resource', {'res_desc':res_desc}, {})
+        logging.info('Service reply: '+str(resid))
+
+        
+        
 class ResourceTypes(object):
     """Static class with constant definitions. Do not instantiate
     """
@@ -31,7 +56,19 @@ class ResourceTypes(object):
     RESTYPE_UNASSIGNED = 'rt_unassigned'
     
     def __init__(self):
-        raise RuntimeException('Do not instantiate '+__name__)
+        raise RuntimeException('Do not instantiate '+self.__class__.__name__)
+
+class ResourceLCState(object):
+    """Static class with constant definitions. Do not instantiate
+    """
+    RESLCS_NEW = 'rlcs_new'
+    RESLCS_ACTIVE = 'rlcs_active'
+    RESLCS_INACTIVE = 'rlcs_inactive'
+    RESLCS_DECOMM = 'rlcs_decomm'
+    RESLCS_RETIRED = 'rlcs_retired'
+    
+    def __init__(self):
+        raise RuntimeException('Do not instantiate '+self.__class__.__name__)
 
 class ResourceDesc(DataObject):
     """Structured object for a resource description.
@@ -91,4 +128,9 @@ class ResourceTypeDesc(DataObject):
 receiver = Receiver(__name__)
 instance = ResourceRegistryService(receiver)
 
+"""
+from ion.services.coi.resource_registry import *
+rd2 = ResourceDesc(name='res2',res_type=ResourceTypes.RESTYPE_GENERIC)
+c = ResourceRegistryClient()
 
+"""
