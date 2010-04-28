@@ -9,14 +9,24 @@
 class Config(object):
     """Helper class managing config files
     """
-    
-    filename = None
-    obj = None
-    
-    def __init__(self, cfgFile):
+
+    def __init__(self, cfgFile, config=None):
+        """Creates a new Config for retrieving configuration
+        @param cfgFile filename or key within Config
+        @param config if present, a Config instance for which the value given
+            by cfgFile will be extracted
+        """
         self.filename = cfgFile
-        filecontent = open(cfgFile,).read()
-        self.obj = eval(filecontent)
+        if config != None:
+            # Get a value out of existing Config
+            self.obj = config.getValue(cfgFile,{})
+        else:
+            # Load config from filename
+            filecontent = open(cfgFile,).read()
+            self.obj = eval(filecontent)
+
+    def __getitem__(self, key):
+        return self.obj[key]
 
     def getObject(self):
         return self.obj

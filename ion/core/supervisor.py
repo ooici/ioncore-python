@@ -12,10 +12,7 @@ from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
 import ion.util.procutils as pu
-from ion.core.base_process import BaseProcess
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
+from ion.core.base_process import BaseProcess, RpcClient
 
 class Supervisor(BaseProcess):
     """
@@ -25,32 +22,49 @@ class Supervisor(BaseProcess):
     # Static definition of child processes
     childProcesses = []
 
+    @defer.inlineCallbacks
     def spawnChildProcesses(self):
+        logging.info("Spawning child processes")
         for child in self.childProcesses:
-            child.spawnChild()
+            yield child.spawnChild(self)
+
+    @defer.inlineCallbacks
+    def initChildProcesses(self):
+        logging.info("Sending init message to all processes")
+
+        for child in self.childProcesses:
+            yield child.initChild()
 
     def event_failure(self):
         return
-    
+
+
 class ChildProcess(object):
-    
-    def __init__(self, procMod, procClass, node=None):
+    """
+    Class that encapsulates attributes about a child process
+    """
+    def __init__(self, procMod, procClass=None, node=None):
         self.procModule = procMod
         self.procClass = procClass
         self.procNode = node
         self.procState = 'DEFINED'
-        
+
     @defer.inlineCallbacks
-    def spawnChild(self):
+    def spawnChild(self, supProc=None):
+        self.supProcess = supProc
         if self.procNode == None:
-            logging.info('Spawning '+self.procClass+' on local node')
+            logging.info('Spawning '+self.procClass+' on node: local')
 
             # Importing service module
             logging.info('from ' + self.procModule + " import " + self.procClass)
             localmod = self.procModule.rpartition('.')[2]
-            proc_mod = __import__(self.procModule, globals(), locals(), [localmod,self.procClass])
+            imports = []
+            imports.append(localmod)
+            if self.procClass != None:
+                imports.append(self.procClass)
+            proc_mod = __import__(self.procModule, globals(), locals(), imports)
             self.procModObj = proc_mod
-        
+
             # Spawn instance of a process
             proc_id = yield spawn(proc_mod)
             self.procId = proc_id
@@ -58,7 +72,19 @@ class ChildProcess(object):
 
             logging.info("Process "+self.procClass+" ID: "+str(proc_id))
         else:
-            logging.error('Cannot spawn '+child.procClass+' on node '+str(child.node))
+            logging.error('Cannot spawn '+self.procClass+' on node '+str(self.procNode))
+
+    @defer.inlineCallbacks
+    def initChild(self):
+        to = self.procId
+        logging.info("Send init: " + str(to))
+        self.rpc = RpcClient()
+        yield self.rpc.attach()
+
+        res = yield self.rpc.rpc_send(to, 'init', self._prepInitMsg(), {})
+
+    def _prepInitMsg(self):
+        return {'proc-name':self.procName, 'sup-id':self.supProcess.receiver.spawned.id.full}
 
 # Direct start of the service as a process with its default name
 receiver = Receiver(__name__)
@@ -72,10 +98,12 @@ def test_sup():
     ]
     instance.childProcesses = children
     sup_id = yield spawn(receiver)
-    
-    instance.spawnChildProcesses()
+
+    yield instance.spawnChildProcesses()
+
     logging.info('Spawning completed')
 
 """
 from ion.core import supervisor as s
+s.test_sup()
 """

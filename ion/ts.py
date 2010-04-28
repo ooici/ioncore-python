@@ -6,11 +6,11 @@
 @package ion  test service with short packet and module name
 """
 
-from twisted.python import log
+
 from twisted.internet import defer
 
 from magnet.spawnable import Receiver
-from magnet.spawnable import send
+
 from magnet.spawnable import spawn
 from magnet.store import Store
 
@@ -25,7 +25,7 @@ receiver = Receiver(__name__)
 def start():
     id = yield spawn(receiver)
     yield store.put('ts', id)
-    
+
     yield bootstrap.start()
     yield test_datastore()
 
@@ -35,8 +35,8 @@ def test_datastore():
     print "===================================================================="
     print "Testing datastore"
 
-    to = yield bootstrap.store.get('datastore')
-    
+    to = yield bootstrap.process_ids.get('datastore')
+
     print "Send PUT to: ",to
     yield pu.send_message(receiver, '', to, 'put', {'key':'obj1','value':'999'}, {'some':'header'})
 
@@ -46,5 +46,9 @@ def test_datastore():
 
 def receive(content, msg):
     print 'in receive ', content, msg
-      
+
 receiver.handle(receive)
+
+# Called as 
+if __name__ == '__main__':
+    pass

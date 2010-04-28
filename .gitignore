@@ -3,3 +3,6 @@
 *.swp
 *.*.swp
 .*.*.swo
+*.log
+twistd.pid
+_trial_temp
