@@ -104,8 +104,9 @@ class BaseProcess(object):
             self.log_conv_message()
 
     def log_conv_message(self):
-        if CF_conversation_log:
-            send = self.receiver.spawned.id.full
+        pass
+        #if CF_conversation_log:
+        #    send = self.receiver.spawned.id.full
             #pu.send_message(self.receiver, send, '', 'logmsg', {}, {})
 
 class RpcClient(object):

@@ -47,3 +47,34 @@ class ResourceRegistryClientTest(unittest.TestCase):
         self.assertEqual(rtd3.name,'new')
         self.assertEqual(rtd3.based_on,ResourceTypes.RESTYPE_GENERIC)
         self.assertEqual(rtd3.res_type,ResourceTypes.RESTYPE_UNASSIGNED)
+        
+class ResourceRegistryTest(IonTestCase):
+    """Testing service classes of resource registry
+    """
+
+    def setUp(self):
+        IonTestCase.setUp(self)
+
+    def tearDown(self):
+        IonTestCase.tearDown(self)
+   
+    @defer.inlineCallbacks
+    def test_serviceReg(self):
+        yield self._startMagnet()
+        yield self._startCoreServices()
+        
+        rd2 = ResourceDesc(name='res2',res_type=ResourceTypes.RESTYPE_GENERIC)
+        c = ResourceRegistryClient()
+        rid = yield c.registerResource(rd2)
+        logging.info('Resource registered with id '+str(rid))
+
+        rd3 = yield c.getResourceDesc(rid)
+        logging.info('Resource desc '+str(rd3))
+        self.assertEqual(rd3.res_name,'res2')
+
+        rd4 = yield c.getResourceDesc('NONE')
+        self.assertFalse(rd4,'resource desc not None')
+        
+        yield self._stopMagnet()
+       
+        

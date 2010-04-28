@@ -11,6 +11,7 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.store import Store
 
+from ion.core.base_process import procRegistry
 from ion.core.base_process import RpcClient
 from ion.data.dataobject import DataObject
 from ion.services.base_service import BaseService, BaseServiceClient
@@ -23,13 +24,24 @@ class ResourceRegistryService(BaseService):
     
     @defer.inlineCallbacks
     def op_register_resource(self, content, headers, msg):
+        """Service operation: Register a resource instance with the registry.
+        """
         resdesc = content['res_desc'].copy()
         logging.info('op_register_resource: '+str(resdesc))
-        resdesc.lifecycle_state = ResourceLCState.RESLCS_NEW
+        resdesc['lifecycle_state'] = ResourceLCState.RESLCS_NEW
         resid = pu.create_unique_id('R:')
-        
-        yield self.datastore.put(resid,resdesc)
+        yield self.datastore.put(resid, resdesc)
         yield self.reply_message(msg, 'result', {'res_id':str(resid)}, {})        
+
+    @defer.inlineCallbacks
+    def op_get_resource_desc(self, content, headers, msg):
+        """Service operation: Get description for a resource instance.
+        """
+        resid = content['res_id']
+        logging.info('op_get_resource_desc: '+str(resid))
+
+        res_desc = yield self.datastore.get(resid)
+        yield self.reply_message(msg, 'result', {'res_desc':res_desc}, {})        
         
 class ResourceRegistryClient(BaseServiceClient):
     """Class for
@@ -43,13 +55,30 @@ class ResourceRegistryClient(BaseServiceClient):
         self.rpc = RpcClient()
         yield self.rpc.attach()
 
-        resid = yield self.rpc.rpc_send(to, 'register_resource', {'res_desc':res_desc}, {})
-        logging.info('Service reply: '+str(resid))
+        resregsvc = yield procRegistry.get('resource_registry')
+        resmsg = yield self.rpc.rpc_send(str(resregsvc), 'register_resource', {'res_desc':res_desc.__dict__}, {})
+        logging.info('Service reply: '+str(resmsg))
+        defer.returnValue(str(resmsg['content']['res_id']))
 
-        
+    @defer.inlineCallbacks
+    def getResourceDesc(self, res_id):
+        self.rpc = RpcClient()
+        yield self.rpc.attach()
+
+        resregsvc = yield procRegistry.get('resource_registry')
+        resmsg = yield self.rpc.rpc_send(str(resregsvc), 'get_resource_desc', {'res_id':res_id}, {})
+        logging.info('Service reply: '+str(resmsg))
+        rd = ResourceDesc()
+        rdd = resmsg['content']['res_desc']
+        if rdd != None:
+            rd.__dict__.update(rdd)
+            defer.returnValue(rd)
+        else:
+            defer.returnValue(None)
         
 class ResourceTypes(object):
-    """Static class with constant definitions. Do not instantiate
+    """Static class with constant definitions for resource types.
+    Do not instantiate
     """
     RESTYPE_GENERIC = 'rt_generic'
     RESTYPE_SERVICE = 'rt_service'
@@ -59,7 +88,8 @@ class ResourceTypes(object):
         raise RuntimeException('Do not instantiate '+self.__class__.__name__)
 
 class ResourceLCState(object):
-    """Static class with constant definitions. Do not instantiate
+    """Static class with constant definitions for resource life cycle states.
+    Do not instantiate
     """
     RESLCS_NEW = 'rlcs_new'
     RESLCS_ACTIVE = 'rlcs_active'
@@ -132,5 +162,5 @@ instance = ResourceRegistryService(receiver)
 from ion.services.coi.resource_registry import *
 rd2 = ResourceDesc(name='res2',res_type=ResourceTypes.RESTYPE_GENERIC)
 c = ResourceRegistryClient()
-
+c.registerResource(rd2)
 """

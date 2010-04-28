@@ -84,6 +84,7 @@ def send_message(receiver, send, recv, operation, content, headers):
     msg.update(headers)
     msg['op'] = operation
     msg['content'] = content
+    logging.info("Send message op="+operation+" to="+str(recv))
     return receiver.send(recv, msg)
 
 def dispatch_message(content, msg, dispatchIn):
@@ -130,5 +131,5 @@ def create_unique_id(ns):
     nss = str(ns)
     if nss in id_seqs: nsc = int(id_seqs[nss]) +1
     else: nsc = 1
-    id_seqs.put(nss, nsc)
+    id_seqs[nss] = nsc
     return nss + str(nsc)
