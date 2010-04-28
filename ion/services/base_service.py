@@ -3,24 +3,18 @@
 """
 @file ion/services/base_service.py
 @author Michael Meisinger
-@package ion.services  abstract base classes for all service interfaces, implementations and provider.
+@brief abstract base classes for all service interfaces, implementations and provider.
 """
 
 import logging
-
-from twisted.python import log
 from twisted.internet import defer
-
 from magnet.spawnable import Receiver
 from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
-import ion.util.procutils as pu
 from ion.core.base_process import BaseProcess
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
+import ion.util.procutils as pu
 
 class BaseService(BaseProcess):
     """

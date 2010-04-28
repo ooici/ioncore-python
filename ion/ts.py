@@ -48,3 +48,7 @@ def receive(content, msg):
     print 'in receive ', content, msg
       
 receiver.handle(receive)
+
+# Called as 
+if __name__ == '__main__':
+    pass
