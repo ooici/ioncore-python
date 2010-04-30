@@ -39,8 +39,7 @@ class IonTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def _startMagnet(self):
         mopt = {}
-        mopt['broker_host'] = '10.211.55.3'
-        #mopt['broker_host'] = 'amoeba.ucsd.edu'
+        mopt['broker_host'] = 'amoeba.ucsd.edu'
         mopt['broker_port'] = 5672
         mopt['broker_vhost'] = '/'
         mopt['boot_script'] = None
@@ -54,7 +53,6 @@ class IonTestCase(unittest.TestCase):
         yield bootstrap.bootstrap_core_services()
         logging.info("Core ION services started")
 
-    @defer.inlineCallbacks
     def _stopMagnet(self):
-        yield self.cont_conn.close(0)
-        #yield self.cont_conn.delegate.close(None)
+        self.cont_conn.transport.loseConnection()
+        container.Container._started = False

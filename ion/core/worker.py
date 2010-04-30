@@ -18,7 +18,14 @@ from ion.services.base_service import BaseService, BaseServiceClient
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
 
-class WorkerProcess(BaseService):
+
+class ProtocolFactory(object):
+    """Mixin class for Magnet protocol factory (protocols aka receiver).
+    """
+    def protocol_factory(cls, name=__name__, args={}):
+        raise NotImplementedError("Must implement protocol_factory()")
+
+class WorkerProcess(BaseService,ProtocolFactory):
     """Worker process
     """
 
@@ -35,6 +42,8 @@ class WorkerProcess(BaseService):
     def startWorker(self):
         work_id = yield spawn(self.workReceiver)
 
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = WorkerProcess(receiver)
+    @classmethod    
+    def protocol_factory(cls, name=__name__, args={}):
+        receiver = Receiver(name)
+        instance = cls(receiver)
+        return receiver

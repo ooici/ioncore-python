@@ -44,7 +44,7 @@ class ResourceRegistryService(BaseService):
         yield self.reply_message(msg, 'result', {'res_desc':res_desc}, {})        
         
 class ResourceRegistryClient(BaseServiceClient):
-    """Class for
+    """Class for the client accessing the resource registry.
     """
     
     def registerResourceType(self, rt_desc):

@@ -26,32 +26,42 @@ from ion.core import ioninit
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
-class BootstrapTest(IonTestCase):
-    
-            
+class BootstrapTest1(IonTestCase):
+    """ Tests the IonTestCase core classes. Starting container and services.
+    """
+       
     @defer.inlineCallbacks
-    def setUp(self):
-        IonTestCase.setUp(self)
+    def test_startContainer(self):
         yield self._startMagnet()
-        yield self._startCoreServices()
 
-    @defer.inlineCallbacks
-    def tearDown(self):
-        IonTestCase.tearDown(self)
+        logging.info("Started magnet container")
+
         yield self._stopMagnet()
 
     @defer.inlineCallbacks
-    def _test_1(self):
-        receiver = Receiver(__name__)
-        def receive(content, msg):
-            print 'in receive ', content, msg
-        receiver.handle(receive)
-        id = yield spawn(receiver)
-        yield send(id.full, {'key':'obj1','value':'999'})
+    def test_startContainerAndServices(self):
+        yield self._startMagnet()
+        yield self._startCoreServices()
+
+        logging.info("Started magnet and core services")
+
+        yield self._stopMagnet()
+        
+
+
+class BootstrapTest2(IonTestCase):
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._startMagnet()
 
     @defer.inlineCallbacks
-    def test_2(self):
+    def tearDown(self):
+        yield self._stopMagnet()
+
+    def test_1(self):
         pass
-        #yield bootstrap.start()
+
+    def test_2(self):
+        pass  
 
 
