@@ -7,8 +7,11 @@
 """
 
 from ion.core.base_process import BaseProcess
-
+   
 class ResourceAgent(BaseProcess):
+
+    lifecycleState = "undeveloped"
+
     """
     This is the abstract superclass for all agents.
     
@@ -42,3 +45,9 @@ class ResourceAgent(BaseProcess):
     def op_getCapabilities(self, content, headers, msg):
         """
         """
+
+"""
+Do these need to be a class or a type or enumerated something?
+ lifecycleStates = ("undeveloped", "developed", "commissioned",
+                            "active", "inactive", "not_acquired", "acquired")
+"""
