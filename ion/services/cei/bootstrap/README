@@ -6,6 +6,7 @@ NOTE: This currently brings a Capability Container into being.
 
 Steps to start a Capability Container VM:
 -----------------------------------------
+    0) install Fabric. "easy_install Fabric" or better, use "pip + virtualenv to install Fabric"
     1) Start the base Capability Container AMI "ami-b48765dd" with ElasticFox (or with boto).
     2) Get the returned hostname for the now running instance "eg. ec2-X-X-X-X.compute-1.amazonaws.com"
     3) Run (in the same directory as this README):
