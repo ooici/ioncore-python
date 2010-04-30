@@ -11,7 +11,7 @@ import logging
 
 from twisted.internet import defer
 from magnet.spawnable import Receiver
-
+from magnet.spawnable import ProtocolFactory
 from magnet.spawnable import spawn
 from magnet.store import Store
 
@@ -109,6 +109,24 @@ class BaseProcess(object):
         #    send = self.receiver.spawned.id.full
             #pu.send_message(self.receiver, send, '', 'logmsg', {}, {})
 
+
+class ProtocolFactory(ProtocolFactory):
+    
+    def build(self, args={}):
+        """Factory method return a new receiver for a new process. At the same
+        time instantiate class.
+        """
+        logging.info("protocol_factory: cls="+repr(cls))
+        logging.info("protocol_factory: procclass="+repr(procclass))
+        if not procclass:
+            procclass = cls
+            logging.info("protocol_factory: No child class given")
+        receiver = Receiver(procclass.__name__)
+        instance = procclass(receiver)
+        logging.info("protocol_factory: Instantiated process class "+repr(instance))
+        receiver.procinst = instance
+        return receiver
+    
 class RpcClient(object):
     """Service client providing a RPC methaphor
     """

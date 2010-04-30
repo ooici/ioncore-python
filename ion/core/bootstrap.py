@@ -23,9 +23,6 @@ import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
 
-# Static definition of message queues
-ion_queues = {}
-
 # Static definition of service names
 ion_core_services = Config(CONF.getValue('coreservices_cfg')).getObject()
 ion_services = Config(CONF.getValue('services_cfg')).getObject()
@@ -37,9 +34,6 @@ process_ids = procRegistry
 def start():
     """Main function of bootstrap. Starts system with static config
     """
-    startsvcs = []
-    startsvcs.extend(ion_core_services)
-    #startsvcs.extend(ion_services)
     yield bootstrap_core_services()
 
 @defer.inlineCallbacks
@@ -47,7 +41,10 @@ def bootstrap_core_services():
     """Starts core system services and messaging setup
     """
     logging.info("ION SYSTEM bootstrapping now...")
-    yield bs_processes(ion_core_services)
+    startsvcs = []
+    startsvcs.extend(ion_core_services)
+    #startsvcs.extend(ion_services)
+    yield bs_processes(startsvcs)
 
 
 @defer.inlineCallbacks

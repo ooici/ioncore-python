@@ -20,8 +20,7 @@ logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
 
 
-
-class WorkerProcess(BaseService,ProtocolFactory):
+class WorkerProcess(BaseService):
     """Worker process
     """
 
@@ -38,8 +37,3 @@ class WorkerProcess(BaseService,ProtocolFactory):
     def startWorker(self):
         work_id = yield spawn(self.workReceiver)
 
-    @classmethod    
-    def protocol_factory(cls, name=__name__, args={}):
-        receiver = Receiver(name)
-        instance = cls(receiver)
-        return receiver

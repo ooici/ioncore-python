@@ -28,28 +28,30 @@ CONF = ioninit.config(__name__)
 ion_messaging = Config(CONF.getValue('messaging_cfg')).getObject()
 
 # Static definition of service names
+ion_core_services = Config(CONF.getValue('coreservices_cfg')).getObject()
 ion_services = Config(CONF.getValue('services_cfg')).getObject()
 
 # Local process ids
 process_ids = procRegistry
-# TODO: create nameRegsitry in Cassandra
 nameRegistry = Store()
-
 
 @defer.inlineCallbacks
 def start():
     """Main function of bootstrap. Starts system with static config
     """
-    yield _bootstrap(ion_messaging,ion_services)
+    yield bs_messaging(ion_messaging)
+    yield bootstrap_core_services()
 
 @defer.inlineCallbacks
-def _bootstrap(queues, procs):
-    """Bootstraps the system from a configuration 
+def bootstrap_core_services():
+    """Starts core system services and messaging setup
     """
     logging.info("ION SYSTEM bootstrapping now...")
-    yield bs_messaging(queues)
-    yield bs_processes(procs)
-    
+    startsvcs = []
+    #startsvcs.extend(ion_core_services)
+    startsvcs.extend(ion_services)
+    yield bs_processes(startsvcs)
+  
 @defer.inlineCallbacks
 def bs_messaging(messagingCfg):
     """Bootstraps the messaging resources 
@@ -68,7 +70,7 @@ def bs_messaging(messagingCfg):
         yield Container.configure_messaging(msgName, msgResource)
         
         # save name is the name registry
-        yield nameRegistry.put(msgName, msgResource)
+        yield nameRegistry.put(name, msgResource)
         
 @defer.inlineCallbacks
 def bs_processes(procs):
@@ -76,14 +78,15 @@ def bs_processes(procs):
     """
     sup = bs_prepSupervisor(procs)
 
+    # Makes the boostrap a process
     logging.info("Spawning bootstrap supervisor")
     supId = yield spawn(sup.receiver)
-    yield process_ids.put("bootstrap", supId)
+    yield process_ids.put("bootstrap", str(supId))
 
     yield sup.spawnChildProcesses()
     for child in sup.childProcesses:
         procId = child.procId
-        yield process_ids.put(child.procName, procId)
+        yield process_ids.put(str(child.procName), str(procId))
 
     logging.debug("process_ids: "+ str(process_ids.kvs))
 
@@ -95,9 +98,10 @@ def bs_prepSupervisor(procs):
     logging.info("Preparing bootstrap supervisor")
    
     children = []
-    for procName, procDef in procs.iteritems():
+    for procDef in procs:
         child = ChildProcess(procDef['module'], procDef['class'], None)
-        child.procName = procName
+        child.procName = procDef['name']
+        child.args = procDef.get('args',None)
         children.append(child)
 
     logging.debug("Supervisor child procs: "+str(children))
@@ -105,8 +109,3 @@ def bs_prepSupervisor(procs):
     sup = Supervisor()
     sup.childProcesses = children
     return sup
-
-"""
-from ion.core import bootstrap as b
-b.start()
-"""
