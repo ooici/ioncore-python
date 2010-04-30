@@ -1,6 +1,8 @@
 {
- "username":"cc",
- "recipes": ["user"]
+  "capabilitycontainer":{
+    "broker":"amoeba.ucsd.edu",
+    "bootscript":"examples/boot.py"
+  },
+  "username":"cc",
+  "recipes":["setuptools", "twisted", "txamqp", "user", "capabilitycontainer"]
 }
-
-
