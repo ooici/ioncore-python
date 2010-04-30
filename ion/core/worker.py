@@ -10,15 +10,11 @@ import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
-from magnet.spawnable import ProtocolFactory
+from magnet import spawnable
 
 import ion.util.procutils as pu
-from ion.core.base_process import RpcClient
+from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
-
 
 class WorkerProcess(BaseService):
     """Worker process
@@ -37,3 +33,4 @@ class WorkerProcess(BaseService):
     def startWorker(self):
         work_id = yield spawn(self.workReceiver)
 
+factory = ProtocolFactory(WorkerProcess)

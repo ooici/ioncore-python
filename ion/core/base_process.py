@@ -111,18 +111,22 @@ class BaseProcess(object):
 
 
 class ProtocolFactory(ProtocolFactory):
-    
-    def build(self, args={}):
+    """
+    """
+
+    def __init__(self, processClass, name=__name__, args={}):
+        self.processClass = processClass
+        self.name = name
+        self.args = args
+
+    def build(self, spawnArgs={}):
         """Factory method return a new receiver for a new process. At the same
         time instantiate class.
         """
-        logging.info("protocol_factory: cls="+repr(cls))
-        logging.info("protocol_factory: procclass="+repr(procclass))
-        if not procclass:
-            procclass = cls
-            logging.info("protocol_factory: No child class given")
-        receiver = Receiver(procclass.__name__)
-        instance = procclass(receiver)
+        logging.info("protocol_factory: args="+repr(args))
+        logging.info("protocol_factory: class="+repr(self.processClass))
+        receiver = self.receiver(self.name)
+        instance = self.processClass(receiver)
         logging.info("protocol_factory: Instantiated process class "+repr(instance))
         receiver.procinst = instance
         return receiver
