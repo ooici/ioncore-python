@@ -39,8 +39,7 @@ class IonTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def _startMagnet(self):
         mopt = {}
-        mopt['broker_host'] = '10.211.55.3'
-        #mopt['broker_host'] = 'amoeba.ucsd.edu'
+        mopt['broker_host'] = 'amoeba.ucsd.edu'
         mopt['broker_port'] = 5672
         mopt['broker_vhost'] = '/'
         mopt['boot_script'] = None
