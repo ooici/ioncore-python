@@ -123,7 +123,7 @@ class ProtocolFactory(ProtocolFactory):
         """Factory method return a new receiver for a new process. At the same
         time instantiate class.
         """
-        logging.info("protocol_factory: args="+repr(args))
+        logging.info("protocol_factory: args="+repr(spawnArgs))
         logging.info("protocol_factory: class="+repr(self.processClass))
         receiver = self.receiver(self.name)
         instance = self.processClass(receiver)
