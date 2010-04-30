@@ -10,6 +10,7 @@ import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
+from magnet.spawnable import ProtocolFactory
 
 import ion.util.procutils as pu
 from ion.core.base_process import RpcClient
@@ -19,11 +20,6 @@ logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
 
 
-class ProtocolFactory(object):
-    """Mixin class for Magnet protocol factory (protocols aka receiver).
-    """
-    def protocol_factory(cls, name=__name__, args={}):
-        raise NotImplementedError("Must implement protocol_factory()")
 
 class WorkerProcess(BaseService,ProtocolFactory):
     """Worker process
