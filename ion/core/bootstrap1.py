@@ -99,9 +99,9 @@ def bs_prepSupervisor(procs):
    
     children = []
     for procDef in procs:
-        child = ChildProcess(procDef['module'], procDef['class'], None)
+        spawnArgs = procDef.get('spawnargs',None)
+        child = ChildProcess(procDef['module'], procDef['class'], None, spawnArgs)
         child.procName = procDef['name']
-        child.args = procDef.get('args',None)
         children.append(child)
 
     logging.debug("Supervisor child procs: "+str(children))

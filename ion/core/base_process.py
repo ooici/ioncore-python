@@ -33,7 +33,7 @@ class BaseProcess(object):
 
     convIdCnt = 0
 
-    def __init__(self, receiver=Receiver(__name__)):
+    def __init__(self, receiver=Receiver(__name__), spawnArgs={}):
         """Constructor using a given name for the spawnable receiver.
         """
         logging.debug('BaseProcess.__init__()')
@@ -42,6 +42,7 @@ class BaseProcess(object):
         self.procName = __name__
         self.idStore = Store()
         self.receiver = receiver
+        self.spawnArgs = spawnArgs
         receiver.handle(self.receive)
 
     def op_init(self, content, headers, msg):
@@ -123,11 +124,9 @@ class ProtocolFactory(ProtocolFactory):
         """Factory method return a new receiver for a new process. At the same
         time instantiate class.
         """
-        logging.info("protocol_factory: args="+repr(spawnArgs))
-        logging.info("protocol_factory: class="+repr(self.processClass))
+        logging.info("ProtocolFactory.build() of name="+self.name+" with args="+str(spawnArgs))
         receiver = self.receiver(self.name)
-        instance = self.processClass(receiver)
-        logging.info("protocol_factory: Instantiated process class "+repr(instance))
+        instance = self.processClass(receiver, spawnArgs)
         receiver.procinst = instance
         return receiver
     

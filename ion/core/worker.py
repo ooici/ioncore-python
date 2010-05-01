@@ -22,7 +22,9 @@ class WorkerProcess(BaseService):
 
     @defer.inlineCallbacks
     def slc_init(self):
-        workReceiver = Receiver(__name__, 'worker1')
+        msg_name = self.spawnArgs['service-name']
+        logging.info("slc_init name used:"+msg_name)
+        workReceiver = Receiver(__name__, msg_name)
         self.workReceiver = workReceiver
         id = yield spawn(workReceiver)
     

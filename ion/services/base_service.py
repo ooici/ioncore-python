@@ -23,10 +23,10 @@ class BaseService(BaseProcess):
     A service process is a Capability Container process that can be spawned
     anywhere in the network and that provides a service.
     """
-    def __init__(self, receiver=None):
+    def __init__(self, receiver=None, spawnArgs=None):
         """Constructor using a given name for the spawnable receiver.
         """
-        BaseProcess.__init__(self, receiver)
+        BaseProcess.__init__(self, receiver, spawnArgs)
 
     def plc_init(self):
         self.slc_init()

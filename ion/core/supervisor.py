@@ -43,10 +43,11 @@ class ChildProcess(object):
     """
     Class that encapsulates attributes about a child process
     """
-    def __init__(self, procMod, procClass=None, node=None):
+    def __init__(self, procMod, procClass=None, node=None, spawnArgs=None):
         self.procModule = procMod
         self.procClass = procClass
         self.procNode = node
+        self.spawnArgs = spawnArgs
         self.procState = 'DEFINED'
 
     @defer.inlineCallbacks
@@ -66,7 +67,7 @@ class ChildProcess(object):
             self.procModObj = proc_mod
 
             # Spawn instance of a process
-            proc_id = yield spawn(proc_mod)
+            proc_id = yield spawn(proc_mod, None, self.spawnArgs)
             self.procId = proc_id
             self.procState = 'SPAWNED'
 
