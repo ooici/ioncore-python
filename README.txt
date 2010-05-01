@@ -60,8 +60,8 @@ carrot (use txamqp branch)
     (cd carrot; git checkout -b txamqp origin/txamqp)
     (cd carrot; python setup.py install)
 
-Install the Magnet package:
----------------------------
+Install the Magnet package [NEED Magent 0.3.3]:
+-----------------------------------------------
 Get the latest version of the repository, if you haven't already.
 ::
     git clone git://amoeba.ucsd.edu/magnet.git # no ooi credential
