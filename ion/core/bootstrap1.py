@@ -66,7 +66,7 @@ def bs_messaging(messagingCfg):
             msgName = CONF['container_group'] + "." + msgName
 
         # declare queues, bindings as needed
-        logging.info("Msg name config: name="+msgName+', '+str(msgResource))
+        logging.info("Messaging name config: name="+msgName+', '+str(msgResource))
         yield Container.configure_messaging(msgName, msgResource)
         
         # save name is the name registry
