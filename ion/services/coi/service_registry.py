@@ -55,8 +55,8 @@ class ServiceRegistryClient(BaseServiceClient):
         self.rpc = RpcClient()
         yield self.rpc.attach()
 
-        resid = yield self.rpc.rpc_send('', 'register_resource', {'res_desc':res_desc.__dict__}, {})
-        logging.info('Service reply: '+str(resid))
+        (content, headers, msg) = yield self.rpc.rpc_send('', 'register_resource', {'res_desc':res_desc.__dict__}, {})
+        logging.info('Service reply: '+str(content))
  
 # Spawn of the process using the module name
 factory = ProtocolFactory(ServiceRegistryService)

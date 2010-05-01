@@ -56,9 +56,9 @@ class ResourceRegistryClient(BaseServiceClient):
         yield self.rpc.attach()
 
         resregsvc = yield base_process.procRegistry.get('resource_registry')
-        resmsg = yield self.rpc.rpc_send(str(resregsvc), 'register_resource', {'res_desc':res_desc.__dict__}, {})
-        logging.info('Service reply: '+str(resmsg))
-        defer.returnValue(str(resmsg['content']['res_id']))
+        (content, headers, msg) = yield self.rpc.rpc_send(str(resregsvc), 'register_resource', {'res_desc':res_desc.__dict__}, {})
+        logging.info('Service reply: '+str(headers))
+        defer.returnValue(str(content['res_id']))
 
     @defer.inlineCallbacks
     def getResourceDesc(self, res_id):
@@ -66,10 +66,10 @@ class ResourceRegistryClient(BaseServiceClient):
         yield self.rpc.attach()
 
         resregsvc = yield base_process.procRegistry.get('resource_registry')
-        resmsg = yield self.rpc.rpc_send(str(resregsvc), 'get_resource_desc', {'res_id':res_id}, {})
-        logging.info('Service reply: '+str(resmsg))
+        (content, headers, msg) = yield self.rpc.rpc_send(str(resregsvc), 'get_resource_desc', {'res_id':res_id}, {})
+        logging.info('Service reply: '+str(content))
         rd = ResourceDesc()
-        rdd = resmsg['content']['res_desc']
+        rdd = content['res_desc']
         if rdd != None:
             rd.__dict__.update(rdd)
             defer.returnValue(rd)

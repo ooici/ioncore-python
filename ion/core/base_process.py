@@ -161,8 +161,10 @@ class RpcClient(object):
         self.deferred = defer.Deferred()
         return self.deferred
 
-    def receive(self, content, msg):
-        pu.log_message(__name__, content, msg)
+    def receive(self, headers, msg):
+        pu.log_message(__name__, headers, msg)
         logging.info('RpcClient.receive(), calling callback in defer')
         msg.ack()
-        self.deferred.callback(content)
+        content = headers.get('content',None)
+        res = (content, headers, msg)
+        self.deferred.callback(res)

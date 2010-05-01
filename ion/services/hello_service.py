@@ -44,8 +44,8 @@ class HelloServiceClient(RpcClient):
 
     @defer.inlineCallbacks
     def hello(self, to='1', text='Hi there'):
-        cont = yield self.rpc_send(to, 'hello', text, {})
-        logging.info('Friends reply: '+str(cont))
+        (content, headers, msg) = yield self.rpc_send(to, 'hello', text, {})
+        logging.info('Friends reply: '+str(content))
 
 
 # Spawn of the process using the module name

@@ -86,7 +86,7 @@ class ChildProcess(object):
         self.rpc = RpcClient()
         yield self.rpc.attach()
 
-        res = yield self.rpc.rpc_send(to, 'init', self._prepInitMsg(), {})
+        (content, headers, msg) = yield self.rpc.rpc_send(to, 'init', self._prepInitMsg(), {})
 
     def _prepInitMsg(self):
         return {'proc-name':self.procName, 'sup-id':self.supProcess.receiver.spawned.id.full}
