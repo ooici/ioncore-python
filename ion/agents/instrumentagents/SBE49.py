@@ -14,22 +14,13 @@ from magnet.store import Store
 
 #from ion.agents.resource_agent import lifecycleStates
 #from ion.agents.resource_agent import ResourceAgent
-from ion.agents.instrument_agents.instrument_agent import InstrumentAgent
+from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+ __name__)
 
-store = Store()
-
 receiver = Receiver(__name__)
 
-"""
-@defer.inlineCallbacks
-def start():
-    id = yield spawn(receiver)
-    # For now we're just storing the service id w/in an in-memory store
-    store.put('SBE49_instrument_agent', id)
-   """ 
 class SBE49InstrumentAgent(InstrumentAgent):
 
     """
@@ -93,44 +84,74 @@ class SBE49InstrumentAgent(InstrumentAgent):
         "test_pressure_raw"
         )
 
-    """ Called via ion.core.base_process.BaseProcess.dispatch_message """
+    @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
-        print 'in get with received content: ', content
+        """
+        React to a request for parameter values,
+        @return A reply message containing a dictionary of name/value pairs
+        """
+        logging.debug('In op_get with received content: ' + str(content))
         response = {}
         for key in content:
             response[key] = self.__instrumentParameters.get(key)
-        print 'responding with: ', response
-        
-    def op_set(self,content, headers, msg):
-        print 'in set with content: ', content
-        for key in content:
-            print 'setting ', self.__instrumentParameters[key], ' to ', \
-                content[key]
-            self.__instrumentParameters[key] = content[key]
-            
+        yield self.reply_message(msg, 'get', response, {})
     
+    @defer.inlineCallbacks    
+    def op_set(self, content, headers, msg):
+        """
+        Set parameters to the requested values.
+        @return Message with a list of settings
+        that were changed and what their new values are upon success.
+        """
+        logging.debug('In op_set with content: ' + str(content))
+        for key in content:
+            self.__instrumentParameters[key] = content[key]
+        # Exception will bubble up if there is one, otherwise report success
+        yield self.reply_message(msg, 'set', content, {})
+    
+    @defer.inlineCallbacks
     def op_getLifecycleState(self, content, headers, msg):
+        """
+        Return the lifecycle state in a reply message
+        """
         print 'lifecycleState is: ', self.lifecycleState
     
+    @defer.inlineCallbacks
     def op_setLifecycleState(self, content, headers, msg):
+        """
+        Set the lifecycle state, reply with an ACK message
+        """
         self.lifecycleState = content
     
+    @defer.inlineCallbacks
     def op_execute(self, content, headers, msg):
         """
+        Execute a specific command on the instrument, reply with a confirmation
+        message including output of command, or simple ACK that command
+        was executed.
         """
     
+    @defer.inlineCallbacks
     def op_getStatus(self, content, headers, msg):
         """
+        Obtain the status of an instrument. This includes non-parameter
+        and non-lifecycle state of the instrument.
         """
     
+    @defer.inlineCallbacks
     def op_getCapabilities(self, content, headers, msg):
         """
+        Obtain a list of capabilities that this instrument has. This is
+        simply a command and parameter list at this point
         """
+        return_content = {'commands': __instrumentCommands,
+                          'parameters': __instrumentParameters}
     
 def receive(content, msg):
   instance.receive(content, msg)
 
-instance = SBE49InstrumentAgent()
+receiver = Receiver(__name__)
+instance = SBE49InstrumentAgent(receiver)
 
 receiver.handle(receive)
 
