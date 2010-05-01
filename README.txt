@@ -31,13 +31,10 @@ Alternatively from shell executing a script:
 ::
     twistd -n magnet -h amoeba.ucsd.edu res/scripts/bootstrap.py
 
-Start a test case by executing within the CC shell:
-><>
-    from ion import ts
-    ts.start()
-    
-Run all test cases
+Run trial test cases (recursively)
 ::
+    trial ion.core
+    trial ion.services.coi.test.test_resource_registry
     trial ion
 
 
@@ -72,3 +69,10 @@ Get the latest version of the repository, if you haven't already.
     git clone git@amoeba.ucsd.edu:magnet.git # need ooi credential
     (cd magnet; git checkout -b space origin/space)
     (cd magnet; python setup.py install)
+
+
+Note:
+=====
+This project dependes closely on magnet. Whenever you do a "git pull" on
+this project, there is a chance that you need to update and install magnet
+again (see above). Please review the branch logs for any cues.
