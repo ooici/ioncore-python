@@ -134,3 +134,37 @@ def create_unique_id(ns):
     else: nsc = 1
     id_seqs[nss] = nsc
     return nss + str(nsc)
+    
+    
+def get_class(qualclassname, mod=None):
+    """Imports module and class and returns class object.
+    
+    @param qualclassname  fully qualified classname, such as
+        ion.data.dataobject.DataObject if module not given, otherwise class name
+    @param mod instance of module
+    @retval instance of 'type', i.e. a class object
+    """
+    if mod:
+        clsname = qualclassname
+    else:
+        # Cut the name apart into package, module and class names
+        qualmodname = qualclassname.rpartition('.')[0]
+        modname = qualmodname.rpartition('.')[2]
+        clsname = qualclassname.rpartition('.')[2]
+        mod = get_module(qualmodname)
+
+    cls = getattr(mod, clsname)
+    logging.debug('Class: '+str(cls))
+    return cls
+
+def get_module(qualmodname):
+    """Imports module and returns module object
+    @param fully qualified modulename, such as ion.data.dataobject
+    @retval instance of types.ModuleType or error
+    """
+    package = qualmodname.rpartition('.')[0]
+    modname = qualmodname.rpartition('.')[2]
+    logging.info('get_module: from '+qualmodname+' import '+modname)
+    mod = __import__(qualmodname, globals(), locals(), [modname])
+    logging.debug('Module: '+str(mod))
+    return mod

@@ -20,6 +20,7 @@ from magnet.store import Store
 from ion.core import ioninit, base_process
 from ion.core.supervisor import Supervisor, ChildProcess
 from ion.core.base_process import procRegistry
+from ion.core.cc.interceptor import BaseInterceptorSystem
 from ion.util.config import Config
 import ion.util.procutils as pu
 
@@ -51,6 +52,7 @@ def bootstrap(messaging, services):
     """Starts services and messaging from given setup
     """
     logging.info("Configuring messaging and starting services...")
+    init_container()
     if messaging and len(messaging)>0:
         yield bs_messaging(messaging)
     if services and len(services)>0:
@@ -116,6 +118,15 @@ def prepare_childprocs(procs):
     logging.debug("Supervisor child procs: "+str(children))
     return children
 
+def init_container():
+    """Performs global initializations on the local container on startup.
+    """
+    interceptorsys = CONF.getValue('interceptor_system',None)
+    if interceptorsys:
+        logging.info("Setting capability container interceptor system")
+        cls = pu.get_class(interceptorsys)
+        Container.interceptor_system = cls()
+
 def reset_container():
     """Resets the container for warm restart. Simple implementation
     currently.
@@ -127,6 +138,7 @@ def reset_container():
     nameRegistry = Store()
     spawnable.store = Container.store
     spawnable.Spawnable.progeny = {}
+
 
 """
 from ion.core import bootstrap as b

@@ -40,7 +40,7 @@ class ProcessProtocolFactory(ProtocolFactory):
         
         svcclass = spawnArgs.get('svcclass',None)
 
-        svc_mod = self.import_service(svcmodule)
+        svc_mod = pu.get_module(svcmodule)
         
         if hasattr(svc_mod,'factory'):
             logging.info("Found module factory. Using factory to get service receiver")
@@ -54,24 +54,11 @@ class ProcessProtocolFactory(ProtocolFactory):
         else:
             logging.error("Service process module cannot be spawned")
     
-    def import_service(self,scvmodule):
-        """Imports service process module from given qualified module name
-        """
-        package = scvmodule.rpartition('.')[0]
-        localMod = scvmodule.rpartition('.')[2]
-        logging.info('import_service: from '+package+' import '+localMod)
-        
-        svc_mod = __import__(scvmodule, globals(), locals(), [localMod])
-        logging.debug('Module: '+str(svc_mod))
-        
-        return svc_mod
-    
     def create_process_instance(self, svc_mod, className):
         """Given a class name and a loaded module, instantiate the class
         with a receiver.
         """
-        svc_class = getattr(svc_mod, className)
-        logging.debug('Class: '+str(svc_class))
+        svc_class = pu.get_class(className, svc_mod)
         #if not issubclass(svc_class,BaseProcess):
         #    raise RuntimeError("class is not a BaseProcess")
         

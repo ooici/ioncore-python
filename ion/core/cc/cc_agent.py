@@ -11,7 +11,7 @@ import logging
 from magnet.spawnable import Receiver
 
 from ion.core.supervisor import Supervisor, ChildProcess
-from ion.services.base_process import ProtocolFactory
+from ion.core.base_process import ProtocolFactory
 from ion.agents.resource_agent import ResourceAgent
 
 
