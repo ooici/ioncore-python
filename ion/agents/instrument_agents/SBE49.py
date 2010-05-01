@@ -10,26 +10,12 @@ from twisted.internet import defer
 
 from magnet.spawnable import Receiver
 #from magnet.spawnable import send
-from magnet.store import Store
 
 #from ion.agents.resource_agent import lifecycleStates
 #from ion.agents.resource_agent import ResourceAgent
 from ion.agents.instrument_agents.instrument_agent import InstrumentAgent
+from ion.core.base_process import ProtocolFactory
 
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+ __name__)
-
-store = Store()
-
-receiver = Receiver(__name__)
-
-"""
-@defer.inlineCallbacks
-def start():
-    id = yield spawn(receiver)
-    # For now we're just storing the service id w/in an in-memory store
-    store.put('SBE49_instrument_agent', id)
-   """ 
 class SBE49InstrumentAgent(InstrumentAgent):
 
     """
@@ -127,12 +113,8 @@ class SBE49InstrumentAgent(InstrumentAgent):
         """
         """
     
-def receive(content, msg):
-  instance.receive(content, msg)
-
-instance = SBE49InstrumentAgent()
-
-receiver.handle(receive)
+# Spawn of the process using the module name
+factory = ProtocolFactory(SBE49InstrumentAgent)
 
 """
 Someday the driver may inherit from a common (RS-232?) object if there is a need...

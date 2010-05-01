@@ -61,6 +61,7 @@ def get_process_id(long_id):
         procId = Id(long_id)
     return procId
 
+@defer.inlineCallbacks
 def send_message(receiver, send, recv, operation, content, headers):
     """Constructs a standard message with standard headers
 
@@ -72,7 +73,7 @@ def send_message(receiver, send, recv, operation, content, headers):
     msg['sender'] = str(send)
     msg['receiver'] = str(recv)
     msg['reply-to'] = str(send)
-    msg['encoding'] = 'json_1'
+    msg['encoding'] = 'json'
     msg['language'] = 'ion1'
     msg['format'] = 'raw'
     msg['ontology'] = ''
@@ -85,7 +86,7 @@ def send_message(receiver, send, recv, operation, content, headers):
     msg['op'] = operation
     msg['content'] = content
     logging.info("Send message op="+operation+" to="+str(recv))
-    return receiver.send(recv, msg)
+    yield receiver.send(recv, msg)
 
 def dispatch_message(content, msg, dispatchIn):
     """

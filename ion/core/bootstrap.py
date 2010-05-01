@@ -10,13 +10,14 @@ import logging
 from twisted.internet import defer
 import time
 
+from magnet import spawnable
 from magnet.container import Container
 from magnet.spawnable import Receiver
 from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
-from ion.core import ioninit
+from ion.core import ioninit, base_process
 from ion.core.supervisor import Supervisor, ChildProcess
 from ion.core.base_process import procRegistry
 from ion.util.config import Config
@@ -31,9 +32,6 @@ ion_messaging = {}
 ion_core_services = Config(CONF.getValue('coreservices_cfg')).getObject()
 ion_services = Config(CONF.getValue('services_cfg')).getObject()
 
-# Local process ids
-process_ids = procRegistry
-
 # Messaging names
 nameRegistry = Store()
 
@@ -42,6 +40,7 @@ def start():
     """Main function of bootstrap. Starts system with static config of
     messaging names and services
     """
+    logging.info("ION SYSTEM bootstrapping now...")
     startsvcs = []
     startsvcs.extend(ion_core_services)
     #startsvcs.extend(ion_services)
@@ -51,7 +50,7 @@ def start():
 def bootstrap(messaging, services):
     """Starts services and messaging from given setup
     """
-    logging.info("ION SYSTEM bootstrapping now...")
+    logging.info("Configuring messaging and starting services...")
     if messaging and len(messaging)>0:
         yield bs_messaging(messaging)
     if services and len(services)>0:
@@ -82,23 +81,26 @@ def bs_messaging(messagingCfg, cgroup=None):
 def bs_processes(procs):
     """Bootstraps a set of processes 
     """
-    sup = prepare_supervisor(procs)
+    children = prepare_childprocs(procs)
 
     # Makes the boostrap a process
     logging.info("Spawning bootstrap supervisor")
+    sup = Supervisor()
+    sup.setChildProcesses(children)
     supId = yield spawn(sup.receiver)
-    yield process_ids.put("bootstrap", str(supId))
+
+    yield base_process.procRegistry.put("bootstrap", str(supId))
 
     yield sup.spawnChildProcesses()
     for child in sup.childProcesses:
         procId = child.procId
-        yield process_ids.put(str(child.procName), str(procId))
+        yield base_process.procRegistry.put(str(child.procName), str(procId))
 
-    logging.debug("process_ids: "+ str(process_ids.kvs))
+    logging.debug("process_ids: "+ str(base_process.procRegistry.kvs))
 
     yield sup.initChildProcesses()
 
-def prepare_supervisor(procs):
+def prepare_childprocs(procs):
     """Prepares a Supervisor class instance with configured child processes.
     """
     logging.info("Preparing bootstrap supervisor")
@@ -112,10 +114,19 @@ def prepare_supervisor(procs):
         children.append(child)
 
     logging.debug("Supervisor child procs: "+str(children))
+    return children
 
-    sup = Supervisor()
-    sup.childProcesses = children
-    return sup
+def reset_container():
+    """Resets the container for warm restart. Simple implementation
+    currently.
+    """
+    # The following is extremely hacky. Reset static module and classvariables
+    # to their defaults. Even further, reset imported names in other modules
+    # to the new objects.
+    base_process.procRegistry = Store()
+    nameRegistry = Store()
+    spawnable.store = Container.store
+    spawnable.Spawnable.progeny = {}
 
 """
 from ion.core import bootstrap as b

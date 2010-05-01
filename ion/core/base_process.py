@@ -33,11 +33,14 @@ class BaseProcess(object):
 
     convIdCnt = 0
 
-    def __init__(self, receiver=Receiver(__name__), spawnArgs={}):
+    def __init__(self, receiver=None, spawnArgs=None):
         """Constructor using a given name for the spawnable receiver.
         """
         logging.debug('BaseProcess.__init__()')
         self.procState = "UNINITIALIZED"
+        if not receiver:
+            receiver = Receiver(__name__)
+        spawnArgs = spawnArgs.copy() if spawnArgs else {}
 
         self.procName = __name__
         self.idStore = Store()
@@ -80,8 +83,10 @@ class BaseProcess(object):
         """
         logging.info('Catch message')
 
+    @defer.inlineCallbacks
     def send_message(self, recv, operation, content, headers):
-        """Send a message via the process receiver to destination. Starts a new conversation.
+        """Send a message via the process receiver to destination.
+        Starts a new conversation.
         """
         send = self.receiver.spawned.id.full
         BaseProcess.convIdCnt += 1
@@ -90,10 +95,12 @@ class BaseProcess(object):
         msgheaders = {}
         msgheaders.update(headers)
         msgheaders['conv-id'] = convid
-        pu.send_message(self.receiver, send, recv, operation, content, msgheaders)
+        yield pu.send_message(self.receiver, send, recv, operation, content, msgheaders)
         self.log_conv_message()
 
     def reply_message(self, msg, operation, content, headers):
+        """Replies to a given message, continuing the ongoing conversation
+        """
         ionMsg = msg.payload
         send = self.receiver.spawned.id.full
         recv = ionMsg.get('reply-to', None)
@@ -112,7 +119,9 @@ class BaseProcess(object):
 
 
 class ProtocolFactory(ProtocolFactory):
-    """
+    """Standard protocol factory that is instantiated in each service process
+    module. Returns a new receiver for each invocation and creates a new
+    process instance.
     """
 
     def __init__(self, processClass, name=__name__, args={}):
@@ -145,9 +154,10 @@ class RpcClient(object):
 
     def rpc_send(self, to, op, cont='', headers={}):
         """
-        @return a deferred with the message value
+        @retval a deferred with the message value
         """
-        pu.send_message(self.clientRecv, self.id, to, op, cont, headers)
+        d = pu.send_message(self.clientRecv, self.id, to, op, cont, headers)
+        # Ignore d deferred, wait for send. TODO: error handling
         self.deferred = defer.Deferred()
         return self.deferred
 

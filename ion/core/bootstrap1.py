@@ -19,7 +19,6 @@ from magnet.store import Store
 from ion.core import ioninit
 from ion.core import bootstrap
 from ion.core.supervisor import Supervisor, ChildProcess
-from ion.core.base_process import procRegistry
 from ion.util.config import Config
 import ion.util.procutils as pu
 
@@ -36,6 +35,7 @@ ion_services = Config(CONF.getValue('services_cfg')).getObject()
 def start():
     """Main function of bootstrap. Starts system with static config
     """
+    logging.info("ION SYSTEM bootstrapping now...")
     startsvcs = []
     #startsvcs.extend(ion_core_services)
     startsvcs.extend(ion_services)

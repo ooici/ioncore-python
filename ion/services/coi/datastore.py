@@ -15,6 +15,7 @@ from magnet.spawnable import spawn
 from magnet.store import Store
 
 import ion.util.procutils as pu
+from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 
@@ -43,9 +44,8 @@ class DatastoreService(BaseService):
         yield self.reply_message(msg, 'result', {'value':value}, {})
 
 
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = DatastoreService(receiver)
+# Spawn of the process using the module name
+factory = ProtocolFactory(DatastoreService)
 
 
 

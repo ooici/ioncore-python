@@ -6,27 +6,42 @@
 @brief test service for registering resources and client classes
 """
 
-import logging
+import logging, time
 from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.core import bootstrap
-from ion.core.base_process import procRegistry
+from ion.core import base_process
 from ion.test.iontest import IonTestCase
 
 class WorkerTest(IonTestCase):
     """Testing service classes of resource registry
     """
 
-    #@defer.inlineCallbacks
+    @defer.inlineCallbacks
     def setUp(self):
-        IonTestCase.setUp(self)
+        yield self._startMagnet()
+        yield self._startCoreServices()
 
-    #@defer.inlineCallbacks
-    def tearDown(self):
-        IonTestCase.tearDown(self)
 
     @defer.inlineCallbacks
+    def tearDown(self):
+        ""
+        yield self._stopMagnet()
+
+    @defer.inlineCallbacks
+    def _test_basic(self):
+        messaging = {}
+        
+        workers = [
+            {'name':'hello','module':'ion.services.hello_service','class':'HelloService'},
+            {'name':'hello1','module':'ion.services.hello_service','class':'HelloService'},
+            {'name':'hello2','module':'ion.services.hello_service','class':'HelloService'},
+        ]
+        
+        yield bootstrap.bootstrap(messaging, workers)
+ 
+     #@defer.inlineCallbacks
     def test_worker_queue(self):
         messaging = {'worker1':{'name_type':'worker', 'args':{'scope':'local'}}}
         
@@ -35,17 +50,22 @@ class WorkerTest(IonTestCase):
             {'name':'workerProc2','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'worker1','scope':'local'}},
         ]
         
-        yield self._startMagnet()
         yield bootstrap.bootstrap(messaging, workers)
         
-        sup = yield procRegistry.get("bootstrap")
+        sup = yield base_process.procRegistry.get("bootstrap")
         logging.info("Supervisor: "+repr(sup))
-        
-        yield self._stopMagnet()
-        
 
-    def _test_fanout(self):
+
+    #@defer.inlineCallbacks
+    def test_fanout(self):
+        messaging = {'fanout1':{'name_type':'fanout', 'args':{'scope':'local'}}}
+
         workers = [
             {'name':'fanoutProc1','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'fanout1','scope':'local'}},
             {'name':'fanoutProc2','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'fanout1','scope':'local'}},
         ]
+
+        yield bootstrap.bootstrap(messaging, workers)
+        
+        sup = yield base_process.procRegistry.get("bootstrap")
+        logging.info("Supervisor: "+repr(sup))

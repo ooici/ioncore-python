@@ -11,8 +11,8 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.store import Store
 
-from ion.core.base_process import procRegistry
-from ion.core.base_process import RpcClient
+from ion.core import base_process
+from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.data.dataobject import DataObject
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
@@ -55,7 +55,7 @@ class ResourceRegistryClient(BaseServiceClient):
         self.rpc = RpcClient()
         yield self.rpc.attach()
 
-        resregsvc = yield procRegistry.get('resource_registry')
+        resregsvc = yield base_process.procRegistry.get('resource_registry')
         resmsg = yield self.rpc.rpc_send(str(resregsvc), 'register_resource', {'res_desc':res_desc.__dict__}, {})
         logging.info('Service reply: '+str(resmsg))
         defer.returnValue(str(resmsg['content']['res_id']))
@@ -65,7 +65,7 @@ class ResourceRegistryClient(BaseServiceClient):
         self.rpc = RpcClient()
         yield self.rpc.attach()
 
-        resregsvc = yield procRegistry.get('resource_registry')
+        resregsvc = yield base_process.procRegistry.get('resource_registry')
         resmsg = yield self.rpc.rpc_send(str(resregsvc), 'get_resource_desc', {'res_id':res_id}, {})
         logging.info('Service reply: '+str(resmsg))
         rd = ResourceDesc()
@@ -154,9 +154,9 @@ class ResourceTypeDesc(DataObject):
         if 'desc' in kwargs:
             self.desc = kwargs['desc']
 
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = ResourceRegistryService(receiver)
+# Spawn of the process using the module name
+factory = ProtocolFactory(ResourceRegistryService)
+
 
 """
 from ion.services.coi.resource_registry import *

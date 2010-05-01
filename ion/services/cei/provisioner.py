@@ -11,17 +11,12 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import RpcClient
+from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
 
 class ProvisionerService(BaseService):
     """Provisioner service interface
     """
 
-
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = ProvisionerService(receiver)
+# Spawn of the process using the module name
+factory = ProtocolFactory(ProvisionerService)

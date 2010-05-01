@@ -15,6 +15,7 @@ from magnet import container
 
 from magnet.store import Store
 
+from ion.core import base_process
 from ion.core import bootstrap
 from ion.core import ioninit
 import ion.util.procutils as pu
@@ -48,4 +49,5 @@ class IonTestCase(unittest.TestCase):
         self.cont_conn.transport.loseConnection()
         container.Container._started = False
         container.Container.store = Store()
+        bootstrap.reset_container()
         logging.info("============ION container closed============")

@@ -11,11 +11,9 @@ import logging
 from magnet.spawnable import Receiver
 
 from ion.core.supervisor import Supervisor, ChildProcess
+from ion.services.base_process import ProtocolFactory
 from ion.services.base_service import BaseService
 
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
 
 class CCAgent(BaseService):
     """Capability Container agent service interface
@@ -38,7 +36,5 @@ class CCAgent(BaseService):
     def op_getConfig(self, content, headers, msg):
         pass
 
-
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = CCAgent(receiver)
+# Spawn of the process using the module name
+factory = ProtocolFactory(CCAgent)

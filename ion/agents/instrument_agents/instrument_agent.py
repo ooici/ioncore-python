@@ -1,18 +1,14 @@
 #!/usr/bin/env python
 
-from ion.agents.resource_agent import ResourceAgent
-
 from twisted.python import log
 from twisted.internet import defer
 
 from magnet.spawnable import Receiver
 from magnet.spawnable import send
 from magnet.spawnable import spawn
-from magnet.store import Store
 
-store = Store()
-
-receiver = Receiver(__name__)
+from ion.agents.resource_agent import ResourceAgent
+from ion.core.base_process import ProtocolFactory
 
 @defer.inlineCallbacks
 def start():
@@ -57,9 +53,5 @@ class InstrumentAgent(ResourceAgent):
         """
         """
 
-def receive(content, msg):
-    instance.receive(content, msg)
-
-instance = InstrumentAgent()
-
-receiver.handle(receive)
+# Spawn of the process using the module name
+factory = ProtocolFactory(InstrumentAgent)

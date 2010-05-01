@@ -12,15 +12,15 @@ from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
 import ion.util.procutils as pu
-from ion.core.base_process import BaseProcess, RpcClient
+from ion.core.base_process import BaseProcess, ProtocolFactory, RpcClient
 
 class Supervisor(BaseProcess):
     """
     Base class for a supervisor process
     """
 
-    # Static definition of child processes
-    childProcesses = []
+    def setChildProcesses(self, childprocs):
+        self.childProcesses = childprocs
 
     @defer.inlineCallbacks
     def spawnChildProcesses(self):
@@ -34,6 +34,8 @@ class Supervisor(BaseProcess):
 
         for child in self.childProcesses:
             yield child.initChild()
+
+        logging.info("All processes initialized")
 
     def event_failure(self):
         return
@@ -89,22 +91,8 @@ class ChildProcess(object):
     def _prepInitMsg(self):
         return {'proc-name':self.procName, 'sup-id':self.supProcess.receiver.spawned.id.full}
 
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = Supervisor(receiver)
-
-@defer.inlineCallbacks
-def test_sup():
-    children = [
-        ChildProcess('ion.services.coi.resource_registry','ResourceRegistryService',None),
-        ChildProcess('ion.services.coi.service_registry','ServiceRegistryService',None),
-    ]
-    instance.childProcesses = children
-    sup_id = yield spawn(receiver)
-
-    yield instance.spawnChildProcesses()
-
-    logging.info('Spawning completed')
+# Spawn of the process using the module name
+factory = ProtocolFactory(Supervisor)
 
 """
 from ion.core import supervisor as s
