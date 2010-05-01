@@ -12,7 +12,7 @@ from magnet.spawnable import Receiver
 
 from ion.core import ionconst as ic
 import ion.util.procutils as pu
-from ion.core.base_process import RpcClient
+from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
 
 logging.basicConfig(level=logging.DEBUG)
@@ -22,8 +22,8 @@ class HelloService(BaseService):
     """Example service implementation
     """
     
-    def __init__(self, receiver):
-        BaseService.__init__(self, receiver)
+    def __init__(self, receiver, spawnArgs=None):
+        BaseService.__init__(self, receiver, spawnArgs)
         logging.info('HelloService.__init__()')
 
     def slc_init(self):
@@ -48,9 +48,9 @@ class HelloServiceClient(RpcClient):
         logging.info('Friends reply: '+str(cont))
 
 
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = HelloService(receiver)
+# Spawn of the process using the module name
+factory = ProtocolFactory(HelloService)
+
 
 
 """

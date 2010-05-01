@@ -24,8 +24,10 @@ class WorkerProcess(BaseService):
     @defer.inlineCallbacks
     def slc_init(self):
         msg_name = self.spawnArgs['service-name']
+        scope = self.spawnArgs['scope']
         logging.info("slc_init name received:"+msg_name)
-        msg_name1 = Container.id + "." + msg_name
+        if scope == 'local':
+            msg_name1 = Container.id + "." + msg_name
         logging.info("slc_init name used:"+msg_name1)
         workReceiver = Receiver(__name__, msg_name1)
         self.workReceiver = workReceiver
@@ -33,9 +35,6 @@ class WorkerProcess(BaseService):
     
     def op_hello(self, content, headers, msg):
         logging.info('op_hello: '+str(content)+' id='+self.receiver.id.full)
-        
-    @defer.inlineCallbacks
-    def startWorker(self):
-        work_id = yield spawn(self.workReceiver)
 
+# Spawn of the process using the module name
 factory = ProtocolFactory(WorkerProcess)
