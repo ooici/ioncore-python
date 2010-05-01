@@ -9,17 +9,10 @@
 import logging
 
 from twisted.trial import unittest
-from twisted.internet import reactor
 from twisted.internet import defer
-from twisted.internet.defer import inlineCallbacks, DeferredQueue
 
 from magnet import container
-from magnet.service import Magnet
-from magnet.service import Options
 
-from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
 from magnet.store import Store
 
 from ion.core import bootstrap
@@ -32,9 +25,6 @@ class IonTestCase(unittest.TestCase):
     purposes of supporting ION tests with a container/AMQP based execution
     environment
     """
-    
-    def setUp(self):
-        pass
 
     @defer.inlineCallbacks
     def _startMagnet(self):
@@ -46,13 +36,16 @@ class IonTestCase(unittest.TestCase):
         mopt['script'] = None
  
         self.cont_conn = yield container.startContainer(mopt)
-        logging.info("Magnet container started, "+repr(self.cont_conn))
+        logging.info("============Magnet container started, "+repr(self.cont_conn))
         
     @defer.inlineCallbacks
     def _startCoreServices(self):
-        yield bootstrap.bootstrap_core_services()
-        logging.info("Core ION services started")
+        yield bootstrap.bootstrap(None, bootstrap.ion_core_services)
+        logging.info("============Core ION services started============")
 
     def _stopMagnet(self):
+        logging.info("Closing ION container")
         self.cont_conn.transport.loseConnection()
         container.Container._started = False
+        container.Container.store = Store()
+        logging.info("============ION container closed============")

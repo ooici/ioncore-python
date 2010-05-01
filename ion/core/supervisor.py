@@ -68,6 +68,7 @@ class ChildProcess(object):
             self.procModObj = proc_mod
 
             # Spawn instance of a process
+            logging.debug("Process spawn args="+str(self.spawnArgs))
             proc_id = yield spawn(proc_mod, None, self.spawnArgs)
             self.procId = proc_id
             self.procState = 'SPAWNED'
