@@ -85,7 +85,7 @@ class ResourceTypes(object):
     RESTYPE_UNASSIGNED = 'rt_unassigned'
     
     def __init__(self):
-        raise RuntimeException('Do not instantiate '+self.__class__.__name__)
+        raise RuntimeError('Do not instantiate '+self.__class__.__name__)
 
 class ResourceLCState(object):
     """Static class with constant definitions for resource life cycle states.
@@ -98,7 +98,7 @@ class ResourceLCState(object):
     RESLCS_RETIRED = 'rlcs_retired'
     
     def __init__(self):
-        raise RuntimeException('Do not instantiate '+self.__class__.__name__)
+        raise RuntimeError('Do not instantiate '+self.__class__.__name__)
 
 class ResourceDesc(DataObject):
     """Structured object for a resource description.
@@ -116,7 +116,7 @@ class ResourceDesc(DataObject):
         if 'res_type' in kwargs:
             self.res_type = kwargs['res_type']
         else:
-            raise RuntimeException("Resource type missing")
+            raise RuntimeError("Resource type missing")
             
         if 'name' in kwargs:
             self.res_name = kwargs['name']
@@ -139,7 +139,7 @@ class ResourceTypeDesc(DataObject):
         if 'name' in kwargs:
             self.name = kwargs['name']
         else:
-            raise RuntimeException("Resource type name missing")
+            raise RuntimeError("Resource type name missing")
 
         if 'based_on' in kwargs:
             self.based_on = kwargs['based_on']
