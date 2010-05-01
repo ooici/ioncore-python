@@ -112,16 +112,20 @@ class SBE49InstrumentAgent(InstrumentAgent):
     @defer.inlineCallbacks
     def op_getLifecycleState(self, content, headers, msg):
         """
-        Return the lifecycle state in a reply message
+        Query the lifecycle state of the object
+        @return Message with the lifecycle state
         """
-        print 'lifecycleState is: ', self.lifecycleState
+        yield self.reply_message(msg, 'getLifecycleState',
+                                 self.lifecycleState, {})
     
     @defer.inlineCallbacks
     def op_setLifecycleState(self, content, headers, msg):
         """
-        Set the lifecycle state, reply with an ACK message
+        Set the lifecycle state
+        @return Message with the lifecycle state that was set
         """
         self.lifecycleState = content
+        yield self.reply_message(msg, 'setLifecycleState', content, {})
     
     @defer.inlineCallbacks
     def op_execute(self, content, headers, msg):

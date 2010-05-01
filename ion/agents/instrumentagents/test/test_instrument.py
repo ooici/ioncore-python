@@ -46,7 +46,7 @@ class TestInstrumentAgent(IonTestCase, RpcClient):
         """
         yield self.store.put('test_instrument', id)
     
-        svc_mod = __import__('ion.agents.instrumentagents.SBE49', globals(), \
+        svc_mod = __import__('ion.agents.instrumentagents.SBE49', globals(),
                              locals(), ['SBE49InstrumentAgent'])
 
         # Spawn instance of a service
@@ -67,15 +67,16 @@ class TestInstrumentAgent(IonTestCase, RpcClient):
         self.assertEqual(response['content'], {'baudrate' : 19200,
                                                'outputformat' : 1})       
      
-    """ 
-        yield pu.send_message(self.receiver, '', svc_id, 'getLifecycleState', (), {})
-     
-        yield pu.send_message(self.receiver, '', svc_id, 'setLifecycleState', {})
-    """
-
-#    def receive(self, content, msg):
-#        print 'in TestInstrumentAgent receive ', content, msg
-#        instance.receive(content, msg)
+        response = yield self.rpc_send(svc_id, 'setLifecycleState',
+                                       'undeveloped', {})
+        self.assertEqual(response['content'], 'undeveloped')       
+        response = yield self.rpc_send(svc_id, 'getLifecycleState', '', {})
+        self.assertEqual(response['content'], 'undeveloped')       
+        response = yield self.rpc_send(svc_id, 'setLifecycleState',
+                                       'developed', {})
+        self.assertEqual(response['content'], 'developed')       
+        response = yield self.rpc_send(svc_id, 'getLifecycleState', '', {})
+        self.assertEqual(response['content'], 'developed')       
 
 
 def start():
