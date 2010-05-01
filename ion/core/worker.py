@@ -10,6 +10,7 @@ import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
+from magnet.spawnable import Container
 from magnet import spawnable
 
 import ion.util.procutils as pu
@@ -23,8 +24,10 @@ class WorkerProcess(BaseService):
     @defer.inlineCallbacks
     def slc_init(self):
         msg_name = self.spawnArgs['service-name']
-        logging.info("slc_init name used:"+msg_name)
-        workReceiver = Receiver(__name__, msg_name)
+        logging.info("slc_init name received:"+msg_name)
+        msg_name1 = Container.id + "." + msg_name
+        logging.info("slc_init name used:"+msg_name1)
+        workReceiver = Receiver(__name__, msg_name1)
         self.workReceiver = workReceiver
         id = yield spawn(workReceiver)
     

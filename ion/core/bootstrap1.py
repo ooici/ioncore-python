@@ -70,7 +70,7 @@ def bs_messaging(messagingCfg):
         yield Container.configure_messaging(msgName, msgResource)
         
         # save name is the name registry
-        yield nameRegistry.put(name, msgResource)
+        yield nameRegistry.put(msgName, msgResource)
         
 @defer.inlineCallbacks
 def bs_processes(procs):

@@ -41,7 +41,8 @@ class Supervisor(BaseProcess):
 
 class ChildProcess(object):
     """
-    Class that encapsulates attributes about a child process
+    Class that encapsulates attributes about a child process and can spawn
+    child processes.
     """
     def __init__(self, procMod, procClass=None, node=None, spawnArgs=None):
         self.procModule = procMod
