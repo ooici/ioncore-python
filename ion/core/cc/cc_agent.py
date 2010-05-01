@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/agents/cc_agent.py
+@file ion/core/cc/cc_agent.py
 @author Michael Meisinger
-@brief capability container control
+@brief capability container control process
 """
 
 import logging
@@ -12,14 +12,14 @@ from magnet.spawnable import Receiver
 
 from ion.core.supervisor import Supervisor, ChildProcess
 from ion.services.base_process import ProtocolFactory
-from ion.services.base_service import BaseService
+from ion.agents.resource_agent import ResourceAgent
 
 
-class CCAgent(BaseService):
-    """Capability Container agent service interface
+class CCAgent(ResourceAgent):
+    """Capability Container agent process interface
     """
 
-    def slc_init(self):
+    def plc_init(self):
         self.supervisor = Supervisor(self.receiver)
 
     def op_spawn(self, content, headers, msg):

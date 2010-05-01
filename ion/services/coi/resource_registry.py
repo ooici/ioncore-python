@@ -96,6 +96,8 @@ class ResourceLCState(object):
     RESLCS_INACTIVE = 'rlcs_inactive'
     RESLCS_DECOMM = 'rlcs_decomm'
     RESLCS_RETIRED = 'rlcs_retired'
+    RESLCS_DEVELOPED = 'rlcs_developed'
+    RESLCS_COMMISSIONED = 'rlcs_commissioned'
     
     def __init__(self):
         raise RuntimeError('Do not instantiate '+self.__class__.__name__)
