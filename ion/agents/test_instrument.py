@@ -4,7 +4,7 @@
 @file ion/services/cei/provisioner.py
 @author Michael Meisinger
 @author Stephen Pasco
-@package ion.agents service for provisioning operational units (VM instances).
+@brief service for provisioning operational units (VM instances).
 """
 
 from twisted.python import log

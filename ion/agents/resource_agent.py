@@ -3,7 +3,7 @@
 """
 @file ion/agents/resource_agent.py
 @author Stephen Pasco
-@package ion.agents abstract superclass for all agents
+@brief abstract superclass for all agents
 """
 
 from ion.core.base_process import BaseProcess

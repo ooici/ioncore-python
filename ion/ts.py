@@ -3,7 +3,7 @@
 """
 @file ion/ts.py
 @author Michael Meisinger
-@package ion  test service with short packet and module name
+@brief test service with short packet and module name
 """
 
 

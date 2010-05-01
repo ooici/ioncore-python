@@ -3,7 +3,7 @@
 """
 @file ion/agents/instrument_agents/SBE49_instrument_agent.py
 @author Steve Foley
-@package ion.agents.instrument_agents CI interface for SeaBird SBE-49 CTD
+@brief CI interface for SeaBird SBE-49 CTD
 """
 import logging
 from twisted.internet import defer
