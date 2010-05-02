@@ -14,6 +14,16 @@ from magnet.container import Id
 
 from ion.core import ionconst as ic
 
+def log_exception(msg=None, e=None):
+    """Logs a recently caught exception and prints traceback
+    """
+    if msg and e:
+        logging.error(msg + " " + repr(e))
+    elif msg:
+        logging.error(msg)
+    (etype, value, trace) = sys.exc_info()
+    traceback.print_tb(trace)
+
 def log_attributes(obj):
     """Print an object's attributes
     """
@@ -30,7 +40,8 @@ def log_message(proc, body, msg):
     lstr = ""
     lstr += "===Message=== RECEIVED @" + str(proc) + "\n"
     amqpm = str(msg._amqp_message)
-    amqpm = re.sub("body='[^']*'","*BODY*", amqpm)
+    # Cut out the redundant or encrypted AMQP body to make log shorter
+    amqpm = re.sub("body='(\\\\'|[^'])*'","*BODY*", amqpm)
     lstr += '---AMQP--- ' + amqpm
     lstr += "\n---CARROT--- "
     for attr,value in msg.__dict__.iteritems():
@@ -86,7 +97,12 @@ def send_message(receiver, send, recv, operation, content, headers):
     msg['op'] = operation
     msg['content'] = content
     logging.info("Send message op="+operation+" to="+str(recv))
-    yield receiver.send(recv, msg)
+    try:
+        yield receiver.send(recv, msg)
+    except StandardError, e:
+        log_exception("Send error: ", e)
+    else:
+        logging.info("Message sent!")
 
 def dispatch_message(content, msg, dispatchIn):
     """
@@ -117,12 +133,8 @@ def dispatch_message(content, msg, dispatchIn):
                 logging.error("Receive() failed. Cannot dispatch to catch")
         else:
             logging.error("Receive() failed. Bad message", content)
-    except Exception, e:
-        logging.error('Exception while dispatching: '+repr(e))
-        (type, value, trace) = sys.exc_info()
-        traceback.print_tb(trace)
-
- #       logging.error('Traceback: '+trace.format_exc())
+    except StandardError, e:
+        log_exception('Exception while dispatching: ',e)
 
 id_seqs = {}
 def create_unique_id(ns):
@@ -157,6 +169,8 @@ def get_class(qualclassname, mod=None):
     logging.debug('Class: '+str(cls))
     return cls
 
+get_modattr = get_class
+
 def get_module(qualmodname):
     """Imports module and returns module object
     @param fully qualified modulename, such as ion.data.dataobject
@@ -168,3 +182,4 @@ def get_module(qualmodname):
     mod = __import__(qualmodname, globals(), locals(), [modname])
     logging.debug('Module: '+str(mod))
     return mod
+
