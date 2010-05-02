@@ -7,16 +7,67 @@
 """
 
 import logging
+import hashlib
+import json
 
-from magnet.container import InterceptorSystem
+from magnet.container import InterceptorSystem, Interceptor
+from carrot.backends.base import BaseMessage
 
-def _gettransform(purpose):
-    def pass_transform(msg):
-        """Trivial identity transform -- pass all
+class IdmInterceptor(Interceptor):
+    @classmethod
+    def transform(cls, msg):
+        """Identity management transform
         """
-        #logging.info('pass_transform ' + purpose + ' ' +str(msg))
+        if isinstance(msg, BaseMessage):
+            msg = cls.message_validator(msg)
+        else:
+            msg = cls.message_signer(msg)
         return msg
-    return pass_transform
+
+    @classmethod
+    def message_validator(cls, msg):
+        #logging.info('IdM interceptor IN')
+        cont = msg.payload.copy()
+        hashrec = cont.pop('signature')
+        blob = json.dumps(cont, sort_keys=True)
+        hash = hashlib.sha1(blob).hexdigest()
+        if hash != hashrec:
+            logging.info("*********message signature wrong***********")
+        return msg
+
+    @classmethod
+    def message_signer(cls, msg):
+        #logging.info('IdM interceptor OUT')
+        blob = json.dumps(msg, sort_keys=True)
+        hash = hashlib.sha1(blob).hexdigest()
+        msg['signature'] = hash
+        return msg
+                
+class PolicyInterceptor(Interceptor):
+    @classmethod
+    def transform(cls, msg):
+        """Policy transform -- pass all
+        """
+        if isinstance(msg, BaseMessage):
+            ""
+            #logging.info('Policy interceptor IN')
+        else:
+            ""
+            #logging.info('Policy interceptor OUT')
+        return msg
+    
+class GovernanceInterceptor(Interceptor):
+    @classmethod
+    def transform(cls, msg):
+        """Governance transform -- pass all
+        """
+        if isinstance(msg, BaseMessage):
+            ""
+            #logging.info('Governance interceptor IN')
+        else:
+            ""
+            #logging.info('Governance interceptor OUT')
+        return msg
 
 class BaseInterceptorSystem(InterceptorSystem):
     """Custom capability container interceptor system for secutiry and
@@ -24,8 +75,7 @@ class BaseInterceptorSystem(InterceptorSystem):
     """
     def __init__(self):
         InterceptorSystem.__init__(self)
-        self.registerIdmInterceptor(_gettransform('IdM'))
-        self.registerPolicyInterceptor(_gettransform('Policy'))
-        self.registerGovernanceInterceptor(_gettransform('Gov'))
+        self.registerIdmInterceptor(IdmInterceptor.transform)
+        self.registerPolicyInterceptor(PolicyInterceptor.transform)
+        self.registerGovernanceInterceptor(GovernanceInterceptor.transform)
         logging.info("Initialized ION BaseInterceptorSystem")
-
