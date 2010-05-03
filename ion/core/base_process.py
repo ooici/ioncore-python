@@ -10,6 +10,7 @@
 import logging
 
 from twisted.internet import defer
+from magnet.container import Container
 from magnet.spawnable import Receiver
 from magnet.spawnable import ProtocolFactory
 from magnet.spawnable import spawn
@@ -20,6 +21,7 @@ import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
+CF_container_group = ioninit.ion_config.getValue2('ion.core.bootstrap','container_group',Container.id)
 
 # Static store (kvs) to register process instances with names
 procRegistry = Store()
@@ -43,6 +45,7 @@ class BaseProcess(object):
         spawnArgs = spawnArgs.copy() if spawnArgs else {}
 
         self.procName = __name__
+        self.sysName = Container.id # The ID that originates from the root supv
         self.idStore = Store()
         self.receiver = receiver
         self.spawnArgs = spawnArgs
@@ -54,6 +57,7 @@ class BaseProcess(object):
         """
         logging.info('BaseProcess.op_init: '+str(content))
         if self.procState == "UNINITIALIZED":
+            self.sysName = content.get('sys-name', Container.id)
             self.procName = content.get('proc-name', __name__)
             supId = content.get('sup-id', None)
             self.procSupId = pu.get_process_id(supId)
@@ -122,6 +126,23 @@ class BaseProcess(object):
         #    send = self.receiver.spawned.id.full
             #pu.send_message(self.receiver, send, '', 'logmsg', {}, {})
 
+    def get_local_name(self, name):
+        """Returns a name that is qualified by the system name. System name is
+        the ID of the container the originated the entire system"""
+        return self.sysName + "." + name
+
+    def get_group_name(self, name):
+        """Returns a name that is qualified by a configured group name."""
+        return CF_container_group + "." + name
+
+    def get_scoped_name(self, scope, name):
+        """Returns a name that is scoped.
+        @param scope  one of "local", "group" or "global"
+        @param name name to be scoped
+        """
+        if scope == 'local': return self.get_local_name(name)
+        if scope == 'group': return self.get_group_name(name)
+        return  name
 
 class ProtocolFactory(ProtocolFactory):
     """Standard protocol factory that is instantiated in each service process

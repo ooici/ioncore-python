@@ -11,8 +11,6 @@ from twisted.internet import defer
 from twisted.trial import unittest
 from magnet.container import Container
 
-from ion.core import bootstrap
-from ion.core import base_process
 from ion.core.worker import *
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
@@ -31,15 +29,13 @@ class WorkerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def _test_basic(self):
-        messaging = {}
-        
         workers = [
             {'name':'hello','module':'ion.services.hello_service','class':'HelloService'},
             {'name':'hello1','module':'ion.services.hello_service','class':'HelloService'},
             {'name':'hello2','module':'ion.services.hello_service','class':'HelloService'},
         ]
         
-        yield bootstrap.bootstrap(messaging, workers)
+        yield self._spawnProcesses(workers)
  
     @defer.inlineCallbacks
     def test_worker_queue(self):
@@ -49,10 +45,11 @@ class WorkerTest(IonTestCase):
             {'name':'workerProc1','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'worker1','scope':'local'}},
             {'name':'workerProc2','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'worker1','scope':'local'}},
         ]
+
+        yield self._declareMessaging(messaging)
+        yield self._spawnProcesses(workers)
         
-        yield bootstrap.bootstrap(messaging, workers)
-        
-        sup = yield base_process.procRegistry.get("bootstrap")
+        sup = yield self.procRegistry.get("bootstrap")
         logging.info("Supervisor: "+repr(sup))
 
         wc = WorkerClient()
@@ -80,9 +77,10 @@ class WorkerTest(IonTestCase):
             {'name':'fanoutProc2','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'fanout1','scope':'local'}},
         ]
 
-        yield bootstrap.bootstrap(messaging, workers)
+        yield self._declareMessaging(messaging)
+        yield self._spawnProcesses(workers)
         
-        sup = yield base_process.procRegistry.get("bootstrap")
+        sup = yield self.procRegistry.get("bootstrap")
         logging.info("Supervisor: "+repr(sup))
 
         wc = WorkerClient()

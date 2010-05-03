@@ -26,8 +26,7 @@ class WorkerProcess(BaseService):
         msg_name = self.spawnArgs['service-name']
         scope = self.spawnArgs['scope']
         logging.info("slc_init name received:"+msg_name)
-        if scope == 'local':
-            msg_name1 = Container.id + "." + msg_name
+        msg_name1 = self.get_scoped_name(scope, msg_name)
         logging.info("slc_init name used:"+msg_name1)
         workReceiver = Receiver(__name__, msg_name1)
         self.workReceiver = workReceiver
