@@ -18,5 +18,14 @@ class ProvisionerService(BaseService):
     """Provisioner service interface
     """
 
+    def op_provision(self, content, headers, msg):
+        """Service operation: Provision a taskable resource
+        """
+
+    def op_terminate(self, content, headers, msg):
+        """Service operation: Terminate a taskable resource
+        """
+        
+        
 # Spawn of the process using the module name
 factory = ProtocolFactory(ProvisionerService)

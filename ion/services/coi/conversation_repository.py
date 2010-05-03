@@ -23,16 +23,27 @@ class ConversationRepositoryService(BaseService):
     def slc_init(self):
         pass
 
-    def op_register_conv_type(self, content, headers, msg):
-        pass
+    def op_define_conv_type(self, content, headers, msg):
+        """Service operation: Define a new conversation type (aka protocol,
+        interaction pattern)
+        """
 
-    def op_get_conv_spec(self, content, headers, msg):
-        pass
+    def op_get_conv_type(self, content, headers, msg):
+        """Service operation: Returns the description of the conversation type
+        including the specification
+        """
 
-    def op_newconv(self, content, headers, msg):
-        pass
+    def op_define_conversation(self, content, headers, msg):
+        """Service operation: Create a new conversation (instance) definition
+        """
 
-    def op_logmsg(self, content, headers, msg):
+    def op_bind_conversation(self, content, headers, msg):
+        """Service operation: Add oneself to the conversation role binding
+        """
+
+    def op_log_message(self, content, headers, msg):
+        """Service operation: Log an occurred message with the repository
+        """
         logmsg = content['msg']
         logserv.info("-----------------------------------------------\n"+
                      str(logmsg))

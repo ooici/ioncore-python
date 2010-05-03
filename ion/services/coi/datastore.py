@@ -29,6 +29,8 @@ class DatastoreService(BaseService):
 
     @defer.inlineCallbacks
     def op_put(self, content, headers, msg):
+        """Service operation: Store object in the datastore
+        """
         key = content.get('key','')
         value = content.get('value','')
         logging.info('Datastore.put('+key+','+value+')')
@@ -36,6 +38,8 @@ class DatastoreService(BaseService):
 
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
+        """Service operation: Retrieve object from the datastore
+        """
         key = content.get('key','')
         logging.info('Datastore.get('+key+')')
 
@@ -46,8 +50,6 @@ class DatastoreService(BaseService):
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(DatastoreService)
-
-
 
 """
 from ion.services.coi import datastore as d
