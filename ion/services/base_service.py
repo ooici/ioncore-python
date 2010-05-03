@@ -48,6 +48,7 @@ class BaseService(BaseProcess):
     def service_declare(cls, **kwargs):
         """Helper method to declare service process module attributes
         """
+        logging.info("Service-declare: "+str(kwargs))
         decl = {}
         decl.update(kwargs)
         return decl

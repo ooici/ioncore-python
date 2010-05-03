@@ -26,6 +26,8 @@ CF_container_group = ioninit.ion_config.getValue2('ion.core.bootstrap','containe
 # Static store (kvs) to register process instances with names
 procRegistry = Store()
 
+processes = {}
+
 class BaseProcess(object):
     """
     This is the base class for all processes. Processes are Spawnables before
@@ -154,6 +156,10 @@ class ProtocolFactory(ProtocolFactory):
         self.processClass = processClass
         self.name = name
         self.args = args
+        if processClass:
+            if hasattr(processClass, 'declare') and type(processClass.declare) is dict:
+                processes[processClass.declare.get('name',processClass.__name__)] = processClass.declare
+                
 
     def build(self, spawnArgs={}):
         """Factory method return a new receiver for a new process. At the same
