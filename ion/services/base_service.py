@@ -43,11 +43,24 @@ class BaseService(BaseProcess):
     @classmethod
     def _add_conv_type(cls):
         pass
+    
+    @classmethod
+    def service_declare(cls, **kwargs):
+        """Helper method to declare service process module attributes
+        """
+        decl = {}
+        decl.update(kwargs)
+        return decl
 
 class BaseServiceClient(object):
     """This is the abstract base class for service client libraries.
     """
-
+    def __init__(self, proc=None):
+        self.process = proc
+    
+    def attach(self):
+        if self.process and self.process.receiver.spawned:
+            pass
 
 class BaseServiceImplementation(object):
     """This is the abstract base class for all service provider implementations

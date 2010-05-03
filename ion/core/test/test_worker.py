@@ -42,7 +42,7 @@ class WorkerTest(IonTestCase):
         yield bootstrap.bootstrap(messaging, workers)
  
     @defer.inlineCallbacks
-    def _test_worker_queue(self):
+    def test_worker_queue(self):
         messaging = {'worker1':{'name_type':'worker', 'args':{'scope':'local'}}}
         
         workers = [
@@ -62,7 +62,7 @@ class WorkerTest(IonTestCase):
         for i in range(1,11):
             yield wc.submit_work(wq_name, i, 1)
         
-        yield pu.asleep(3)
+        yield pu.asleep(10)
         logging.info("Work results: "+str(wc.workresult))
         logging.info("Worker results: "+str(wc.worker))
         
@@ -89,15 +89,15 @@ class WorkerTest(IonTestCase):
         wcId = yield spawn(wc.receiver)
 
         wq_name = Container.id + ".fanout1"
-        for i in range(1,3):
+        for i in range(1,6):
             yield wc.submit_work(wq_name, i, 1)
         
-        yield pu.asleep(3)
+        yield pu.asleep(8)
         logging.info("Work results: "+str(wc.workresult))
         logging.info("Worker results: "+str(wc.worker))
         
         sum = 0
         for w,v in wc.worker.items():
             sum += v
-        #self.assertEqual(sum, 20)
+        self.assertEqual(sum, 10)
         

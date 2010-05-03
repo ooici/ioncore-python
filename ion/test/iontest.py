@@ -15,7 +15,7 @@ from magnet import container
 from magnet.container import Id
 from magnet.store import Store
 
-from ion.core import bootstrap
+from ion.core import base_process, bootstrap
 from ion.core import ioninit
 import ion.util.procutils as pu
 
@@ -25,6 +25,8 @@ class IonTestCase(unittest.TestCase):
     purposes of supporting ION tests with a container/AMQP based execution
     environment
     """
+
+    procRegistry = base_process.procRegistry
 
     @defer.inlineCallbacks
     def _startContainer(self):
@@ -36,6 +38,8 @@ class IonTestCase(unittest.TestCase):
         mopt['script'] = None
  
         self.cont_conn = yield container.startContainer(mopt)
+        bootstrap.init_container()
+        self.procRegistry = base_process.procRegistry
         logging.info("============Magnet container started, "+repr(self.cont_conn))
     
     _startMagnet = _startContainer
@@ -55,4 +59,10 @@ class IonTestCase(unittest.TestCase):
 
     _stopMagnet = _stopContainer
 
-
+    @defer.inlineCallbacks
+    def _declareMessaging(self, messaging):
+        yield bootstrap.bs_messaging(messaging)
+    
+    @defer.inlineCallbacks
+    def _spawnProcesses(self, procs):
+        yield bootstrap.bs_processes(procs)

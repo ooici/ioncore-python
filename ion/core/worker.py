@@ -43,7 +43,7 @@ class WorkerProcess(BaseService):
 
     @defer.inlineCallbacks
     def op_work(self, content, headers, msg):
-        self._work(content)
+        yield self._work(content)
         yield self.reply_message(msg, 'result', {'work-id':content['work-id']}, {})        
 
     @defer.inlineCallbacks

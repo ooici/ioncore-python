@@ -18,6 +18,9 @@ class HelloService(BaseService):
     """Example service implementation
     """
     
+    # Declaration of service
+    declare = BaseService.service_declare(name='hello', version='0.1.0', dependencies=[])
+    
     def __init__(self, receiver, spawnArgs=None):
         BaseService.__init__(self, receiver, spawnArgs)
         logging.info('HelloService.__init__()')

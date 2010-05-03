@@ -75,6 +75,7 @@ class BaseProcess(object):
         logging.info('BaseProcess.receive()')
         d = self.dispatch_message(content, msg)
         def _cb(res):
+            logging.info("******ACK msg")
             msg.ack()
         d.addCallback(_cb)
         d.addErrback(logging.error)
