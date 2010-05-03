@@ -19,6 +19,9 @@ class DataProductRegistryService(BaseService):
     created as a pipeline of refining raw data through automatic and manual
     QAQC processes.
     """
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='data_product_registry', version='0.1.0', dependencies=[])
  
     def op_define_data_product(self, content, headers, msg):
         """Service operation: Create or update a data product definition.

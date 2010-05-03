@@ -18,6 +18,9 @@ class ExchangeRegistryService(BaseService):
     """Exchange registry service interface
     """
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='exchange_registry', version='0.1.0', dependencies=[])
+
     def op_define_exchange_space(self, content, headers, msg):
         """Service operation: .
         """

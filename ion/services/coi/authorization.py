@@ -18,6 +18,9 @@ class AuthorizationService(BaseService):
     """Authorization service interface
     """
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='authorization', version='0.1.0', dependencies=[])
+
     def op_authorize(self, content, headers, msg):
         """Service operation: 
         """

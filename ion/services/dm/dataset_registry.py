@@ -18,6 +18,9 @@ class DatasetRegistryService(BaseService):
     """Dataset registry service interface
     """
  
+     # Declaration of service
+    declare = BaseService.service_declare(name='dataset_registry', version='0.1.0', dependencies=[])
+
     def op_define_dataset(self, content, headers, msg):
         """Service operation: Create or update a dataset resource.
         """

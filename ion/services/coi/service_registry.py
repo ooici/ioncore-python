@@ -20,6 +20,9 @@ class ServiceRegistryService(BaseService):
     """Service registry service interface
     """
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='service_registry', version='0.1.0', dependencies=[])
+
     datastore = Store()
     
     @defer.inlineCallbacks

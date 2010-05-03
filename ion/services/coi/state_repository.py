@@ -19,6 +19,9 @@ class StateRepositoryService(BaseService):
     information shared between many processes.
     """
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='state_repository', version='0.1.0', dependencies=[])
+
     def op_define_state(self, content, headers, msg):
         """Service operation: Create a new state object (session) or update
         an existing one by replacing

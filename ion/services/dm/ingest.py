@@ -17,6 +17,9 @@ from ion.services.base_service import BaseService, BaseServiceClient
 class IngestService(BaseService):
     """Ingestion service interface
     """
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='ingest', version='0.1.0', dependencies=[])
  
     def op_ingest(self, content, headers, msg):
         """Service operation: TBD

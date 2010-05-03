@@ -18,6 +18,9 @@ class IdentityRegistryService(BaseService):
     """(User and resource) identity registry service interface
     """
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='identity_registry', version='0.1.0', dependencies=[])
+
     def op_define_identity(self, content, headers, msg):
         """Service operation: .
         """

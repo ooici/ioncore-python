@@ -23,6 +23,9 @@ class DatastoreService(BaseService):
     datastore = Store()
     #datastore = CassandraStore()
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='datastore', version='0.1.0', dependencies=[])
+
     def slc_init(self):
         pass
         #self.datastore.start()
