@@ -12,8 +12,6 @@ from twisted.python import log
 from twisted.internet import defer
 from magnet.container import Id
 
-from ion.core import ionconst as ic
-
 def log_exception(msg=None, e=None):
     """Logs a recently caught exception and prints traceback
     """

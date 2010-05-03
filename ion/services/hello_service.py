@@ -10,13 +10,9 @@ import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
-from ion.core import ionconst as ic
 import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
 
 class HelloService(BaseService):
     """Example service implementation

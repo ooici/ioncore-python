@@ -84,7 +84,7 @@ class MessageEncrypter(object):
         encmsg = encrypter.encrypt(padmsg)
         logging.info("Encrypted message len="+str(len(encmsg)))
         # HACK1: Returning the encrypted message in a mutable dict so that
-        # we can replce dict content when decoding
+        # we can replace dict content when decoding
         # HACK2: Need to repr the binary encmsg because otherwise failure        
         return {'msg':repr(encmsg)}
 
