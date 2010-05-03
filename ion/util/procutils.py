@@ -11,6 +11,7 @@ import logging
 from twisted.python import log
 from twisted.internet import defer
 from magnet.container import Id
+from magnet.store import Store
 
 def log_exception(msg=None, e=None):
     """Logs a recently caught exception and prints traceback
@@ -130,7 +131,7 @@ def dispatch_message(content, msg, dispatchIn):
             else:
                 logging.error("Receive() failed. Cannot dispatch to catch")
         else:
-            logging.error("Receive() failed. Bad message", content)
+            logging.error("Invalid message. No 'op' header", content)
     except StandardError, e:
         log_exception('Exception while dispatching: ',e)
 
@@ -180,4 +181,42 @@ def get_module(qualmodname):
     mod = __import__(qualmodname, globals(), locals(), [modname])
     logging.debug('Module: '+str(mod))
     return mod
+
+# Stuff for testing: Stubs, mock objects
+fakeStore = Store()
+
+class FakeMessage(object):
+    """Instances of this object are given to receive functions and handlers
+    by test cases, in lieu of carrot BaseMessage instances. Production code
+    detects these and no send is done.
+    """
+    def __init__(self, payload=None):
+        self.payload = payload
+    
+    @defer.inlineCallbacks
+    def send(self, to, msg):
+        self.sendto = to
+        self.sendmsg = msg
+        # Need to be a generator
+        yield fakeStore.put('fake','fake')
+
+class FakeSpawnable(object):
+    def __init__(self, id=None):
+        self.id = id if id else Id('fakec','fakep')
+
+class FakeReceiver(object):
+    """Instances of this object are given to send/spawn functions
+    by test cases, in lieu of magnet Receiver instances. Production code
+    detects these and no send is done.
+    """
+    def __init__(self, id=None):
+        self.payload = None
+        self.spawned = FakeSpawnable()
+
+    @defer.inlineCallbacks
+    def send(self, to, msg):
+        self.sendto = to
+        self.sendmsg = msg
+        # Need to be a generator
+        yield fakeStore.put('fake','fake')
 

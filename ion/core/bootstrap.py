@@ -19,7 +19,6 @@ from magnet.store import Store
 
 from ion.core import ioninit, base_process
 from ion.core.supervisor import Supervisor, ChildProcess
-from ion.core.base_process import procRegistry
 from ion.core.cc.interceptor import BaseInterceptorSystem
 from ion.util.config import Config
 import ion.util.procutils as pu

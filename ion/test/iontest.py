@@ -12,10 +12,9 @@ from twisted.trial import unittest
 from twisted.internet import defer
 
 from magnet import container
-
+from magnet.container import Id
 from magnet.store import Store
 
-from ion.core import base_process
 from ion.core import bootstrap
 from ion.core import ioninit
 import ion.util.procutils as pu
@@ -28,7 +27,7 @@ class IonTestCase(unittest.TestCase):
     """
 
     @defer.inlineCallbacks
-    def _startMagnet(self):
+    def _startContainer(self):
         mopt = {}
         mopt['broker_host'] = 'amoeba.ucsd.edu'
         mopt['broker_port'] = 5672
@@ -38,16 +37,21 @@ class IonTestCase(unittest.TestCase):
  
         self.cont_conn = yield container.startContainer(mopt)
         logging.info("============Magnet container started, "+repr(self.cont_conn))
-        
+    
+    _startMagnet = _startContainer
+
     @defer.inlineCallbacks
     def _startCoreServices(self):
         yield bootstrap.bootstrap(None, bootstrap.ion_core_services)
         logging.info("============Core ION services started============")
 
-    def _stopMagnet(self):
+    def _stopContainer(self):
         logging.info("Closing ION container")
         self.cont_conn.transport.loseConnection()
         container.Container._started = False
         container.Container.store = Store()
         bootstrap.reset_container()
         logging.info("============ION container closed============")
+
+    _stopMagnet = _stopContainer
+
