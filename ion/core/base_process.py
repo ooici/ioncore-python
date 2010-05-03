@@ -48,6 +48,7 @@ class BaseProcess(object):
         self.spawnArgs = spawnArgs
         receiver.handle(self.receive)
 
+    @defer.inlineCallbacks
     def op_init(self, content, headers, msg):
         """Init operation, on receive of the init message
         """
@@ -58,7 +59,7 @@ class BaseProcess(object):
             self.procSupId = pu.get_process_id(supId)
             logging.info('BaseProcess.op_init: proc-name='+self.procName+', sup-id='+supId)
 
-            self.plc_init()
+            r = yield defer.maybeDeferred(self.plc_init)
             logging.info('===== Process '+self.procName+' INITIALIZED ============')
 
             self.reply_message(msg, 'inform_init', {'status':'OK'}, {})
@@ -72,11 +73,14 @@ class BaseProcess(object):
 
     def receive(self, content, msg):
         logging.info('BaseProcess.receive()')
-        self.dispatch_message(content, msg)
-        msg.ack()
-
+        d = self.dispatch_message(content, msg)
+        def _cb(res):
+            msg.ack()
+        d.addCallback(_cb)
+        d.addErrback(logging.error)
+        
     def dispatch_message(self, content, msg):
-        pu.dispatch_message(content, msg, self)
+        return pu.dispatch_message(content, msg, self)
 
     def op_noop_catch(self, content, headers, msg):
         """The method called if operation is not defined

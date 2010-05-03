@@ -9,10 +9,13 @@
 import logging, time
 from twisted.internet import defer
 from twisted.trial import unittest
+from magnet.container import Container
 
 from ion.core import bootstrap
 from ion.core import base_process
+from ion.core.worker import *
 from ion.test.iontest import IonTestCase
+import ion.util.procutils as pu
 
 class WorkerTest(IonTestCase):
     """Testing service classes of resource registry
@@ -21,8 +24,6 @@ class WorkerTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._startContainer()
-        yield self._startCoreServices()
-
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -40,8 +41,8 @@ class WorkerTest(IonTestCase):
         
         yield bootstrap.bootstrap(messaging, workers)
  
-     #@defer.inlineCallbacks
-    def test_worker_queue(self):
+    @defer.inlineCallbacks
+    def _test_worker_queue(self):
         messaging = {'worker1':{'name_type':'worker', 'args':{'scope':'local'}}}
         
         workers = [
@@ -54,8 +55,23 @@ class WorkerTest(IonTestCase):
         sup = yield base_process.procRegistry.get("bootstrap")
         logging.info("Supervisor: "+repr(sup))
 
+        wc = WorkerClient()
+        wcId = yield spawn(wc.receiver)
 
-    #@defer.inlineCallbacks
+        wq_name = Container.id + ".worker1"
+        for i in range(1,11):
+            yield wc.submit_work(wq_name, i, 1)
+        
+        yield pu.asleep(3)
+        logging.info("Work results: "+str(wc.workresult))
+        logging.info("Worker results: "+str(wc.worker))
+        
+        sum = 0
+        for w,v in wc.worker.items():
+            sum += v
+        self.assertEqual(sum, 10)
+    
+    @defer.inlineCallbacks
     def test_fanout(self):
         messaging = {'fanout1':{'name_type':'fanout', 'args':{'scope':'local'}}}
 
@@ -68,3 +84,20 @@ class WorkerTest(IonTestCase):
         
         sup = yield base_process.procRegistry.get("bootstrap")
         logging.info("Supervisor: "+repr(sup))
+
+        wc = WorkerClient()
+        wcId = yield spawn(wc.receiver)
+
+        wq_name = Container.id + ".fanout1"
+        for i in range(1,3):
+            yield wc.submit_work(wq_name, i, 1)
+        
+        yield pu.asleep(3)
+        logging.info("Work results: "+str(wc.workresult))
+        logging.info("Worker results: "+str(wc.worker))
+        
+        sum = 0
+        for w,v in wc.worker.items():
+            sum += v
+        #self.assertEqual(sum, 20)
+        

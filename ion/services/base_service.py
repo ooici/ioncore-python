@@ -29,7 +29,7 @@ class BaseService(BaseProcess):
         BaseProcess.__init__(self, receiver, spawnArgs)
 
     def plc_init(self):
-        self.slc_init()
+        return self.slc_init()
 
     def slc_init(self):
         """Service life cycle event: on initialization of process (once)

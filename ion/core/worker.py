@@ -6,7 +6,7 @@
 @brief service for registering exchange names
 """
 
-import logging
+import logging, time
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
@@ -14,7 +14,7 @@ from magnet.spawnable import Container
 from magnet import spawnable
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory, RpcClient
+from ion.core.base_process import BaseProcess, ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class WorkerProcess(BaseService):
@@ -31,10 +31,53 @@ class WorkerProcess(BaseService):
         logging.info("slc_init name used:"+msg_name1)
         workReceiver = Receiver(__name__, msg_name1)
         self.workReceiver = workReceiver
+        self.workReceiver.handle(self.receive)
+
+        logging.info("slc_init worker receiver spawning")
         id = yield spawn(workReceiver)
+        logging.info("slc_init worker receiver spawned:"+str(id))
     
-    def op_hello(self, content, headers, msg):
-        logging.info('op_hello: '+str(content)+' id='+self.receiver.id.full)
+    @defer.inlineCallbacks
+    def op_workx(self, content, headers, msg):
+        self._work(content)
+
+    @defer.inlineCallbacks
+    def op_work(self, content, headers, msg):
+        self._work(content)
+        yield self.reply_message(msg, 'result', {'work-id':content['work-id']}, {})        
+
+    @defer.inlineCallbacks
+    def _work(self,content):
+        myid = self.procName + ":" + self.receiver.spawned.id.local
+        workid = str(content['work-id'])
+        waittime = int(content['work'])
+        logging.info("worker="+myid+" job="+workid+" work="+str(waittime))
+        yield pu.asleep(waittime)
+        logging.info("worker="+myid+" job="+workid+" done at="+str(time.clock()))
+
+class WorkerClient(BaseProcess):
+    """Class for the client accessing the object store.
+    """
+    def __init__(self, *args):
+        BaseProcess.__init__(self, *args)
+        self.workresult = {}
+        self.worker = {}
+
+    def op_result(self, content, headers, msg):
+        ts = time.clock()
+        logging.info("Work result received "+str(content)+" at "+str(ts))
+        workid = content['work-id']
+        worker = headers['sender']
+        self.workresult[workid] = ts
+        if worker in self.worker:
+            wcnt = self.worker[worker] + 1
+        else:
+            wcnt = 1
+        self.worker[worker] = wcnt
+
+    @defer.inlineCallbacks
+    def submit_work(self, to, workid, work):
+        yield self.send_message(str(to),'work',{'work-id':workid,'work':work},{})
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(WorkerProcess)

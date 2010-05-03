@@ -55,3 +55,4 @@ class IonTestCase(unittest.TestCase):
 
     _stopMagnet = _stopContainer
 
+

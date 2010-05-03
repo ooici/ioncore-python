@@ -9,7 +9,7 @@
 import sys, traceback, re
 import logging
 from twisted.python import log
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from magnet.container import Id
 from magnet.store import Store
 
@@ -125,9 +125,12 @@ def dispatch_message(content, msg, dispatchIn):
 
             # dynamically invoke the operation
             if hasattr(dispatchIn, opname):
-                getattr(dispatchIn, opname)(cont, content, msg)
+                # getattr(dispatchIn, opname)(cont, content, msg)
+                opf = getattr(dispatchIn, opname)
+                return defer.maybeDeferred(opf, cont, content, msg)
             elif hasattr(dispatchIn,'op_noop_catch'):
-                dispatchIn.op_noop_catch(cont, content, msg)
+                #dispatchIn.op_noop_catch(cont, content, msg)
+                return defer.maybeDeferred(dispatchIn.op_noop_catch, cont, content, msg)
             else:
                 logging.error("Receive() failed. Cannot dispatch to catch")
         else:
@@ -182,6 +185,11 @@ def get_module(qualmodname):
     logging.debug('Module: '+str(mod))
     return mod
 
+def asleep(secs):
+    d = defer.Deferred()
+    reactor.callLater(secs, d.callback, None)
+    return d
+    
 # Stuff for testing: Stubs, mock objects
 fakeStore = Store()
 

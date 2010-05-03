@@ -73,7 +73,7 @@ def bs_messaging(messagingCfg, cgroup=None):
 
         # declare queues, bindings as needed
         logging.info("Messaging name config: name="+msgName+', '+str(msgResource))
-        yield Container.configure_messaging(msgName, msgResource)
+        cfg = yield Container.configure_messaging(msgName, msgResource)
         
         # save name is the name registry
         yield nameRegistry.put(msgName, msgResource)
