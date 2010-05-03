@@ -18,6 +18,9 @@ class ProvisionerService(BaseService):
     """Provisioner service interface
     """
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='provisioner', version='0.1.0', dependencies=[])
+
     def op_provision(self, content, headers, msg):
         """Service operation: Provision a taskable resource
         """

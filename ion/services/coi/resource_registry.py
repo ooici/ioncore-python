@@ -20,6 +20,10 @@ import ion.util.procutils as pu
 class ResourceRegistryService(BaseService):
     """Resource registry service interface
     """
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
+
     datastore = Store()
     
     @defer.inlineCallbacks

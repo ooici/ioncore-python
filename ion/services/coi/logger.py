@@ -21,6 +21,9 @@ class LoggerService(BaseService):
     """Logger service interface
     """
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='logger', version='0.1.0', dependencies=[])
+
     def slc_init(self):
         pass
 

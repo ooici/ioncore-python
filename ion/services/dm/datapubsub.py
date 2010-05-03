@@ -18,6 +18,9 @@ class DataPubsubService(BaseService):
     """Data publish/subscribe service interface
     """
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='data_pubsub', version='0.1.0', dependencies=[])
+
     def op_define_topic(self, content, headers, msg):
         """Service operation: Register a "topic" that can be published on and
         that can be subscribed to. Note: this has no direct connection to any

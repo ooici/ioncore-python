@@ -18,6 +18,9 @@ class TaskableResourceRegistryService(BaseService):
     """Taskable resource registry and definition repository service interface
     """
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='taskable_resource_registry', version='0.1.0', dependencies=[])
+
     def op_define_resource(self, content, headers, msg):
         """Service operation: Create or update taskable resource description
         """

@@ -17,6 +17,9 @@ from ion.services.base_service import BaseService, BaseServiceClient
 class DataAcquisitionService(BaseService):
     """Data acquisition service interface
     """
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='data_acquisition', version='0.1.0', dependencies=[])
  
     def op_acquire_block(self, content, headers, msg):
         """Service operation: Acquire an entire, fully described version of a

@@ -18,6 +18,9 @@ class ComputationPlannerService(BaseService):
     """Provisioner service interface
     """
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='computation_planner', version='0.1.0', dependencies=[])
+
     def op_request_computation(self, content, headers, msg):
         """Service operation: Request computation resources 
         """

@@ -17,6 +17,9 @@ from ion.services.base_service import BaseService, BaseServiceClient
 class TransformService(BaseService):
     """Transformation service interface
     """
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='transform', version='0.1.0', dependencies=[])
  
     def op_transform(self, content, headers, msg):
         """Service operation: TBD
