@@ -11,7 +11,7 @@ from twisted.internet import defer
 from twisted.trial import unittest
 from magnet.spawnable import spawn
 
-from ion.services.hello_service import *
+from ion.play.hello_service import *
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -31,7 +31,7 @@ class HelloTest(IonTestCase):
     def test_hello(self):
        
         services = [
-            {'name':'hello1','module':'ion.services.hello_service','class':'HelloService'},
+            {'name':'hello1','module':'ion.play.hello_service','class':'HelloService'},
         ]
         
         yield self._spawnProcesses(services)

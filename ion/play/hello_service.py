@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/hello_service.py
+@file ion/play/hello_service.py
 @author Michael Meisinger
 @brief  example service definition that can be used as template
 """
@@ -53,11 +53,11 @@ factory = ProtocolFactory(HelloService)
 
 
 """
-from ion.services import hello_service as h
+from ion.play import hello_service as h
 spawn(h)
 send(1, {'op':'hello','content':'Hello you there!'})
 
-from ion.services.hello_service import HelloServiceClient
+from ion.play.hello_service import HelloServiceClient
 hc = HelloServiceClient()
 hc.attach()
 hc.hello()
