@@ -11,14 +11,17 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.store import Store
 
-from ion.core.base_process import procRegistry
+from ion.core import base_process
 import ion.util.procutils as pu
-from ion.core.base_process import RpcClient
+from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class ServiceRegistryService(BaseService):
     """Service registry service interface
     """
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='service_registry', version='0.1.0', dependencies=[])
 
     datastore = Store()
     
@@ -55,9 +58,8 @@ class ServiceRegistryClient(BaseServiceClient):
         self.rpc = RpcClient()
         yield self.rpc.attach()
 
-        resid = yield self.rpc.rpc_send('', 'register_resource', {'res_desc':res_desc.__dict__}, {})
-        logging.info('Service reply: '+str(resid))
+        (content, headers, msg) = yield self.rpc.rpc_send('', 'register_resource', {'res_desc':res_desc.__dict__}, {})
+        logging.info('Service reply: '+str(content))
  
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = ServiceRegistryService(receiver)
+# Spawn of the process using the module name
+factory = ProtocolFactory(ServiceRegistryService)

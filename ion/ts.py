@@ -3,7 +3,7 @@
 """
 @file ion/ts.py
 @author Michael Meisinger
-@package ion  test service with short packet and module name
+@brief test service with short packet and module name
 """
 
 
@@ -15,6 +15,7 @@ from magnet.spawnable import spawn
 from magnet.store import Store
 
 from ion.core import bootstrap
+from ion.core import base_process
 import ion.util.procutils as pu
 
 store = Store()
@@ -35,7 +36,7 @@ def test_datastore():
     print "===================================================================="
     print "Testing datastore"
 
-    to = yield bootstrap.process_ids.get('datastore')
+    to = yield base_process.procRegistry.get('datastore')
 
     print "Send PUT to: ",to
     yield pu.send_message(receiver, '', to, 'put', {'key':'obj1','value':'999'}, {'some':'header'})

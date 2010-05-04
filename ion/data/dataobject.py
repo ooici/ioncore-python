@@ -26,4 +26,4 @@ class DataObject(object):
     def createUniqueId(cls):
         cls.isSeqCnt += 1
         return str(cls.isSeqCnt) + str(random.randint(10**8, 10**9-1))
-        
+    

@@ -9,10 +9,19 @@
 import sys, traceback, re
 import logging
 from twisted.python import log
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from magnet.container import Id
+from magnet.store import Store
 
-from ion.core import ionconst as ic
+def log_exception(msg=None, e=None):
+    """Logs a recently caught exception and prints traceback
+    """
+    if msg and e:
+        logging.error(msg + " " + repr(e))
+    elif msg:
+        logging.error(msg)
+    (etype, value, trace) = sys.exc_info()
+    traceback.print_tb(trace)
 
 def log_attributes(obj):
     """Print an object's attributes
@@ -30,7 +39,8 @@ def log_message(proc, body, msg):
     lstr = ""
     lstr += "===Message=== RECEIVED @" + str(proc) + "\n"
     amqpm = str(msg._amqp_message)
-    amqpm = re.sub("body='[^']*'","*BODY*", amqpm)
+    # Cut out the redundant or encrypted AMQP body to make log shorter
+    amqpm = re.sub("body='(\\\\'|[^'])*'","*BODY*", amqpm)
     lstr += '---AMQP--- ' + amqpm
     lstr += "\n---CARROT--- "
     for attr,value in msg.__dict__.iteritems():
@@ -61,6 +71,7 @@ def get_process_id(long_id):
         procId = Id(long_id)
     return procId
 
+@defer.inlineCallbacks
 def send_message(receiver, send, recv, operation, content, headers):
     """Constructs a standard message with standard headers
 
@@ -72,7 +83,7 @@ def send_message(receiver, send, recv, operation, content, headers):
     msg['sender'] = str(send)
     msg['receiver'] = str(recv)
     msg['reply-to'] = str(send)
-    msg['encoding'] = 'json_1'
+    msg['encoding'] = 'json'
     msg['language'] = 'ion1'
     msg['format'] = 'raw'
     msg['ontology'] = ''
@@ -85,7 +96,12 @@ def send_message(receiver, send, recv, operation, content, headers):
     msg['op'] = operation
     msg['content'] = content
     logging.info("Send message op="+operation+" to="+str(recv))
-    return receiver.send(recv, msg)
+    try:
+        yield receiver.send(recv, msg)
+    except StandardError, e:
+        log_exception("Send error: ", e)
+    else:
+        logging.info("Message sent!")
 
 def dispatch_message(content, msg, dispatchIn):
     """
@@ -109,19 +125,18 @@ def dispatch_message(content, msg, dispatchIn):
 
             # dynamically invoke the operation
             if hasattr(dispatchIn, opname):
-                getattr(dispatchIn, opname)(cont, content, msg)
+                # getattr(dispatchIn, opname)(cont, content, msg)
+                opf = getattr(dispatchIn, opname)
+                return defer.maybeDeferred(opf, cont, content, msg)
             elif hasattr(dispatchIn,'op_noop_catch'):
-                dispatchIn.op_noop_catch(cont, content, msg)
+                #dispatchIn.op_noop_catch(cont, content, msg)
+                return defer.maybeDeferred(dispatchIn.op_noop_catch, cont, content, msg)
             else:
                 logging.error("Receive() failed. Cannot dispatch to catch")
         else:
-            logging.error("Receive() failed. Bad message", content)
-    except Exception, e:
-        logging.error('Exception while dispatching: '+repr(e))
-        (type, value, trace) = sys.exc_info()
-        traceback.print_tb(trace)
-
- #       logging.error('Traceback: '+trace.format_exc())
+            logging.error("Invalid message. No 'op' header", content)
+    except StandardError, e:
+        log_exception('Exception while dispatching: ',e)
 
 id_seqs = {}
 def create_unique_id(ns):
@@ -133,3 +148,83 @@ def create_unique_id(ns):
     else: nsc = 1
     id_seqs[nss] = nsc
     return nss + str(nsc)
+    
+    
+def get_class(qualclassname, mod=None):
+    """Imports module and class and returns class object.
+    
+    @param qualclassname  fully qualified classname, such as
+        ion.data.dataobject.DataObject if module not given, otherwise class name
+    @param mod instance of module
+    @retval instance of 'type', i.e. a class object
+    """
+    if mod:
+        clsname = qualclassname
+    else:
+        # Cut the name apart into package, module and class names
+        qualmodname = qualclassname.rpartition('.')[0]
+        modname = qualmodname.rpartition('.')[2]
+        clsname = qualclassname.rpartition('.')[2]
+        mod = get_module(qualmodname)
+
+    cls = getattr(mod, clsname)
+    logging.debug('Class: '+str(cls))
+    return cls
+
+get_modattr = get_class
+
+def get_module(qualmodname):
+    """Imports module and returns module object
+    @param fully qualified modulename, such as ion.data.dataobject
+    @retval instance of types.ModuleType or error
+    """
+    package = qualmodname.rpartition('.')[0]
+    modname = qualmodname.rpartition('.')[2]
+    logging.info('get_module: from '+qualmodname+' import '+modname)
+    mod = __import__(qualmodname, globals(), locals(), [modname])
+    logging.debug('Module: '+str(mod))
+    return mod
+
+def asleep(secs):
+    d = defer.Deferred()
+    reactor.callLater(secs, d.callback, None)
+    return d
+    
+# Stuff for testing: Stubs, mock objects
+fakeStore = Store()
+
+class FakeMessage(object):
+    """Instances of this object are given to receive functions and handlers
+    by test cases, in lieu of carrot BaseMessage instances. Production code
+    detects these and no send is done.
+    """
+    def __init__(self, payload=None):
+        self.payload = payload
+    
+    @defer.inlineCallbacks
+    def send(self, to, msg):
+        self.sendto = to
+        self.sendmsg = msg
+        # Need to be a generator
+        yield fakeStore.put('fake','fake')
+
+class FakeSpawnable(object):
+    def __init__(self, id=None):
+        self.id = id if id else Id('fakec','fakep')
+
+class FakeReceiver(object):
+    """Instances of this object are given to send/spawn functions
+    by test cases, in lieu of magnet Receiver instances. Production code
+    detects these and no send is done.
+    """
+    def __init__(self, id=None):
+        self.payload = None
+        self.spawned = FakeSpawnable()
+
+    @defer.inlineCallbacks
+    def send(self, to, msg):
+        self.sendto = to
+        self.sendmsg = msg
+        # Need to be a generator
+        yield fakeStore.put('fake','fake')
+

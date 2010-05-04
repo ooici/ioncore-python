@@ -22,13 +22,13 @@ class ServiceRegistryClientTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         IonTestCase.setUp(self)
-        yield self._startMagnet()
+        yield self._startContainer()
         yield self._startCoreServices()
 
     @defer.inlineCallbacks
     def tearDown(self):
         IonTestCase.tearDown(self)
-        yield self._stopMagnet()
+        yield self._stopContainer()
     
     def test_serviceReg(self):
         src = None

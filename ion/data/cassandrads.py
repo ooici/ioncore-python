@@ -24,7 +24,9 @@ class CassandraStore():
         @param cass_host_list List of hostname:ports for cassandra host or cluster
         @retval Connected object instance
         """
-        logging.info('Connecting to Cassandra at "%s"...' % str(cass_host_list))
+        if not cass_host_list:
+            logging.info('Connecting to Cassandra on localhost...')
+            logging.info('Connecting to Cassandra at "%s"...' % str(cass_host_list))
         client = pycassa.connect(cass_host_list)
         self._kvs = pycassa.ColumnFamily(client, 'Datasets', 'Catalog')
         logging.info('connected OK.')

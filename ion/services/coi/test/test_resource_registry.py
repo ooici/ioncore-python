@@ -60,7 +60,7 @@ class ResourceRegistryTest(IonTestCase):
    
     @defer.inlineCallbacks
     def test_serviceReg(self):
-        yield self._startMagnet()
+        yield self._startContainer()
         yield self._startCoreServices()
         
         rd2 = ResourceDesc(name='res2',res_type=ResourceTypes.RESTYPE_GENERIC)
@@ -75,6 +75,6 @@ class ResourceRegistryTest(IonTestCase):
         rd4 = yield c.getResourceDesc('NONE')
         self.assertFalse(rd4,'resource desc not None')
         
-        yield self._stopMagnet()
+        yield self._stopContainer()
        
         

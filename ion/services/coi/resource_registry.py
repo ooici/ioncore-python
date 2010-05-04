@@ -11,8 +11,8 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.store import Store
 
-from ion.core.base_process import procRegistry
-from ion.core.base_process import RpcClient
+from ion.core import base_process
+from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.data.dataobject import DataObject
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
@@ -20,6 +20,10 @@ import ion.util.procutils as pu
 class ResourceRegistryService(BaseService):
     """Resource registry service interface
     """
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
+
     datastore = Store()
     
     @defer.inlineCallbacks
@@ -44,7 +48,7 @@ class ResourceRegistryService(BaseService):
         yield self.reply_message(msg, 'result', {'res_desc':res_desc}, {})        
         
 class ResourceRegistryClient(BaseServiceClient):
-    """Class for
+    """Class for the client accessing the resource registry.
     """
     
     def registerResourceType(self, rt_desc):
@@ -55,21 +59,21 @@ class ResourceRegistryClient(BaseServiceClient):
         self.rpc = RpcClient()
         yield self.rpc.attach()
 
-        resregsvc = yield procRegistry.get('resource_registry')
-        resmsg = yield self.rpc.rpc_send(str(resregsvc), 'register_resource', {'res_desc':res_desc.__dict__}, {})
-        logging.info('Service reply: '+str(resmsg))
-        defer.returnValue(str(resmsg['content']['res_id']))
+        resregsvc = yield base_process.procRegistry.get('resource_registry')
+        (content, headers, msg) = yield self.rpc.rpc_send(str(resregsvc), 'register_resource', {'res_desc':res_desc.__dict__}, {})
+        logging.info('Service reply: '+str(headers))
+        defer.returnValue(str(content['res_id']))
 
     @defer.inlineCallbacks
     def getResourceDesc(self, res_id):
         self.rpc = RpcClient()
         yield self.rpc.attach()
 
-        resregsvc = yield procRegistry.get('resource_registry')
-        resmsg = yield self.rpc.rpc_send(str(resregsvc), 'get_resource_desc', {'res_id':res_id}, {})
-        logging.info('Service reply: '+str(resmsg))
+        resregsvc = yield base_process.procRegistry.get('resource_registry')
+        (content, headers, msg) = yield self.rpc.rpc_send(str(resregsvc), 'get_resource_desc', {'res_id':res_id}, {})
+        logging.info('Service reply: '+str(content))
         rd = ResourceDesc()
-        rdd = resmsg['content']['res_desc']
+        rdd = content['res_desc']
         if rdd != None:
             rd.__dict__.update(rdd)
             defer.returnValue(rd)
@@ -85,7 +89,7 @@ class ResourceTypes(object):
     RESTYPE_UNASSIGNED = 'rt_unassigned'
     
     def __init__(self):
-        raise RuntimeException('Do not instantiate '+self.__class__.__name__)
+        raise RuntimeError('Do not instantiate '+self.__class__.__name__)
 
 class ResourceLCState(object):
     """Static class with constant definitions for resource life cycle states.
@@ -96,9 +100,11 @@ class ResourceLCState(object):
     RESLCS_INACTIVE = 'rlcs_inactive'
     RESLCS_DECOMM = 'rlcs_decomm'
     RESLCS_RETIRED = 'rlcs_retired'
+    RESLCS_DEVELOPED = 'rlcs_developed'
+    RESLCS_COMMISSIONED = 'rlcs_commissioned'
     
     def __init__(self):
-        raise RuntimeException('Do not instantiate '+self.__class__.__name__)
+        raise RuntimeError('Do not instantiate '+self.__class__.__name__)
 
 class ResourceDesc(DataObject):
     """Structured object for a resource description.
@@ -116,7 +122,7 @@ class ResourceDesc(DataObject):
         if 'res_type' in kwargs:
             self.res_type = kwargs['res_type']
         else:
-            raise RuntimeException("Resource type missing")
+            raise RuntimeError("Resource type missing")
             
         if 'name' in kwargs:
             self.res_name = kwargs['name']
@@ -139,7 +145,7 @@ class ResourceTypeDesc(DataObject):
         if 'name' in kwargs:
             self.name = kwargs['name']
         else:
-            raise RuntimeException("Resource type name missing")
+            raise RuntimeError("Resource type name missing")
 
         if 'based_on' in kwargs:
             self.based_on = kwargs['based_on']
@@ -154,9 +160,9 @@ class ResourceTypeDesc(DataObject):
         if 'desc' in kwargs:
             self.desc = kwargs['desc']
 
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = ResourceRegistryService(receiver)
+# Spawn of the process using the module name
+factory = ProtocolFactory(ResourceRegistryService)
+
 
 """
 from ion.services.coi.resource_registry import *

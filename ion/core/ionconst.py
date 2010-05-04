@@ -11,4 +11,4 @@ LOGCONF_FILENAME = 'res/logging/ionlogging.conf'
 ION_CONF_FILENAME = 'res/config/ion.config'
 
 # @todo use magnet version system
-VERSION = "ion 0.1.0"
+VERSION = "ion 0.2.0"

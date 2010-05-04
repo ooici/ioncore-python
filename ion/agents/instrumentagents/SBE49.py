@@ -3,23 +3,22 @@
 """
 @file ion/agents/instrument_agents/SBE49_instrument_agent.py
 @author Steve Foley
-@package ion.agents.instrument_agents CI interface for SeaBird SBE-49 CTD
+@brief CI interface for SeaBird SBE-49 CTD
 """
 import logging
 from twisted.internet import defer
 
 from magnet.spawnable import Receiver
 #from magnet.spawnable import send
-from magnet.store import Store
 
 #from ion.agents.resource_agent import lifecycleStates
 #from ion.agents.resource_agent import ResourceAgent
-from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+ __name__)
 
-receiver = Receiver(__name__)
+from ion.agents.instrument_agents.instrument_agent import InstrumentAgent
+from ion.core.base_process import ProtocolFactory
 
 class SBE49InstrumentAgent(InstrumentAgent):
 
@@ -151,13 +150,8 @@ class SBE49InstrumentAgent(InstrumentAgent):
         return_content = {'commands': __instrumentCommands,
                           'parameters': __instrumentParameters}
     
-def receive(content, msg):
-  instance.receive(content, msg)
-
-receiver = Receiver(__name__)
-instance = SBE49InstrumentAgent(receiver)
-
-receiver.handle(receive)
+# Spawn of the process using the module name
+factory = ProtocolFactory(SBE49InstrumentAgent)
 
 """
 Someday the driver may inherit from a common (RS-232?) object if there is a need...

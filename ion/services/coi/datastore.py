@@ -15,6 +15,7 @@ from magnet.spawnable import spawn
 from magnet.store import Store
 
 import ion.util.procutils as pu
+from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 
@@ -22,12 +23,17 @@ class DatastoreService(BaseService):
     datastore = Store()
     #datastore = CassandraStore()
 
+    # Declaration of service
+    declare = BaseService.service_declare(name='datastore', version='0.1.0', dependencies=[])
+
     def slc_init(self):
         pass
         #self.datastore.start()
 
     @defer.inlineCallbacks
     def op_put(self, content, headers, msg):
+        """Service operation: Store object in the datastore
+        """
         key = content.get('key','')
         value = content.get('value','')
         logging.info('Datastore.put('+key+','+value+')')
@@ -35,6 +41,8 @@ class DatastoreService(BaseService):
 
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
+        """Service operation: Retrieve object from the datastore
+        """
         key = content.get('key','')
         logging.info('Datastore.get('+key+')')
 
@@ -43,11 +51,8 @@ class DatastoreService(BaseService):
         yield self.reply_message(msg, 'result', {'value':value}, {})
 
 
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = DatastoreService(receiver)
-
-
+# Spawn of the process using the module name
+factory = ProtocolFactory(DatastoreService)
 
 """
 from ion.services.coi import datastore as d

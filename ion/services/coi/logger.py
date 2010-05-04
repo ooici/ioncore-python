@@ -11,7 +11,7 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import RpcClient
+from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
 
 logging.debug('Loaded: '+__name__)
@@ -20,6 +20,9 @@ logserv = logging.getLogger('logServer')
 class LoggerService(BaseService):
     """Logger service interface
     """
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='logger', version='0.1.0', dependencies=[])
 
     def slc_init(self):
         pass
@@ -46,9 +49,8 @@ class LoggerService(BaseService):
         else:
             logging.error('Invalid log level: '+str(level))
 
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = LoggerService(receiver)
+# Spawn of the process using the module name
+factory = ProtocolFactory(LoggerService)
 
 """
 from ion.services.coi import logger
