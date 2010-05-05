@@ -1,12 +1,11 @@
-# Make sure the init code in ioninit (e.g. logging settings) executes before
-# anything else in the system
-from .core import ioninit
-from .core import ionconst
-
-__version__ = ionconst.VERSION
+#!/usr/bin/env python
 
 """
+@file __init__.py
+@author Michael Meisinger
+
 @mainpage
+@section intro Introduction
 
 The lcaarch project is a GIT source code repository and integrated Python code
 base that provides some basic framework code for bootstrapping a CI-wide
@@ -18,8 +17,14 @@ Initially, all services start out as stubs with their message sending and
 receiving interface only and have the potential to grow into a fully functional
 operational architecture prototype as required for LCA.
 
-@section intro Introduction
 
 @see http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project
 
 """
+
+# Make sure the init code in ioninit (e.g. logging settings) executes before
+# anything else in the system
+from .core import ioninit
+from .core import ionconst
+
+__version__ = ionconst.VERSION
