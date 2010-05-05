@@ -37,6 +37,10 @@ class ResourceRegistryService(BaseService):
         yield self.datastore.put(resid, resdesc)
         yield self.reply_message(msg, 'result', {'res_id':str(resid)}, {})        
 
+    def op_define_resource_type(self, content, headers, msg):
+        """Service operation: Create or update a resource type with the registry.
+        """
+
     @defer.inlineCallbacks
     def op_get_resource_desc(self, content, headers, msg):
         """Service operation: Get description for a resource instance.
@@ -46,6 +50,15 @@ class ResourceRegistryService(BaseService):
 
         res_desc = yield self.datastore.get(resid)
         yield self.reply_message(msg, 'result', {'res_desc':res_desc}, {})        
+
+    def op_set_resource_lcstate(self, content, headers, msg):
+        """Service operation:
+        """
+        
+    def op_find_resources(self, content, headers, msg):
+        """Service operation:
+        """
+
         
 class ResourceRegistryClient(BaseServiceClient):
     """Class for the client accessing the resource registry.
@@ -166,7 +179,7 @@ factory = ProtocolFactory(ResourceRegistryService)
 
 """
 from ion.services.coi.resource_registry import *
-rd2 = ResourceDesc(name='res2',res_type=ResourceTypes.RESTYPE_GENERIC)
+rd1 = ResourceDesc(name='res1',res_type=ResourceTypes.RESTYPE_GENERIC)
 c = ResourceRegistryClient()
-c.registerResource(rd2)
+c.registerResource(rd1)
 """

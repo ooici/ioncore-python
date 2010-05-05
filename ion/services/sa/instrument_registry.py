@@ -30,6 +30,10 @@ class InstrumentRegistryService(BaseService):
         and register with an instrument or platform.
         """
 
+    def op_register_agent_instance(self, content, headers, msg):
+        """Service operation: .
+        """
+
     def op_define_platform(self, content, headers, msg):
         """Service operation: Create or update a platform registration
         """

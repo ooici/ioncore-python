@@ -80,20 +80,30 @@ def send_message(receiver, send, recv, operation, content, headers):
     """
     msg = {}
     # The following headers are FIPA ACL Message Format based
+    # Exchange name of sender, receiver, reply-to
     msg['sender'] = str(send)
     msg['receiver'] = str(recv)
     msg['reply-to'] = str(send)
+    # Wire form encoding, such as 'json', 'fudge', 'XDR', 'XML', 'custom'
     msg['encoding'] = 'json'
+    # Language of the format specification
     msg['language'] = 'ion1'
+    # Identifier of a registered format specification (i.e. message schema)
     msg['format'] = 'raw'
+    # Ontology associated with the content of the message
     msg['ontology'] = ''
+    # Conversation instance id
     msg['conv-id'] = ''
+    # Conversation type id
     msg['protocol'] = ''
     #msg['reply-with'] = ''
     #msg['in-reply-to'] = ''
     #msg['reply-by'] = ''
+    # Sender defined headers are updating the default headers set above.
     msg.update(headers)
+    # Operation of the message, aka performative, verb, method
     msg['op'] = operation
+    # The actual content
     msg['content'] = content
     logging.info("Send message op="+operation+" to="+str(recv))
     try:
