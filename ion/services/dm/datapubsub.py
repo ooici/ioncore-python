@@ -35,7 +35,7 @@ class DataPubsubService(BaseService):
         topic_name = content['topic_name']
         topic = {topic_name:{'name_type':'fanout', 'args':{'scope':'local'}}}
         yield bootstrap.bs_messaging(topic)
-        qtopic_name = self.get_name('local',topic_name)
+        qtopic_name = self.get_scoped_name('local',topic_name)
         yield self.topics.put (topic_name, topic[topic_name])
         yield self.reply_message(msg, 'result', {'topic_name':qtopic_name}, {})        
 
@@ -65,7 +65,7 @@ class DataPubsubService(BaseService):
         headers = content['msg_headers']
         op = content['msg_op']
         msg = content['msg']
-        qtopic = self.get_name('local',topic_name)
+        qtopic = self.get_scoped_name('local',topic_name)
         # Todo: impersonate message as from sender
         yield self.send_message(qtopic, op, msg, headers)        
 
@@ -77,3 +77,23 @@ class DataPubsubService(BaseService):
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(DataPubsubService)
+
+
+class DataPubsubClient(BaseServiceClient):
+    """Client class for accessing the data pubsub service.
+    """
+    
+    def __init__(self, dps_svc):
+        self.dps_svc = str(dps_svc)
+    
+    @defer.inlineCallbacks
+    def define_topic(self, topic_name):
+        self.rpc = RpcClient()
+        yield self.rpc.attach()
+
+        (content, headers, msg) = yield self.rpc.rpc_send(self.dps_svc, 'define_topic', {'topic_name':topic_name}, {})
+        defer.returnValue(str(content['topic_name']))
+
+    @defer.inlineCallbacks
+    def subscribe(self, topic_name):
+        pass
