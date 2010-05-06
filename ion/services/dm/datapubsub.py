@@ -9,8 +9,10 @@
 import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
+from magnet.store import Store
 
 import ion.util.procutils as pu
+from ion.core import bootstrap
 from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
 
@@ -21,12 +23,22 @@ class DataPubsubService(BaseService):
     # Declaration of service
     declare = BaseService.service_declare(name='data_pubsub', version='0.1.0', dependencies=[])
 
+    def slc_init(self):
+        self.topics = Store()
+
+    @defer.inlineCallbacks
     def op_define_topic(self, content, headers, msg):
         """Service operation: Register a "topic" that can be published on and
         that can be subscribed to. Note: this has no direct connection to any
         AMQP topic notion. A topic is basically a data stream.
         """
-        
+        topic_name = content['topic_name']
+        topic = {topic_name:{'name_type':'fanout', 'args':{'scope':'local'}}}
+        yield bootstrap.bs_messaging(topic)
+        qtopic_name = self.get_name('local',topic_name)
+        yield self.topics.put (topic_name, topic[topic_name])
+        yield self.reply_message(msg, 'result', {'topic_name':qtopic_name}, {})        
+
     def op_define_publisher(self, content, headers, msg):
         """Service operation: Register a publisher that subsequently is
         authorized to publish on a topic.
@@ -45,15 +57,23 @@ class DataPubsubService(BaseService):
         """Service operation: Stop one's existing subscription to a topic.
         """
 
+    @defer.inlineCallbacks
     def op_publish(self, content, headers, msg):
         """Service operation: Publish data message on a topic
         """
-        
+        topic_name = content['topic_name']
+        headers = content['msg_headers']
+        op = content['msg_op']
+        msg = content['msg']
+        qtopic = self.get_name('local',topic_name)
+        # Todo: impersonate message as from sender
+        yield self.send_message(qtopic, op, msg, headers)        
+
     def find_topic(self, content, headers, msg):
         """Service operation: For a given resource, find the topic that contains
         updates to the resource or resource description. Might involve creation
         of this topic of this topic does not yet exist
         """
-    
+
 # Spawn of the process using the module name
 factory = ProtocolFactory(DataPubsubService)
