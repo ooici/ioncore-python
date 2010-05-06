@@ -17,6 +17,28 @@ from ion.services.dm.datapubsub import *
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
+proc = """
+# This is a data processing function that takes a sample message, filters for
+# out of range values, adds to an event queue, and computes a new sample packet
+# where outlyers are zero'ed out
+print "In data process"
+data = content['data']
+resdata = []
+messages = []
+for (ts,samp) in data:
+    if samp<0 or samp>100:
+        messages.append(('topic_qcevent',{'event':(ts,'out_of_range',samp)}))
+        samp = 0
+    newsamp = samp * samp
+    ds = (ts,newsamp)
+    resdata.append(ds)
+
+messages.append(('topic_qc',{'metadata':{},'data':resdata}))
+
+print "messages", messages
+result = messages
+"""
+
 class PubSubTest(IonTestCase):
     """Testing service classes of resource registry
     """
@@ -32,13 +54,10 @@ class PubSubTest(IonTestCase):
     @defer.inlineCallbacks
     def test_pubsub(self):
         services = [
-            {'name':'datapubsub','module':'ion.services.dm.datapubsub','class':'DataPubsubservice'},
+            {'name':'datapubsub','module':'ion.services.dm.datapubsub','class':'DataPubsubService'},
         ]
 
         yield self._spawnProcesses(services)
-        
-        sup = yield self.procRegistry.get("bootstrap")
-        logging.info("Supervisor: "+repr(sup))
         
         dps = yield self.procRegistry.get("datapubsub")
         logging.info("DataPubsubservice: "+repr(dps))
@@ -51,7 +70,7 @@ class PubSubTest(IonTestCase):
         dc1_id = yield spawn(dc1.receiver)
         yield dc1.attach(topic_name)
         
-        dmsg = self._get_datamsg()
+        dmsg = self._get_datamsg({}, [1,2,1,4,3,2])
         yield pu.send_message(dpsc.rpc.clientRecv, '', topic_name, 'data', dmsg, {})
 
         # Need to await the delivery of data messages into the (separate) consumers
@@ -64,7 +83,7 @@ class PubSubTest(IonTestCase):
         dc2_id = yield spawn(dc2.receiver)
         yield dc2.attach(topic_name)
         
-        dmsg = self._get_datamsg()
+        dmsg = self._get_datamsg({}, [1,2,1,4,3,2])
         yield pu.send_message(dpsc.rpc.clientRecv, '', topic_name, 'data', dmsg, {})
 
         # Need to await the delivery of data messages into the (separate) consumers
@@ -73,10 +92,73 @@ class PubSubTest(IonTestCase):
         self.assertEqual(dc1.receive_cnt, 2)
         self.assertEqual(dc2.receive_cnt, 1)
 
-    def _get_datamsg(self):
-        return {'metadata':{},'data':'sample1\nsample2\sample3'}
+    @defer.inlineCallbacks
+    def test_chainprocess(self):
+        # This test covers a chain of three data consumer processes on three
+        # topics. One process is an event-detector and data-filter, sending
+        # event messages to an event queue and a new data message to a different
+        # data queue
+        
+        services = [
+            {'name':'datapubsub','module':'ion.services.dm.datapubsub','class':'DataPubsubService'},
+        ]
+
+        yield self._spawnProcesses(services)
+        
+        dps = yield self.procRegistry.get("datapubsub")
+        logging.info("DataPubsubservice: "+repr(dps))
+
+        dpsc = DataPubsubClient(dps)
+        topic_raw = yield dpsc.define_topic("topic_raw")
+        topic_qc = yield dpsc.define_topic("topic_qc")
+        topic_evt = yield dpsc.define_topic("topic_qcevent")
+
+        dc1 = DataConsumer()
+        dc1_id = yield spawn(dc1.receiver)
+        yield dc1.attach(topic_raw)
+        dp = DataProcess(proc)
+        dc1.set_ondata(dp.get_ondata())
+        
+        dc2 = DataConsumer()
+        dc2_id = yield spawn(dc2.receiver)
+        yield dc2.attach(topic_qc)
+
+        dc3 = DataConsumer()
+        dc3_id = yield spawn(dc3.receiver)
+        yield dc3.attach(topic_evt)
+
+        # Create an example data message with time
+        dmsg = self._get_datamsg({}, [(101,5),(102,2),(103,4),(104,5),(105,-1),(106,9),(107,3),(108,888),(109,3),(110,4)])
+        yield pu.send_message(dpsc.rpc.clientRecv, '', topic_raw, 'data', dmsg, {})
+
+        # Need to await the delivery of data messages into the consumers
+        yield pu.asleep(2)
+        
+        self.assertEqual(dc1.receive_cnt, 1)
+        self.assertEqual(dc2.receive_cnt, 1)
+        self.assertEqual(dc3.receive_cnt, 2)
+
+        dmsg = self._get_datamsg({}, [(111,8),(112,6),(113,4),(114,-2),(115,-1),(116,5),(117,3),(118,1),(119,4),(120,5)])
+        yield pu.send_message(dpsc.rpc.clientRecv, '', topic_raw, 'data', dmsg, {})
+
+        # Need to await the delivery of data messages into the consumers
+        yield pu.asleep(2)
+        
+        self.assertEqual(dc1.receive_cnt, 2)
+        self.assertEqual(dc2.receive_cnt, 2)
+        self.assertEqual(dc3.receive_cnt, 4)
+
+
+    def _get_datamsg(self, metadata, data):
+        #metadata.update('timestamp':time.clock())
+        return {'metadata':metadata, 'data':data}
+
+
 
 class DataConsumer(BaseProcess):
+    
+    def set_ondata(self, ondata):
+        self.ondata = ondata
         
     @defer.inlineCallbacks
     def attach(self, topic_name):
@@ -87,10 +169,35 @@ class DataConsumer(BaseProcess):
         
         self.receive_cnt = 0
         self.received_msg = []
+        self.ondata = None
 
+    @defer.inlineCallbacks
     def op_data(self, content, headers, msg):
         logging.info("Data message received: "+repr(content))
         self.receive_cnt += 1
         self.received_msg.append(content)
+        if hasattr(self, 'ondata') and self.ondata:
+            logging.info("op_data: Executing data process")
+            res = self.ondata(content, headers)
+            logging.info("op_data: Finished data process")
+            if res:
+                for (topic, msg) in res:
+                    yield self.send_message(self.get_local_name(topic), 'data', msg, {})
+
+class DataProcess(object):
+    
+    def __init__(self, procdef):
+        self.proc_def = procdef
+    
+    def get_ondata(self):
+        return self.execute_process
+    
+    def execute_process(self, content, headers):
+        loc = {'content':content,'headers':headers}
+        exec self.proc_def in globals(), loc
+        if 'result' in loc:
+            return loc['result']
+        return None
+
 
 
