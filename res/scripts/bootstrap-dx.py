@@ -13,17 +13,12 @@ from ion.core import ioninit
 from ion.core import bootstrap
 from ion.util.config import Config
 
-CONF = ioninit.config(__name__)
-
-mc = CONF.getValue('messaging_cfg')
-mc2 = Config(mc)
-mc3 = mc2.getObject()
-
+CONF = ioninit.config('ion.core.bootstrap-dx')
 # Static definition of message queues
-#ion_messaging = Config(CONF.getValue('messaging_cfg')).getObject()
+ion_messaging = Config(CONF.getValue('messaging_cfg')).getObject()
 
 # Static definition of service names
-#dx_services = Config(CONF.getValue('services_cfg')).getObject()
+dx_services = Config(CONF.getValue('services_cfg')).getObject()
 
 @defer.inlineCallbacks
 def start():

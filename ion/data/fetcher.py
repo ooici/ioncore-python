@@ -25,23 +25,25 @@ class FetcherService(BaseService):
     @todo Dependencies - perhaps pub-sub?
     """
     declare = BaseService.service_declare(name='fetcher',
-                                          version='1.0.0',
-                                          dependencies='[]')
+                                          version='0.1.0',
+                                          dependencies=[])
 
     def __init__(self, receiver, spawnArgs=None):
         BaseService.__init__(self, receiver, spawnArgs)
-        logging.debug('Fetcher starting')
+        logging.info('Fetcher starting')
 
     def slc_init(self):
         logging.debug('Service lifecycle init invoked')
 
-#    @defer.inlineCallbacks
+    @defer.inlineCallbacks
     def op_get_url(self, content, headers, msg):
+        yield self.reply_message(msg, 'reply', {'value':'no code!'}, {})
         logging.warn('Implement me!')
 
-#    @defer.inlineCallbacks
+    @defer.inlineCallbacks
     def op_get_dap_dataset(self, content, headers, msg):
         logging.warn('Implement me!')
+        yield self.reply_message(msg, 'reply', {'value':'no code!'}, {})
 
 
 class FetcherClient(RpcClient):
