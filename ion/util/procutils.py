@@ -8,7 +8,6 @@
 
 import sys, traceback, re
 import logging
-from twisted.python import log
 from twisted.internet import defer, reactor
 from magnet.container import Id
 from magnet.store import Store

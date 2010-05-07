@@ -8,7 +8,6 @@
 
 import logging
 from twisted.internet import defer
-from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
 import ion.util.procutils as pu

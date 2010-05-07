@@ -10,12 +10,10 @@ import logging, time
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
-from magnet.spawnable import Container
-from magnet import spawnable
 
 import ion.util.procutils as pu
-from ion.core.base_process import BaseProcess, ProtocolFactory, RpcClient
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.base_process import BaseProcess, ProtocolFactory
+from ion.services.base_service import BaseService
 
 class WorkerProcess(BaseService):
     """Worker process

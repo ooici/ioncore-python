@@ -8,18 +8,14 @@
 
 import logging
 from twisted.internet import defer
-import time
 
 from magnet import spawnable
 from magnet.container import Container
-from magnet.spawnable import Receiver
-from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
 from ion.core import ioninit, base_process
 from ion.core.supervisor import Supervisor, ChildProcess
-from ion.core.cc.interceptor import BaseInterceptorSystem
 from ion.util.config import Config
 import ion.util.procutils as pu
 
@@ -73,7 +69,7 @@ def bs_messaging(messagingCfg, cgroup=None):
 
         # declare queues, bindings as needed
         logging.info("Messaging name config: name="+msgName+', '+str(msgResource))
-        cfg = yield Container.configure_messaging(msgName, msgResource)
+        yield Container.configure_messaging(msgName, msgResource)
         
         # save name is the name registry
         yield nameRegistry.put(msgName, msgResource)

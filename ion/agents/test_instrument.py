@@ -7,11 +7,9 @@
 @brief service for provisioning operational units (VM instances).
 """
 
-from twisted.python import log
 from twisted.internet import defer
 
 from magnet.spawnable import Receiver
-from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 

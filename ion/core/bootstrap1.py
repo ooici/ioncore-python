@@ -8,17 +8,9 @@
 
 import logging
 from twisted.internet import defer
-import time
-
-from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
-from magnet.container import Container
-from magnet.store import Store
 
 from ion.core import ioninit
 from ion.core import bootstrap
-from ion.core.supervisor import Supervisor, ChildProcess
 from ion.util.config import Config
 import ion.util.procutils as pu
 

@@ -65,7 +65,7 @@ class BaseProcess(object):
             self.procSupId = pu.get_process_id(supId)
             logging.info('BaseProcess.op_init: proc-name='+self.procName+', sup-id='+supId)
 
-            r = yield defer.maybeDeferred(self.plc_init)
+            yield defer.maybeDeferred(self.plc_init)
             logging.info('===== Process '+self.procName+' INITIALIZED ============')
 
             self.reply_message(msg, 'inform_init', {'status':'OK'}, {})
@@ -113,7 +113,6 @@ class BaseProcess(object):
         """Replies to a given message, continuing the ongoing conversation
         """
         ionMsg = msg.payload
-        send = self.receiver.spawned.id.full
         recv = ionMsg.get('reply-to', None)
         if recv == None:
             logging.error('No reply-to given for message '+str(msg))
@@ -188,7 +187,7 @@ class RpcClient(object):
         """
         @retval a deferred with the message value
         """
-        d = pu.send_message(self.clientRecv, self.id, to, op, cont, headers)
+        pu.send_message(self.clientRecv, self.id, to, op, cont, headers)
         # Ignore d deferred, wait for send. TODO: error handling
         self.deferred = defer.Deferred()
         return self.deferred
