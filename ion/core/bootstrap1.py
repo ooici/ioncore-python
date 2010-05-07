@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/core/bootstrap.py
+@file ion/core/bootstrap1.py
 @author Michael Meisinger
 @brief main module for bootstrapping the system
 """

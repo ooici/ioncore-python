@@ -11,37 +11,36 @@ from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.core import base_process, bootstrap
-from ion.data.objstore import *
+from ion.data.objstore import ObjectStoreClient, ObjectStoreService, ValueObject
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
-
 
 class ObjectStoreTest(unittest.TestCase):
     """Testing client classes of object store
     """
-    
+
     def test_ValueObjects(self):
         vo1 = ValueObject('1')
         self.assertNotEqual(vo1.identity, None)
         # Basic value objects
         print vo1
         print "vo1=", vo1.__dict__
-        
+
         vo2 = ValueObject(2)
         self.assertNotEqual(vo1.identity, vo2.identity)
-        
+
         vo3 = ValueObject(('a','b'))
         self.assertNotEqual(vo1.identity, vo3.identity)
         vo4 = ValueObject(['a','b'])
         vo5 = ValueObject({'a':'b', 'c':(1,2), 'd':{}, 'e':{'x':'y'}})
-        self.assertNotEqual(vo5.identity, None)
+        self.assertNotEqual(vo5.identity, vo4.identity)
         print "vo5=", vo5.__dict__
 
         # Composite value objects with childrefs
         voc0 = ValueObject('comp1',None)
         voc1 = ValueObject('comp1',())
         self.assertEqual(voc0.identity, voc1.identity)
-        
+
         voc2 = ValueObject('comp1',vo1.identity)
         voc3 = ValueObject('comp1',(vo1.identity,))
         voc4 = ValueObject('comp1',vo1)
@@ -50,7 +49,7 @@ class ObjectStoreTest(unittest.TestCase):
         self.assertEqual(voc4.identity, voc5.identity)
         self.assertEqual(voc2.identity, voc4.identity)
         self.assertNotEqual(voc0.identity, voc2.identity)
-        
+
         voc6 = ValueObject('comp1',(vo2,vo3))
         print "voc6=", voc6.__dict__
         voc7 = ValueObject('comp1',voc6)
@@ -94,7 +93,7 @@ class ObjectStoreTest(unittest.TestCase):
         vo13 = ValueObject('13')
         vo14 = ValueObject('14',None,(vo12,vo13))
         vo15 = ValueObject('15',None,vo14)
-        
+
         def _cont(key, value=None, childrefs=None, basedon=None):
             res = {}
             if type(key) is list: res['keys'] = key
@@ -103,13 +102,13 @@ class ObjectStoreTest(unittest.TestCase):
             if childrefs: res['childrefs'] = childrefs
             if basedon: res['basedon'] = basedon
             return res
-        
+
         def _opfix(op, cont):
             """Calls a service op with receive params and gets result in
             reply from fake receiver"""
             getattr(oss, 'op_'+op)(cont, {}, msg)
             return oss.receiver.sendmsg['content']
-        
+
         r1 = _opfix('put',_cont('key1','1'))
         print "r1=", r1
         r2 = _opfix('put',_cont('key2','2'))
@@ -124,7 +123,7 @@ class ObjectStoreTest(unittest.TestCase):
         r15 = _opfix('put',_cont('key15','15',None,r14['identity']))
 
         r16 = _opfix('put',_cont('key16','1'))
-        
+
         # Check get
         fg0 = _opfix('get',_cont('key0'))
         print "fg0=", fg0
@@ -158,7 +157,7 @@ class ObjectStoreTest(unittest.TestCase):
         self.assertEqual(len(fg14['basedon']),2)
         self.assertIn(vo12.identity,fg14['basedon'])
         self.assertIn(vo13.identity,fg14['basedon'])
-        
+
         # Check get_values
         rv1 = _opfix('get_values',_cont([r1['identity'],r2['identity'],r4['identity'],r5['identity']]))
         print "rv1=", rv1
@@ -180,7 +179,7 @@ class ObjectStoreTest(unittest.TestCase):
         ra15 = _opfix('get_ancestors',_cont(r15['identity']))
         print "ra15=", ra15
         self.assertEqual(len(ra15),5)
-        
+
 class ObjectStoreServiceTest(IonTestCase):
     """Testing service classes of object store
     """
@@ -199,19 +198,19 @@ class ObjectStoreServiceTest(IonTestCase):
             {'name':'objstoreSvc1','module':'ion.data.objstore','class':'ObjectStoreService'},
             #{'name':'objstoreSvc2','module':'ion.data.objstore','class':'ObjectStoreService'},
         ]
-        
+
         yield bootstrap.bootstrap(None, services)
-        
+
         sup = yield base_process.procRegistry.get("bootstrap")
         logging.info("Supervisor: "+repr(sup))
 
         oss1 = yield base_process.procRegistry.get("objstoreSvc1")
         osc = ObjectStoreClient(oss1)
         yield osc.attach()
-        
+
         res1 = yield osc.put('key1','value1')
         logging.info('Result1 put: '+str(res1))
-        
+
         res2 = yield osc.get('key1')
         logging.info('Result2 get: '+str(res2))
 
@@ -220,4 +219,3 @@ class ObjectStoreServiceTest(IonTestCase):
 
         res4 = yield osc.put('key2','value1')
         logging.info('Result4 put: '+str(res4))
-        
