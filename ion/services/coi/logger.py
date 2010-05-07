@@ -14,7 +14,6 @@ import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
 
-logging.debug('Loaded: '+__name__)
 logserv = logging.getLogger('logServer')
 
 class LoggerService(BaseService):

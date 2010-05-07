@@ -45,7 +45,7 @@ class BootstrapTest1(IonTestCase):
 
         logging.info("Started magnet and core services")
 
-        yield self._stopMagnet()
+        yield self._stopContainer()
         
 
 

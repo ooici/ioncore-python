@@ -59,10 +59,8 @@ class IonTestCase(unittest.TestCase):
 
     _stopMagnet = _stopContainer
 
-    @defer.inlineCallbacks
     def _declareMessaging(self, messaging):
-        yield bootstrap.bs_messaging(messaging)
+        return bootstrap.bs_messaging(messaging)
     
-    @defer.inlineCallbacks
     def _spawnProcesses(self, procs):
-        yield bootstrap.bs_processes(procs)
+        return bootstrap.bs_processes(procs)

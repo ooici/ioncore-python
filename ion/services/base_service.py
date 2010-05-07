@@ -13,6 +13,7 @@ from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
+from ion.core import base_process
 from ion.core.base_process import BaseProcess
 import ion.util.procutils as pu
 
@@ -54,14 +55,29 @@ class BaseService(BaseProcess):
         return decl
 
 class BaseServiceClient(object):
-    """This is the abstract base class for service client libraries.
     """
-    def __init__(self, proc=None):
-        self.process = proc
-    
-    def attach(self):
-        if self.process and self.process.receiver.spawned:
-            pass
+    This is the abstract base class for service client libraries.
+    """
+    def __init__(self, svc=None, proc=None):
+        """
+        Initializes a service client with a target service id and a BaseProcess
+        instance
+        """
+        self.svc = svc
+        if not proc: proc = BaseProcess()
+        self.proc = proc
+
+    @defer.inlineCallbacks
+    def _check_init(self):
+        """
+        Called in client methods to ensure 
+        """
+        if not self.svc:
+            assert self.svcname, 'Must hace svcname to access service'
+            svcid = yield base_process.procRegistry.get(self.svcname)
+            self.svc = str(svcid)
+        if not self.proc.is_spawned():
+            yield self.proc.spawn()
 
 class BaseServiceImplementation(object):
     """This is the abstract base class for all service provider implementations

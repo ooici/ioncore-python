@@ -112,38 +112,34 @@ def send_message(receiver, send, recv, operation, content, headers):
     else:
         logging.info("Message sent!")
 
-def dispatch_message(content, msg, dispatchIn):
+def dispatch_message(payload, msg, dispatchIn, conv=None):
     """
-    content - content can be anything (list, tuple, dictionary, string, int, etc.)
-
-    For this implementation, 'content' will be a dictionary:
-    content = {
+    Dispatches a message by operation in a given class.
+    payload = {
         "op": "operation name here",
         "content": ('arg1', 'arg2')
     }
     """
     try:
-        log_message(__name__, content, msg)
+        log_message(__name__, payload, msg)
 
-        if "op" in content:
-            op = content['op']
-            logging.info('dispatch_message() OP=' + str(op))
+        if "op" in payload:
+            op = payload['op']
+            logging.info('dispatch_message() operation=' + str(op))
 
-            cont = content.get('content','')
+            content = payload.get('content','')
             opname = 'op_' + str(op)
 
-            # dynamically invoke the operation
+            # dynamically invoke the operation in the given class
             if hasattr(dispatchIn, opname):
-                # getattr(dispatchIn, opname)(cont, content, msg)
                 opf = getattr(dispatchIn, opname)
-                return defer.maybeDeferred(opf, cont, content, msg)
-            elif hasattr(dispatchIn,'op_noop_catch'):
-                #dispatchIn.op_noop_catch(cont, content, msg)
-                return defer.maybeDeferred(dispatchIn.op_noop_catch, cont, content, msg)
+                return defer.maybeDeferred(opf, content, payload, msg)
+            elif hasattr(dispatchIn,'op_none'):
+                return defer.maybeDeferred(dispatchIn.op_none, content, payload, msg)
             else:
                 logging.error("Receive() failed. Cannot dispatch to catch")
         else:
-            logging.error("Invalid message. No 'op' header", content)
+            logging.error("Invalid message. No 'op' in header", payload)
     except StandardError, e:
         log_exception('Exception while dispatching: ',e)
 
@@ -189,9 +185,9 @@ def get_module(qualmodname):
     """
     package = qualmodname.rpartition('.')[0]
     modname = qualmodname.rpartition('.')[2]
-    logging.info('get_module: from '+qualmodname+' import '+modname)
+    logging.info('get_module: from '+package+' import '+modname)
     mod = __import__(qualmodname, globals(), locals(), [modname])
-    logging.debug('Module: '+str(mod))
+    #logging.debug('Module: '+str(mod))
     return mod
 
 def asleep(secs):

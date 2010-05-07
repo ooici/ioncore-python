@@ -15,9 +15,9 @@ from ion.core.base_process import BaseProcess, ProtocolFactory, RpcClient
 
 class Supervisor(BaseProcess):
     """
-    Base class for a supervisor process
+    Base class for a supervisor process. A supervisor is a process with the
+    purpose to spawn and monitor other (child) processes.
     """
-
     def setChildProcesses(self, childprocs):
         self.childProcesses = childprocs
 
@@ -59,17 +59,11 @@ class ChildProcess(object):
             logging.info('Spawning '+self.procClass+' on node: local')
 
             # Importing service module
-            logging.info('from ' + self.procModule + " import " + self.procClass)
-            localmod = self.procModule.rpartition('.')[2]
-            imports = []
-            imports.append(localmod)
-            if self.procClass != None:
-                imports.append(self.procClass)
-            proc_mod = __import__(self.procModule, globals(), locals(), imports)
+            proc_mod = pu.get_module(self.procModule)
             self.procModObj = proc_mod
 
             # Spawn instance of a process
-            logging.debug("Process spawn args="+str(self.spawnArgs))
+            logging.debug("spawn({0},args={1!s})".format(self.procModule,self.spawnArgs))
             proc_id = yield spawn(proc_mod, None, self.spawnArgs)
             self.procId = proc_id
             self.procState = 'SPAWNED'
@@ -81,14 +75,9 @@ class ChildProcess(object):
     @defer.inlineCallbacks
     def initChild(self):
         to = self.procId
-        logging.info("Send init: " + str(to))
-        self.rpc = RpcClient()
-        yield self.rpc.attach()
-
-        (content, headers, msg) = yield self.rpc.rpc_send(to, 'init', self._prepInitMsg(), {})
-
-    def _prepInitMsg(self):
-        return {'proc-name':self.procName, 'sup-id':self.supProcess.receiver.spawned.id.full}
+        #logging.info("Send init: " + str(to))
+        initm = {'proc-name':self.procName, 'sup-id':self.supProcess.receiver.spawned.id.full,'sys-name':self.supProcess.sysName}
+        (content, headers, msg) = yield self.supProcess.rpc_send(to, 'init', initm, {})
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(Supervisor)

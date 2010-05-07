@@ -52,16 +52,17 @@ class ResourceRegistryTest(IonTestCase):
     """Testing service classes of resource registry
     """
 
+    @defer.inlineCallbacks
     def setUp(self):
-        IonTestCase.setUp(self)
+        yield self._startContainer()
+        yield self._startCoreServices()
 
+    @defer.inlineCallbacks
     def tearDown(self):
-        IonTestCase.tearDown(self)
+        yield self._stopContainer()
    
     @defer.inlineCallbacks
     def test_serviceReg(self):
-        yield self._startContainer()
-        yield self._startCoreServices()
         
         rd2 = ResourceDesc(name='res2',res_type=ResourceTypes.RESTYPE_GENERIC)
         c = ResourceRegistryClient()
@@ -74,7 +75,6 @@ class ResourceRegistryTest(IonTestCase):
 
         rd4 = yield c.getResourceDesc('NONE')
         self.assertFalse(rd4,'resource desc not None')
-        
-        yield self._stopContainer()
+
        
         

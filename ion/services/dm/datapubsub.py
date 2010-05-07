@@ -13,7 +13,7 @@ from magnet.store import Store
 
 import ion.util.procutils as pu
 from ion.core import bootstrap
-from ion.core.base_process import ProtocolFactory, RpcClient
+from ion.core.base_process import BaseProcess, ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class DataPubsubService(BaseService):
@@ -82,16 +82,14 @@ factory = ProtocolFactory(DataPubsubService)
 class DataPubsubClient(BaseServiceClient):
     """Client class for accessing the data pubsub service.
     """
-    
-    def __init__(self, dps_svc):
-        self.dps_svc = str(dps_svc)
+    def __init__(self, *args):
+        BaseServiceClient.__init__(self, *args)
+        self.svcname = "data_pubsub"
     
     @defer.inlineCallbacks
     def define_topic(self, topic_name):
-        self.rpc = RpcClient()
-        yield self.rpc.attach()
-
-        (content, headers, msg) = yield self.rpc.rpc_send(self.dps_svc, 'define_topic', {'topic_name':topic_name}, {})
+        yield self._check_init()
+        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'define_topic', {'topic_name':topic_name}, {})
         defer.returnValue(str(content['topic_name']))
 
     @defer.inlineCallbacks

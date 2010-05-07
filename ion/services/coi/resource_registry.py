@@ -12,7 +12,7 @@ from magnet.spawnable import Receiver
 from magnet.store import Store
 
 from ion.core import base_process
-from ion.core.base_process import ProtocolFactory, RpcClient
+from ion.core.base_process import ProtocolFactory, BaseProcess
 from ion.data.dataobject import DataObject
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
@@ -63,27 +63,26 @@ class ResourceRegistryService(BaseService):
 class ResourceRegistryClient(BaseServiceClient):
     """Class for the client accessing the resource registry.
     """
-    
+    def __init__(self, *args):
+        BaseServiceClient.__init__(self, *args)
+        self.svcname = "resource_registry"
+
     def registerResourceType(self, rt_desc):
         pass
 
     @defer.inlineCallbacks
     def registerResource(self, res_desc):
-        self.rpc = RpcClient()
-        yield self.rpc.attach()
+        yield self._check_init()
 
-        resregsvc = yield base_process.procRegistry.get('resource_registry')
-        (content, headers, msg) = yield self.rpc.rpc_send(str(resregsvc), 'register_resource', {'res_desc':res_desc.__dict__}, {})
+        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'register_resource', {'res_desc':res_desc.__dict__}, {})
         logging.info('Service reply: '+str(headers))
         defer.returnValue(str(content['res_id']))
 
     @defer.inlineCallbacks
     def getResourceDesc(self, res_id):
-        self.rpc = RpcClient()
-        yield self.rpc.attach()
+        yield self._check_init()
 
-        resregsvc = yield base_process.procRegistry.get('resource_registry')
-        (content, headers, msg) = yield self.rpc.rpc_send(str(resregsvc), 'get_resource_desc', {'res_id':res_id}, {})
+        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'get_resource_desc', {'res_id':res_id}, {})
         logging.info('Service reply: '+str(content))
         rd = ResourceDesc()
         rdd = content['res_desc']

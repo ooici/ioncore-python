@@ -83,11 +83,11 @@ def bs_processes(procs):
     # Makes the boostrap a process
     logging.info("Spawning bootstrap supervisor")
     sup = Supervisor()
-    sup.setChildProcesses(children)
-    supId = yield spawn(sup.receiver)
-
+    sup.receiver.label = Supervisor.__name__
+    supId = yield sup.spawn()
     yield base_process.procRegistry.put("bootstrap", str(supId))
 
+    sup.setChildProcesses(children)
     yield sup.spawnChildProcesses()
     for child in sup.childProcesses:
         procId = child.procId
@@ -96,6 +96,7 @@ def bs_processes(procs):
     logging.debug("process_ids: "+ str(base_process.procRegistry.kvs))
 
     yield sup.initChildProcesses()
+    defer.returnValue(sup)
 
 def prepare_childprocs(procs):
     """Prepares a Supervisor class instance with configured child processes.

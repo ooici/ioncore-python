@@ -10,10 +10,11 @@ import logging, time
 from twisted.internet import defer
 from twisted.trial import unittest
 from magnet.container import Container
+from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
 from ion.core.base_process import BaseProcess
-from ion.services.dm.datapubsub import *
+from ion.services.dm.datapubsub import DataPubsubClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -54,24 +55,24 @@ class PubSubTest(IonTestCase):
     @defer.inlineCallbacks
     def test_pubsub(self):
         services = [
-            {'name':'datapubsub','module':'ion.services.dm.datapubsub','class':'DataPubsubService'},
+            {'name':'data_pubsub','module':'ion.services.dm.datapubsub','class':'DataPubsubService'},
         ]
 
-        yield self._spawnProcesses(services)
+        sup = yield self._spawnProcesses(services)
         
-        dps = yield self.procRegistry.get("datapubsub")
+        dps = yield self.procRegistry.get("data_pubsub")
         logging.info("DataPubsubservice: "+repr(dps))
 
-        dpsc = DataPubsubClient(dps)
+        dpsc = DataPubsubClient(dps, sup)
         topic_name = yield dpsc.define_topic("topic1")
         logging.info('Service reply: '+str(topic_name))
         
         dc1 = DataConsumer()
-        dc1_id = yield spawn(dc1.receiver)
+        dc1_id = yield dc1.spawn()
         yield dc1.attach(topic_name)
         
         dmsg = self._get_datamsg({}, [1,2,1,4,3,2])
-        yield pu.send_message(dpsc.rpc.clientRecv, '', topic_name, 'data', dmsg, {})
+        yield sup.send(topic_name, 'data', dmsg)
 
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
@@ -80,11 +81,11 @@ class PubSubTest(IonTestCase):
 
         # Create a second data consumer
         dc2 = DataConsumer()
-        dc2_id = yield spawn(dc2.receiver)
+        dc2_id = yield dc2.spawn()
         yield dc2.attach(topic_name)
         
         dmsg = self._get_datamsg({}, [1,2,1,4,3,2])
-        yield pu.send_message(dpsc.rpc.clientRecv, '', topic_name, 'data', dmsg, {})
+        yield sup.send(topic_name, 'data', dmsg, {})
 
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
@@ -100,36 +101,36 @@ class PubSubTest(IonTestCase):
         # data queue
         
         services = [
-            {'name':'datapubsub','module':'ion.services.dm.datapubsub','class':'DataPubsubService'},
+            {'name':'data_pubsub','module':'ion.services.dm.datapubsub','class':'DataPubsubService'},
         ]
 
-        yield self._spawnProcesses(services)
+        sup = yield self._spawnProcesses(services)
         
-        dps = yield self.procRegistry.get("datapubsub")
+        dps = yield self.procRegistry.get("data_pubsub")
         logging.info("DataPubsubservice: "+repr(dps))
 
-        dpsc = DataPubsubClient(dps)
+        dpsc = DataPubsubClient(dps, sup)
         topic_raw = yield dpsc.define_topic("topic_raw")
         topic_qc = yield dpsc.define_topic("topic_qc")
         topic_evt = yield dpsc.define_topic("topic_qcevent")
 
         dc1 = DataConsumer()
-        dc1_id = yield spawn(dc1.receiver)
+        dc1_id = yield dc1.spawn()
         yield dc1.attach(topic_raw)
         dp = DataProcess(proc)
         dc1.set_ondata(dp.get_ondata())
         
         dc2 = DataConsumer()
-        dc2_id = yield spawn(dc2.receiver)
+        dc2_id = yield dc2.spawn()
         yield dc2.attach(topic_qc)
 
         dc3 = DataConsumer()
-        dc3_id = yield spawn(dc3.receiver)
+        dc3_id = yield dc3.spawn()
         yield dc3.attach(topic_evt)
 
         # Create an example data message with time
         dmsg = self._get_datamsg({}, [(101,5),(102,2),(103,4),(104,5),(105,-1),(106,9),(107,3),(108,888),(109,3),(110,4)])
-        yield pu.send_message(dpsc.rpc.clientRecv, '', topic_raw, 'data', dmsg, {})
+        yield sup.send(topic_raw, 'data', dmsg, {})
 
         # Need to await the delivery of data messages into the consumers
         yield pu.asleep(2)
@@ -139,7 +140,7 @@ class PubSubTest(IonTestCase):
         self.assertEqual(dc3.receive_cnt, 2)
 
         dmsg = self._get_datamsg({}, [(111,8),(112,6),(113,4),(114,-2),(115,-1),(116,5),(117,3),(118,1),(119,4),(120,5)])
-        yield pu.send_message(dpsc.rpc.clientRecv, '', topic_raw, 'data', dmsg, {})
+        yield sup.send(topic_raw, 'data', dmsg, {})
 
         # Need to await the delivery of data messages into the consumers
         yield pu.asleep(2)
