@@ -13,6 +13,7 @@ from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService
+from ion.services.coi.service_registry import ServiceRegistryClient
 
 class FetcherService(BaseService):
     """
@@ -52,14 +53,22 @@ class FetcherClient(RpcClient):
     @note RPC style interactions
     """
 
-#    @defer.inlineCallbacks
+    @defer.inlineCallbacks
     def get_url(self, requested_url):
         """
         look up fetcher in dns
         send to same
         return unpacked reply
         """
-        pass
+        logging.info('Lookup up the service ID...')
+        sc = ServiceRegistryClient()
+        dest = yield sc.get_service_instance('fetcher')
+
+        logging.info('Sending request')
+        (content, headers, msg) = yield self.rpc_send(dest, 'get_url',
+                                                      requested_url, {})
+
+        logging.info('Got back: ' + content)
 
 #    @defer.inlineCallbacks
     def get_dap_dataset(self, requested_url, dest_address):

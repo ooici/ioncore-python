@@ -6,7 +6,8 @@
 @brief test service for registering resources and client classes
 """
 
-import logging, time
+import logging
+import time
 from twisted.internet import defer
 from twisted.trial import unittest
 from magnet.spawnable import spawn
@@ -29,11 +30,11 @@ class HelloTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_hello(self):
-       
+
         services = [
             {'name':'hello1','module':'ion.play.hello_service','class':'HelloService'},
         ]
-        
+
         yield self._spawnProcesses(services)
         
         sup = yield self.procRegistry.get("bootstrap")
