@@ -3,16 +3,16 @@
 """
 @file ion/agents/resource_agent.py
 @author Stephen Pasco
-@package ion.agents abstract superclass for all agents
+@author Michael Meisinger
+@brief base class for all resource agent processes
 """
 
 from ion.core.base_process import BaseProcess
-
+from ion.services.coi.resource_registry import ResourceLCState
+   
 class ResourceAgent(BaseProcess):
-    """
-    This is the abstract superclass for all agents.
-    
-    If you are going to write a new agent, start here.
+    """Base class for agent processes
+    If you are going to write a new agent process, start here.
     """
     
     def op_get(self, content, headers, msg):
@@ -30,6 +30,7 @@ class ResourceAgent(BaseProcess):
     def op_setLifecycleState(self, content, headers, msg):
         """
         """
+        self.lifecycleState = ResourceLCState.RESLCS_NEW
     
     def op_execute(self, content, headers, msg):
         """

@@ -6,34 +6,35 @@
 @brief service backend for logging. Plays nicely with logging package
 """
 
-import logging
 import logging.config
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import RpcClient
+from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
 
-logging.debug('Loaded: '+__name__)
 logserv = logging.getLogger('logServer')
 
 class LoggerService(BaseService):
     """Logger service interface
     """
-    
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='logger', version='0.1.0', dependencies=[])
+
     def slc_init(self):
         pass
-    
+
     def op_config(self, content, headers, msg):
         pass
-    
+
     def op_logmsg(self, content, headers, msg):
         level = content.get('level','info')
         logmsg = content.get('msg','#NO MESSAGE#')
         lfrom = headers.get('sender','')
         ltime = content.get('logtime')
-        
+
         if level=='debug':
             logserv.debug(logmsg)
         elif level=='info':
@@ -46,10 +47,9 @@ class LoggerService(BaseService):
             logserv.critical(logmsg)
         else:
             logging.error('Invalid log level: '+str(level))
-    
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = LoggerService(receiver)
+
+# Spawn of the process using the module name
+factory = ProtocolFactory(LoggerService)
 
 """
 from ion.services.coi import logger

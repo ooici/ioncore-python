@@ -4,14 +4,12 @@
 @file ion/services/cei/provisioner.py
 @author Michael Meisinger
 @author Stephen Pasco
-@package ion.agents service for provisioning operational units (VM instances).
+@brief service for provisioning operational units (VM instances).
 """
 
-from twisted.python import log
 from twisted.internet import defer
 
 from magnet.spawnable import Receiver
-from magnet.spawnable import send
 from magnet.spawnable import spawn
 from magnet.store import Store
 
@@ -27,14 +25,21 @@ def start():
     id = yield spawn(receiver)
     yield store.put('test_instrument', id)
     
-    svc_mod = __import__('ion.agents.instrument_agent', globals(), locals(), ['instrument_agent'])
+    svc_mod = __import__('ion.agents.instrument_agents.SBE49', globals(), locals(), ['SBE49InstrumentAgent'])
 
     # Spawn instance of a service
     svc_id = yield spawn(svc_mod)
     
-    yield store.put('instrument_agent', svc_id)
+    yield store.put('SBE49InstrumentAgent', svc_id)
     
-    yield pu.send_message(receiver, '', svc_id, 'get', {'key':'obj1'}, {})
+    yield pu.send_message(receiver, '', svc_id, 'get', ('baudrate',
+                                                        'outputformat'), {})
+    yield pu.send_message(receiver, '', svc_id, 'set', {'baudrate': 19200,
+                                                        'outputformat': 1}, {})
+    yield pu.send_message(receiver, '', svc_id, 'get', ('baudrate',
+                                                         'outputformat'), {})
+    yield pu.send_message(receiver, '', svc_id, 'getLifecycleState', (), {})
+    yield pu.send_message(receiver, '', svc_id, 'setLifecycleState', {})
 
 def receive(content, msg):
     print 'in receive ', content, msg

@@ -6,13 +6,12 @@
 @brief Service that receives all sent messages in the system
 """
 
-import logging
 import logging.config
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import RpcClient
+from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService, BaseServiceClient
 
 logserv = logging.getLogger('convRepos')
@@ -20,25 +19,39 @@ logserv = logging.getLogger('convRepos')
 class ConversationRepositoryService(BaseService):
     """Conversation repository service interface
     """
-    
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='conversation_repository', version='0.1.0', dependencies=[])
+
     def slc_init(self):
         pass
 
-    def op_register_conv_type(self, content, headers, msg):
-        pass
-    
-    def op_get_conv_spec(self, content, headers, msg):
-        pass
-    
-    def op_newconv(self, content, headers, msg):
-        pass
+    def op_define_conv_type(self, content, headers, msg):
+        """Service operation: Define a new conversation type (aka protocol,
+        interaction pattern)
+        """
 
-    def op_logmsg(self, content, headers, msg):
+    def op_get_conv_type(self, content, headers, msg):
+        """Service operation: Returns the description of the conversation type
+        including the specification
+        """
+
+    def op_define_conversation(self, content, headers, msg):
+        """Service operation: Create a new conversation (instance) definition
+        """
+
+    def op_bind_conversation(self, content, headers, msg):
+        """Service operation: Add oneself to the conversation role binding
+        """
+
+    def op_log_message(self, content, headers, msg):
+        """Service operation: Log an occurred message with the repository
+        """
         logmsg = content['msg']
         logserv.info("-----------------------------------------------\n"+
                      str(logmsg))
 
-    
-# Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = ConversationRepositoryService(receiver)
+
+# Spawn of the process using the module name
+factory = ProtocolFactory(ConversationRepositoryService)
+

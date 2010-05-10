@@ -16,21 +16,27 @@ Get it with
 Usage
 =====
 
+(all subsequent steps assume start from lcaarch/ dir)
+
 Start CC ("Magnet" Python Capability Container) shell with:
-Note: it is important to start from the root of the lcaarch/ dir.
 ::
-    cd lcaarch
-    twistd -n magnet -h amoeba.ucsd.edu shell
+    twistd -n magnet -h amoeba.ucsd.edu
 
 Start system by executing within the CC shell:
 ><>
     from ion.core import bootstrap
     bootstrap.start()
 
-Start a test case by executing within the CC shell:
-><>
-    from ion import ts
-    ts.start()
+Alternatively from shell executing a script:
+::
+    twistd -n magnet -h amoeba.ucsd.edu res/scripts/bootstrap.py
+
+Run trial test cases (recursively)
+::
+    trial ion.core
+    trial ion.services.coi.test.test_resource_registry
+    trial ion
+
 
 Install the dependencies: Magnet (see Magnet's Readme)
 ======================================================
@@ -54,8 +60,8 @@ carrot (use txamqp branch)
     (cd carrot; git checkout -b txamqp origin/txamqp)
     (cd carrot; python setup.py install)
 
-Install the Magnet package:
----------------------------
+Install the Magnet package [NEED Magent 0.3.3]:
+-----------------------------------------------
 Get the latest version of the repository, if you haven't already.
 ::
     git clone git://amoeba.ucsd.edu/magnet.git # no ooi credential
@@ -63,3 +69,10 @@ Get the latest version of the repository, if you haven't already.
     git clone git@amoeba.ucsd.edu:magnet.git # need ooi credential
     (cd magnet; git checkout -b space origin/space)
     (cd magnet; python setup.py install)
+
+
+Note:
+=====
+This project dependes closely on magnet. Whenever you do a "git pull" on
+this project, there is a chance that you need to update and install magnet
+again (see above). Please review the branch logs for any cues.

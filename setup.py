@@ -3,15 +3,16 @@
 """
 @file setup.py
 @author Paul Hubbard
-@date 4/2/10
+@author Michael Meisinger
+@date 5/2/10
 @brief setup file for OOI LCA architecture prototype project.
 """
 
 setupdict = {
     'name' : 'lcaarch',
-    'version' : '0.0.1',
+    'version' : '0.2.0',
     'description' : 'OOI LCA architecture prototype',
-    'url': 'http://www.oceanobservatories.org/spaces/display/CIDev/',
+    'url': 'http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project',
     'download_url' : 'http://ooici.net/packages',
     'license' : 'Apache 2.0',
     'author' : 'Michael Meisinger',
@@ -31,7 +32,7 @@ try:
     from setuptools import setup, find_packages
     setupdict['packages'] = find_packages()
     setupdict['test_suite'] = 'lcaarch.test'
-    setupdict['install_requires'] = ['Twisted']
+    setupdict['install_requires'] = ['Twisted', 'magnet', 'carrot', 'pycassa']
     setupdict['include_package_data'] = True
     setup(**setupdict)
 
