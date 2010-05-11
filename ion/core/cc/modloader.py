@@ -47,16 +47,22 @@ class ModuleLoader(object):
 
     def _load_module(self, mod):
         #logging.info('Loading Module {0}'.format(mod))
-        modo = pu.get_module(mod)
+        try:
+            modo = pu.get_module(mod)
+        except StandardError, ie:
+            logging.error("Error importing module: "+str(mod))
         
     def _load_package(self, pack, recurse=False):
         #logging.info('Loading Package {0}'.format(pack))
-        packo = pu.get_module(pack)
-        ppath = packo.__path__
-        for path1 in ppath:
-            dirList=os.listdir(path1)
-            for fname in dirList:
-                if fname.endswith('.py') and fname != '__init__.py':
-                    self._load_module(pack+'.'+fname[:len(fname)-3])
-                elif os.path.isdir(os.path.join(path1,fname)) and recurse:
-                    self._load_package(pack+'.'+fname)
+        try:
+            packo = pu.get_module(pack)
+            ppath = packo.__path__
+            for path1 in ppath:
+                dirList=os.listdir(path1)
+                for fname in dirList:
+                    if fname.endswith('.py') and fname != '__init__.py':
+                        self._load_module(pack+'.'+fname[:len(fname)-3])
+                    elif os.path.isdir(os.path.join(path1,fname)) and recurse:
+                        self._load_package(pack+'.'+fname)
+        except StandardError, ie:
+            logging.error("Error importing package: "+str(pack))
