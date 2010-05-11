@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/data/dataobject.py
+@file ion/data/objstore.py
 @author Michael Meisinger
 @author David Stuebe
 @brief storing structured mutable objects mapped to graphs of immutable values

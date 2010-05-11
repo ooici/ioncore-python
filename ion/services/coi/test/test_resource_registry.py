@@ -16,7 +16,8 @@ from ion.test.iontest import IonTestCase
 
 
 class ResourceRegistryClientTest(unittest.TestCase):
-    """Testing client classes of resource registry
+    """
+    Testing client classes of resource registry
     """
     
     def test_ResourceDesc(self):
@@ -49,7 +50,8 @@ class ResourceRegistryClientTest(unittest.TestCase):
         self.assertEqual(rtd3.res_type,ResourceTypes.RESTYPE_UNASSIGNED)
         
 class ResourceRegistryTest(IonTestCase):
-    """Testing service classes of resource registry
+    """
+    Testing service classes of resource registry
     """
 
     @defer.inlineCallbacks
@@ -62,18 +64,19 @@ class ResourceRegistryTest(IonTestCase):
         yield self._stop_container()
    
     @defer.inlineCallbacks
-    def test_serviceReg(self):
+    def test_resource_reg(self):
         
         rd2 = ResourceDesc(name='res2',res_type=ResourceTypes.RESTYPE_GENERIC)
         c = ResourceRegistryClient()
-        rid = yield c.registerResource(rd2)
+        rid = yield c.register_resource(rd2)
         logging.info('Resource registered with id '+str(rid))
 
-        rd3 = yield c.getResourceDesc(rid)
+        rd3 = yield c.get_resource_desc(rid)
         logging.info('Resource desc '+str(rd3))
         self.assertEqual(rd3.res_name,'res2')
+        self.assertEqual(rd2.identity, rd3.identity)
 
-        rd4 = yield c.getResourceDesc('NONE')
+        rd4 = yield c.get_resource_desc('NONE')
         self.assertFalse(rd4,'resource desc not None')
 
        

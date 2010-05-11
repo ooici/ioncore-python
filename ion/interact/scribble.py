@@ -8,7 +8,6 @@
 
 import logging
 
-from ion.data.dataobject import DataObject
 from ion.interact.conversation import ConversationTypeSpec
 
 class ScribbleSpec(ConversationTypeSpec):

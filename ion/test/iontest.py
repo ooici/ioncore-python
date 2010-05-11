@@ -44,8 +44,9 @@ class IonTestCase(unittest.TestCase):
     
     @defer.inlineCallbacks
     def _start_core_services(self):
-        yield bootstrap.bootstrap(None, bootstrap.ion_core_services)
+        sup = yield bootstrap.bootstrap(None, bootstrap.ion_core_services)
         logging.info("============Core ION services started============")
+        defer.returnValue(sup)
 
     def _stop_container(self):
         logging.info("Closing ION container")
