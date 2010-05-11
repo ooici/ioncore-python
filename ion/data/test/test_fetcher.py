@@ -25,15 +25,20 @@ class DatastoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_single_get(self):
+        """
+        Simplest test, fetch a fixed local page.
+        @note Contenst of same in /var/www/tmp on amoeba.ucsd.edu
+        """
         services = [{'name':'fetcher', 'module':'ion.data.fetcher',
                     'class': 'FetcherService'},]
         yield self._spawnProcesses(services)
 
-        sup = yield self.procRegistry.get('fetcher')
-        logging.info('Supervisor: '+repr(sup))
+        dest = yield self.procRegistry.get('fetcher')
+        logging.debug('fetcher: '+repr(dest))
 
         fc = FetcherClient()
         fc.attach()
-        logging.info('sending request...')
-        res = yield fc.get_url('http://amoeba.ucsd.edu/tmp/test1.txt')
-        logging.info(res)
+        logging.debug('sending request...')
+        res = yield fc.get_url(dest, 'http://amoeba.ucsd.edu/tmp/test1.txt')
+        msg = res['value'].strip()
+        self.failUnlessEqual(msg, 'Now is the time for all good men to come to the aid of their country.')

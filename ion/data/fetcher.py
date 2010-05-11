@@ -10,6 +10,7 @@
 import logging
 
 from twisted.internet import defer
+from twisted.web import client
 
 from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService
@@ -25,9 +26,13 @@ class FetcherService(BaseService):
     Service declaration - seems similar to the Zope methods
     @todo Dependencies - perhaps pub-sub?
     """
+    logging.info('Declaring fetcher...')
     declare = BaseService.service_declare(name='fetcher',
                                           version='0.1.0',
                                           dependencies=[])
+    """
+    @todo Declare fetcher name into dns-equivalent...
+    """
 
     def __init__(self, receiver, spawnArgs=None):
         BaseService.__init__(self, receiver, spawnArgs)
@@ -38,8 +43,15 @@ class FetcherService(BaseService):
 
     @defer.inlineCallbacks
     def op_get_url(self, content, headers, msg):
-        yield self.reply_message(msg, 'reply', {'value':'no code!'}, {})
-        logging.warn('Implement me!')
+        # Payload is just the URL itself
+        src_url = content.encode('ascii')
+        hostname = src_url.split('/')[2]
+
+        logging.debug('Fetching page "%s"...' % src_url)
+        page = yield client.getPage(src_url, headers={'Host': hostname})
+        logging.debug('Fetch complete, sending to caller')
+        yield self.reply_message(msg, 'reply', {'value':page}, {})
+        logging.debug('get_url complete!')
 
     @defer.inlineCallbacks
     def op_get_dap_dataset(self, content, headers, msg):
@@ -54,27 +66,27 @@ class FetcherClient(RpcClient):
     """
 
     @defer.inlineCallbacks
-    def get_url(self, requested_url):
+    def get_url(self, faddr, requested_url):
         """
-        look up fetcher in dns
+        @todo look up fetcher in dns
         send to same
         return unpacked reply
         """
-        logging.info('Lookup up the service ID...')
-        sc = ServiceRegistryClient()
-        dest = yield sc.get_service_instance('fetcher')
+#        logging.info('Lookup up the service ID...')
+#        sc = ServiceRegistryClient()
+#        dest = '1'
+        #yield sc.get_service_instance('fetcher')
 
         logging.info('Sending request')
-        (content, headers, msg) = yield self.rpc_send(dest, 'get_url',
+        (content, headers, msg) = yield self.rpc_send(faddr, 'get_url',
                                                       requested_url, {})
-
-        logging.info('Got back: ' + content)
+        defer.returnValue(content)
 
 #    @defer.inlineCallbacks
     def get_dap_dataset(self, requested_url, dest_address):
         """
-        Look up fetcher in dns
-        send to same
+        @todo Look up fetcher in dns
+        @todo send to same
         """
         pass
 
