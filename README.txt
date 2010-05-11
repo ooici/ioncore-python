@@ -85,7 +85,8 @@ Change log:
 2010-05-06:
 - Refactored the BaseProcess class.
   - You can now do RPC directly from the process, via self.rpc_send without
-    the need for an RpcClient
+    the need for an RpcClient. Works even with other messages coming in at the
+    same time (using the conv-id)
   - Added aliases: self.send, self.reply (use these now)
   - Process instance can be spawned via self.spawn()
 - Provided an easier to use BaseServiceClient, which uses a default service

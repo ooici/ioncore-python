@@ -22,11 +22,11 @@ class HelloTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._startContainer()
+        yield self._start_container()
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stopContainer()
+        yield self._stop_container()
 
     @defer.inlineCallbacks
     def test_hello(self):
@@ -35,9 +35,7 @@ class HelloTest(IonTestCase):
             {'name':'hello1','module':'ion.play.hello_service','class':'HelloService'},
         ]
 
-        yield self._spawnProcesses(services)
-        
-        sup = yield self.procRegistry.get("bootstrap")
+        sup = yield self._spawn_processes(services)
         logging.info("Supervisor: "+repr(sup))
 
         hsid = yield self.procRegistry.get("hello1")

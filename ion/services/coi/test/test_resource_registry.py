@@ -54,12 +54,12 @@ class ResourceRegistryTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._startContainer()
-        yield self._startCoreServices()
+        yield self._start_container()
+        yield self._start_core_services()
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stopContainer()
+        yield self._stop_container()
    
     @defer.inlineCallbacks
     def test_serviceReg(self):

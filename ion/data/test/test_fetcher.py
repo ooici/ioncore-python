@@ -17,11 +17,11 @@ from ion.test.iontest import IonTestCase
 class DatastoreTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._startContainer()
+        yield self._start_container()
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stopContainer()
+        yield self._stop_container()
 
     @defer.inlineCallbacks
     def test_single_get(self):
@@ -31,7 +31,7 @@ class DatastoreTest(IonTestCase):
         """
         services = [{'name':'fetcher', 'module':'ion.data.fetcher',
                     'class': 'FetcherService'},]
-        yield self._spawnProcesses(services)
+        yield self._spawn_processes(services)
 
         dest = yield self.procRegistry.get('fetcher')
         logging.debug('fetcher: '+repr(dest))

@@ -185,11 +185,11 @@ class ObjectStoreServiceTest(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._startContainer()
+        yield self._start_container()
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stopContainer()
+        yield self._stop_container()
 
 
     @defer.inlineCallbacks
@@ -199,7 +199,7 @@ class ObjectStoreServiceTest(IonTestCase):
             #{'name':'objstoreSvc2','module':'ion.data.objstore','class':'ObjectStoreService'},
         ]
 
-        yield bootstrap.bootstrap(None, services)
+        yield self._spawn_processes(services)
 
         sup = yield base_process.procRegistry.get("bootstrap")
         logging.info("Supervisor: "+repr(sup))

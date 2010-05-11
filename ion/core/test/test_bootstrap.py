@@ -31,32 +31,32 @@ class BootstrapTest1(IonTestCase):
     """
        
     @defer.inlineCallbacks
-    def test_startContainer(self):
-        yield self._startContainer()
+    def test_start_container(self):
+        yield self._start_container()
 
         logging.info("Started magnet container")
 
-        yield self._stopContainer()
+        yield self._stop_container()
 
     @defer.inlineCallbacks
     def test_startContainerAndServices(self):
-        yield self._startContainer()
-        yield self._startCoreServices()
+        yield self._start_container()
+        yield self._start_core_services()
 
         logging.info("Started magnet and core services")
 
-        yield self._stopContainer()
+        yield self._stop_container()
         
 
 
 class BootstrapTest2(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._startContainer()
+        yield self._start_container()
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stopContainer()
+        yield self._stop_container()
 
     def test_1(self):
         pass
