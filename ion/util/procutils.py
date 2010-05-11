@@ -173,7 +173,7 @@ def get_class(qualclassname, mod=None):
         mod = get_module(qualmodname)
 
     cls = getattr(mod, clsname)
-    logging.debug('Class: '+str(cls))
+    #logging.debug('Class: '+str(cls))
     return cls
 
 get_modattr = get_class
@@ -185,7 +185,7 @@ def get_module(qualmodname):
     """
     package = qualmodname.rpartition('.')[0]
     modname = qualmodname.rpartition('.')[2]
-    logging.info('get_module: from '+package+' import '+modname)
+    #logging.info('get_module: from '+package+' import '+modname)
     mod = __import__(qualmodname, globals(), locals(), [modname])
     #logging.debug('Module: '+str(mod))
     return mod

@@ -29,7 +29,7 @@ class IonTestCase(unittest.TestCase):
     procRegistry = base_process.procRegistry
 
     @defer.inlineCallbacks
-    def _startContainer(self):
+    def _start_container(self):
         mopt = {}
         mopt['broker_host'] = 'amoeba.ucsd.edu'
         mopt['broker_port'] = 5672
@@ -42,14 +42,13 @@ class IonTestCase(unittest.TestCase):
         self.procRegistry = base_process.procRegistry
         logging.info("============Magnet container started, "+repr(self.cont_conn))
     
-    _startMagnet = _startContainer
-
     @defer.inlineCallbacks
-    def _startCoreServices(self):
-        yield bootstrap.bootstrap(None, bootstrap.ion_core_services)
+    def _start_core_services(self):
+        sup = yield bootstrap.bootstrap(None, bootstrap.ion_core_services)
         logging.info("============Core ION services started============")
+        defer.returnValue(sup)
 
-    def _stopContainer(self):
+    def _stop_container(self):
         logging.info("Closing ION container")
         self.cont_conn.transport.loseConnection()
         container.Container._started = False
@@ -57,10 +56,10 @@ class IonTestCase(unittest.TestCase):
         bootstrap.reset_container()
         logging.info("============ION container closed============")
 
-    _stopMagnet = _stopContainer
 
-    def _declareMessaging(self, messaging):
+    def _declare_messaging(self, messaging):
         return bootstrap.bs_messaging(messaging)
     
-    def _spawnProcesses(self, procs):
+    def _spawn_processes(self, procs):
         return bootstrap.bs_processes(procs)
+

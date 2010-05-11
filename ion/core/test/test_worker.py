@@ -21,11 +21,11 @@ class WorkerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._startContainer()
+        yield self._start_container()
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stopContainer()
+        yield self._stop_container()
 
     @defer.inlineCallbacks
     def _test_basic(self):
@@ -35,7 +35,7 @@ class WorkerTest(IonTestCase):
             {'name':'hello2','module':'ion.services.hello_service','class':'HelloService'},
         ]
         
-        yield self._spawnProcesses(workers)
+        yield self._spawn_processes(workers)
  
     @defer.inlineCallbacks
     def test_worker_queue(self):
@@ -46,8 +46,8 @@ class WorkerTest(IonTestCase):
             {'name':'workerProc2','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'worker1','scope':'local'}},
         ]
 
-        yield self._declareMessaging(messaging)
-        yield self._spawnProcesses(workers)
+        yield self._declare_messaging(messaging)
+        yield self._spawn_processes(workers)
         
         sup = yield self.procRegistry.get("bootstrap")
         logging.info("Supervisor: "+repr(sup))
@@ -77,8 +77,8 @@ class WorkerTest(IonTestCase):
             {'name':'fanoutProc2','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'fanout1','scope':'local'}},
         ]
 
-        yield self._declareMessaging(messaging)
-        yield self._spawnProcesses(workers)
+        yield self._declare_messaging(messaging)
+        yield self._spawn_processes(workers)
         
         sup = yield self.procRegistry.get("bootstrap")
         logging.info("Supervisor: "+repr(sup))

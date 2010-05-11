@@ -17,10 +17,10 @@ from ion.test.iontest import IonTestCase
 class DatastoreTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._startContainer()
+        yield self._start_container()
         services = [{'name':'fetcher', 'module':'ion.data.fetcher',
                     'class': 'FetcherService'},]
-        yield self._spawnProcesses(services)
+        yield self._spawn_processes(services)
 
         self.dest = yield self.procRegistry.get('fetcher')
         self.fc = FetcherClient()
@@ -28,7 +28,7 @@ class DatastoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stopContainer()
+        yield self._stop_container()
 
     @defer.inlineCallbacks
     def _get_page(self, src_url):

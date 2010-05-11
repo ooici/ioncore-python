@@ -3,7 +3,7 @@
 """
 @file ion/core/bootstrap.py
 @author Michael Meisinger
-@brief main module for bootstrapping the system
+@brief main module for bootstrapping the system and support functions
 """
 
 import logging
@@ -15,7 +15,9 @@ from magnet.spawnable import spawn
 from magnet.store import Store
 
 from ion.core import ioninit, base_process
+from ion.core.cc.modloader import ModuleLoader
 from ion.core.supervisor import Supervisor, ChildProcess
+from ion.services.coi.service_registry import ServiceRegistryClient, ServiceDesc
 from ion.util.config import Config
 import ion.util.procutils as pu
 
@@ -33,7 +35,8 @@ nameRegistry = Store()
 
 @defer.inlineCallbacks
 def start():
-    """Main function of bootstrap. Starts system with static config of
+    """
+    Main function of bootstrap. Starts system with static config of
     messaging names and services
     """
     logging.info("ION SYSTEM bootstrapping now...")
@@ -41,21 +44,28 @@ def start():
     startsvcs.extend(ion_core_services)
     #startsvcs.extend(ion_services)
     yield bootstrap(ion_messaging, startsvcs)
+    ModuleLoader().load_modules()
+    #yield bs_register_services()
 
 @defer.inlineCallbacks
 def bootstrap(messaging, services):
-    """Starts services and messaging from given setup
+    """
+    Starts services and messaging from given setup.
+    @retval supervisor BaseProcess instance
     """
     logging.info("Configuring messaging and starting services...")
     init_container()
+    res = None
     if messaging and len(messaging)>0:
         yield bs_messaging(messaging)
     if services and len(services)>0:
-        yield bs_processes(services)
+        res = yield bs_processes(services)
+    defer.returnValue(res)
 
 @defer.inlineCallbacks
 def bs_messaging(messagingCfg, cgroup=None):
-    """Configures the container messaging resources 
+    """
+    Configures the container messaging resources 
     """
     # for each messaging resource call Magnet to define a resource
     for name, msgResource in messagingCfg.iteritems():
@@ -76,7 +86,9 @@ def bs_messaging(messagingCfg, cgroup=None):
 
 @defer.inlineCallbacks
 def bs_processes(procs):
-    """Bootstraps a set of processes 
+    """
+    Bootstraps a set of processes.
+    @retval supervisor BaseProcess instance
     """
     children = prepare_childprocs(procs)
 
@@ -99,7 +111,8 @@ def bs_processes(procs):
     defer.returnValue(sup)
 
 def prepare_childprocs(procs):
-    """Prepares a Supervisor class instance with configured child processes.
+    """
+    Prepares a Supervisor class instance with configured child processes.
     """
     logging.info("Preparing bootstrap supervisor")
    
@@ -114,8 +127,19 @@ def prepare_childprocs(procs):
     logging.debug("Supervisor child procs: "+str(children))
     return children
 
+@defer.inlineCallbacks
+def bs_register_services():
+    """
+    Register all the declared processes.
+    """
+    src = ServiceRegistryClient()
+    for proc in base_process.processes.values():
+        sd = ServiceDesc(name=proc['name'])
+        res = yield src.register_service(sd)
+
 def init_container():
-    """Performs global initializations on the local container on startup.
+    """
+    Performs global initializations on the local container on startup.
     """
     interceptorsys = CONF.getValue('interceptor_system',None)
     if interceptorsys:
@@ -124,8 +148,9 @@ def init_container():
         Container.interceptor_system = cls()
 
 def reset_container():
-    """Resets the container for warm restart. Simple implementation
-    currently.
+    """
+    Resets the container for warm restart. Simple implementation
+    currently. Used for testing only.
     """
     # The following is extremely hacky. Reset static module and classvariables
     # to their defaults. Even further, reset imported names in other modules
