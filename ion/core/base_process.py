@@ -226,6 +226,15 @@ class BaseProcess(object):
     # Some aliases for initial backwards compatibility
     send_message = send 
     reply_message = reply
+    
+    # OTP style functions for working with processes and modules/apps
+    
+    def spawn_child(self):
+        pass
+    def link_child(self):
+        pass
+    def spawn_link(self):
+        pass
 
 class ProtocolFactory(ProtocolFactory):
     """
