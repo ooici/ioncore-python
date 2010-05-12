@@ -6,14 +6,12 @@
 @brief service for publishing on data streams, and for subscribing to streams
 """
 
-import logging
+
 from twisted.internet import defer
-from magnet.spawnable import Receiver
 from magnet.store import Store
 
-import ion.util.procutils as pu
 from ion.core import bootstrap
-from ion.core.base_process import BaseProcess, ProtocolFactory
+from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class DataPubsubService(BaseService):
@@ -37,7 +35,7 @@ class DataPubsubService(BaseService):
         yield bootstrap.bs_messaging(topic)
         qtopic_name = self.get_scoped_name('local',topic_name)
         yield self.topics.put (topic_name, topic[topic_name])
-        yield self.reply_message(msg, 'result', {'topic_name':qtopic_name}, {})        
+        yield self.reply_message(msg, 'result', {'topic_name':qtopic_name}, {})
 
     def op_define_publisher(self, content, headers, msg):
         """Service operation: Register a publisher that subsequently is
@@ -67,7 +65,7 @@ class DataPubsubService(BaseService):
         msg = content['msg']
         qtopic = self.get_scoped_name('local',topic_name)
         # Todo: impersonate message as from sender
-        yield self.send_message(qtopic, op, msg, headers)        
+        yield self.send_message(qtopic, op, msg, headers)
 
     def find_topic(self, content, headers, msg):
         """Service operation: For a given resource, find the topic that contains
@@ -85,7 +83,7 @@ class DataPubsubClient(BaseServiceClient):
     def __init__(self, *args):
         BaseServiceClient.__init__(self, *args)
         self.svcname = "data_pubsub"
-    
+
     @defer.inlineCallbacks
     def define_topic(self, topic_name):
         yield self._check_init()

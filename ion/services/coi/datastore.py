@@ -9,12 +9,6 @@
 import logging
 from twisted.internet import defer
 
-from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
-from magnet.store import Store
-
-import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
@@ -50,6 +44,9 @@ class DatastoreService(BaseService):
         logging.info('Datastore.get('+key+') = '+str(value))
         yield self.reply_message(msg, 'result', {'value':value}, {})
 
+
+class DatastoreServiceClient(BaseServiceClient):
+    pass
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(DatastoreService)

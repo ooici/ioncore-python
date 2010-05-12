@@ -6,12 +6,10 @@
 @test ion.data.fetcher Test of refactored fetcher
 """
 
-from twisted.trial import unittest
 import logging
 from twisted.internet import defer
 
-from ion.data.fetcher import FetcherClient, FetcherService
-from magnet.spawnable import spawn
+from ion.data.fetcher import FetcherClient
 from ion.test.iontest import IonTestCase
 
 class DatastoreTest(IonTestCase):

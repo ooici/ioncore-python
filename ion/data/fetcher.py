@@ -14,7 +14,6 @@ from twisted.web import client
 
 from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService
-from ion.services.coi.service_registry import ServiceRegistryClient
 
 class FetcherService(BaseService):
     """
