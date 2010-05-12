@@ -11,8 +11,9 @@
 
 import logging
 import re
-
+import hashlib
 import pycassa
+from uuid import uuid4
 
 class CassandraStore():
     """
@@ -41,10 +42,19 @@ class CassandraStore():
         """
         try:
             val = self._kvs.get(key)
-            logging.info('Key "%s":"%s"' % (key, val))
-            return(val['value'])
+            logging.info('Read Key:Val "%s":"%s"' % (key, val))
+            if '__value__' in val:
+                r = val['__value__']
+            elif '__set__' in val:
+                r=set()
+                for v in val:
+                    if v!='__set__':
+                        r.add(val[v])
+            else:
+                r = val
+            return(r)
         except:
-            logging.info('Key "%s" not found' % key)
+            logging.info('Get: Key "%s" not found' % key)
             return(None)
 
     def put(self, key, value):
@@ -55,9 +65,46 @@ class CassandraStore():
         @note Value is composed into OOI dictionary under keyname 'value'
         @retval None
         """
-        logging.info('writing key %s value %s' % (key, value))
-        self._kvs.insert(key, {'value' : value})
+        logging.info('writing key %s value %s' % (key, value))                
+        if type(value) == type(dict()):
+            if '__value__' in value:
+                logging.error('The dictionary key "__value__" is reserved')
+                raise Exception('The dictionary key "__value__" is reserved in cassandras put function')
+            if '__set__' in value:
+                logging.error('The dictionary key "__set__" is reserved')
+                raise Exception('The dictionary key "__set__" is reserved in cassandras put function')
+            self._kvs.insert(key, value)
+
+        elif type(value) == type(set()):
+            d=dict()
+            for val in value:
+                col=hashlib.sha224(val).hexdigest()
+                d[str(col)]=val
+            d['__set__']='True'
+            
+            self._kvs.insert(key, d)        
+        
+        else:
+            self._kvs.insert(key, {'__value__' : value})
+        
         logging.info('write complete')
+
+
+    def incr(self, key):
+        '''
+        @brief Increment the value of a counter
+        @param key is the name of the counter
+        @retval integer counter
+        @note Note quiet atomic - a race condition is possible where two
+        simultanious calls would each increment the counter and return the same
+        value. Each call will always result in an increment though.
+        This method is clearly inefficient.
+        '''
+        col=str(uuid4())
+        self._kvs.insert(key, {col:'a'})
+        return self._kvs.get_count(key)
+
+
 
     def query(self, regex):
         """
