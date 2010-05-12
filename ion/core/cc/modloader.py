@@ -46,14 +46,14 @@ class ModuleLoader(object):
                 self._load_module(mod)
 
     def _load_module(self, mod):
-        #logging.info('Loading Module {0}'.format(mod))
+        #logging.info('Loading Module %s' % (mod))
         try:
             modo = pu.get_module(mod)
         except StandardError, ie:
             logging.error("Error importing module: "+str(mod))
         
     def _load_package(self, pack, recurse=False):
-        #logging.info('Loading Package {0}'.format(pack))
+        #logging.info('Loading Package %s' % (pack))
         try:
             packo = pu.get_module(pack)
             ppath = packo.__path__
