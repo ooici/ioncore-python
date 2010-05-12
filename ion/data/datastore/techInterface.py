@@ -38,7 +38,8 @@ class CassandraStore():
         """
         @brief Return a value corresponding to a given key
         @param Key Cassandra key
-        @retval Value from the ion dictionary, or None
+        @retval Value from the ion dictionary, or None. The value returned can be
+        a python dictionary, a python set, or an integer, float or string.
         """
         try:
             val = self._kvs.get(key)
@@ -61,8 +62,8 @@ class CassandraStore():
         """
         @brief Write a key/value pair into cassandra
         @param key Lookup key
-        @param value Corresponding value
-        @note Value is composed into OOI dictionary under keyname 'value'
+        @param value Corresponding value. The value can be a python Dictionary
+        a python Set, or an integer, float or string.
         @retval None
         """
         logging.info('writing key %s value %s' % (key, value))                
