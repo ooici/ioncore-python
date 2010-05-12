@@ -15,6 +15,8 @@ from twisted.web import client
 from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService
 
+from IPython.Shell import IPShellEmbed
+
 class FetcherService(BaseService):
     """
     Fetcher, implemented as a service.
@@ -42,15 +44,33 @@ class FetcherService(BaseService):
 
     @defer.inlineCallbacks
     def op_get_url(self, content, headers, msg):
+        self.got_err = False
+        def error_callback(failure):
+            """
+            Inline function to catch and note getPage errors.
+            """
+            self.got_err = True
+            self.failure = failure
+
         # Payload is just the URL itself
         src_url = content.encode('ascii')
         hostname = src_url.split('/')[2]
 
         logging.debug('Fetching page "%s"...' % src_url)
-        page = yield client.getPage(src_url, headers={'Host': hostname})
-        logging.debug('Fetch complete, sending to caller')
-        yield self.reply_message(msg, 'reply', {'value':page}, {})
-        logging.debug('get_url complete!')
+
+        d = client.getPage(src_url, headers={'Host': hostname})
+        d.addErrback(error_callback)
+        page = yield d
+        if not self.got_err:
+            logging.debug('Fetch complete, sending to caller')
+            yield self.reply_message(msg, 'reply', {'value':page}, {})
+            logging.debug('get_url complete!')
+
+        # Did catch an error
+        logging.error('Error on page fetch: ' + str(self.failure))
+        yield self.reply_message(msg, 'reply',
+                                 {'failure': str(self.failure),
+                                'value':None})
 
     @defer.inlineCallbacks
     def op_get_dap_dataset(self, content, headers, msg):
@@ -79,6 +99,8 @@ class FetcherClient(RpcClient):
         logging.info('Sending request')
         (content, headers, msg) = yield self.rpc_send(faddr, 'get_url',
                                                       requested_url, {})
+        if 'failure' in content:
+            raise ValueError('Error on URL: ' + content['failure'])
         defer.returnValue(content)
 
 #    @defer.inlineCallbacks
