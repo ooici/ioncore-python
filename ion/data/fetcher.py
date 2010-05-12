@@ -24,6 +24,7 @@ class FetcherService(BaseService):
     """
     Service declaration - seems similar to the Zope methods
     @todo Dependencies - perhaps pub-sub?
+    @note These are not class methods!
     """
     logging.info('Declaring fetcher...')
     declare = BaseService.service_declare(name='fetcher',
