@@ -82,6 +82,10 @@ again (see above). Please review the branch logs for any cues.
 Change log:
 ===========
 
+2010-05-10:
+- Based on entries in config files, service process modules are sought and
+  loaded in order to collect the service process declarations. This enables
+  a registration of services with versions and dependencies on startup
 2010-05-06:
 - Refactored the BaseProcess class.
   - You can now do RPC directly from the process, via self.rpc_send without

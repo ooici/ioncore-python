@@ -8,7 +8,10 @@
 """
 
 import hashlib
-import json
+try:
+    import json
+except:
+    import simplejson as json
 import logging
 from twisted.internet import defer
 

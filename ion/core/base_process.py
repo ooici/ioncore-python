@@ -91,10 +91,10 @@ class BaseProcess(object):
             self.procName = content.get('proc-name', __name__)
             supId = content.get('sup-id', None)
             self.procSupId = pu.get_process_id(supId)
-            logging.info('op_init: proc-name={0}, sup-id={1}'.format(self.procName,supId))
+            logging.info('op_init: proc-name=%s, sup-id=%s' % (self.procName,supId))
 
             yield defer.maybeDeferred(self.plc_init)
-            logging.info('===== Process {0} INITIALIZED ====='.format(self.procName))
+            logging.info('===== Process %s INITIALIZED =====' % (self.procName))
 
             yield self.reply(msg, 'inform_init', {'status':'OK'}, {})
             self.procState = "INITIALIZED"
@@ -272,7 +272,7 @@ class ProtocolFactory(ProtocolFactory):
         time instantiate class.
         """
         if not spawnArgs: spawnArgs = {}
-        logging.info("ProtocolFactory.build(name={0},args={1!s})".format(self.name,spawnArgs))
+        logging.info("ProtocolFactory.build(name=%s,args=%s)" % (self.name,spawnArgs))
         receiver = self.receiver(self.name)
         instance = self.processClass(receiver, spawnArgs)
         receiver.procinst = instance
