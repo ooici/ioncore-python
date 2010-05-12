@@ -15,8 +15,6 @@ from twisted.web import client
 from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.services.base_service import BaseService
 
-from IPython.Shell import IPShellEmbed
-
 class FetcherService(BaseService):
     """
     Fetcher, implemented as a service.

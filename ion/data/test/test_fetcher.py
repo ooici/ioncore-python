@@ -15,6 +15,9 @@ from ion.test.iontest import IonTestCase
 class FetcherTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
+        self.log = logging.getLogger(name='ion.data.test.test_fetcher')
+        logging.basicConfig(level=logging.DEBUG, \
+                format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
         yield self._start_container()
         services = [{'name':'fetcher', 'module':'ion.data.fetcher',
                     'class': 'FetcherService'},]
@@ -30,7 +33,7 @@ class FetcherTest(IonTestCase):
 
     @defer.inlineCallbacks
     def _get_page(self, src_url):
-        logging.debug('sending request for "%s"...' % src_url)
+        self.log.debug('sending request for "%s"...' % src_url)
         res = yield self.fc.get_url(self.dest, src_url)
         msg = res['value']
         defer.returnValue(msg)
