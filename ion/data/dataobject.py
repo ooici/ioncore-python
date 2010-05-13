@@ -42,5 +42,11 @@ class DataObject(object):
             self.__dict__.update(blob)
 
     @classmethod
+    def from_encoding(cls, blob):
+        inst = cls()
+        inst.decode(blob)
+        return inst
+
+    @classmethod
     def create_unique_id(cls):
         return str(uuid4())[:9]

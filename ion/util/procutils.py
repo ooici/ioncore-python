@@ -6,7 +6,11 @@
 @brief  utility helper functions for processes in capability containers
 """
 
-import sys, traceback, re
+import sys
+import traceback
+import re
+from datetime import datetime
+import time
 import logging
 from twisted.internet import defer, reactor
 from magnet.container import Id
@@ -95,6 +99,7 @@ def send_message(receiver, send, recv, operation, content, headers):
     msg['conv-id'] = ''
     # Conversation type id
     msg['protocol'] = ''
+    msg['us'] = str(currenttime_ms())
     #msg['reply-with'] = ''
     #msg['in-reply-to'] = ''
     #msg['reply-by'] = ''
@@ -194,6 +199,19 @@ def asleep(secs):
     d = defer.Deferred()
     reactor.callLater(secs, d.callback, None)
     return d
+
+def currenttime():
+    """
+    @retval current UTC time as float with seconds in epoch and fraction
+    """
+    now = datetime.utcnow()
+    return time.mktime(now.timetuple()) + now.microsecond / 1000000.0
+
+def currenttime_ms():
+    """
+    @retval current UTC time as int with milliseconds in epoch
+    """
+    return int(currenttime() * 1000)
     
 # Stuff for testing: Stubs, mock objects
 fakeStore = Store()
