@@ -7,14 +7,11 @@
 """
 
 import logging
-import time
-from twisted.internet import defer
-from twisted.trial import unittest
-from magnet.spawnable import spawn
 
-from ion.play.hello_service import *
+from twisted.internet import defer
+
+from ion.play.hello_service import HelloServiceClient
 from ion.test.iontest import IonTestCase
-import ion.util.procutils as pu
 
 class HelloTest(IonTestCase):
     """Testing service classes of resource registry

@@ -6,15 +6,13 @@
 @test ion.data.fetcher Test of refactored fetcher
 """
 
-from twisted.trial import unittest
 import logging
 from twisted.internet import defer
 
-from ion.data.fetcher import FetcherClient, FetcherService
-from magnet.spawnable import spawn
+from ion.data.fetcher import FetcherClient
 from ion.test.iontest import IonTestCase
 
-class DatastoreTest(IonTestCase):
+class FetcherTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -49,4 +47,8 @@ class DatastoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_404(self):
-        self.failUnlessFailure(self._get_page('http://ooici.net/404-fer-sure'))
+        try:
+            d = yield self._get_page('http://ooici.net/404-fer-sure')
+            self.fail('Should have gotten an exception for 404 error!')
+        except ValueError, e:
+            pass

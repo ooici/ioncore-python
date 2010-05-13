@@ -9,12 +9,6 @@
 import logging
 from twisted.internet import defer
 
-from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
-from magnet.store import Store
-
-import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.data.objstore import ObjectStore
 from ion.services.base_service import BaseService, BaseServiceClient
@@ -115,6 +109,9 @@ class DatastoreDirectClient(BaseServiceClient):
     backend technology, such as a Cassandra or Redis client.
     """
 
+
+class DatastoreServiceClient(BaseServiceClient):
+    pass
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(DatastoreService)

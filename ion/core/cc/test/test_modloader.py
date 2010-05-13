@@ -6,8 +6,6 @@
 @brief test cases for module loader
 """
 
-import logging
-
 from ion.core import ioninit
 from ion.core.cc.modloader import ModuleLoader
 from ion.test.iontest import IonTestCase
@@ -17,7 +15,7 @@ class ModuleLoaderTest(IonTestCase):
     """
     Tests the module loader.
     """
-       
+
     def test_modloader(self):
         ml = ModuleLoader()
 

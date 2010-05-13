@@ -3,11 +3,10 @@
 """
 @file ion/core/cc/modloader.py
 @author Michael Meisinger
-@brief loads modules in given list of 
+@brief loads modules in given list of
 """
 
 import logging
-import os
 import os.path
 
 from ion.core import ioninit
@@ -34,7 +33,7 @@ class ModuleLoader(object):
         elif not CF_load_modules:
             # This should only apply if called with default arguments
             return
-        
+
         for mod in mods:
             if not type(mod) is str:
                 raise RuntimeError("Entries in module list must be str")
@@ -51,7 +50,7 @@ class ModuleLoader(object):
             modo = pu.get_module(mod)
         except StandardError, ie:
             logging.error("Error importing module: "+str(mod))
-        
+
     def _load_package(self, pack, recurse=False):
         #logging.info('Loading Package %s' % (pack))
         try:
