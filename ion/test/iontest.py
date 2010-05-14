@@ -23,33 +23,38 @@ class IonTestCase(unittest.TestCase):
     """
     Extension of python unittest.TestCase and trial unittest.TestCase for the
     purposes of supporting ION tests with a container/AMQP based execution
-    environment
+    environment.
+    Use this as a base case for your unit tests, e.g.
+     class DatastoreTest(IonTestCase):
     """
 
     procRegistry = base_process.procRegistry
 
     @defer.inlineCallbacks
-    def _startContainer(self):
+    def _start_container(self):
+        """
+        Hook to start the container.
+        @note Hardwired to connect to amoeba for broker.
+        """
         mopt = {}
         mopt['broker_host'] = 'amoeba.ucsd.edu'
         mopt['broker_port'] = 5672
         mopt['broker_vhost'] = '/'
         mopt['boot_script'] = None
         mopt['script'] = None
- 
+
         self.cont_conn = yield container.startContainer(mopt)
         bootstrap.init_container()
         self.procRegistry = base_process.procRegistry
         logging.info("============Magnet container started, "+repr(self.cont_conn))
-    
-    _startMagnet = _startContainer
 
     @defer.inlineCallbacks
-    def _startCoreServices(self):
-        yield bootstrap.bootstrap(None, bootstrap.ion_core_services)
+    def _start_core_services(self):
+        sup = yield bootstrap.bootstrap(None, bootstrap.ion_core_services)
         logging.info("============Core ION services started============")
+        defer.returnValue(sup)
 
-    def _stopContainer(self):
+    def _stop_container(self):
         logging.info("Closing ION container")
         self.cont_conn.transport.loseConnection()
         container.Container._started = False
@@ -57,10 +62,9 @@ class IonTestCase(unittest.TestCase):
         bootstrap.reset_container()
         logging.info("============ION container closed============")
 
-    _stopMagnet = _stopContainer
 
-    def _declareMessaging(self, messaging):
+    def _declare_messaging(self, messaging):
         return bootstrap.bs_messaging(messaging)
-    
-    def _spawnProcesses(self, procs):
+
+    def _spawn_processes(self, procs):
         return bootstrap.bs_processes(procs)

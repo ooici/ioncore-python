@@ -46,11 +46,11 @@ class PubSubTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._startContainer()
+        yield self._start_container()
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stopContainer()
+        yield self._stop_container()
 
     @defer.inlineCallbacks
     def test_pubsub(self):
@@ -58,7 +58,7 @@ class PubSubTest(IonTestCase):
             {'name':'data_pubsub','module':'ion.services.dm.datapubsub','class':'DataPubsubService'},
         ]
 
-        sup = yield self._spawnProcesses(services)
+        sup = yield self._spawn_processes(services)
         
         dps = yield self.procRegistry.get("data_pubsub")
         logging.info("DataPubsubservice: "+repr(dps))
@@ -104,7 +104,7 @@ class PubSubTest(IonTestCase):
             {'name':'data_pubsub','module':'ion.services.dm.datapubsub','class':'DataPubsubService'},
         ]
 
-        sup = yield self._spawnProcesses(services)
+        sup = yield self._spawn_processes(services)
         
         dps = yield self.procRegistry.get("data_pubsub")
         logging.info("DataPubsubservice: "+repr(dps))

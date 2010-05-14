@@ -8,8 +8,11 @@
 
 import logging
 import hashlib
-import json
-
+try:
+    import json
+except:
+    import simplejson as json
+    
 from magnet.container import InterceptorSystem, Interceptor
 from carrot.backends.base import BaseMessage
 from ion.core import ioninit

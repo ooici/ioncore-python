@@ -27,6 +27,6 @@ def start():
     """
     logging.info("ION/DX bootstrapping now...")
     startsvcs = []
-    startsvcs.extend(ion_services)
+    startsvcs.extend(dx_services)
 
     yield bootstrap.bootstrap(ion_messaging, startsvcs)

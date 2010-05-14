@@ -6,34 +6,49 @@
 @test ion.data.fetcher Test of refactored fetcher
 """
 
-from twisted.trial import unittest
 import logging
 from twisted.internet import defer
 
-from ion.data.fetcher import FetcherClient, FetcherService
-from magnet.spawnable import spawn
+from ion.data.fetcher import FetcherClient
 from ion.test.iontest import IonTestCase
 
-class DatastoreTest(IonTestCase):
+class FetcherTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._startContainer()
+        yield self._start_container()
+        services = [{'name':'fetcher', 'module':'ion.data.fetcher',
+                    'class': 'FetcherService'},]
+        yield self._spawn_processes(services)
+
+        self.dest = yield self.procRegistry.get('fetcher')
+        self.fc = FetcherClient()
+        self.fc.attach()
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stopContainer()
+        yield self._stop_container()
+
+    @defer.inlineCallbacks
+    def _get_page(self, src_url):
+        logging.debug('sending request for "%s"...' % src_url)
+        res = yield self.fc.get_url(self.dest, src_url)
+        msg = res['value']
+        defer.returnValue(msg)
 
     @defer.inlineCallbacks
     def test_single_get(self):
-        services = [{'name':'fetcher', 'module':'ion.data.fetcher',
-                    'class': 'FetcherService'},]
-        yield self._spawnProcesses(services)
+        """
+        Simplest test, fetch a fixed local page.
+        @note Contenst of same in /var/www/tmp on amoeba.ucsd.edu
+        """
+        res = yield self._get_page('http://amoeba.ucsd.edu/tmp/test1.txt')
+        msg = res.strip()
+        self.failUnlessEqual(msg, 'Now is the time for all good men to come to the aid of their country.')
 
-        sup = yield self.procRegistry.get('fetcher')
-        logging.info('Supervisor: '+repr(sup))
-
-        fc = FetcherClient()
-        fc.attach()
-        logging.info('sending request...')
-        res = yield fc.get_url('http://amoeba.ucsd.edu/tmp/test1.txt')
-        logging.info(res)
+    @defer.inlineCallbacks
+    def test_404(self):
+        try:
+            d = yield self._get_page('http://ooici.net/404-fer-sure')
+            self.fail('Should have gotten an exception for 404 error!')
+        except ValueError, e:
+            pass

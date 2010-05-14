@@ -6,3 +6,4 @@
 *.log
 twistd.pid
 _trial*
+docs

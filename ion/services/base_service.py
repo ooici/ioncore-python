@@ -44,7 +44,7 @@ class BaseService(BaseProcess):
     @classmethod
     def _add_conv_type(cls):
         pass
-    
+
     @classmethod
     def service_declare(cls, **kwargs):
         """Helper method to declare service process module attributes
@@ -64,13 +64,14 @@ class BaseServiceClient(object):
         instance
         """
         self.svc = svc
-        if not proc: proc = BaseProcess()
+        if not proc:
+            proc = BaseProcess()
         self.proc = proc
 
     @defer.inlineCallbacks
     def _check_init(self):
         """
-        Called in client methods to ensure 
+        Called in client methods to ensure
         """
         if not self.svc:
             assert self.svcname, 'Must hace svcname to access service'

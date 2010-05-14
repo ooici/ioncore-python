@@ -27,6 +27,7 @@ CF_container_group = ioninit.ion_config.getValue2('ion.core.bootstrap','containe
 # Static store (kvs) to register process instances with names
 procRegistry = Store()
 
+# HACK: Dict of process "alias" to process declaration
 processes = {}
 
 class BaseProcess(object):
@@ -57,21 +58,24 @@ class BaseProcess(object):
         self.spawnArgs = spawnArgs
         receiver.handle(self.receive)
         # Dict of converations.
-        # @todo: make sure this is garbage collected
+        # @todo: make sure this is garbage collected once in a while
         self.conversations = {}
-        # Conversations by conv-id for currently outstanding RPC
+        # Conversations by conv-id for currently outstanding RPCs
         self.rpc_conv = {}
 
     @defer.inlineCallbacks
-    def spawn(self):
+    def spawn(self, childproc=None):
         """
-        Spawns this process using the process' receiver. Can only be called
-        once per instance.
+        Spawns either this process using the process' receiver or a chile
+        process. Self spawn can only be called once per instance.
         """
-        assert not self.receiver.spawned, "Process already spawned"
-        self.id = yield spawn(self.receiver)
-        logging.debug('spawn()='+str(self.id))
-        defer.returnValue(self.id)
+        if childproc:
+            pass
+        else:
+            assert not self.receiver.spawned, "Process already spawned"
+            self.id = yield spawn(self.receiver)
+            logging.debug('spawn()='+str(self.id))
+            defer.returnValue(self.id)
 
     def is_spawned(self):
         return self.receiver.spawned != None
@@ -87,10 +91,10 @@ class BaseProcess(object):
             self.procName = content.get('proc-name', __name__)
             supId = content.get('sup-id', None)
             self.procSupId = pu.get_process_id(supId)
-            logging.info('op_init: proc-name={0}, sup-id={1}'.format(self.procName,supId))
+            logging.info('op_init: proc-name=%s, sup-id=%s' % (self.procName,supId))
 
             yield defer.maybeDeferred(self.plc_init)
-            logging.info('===== Process {0} INITIALIZED ====='.format(self.procName))
+            logging.info('===== Process %s INITIALIZED =====' % (self.procName))
 
             yield self.reply(msg, 'inform_init', {'status':'OK'}, {})
             self.procState = "INITIALIZED"
@@ -104,7 +108,7 @@ class BaseProcess(object):
     def receive(self, payload, msg):
         """
         This is the main entry point for received messages. Messages are
-        dispatched to operation handling methods.
+        dispatched to operation handling methods. RPC is caught and completed.
         """
         # Check if this response is in reply to an RPC call
         if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
@@ -128,7 +132,7 @@ class BaseProcess(object):
 
     def op_none(self, content, headers, msg):
         """
-        The method called if operation is not defined
+        The method called if operation callback operation is not defined
         """
         logging.info('Catch message')
 
@@ -158,8 +162,7 @@ class BaseProcess(object):
 
         yield pu.send_message(self.receiver, send, recv, operation,
                               content, msgheaders)
-        self.log_conv_message()
-    
+        
     def _prepare_message(self, headers):
         msgheaders = {}
         if headers: msgheaders.update(headers)
@@ -177,20 +180,24 @@ class BaseProcess(object):
         #convid = send + "#" + BaseProcess.convIdCnt
         return convid
         
-    def reply(self, msg, operation, content, headers):
+    def reply(self, msg, operation, content, headers=None):
         """
         Replies to a given message, continuing the ongoing conversation
         """
         ionMsg = msg.payload
         recv = ionMsg.get('reply-to', None)
+        if not headers:
+            headers = {}
         if recv == None:
             logging.error('No reply-to given for message '+str(msg))
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
             self.send_message(pu.get_process_id(recv), operation, content, headers)
-            self.log_conv_message()
 
     def log_conv_message(self):
+        """
+        Logs received message 
+        """
         pass
         #if CF_conversation_log:
         #    send = self.receiver.spawned.id.full
@@ -203,7 +210,7 @@ class BaseProcess(object):
     def get_local_name(self, name):
         """
         Returns a name that is qualified by the system name. System name is
-        the ID of the container the originated the entire system
+        the ID of the container that bootstrapped all other processes
         """
         return self.sysName + "." + name
 
@@ -226,13 +233,23 @@ class BaseProcess(object):
     # Some aliases for initial backwards compatibility
     send_message = send 
     reply_message = reply
+    
+    # OTP style functions for working with processes and modules/apps
+    
+    def spawn_child(self):
+        pass
+    def link_child(self):
+        pass
+    def spawn_link(self):
+        pass
 
 class ProtocolFactory(ProtocolFactory):
     """
     This protocol factory returns receiver instances used to spawn processes
     from a module. This implementation creates process class instances together
     with the receiver. This is a standard implementation that can be used
-    in the code of every module containing a process.
+    in the code of every module containing a process. This factory also collects
+    process declarations alongside.
     """
     def __init__(self, pcls, name=None, args=None):
         self.processClass = pcls
@@ -242,7 +259,12 @@ class ProtocolFactory(ProtocolFactory):
         self.args = args
         # Collecting the declare static class variable in a process class
         if pcls and hasattr(pcls, 'declare') and type(pcls.declare) is dict:
-            processes[pcls.declare.get('name',pcls.__name__)] = pcls.declare
+            procdec = pcls.declare.copy()
+            procdec['class'] = pcls
+            procname = pcls.declare.get('name', pcls.__name__)
+            if procname in processes:
+                raise RuntimeError('Process already declared: '+str(procname))
+            processes[procname] = procdec
 
     def build(self, spawnArgs=None):
         """
@@ -250,7 +272,7 @@ class ProtocolFactory(ProtocolFactory):
         time instantiate class.
         """
         if not spawnArgs: spawnArgs = {}
-        logging.info("ProtocolFactory.build(name={0},args={1!s})".format(self.name,spawnArgs))
+        logging.info("ProtocolFactory.build(name=%s,args=%s)" % (self.name,spawnArgs))
         receiver = self.receiver(self.name)
         instance = self.processClass(receiver, spawnArgs)
         receiver.procinst = instance
@@ -259,7 +281,7 @@ class ProtocolFactory(ProtocolFactory):
 class RpcClient(BaseProcess):
     """
     Service client providing a RPC methaphor
-    @deprecated Do not use anymore. This is just a regular BaseProcess.
+    @deprecated  Do not use anymore. This is just a regular BaseProcess.
     """
     attach = BaseProcess.spawn
     

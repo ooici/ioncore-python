@@ -76,3 +76,23 @@ Note:
 This project dependes closely on magnet. Whenever you do a "git pull" on
 this project, there is a chance that you need to update and install magnet
 again (see above). Please review the branch logs for any cues.
+
+
+---------------------------------------------------------------------------
+Change log:
+===========
+
+2010-05-10:
+- Based on entries in config files, service process modules are sought and
+  loaded in order to collect the service process declarations. This enables
+  a registration of services with versions and dependencies on startup
+2010-05-06:
+- Refactored the BaseProcess class.
+  - You can now do RPC directly from the process, via self.rpc_send without
+    the need for an RpcClient. Works even with other messages coming in at the
+    same time (using the conv-id)
+  - Added aliases: self.send, self.reply (use these now)
+  - Process instance can be spawned via self.spawn()
+- Provided an easier to use BaseServiceClient, which uses a default service
+  name lookup. Accepts BaseProcess instance as argument to use for sending/
+  receiving service calls.
