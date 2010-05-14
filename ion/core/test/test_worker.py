@@ -9,6 +9,7 @@
 import logging
 from twisted.internet import defer
 from magnet.container import Container
+from magnet.spawnable import spawn
 
 from ion.core.worker import WorkerClient
 from ion.test.iontest import IonTestCase

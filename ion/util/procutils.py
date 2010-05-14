@@ -99,7 +99,7 @@ def send_message(receiver, send, recv, operation, content, headers):
     msg['conv-id'] = ''
     # Conversation type id
     msg['protocol'] = ''
-    msg['us'] = str(currenttime_ms())
+    msg['ts'] = str(currenttime_ms())
     #msg['reply-with'] = ''
     #msg['in-reply-to'] = ''
     #msg['reply-by'] = ''
