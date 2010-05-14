@@ -10,6 +10,8 @@ import logging, time
 from twisted.internet import defer
 from twisted.trial import unittest
 from magnet.container import Container
+from magnet.spawnable import spawn
+
 
 from ion.core.worker import *
 from ion.test.iontest import IonTestCase
