@@ -7,8 +7,10 @@
 """
 
 import logging
+from twisted.internet import defer
 from magnet.spawnable import Receiver
 from ion.services.base_service import BaseService
+from ion.core.base_process import ProtocolFactory
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
@@ -16,8 +18,16 @@ logging.debug('Loaded: '+__name__)
 class EPUControllerService(BaseService):
     """EPU Controller service interface
     """
-    pass
+    declare = BaseService.service_declare(name='epu_controller', version='0.1.0', dependencies=[])
+
+    @defer.inlineCallbacks
+    def op_sensor_aggregator_info(self, content, headers, msg):
+        """
+        Take in SensorAggregator info, and make Policy decisions (via the "Policy Engine").
+
+        """
+        logging.info("content:"+str(content))
+        yield self.reply(msg, 'result', {'result':'policy-executed-success'}, {})        
 
 # Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = EPUControllerService(receiver)
+factory = ProtocolFactory(EPUControllerService)
