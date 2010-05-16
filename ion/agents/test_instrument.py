@@ -11,7 +11,7 @@ from twisted.internet import defer
 
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
-from magnet.store import Store
+from ion.data.store import Store
 
 import ion.util.procutils as pu
 

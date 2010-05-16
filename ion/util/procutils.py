@@ -14,7 +14,7 @@ import time
 import logging
 from twisted.internet import defer, reactor
 from magnet.container import Id
-from magnet.store import Store
+from ion.data.store import Store
 
 def log_exception(msg=None, e=None):
     """Logs a recently caught exception and prints traceback

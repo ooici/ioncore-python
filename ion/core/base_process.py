@@ -14,7 +14,7 @@ from magnet.container import Container
 from magnet.spawnable import Receiver
 from magnet.spawnable import ProtocolFactory
 from magnet.spawnable import spawn
-from magnet.store import Store
+from ion.data.store import Store
 
 from ion.core import ioninit
 from ion.interact.conversation import Conversation

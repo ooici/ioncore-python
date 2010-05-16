@@ -13,7 +13,7 @@ from twisted.internet import defer
 
 from magnet import container
 from magnet.container import Id
-from magnet.store import Store
+from ion.data.store import Store
 
 from ion.core import base_process, bootstrap
 from ion.core import ioninit

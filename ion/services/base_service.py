@@ -11,7 +11,7 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import send
 from magnet.spawnable import spawn
-from magnet.store import Store
+from ion.data.store import Store
 
 from ion.core import base_process
 from ion.core.base_process import BaseProcess

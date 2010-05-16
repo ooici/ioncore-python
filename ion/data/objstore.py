@@ -15,11 +15,10 @@ except:
     import simplejson as json
 import logging
 from twisted.internet import defer
-from magnet.store import Store
 
-from ion.core.base_process import ProtocolFactory, RpcClient
 from ion.data.dataobject import DataObject
 from ion.data.cassandrads import CassandraStore
+from ion.data.store import Store
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
 

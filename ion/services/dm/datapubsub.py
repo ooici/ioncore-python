@@ -8,7 +8,7 @@
 
 
 from twisted.internet import defer
-from magnet.store import Store
+from ion.data.store import Store
 
 from ion.core import bootstrap
 from ion.core.base_process import ProtocolFactory

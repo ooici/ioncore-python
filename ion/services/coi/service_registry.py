@@ -9,7 +9,7 @@
 import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
-from magnet.store import Store
+from ion.data.store import Store
 
 from ion.core import base_process
 from ion.data.dataobject import DataObject
