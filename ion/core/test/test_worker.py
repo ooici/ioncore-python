@@ -49,7 +49,7 @@ class WorkerTest(IonTestCase):
         yield self._declare_messaging(messaging)
         yield self._spawn_processes(workers)
 
-        sup = yield self.procRegistry.get("bootstrap")
+        sup = yield self._get_procid("bootstrap")
         logging.info("Supervisor: "+repr(sup))
 
         wc = WorkerClient()
@@ -80,7 +80,7 @@ class WorkerTest(IonTestCase):
         yield self._declare_messaging(messaging)
         yield self._spawn_processes(workers)
 
-        sup = yield self.procRegistry.get("bootstrap")
+        sup = yield self._get_procid("bootstrap")
         logging.info("Supervisor: "+repr(sup))
 
         wc = WorkerClient()

@@ -33,7 +33,7 @@ class IonTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def _start_container(self):
         """
-        Hook to start the container.
+        Starting and initialzing the container with a connection to a broker.
         @note Hardwired to connect to amoeba for broker.
         """
         mopt = {}
@@ -55,6 +55,10 @@ class IonTestCase(unittest.TestCase):
         defer.returnValue(sup)
 
     def _stop_container(self):
+        """
+        Taking down the container's connection to the broker an preparing for
+        reinitialization.
+        """
         logging.info("Closing ION container")
         self.cont_conn.transport.loseConnection()
         container.Container._started = False
@@ -68,3 +72,10 @@ class IonTestCase(unittest.TestCase):
 
     def _spawn_processes(self, procs):
         return bootstrap.spawn_processes(procs)
+        
+    def _get_procid(self, name):
+        """
+        @param name  process instance label given when spawning
+        @retval process id of the process (locally) identified by name
+        """
+        return self.procRegistry.get(name)

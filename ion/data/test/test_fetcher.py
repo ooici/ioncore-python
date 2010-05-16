@@ -20,9 +20,8 @@ class FetcherTest(IonTestCase):
                     'class': 'FetcherService'},]
         yield self._spawn_processes(services)
 
-        self.dest = yield self.procRegistry.get('fetcher')
-        self.fc = FetcherClient()
-        self.fc.attach()
+        self.dest = yield self._get_procid('fetcher')
+        self.fc = FetcherClient(self.dest)
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -31,7 +30,7 @@ class FetcherTest(IonTestCase):
     @defer.inlineCallbacks
     def _get_page(self, src_url):
         logging.debug('sending request for "%s"...' % src_url)
-        res = yield self.fc.get_url(self.dest, src_url)
+        res = yield self.fc.get_url(src_url)
         msg = res['value']
         defer.returnValue(msg)
 

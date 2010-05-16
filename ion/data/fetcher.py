@@ -12,8 +12,8 @@ import logging
 from twisted.internet import defer
 from twisted.web import client
 
-from ion.core.base_process import ProtocolFactory, RpcClient
-from ion.services.base_service import BaseService
+from ion.core.base_process import ProtocolFactory
+from ion.services.base_service import BaseService, BaseServiceClient
 
 class FetcherService(BaseService):
     """
@@ -77,27 +77,27 @@ class FetcherService(BaseService):
         yield self.reply_message(msg, 'reply', {'value':'no code!'}, {})
 
 
-class FetcherClient(RpcClient):
+class FetcherClient(BaseServiceClient):
     """
     Client class for the fetcher.
     @note RPC style interactions
     """
+    def __init__(self, *args):
+        BaseServiceClient.__init__(self, *args)
+        self.svcname = "fetcher"
 
     @defer.inlineCallbacks
-    def get_url(self, faddr, requested_url):
+    def get_url(self, requested_url):
         """
         @todo look up fetcher in dns
         send to same
         return unpacked reply
         """
-#        logging.info('Lookup up the service ID...')
-#        sc = ServiceRegistryClient()
-#        dest = '1'
-        #yield sc.get_service_instance('fetcher')
+        yield self._check_init()
 
         logging.info('Sending request')
-        (content, headers, msg) = yield self.rpc_send(faddr, 'get_url',
-                                                      requested_url, {})
+        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'get_url',
+                                                      requested_url)
         if 'failure' in content:
             raise ValueError('Error on URL: ' + content['failure'])
         defer.returnValue(content)

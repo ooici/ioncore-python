@@ -35,7 +35,7 @@ class HelloTest(IonTestCase):
         sup = yield self._spawn_processes(services)
         logging.info("Supervisor: "+repr(sup))
 
-        hsid = yield self.procRegistry.get("hello1")
+        hsid = yield self._get_procid("hello1")
         logging.info("Hello service process 1: "+repr(hsid))
 
         hc = HelloServiceClient(hsid, sup)

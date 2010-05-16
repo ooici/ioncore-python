@@ -26,7 +26,7 @@ CF_conversation_log = CONF['conversation_log']
 CF_container_group = ioninit.ion_config.getValue2('ion.core.bootstrap','container_group',Container.id)
 
 # Define the exported public names of this module
-__all__ = ['BaseProcess','RpcClient','ProtocolFactory','Message','processes','procRegistry']
+__all__ = ['BaseProcess','ChildProcess','ProtocolFactory','Message','processes','procRegistry']
 
 # Static store (kvs) to register process instances with names
 # @todo CHANGE
@@ -253,6 +253,7 @@ class BaseProcess(object):
     # Some aliases for initial backwards compatibility
     send_message = send 
     reply_message = reply
+    attach = spawn
     
     # OTP style functions for working with processes and modules/apps
     
@@ -262,6 +263,49 @@ class BaseProcess(object):
         pass
     def spawn_link(self):
         pass
+
+class ChildProcess(object):
+    """
+    Class that encapsulates attributes about a child process and can spawn
+    child processes.
+    """
+    def __init__(self, procMod, procClass=None, node=None, spawnArgs=None):
+        self.procModule = procMod
+        self.procClass = procClass
+        self.procNode = node
+        self.spawnArgs = spawnArgs
+        self.procState = 'DEFINED'
+
+    @defer.inlineCallbacks
+    def spawn_child(self, supProc=None):
+        self.supProcess = supProc
+        if self.procNode == None:
+            logging.info('Spawning name=%s node=%s' % (self.procName, self.procNode))
+
+            # Importing service module
+            proc_mod = pu.get_module(self.procModule)
+            self.procModObj = proc_mod
+
+            # Spawn instance of a process
+            # During spawn, the supervisor process id, system name and proc name
+            # get provided as spawn args, in addition to any give spawn args.
+            spawnargs = {'proc-name':self.procName,
+                         'sup-id':self.supProcess.receiver.spawned.id.full,
+                         'sys-name':self.supProcess.sysName}
+            if self.spawnArgs:
+                spawnargs.update(self.spawnArgs)
+            #logging.debug("spawn(%s, args=%s)" % (self.procModule, spawnargs))
+            proc_id = yield spawn(proc_mod, None, spawnargs)
+            self.procId = proc_id
+            self.procState = 'SPAWNED'
+
+            #logging.info("Process "+self.procClass+" ID: "+str(proc_id))
+        else:
+            logging.error('Cannot spawn '+self.procClass+' on node='+str(self.procNode))
+
+    @defer.inlineCallbacks
+    def init_child(self):
+        (content, headers, msg) = yield self.supProcess.rpc_send(self.procId, 'init', {}, {'quiet':True})
 
 
 class ProtocolFactory(ProtocolFactory):
@@ -302,9 +346,3 @@ class ProtocolFactory(ProtocolFactory):
         receiver.procinst = instance
         return receiver
     
-class RpcClient(BaseProcess):
-    """
-    Service client providing a RPC methaphor
-    @deprecated  Do not use anymore. This is just a regular BaseProcess.
-    """
-    attach = BaseProcess.spawn

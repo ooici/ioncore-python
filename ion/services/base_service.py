@@ -19,7 +19,7 @@ import ion.util.procutils as pu
 
 class BaseService(BaseProcess):
     """
-    This is the abstract superclass for all service processes.
+    This is the superclass for all service processes.
 
     A service process is a Capability Container process that can be spawned
     anywhere in the network and that provides a service.
@@ -90,3 +90,7 @@ class BaseServiceClient(object):
             self.svc = str(svcid)
         if not self.proc.is_spawned():
             yield self.proc.spawn()
+
+    @defer.inlineCallbacks
+    def attach(self):
+        yield self.proc.spawn()

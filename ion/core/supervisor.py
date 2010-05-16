@@ -10,7 +10,7 @@ import logging
 from twisted.internet import defer
 from magnet.spawnable import spawn
 
-from ion.core.base_process import BaseProcess, ProtocolFactory
+from ion.core.base_process import BaseProcess, ProtocolFactory, ChildProcess
 import ion.util.procutils as pu
 
 class Supervisor(BaseProcess):
@@ -39,49 +39,6 @@ class Supervisor(BaseProcess):
     def event_failure(self):
         return
 
-
-class ChildProcess(object):
-    """
-    Class that encapsulates attributes about a child process and can spawn
-    child processes.
-    """
-    def __init__(self, procMod, procClass=None, node=None, spawnArgs=None):
-        self.procModule = procMod
-        self.procClass = procClass
-        self.procNode = node
-        self.spawnArgs = spawnArgs
-        self.procState = 'DEFINED'
-
-    @defer.inlineCallbacks
-    def spawn_child(self, supProc=None):
-        self.supProcess = supProc
-        if self.procNode == None:
-            logging.info('Spawning name=%s node=%s' % (self.procName, self.procNode))
-
-            # Importing service module
-            proc_mod = pu.get_module(self.procModule)
-            self.procModObj = proc_mod
-
-            # Spawn instance of a process
-            # During spawn, the supervisor process id, system name and proc name
-            # get provided as spawn args, in addition to any give spawn args.
-            spawnargs = {'proc-name':self.procName,
-                         'sup-id':self.supProcess.receiver.spawned.id.full,
-                         'sys-name':self.supProcess.sysName}
-            if self.spawnArgs:
-                spawnargs.update(self.spawnArgs)
-            #logging.debug("spawn(%s, args=%s)" % (self.procModule, spawnargs))
-            proc_id = yield spawn(proc_mod, None, spawnargs)
-            self.procId = proc_id
-            self.procState = 'SPAWNED'
-
-            #logging.info("Process "+self.procClass+" ID: "+str(proc_id))
-        else:
-            logging.error('Cannot spawn '+self.procClass+' on node='+str(self.procNode))
-
-    @defer.inlineCallbacks
-    def init_child(self):
-        (content, headers, msg) = yield self.supProcess.rpc_send(self.procId, 'init', {}, {'quiet':True})
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(Supervisor)

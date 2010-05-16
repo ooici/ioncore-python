@@ -60,7 +60,7 @@ class PubSubTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
         
-        dps = yield self.procRegistry.get("data_pubsub")
+        dps = yield self._get_procid("data_pubsub")
         logging.info("DataPubsubservice: "+repr(dps))
 
         dpsc = DataPubsubClient(dps, sup)
@@ -106,7 +106,7 @@ class PubSubTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
         
-        dps = yield self.procRegistry.get("data_pubsub")
+        dps = yield self._get_procid("data_pubsub")
         logging.info("DataPubsubservice: "+repr(dps))
 
         dpsc = DataPubsubClient(dps, sup)
