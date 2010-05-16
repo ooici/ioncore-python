@@ -32,14 +32,14 @@ def start():
     
     yield store.put('SBE49InstrumentAgent', svc_id)
     
-    yield pu.send_message(receiver, '', svc_id, 'get', ('baudrate',
+    yield pu.send(receiver, '', svc_id, 'get', ('baudrate',
                                                         'outputformat'), {})
-    yield pu.send_message(receiver, '', svc_id, 'set', {'baudrate': 19200,
+    yield pu.send(receiver, '', svc_id, 'set', {'baudrate': 19200,
                                                         'outputformat': 1}, {})
-    yield pu.send_message(receiver, '', svc_id, 'get', ('baudrate',
+    yield pu.send(receiver, '', svc_id, 'get', ('baudrate',
                                                          'outputformat'), {})
-    yield pu.send_message(receiver, '', svc_id, 'getLifecycleState', (), {})
-    yield pu.send_message(receiver, '', svc_id, 'setLifecycleState', {})
+    yield pu.send(receiver, '', svc_id, 'getLifecycleState', (), {})
+    yield pu.send(receiver, '', svc_id, 'setLifecycleState', {})
 
 def receive(content, msg):
     print 'in receive ', content, msg

@@ -62,19 +62,19 @@ class FetcherService(BaseService):
         page = yield d
         if not self.got_err:
             logging.debug('Fetch complete, sending to caller')
-            yield self.reply_message(msg, 'reply', {'value':page}, {})
+            yield self.reply(msg, 'reply', {'value':page}, {})
             logging.debug('get_url complete!')
 
         # Did catch an error
         logging.error('Error on page fetch: ' + str(self.failure))
-        yield self.reply_message(msg, 'reply',
+        yield self.reply(msg, 'reply',
                                  {'failure': str(self.failure),
                                 'value':None})
 
     @defer.inlineCallbacks
     def op_get_dap_dataset(self, content, headers, msg):
         logging.warn('Implement me!')
-        yield self.reply_message(msg, 'reply', {'value':'no code!'}, {})
+        yield self.reply(msg, 'reply', {'value':'no code!'}, {})
 
 
 class FetcherClient(BaseServiceClient):

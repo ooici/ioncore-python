@@ -35,7 +35,7 @@ class DataPubsubService(BaseService):
         yield bootstrap.declare_messaging(topic)
         qtopic_name = self.get_scoped_name('local',topic_name)
         yield self.topics.put (topic_name, topic[topic_name])
-        yield self.reply_message(msg, 'result', {'topic_name':qtopic_name}, {})
+        yield self.reply(msg, 'result', {'topic_name':qtopic_name}, {})
 
     def op_define_publisher(self, content, headers, msg):
         """Service operation: Register a publisher that subsequently is
@@ -65,7 +65,7 @@ class DataPubsubService(BaseService):
         msg = content['msg']
         qtopic = self.get_scoped_name('local',topic_name)
         # Todo: impersonate message as from sender
-        yield self.send_message(qtopic, op, msg, headers)
+        yield self.send(qtopic, op, msg, headers)
 
     def find_topic(self, content, headers, msg):
         """Service operation: For a given resource, find the topic that contains

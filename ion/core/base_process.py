@@ -169,7 +169,7 @@ class BaseProcess(object):
         # Create a new deferred that the caller can yield on to wait for RPC
         rpc_deferred = defer.Deferred()
         self.rpc_conv[convid] = rpc_deferred
-        d = self.send_message(recv, operation, content, msgheaders)
+        d = self.send(recv, operation, content, msgheaders)
         # Continue with deferred d. The caller can yield for the new deferred.
         return rpc_deferred
 
@@ -183,7 +183,7 @@ class BaseProcess(object):
         msgheaders = self._prepare_message(headers)
         convid = msgheaders['conv-id']
 
-        yield pu.send_message(self.receiver, send, recv, operation,
+        yield pu.send(self.receiver, send, recv, operation,
                               content, msgheaders)
         
     def _prepare_message(self, headers):
@@ -215,7 +215,7 @@ class BaseProcess(object):
             logging.error('No reply-to given for message '+str(msg))
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
-            self.send_message(pu.get_process_id(recv), operation, content, headers)
+            self.send(pu.get_process_id(recv), operation, content, headers)
             
     def get_conversation(self, headers):
         convid = headers.get('conv-id', None)
@@ -243,10 +243,6 @@ class BaseProcess(object):
         if scope == 'local': return self.get_local_name(name)
         if scope == 'group': return self.get_group_name(name)
         return  name
-
-    # Some aliases for initial backwards compatibility
-    send_message = send 
-    reply_message = reply
     
     # OTP style functions for working with processes and modules/apps
     

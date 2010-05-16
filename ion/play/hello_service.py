@@ -33,7 +33,7 @@ class HelloService(BaseService):
         logging.info('op_hello: '+str(content))
 
         # The following line shows how to reply to a message
-        yield self.reply_message(msg, 'reply', {'value':'Hello there, '+str(content)}, {})
+        yield self.reply(msg, 'reply', {'value':'Hello there, '+str(content)}, {})
 
 
 class HelloServiceClient(BaseServiceClient):

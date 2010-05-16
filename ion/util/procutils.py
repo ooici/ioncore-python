@@ -82,7 +82,7 @@ def get_process_id(long_id):
     return procId
 
 @defer.inlineCallbacks
-def send_message(receiver, send, recv, operation, content, headers=None):
+def send(receiver, send, recv, operation, content, headers=None):
     """
     Constructs a standard message with standard headers and sends on given
     receiver.

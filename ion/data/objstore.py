@@ -607,12 +607,12 @@ class CassObjectStoreService(BaseService):
         self.kvs.put(key, str(v))
 
         # There is no need to return a value
-        yield self.reply_message(msg, 'result', self._get_value(v), {})
+        yield self.reply(msg, 'result', self._get_value(v), {})
 
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
         val = self.kvs.get(content['key'])
-        yield self.reply_message(msg, 'result', self._get_value(val), {})
+        yield self.reply(msg, 'result', self._get_value(val), {})
 
     def _get_value(self, vo):
         """Creates a return dict with ValueObject state and identity"""
