@@ -21,6 +21,7 @@ import ion.util.procutils as pu
 # Configuration
 CONF = ioninit.config(__name__)
 master_off = CONF.getValue('master_off', False)
+msg_sign = CONF.getValue('msg_sign', True)
 encrypt = CONF.getValue('encrypt', False)
 encrypt_mod = CONF.getValue('encrypt_mod', None)
 encrypt_key = CONF.getValue('encrypt_key', None)
@@ -46,14 +47,18 @@ class IdmInterceptor(Interceptor):
         if master_off: return msg
         try:
             if isinstance(msg, BaseMessage):
-                msg = cls.message_validator(msg)
+                # @todo: don't use flag to decide whether to validate or decrypt
+                # but the presence of the resp. message attributes
+                if msg_sign:
+                    msg = cls.message_validator(msg)
                 if encrypt:
                     msg = MessageEncrypter.decrypt_message(msg)
             else:
                 if encrypt:
                     msg = MessageEncrypter.encrypt_message(msg)
-                msg = cls.message_signer(msg)
-        except StandardError, e:
+                if msg_sign:
+                    msg = cls.message_signer(msg)
+        except Exception, e:
             pu.log_exception("IdM Interceptor failed",e)
         return msg
 

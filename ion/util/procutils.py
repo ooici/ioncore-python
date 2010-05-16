@@ -14,52 +14,59 @@ import time
 import logging
 from twisted.internet import defer, reactor
 from magnet.container import Id
+
 from ion.data.store import Store
 
 def log_exception(msg=None, e=None):
-    """Logs a recently caught exception and prints traceback
+    """
+    Logs a recently caught exception and prints traceback
     """
     if msg and e:
-        logging.error(msg + " " + repr(e))
+        logging.error("%s %r" % (msg, e))
     elif msg:
         logging.error(msg)
     (etype, value, trace) = sys.exc_info()
     traceback.print_tb(trace)
 
 def log_attributes(obj):
-    """Print an object's attributes
+    """
+    Print an object's attributes
     """
     lstr = ""
     for attr, value in obj.__dict__.iteritems():
         lstr = lstr + str(attr) + ": " +str(value) + ", "
     logging.info(lstr)
 
-def log_message(proc, body, msg):
-    """Log an incoming message with all headers
+def log_message(msg):
     """
-    #mkeys = sorted(msg.__dict__.keys)
-    mkeys = msg.__dict__.keys().sort()
+    Log an incoming message with all headers unless quiet attribute set.
+    @param msg  carrot BaseMessage instance
+    """
+    body = msg.payload
     lstr = ""
-    lstr += "===Message=== RECEIVED @" + str(proc) + "\n"
-    amqpm = str(msg._amqp_message)
-    # Cut out the redundant or encrypted AMQP body to make log shorter
-    amqpm = re.sub("body='(\\\\'|[^'])*'","*BODY*", amqpm)
-    lstr += '---AMQP--- ' + amqpm
-    lstr += "\n---CARROT--- "
-    for attr,value in msg.__dict__.iteritems():
-        if attr == '_amqp_message': pass
-        elif attr == 'body': pass
-        elif attr == '_decoded_cache': pass
-        else:
-            lstr += str(attr) + ": " +str(value) + ", "
-    lstr += "\n---HEADERS--- "
-    mbody = {}
-    mbody.update(body)
-    content = mbody.pop('content')
-    lstr += str(mbody)
-    lstr += "\n---CONTENT---\n"
-    lstr += str(content)
-    lstr += "\n============="
+    procname = str(body.get('receiver',None))
+    lstr += "===Message=== receiver=%s op=%s" % (procname, body.get('op', None))
+    if not body.get('quiet', False):
+        amqpm = str(msg._amqp_message)
+        # Cut out the redundant or encrypted AMQP body to make log shorter
+        amqpm = re.sub("body='(\\\\'|[^'])*'","*BODY*", amqpm)
+        lstr += '\n---AMQP--- ' + amqpm
+        lstr += "\n---CARROT--- "
+        for attr in sorted(msg.__dict__.keys()):
+            value = msg.__dict__.get(attr)
+            if attr == '_amqp_message' or attr == 'body' or attr == '_decoded_cache':
+                pass
+            else:
+                lstr += "%s=%r, " % (attr, value)
+        lstr += "\n---HEADERS--- "
+        mbody = dict(body)
+        content = mbody.pop('content')
+        for attr in sorted(mbody.keys()):
+            value = mbody.get(attr)
+            lstr += "%s=%r, " % (attr, value)
+        lstr += "\n---CONTENT---\n"
+        lstr += repr(content)
+        lstr += "\n============="
     logging.info(lstr)
 
 def get_process_id(long_id):
@@ -75,8 +82,10 @@ def get_process_id(long_id):
     return procId
 
 @defer.inlineCallbacks
-def send_message(receiver, send, recv, operation, content, headers):
-    """Constructs a standard message with standard headers
+def send_message(receiver, send, recv, operation, content, headers=None):
+    """
+    Constructs a standard message with standard headers and sends on given
+    receiver.
 
     @param operation the operation (performative) of the message
     @param headers dict with headers that may override standard headers
@@ -104,34 +113,34 @@ def send_message(receiver, send, recv, operation, content, headers):
     #msg['in-reply-to'] = ''
     #msg['reply-by'] = ''
     # Sender defined headers are updating the default headers set above.
-    msg.update(headers)
+    if headers:
+        msg.update(headers)
     # Operation of the message, aka performative, verb, method
     msg['op'] = operation
     # The actual content
     msg['content'] = content
-    logging.info("Send message op="+operation+" to="+str(recv))
+    #logging.debug("Send message op="+operation+" to="+str(recv))
     try:
         yield receiver.send(recv, msg)
     except StandardError, e:
         log_exception("Send error: ", e)
     else:
-        logging.info("Message sent!")
+        logging.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
 
 def dispatch_message(payload, msg, dispatchIn, conv=None):
     """
     Dispatches a message by operation in a given class.
-    payload = {
+    Expected message content:
+    body = {
         "op": "operation name here",
-        "content": ('arg1', 'arg2')
+        "content": # Any valid type here (str, list, dict)
     }
     """
     try:
-        log_message(__name__, payload, msg)
+        log_message(msg)
 
         if "op" in payload:
             op = payload['op']
-            logging.info('dispatch_message() operation=' + str(op))
-
             content = payload.get('content','')
             opname = 'op_' + str(op)
 

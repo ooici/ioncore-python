@@ -134,15 +134,15 @@ def spawn_processes(procs):
     supId = yield sup.spawn()
     yield base_process.procRegistry.put("bootstrap", str(supId))
 
-    sup.setChildProcesses(children)
-    yield sup.spawnChildProcesses()
+    sup.set_child_processes(children)
+    yield sup.spawn_child_processes()
     for child in sup.childProcesses:
         procId = child.procId
         yield base_process.procRegistry.put(str(child.procName), str(procId))
 
     logging.debug("process_ids: "+ str(base_process.procRegistry.kvs))
 
-    yield sup.initChildProcesses()
+    yield sup.init_child_processes()
     defer.returnValue(sup)
 
 def prepare_childprocs(procs):

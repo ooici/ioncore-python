@@ -29,16 +29,16 @@ CF_container_group = ioninit.ion_config.getValue2('ion.core.bootstrap','containe
 __all__ = ['BaseProcess','RpcClient','ProtocolFactory','Message','processes','procRegistry']
 
 # Static store (kvs) to register process instances with names
+# @todo CHANGE
 procRegistry = Store()
 
-# HACK: Dict of process "alias" to process declaration
+# @todo HACK: Dict of process "alias" to process declaration
 processes = {}
 
 class BaseProcess(object):
     """
     This is the base class for all processes. Processes can be spawned and
-    have a unique identifier. Processes are based on the underlying concept of
-    magnet Spawnable. Each process has one main process receiver and can
+    have a unique identifier. Each process has one main process receiver and can
     define additional receivers as needed. This base class provides a lot of
     mechanics for developing processes, such as sending and receiving messages.
     
@@ -50,27 +50,49 @@ class BaseProcess(object):
     def __init__(self, receiver=None, spawnArgs=None):
         """
         Initialize process using an optional receiver and optional spawn args
+        @param receiver  instance of a Receiver for process control
+        @param spawnArgs  standard and additional spawn arguments
         """
-        logging.debug('BaseProcess.__init__()')
+        #logging.debug('BaseProcess.__init__()')
         self.procState = "UNINITIALIZED"
-        if not receiver: receiver = Receiver(__name__)
+        if not receiver:
+            receiver = Receiver(__name__) 
         spawnArgs = spawnArgs.copy() if spawnArgs else {}
-
-        self.procName = __name__ # Name of this process. Will be reset in init
-        self.sysName = Container.id # The ID that originates from the root supv
-        self.receiver = receiver
         self.spawnArgs = spawnArgs
+
+        # Name (human readable label) of this process.
+        self.procName = self.spawnArgs.get('proc-name', __name__)
+        
+        # The system unique ID; propagates from root supv to all child procs
+        self.sysName = self.spawnArgs.get('sys-name', Container.id)
+        
+        # The process ID of the supervisor process
+        self.procSupId =  pu.get_process_id(self.spawnArgs.get('sup-id', None))
+
+        self.receiver = receiver
         receiver.handle(self.receive)
+        
+        # Dict of all receivers of this process. Key is the name
+        self.receivers = {}
+        self.add_receiver(self.receiver)
+        
         # Dict of converations.
         # @todo: make sure this is garbage collected once in a while
         self.conversations = {}
         # Conversations by conv-id for currently outstanding RPCs
         self.rpc_conv = {}
 
+        logging.info("Process init'd: proc-name=%s, sup-id=%s, sys-name=%s" % (
+                self.procName, self.procSupId, self.sysName))
+
+    def add_receiver(self, receiver):
+        key = receiver.name
+        self.receivers[key] = receiver
+    
     @defer.inlineCallbacks
     def spawn(self, childproc=None):
         """
-        Spawns either this process using the process' receiver or a chile
+        Spawns either this process using the process' receiver or a child
         process. Self spawn can only be called once per instance.
         """
         if childproc:
@@ -89,16 +111,9 @@ class BaseProcess(object):
         """
         Init operation, on receive of the init message
         """
-        logging.info('op_init: '+str(content))
         if self.procState == "UNINITIALIZED":
-            self.sysName = content.get('sys-name', Container.id)
-            self.procName = content.get('proc-name', __name__)
-            supId = content.get('sup-id', None)
-            self.procSupId = pu.get_process_id(supId)
-            logging.info('op_init: proc-name=%s, sup-id=%s' % (self.procName,supId))
-
             yield defer.maybeDeferred(self.plc_init)
-            logging.info('===== Process %s INITIALIZED =====' % (self.procName))
+            logging.info('----- Process %s INITIALIZED -----' % (self.procName))
 
             yield self.reply(msg, 'inform_init', {'status':'OK'}, {})
             self.procState = "INITIALIZED"
@@ -116,10 +131,11 @@ class BaseProcess(object):
         """
         # Check if this response is in reply to an RPC call
         if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
-            logging.info('BaseProcess: Received RPC reply.')
+            logging.info('BaseProcess: Received RPC reply. content=' +str(payload['content']))
             d = self.rpc_conv.pop(payload['conv-id'])
             content = payload.get('content', None)
             res = (content, payload, msg)
+            # @todo error case: no ack
             d.callback(res)
             msg.ack()
         else:       
@@ -129,7 +145,7 @@ class BaseProcess(object):
             # Perform a dispatch of message by operation
             d = pu.dispatch_message(payload, msg, self, conv)
             def _cb(res):
-                logging.info("******ACK msg")
+                logging.info("ACK msg")
                 msg.ack()
             d.addCallback(_cb)
             d.addErrback(logging.error)
@@ -258,9 +274,11 @@ class ProtocolFactory(ProtocolFactory):
     """
     def __init__(self, pcls, name=None, args=None):
         self.processClass = pcls
-        if not name: name = pcls.__name__
+        if not name:
+            name = pcls.__name__
         self.name = name
-        if not args: args = {}
+        if not args:
+            args = {}
         self.args = args
         # Collecting the declare static class variable in a process class
         if pcls and hasattr(pcls, 'declare') and type(pcls.declare) is dict:
@@ -276,8 +294,9 @@ class ProtocolFactory(ProtocolFactory):
         Factory method return a new receiver for a new process. At the same
         time instantiate class.
         """
-        if not spawnArgs: spawnArgs = {}
-        logging.info("ProtocolFactory.build(name=%s,args=%s)" % (self.name,spawnArgs))
+        if not spawnArgs:
+            spawnArgs = {}
+        #logging.debug("ProtocolFactory.build(name=%s, args=%s)" % (self.name,spawnArgs))
         receiver = self.receiver(self.name)
         instance = self.processClass(receiver, spawnArgs)
         receiver.procinst = instance
