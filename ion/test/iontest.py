@@ -64,7 +64,7 @@ class IonTestCase(unittest.TestCase):
 
 
     def _declare_messaging(self, messaging):
-        return bootstrap.bs_messaging(messaging)
+        return bootstrap.declare_messaging(messaging)
 
     def _spawn_processes(self, procs):
-        return bootstrap.bs_processes(procs)
+        return bootstrap.spawn_processes(procs)

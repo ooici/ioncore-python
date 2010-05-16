@@ -32,7 +32,7 @@ class DataPubsubService(BaseService):
         """
         topic_name = content['topic_name']
         topic = {topic_name:{'name_type':'fanout', 'args':{'scope':'local'}}}
-        yield bootstrap.bs_messaging(topic)
+        yield bootstrap.declare_messaging(topic)
         qtopic_name = self.get_scoped_name('local',topic_name)
         yield self.topics.put (topic_name, topic[topic_name])
         yield self.reply_message(msg, 'result', {'topic_name':qtopic_name}, {})

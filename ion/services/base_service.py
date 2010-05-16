@@ -33,9 +33,11 @@ class BaseService(BaseProcess):
         return self.slc_init()
 
     def slc_init(self):
-        """Service life cycle event: on initialization of process (once)
         """
-        logging.info('BaseService.slc_init()')
+        Service life cycle event: initialization of service process. This is
+        called once.
+        """
+        logging.debug('BaseService.slc_init()')
 
     @classmethod
     def _add_messages(cls):
@@ -47,7 +49,10 @@ class BaseService(BaseProcess):
 
     @classmethod
     def service_declare(cls, **kwargs):
-        """Helper method to declare service process module attributes
+        """
+        Helper method to create a declaration of service.
+        @param kwargs keyword attributes for service. Common ones must be present.
+        @retval a dict with service attributes
         """
         logging.info("Service-declare: "+str(kwargs))
         decl = {}
@@ -56,12 +61,17 @@ class BaseService(BaseProcess):
 
 class BaseServiceClient(object):
     """
-    This is the abstract base class for service client libraries.
+    This is the base class for service client libraries. Service client libraries
+    can be used from any process or standalone (in which case they spawn their
+    own client process). A service client makes accessing the service easier and
+    can perform client side optimizations (such as caching and transformation
+    of certain service results).
     """
     def __init__(self, svc=None, proc=None):
         """
-        Initializes a service client with a target service id and a BaseProcess
-        instance
+        Initializes a service client
+        @param svc  target exchange name (service process id)
+        @param proc a BaseProcess instance as originator of requests
         """
         self.svc = svc
         if not proc:
@@ -71,7 +81,8 @@ class BaseServiceClient(object):
     @defer.inlineCallbacks
     def _check_init(self):
         """
-        Called in client methods to ensure
+        Called in client methods to ensure that there exists a spawned process
+        to send messages from
         """
         if not self.svc:
             assert self.svcname, 'Must hace svcname to access service'
@@ -79,8 +90,3 @@ class BaseServiceClient(object):
             self.svc = str(svcid)
         if not self.proc.is_spawned():
             yield self.proc.spawn()
-
-class BaseServiceImplementation(object):
-    """This is the abstract base class for all service provider implementations
-    of a service provider interface.
-    """

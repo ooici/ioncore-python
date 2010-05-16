@@ -3,7 +3,8 @@
 """
 @file ion/core/bootstrap.py
 @author Michael Meisinger
-@brief main module for bootstrapping the system and support functions
+@brief main module for bootstrapping the system and support functions. Functions
+        in here are actually called from start scripts and test cases.
 """
 
 import logging
@@ -36,36 +37,69 @@ nameRegistry = Store()
 @defer.inlineCallbacks
 def start():
     """
-    Main function of bootstrap. Starts system with static config of
-    messaging names and services
+    Starts ION system with static config of core messaging names and services.
     """
     logging.info("ION SYSTEM bootstrapping now...")
     startsvcs = []
     startsvcs.extend(ion_core_services)
-    #startsvcs.extend(ion_services)
-    yield bootstrap(ion_messaging, startsvcs)
+    sup = yield bootstrap(ion_messaging, startsvcs)
+
+@defer.inlineCallbacks
+def bootstrap(messaging=None, services=None):
+    """
+    Initializes local container and starts services and messaging from given
+    setup args.
+    @param messaging  dict of messaging name configuration dicts
+    @param services list of services (as svc description dict) to start up
+    @retval supervisor BaseProcess instance
+    """
+    logging.info("Init container, configuring messaging and starting services...")
+    init_container()
+    sup = None
+    if messaging:
+        assert type(messaging) is dict
+        yield declare_messaging(messaging)
+    if services:
+        assert type(services) is list
+        sup = yield spawn_processes(services)
+
+    defer.returnValue(sup)
+
+def init_container():
+    """
+    Performs global initializations on the local container on startup.
+    """
+    _set_container_args(Container.args)
+    interceptorsys = CONF.getValue('interceptor_system',None)
+    if interceptorsys:
+        logging.info("Setting capability container interceptor system")
+        cls = pu.get_class(interceptorsys)
+        Container.interceptor_system = cls()
+    # Collect all service declarations in local code modules
     ModuleLoader().load_modules()
     #yield bs_register_services()
 
+def _set_container_args(contargs=None):
+    ioninit.cont_args['_args'] = contargs
+    if contargs:
+        logging.info('Evaluating and setting container args: '+str(contargs))
+        if contargs.startswith('{}'):
+            try:
+                # Evaluate args and expect they are dict as str
+                evargs = eval(contargs)
+                logging.info('Evaluating args: '+str(evargs))
+                if type(evargs) is dict:
+                    ioninit.update(evargs)
+            except Exception, e:
+                logging.error('Invalid argument format: ', e)
+        else:
+            ioninit.cont_args['args'] = contargs
+            
 @defer.inlineCallbacks
-def bootstrap(messaging, services):
+def declare_messaging(messagingCfg, cgroup=None):
     """
-    Starts services and messaging from given setup.
-    @retval supervisor BaseProcess instance
-    """
-    logging.info("Configuring messaging and starting services...")
-    init_container()
-    res = None
-    if messaging and len(messaging)>0:
-        yield bs_messaging(messaging)
-    if services and len(services)>0:
-        res = yield bs_processes(services)
-    defer.returnValue(res)
-
-@defer.inlineCallbacks
-def bs_messaging(messagingCfg, cgroup=None):
-    """
-    Configures the container messaging resources 
+    Configures messaging resources.
+    @todo this needs to go to the exchange registry service
     """
     # for each messaging resource call Magnet to define a resource
     for name, msgResource in messagingCfg.iteritems():
@@ -81,13 +115,14 @@ def bs_messaging(messagingCfg, cgroup=None):
         logging.info("Messaging name config: name="+msgName+', '+str(msgResource))
         yield Container.configure_messaging(msgName, msgResource)
         
-        # save name is the name registry
+        # save name in the name registry
         yield nameRegistry.put(msgName, msgResource)
 
 @defer.inlineCallbacks
-def bs_processes(procs):
+def spawn_processes(procs):
     """
-    Bootstraps a set of processes.
+    Spawns a set of processes.
+    @param procs  list of processes (as description dict) to start up
     @retval supervisor BaseProcess instance
     """
     children = prepare_childprocs(procs)
@@ -137,15 +172,6 @@ def bs_register_services():
         sd = ServiceDesc(name=proc['name'])
         res = yield src.register_service(sd)
 
-def init_container():
-    """
-    Performs global initializations on the local container on startup.
-    """
-    interceptorsys = CONF.getValue('interceptor_system',None)
-    if interceptorsys:
-        logging.info("Setting capability container interceptor system")
-        cls = pu.get_class(interceptorsys)
-        Container.interceptor_system = cls()
 
 def reset_container():
     """

@@ -2,7 +2,7 @@
 
 """
 @file ion/core/bootstrap-dx.py
-@author Michael Meisinger
+@author Paul Hubbard
 @brief main module for bootstrapping data exchange
 """
 
@@ -11,14 +11,15 @@ from twisted.internet import defer
 
 from ion.core import ioninit
 from ion.core import bootstrap
-from ion.util.config import Config
 
-CONF = ioninit.config('ion.core.bootstrap-dx')
+CONF = ioninit.config('startup.bootstrap-dx')
+
 # Static definition of message queues
-ion_messaging = Config(CONF.getValue('messaging_cfg')).getObject()
+ion_messaging = ioninit.get_config('messaging_cfg', CONF)
 
 # Static definition of service names
-dx_services = Config(CONF.getValue('services_cfg')).getObject()
+dx_services = ioninit.get_config('services_cfg', CONF)
+
 
 @defer.inlineCallbacks
 def start():
@@ -30,3 +31,5 @@ def start():
     startsvcs.extend(dx_services)
 
     yield bootstrap.bootstrap(ion_messaging, startsvcs)
+
+start()

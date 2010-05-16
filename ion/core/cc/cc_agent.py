@@ -22,18 +22,24 @@ class CCAgent(ResourceAgent):
     def plc_init(self):
         self.supervisor = Supervisor(self.receiver)
 
+    def op_start_node(self, content, headers, msg):
+        pass
+
+    def op_terminate_node(self, content, headers, msg):
+        pass
+
     def op_spawn(self, content, headers, msg):
         procMod = content['module']
         child = ChildProcess(procMod)
         pass
 
-    def op_getNodeId(self, content, headers, msg):
+    def op_get_node_id(self, content, headers, msg):
         pass
 
     def op_advertise(self, content, headers, msg):
         pass
 
-    def op_getConfig(self, content, headers, msg):
+    def op_get_config(self, content, headers, msg):
         pass
 
 # Spawn of the process using the module name

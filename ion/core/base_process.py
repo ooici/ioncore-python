@@ -18,11 +18,15 @@ from magnet.store import Store
 
 from ion.core import ioninit
 from ion.interact.conversation import Conversation
+from ion.interact.message import Message
 import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
 CF_container_group = ioninit.ion_config.getValue2('ion.core.bootstrap','container_group',Container.id)
+
+# Define the exported public names of this module
+__all__ = ['BaseProcess','RpcClient','ProtocolFactory','Message','processes','procRegistry']
 
 # Static store (kvs) to register process instances with names
 procRegistry = Store()
@@ -243,6 +247,7 @@ class BaseProcess(object):
     def spawn_link(self):
         pass
 
+
 class ProtocolFactory(ProtocolFactory):
     """
     This protocol factory returns receiver instances used to spawn processes
@@ -284,4 +289,3 @@ class RpcClient(BaseProcess):
     @deprecated  Do not use anymore. This is just a regular BaseProcess.
     """
     attach = BaseProcess.spawn
-    
