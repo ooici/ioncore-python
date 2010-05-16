@@ -16,8 +16,8 @@ from magnet.spawnable import spawn
 from ion.data.store import Store
 
 from ion.core import ioninit, base_process
+from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core.cc.modloader import ModuleLoader
-from ion.core.supervisor import Supervisor, ChildProcess
 from ion.services.coi.service_registry import ServiceRegistryClient, ServiceDesc
 from ion.util.config import Config
 import ion.util.procutils as pu
@@ -118,49 +118,45 @@ def declare_messaging(messagingCfg, cgroup=None):
         # save name in the name registry
         yield nameRegistry.put(msgName, msgResource)
 
+# Sequence number of supervisors
+sup_seq = 0
+
 @defer.inlineCallbacks
-def spawn_processes(procs):
+def spawn_processes(procs, sup=None):
     """
     Spawns a set of processes.
     @param procs  list of processes (as description dict) to start up
+    @param sup  spawned BaseProcess instance acting as supervisor
     @retval supervisor BaseProcess instance
     """
-    children = prepare_childprocs(procs)
+    global sup_seq
+    children = []
+    for procDef in procs:
+        spawnArgs = procDef.get('spawnargs', None)
+        child = ProcessDesc(procDef['name'], procDef['module'], procDef['class'], None, spawnArgs)
+        children.append(child)
 
-    # Makes the boostrap a process
-    logging.info("Spawning bootstrap supervisor")
-    sup = Supervisor()
-    sup.receiver.label = Supervisor.__name__
-    supId = yield sup.spawn()
-    yield base_process.procRegistry.put("bootstrap", str(supId))
+    if not sup:
+        # Makes the boostrap a process
+        logging.info("Spawning supervisor")
+        if sup_seq == 0:
+            supname = "bootstrap"
+        else:
+            supname = "supervisor."+str(sup_seq)
+        sup = BaseProcess()
+        sup.receiver.label = supname
+        supId = yield sup.spawn()
+        yield base_process.procRegistry.put(supname, str(supId))
+        sup_seq += 1
 
-    sup.set_child_processes(children)
-    yield sup.spawn_child_processes()
-    for child in sup.childProcesses:
-        procId = child.procId
-        yield base_process.procRegistry.put(str(child.procName), str(procId))
+    logging.info("Spawning child processes")
+    for child in children:
+        child_id = yield sup.spawn_child(child)
+        yield base_process.procRegistry.put(str(child.procName), str(child_id))
 
     logging.debug("process_ids: "+ str(base_process.procRegistry.kvs))
 
-    yield sup.init_child_processes()
     defer.returnValue(sup)
-
-def prepare_childprocs(procs):
-    """
-    Prepares a Supervisor class instance with configured child processes.
-    """
-    logging.info("Preparing bootstrap supervisor")
-   
-    children = []
-    for procDef in procs:
-        spawnArgs = procDef.get('spawnargs',None)
-
-        child = ChildProcess(procDef['module'], procDef['class'], None, spawnArgs)
-        child.procName = procDef['name']
-        children.append(child)
-
-    logging.debug("Supervisor child procs: "+str(children))
-    return children
 
 @defer.inlineCallbacks
 def bs_register_services():

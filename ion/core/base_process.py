@@ -26,7 +26,7 @@ CF_conversation_log = CONF['conversation_log']
 CF_container_group = ioninit.ion_config.getValue2('ion.core.bootstrap','container_group',Container.id)
 
 # Define the exported public names of this module
-__all__ = ['BaseProcess','ChildProcess','ProtocolFactory','Message','processes','procRegistry']
+__all__ = ['BaseProcess','ProcessDesc','ProtocolFactory','Message','processes','procRegistry']
 
 # Static store (kvs) to register process instances with names
 # @todo CHANGE
@@ -55,8 +55,6 @@ class BaseProcess(object):
         """
         #logging.debug('BaseProcess.__init__()')
         self.procState = "UNINITIALIZED"
-        if not receiver:
-            receiver = Receiver(__name__) 
         spawnArgs = spawnArgs.copy() if spawnArgs else {}
         self.spawnArgs = spawnArgs
 
@@ -69,6 +67,8 @@ class BaseProcess(object):
         # The process ID of the supervisor process
         self.procSupId =  pu.get_process_id(self.spawnArgs.get('sup-id', None))
 
+        if not receiver:
+            receiver = Receiver(self.procName)
         self.receiver = receiver
         receiver.handle(self.receive)
         
@@ -81,6 +81,9 @@ class BaseProcess(object):
         self.conversations = {}
         # Conversations by conv-id for currently outstanding RPCs
         self.rpc_conv = {}
+        
+        # List of ProcessDesc instances of defined and spawned child processes
+        self.child_procs = []
 
         logging.info("Process init'd: proc-name=%s, sup-id=%s, sys-name=%s" % (
                 self.procName, self.procSupId, self.sysName))
@@ -213,15 +216,6 @@ class BaseProcess(object):
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
             self.send_message(pu.get_process_id(recv), operation, content, headers)
-
-    def log_conv_message(self):
-        """
-        Logs received message 
-        """
-        pass
-        #if CF_conversation_log:
-        #    send = self.receiver.spawned.id.full
-            #pu.send_message(self.receiver, send, '', 'logmsg', {}, {})
             
     def get_conversation(self, headers):
         convid = headers.get('conv-id', None)
@@ -253,31 +247,61 @@ class BaseProcess(object):
     # Some aliases for initial backwards compatibility
     send_message = send 
     reply_message = reply
-    attach = spawn
     
     # OTP style functions for working with processes and modules/apps
     
-    def spawn_child(self):
+    @defer.inlineCallbacks
+    def spawn_child(self, childproc, init=True):
+        """
+        Spawns a process described by the ProcessDesc instance as child of this
+        process instance. An init message is sent depending on flag.
+        @param childproc  ProcessDesc instance with attributes
+        @param init  flag determining whether an init message should be sent
+        @retval process id of the child process
+        """
+        assert isinstance(childproc, ProcessDesc)
+        assert not childproc in self.child_procs
+        self.child_procs.append(childproc)
+        child_id = yield childproc.spawn(self)
+        if init:
+            yield childproc.init()
+        defer.returnValue(child_id)
+
+    def link_child(self, supervisor):
         pass
-    def link_child(self):
-        pass
-    def spawn_link(self):
+    
+    def spawn_link(self, childproc, supervisor):
         pass
 
-class ChildProcess(object):
+class ProcessDesc(object):
     """
-    Class that encapsulates attributes about a child process and can spawn
-    child processes.
+    Class that encapsulates attributes about a spawnable process; can spawn
+    and init processes.
     """
-    def __init__(self, procMod, procClass=None, node=None, spawnArgs=None):
+    def __init__(self, procName, procMod, procClass=None, node=None, spawnArgs=None):
+        """
+        Initializes ProcessDesc instance with process attributes
+        @param procName  name label of process
+        @param procMod  module name of process module
+        @param procClass  class name in process module (optional)
+        @param node  ID of container to spawn process on (optional)
+        @param spawnArgs  dict of additional spawn arguments (optional)
+        """
+        self.procName = procName
         self.procModule = procMod
         self.procClass = procClass
         self.procNode = node
         self.spawnArgs = spawnArgs
+        self.procId = None
         self.procState = 'DEFINED'
 
     @defer.inlineCallbacks
-    def spawn_child(self, supProc=None):
+    def spawn(self, supProc=None):
+        """
+        Spawns this process description with the initialized attributes.
+        @param supProc  the process instance that should be set as supervisor
+        """
+        assert self.procState == 'DEFINED', "Cannot spawn process twice"
         self.supProcess = supProc
         if self.procNode == None:
             logging.info('Spawning name=%s node=%s' % (self.procName, self.procNode))
@@ -302,10 +326,15 @@ class ChildProcess(object):
             #logging.info("Process "+self.procClass+" ID: "+str(proc_id))
         else:
             logging.error('Cannot spawn '+self.procClass+' on node='+str(self.procNode))
+        defer.returnValue(self.procId)
 
     @defer.inlineCallbacks
-    def init_child(self):
+    def init(self):
         (content, headers, msg) = yield self.supProcess.rpc_send(self.procId, 'init', {}, {'quiet':True})
+        if content.get('status','ERROR') == 'OK':
+            self.procState = 'INIT_OK'
+        else:
+            self.procState = 'INIT_ERROR'
 
 
 class ProtocolFactory(ProtocolFactory):
@@ -341,7 +370,7 @@ class ProtocolFactory(ProtocolFactory):
         if not spawnArgs:
             spawnArgs = {}
         #logging.debug("ProtocolFactory.build(name=%s, args=%s)" % (self.name,spawnArgs))
-        receiver = self.receiver(self.name)
+        receiver = self.receiver(spawnArgs.get('proc-name',self.name))
         instance = self.processClass(receiver, spawnArgs)
         receiver.procinst = instance
         return receiver

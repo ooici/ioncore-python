@@ -10,8 +10,8 @@ import logging
 
 from magnet.spawnable import Receiver
 
-from ion.core.supervisor import Supervisor, ChildProcess
-from ion.core.base_process import ProtocolFactory
+from ion.core.supervisor import Supervisor, ProcessDesc
+from ion.core.base_process import BaseProcess, ProtocolFactory
 from ion.agents.resource_agent import ResourceAgent
 
 
@@ -30,7 +30,7 @@ class CCAgent(ResourceAgent):
 
     def op_spawn(self, content, headers, msg):
         procMod = content['module']
-        child = ChildProcess(procMod)
+        child = ProcessDesc(procMod, procMod)
         pass
 
     def op_get_node_id(self, content, headers, msg):
