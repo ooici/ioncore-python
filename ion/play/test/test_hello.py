@@ -38,6 +38,5 @@ class HelloTest(IonTestCase):
         hsid = yield self.procRegistry.get("hello1")
         logging.info("Hello service process 1: "+repr(hsid))
 
-        hc = HelloServiceClient()
-        yield hc.attach()
-        res = yield hc.hello(hsid,"Hi there, hello1")
+        hc = HelloServiceClient(hsid, sup)
+        res = yield hc.hello("Hi there, hello1")

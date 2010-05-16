@@ -36,16 +36,22 @@ class HelloService(BaseService):
         yield self.reply_message(msg, 'reply', {'value':'Hello there, '+str(content)}, {})
 
 
-class HelloServiceClient(RpcClient):
+class HelloServiceClient(BaseServiceClient):
     """This is an exemplar service class that calls the hello service. It
     applies the RPC pattern.
     """
 
-    @defer.inlineCallbacks
-    def hello(self, to='1', text='Hi there'):
-        (content, headers, msg) = yield self.rpc_send(to, 'hello', text, {})
-        logging.info('Friends reply: '+str(content))
+    def __init__(self, *args):
+        BaseServiceClient.__init__(self, *args)
+        self.svcname = "hello_service"
 
+
+    @defer.inlineCallbacks
+    def hello(self, text='Hi there'):
+        yield self._check_init()
+        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'hello', text, {})
+        logging.info('Friends reply: '+str(content))
+        defer.returnValue(str(content))
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(HelloService)
@@ -58,7 +64,6 @@ spawn(h)
 send(1, {'op':'hello','content':'Hello you there!'})
 
 from ion.play.hello_service import HelloServiceClient
-hc = HelloServiceClient()
-hc.attach()
+hc = HelloServiceClient(1)
 hc.hello()
 """
