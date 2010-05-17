@@ -4,17 +4,15 @@ from twisted.internet import defer
 
 from ion.core import ioninit
 from ion.core import bootstrap
-from ion.util.config import Config
-import ion.util.procutils as pu
 
-CONF = ioninit.config('ion.core.bootstrap1')
+CONF = ioninit.config('startup.bootstrap1')
 
 # Static definition of message queues
-ion_messaging = Config(CONF.getValue('messaging_cfg')).getObject()
+ion_messaging = ioninit.get_config('messaging_cfg', CONF)
 
 # Static definition of service names
-ion_core_services = Config(CONF.getValue('coreservices_cfg')).getObject()
-ion_services = Config(CONF.getValue('services_cfg')).getObject()
+ion_core_services = ioninit.get_config('coreservices_cfg', CONF)
+ion_services = ioninit.get_config('services_cfg', CONF)
 
 
 @defer.inlineCallbacks

@@ -11,7 +11,7 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory, RpcClient
+from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class HelloService(BaseService):
@@ -33,19 +33,23 @@ class HelloService(BaseService):
         logging.info('op_hello: '+str(content))
 
         # The following line shows how to reply to a message
-        yield self.reply_message(msg, 'reply', {'value':'Hello there, '+str(content)}, {})
+        yield self.reply(msg, 'reply', {'value':'Hello there, '+str(content)}, {})
 
 
-class HelloServiceClient(RpcClient):
-    """This is an exemplar service class that calls the hello service. It
+class HelloServiceClient(BaseServiceClient):
+    """
+    This is an exemplar service class that calls the hello service. It
     applies the RPC pattern.
     """
+    def __init__(self, proc=None, pid=None):
+        BaseServiceClient.__init__(self, "hello", proc, pid)
 
     @defer.inlineCallbacks
-    def hello(self, to='1', text='Hi there'):
-        (content, headers, msg) = yield self.rpc_send(to, 'hello', text, {})
+    def hello(self, text='Hi there'):
+        yield self._check_init()
+        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'hello', text, {})
         logging.info('Friends reply: '+str(content))
-
+        defer.returnValue(str(content))
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(HelloService)
@@ -58,7 +62,6 @@ spawn(h)
 send(1, {'op':'hello','content':'Hello you there!'})
 
 from ion.play.hello_service import HelloServiceClient
-hc = HelloServiceClient()
-hc.attach()
+hc = HelloServiceClient(1)
 hc.hello()
 """

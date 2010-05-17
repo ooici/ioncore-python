@@ -8,7 +8,7 @@
 
 
 from twisted.internet import defer
-from magnet.store import Store
+from ion.data.store import Store
 
 from ion.core import bootstrap
 from ion.core.base_process import ProtocolFactory
@@ -31,11 +31,11 @@ class DataPubsubService(BaseService):
         AMQP topic notion. A topic is basically a data stream.
         """
         topic_name = content['topic_name']
-        topic = {topic_name:{'name_type':'fanout', 'args':{'scope':'local'}}}
-        yield bootstrap.bs_messaging(topic)
-        qtopic_name = self.get_scoped_name('local',topic_name)
+        topic = {topic_name:{'name_type':'fanout', 'args':{'scope':'system'}}}
+        yield bootstrap.declare_messaging(topic)
+        qtopic_name = self.get_scoped_name('system',topic_name)
         yield self.topics.put (topic_name, topic[topic_name])
-        yield self.reply_message(msg, 'result', {'topic_name':qtopic_name}, {})
+        yield self.reply(msg, 'result', {'topic_name':qtopic_name}, {})
 
     def op_define_publisher(self, content, headers, msg):
         """Service operation: Register a publisher that subsequently is
@@ -63,9 +63,9 @@ class DataPubsubService(BaseService):
         headers = content['msg_headers']
         op = content['msg_op']
         msg = content['msg']
-        qtopic = self.get_scoped_name('local',topic_name)
+        qtopic = self.get_scoped_name('system',topic_name)
         # Todo: impersonate message as from sender
-        yield self.send_message(qtopic, op, msg, headers)
+        yield self.send(qtopic, op, msg, headers)
 
     def find_topic(self, content, headers, msg):
         """Service operation: For a given resource, find the topic that contains
@@ -80,9 +80,8 @@ factory = ProtocolFactory(DataPubsubService)
 class DataPubsubClient(BaseServiceClient):
     """Client class for accessing the data pubsub service.
     """
-    def __init__(self, *args):
-        BaseServiceClient.__init__(self, *args)
-        self.svcname = "data_pubsub"
+    def __init__(self, proc=None, pid=None):
+        BaseServiceClient.__init__(self, "data_pubsub", proc, pid)
 
     @defer.inlineCallbacks
     def define_topic(self, topic_name):

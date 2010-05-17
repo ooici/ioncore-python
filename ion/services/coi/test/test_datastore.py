@@ -106,8 +106,7 @@ class DatastoreServiceTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
 
-        oss1 = yield base_process.procRegistry.get("datastore1")
-        osc = DatastoreClient(oss1, sup)
+        osc = DatastoreClient(sup)
 
         res1 = yield osc.put('key1','value1')
         logging.info('Result1 put: '+str(res1))

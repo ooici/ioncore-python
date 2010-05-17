@@ -12,8 +12,8 @@ import logging
 from twisted.internet import defer
 from twisted.web import client
 
-from ion.core.base_process import ProtocolFactory, RpcClient
-from ion.services.base_service import BaseService
+from ion.core.base_process import ProtocolFactory
+from ion.services.base_service import BaseService, BaseServiceClient
 
 class FetcherService(BaseService):
     """
@@ -62,42 +62,41 @@ class FetcherService(BaseService):
         page = yield d
         if not self.got_err:
             logging.debug('Fetch complete, sending to caller')
-            yield self.reply_message(msg, 'reply', {'value':page}, {})
+            yield self.reply(msg, 'reply', {'value':page}, {})
             logging.debug('get_url complete!')
 
         # Did catch an error
         logging.error('Error on page fetch: ' + str(self.failure))
-        yield self.reply_message(msg, 'reply',
+        yield self.reply(msg, 'reply',
                                  {'failure': str(self.failure),
                                 'value':None})
 
     @defer.inlineCallbacks
     def op_get_dap_dataset(self, content, headers, msg):
         logging.warn('Implement me!')
-        yield self.reply_message(msg, 'reply', {'value':'no code!'}, {})
+        yield self.reply(msg, 'reply', {'value':'no code!'}, {})
 
 
-class FetcherClient(RpcClient):
+class FetcherClient(BaseServiceClient):
     """
     Client class for the fetcher.
     @note RPC style interactions
     """
+    def __init__(self, proc=None, pid=None):
+        BaseServiceClient.__init__(self, "fetcher", proc, pid)
 
     @defer.inlineCallbacks
-    def get_url(self, faddr, requested_url):
+    def get_url(self, requested_url):
         """
         @todo look up fetcher in dns
         send to same
         return unpacked reply
         """
-#        logging.info('Lookup up the service ID...')
-#        sc = ServiceRegistryClient()
-#        dest = '1'
-        #yield sc.get_service_instance('fetcher')
+        yield self._check_init()
 
         logging.info('Sending request')
-        (content, headers, msg) = yield self.rpc_send(faddr, 'get_url',
-                                                      requested_url, {})
+        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'get_url',
+                                                      requested_url)
         if 'failure' in content:
             raise ValueError('Error on URL: ' + content['failure'])
         defer.returnValue(content)

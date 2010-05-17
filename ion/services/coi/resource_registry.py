@@ -9,7 +9,7 @@
 import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
-from magnet.store import Store
+from ion.data.store import Store
 
 from ion.core import base_process
 from ion.core.base_process import ProtocolFactory, BaseProcess
@@ -72,9 +72,8 @@ class ResourceRegistryClient(BaseServiceClient):
     """
     Class for the client accessing the resource registry.
     """
-    def __init__(self, *args):
-        BaseServiceClient.__init__(self, *args)
-        self.svcname = "resource_registry"
+    def __init__(self, proc=None, pid=None):
+        BaseServiceClient.__init__(self, "resource_registry", proc, pid)
 
     def registerResourceType(self, rt_desc):
         pass

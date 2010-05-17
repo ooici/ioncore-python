@@ -19,7 +19,7 @@ from twisted.internet.defer import inlineCallbacks, DeferredQueue
 from magnet.spawnable import Receiver
 from magnet.spawnable import send
 from magnet.spawnable import spawn
-from magnet.store import Store
+from ion.data.store import Store
 
 from ion.core import bootstrap
 from ion.core import ioninit

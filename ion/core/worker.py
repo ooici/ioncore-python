@@ -18,6 +18,8 @@ from ion.services.base_service import BaseService
 class WorkerProcess(BaseService):
     """Worker process
     """
+    # Declaration of service
+    declare = BaseService.service_declare(name='worker', version='0.1.0', dependencies=[])
 
     @defer.inlineCallbacks
     def slc_init(self):
@@ -41,7 +43,7 @@ class WorkerProcess(BaseService):
     @defer.inlineCallbacks
     def op_work(self, content, headers, msg):
         yield self._work(content)
-        yield self.reply_message(msg, 'result', {'work-id':content['work-id']}, {})        
+        yield self.reply(msg, 'result', {'work-id':content['work-id']}, {})        
 
     @defer.inlineCallbacks
     def _work(self,content):
@@ -74,7 +76,7 @@ class WorkerClient(BaseProcess):
 
     @defer.inlineCallbacks
     def submit_work(self, to, workid, work):
-        yield self.send_message(str(to),'work',{'work-id':workid,'work':work},{})
+        yield self.send(str(to),'work',{'work-id':workid,'work':work},{})
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(WorkerProcess)

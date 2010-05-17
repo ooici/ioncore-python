@@ -60,10 +60,7 @@ class PubSubTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
         
-        dps = yield self.procRegistry.get("data_pubsub")
-        logging.info("DataPubsubservice: "+repr(dps))
-
-        dpsc = DataPubsubClient(dps, sup)
+        dpsc = DataPubsubClient(sup)
         topic_name = yield dpsc.define_topic("topic1")
         logging.info('Service reply: '+str(topic_name))
         
@@ -106,10 +103,7 @@ class PubSubTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
         
-        dps = yield self.procRegistry.get("data_pubsub")
-        logging.info("DataPubsubservice: "+repr(dps))
-
-        dpsc = DataPubsubClient(dps, sup)
+        dpsc = DataPubsubClient(sup)
         topic_raw = yield dpsc.define_topic("topic_raw")
         topic_qc = yield dpsc.define_topic("topic_qc")
         topic_evt = yield dpsc.define_topic("topic_qcevent")
@@ -183,7 +177,7 @@ class DataConsumer(BaseProcess):
             logging.info("op_data: Finished data process")
             if res:
                 for (topic, msg) in res:
-                    yield self.send_message(self.get_local_name(topic), 'data', msg, {})
+                    yield self.send(self.get_scoped_name('system',topic), 'data', msg, {})
 
 class DataProcess(object):
     
