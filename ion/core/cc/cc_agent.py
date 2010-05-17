@@ -86,17 +86,21 @@ class CCAgent(ResourceAgent):
         logging.info("op_identify(). Send announcement")
         yield self._send_announcement('identify')
 
+    @defer.inlineCallbacks
+    def op_spawn(self, content, headers, msg):
+        """
+        Service operation: spawns a local module
+        """
+        procMod = str(content['module'])
+        child = ProcessDesc(procMod.rpartition('.')[2], procMod)
+        pid = yield self.spawn_child(child)
+        yield self.reply(msg, 'result', {'status':'OK', 'process-id':str(pid)})
+
     def op_start_node(self, content, headers, msg):
         pass
 
     def op_terminate_node(self, content, headers, msg):
         pass
-
-    @defer.inlineCallbacks
-    def op_spawn(self, content, headers, msg):
-        procMod = str(content['module'])
-        child = ProcessDesc(procMod, procMod)
-        yield self.spawn_child(child)
 
     def op_get_node_id(self, content, headers, msg):
         pass
@@ -113,4 +117,5 @@ twistd -n --pidfile t1.pid magnet -h amoeba.ucsd.edu -a sysname=mm res/scripts/n
 twistd -n --pidfile t2.pid magnet -h amoeba.ucsd.edu -a sysname=mm res/scripts/newcc.py
 
 send (2, {'op':'identify','content':''})
+send (2, {'op':'spawn','content':{'module':'ion.play.hello_service'}})
 """

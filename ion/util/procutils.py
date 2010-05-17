@@ -259,6 +259,7 @@ class FakeReceiver(object):
     def __init__(self, id=None):
         self.payload = None
         self.spawned = FakeSpawnable()
+        self.group = 'fake'
 
     @defer.inlineCallbacks
     def send(self, to, msg):

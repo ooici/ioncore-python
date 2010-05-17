@@ -104,6 +104,7 @@ Change log:
   global names, because they will clash.
 - Less verbose trace output for process init messages and changes to other
   trace output as well.
+- Changed BaseServiceClient and tests. Initializer arguments different.
 2010-05-10:
 - Based on entries in config files, service process modules are sought and
   loaded in order to collect the service process declarations. This enables

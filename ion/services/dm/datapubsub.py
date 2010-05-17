@@ -80,9 +80,8 @@ factory = ProtocolFactory(DataPubsubService)
 class DataPubsubClient(BaseServiceClient):
     """Client class for accessing the data pubsub service.
     """
-    def __init__(self, *args):
-        BaseServiceClient.__init__(self, *args)
-        self.svcname = "data_pubsub"
+    def __init__(self, proc=None, pid=None):
+        BaseServiceClient.__init__(self, "data_pubsub", proc, pid)
 
     @defer.inlineCallbacks
     def define_topic(self, topic_name):

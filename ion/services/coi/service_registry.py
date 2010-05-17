@@ -78,9 +78,8 @@ class ServiceRegistryClient(BaseServiceClient):
     finding and accessing any other services. This client knows how to find the
     service registry
     """
-    def __init__(self, *args):
-        BaseServiceClient.__init__(self, *args)
-        self.svcname = "service_registry"
+    def __init__(self, proc=None, pid=None):
+        BaseServiceClient.__init__(self, "service_registry", proc, pid)
 
     @defer.inlineCallbacks
     def register_service(self, svc):

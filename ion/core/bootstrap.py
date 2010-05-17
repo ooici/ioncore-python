@@ -93,7 +93,7 @@ def _set_container_args(contargs=None):
                 logging.error('Invalid argument format: ', e)
         elif contargs.find('=') > 0:
             # Key=value arguments separated by comma
-            print "Parsing KV"
+            logging.info("Parsing KV")
             args = contargs.split(',')
             for a in args:
                 k,s,v = a.partition('=')

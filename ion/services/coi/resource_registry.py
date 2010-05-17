@@ -72,9 +72,8 @@ class ResourceRegistryClient(BaseServiceClient):
     """
     Class for the client accessing the resource registry.
     """
-    def __init__(self, *args):
-        BaseServiceClient.__init__(self, *args)
-        self.svcname = "resource_registry"
+    def __init__(self, proc=None, pid=None):
+        BaseServiceClient.__init__(self, "resource_registry", proc, pid)
 
     def registerResourceType(self, rt_desc):
         pass

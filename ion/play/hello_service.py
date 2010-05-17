@@ -37,14 +37,12 @@ class HelloService(BaseService):
 
 
 class HelloServiceClient(BaseServiceClient):
-    """This is an exemplar service class that calls the hello service. It
+    """
+    This is an exemplar service class that calls the hello service. It
     applies the RPC pattern.
     """
-
-    def __init__(self, *args):
-        BaseServiceClient.__init__(self, *args)
-        self.svcname = "hello_service"
-
+    def __init__(self, proc=None, pid=None):
+        BaseServiceClient.__init__(self, "hello", proc, pid)
 
     @defer.inlineCallbacks
     def hello(self, text='Hi there'):

@@ -31,7 +31,7 @@ class ServiceRegistryClientTest(IonTestCase):
     def test_service_reg(self):
         sd1 = ServiceDesc(name='svc1')
         
-        c = ServiceRegistryClient(None, self.sup)
+        c = ServiceRegistryClient(self.sup)
         res1 = yield c.register_service(sd1)
 
         si1 = ServiceInstanceDesc(xname=self.sup.id.full, svc_name='svc1')

@@ -37,7 +37,8 @@ class BaseService(BaseProcess):
         
         msgName = self.get_scoped_name('system', svcname)
         svcReceiver = Receiver(svcname+'.'+self.receiver.label, msgName)
-        svcReceiver.group = self.receiver.group
+        if hasattr(self.receiver, 'group'):
+            svcReceiver.group = self.receiver.group
         self.svc_receiver = svcReceiver
         self.svc_receiver.handle(self.receive)
         self.add_receiver(self.svc_receiver)
@@ -92,13 +93,16 @@ class BaseServiceClient(object):
     can perform client side optimizations (such as caching and transformation
     of certain service results).
     """
-    def __init__(self, svc=None, proc=None):
+    def __init__(self, svcname=None, proc=None, svcpid=None):
         """
         Initializes a service client
-        @param svc  target exchange name (service process id)
+        @param svc  service name (globally known name)
         @param proc a BaseProcess instance as originator of requests
+        @param svcpid  target exchange name (service process id or name)
         """
-        self.svc = svc
+        assert svcname or svcpid, "Need either service name or process-id"
+        self.svcname = svcname
+        self.svc = svcpid            
         if not proc:
             proc = BaseProcess()
         self.proc = proc
@@ -109,12 +113,13 @@ class BaseServiceClient(object):
         Called in client methods to ensure that there exists a spawned process
         to send messages from
         """
-        if not self.svc:
-            assert self.svcname, 'Must hace svcname to access service'
-            svcid = yield base_process.procRegistry.get(self.svcname)
-            self.svc = str(svcid)
         if not self.proc.is_spawned():
             yield self.proc.spawn()
+        if not self.svc:
+            assert self.svcname, 'Must hace svcname to access service'
+            svcid = self.proc.get_scoped_name('system', self.svcname)
+            #svcid = yield base_process.procRegistry.get(self.svcname)
+            self.svc = str(svcid)
 
     @defer.inlineCallbacks
     def attach(self):

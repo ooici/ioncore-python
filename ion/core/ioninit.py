@@ -7,6 +7,8 @@
 """
 
 import logging.config
+import magnet
+import re
 
 from ion.core import ionconst as ic
 from ion.util.config import Config
@@ -38,3 +40,12 @@ def get_config(confname, conf=None):
     if conf == None:
         conf = ion_config
     return Config(conf.getValue(confname)).getObject()
+
+def check_magnet_version():
+    minmv = ic.MIN_MAGNET.split('.')
+    mv = magnet.__version__.split('.')
+    mv[2] = mv[2].partition('+')[0]
+    if mv[0]<minmv[0] or mv[1]<minmv[1] or mv[2]<minmv[2]:
+        logging.error("*********** ATTENTION! Magnet %s required. Is %s ***********" % (ic.MIN_MAGNET, magnet.__version__))
+
+check_magnet_version()

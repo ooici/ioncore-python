@@ -82,9 +82,8 @@ class FetcherClient(BaseServiceClient):
     Client class for the fetcher.
     @note RPC style interactions
     """
-    def __init__(self, *args):
-        BaseServiceClient.__init__(self, *args)
-        self.svcname = "fetcher"
+    def __init__(self, proc=None, pid=None):
+        BaseServiceClient.__init__(self, "fetcher", proc, pid)
 
     @defer.inlineCallbacks
     def get_url(self, requested_url):

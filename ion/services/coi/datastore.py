@@ -80,9 +80,8 @@ class DatastoreClient(BaseServiceClient):
     """
     Class for the client accessing the object store service via ION Exchange
     """
-    def __init__(self, *args):
-        BaseServiceClient.__init__(self, *args)
-        self.svcname = "objstore"
+    def __init__(self, proc=None, pid=None):
+        BaseServiceClient.__init__(self, "datastore", proc, pid)
 
     @defer.inlineCallbacks
     def put(self, key, value, parents=None):

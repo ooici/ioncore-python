@@ -18,10 +18,9 @@ class FetcherTest(IonTestCase):
         yield self._start_container()
         services = [{'name':'fetcher', 'module':'ion.data.fetcher',
                     'class': 'FetcherService'},]
-        yield self._spawn_processes(services)
+        sup = yield self._spawn_processes(services)
 
-        self.dest = yield self._get_procid('fetcher')
-        self.fc = FetcherClient(self.dest)
+        self.fc = FetcherClient(sup)
 
     @defer.inlineCallbacks
     def tearDown(self):

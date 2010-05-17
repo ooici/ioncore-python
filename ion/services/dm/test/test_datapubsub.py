@@ -60,10 +60,7 @@ class PubSubTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
         
-        dps = yield self._get_procid("data_pubsub")
-        logging.info("DataPubsubservice: "+repr(dps))
-
-        dpsc = DataPubsubClient(dps, sup)
+        dpsc = DataPubsubClient(sup)
         topic_name = yield dpsc.define_topic("topic1")
         logging.info('Service reply: '+str(topic_name))
         
@@ -106,10 +103,7 @@ class PubSubTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
         
-        dps = yield self._get_procid("data_pubsub")
-        logging.info("DataPubsubservice: "+repr(dps))
-
-        dpsc = DataPubsubClient(dps, sup)
+        dpsc = DataPubsubClient(sup)
         topic_raw = yield dpsc.define_topic("topic_raw")
         topic_qc = yield dpsc.define_topic("topic_qc")
         topic_evt = yield dpsc.define_topic("topic_qcevent")
