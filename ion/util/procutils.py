@@ -46,7 +46,9 @@ def log_message(msg):
     lstr = ""
     procname = str(body.get('receiver',None))
     lstr += "===Message=== receiver=%s op=%s" % (procname, body.get('op', None))
-    if not body.get('quiet', False):
+    if body.get('quiet', False):
+        lstr += " (Q)"
+    else:
         amqpm = str(msg._amqp_message)
         # Cut out the redundant or encrypted AMQP body to make log shorter
         amqpm = re.sub("body='(\\\\'|[^'])*'","*BODY*", amqpm)
@@ -65,7 +67,12 @@ def log_message(msg):
             value = mbody.get(attr)
             lstr += "%s=%r, " % (attr, value)
         lstr += "\n---CONTENT---\n"
-        lstr += repr(content)
+        if type(content) is dict:
+            for attr in sorted(content.keys()):
+                value = content.get(attr)
+                lstr += "%s=%r, " % (attr, value)
+        else:
+            lstr += repr(content)
         lstr += "\n============="
     logging.info(lstr)
 

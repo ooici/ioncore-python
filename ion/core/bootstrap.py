@@ -91,6 +91,13 @@ def _set_container_args(contargs=None):
                     ioninit.cont_args.update(evargs)
             except Exception, e:
                 logging.error('Invalid argument format: ', e)
+        elif contargs.find('=') > 0:
+            # Key=value arguments separated by comma
+            print "Parsing KV"
+            args = contargs.split(',')
+            for a in args:
+                k,s,v = a.partition('=')
+                ioninit.cont_args[k.strip()] = v.strip()
         else:
             ioninit.cont_args['args'] = contargs
             

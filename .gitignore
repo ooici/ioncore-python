@@ -4,6 +4,6 @@
 *.*.swp
 .*.*.swo
 *.log
-twistd.pid
+*.pid
 _trial*
 docs

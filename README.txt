@@ -22,6 +22,8 @@ Start CC ("Magnet" Python Capability Container) shell with:
 ::
     twistd -n magnet -h amoeba.ucsd.edu
 
+(to end a magnet container shell, press Ctrl-D Ctrl-C)
+
 Start system by executing within the CC shell:
 ><>
     from ion.core import bootstrap
@@ -30,12 +32,13 @@ Start system by executing within the CC shell:
 Alternatively from shell executing a script:
 ::
     twistd -n magnet -h amoeba.ucsd.edu res/scripts/bootstrap.py
+    twistd -n magnet -h amoeba.ucsd.edu res/scripts/newcc.py
 
 Run trial test cases (recursively)
 ::
+    trial ion
     trial ion.core
     trial ion.services.coi.test.test_resource_registry
-    trial ion
 
 
 Install the dependencies: Magnet (see Magnet's Readme)
@@ -82,6 +85,25 @@ again (see above). Please review the branch logs for any cues.
 Change log:
 ===========
 
+2010-05-16:
+- Removed support for BaseProcess.send_message and reply_message. Always use
+  send, reply and rpc_send now.
+- Any BaseProcess instance can now spawn_child() other processes.
+- Removed RpcClient class, because every process can do rpc_send()
+- Service processes now also listen to their service name's queue. The service
+  name is determined from the service declaration. Two processes will listen
+  to the same queue and take messages round robin from the queue.
+- Startup arguments evaluated, for instance to start with system name set:
+  twistd -n magnet -a sysname=mysys
+  twistd -n magnet -a "{'sysname':'mysys'}"
+- Added capability container agent process. Start with:
+  twistd -n magnet res/scripts/newcc.py
+  Agents announce themselves to others in the same system and can spawn procs.
+- Name scope 'local' for messaging names means now really local to one container.
+  Use scope 'system' for names unique for each bootstrapped system. Do not use
+  global names, because they will clash.
+- Less verbose trace output for process init messages and changes to other
+  trace output as well.
 2010-05-10:
 - Based on entries in config files, service process modules are sought and
   loaded in order to collect the service process declarations. This enables
