@@ -23,7 +23,6 @@ import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
-CF_container_group = ioninit.ion_config.getValue2('ion.core.bootstrap','container_group',Container.id)
 
 # Define the exported public names of this module
 __all__ = ['BaseProcess','ProcessDesc','ProtocolFactory','Message','processes','procRegistry']
@@ -62,7 +61,8 @@ class BaseProcess(object):
         self.procName = self.spawnArgs.get('proc-name', __name__)
         
         # The system unique ID; propagates from root supv to all child procs
-        self.sysName = self.spawnArgs.get('sys-name', Container.id)
+        sysname = ioninit.cont_args.get('sysname', Container.id)
+        self.sysName = self.spawnArgs.get('sys-name', sysname)
         
         # The process ID of the supervisor process
         self.procSupId =  pu.get_process_id(self.spawnArgs.get('sup-id', None))
@@ -93,18 +93,16 @@ class BaseProcess(object):
         self.receivers[key] = receiver
     
     @defer.inlineCallbacks
-    def spawn(self, childproc=None):
+    def spawn(self):
         """
-        Spawns either this process using the process' receiver or a child
-        process. Self spawn can only be called once per instance.
+        Spawns this process using the process' receiver. Self spawn can
+        only be called once per instance.
+        @note this method is not called when spawned by magnet
         """
-        if childproc:
-            pass
-        else:
-            assert not self.receiver.spawned, "Process already spawned"
-            self.id = yield spawn(self.receiver)
-            logging.debug('spawn()='+str(self.id))
-            defer.returnValue(self.id)
+        assert not self.receiver.spawned, "Process already spawned"
+        self.id = yield spawn(self.receiver)
+        logging.debug('spawn()='+str(self.id))
+        defer.returnValue(self.id)
 
     def is_spawned(self):
         return self.receiver.spawned != None
@@ -221,28 +219,24 @@ class BaseProcess(object):
         convid = headers.get('conv-id', None)
         return self.conversations(convid, None)
 
-    def get_local_name(self, name):
-        """
-        Returns a name that is qualified by the system name. System name is
-        the ID of the container that bootstrapped all other processes
-        """
-        return self.sysName + "." + name
-
-    def get_group_name(self, name):
-        """
-        Returns a name that is qualified by a configured group name.
-        """
-        return CF_container_group + "." + name
-
     def get_scoped_name(self, scope, name):
         """
-        Returns a name that is scoped.
-        @param scope  one of "local", "group" or "global"
+        Returns a name that is scoped. Local=Name prefixed by container id.
+        System=Name prefixed by system name, ie id of root process's container.
+        Global=Name unchanged.
+        @param scope  one of "local", "system" or "global"
         @param name name to be scoped
         """
-        if scope == 'local': return self.get_local_name(name)
-        if scope == 'group': return self.get_group_name(name)
-        return  name
+        scoped_name = name
+        if scope == 'local':
+            scoped_name =  str(Container.id) + "." + name
+        elif scope == 'system':
+            scoped_name =  self.sysName + "." + name
+        elif scope == 'global':
+            pass
+        else:
+            assert 0, "Unknown scope: "+scope
+        return  scoped_name
     
     # OTP style functions for working with processes and modules/apps
     
@@ -366,7 +360,8 @@ class ProtocolFactory(ProtocolFactory):
         if not spawnArgs:
             spawnArgs = {}
         #logging.debug("ProtocolFactory.build(name=%s, args=%s)" % (self.name,spawnArgs))
-        receiver = self.receiver(spawnArgs.get('proc-name',self.name))
+        receiver = self.receiver(spawnArgs.get('proc-name', self.name))
+        receiver.group = self.name
         instance = self.processClass(receiver, spawnArgs)
         receiver.procinst = instance
         return receiver

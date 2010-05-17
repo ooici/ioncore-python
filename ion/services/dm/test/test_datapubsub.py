@@ -183,7 +183,7 @@ class DataConsumer(BaseProcess):
             logging.info("op_data: Finished data process")
             if res:
                 for (topic, msg) in res:
-                    yield self.send(self.get_local_name(topic), 'data', msg, {})
+                    yield self.send(self.get_scoped_name('system',topic), 'data', msg, {})
 
 class DataProcess(object):
     

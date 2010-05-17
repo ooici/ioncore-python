@@ -83,13 +83,12 @@ def _set_container_args(contargs=None):
     ioninit.cont_args['_args'] = contargs
     if contargs:
         logging.info('Evaluating and setting container args: '+str(contargs))
-        if contargs.startswith('{}'):
+        if contargs.startswith('{'):
             try:
                 # Evaluate args and expect they are dict as str
                 evargs = eval(contargs)
-                logging.info('Evaluating args: '+str(evargs))
                 if type(evargs) is dict:
-                    ioninit.update(evargs)
+                    ioninit.cont_args.update(evargs)
             except Exception, e:
                 logging.error('Invalid argument format: ', e)
         else:
@@ -107,9 +106,9 @@ def declare_messaging(messagingCfg, cgroup=None):
         msgName = name
         if scope == 'local':
             msgName = Container.id + "." + msgName
-        if scope == 'group':
-            group = cgroup if cgroup else CONF['container_group']
-            msgName =  group + "." + msgName
+        elif scope == 'system':
+            # @todo: in the root bootstrap this is ok, but HACK
+            msgName = Container.id + "." + msgName
 
         # declare queues, bindings as needed
         logging.info("Messaging name config: name="+msgName+', '+str(msgResource))
@@ -145,6 +144,7 @@ def spawn_processes(procs, sup=None):
             supname = "supervisor."+str(sup_seq)
         sup = BaseProcess()
         sup.receiver.label = supname
+        sup.receiver.group = supname
         supId = yield sup.spawn()
         yield base_process.procRegistry.put(supname, str(supId))
         sup_seq += 1

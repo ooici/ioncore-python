@@ -18,6 +18,8 @@ from ion.services.base_service import BaseService
 class WorkerProcess(BaseService):
     """Worker process
     """
+    # Declaration of service
+    declare = BaseService.service_declare(name='worker', version='0.1.0', dependencies=[])
 
     @defer.inlineCallbacks
     def slc_init(self):

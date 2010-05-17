@@ -31,9 +31,9 @@ class DataPubsubService(BaseService):
         AMQP topic notion. A topic is basically a data stream.
         """
         topic_name = content['topic_name']
-        topic = {topic_name:{'name_type':'fanout', 'args':{'scope':'local'}}}
+        topic = {topic_name:{'name_type':'fanout', 'args':{'scope':'system'}}}
         yield bootstrap.declare_messaging(topic)
-        qtopic_name = self.get_scoped_name('local',topic_name)
+        qtopic_name = self.get_scoped_name('system',topic_name)
         yield self.topics.put (topic_name, topic[topic_name])
         yield self.reply(msg, 'result', {'topic_name':qtopic_name}, {})
 
@@ -63,7 +63,7 @@ class DataPubsubService(BaseService):
         headers = content['msg_headers']
         op = content['msg_op']
         msg = content['msg']
-        qtopic = self.get_scoped_name('local',topic_name)
+        qtopic = self.get_scoped_name('system',topic_name)
         # Todo: impersonate message as from sender
         yield self.send(qtopic, op, msg, headers)
 
