@@ -1,15 +1,24 @@
 ==================================================
-LCAARCH - OOI Release 1 LCA architecture prototype
+LCAarch - OOI Release 1 LCA architecture prototype
 ==================================================
 
-April 2010
+April 2010 - May 2010
 
-This project defines the services of the OOI release 1 system with their
-architectural dependencies.
+This project provides a service framwork and auxilliary functions for running
+architecturally complete, but functionally limited versions of all the
+services of the OOI release 1 system with their full architectural dependencies.
+
+The "core" part of LCAarch provides base classes and a framework for spawnable,
+message communicating processes, for services with defined names, for
+bootstrapping the system, for managing logging and configuration etc.
+
+For more information, plese see:
+http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project
 
 This project and relies on selected external packages, such as Magnet, etc.
+LCAarch is compatible with Python 2.5 and higher, but not Python 3.x
 
-Get it with
+Get LCAarch with
 ::
     git clone git@amoeba.ucsd.edu:lcaarch.git
 
@@ -18,7 +27,7 @@ Usage
 
 (all subsequent steps assume start from lcaarch/ dir)
 
-Start CC ("Magnet" Python Capability Container) shell with:
+Start empty CC ("Magnet" Python Capability Container) shell with:
 ::
     twistd -n magnet -h amoeba.ucsd.edu
 
@@ -46,8 +55,8 @@ Install the dependencies: Magnet (see Magnet's Readme)
 Recommendation:
     Create a virtualenv for installing Magnet and its dependencies.
 
-Twisted Python
---------------
+Twisted Framework
+-----------------
 ::
     easy_install twisted
 
@@ -55,6 +64,11 @@ txAMQP
 ------
 ::
     easy_install txamqp
+
+SimpleJSON (only when running Python2.5)
+----------------------------------------
+::
+    easy_install simplejson
 
 carrot (use txamqp branch)
 ----------------------
