@@ -25,10 +25,6 @@ class MockLoopProvisionerService(BaseService):
     """Provisioner service for "mockloop" setup
     """
 
-    ############################################################################
-    # LIFECYCLE ETC
-    ############################################################################
-
     # Declaration of service
     declare = BaseService.service_declare(name='provisioner', version='0.1.0', dependencies=[])
 
@@ -40,10 +36,6 @@ class MockLoopProvisionerService(BaseService):
         
         self.looping_call = LoopingCall(self._move_states)
         self.looping_call.start(2.0)
-
-    ############################################################################
-    # OPERATION INTAKE
-    ############################################################################
 
     def op_provision(self, content, headers, msg):
         """Service operation: Provision a taskable resource
@@ -65,11 +57,6 @@ class MockLoopProvisionerService(BaseService):
         """
         logging.error("cannot terminate yet")
         
-        
-    ############################################################################
-    # MOCK PROVISIONER IMPL
-    ############################################################################
-
     def _move_states(self):
         # in future will be per-instance, provided by provisioner client
         sa_instance = "sensor_aggregator"
