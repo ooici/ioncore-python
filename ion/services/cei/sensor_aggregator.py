@@ -18,7 +18,7 @@ logging.debug('Loaded: '+__name__)
 class SensorAggregatorService(BaseService):
     """SensorAggregator service interface
     """
-    declare = BaseService.service_declare(name='epu_controller', version='0.1.0', dependencies=[])
+    declare = BaseService.service_declare(name='sensor_aggregator', version='0.1.0', dependencies=[])
 
     @defer.inlineCallbacks
     def op_provisioner_iaas_info(self, content, headers, msg):
