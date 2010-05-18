@@ -62,11 +62,13 @@ class MockLoopProvisionerService(BaseService):
         sa_instance = "sensor_aggregator"
         
         for (launch_id, instance_dict) in self.tracker.iteritems():
-            logging.info("checking launch ID '%s'" % launch_id)
             for instance_id in instance_dict.keys():
-                if instance_dict[instance_id] > 5:
+                if instance_dict[instance_id] == 6:
                     logging.info("'%s' instance: '%s'" % (instance_id, STATES[instance_dict[instance_id]]))
-                else:
+                    # moving to 7 means it won't show up again in logging
+                    instance_dict[instance_id] += 1
+                    
+                elif instance_dict[instance_id] < 6:
                     current = STATES[instance_dict[instance_id]]
                     instance_dict[instance_id] += 1
                     newstate = STATES[instance_dict[instance_id]]
