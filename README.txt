@@ -49,6 +49,20 @@ Run trial test cases (recursively)
     trial ion.core
     trial ion.services.coi.test.test_resource_registry
 
+A good learning example is the HelloService
+::
+    trial ion.play.test.test_hello
+
+Or in the CC shell:
+><>
+    from ion.play import hello_service
+    spawn(hello_service)
+    send(1, {'op':'hello','content':'Hello you there!'})
+
+    from ion.play.hello_service import HelloServiceClient
+    hc = HelloServiceClient() 
+    hc.hello()
+
 
 Install the dependencies: Magnet (see Magnet's Readme)
 ======================================================
@@ -77,14 +91,13 @@ carrot (use txamqp branch)
     (cd carrot; git checkout -b txamqp origin/txamqp)
     (cd carrot; python setup.py install)
 
-Install the Magnet package [NEED Magent 0.3.3]:
------------------------------------------------
+Install the Magnet package [NEED Magent 0.3.4] (use master branch)
+------------------------------------------------------------------
 Get the latest version of the repository, if you haven't already.
 ::
     git clone git://amoeba.ucsd.edu/magnet.git # no ooi credential
     # OR
     git clone git@amoeba.ucsd.edu:magnet.git # need ooi credential
-    (cd magnet; git checkout -b space origin/space)
     (cd magnet; python setup.py install)
 
 
@@ -92,7 +105,7 @@ Note:
 =====
 This project dependes closely on magnet. Whenever you do a "git pull" on
 this project, there is a chance that you need to update and install magnet
-again (see above). Please review the branch logs for any cues.
+again (see above). Please review the branch logs for any hints.
 
 
 ---------------------------------------------------------------------------
@@ -119,6 +132,7 @@ Change log:
 - Less verbose trace output for process init messages and changes to other
   trace output as well.
 - Changed BaseServiceClient and tests. Initializer arguments different.
+- Using master branch of magnet now
 2010-05-10:
 - Based on entries in config files, service process modules are sought and
   loaded in order to collect the service process declarations. This enables
