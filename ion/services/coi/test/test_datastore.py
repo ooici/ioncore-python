@@ -116,6 +116,25 @@ class DatastoreServiceTest(IonTestCase):
 
         res3 = yield osc.put('key1','value2')
         logging.info('Result3 put: '+str(res3))
-
-        res4 = yield osc.put('key2','value1')
+        
+        res4 = yield osc.put('key1','value3',res3)
         logging.info('Result4 put: '+str(res4))
+
+        res5 = yield osc.put('key2','value1')
+        logging.info('Result5 put: '+str(res5))
+
+        parents=set()
+        parents.add(res4)
+        parents.add(res5)
+
+        res6 = yield osc.put('key1','value3',parents)
+        logging.info('Result6 put: '+str(res6))
+
+        res7 = yield osc.put('key1','value9',(res6,res4))
+        logging.info('Result7 put: '+str(res7))
+
+        res8 = yield osc.put('key1','value10',[res6,res7])
+        logging.info('Result8 put: '+str(res8))
+
+
+
