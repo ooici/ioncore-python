@@ -62,7 +62,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         "ptca2": 0.0,
         "ptcb0": 0.0,
         "ptcb1": 0.0,
-        "ptcb2": 0.0
+        "ptcb2": 0.0,
     }
     __instrumentCommands = (
         "setdefaults",
@@ -86,15 +86,14 @@ class SBE49InstrumentAgent(InstrumentAgent):
         for key in content:
             response[key] = self.__instrumentParameters.get(key)
         print 'responding with: ', response
-        
+
     def op_set(self,content, headers, msg):
         print 'in set with content: ', content
         for key in content:
             print 'setting ', self.__instrumentParameters[key], ' to ', \
                 content[key]
             self.__instrumentParameters[key] = content[key]
-            
-    
+
     def op_getLifecycleState(self, content, headers, msg):
         print 'lifecycleState is: ', self.lifecycleState
     
@@ -120,7 +119,7 @@ factory = ProtocolFactory(SBE49InstrumentAgent)
 Someday the driver may inherit from a common (RS-232?) object if there is a need...
 """
 
-class SBE49InstrumentDriver():
+class SBE49InstrumentDriver(object):
     def fetch_param(param):
         """
         operate in instrument protocol to get parameter

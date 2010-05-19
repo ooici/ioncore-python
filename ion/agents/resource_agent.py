@@ -9,7 +9,7 @@
 
 from ion.core.base_process import BaseProcess
 from ion.services.coi.resource_registry import ResourceLCState
-   
+
 class ResourceAgent(BaseProcess):
     """Base class for agent processes
     If you are going to write a new agent process, start here.

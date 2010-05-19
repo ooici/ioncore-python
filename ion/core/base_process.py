@@ -65,7 +65,7 @@ class BaseProcess(object):
         self.sysName = self.spawnArgs.get('sys-name', sysname)
         
         # The process ID of the supervisor process
-        self.procSupId =  pu.get_process_id(self.spawnArgs.get('sup-id', None))
+        self.procSupId = pu.get_process_id(self.spawnArgs.get('sup-id', None))
 
         if not receiver:
             receiver = Receiver(self.procName)
@@ -101,7 +101,7 @@ class BaseProcess(object):
         """
         assert not self.receiver.spawned, "Process already spawned"
         self.id = yield spawn(self.receiver)
-        logging.debug('spawn()='+str(self.id))
+        logging.debug('spawn()=' + str(self.id))
         defer.returnValue(self.id)
 
     def is_spawned(self):
@@ -186,7 +186,8 @@ class BaseProcess(object):
         
     def _prepare_message(self, headers):
         msgheaders = {}
-        if headers: msgheaders.update(headers)
+        if headers:
+            msgheaders.update(headers)
         if not 'conv-id' in msgheaders:
             convid = self._create_convid()
             msgheaders['conv-id'] = convid
