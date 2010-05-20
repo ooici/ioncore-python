@@ -8,12 +8,6 @@
 import logging
 from twisted.internet import defer
 
-from magnet.spawnable import Receiver
-#from magnet.spawnable import send
-
-#from ion.agents.resource_agent import lifecycleStates
-#from ion.agents.resource_agent import ResourceAgent
-
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+ __name__)
 
@@ -167,7 +161,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         response = {}
         for key in content:
             response[key] = self.__driver.fetch_param(key)
-        yield self.reply_message(msg, 'get', response, {})
+        yield self.reply(msg, 'get', response, {})
     
     @defer.inlineCallbacks    
     def op_set(self, content, headers, msg):
@@ -179,7 +173,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         for key in content:
             self.__driver.set_param(key, content[key])
         # Exception will bubble up if there is one, otherwise report success
-        yield self.reply_message(msg, 'set', content, {})
+        yield self.reply(msg, 'set', content, {})
     
     @defer.inlineCallbacks
     def op_getLifecycleState(self, content, headers, msg):
@@ -187,9 +181,8 @@ class SBE49InstrumentAgent(InstrumentAgent):
         Query the lifecycle state of the object
         @return Message with the lifecycle state
         """
-        yield self.reply_message(msg, 'getLifecycleState',
-                                 self.lifecycleState, {})
-    
+        yield self.reply(msg, 'getLifecycleState', self.lifecycleState, {})
+        
     @defer.inlineCallbacks
     def op_setLifecycleState(self, content, headers, msg):
         """
@@ -197,7 +190,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         @return Message with the lifecycle state that was set
         """
         self.lifecycleState = content
-        yield self.reply_message(msg, 'setLifecycleState', content, {})
+        yield self.reply(msg, 'setLifecycleState', content, {})
     
     @defer.inlineCallbacks
     def op_execute(self, content, headers, msg):
@@ -206,7 +199,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         message including output of command, or simple ACK that command
         was executed.
         """
-        yield self.reply_message(msg, 'execute', self.__driver.execute(content), {})
+        yield self.reply(msg, 'execute', self.__driver.execute(content), {})
     
     @defer.inlineCallbacks
     def op_getStatus(self, content, headers, msg):
@@ -221,8 +214,9 @@ class SBE49InstrumentAgent(InstrumentAgent):
         Obtain a list of capabilities that this instrument has. This is
         simply a command and parameter list at this point
         """
-        yield self.reply_message(msg, 'getCapabilties', {'commands': instrumentCommands,
+        yield self.reply(msg, 'getCapabilties',
+                         {'commands': instrumentCommands,
                           'parameters': instrumentParameters}, {})
-    
+
 # Spawn of the process using the module name
 factory = ProtocolFactory(SBE49InstrumentAgent)

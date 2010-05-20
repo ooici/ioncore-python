@@ -14,14 +14,13 @@ import logging
 from twisted.python import log
 from twisted.internet import defer
 
-from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
-from magnet.store import Store
+from ion.data.store import Store
+from ion.services.base_service import BaseServiceClient
 from ion.test.iontest import IonTestCase
-from ion.core.base_process import RpcClient
+from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 from ion.agents.instrumentagents.SBE49 import instrumentCommands as IAcommands
 from ion.agents.instrumentagents.SBE49 import instrumentParameters as IAparameters
+from ion.agents.instrumentagents.SBE49 import SBE49InstrumentAgent as SBE49IA
 
 import ion.util.procutils as pu
 
@@ -33,24 +32,19 @@ class TestInstrumentAgent(IonTestCase):
     def setUp(self):
         IonTestCase.setUp(self)
         self.store = yield Store()
-        yield self._startContainer()
-        self.rpc = RpcClient()
-        yield self.rpc.attach()
+        yield self._start_container()
         
-        # Setup a store and register a test instrument
-        yield self.store.put('test_instrument', id)
+        # Start an instrument agent and client (for the RPC)
+        self.instrumentAgent = yield SBE49IA()
+        self.svc_id = yield self.instrumentAgent.spawn()
+        self.IAClient = InstrumentAgentClient()
+        self.client_id = yield self.IAClient.spawn()
 
-        svc_mod = __import__('ion.agents.instrumentagents.SBE49', globals(),
-                             locals(), ['SBE49InstrumentAgent'])
-
-        # Spawn instance of a service
-        self.svc_id = yield spawn(svc_mod)
-    
-        yield self.store.put('SBE49InstrumentAgent', self.svc_id)
+        yield self.store.put('testSBE49InstrumentAgent', self.svc_id)
         
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stopContainer()
+        yield self._stop_container()
 
     @defer.inlineCallbacks
     def testGetSBE49Capabilities(self):
@@ -58,7 +52,10 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability to gather capabilities from the SBE49 instrument
         capabilities
         """
-        (content, headers, message) = yield self.rpc.rpc_send(self.svc_id, 'getCapabilities')
+        (content, headers, message) = \
+         yield self.IAClient.rpc_send(self.svc_id,
+                                      'getCapabilities',
+                                      (), {})
         self.assert_(set(IAcommands) == set(content['commands']))
         self.assert_(set(IAparameters) == set(content['parameters']))
         
@@ -68,30 +65,32 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability of the SBE49 driver to send and receive get, set,
         and other messages. Best called as RPC message pairs.
         """
-        (content, headers, message) = yield self.rpc.rpc_send(self.svc_id, 'get',
-                                                              ('baudrate', 'outputformat'), {})
+        (content, headers, message) = \
+         yield self.IAClient.rpc_send(self.svc_id, 'get', ('baudrate',
+                                                           'outputformat'), {})
         self.assertEqual(content, {'baudrate' : 9600,
                                    'outputformat' : 0})
-        (content, headers, message) = yield self.rpc.rpc_send(self.svc_id, 'set',
-                                                              {'baudrate': 19200,
-                                                               'outputformat': 1}, {})
+        (content, headers, message) = \
+         yield self.IAClient.rpc_send(self.svc_id, 'set', {'baudrate': 19200,
+                                                           'outputformat': 1}, {})
         self.assertEqual(content, {'baudrate' : 19200,
                                    'outputformat' : 1})
-        (content, headers, message) = yield self.rpc.rpc_send(self.svc_id, 'get',
-                                                              ('baudrate',
-                                                               'outputformat'), {})
-        self.assertEqual(content, {'baudrate' : 19200,
-                                   'outputformat' : 1})       
+        (content, headers, message) = \
+         yield self.IAClient.rpc_send(self.svc_id, 'get', ('baudrate',
+                                                           'outputformat'), {})
+        self.assertEqual(content, {'baudrate' : 19200, 'outputformat' : 1})       
         
-        (content, headers, message) = yield self.rpc.rpc_send(self.svc_id, 'setLifecycleState',
-                                                              'undeveloped', {})
+        (content, headers, message) = \
+         yield self.IAClient.rpc_send(self.svc_id, 'setLifecycleState', 
+                                      'undeveloped', {})
         self.assertEqual(content, 'undeveloped')       
-        (content, headers, message) = yield self.rpc.rpc_send(self.svc_id, 'getLifecycleState',
-                                                              '', {})
+        (content, headers, message) = \
+         yield self.IAClient.rpc_send(self.svc_id, 'getLifecycleState', '', {})
         self.assertEqual(content, 'undeveloped')       
-        (content, headers, message) = yield self.rpc.rpc_send(self.svc_id, 'setLifecycleState',
-                                                              'developed', {})
+        (content, headers, message) = \
+         yield self.IAClient.rpc_send(self.svc_id, 'setLifecycleState',
+                                      'developed', {})
         self.assertEqual(content, 'developed')       
-        (content, headers, message) = yield self.rpc.rpc_send(self.svc_id, 'getLifecycleState',
-                                                              '', {})
+        (content, headers, message) = \
+         yield self.IAClient.rpc_send(self.svc_id, 'getLifecycleState', '', {})
         self.assertEqual(content, 'developed')       
