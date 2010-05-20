@@ -1,2 +1,4 @@
+recursive-include ion *
+recursive-include res *
 include *.txt Doxyfile 
 recursive-include lcaarch *.ini
