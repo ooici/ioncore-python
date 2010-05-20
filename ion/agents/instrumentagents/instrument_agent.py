@@ -5,21 +5,19 @@ from twisted.internet import defer
 from magnet.spawnable import spawn
 
 from ion.agents.resource_agent import ResourceAgent
+from ion.core.base_process import BaseProcess
 from ion.core.base_process import ProtocolFactory
 
 
 class InstrumentAgent(ResourceAgent):
     """
-    TODO: Add class description
+    The base class for developing Instrument Agents. This defines
+    the interface to use for an instrumen agent.
     """
 
     def op_get(self, content, headers, msg):
         """
         """
-        print 'in get'
-        print 'headers = ', headers
-        print 'content = ', content
-        print 'msg = ', msg
 
     def op_set(self, content, headers, msg):
         """
@@ -44,6 +42,15 @@ class InstrumentAgent(ResourceAgent):
     def op_getCapabilities(self, content, headers, msg):
         """
         """
+
+class InstrumentAgentClient(BaseProcess):
+    """
+    The base class for an Instrument Agent Client. It is a service
+    that allows for RPC messaging
+    """
+    def __init__(self):
+        BaseProcess.__init__(self)
+    
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(InstrumentAgent)

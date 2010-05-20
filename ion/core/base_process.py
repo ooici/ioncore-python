@@ -40,7 +40,7 @@ class BaseProcess(object):
     have a unique identifier. Each process has one main process receiver and can
     define additional receivers as needed. This base class provides a lot of
     mechanics for developing processes, such as sending and receiving messages.
-    
+
     @todo tighter integration with Spawnable
     """
     # Conversation ID counter
@@ -59,29 +59,29 @@ class BaseProcess(object):
 
         # Name (human readable label) of this process.
         self.procName = self.spawnArgs.get('proc-name', __name__)
-        
+
         # The system unique ID; propagates from root supv to all child procs
         sysname = ioninit.cont_args.get('sysname', Container.id)
         self.sysName = self.spawnArgs.get('sys-name', sysname)
-        
+
         # The process ID of the supervisor process
-        self.procSupId =  pu.get_process_id(self.spawnArgs.get('sup-id', None))
+        self.procSupId = pu.get_process_id(self.spawnArgs.get('sup-id', None))
 
         if not receiver:
             receiver = Receiver(self.procName)
         self.receiver = receiver
         receiver.handle(self.receive)
-        
+
         # Dict of all receivers of this process. Key is the name
         self.receivers = {}
         self.add_receiver(self.receiver)
-        
+
         # Dict of converations.
         # @todo: make sure this is garbage collected once in a while
         self.conversations = {}
         # Conversations by conv-id for currently outstanding RPCs
         self.rpc_conv = {}
-        
+
         # List of ProcessDesc instances of defined and spawned child processes
         self.child_procs = []
 
@@ -91,7 +91,7 @@ class BaseProcess(object):
     def add_receiver(self, receiver):
         key = receiver.name
         self.receivers[key] = receiver
-    
+
     @defer.inlineCallbacks
     def spawn(self):
         """
@@ -101,12 +101,12 @@ class BaseProcess(object):
         """
         assert not self.receiver.spawned, "Process already spawned"
         self.id = yield spawn(self.receiver)
-        logging.debug('spawn()='+str(self.id))
+        logging.debug('spawn()=' + str(self.id))
         defer.returnValue(self.id)
 
     def is_spawned(self):
         return self.receiver.spawned != None
-    
+
     @defer.inlineCallbacks
     def op_init(self, content, headers, msg):
         """
@@ -139,7 +139,7 @@ class BaseProcess(object):
             # @todo error case: no ack
             d.callback(res)
             msg.ack()
-        else:       
+        else:
             logging.info('BaseProcess: Message received, dispatching...')
             convid = payload.get('conv-id', None)
             conv = self.conversations.get(convid, None) if convid else None
@@ -183,16 +183,17 @@ class BaseProcess(object):
 
         yield pu.send(self.receiver, send, recv, operation,
                               content, msgheaders)
-        
+
     def _prepare_message(self, headers):
         msgheaders = {}
-        if headers: msgheaders.update(headers)
+        if headers:
+            msgheaders.update(headers)
         if not 'conv-id' in msgheaders:
             convid = self._create_convid()
             msgheaders['conv-id'] = convid
             self.conversations[convid] = Conversation()
         return msgheaders
-        
+
     def _create_convid(self):
         # Returns a new unique conversation id
         send = self.receiver.spawned.id.full
@@ -200,7 +201,7 @@ class BaseProcess(object):
         convid = "#" + str(BaseProcess.convIdCnt)
         #convid = send + "#" + BaseProcess.convIdCnt
         return convid
-        
+
     def reply(self, msg, operation, content, headers=None):
         """
         Replies to a given message, continuing the ongoing conversation
@@ -214,7 +215,7 @@ class BaseProcess(object):
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
             self.send(pu.get_process_id(recv), operation, content, headers)
-            
+
     def get_conversation(self, headers):
         convid = headers.get('conv-id', None)
         return self.conversations(convid, None)
@@ -237,9 +238,9 @@ class BaseProcess(object):
         else:
             assert 0, "Unknown scope: "+scope
         return  scoped_name
-    
+
     # OTP style functions for working with processes and modules/apps
-    
+
     @defer.inlineCallbacks
     def spawn_child(self, childproc, init=True):
         """
@@ -259,7 +260,7 @@ class BaseProcess(object):
 
     def link_child(self, supervisor):
         pass
-    
+
     def spawn_link(self, childproc, supervisor):
         pass
 
@@ -365,4 +366,3 @@ class ProtocolFactory(ProtocolFactory):
         instance = self.processClass(receiver, spawnArgs)
         receiver.procinst = instance
         return receiver
-    

@@ -55,7 +55,7 @@ class CassandraStore():
         @retval None
         """
         logging.info('writing key %s value %s' % (key, value))
-        self._kvs.insert(key, {'value' : value})
+        self._kvs.insert(key, {'value':value})
         logging.info('write complete')
 
     def query(self, regex):

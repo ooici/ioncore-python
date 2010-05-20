@@ -87,10 +87,13 @@ class DatastoreClient(BaseServiceClient):
     def put(self, key, value, parents=None):
         yield self._check_init()
         cont = {'key':str(key), 'value':value}
-        if parents and parents is list:
-            cont['parents'] = basedon
+
+        # Parents can be a string id, a list of strings, a tuple of strings or a set of strings.
+        if type(parents) is set:
+            cont['parents'] = list(parents)
         elif parents:
             cont['parents'] = [parents]
+            
         (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'put', cont)
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content))

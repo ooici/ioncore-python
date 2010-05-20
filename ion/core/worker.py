@@ -6,7 +6,8 @@
 @brief service for registering exchange names
 """
 
-import logging, time
+import logging
+import time
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
