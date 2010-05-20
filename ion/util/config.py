@@ -7,11 +7,13 @@
 """
 
 class Config(object):
-    """Helper class managing config files
+    """
+    Helper class managing config files
     """
 
     def __init__(self, cfgFile, config=None):
-        """Creates a new Config for retrieving configuration
+        """
+        @brief Creates a new Config for retrieving configuration
         @param cfgFile filename or key within Config
         @param config if present, a Config instance for which the value given
             by cfgFile will be extracted
@@ -30,12 +32,12 @@ class Config(object):
 
     def getObject(self):
         return self.obj
-    
+
     def _getValue(self, dic, key, default=None):
         if dic == None:
             return None
         return dic.get(key,default)
-        
+
     def getValue(self, key, default=None):
         return self._getValue(self.obj, key, default)
 

@@ -1,20 +1,12 @@
 #!/usr/bin/env python
 
-from twisted.python import log
 from twisted.internet import defer
 
-from magnet.spawnable import Receiver
-from magnet.spawnable import send
 from magnet.spawnable import spawn
 
 from ion.agents.resource_agent import ResourceAgent
 from ion.core.base_process import ProtocolFactory
 
-@defer.inlineCallbacks
-def start():
-    id = yield spawn(receiver)
-    # For now we're just storing the service id w/in an in-memory store
-    store.put('instrument_agent', id)
 
 class InstrumentAgent(ResourceAgent):
     """

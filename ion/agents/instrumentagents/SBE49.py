@@ -164,12 +164,9 @@ class SBE49InstrumentAgent(InstrumentAgent):
         React to a request for parameter values,
         @return A reply message containing a dictionary of name/value pairs
         """
-        logging.debug('In op_get with received content: ' + str(content))
         response = {}
         for key in content:
             response[key] = self.__driver.fetch_param(key)
-
-        logging.debug('returning response: %s', str(response))
         yield self.reply_message(msg, 'get', response, {})
     
     @defer.inlineCallbacks    
@@ -179,7 +176,6 @@ class SBE49InstrumentAgent(InstrumentAgent):
         @return Message with a list of settings
         that were changed and what their new values are upon success.
         """
-        logging.debug('In op_set with content: ' + str(content))
         for key in content:
             self.__driver.set_param(key, content[key])
         # Exception will bubble up if there is one, otherwise report success

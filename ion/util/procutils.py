@@ -6,57 +6,74 @@
 @brief  utility helper functions for processes in capability containers
 """
 
-import sys, traceback, re
+import sys
+import traceback
+import re
+from datetime import datetime
+import time
 import logging
-from twisted.python import log
 from twisted.internet import defer, reactor
 from magnet.container import Id
-from magnet.store import Store
+
+from ion.data.store import Store
 
 def log_exception(msg=None, e=None):
-    """Logs a recently caught exception and prints traceback
+    """
+    Logs a recently caught exception and prints traceback
     """
     if msg and e:
-        logging.error(msg + " " + repr(e))
+        logging.error("%s %r" % (msg, e))
     elif msg:
         logging.error(msg)
     (etype, value, trace) = sys.exc_info()
     traceback.print_tb(trace)
 
 def log_attributes(obj):
-    """Print an object's attributes
+    """
+    Print an object's attributes
     """
     lstr = ""
     for attr, value in obj.__dict__.iteritems():
         lstr = lstr + str(attr) + ": " +str(value) + ", "
     logging.info(lstr)
 
-def log_message(proc, body, msg):
-    """Log an incoming message with all headers
+def log_message(msg):
     """
-    #mkeys = sorted(msg.__dict__.keys)
-    mkeys = msg.__dict__.keys().sort()
+    Log an incoming message with all headers unless quiet attribute set.
+    @param msg  carrot BaseMessage instance
+    """
+    body = msg.payload
     lstr = ""
-    lstr += "===Message=== RECEIVED @" + str(proc) + "\n"
-    amqpm = str(msg._amqp_message)
-    # Cut out the redundant or encrypted AMQP body to make log shorter
-    amqpm = re.sub("body='(\\\\'|[^'])*'","*BODY*", amqpm)
-    lstr += '---AMQP--- ' + amqpm
-    lstr += "\n---CARROT--- "
-    for attr,value in msg.__dict__.iteritems():
-        if attr == '_amqp_message': pass
-        elif attr == 'body': pass
-        elif attr == '_decoded_cache': pass
+    procname = str(body.get('receiver',None))
+    lstr += "===Message=== receiver=%s op=%s" % (procname, body.get('op', None))
+    if body.get('quiet', False):
+        lstr += " (Q)"
+    else:
+        amqpm = str(msg._amqp_message)
+        # Cut out the redundant or encrypted AMQP body to make log shorter
+        amqpm = re.sub("body='(\\\\'|[^'])*'","*BODY*", amqpm)
+        lstr += '\n---AMQP--- ' + amqpm
+        lstr += "\n---CARROT--- "
+        for attr in sorted(msg.__dict__.keys()):
+            value = msg.__dict__.get(attr)
+            if attr == '_amqp_message' or attr == 'body' or attr == '_decoded_cache':
+                pass
+            else:
+                lstr += "%s=%r, " % (attr, value)
+        lstr += "\n---HEADERS--- "
+        mbody = dict(body)
+        content = mbody.pop('content')
+        for attr in sorted(mbody.keys()):
+            value = mbody.get(attr)
+            lstr += "%s=%r, " % (attr, value)
+        lstr += "\n---CONTENT---\n"
+        if type(content) is dict:
+            for attr in sorted(content.keys()):
+                value = content.get(attr)
+                lstr += "%s=%r, " % (attr, value)
         else:
-            lstr += str(attr) + ": " +str(value) + ", "
-    lstr += "\n---HEADERS--- "
-    mbody = {}
-    mbody.update(body)
-    content = mbody.pop('content')
-    lstr += str(mbody)
-    lstr += "\n---CONTENT---\n"
-    lstr += str(content)
-    lstr += "\n============="
+            lstr += repr(content)
+        lstr += "\n============="
     logging.info(lstr)
 
 def get_process_id(long_id):
@@ -72,69 +89,78 @@ def get_process_id(long_id):
     return procId
 
 @defer.inlineCallbacks
-def send_message(receiver, send, recv, operation, content, headers):
-    """Constructs a standard message with standard headers
+def send(receiver, send, recv, operation, content, headers=None):
+    """
+    Constructs a standard message with standard headers and sends on given
+    receiver.
 
     @param operation the operation (performative) of the message
     @param headers dict with headers that may override standard headers
     """
     msg = {}
     # The following headers are FIPA ACL Message Format based
+    # Exchange name of sender, receiver, reply-to
     msg['sender'] = str(send)
     msg['receiver'] = str(recv)
     msg['reply-to'] = str(send)
+    # Wire form encoding, such as 'json', 'fudge', 'XDR', 'XML', 'custom'
     msg['encoding'] = 'json'
+    # Language of the format specification
     msg['language'] = 'ion1'
+    # Identifier of a registered format specification (i.e. message schema)
     msg['format'] = 'raw'
+    # Ontology associated with the content of the message
     msg['ontology'] = ''
+    # Conversation instance id
     msg['conv-id'] = ''
+    # Conversation type id
     msg['protocol'] = ''
+    msg['ts'] = str(currenttime_ms())
     #msg['reply-with'] = ''
     #msg['in-reply-to'] = ''
     #msg['reply-by'] = ''
-    msg.update(headers)
+    # Sender defined headers are updating the default headers set above.
+    if headers:
+        msg.update(headers)
+    # Operation of the message, aka performative, verb, method
     msg['op'] = operation
+    # The actual content
     msg['content'] = content
-    logging.info("Send message op="+operation+" to="+str(recv))
+    #logging.debug("Send message op="+operation+" to="+str(recv))
     try:
         yield receiver.send(recv, msg)
     except StandardError, e:
         log_exception("Send error: ", e)
     else:
-        logging.info("Message sent!")
+        logging.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
 
-def dispatch_message(content, msg, dispatchIn):
+def dispatch_message(payload, msg, dispatchIn, conv=None):
     """
-    content - content can be anything (list, tuple, dictionary, string, int, etc.)
-
-    For this implementation, 'content' will be a dictionary:
-    content = {
+    Dispatches a message by operation in a given class.
+    Expected message content:
+    body = {
         "op": "operation name here",
-        "content": ('arg1', 'arg2')
+        "content": # Any valid type here (str, list, dict)
     }
     """
     try:
-        log_message(__name__, content, msg)
+        log_message(msg)
 
-        if "op" in content:
-            op = content['op']
-            logging.info('dispatch_message() OP=' + str(op))
-
-            cont = content.get('content','')
+        if "op" in payload:
+            op = payload['op']
+            content = payload.get('content','')
             opname = 'op_' + str(op)
 
-            # dynamically invoke the operation
+            # dynamically invoke the operation in the given class
             if hasattr(dispatchIn, opname):
-                # getattr(dispatchIn, opname)(cont, content, msg)
                 opf = getattr(dispatchIn, opname)
-                return defer.maybeDeferred(opf, cont, content, msg)
-            elif hasattr(dispatchIn,'op_noop_catch'):
-                #dispatchIn.op_noop_catch(cont, content, msg)
-                return defer.maybeDeferred(dispatchIn.op_noop_catch, cont, content, msg)
+                return defer.maybeDeferred(opf, content, payload, msg)
+            elif hasattr(dispatchIn,'op_none'):
+                return defer.maybeDeferred(dispatchIn.op_none, content, payload, msg)
             else:
                 logging.error("Receive() failed. Cannot dispatch to catch")
         else:
-            logging.error("Invalid message. No 'op' header", content)
+            logging.error("Invalid message. No 'op' in header", payload)
     except StandardError, e:
         log_exception('Exception while dispatching: ',e)
 
@@ -168,7 +194,7 @@ def get_class(qualclassname, mod=None):
         mod = get_module(qualmodname)
 
     cls = getattr(mod, clsname)
-    logging.debug('Class: '+str(cls))
+    #logging.debug('Class: '+str(cls))
     return cls
 
 get_modattr = get_class
@@ -180,15 +206,28 @@ def get_module(qualmodname):
     """
     package = qualmodname.rpartition('.')[0]
     modname = qualmodname.rpartition('.')[2]
-    logging.info('get_module: from '+qualmodname+' import '+modname)
+    #logging.info('get_module: from '+package+' import '+modname)
     mod = __import__(qualmodname, globals(), locals(), [modname])
-    logging.debug('Module: '+str(mod))
+    #logging.debug('Module: '+str(mod))
     return mod
 
 def asleep(secs):
     d = defer.Deferred()
     reactor.callLater(secs, d.callback, None)
     return d
+
+def currenttime():
+    """
+    @retval current UTC time as float with seconds in epoch and fraction
+    """
+    now = datetime.utcnow()
+    return time.mktime(now.timetuple()) + now.microsecond / 1000000.0
+
+def currenttime_ms():
+    """
+    @retval current UTC time as int with milliseconds in epoch
+    """
+    return int(currenttime() * 1000)
     
 # Stuff for testing: Stubs, mock objects
 fakeStore = Store()
@@ -220,6 +259,7 @@ class FakeReceiver(object):
     def __init__(self, id=None):
         self.payload = None
         self.spawned = FakeSpawnable()
+        self.group = 'fake'
 
     @defer.inlineCallbacks
     def send(self, to, msg):

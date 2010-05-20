@@ -11,7 +11,7 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory, RpcClient
+from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class InstrumentRegistryService(BaseService):
@@ -28,6 +28,10 @@ class InstrumentRegistryService(BaseService):
     def op_define_agent(self, content, headers, msg):
         """Service operation: Create or update instrument or platform agent
         and register with an instrument or platform.
+        """
+
+    def op_register_agent_instance(self, content, headers, msg):
+        """Service operation: .
         """
 
     def op_define_platform(self, content, headers, msg):

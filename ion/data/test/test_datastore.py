@@ -39,6 +39,12 @@ class DatastoreTest(unittest.TestCase):
         # Hmm, simplest op, just looking for exceptions
         self.ds.put(self.key, self.value)
 
+    def test_delete(self):
+        self.ds.put(self.key, self.value)
+        self.ds.delete(self.key)
+        rc = self.ds.get(self.key)
+        self.failUnlessEqual(rc, None)
+
     def test_put_get_delete(self):
         # Write, then read to verify same
         self.ds.put(self.key, self.value)

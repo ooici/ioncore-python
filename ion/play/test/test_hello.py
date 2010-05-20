@@ -6,14 +6,12 @@
 @brief test service for registering resources and client classes
 """
 
-import logging, time
-from twisted.internet import defer
-from twisted.trial import unittest
-from magnet.spawnable import spawn
+import logging
 
-from ion.play.hello_service import *
+from twisted.internet import defer
+
+from ion.play.hello_service import HelloServiceClient
 from ion.test.iontest import IonTestCase
-import ion.util.procutils as pu
 
 class HelloTest(IonTestCase):
     """Testing service classes of resource registry
@@ -21,27 +19,20 @@ class HelloTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._startContainer()
+        yield self._start_container()
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stopContainer()
+        yield self._stop_container()
 
     @defer.inlineCallbacks
     def test_hello(self):
-       
+
         services = [
             {'name':'hello1','module':'ion.play.hello_service','class':'HelloService'},
         ]
-        
-        yield self._spawnProcesses(services)
-        
-        sup = yield self.procRegistry.get("bootstrap")
-        logging.info("Supervisor: "+repr(sup))
 
-        hsid = yield self.procRegistry.get("hello1")
-        logging.info("Hello service process 1: "+repr(hsid))
+        sup = yield self._spawn_processes(services)
 
-        hc = HelloServiceClient()
-        yield hc.attach()
-        res = yield hc.hello(hsid,"Hi there, hello1")
+        hc = HelloServiceClient(sup)
+        res = yield hc.hello("Hi there, hello1")

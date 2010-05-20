@@ -13,22 +13,30 @@ from twisted.trial import unittest
 from ion.services.coi.service_registry import *
 from ion.test.iontest import IonTestCase
 
-
-
 class ServiceRegistryClientTest(IonTestCase):
-    """Testing client classes of service registry
+    """
+    Testing client classes of service registry
     """
     
     @defer.inlineCallbacks
     def setUp(self):
-        IonTestCase.setUp(self)
-        yield self._startContainer()
-        yield self._startCoreServices()
+        yield self._start_container()
+        self.sup = yield self._start_core_services()
 
     @defer.inlineCallbacks
     def tearDown(self):
-        IonTestCase.tearDown(self)
-        yield self._stopContainer()
+        yield self._stop_container()
     
-    def test_serviceReg(self):
-        src = None
+    @defer.inlineCallbacks
+    def test_service_reg(self):
+        sd1 = ServiceDesc(name='svc1')
+        
+        c = ServiceRegistryClient(self.sup)
+        res1 = yield c.register_service(sd1)
+
+        si1 = ServiceInstanceDesc(xname=self.sup.id.full, svc_name='svc1')
+        ri1 = yield c.register_service_instance(si1)
+
+        ri2 = yield c.get_service_instance_name('svc1')
+        self.assertEqual(ri2, self.sup.id.full)
+        

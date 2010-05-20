@@ -26,6 +26,7 @@ class CassandraStore():
         """
         if not cass_host_list:
             logging.info('Connecting to Cassandra on localhost...')
+        else:
             logging.info('Connecting to Cassandra at "%s"...' % str(cass_host_list))
         client = pycassa.connect(cass_host_list)
         self._kvs = pycassa.ColumnFamily(client, 'Datasets', 'Catalog')
@@ -54,7 +55,7 @@ class CassandraStore():
         @retval None
         """
         logging.info('writing key %s value %s' % (key, value))
-        self._kvs.insert(key, {'value' : value})
+        self._kvs.insert(key, {'value':value})
         logging.info('write complete')
 
     def query(self, regex):

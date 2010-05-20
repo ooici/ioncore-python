@@ -13,7 +13,7 @@ from twisted.internet import defer
 
 from magnet import container
 from magnet.container import Id
-from magnet.store import Store
+from ion.data.store import Store
 
 from ion.core import base_process, bootstrap
 from ion.core import ioninit
@@ -23,33 +23,42 @@ class IonTestCase(unittest.TestCase):
     """
     Extension of python unittest.TestCase and trial unittest.TestCase for the
     purposes of supporting ION tests with a container/AMQP based execution
-    environment
+    environment.
+    Use this as a base case for your unit tests, e.g.
+     class DatastoreTest(IonTestCase):
     """
 
     procRegistry = base_process.procRegistry
 
     @defer.inlineCallbacks
-    def _startContainer(self):
+    def _start_container(self):
+        """
+        Starting and initialzing the container with a connection to a broker.
+        @note Hardwired to connect to amoeba for broker.
+        """
         mopt = {}
         mopt['broker_host'] = 'amoeba.ucsd.edu'
         mopt['broker_port'] = 5672
         mopt['broker_vhost'] = '/'
         mopt['boot_script'] = None
         mopt['script'] = None
- 
+
         self.cont_conn = yield container.startContainer(mopt)
         bootstrap.init_container()
         self.procRegistry = base_process.procRegistry
         logging.info("============Magnet container started, "+repr(self.cont_conn))
-    
-    _startMagnet = _startContainer
 
     @defer.inlineCallbacks
-    def _startCoreServices(self):
-        yield bootstrap.bootstrap(None, bootstrap.ion_core_services)
+    def _start_core_services(self):
+        sup = yield bootstrap.bootstrap(None, bootstrap.ion_core_services)
         logging.info("============Core ION services started============")
+        defer.returnValue(sup)
 
-    def _stopContainer(self):
+    def _stop_container(self):
+        """
+        Taking down the container's connection to the broker an preparing for
+        reinitialization.
+        """
         logging.info("Closing ION container")
         self.cont_conn.transport.loseConnection()
         container.Container._started = False
@@ -57,12 +66,16 @@ class IonTestCase(unittest.TestCase):
         bootstrap.reset_container()
         logging.info("============ION container closed============")
 
-    _stopMagnet = _stopContainer
 
-    @defer.inlineCallbacks
-    def _declareMessaging(self, messaging):
-        yield bootstrap.bs_messaging(messaging)
-    
-    @defer.inlineCallbacks
-    def _spawnProcesses(self, procs):
-        yield bootstrap.bs_processes(procs)
+    def _declare_messaging(self, messaging):
+        return bootstrap.declare_messaging(messaging)
+
+    def _spawn_processes(self, procs):
+        return bootstrap.spawn_processes(procs)
+        
+    def _get_procid(self, name):
+        """
+        @param name  process instance label given when spawning
+        @retval process id of the process (locally) identified by name
+        """
+        return self.procRegistry.get(name)
