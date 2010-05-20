@@ -17,11 +17,77 @@ from magnet.spawnable import Receiver
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+ __name__)
 
-from ion.agents.instrument_agents.instrument_agent import InstrumentAgent
+from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 from ion.core.base_process import ProtocolFactory
 
-class SBE49InstrumentAgent(InstrumentAgent):
 
+instrumentCommands = (
+    "setdefaults",
+    "start",
+    "stop",
+    "pumpon",
+    "pumpoff",
+    "getsample",
+    "test_temperature_converted",
+    "test_conductivity_converted",
+    "test_pressure_converted",
+    "test_temperature_raw",
+    "test_conductivity_raw",
+    "test_pressure_raw"
+)
+
+"""
+Maybe some day these values are looked up from a registry of common
+controlled vocabulary
+"""
+instrumentParameters = (    
+    "baudrate",
+    "outputformat",
+    "outputsal",
+    "outputsv",
+    "navg",
+    "mincondfreq",
+    "pumpdelay",
+    "tadvance",
+    "alpha",
+    "tau",
+    "autorun",
+    "tcaldate",
+    "ta0",
+    "ta1",
+    "ta2",
+    "ta3",
+    "toffset",
+    "ccaldate",
+    "cg",
+    "ch",
+    "ci",
+    "cj",
+    "cpcor",
+    "ctcor",
+    "cslope",
+    "pcaldate",
+    "prange",
+    "poffset",
+    "pa0",
+    "pa1",
+    "pa2",
+    "ptempa0",
+    "ptempa1",
+    "ptempa2",
+    "ptca0",
+    "ptca1",
+    "ptca2",
+    "ptcb0",
+    "ptcb1",
+    "ptcb2"
+)
+
+"""
+Someday the driver may inherit from a common (RS-232?) object if there is a need...
+"""
+
+class SBE49InstrumentDriver():
     """
     Maybe some day these values are looked up from a registry of common
         controlled vocabulary
@@ -68,21 +134,30 @@ class SBE49InstrumentAgent(InstrumentAgent):
         "ptcb1": 0.0,
         "ptcb2": 0.0
     }
-    __instrumentCommands = (
-        "setdefaults",
-        "start",
-        "stop",
-        "pumpon",
-        "pumpoff",
-        "getsample",
-        "test_temperature_converted",
-        "test_conductivity_converted",
-        "test_pressure_converted",
-        "test_temperature_raw",
-        "test_conductivity_raw",
-        "test_pressure_raw"
-        )
+    
+    def fetch_param(self, param):
+        """
+        operate in instrument protocol to get parameter
+        """
+        return self.__instrumentParameters[param]
+    
+    def set_param(self, param, value):
+        """
+        operate in instrument protocol to set a parameter
+        """
+        self.__instrumentParameters[param] = value
+        return {param: value}
+    
+    def execute(self, command):
+        """
+        Execute the given command
+        """
+        return (1, command)
+        
+class SBE49InstrumentAgent(InstrumentAgent):
 
+    __driver = SBE49InstrumentDriver()
+    
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
         """
@@ -92,7 +167,9 @@ class SBE49InstrumentAgent(InstrumentAgent):
         logging.debug('In op_get with received content: ' + str(content))
         response = {}
         for key in content:
-            response[key] = self.__instrumentParameters.get(key)
+            response[key] = self.__driver.fetch_param(key)
+
+        logging.debug('returning response: %s', str(response))
         yield self.reply_message(msg, 'get', response, {})
     
     @defer.inlineCallbacks    
@@ -104,7 +181,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         """
         logging.debug('In op_set with content: ' + str(content))
         for key in content:
-            self.__instrumentParameters[key] = content[key]
+            self.__driver.set_param(key, content[key])
         # Exception will bubble up if there is one, otherwise report success
         yield self.reply_message(msg, 'set', content, {})
     
@@ -133,6 +210,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         message including output of command, or simple ACK that command
         was executed.
         """
+        yield self.reply_message(msg, 'execute', self.__driver.execute(content), {})
     
     @defer.inlineCallbacks
     def op_getStatus(self, content, headers, msg):
@@ -147,28 +225,8 @@ class SBE49InstrumentAgent(InstrumentAgent):
         Obtain a list of capabilities that this instrument has. This is
         simply a command and parameter list at this point
         """
-        return_content = {'commands': __instrumentCommands,
-                          'parameters': __instrumentParameters}
+        yield self.reply_message(msg, 'getCapabilties', {'commands': instrumentCommands,
+                          'parameters': instrumentParameters}, {})
     
 # Spawn of the process using the module name
 factory = ProtocolFactory(SBE49InstrumentAgent)
-
-"""
-Someday the driver may inherit from a common (RS-232?) object if there is a need...
-"""
-
-class SBE49InstrumentDriver():
-    def fetch_param(param):
-        """
-        operate in instrument protocol to get parameter
-        """
-        
-    def set_param(param, value):
-        """
-        operate in instrument protocol to set a parameter
-        """
-        
-    def execute(command):
-        """
-        Execute the given command
-        """
