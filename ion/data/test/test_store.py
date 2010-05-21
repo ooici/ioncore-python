@@ -16,12 +16,14 @@ from twisted.internet import defer
 from ion.data.store import CassandraStore
 
 class CassandraStoreTest(unittest.TestCase):
+
+    @defer.inlineCallbacks
     def setUp(self):
         logging.basicConfig(level=logging.WARN, \
                 format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
         clist = ['amoeba.ucsd.edu:9160']
         self.ds = CassandraStore(cass_host_list=clist)
-        self.ds.init()
+        yield self.ds.init()
         self.key = self._mkey()
         self.value = self._mkey()
 

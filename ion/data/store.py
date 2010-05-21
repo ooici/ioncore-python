@@ -129,10 +129,10 @@ class CassandraStore(IStore):
         """
         @brief Constructor, safe to use no arguments
         @param cass_host_list List of hostname:ports for cassandra host or cluster
-        @retval Connected object instance
+        @retval Deferred
         """
         #return defer.maybeDeferred(self._init, cass_host_list, None)
-        return self._init(self.cass_host_list)
+        return defer.succeed(self._init(self.cass_host_list))
         
 
     def get(self, key):
