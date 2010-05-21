@@ -13,7 +13,7 @@ from uuid import uuid4
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from ion.data.store import CassandraStore
+from ion.data.backends import cassandra
 
 class CassandraStoreTest(unittest.TestCase):
 
@@ -22,7 +22,7 @@ class CassandraStoreTest(unittest.TestCase):
         logging.basicConfig(level=logging.WARN, \
                 format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
         clist = ['amoeba.ucsd.edu:9160']
-        self.ds = CassandraStore(cass_host_list=clist)
+        self.ds = cassandra.CassandraStore(cass_host_list=clist)
         yield self.ds.init()
         self.key = self._mkey()
         self.value = self._mkey()
