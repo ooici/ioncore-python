@@ -43,7 +43,8 @@ class DatastoreService(BaseService):
 
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
-        """Service operation: Gets a structured object from the data store.
+        """
+        Service operation: Gets a structured object from the data store.
         Equivalent to a git-pull.
         """
         logging.info("op_get: "+str(content))
@@ -69,7 +70,7 @@ class DatastoreService(BaseService):
         """
         logging.info("op_get_ancestors: "+str(content))
         key = str(content['key'])
-        
+
         resvalues = []
         cref = yield self.os.get_commitref(key)
         ancs = yield self.os.vs.get_ancestors(cref)
@@ -93,7 +94,7 @@ class DatastoreClient(BaseServiceClient):
             cont['parents'] = list(parents)
         elif parents:
             cont['parents'] = [parents]
-            
+
         (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'put', cont)
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content))
@@ -110,10 +111,6 @@ class DatastoreDirectClient(BaseServiceClient):
     Class for the client accessing the an object store via an out-of-band
     backend technology, such as a Cassandra or Redis client.
     """
-
-
-class DatastoreServiceClient(BaseServiceClient):
-    pass
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(DatastoreService)

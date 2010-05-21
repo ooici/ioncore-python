@@ -24,40 +24,41 @@ class BaseService(BaseProcess):
     subclass must have declaration with service name and dependencies.
     """
     declare = {}
-    
+
     def __init__(self, receiver=None, spawnArgs=None):
         """
         Initializes base service. The service name is taken from the service
         declaration
         """
         BaseProcess.__init__(self, receiver, spawnArgs)
-        
-        svcname = self.declare['name']
-        assert svcname, "Service must have a declare with a valid name"
-        
-        msgName = self.get_scoped_name('system', svcname)
-        svcReceiver = Receiver(svcname+'.'+self.receiver.label, msgName)
+
+        # Determine service known messging name either from spawn args or
+        # if not given from service declaration
+        self.svc_name = self.spawnArgs.get('servicename', self.declare['name'])
+        assert self.svc_name, "Service must have a declare with a valid name"
+
+        msgName = self.get_scoped_name('system', self.svc_name)
+        svcReceiver = Receiver(self.svc_name+'.'+self.receiver.label, msgName)
         if hasattr(self.receiver, 'group'):
             svcReceiver.group = self.receiver.group
         self.svc_receiver = svcReceiver
         self.svc_receiver.handle(self.receive)
         self.add_receiver(self.svc_receiver)
-    
+
     @defer.inlineCallbacks
     def plc_init(self):
         yield self._declare_service_name()
         svcid = yield spawn(self.svc_receiver)
-        logging.info('Service registered as consumer to '+str(svcid))
+        logging.info('Service process bound to name=%s as pid=%s' % (self.svc_receiver.name, svcid))
         yield defer.maybeDeferred(self.slc_init)
 
     @defer.inlineCallbacks
     def _declare_service_name(self):
         # Ad hoc service exchange name declaration
-        svcname = self.declare['name']
-        msgName = self.get_scoped_name('system',svcname)
+        msgName = self.get_scoped_name('system', self.svc_name)
         messaging = {'name_type':'worker', 'args':{'scope':'system'}}
         yield Container.configure_messaging(msgName, messaging)
-    
+
     def slc_init(self):
         """
         Service life cycle event: initialization of service process. This is
@@ -102,7 +103,7 @@ class BaseServiceClient(object):
         """
         assert svcname or svcpid, "Need either service name or process-id"
         self.svcname = svcname
-        self.svc = svcpid            
+        self.svc = svcpid
         if not proc:
             proc = BaseProcess()
         self.proc = proc
