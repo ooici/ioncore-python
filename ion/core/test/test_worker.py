@@ -28,22 +28,12 @@ class WorkerTest(IonTestCase):
         yield self._stop_container()
 
     @defer.inlineCallbacks
-    def _test_basic(self):
-        workers = [
-            {'name':'hello','module':'ion.services.hello_service','class':'HelloService'},
-            {'name':'hello1','module':'ion.services.hello_service','class':'HelloService'},
-            {'name':'hello2','module':'ion.services.hello_service','class':'HelloService'},
-        ]
-
-        yield self._spawn_processes(workers)
-
-    @defer.inlineCallbacks
     def test_worker_queue(self):
         messaging = {'worker1':{'name_type':'worker', 'args':{'scope':'local'}}}
 
         workers = [
-            {'name':'workerProc1','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'worker1','scope':'local'}},
-            {'name':'workerProc2','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'worker1','scope':'local'}},
+            {'name':'workerProc1','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'worker1','scope':'system'}},
+            {'name':'workerProc2','module':'ion.core.worker','class':'WorkerProcess','spawnargs':{'service-name':'worker1','scope':'system'}},
         ]
 
         yield self._declare_messaging(messaging)
@@ -57,9 +47,9 @@ class WorkerTest(IonTestCase):
 
         wq_name = Container.id + ".worker1"
         for i in range(1,11):
-            yield wc.submit_work(wq_name, i, 1)
+            yield wc.submit_work(wq_name, i, 0.5)
 
-        yield pu.asleep(10)
+        yield pu.asleep(7)
         logging.info("Work results: "+str(wc.workresult))
         logging.info("Worker results: "+str(wc.worker))
 
@@ -88,9 +78,9 @@ class WorkerTest(IonTestCase):
 
         wq_name = Container.id + ".fanout1"
         for i in range(1,6):
-            yield wc.submit_work(wq_name, i, 1)
+            yield wc.submit_work(wq_name, i, 0.5)
 
-        yield pu.asleep(8)
+        yield pu.asleep(5)
         logging.info("Work results: "+str(wc.workresult))
         logging.info("Worker results: "+str(wc.worker))
 

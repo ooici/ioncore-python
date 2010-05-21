@@ -264,25 +264,41 @@ class BaseProcess(object):
     def spawn_link(self, childproc, supervisor):
         pass
 
+    def get_child_def(self, name):
+        """
+        @retval the ProcessDesc instance of a child process by name
+        """
+        for child in self.child_procs:
+            if child.procName == name:
+                return child
+
+    def get_child_id(self, name):
+        """
+        @retval the process id a child process by name
+        """
+        child = self.get_child_def(name)
+        return child.procId if child else None
+
 class ProcessDesc(object):
     """
     Class that encapsulates attributes about a spawnable process; can spawn
     and init processes.
     """
-    def __init__(self, procName, procMod, procClass=None, node=None, spawnArgs=None):
+#    def __init__(self, name, module, procClass=None, node=None, spawnargs=None):
+    def __init__(self, **kwargs):
         """
         Initializes ProcessDesc instance with process attributes
-        @param procName  name label of process
-        @param procMod  module name of process module
-        @param procClass  class name in process module (optional)
+        @param name  name label of process
+        @param module  module name of process module
+        @param class  or procclass is class name in process module (optional)
         @param node  ID of container to spawn process on (optional)
-        @param spawnArgs  dict of additional spawn arguments (optional)
+        @param spawnargs  dict of additional spawn arguments (optional)
         """
-        self.procName = procName
-        self.procModule = procMod
-        self.procClass = procClass
-        self.procNode = node
-        self.spawnArgs = spawnArgs
+        self.procName = kwargs.get('name', None)
+        self.procModule = kwargs.get('module', None)
+        self.procClass = kwargs.get('class', kwargs.get('procclass', None))
+        self.procNode = kwargs.get('node', None)
+        self.spawnArgs = kwargs.get('spawnargs', None)
         self.procId = None
         self.procState = 'DEFINED'
 

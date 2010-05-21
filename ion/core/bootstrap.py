@@ -138,8 +138,7 @@ def spawn_processes(procs, sup=None):
     global sup_seq
     children = []
     for procDef in procs:
-        spawnArgs = procDef.get('spawnargs', None)
-        child = ProcessDesc(procDef['name'], procDef['module'], procDef['class'], None, spawnArgs)
+        child = ProcessDesc(**procDef)
         children.append(child)
 
     if not sup:

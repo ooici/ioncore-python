@@ -32,7 +32,7 @@ class CCAgent(ResourceAgent):
         self.ann_name = self.get_scoped_name('system', annName)
         self.start_time = pu.currenttime_ms()
         self.containers = {}
-        
+
         # Declare CC announcement name
         messaging = {'name_type':'fanout', 'args':{'scope':'system'}}
         yield Container.configure_messaging(self.ann_name, messaging)
@@ -47,7 +47,7 @@ class CCAgent(ResourceAgent):
         annid = yield spawn(self.ann_receiver)
         logging.info("Listening to CC anouncements: "+str(annid))
 
-        # Start with an identify request. Will lead to an announce by myself        
+        # Start with an identify request. Will lead to an announce by myself
         yield self.send(self.ann_name, 'identify', 'started', {'quiet':True})
 
     @defer.inlineCallbacks
@@ -76,7 +76,7 @@ class CCAgent(ResourceAgent):
         elif event == 'terminate':
             del self.containers[contid]
         logging.info("op_announce(): Know about %s containers!" % (len(self.containers)))
-        
+
 
     @defer.inlineCallbacks
     def op_identify(self, content, headers, msg):
@@ -92,7 +92,7 @@ class CCAgent(ResourceAgent):
         Service operation: spawns a local module
         """
         procMod = str(content['module'])
-        child = ProcessDesc(procMod.rpartition('.')[2], procMod)
+        child = ProcessDesc(name=procMod.rpartition('.')[2], procclass=procMod)
         pid = yield self.spawn_child(child)
         yield self.reply(msg, 'result', {'status':'OK', 'process-id':str(pid)})
 

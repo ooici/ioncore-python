@@ -24,24 +24,22 @@ from ion.agents.instrumentagents.SBE49 import SBE49InstrumentAgent as SBE49IA
 
 import ion.util.procutils as pu
 
-logging.basicConfig(level=logging.DEBUG)
-
 class TestInstrumentAgent(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        IonTestCase.setUp(self)
-        self.store = yield Store()
         yield self._start_container()
-        
-        # Start an instrument agent and client (for the RPC)
-        self.instrumentAgent = yield SBE49IA()
-        self.svc_id = yield self.instrumentAgent.spawn()
-        self.IAClient = InstrumentAgentClient()
-        self.client_id = yield self.IAClient.spawn()
 
-        yield self.store.put('testSBE49InstrumentAgent', self.svc_id)
-        
+        # Start an instrument agent
+        processes = [
+            {'name':'testSBE49IA','module':'ion.agents.instrumentagents.SBE49'},
+        ]
+        sup = yield self._spawn_processes(processes)
+        svc_id = sup.get_child_id('testSBE49IA')
+
+        # Start a client (for the RPC)
+        self.IAClient = InstrumentAgentClient(proc=sup, target=svc_id)
+
     @defer.inlineCallbacks
     def tearDown(self):
         yield self._stop_container()
@@ -53,12 +51,10 @@ class TestInstrumentAgent(IonTestCase):
         capabilities
         """
         (content, headers, message) = \
-         yield self.IAClient.rpc_send(self.svc_id,
-                                      'getCapabilities',
-                                      (), {})
+         yield self.IAClient.rpc_send('getCapabilities', ())
         self.assert_(set(IAcommands) == set(content['commands']))
         self.assert_(set(IAparameters) == set(content['parameters']))
-        
+
     @defer.inlineCallbacks
     def testGetSetSBE49Params(self):
         """
@@ -66,31 +62,33 @@ class TestInstrumentAgent(IonTestCase):
         and other messages. Best called as RPC message pairs.
         """
         (content, headers, message) = \
-         yield self.IAClient.rpc_send(self.svc_id, 'get', ('baudrate',
-                                                           'outputformat'), {})
+            yield self.IAClient.rpc_send('get', ('baudrate','outputformat'))
         self.assertEqual(content, {'baudrate' : 9600,
                                    'outputformat' : 0})
+
         (content, headers, message) = \
-         yield self.IAClient.rpc_send(self.svc_id, 'set', {'baudrate': 19200,
-                                                           'outputformat': 1}, {})
+            yield self.IAClient.rpc_send('set', {'baudrate': 19200,
+                                                 'outputformat': 1})
         self.assertEqual(content, {'baudrate' : 19200,
                                    'outputformat' : 1})
+
         (content, headers, message) = \
-         yield self.IAClient.rpc_send(self.svc_id, 'get', ('baudrate',
-                                                           'outputformat'), {})
-        self.assertEqual(content, {'baudrate' : 19200, 'outputformat' : 1})       
-        
+            yield self.IAClient.rpc_send('get', ('baudrate', 'outputformat'))
+        self.assertEqual(content, {'baudrate' : 19200,
+                                   'outputformat' : 1})
+
         (content, headers, message) = \
-         yield self.IAClient.rpc_send(self.svc_id, 'setLifecycleState', 
-                                      'undeveloped', {})
-        self.assertEqual(content, 'undeveloped')       
+            yield self.IAClient.rpc_send('setLifecycleState', 'undeveloped')
+        self.assertEqual(content, 'undeveloped')
+
         (content, headers, message) = \
-         yield self.IAClient.rpc_send(self.svc_id, 'getLifecycleState', '', {})
-        self.assertEqual(content, 'undeveloped')       
+            yield self.IAClient.rpc_send('getLifecycleState', '')
+        self.assertEqual(content, 'undeveloped')
+
         (content, headers, message) = \
-         yield self.IAClient.rpc_send(self.svc_id, 'setLifecycleState',
-                                      'developed', {})
-        self.assertEqual(content, 'developed')       
+            yield self.IAClient.rpc_send('setLifecycleState', 'developed')
+        self.assertEqual(content, 'developed')
+
         (content, headers, message) = \
-         yield self.IAClient.rpc_send(self.svc_id, 'getLifecycleState', '', {})
-        self.assertEqual(content, 'developed')       
+        yield self.IAClient.rpc_send('getLifecycleState', '')
+        self.assertEqual(content, 'developed')
