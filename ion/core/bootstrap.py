@@ -28,8 +28,8 @@ CONF = ioninit.config(__name__)
 ion_messaging = {}
 
 # Static definition of service names
+cc_agent = Config(CONF.getValue('ccagent_cfg')).getObject()
 ion_core_services = Config(CONF.getValue('coreservices_cfg')).getObject()
-ion_services = Config(CONF.getValue('services_cfg')).getObject()
 
 # Messaging names
 nameRegistry = Store()
@@ -100,7 +100,7 @@ def _set_container_args(contargs=None):
                 ioninit.cont_args[k.strip()] = v.strip()
         else:
             ioninit.cont_args['args'] = contargs
-            
+
 @defer.inlineCallbacks
 def declare_messaging(messagingCfg, cgroup=None):
     """
@@ -120,7 +120,7 @@ def declare_messaging(messagingCfg, cgroup=None):
         # declare queues, bindings as needed
         logging.info("Messaging name config: name="+msgName+', '+str(msgResource))
         yield Container.configure_messaging(msgName, msgResource)
-        
+
         # save name in the name registry
         yield nameRegistry.put(msgName, msgResource)
 
