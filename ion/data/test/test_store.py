@@ -2,6 +2,7 @@
 
 """
 @file ion/data/test/test_store.py
+@author Paul Hubbard
 @author Dorian Raymer
 @test Service only test of Cassandra datastore
 """

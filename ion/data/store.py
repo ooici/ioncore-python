@@ -3,6 +3,7 @@
 """
 @file ion/data/store.py
 @author Michael Meisinger
+@author Dorian Raymer 
 @brief base interface for all key-value stores in the system and default
         in memory implementation
 """
