@@ -13,7 +13,7 @@ from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
 from ion.core import base_process
-from ion.core.base_process import BaseProcess
+from ion.core.base_process import BaseProcess, BaseProcessClient
 import ion.util.procutils as pu
 
 class BaseService(BaseProcess):
@@ -24,40 +24,41 @@ class BaseService(BaseProcess):
     subclass must have declaration with service name and dependencies.
     """
     declare = {}
-    
+
     def __init__(self, receiver=None, spawnArgs=None):
         """
         Initializes base service. The service name is taken from the service
         declaration
         """
         BaseProcess.__init__(self, receiver, spawnArgs)
-        
-        svcname = self.declare['name']
-        assert svcname, "Service must have a declare with a valid name"
-        
-        msgName = self.get_scoped_name('system', svcname)
-        svcReceiver = Receiver(svcname+'.'+self.receiver.label, msgName)
+
+        # Determine service known messging name either from spawn args or
+        # if not given from service declaration
+        self.svc_name = self.spawnArgs.get('servicename', self.declare['name'])
+        assert self.svc_name, "Service must have a declare with a valid name"
+
+        msgName = self.get_scoped_name('system', self.svc_name)
+        svcReceiver = Receiver(self.svc_name+'.'+self.receiver.label, msgName)
         if hasattr(self.receiver, 'group'):
             svcReceiver.group = self.receiver.group
         self.svc_receiver = svcReceiver
         self.svc_receiver.handle(self.receive)
         self.add_receiver(self.svc_receiver)
-    
+
     @defer.inlineCallbacks
     def plc_init(self):
         yield self._declare_service_name()
         svcid = yield spawn(self.svc_receiver)
-        logging.info('Service registered as consumer to '+str(svcid))
+        logging.info('Service process bound to name=%s as pid=%s' % (self.svc_receiver.name, svcid))
         yield defer.maybeDeferred(self.slc_init)
 
     @defer.inlineCallbacks
     def _declare_service_name(self):
         # Ad hoc service exchange name declaration
-        svcname = self.declare['name']
-        msgName = self.get_scoped_name('system',svcname)
+        msgName = self.get_scoped_name('system', self.svc_name)
         messaging = {'name_type':'worker', 'args':{'scope':'system'}}
         yield Container.configure_messaging(msgName, messaging)
-    
+
     def slc_init(self):
         """
         Service life cycle event: initialization of service process. This is
@@ -85,7 +86,7 @@ class BaseService(BaseProcess):
         decl.update(kwargs)
         return decl
 
-class BaseServiceClient(object):
+class BaseServiceClient(BaseProcessClient):
     """
     This is the base class for service client libraries. Service client libraries
     can be used from any process or standalone (in which case they spawn their
@@ -93,34 +94,3 @@ class BaseServiceClient(object):
     can perform client side optimizations (such as caching and transformation
     of certain service results).
     """
-    def __init__(self, svcname=None, proc=None, svcpid=None):
-        """
-        Initializes a service client
-        @param svc  service name (globally known name)
-        @param proc a BaseProcess instance as originator of requests
-        @param svcpid  target exchange name (service process id or name)
-        """
-        assert svcname or svcpid, "Need either service name or process-id"
-        self.svcname = svcname
-        self.svc = svcpid            
-        if not proc:
-            proc = BaseProcess()
-        self.proc = proc
-
-    @defer.inlineCallbacks
-    def _check_init(self):
-        """
-        Called in client methods to ensure that there exists a spawned process
-        to send messages from
-        """
-        if not self.proc.is_spawned():
-            yield self.proc.spawn()
-        if not self.svc:
-            assert self.svcname, 'Must hace svcname to access service'
-            svcid = self.proc.get_scoped_name('system', self.svcname)
-            #svcid = yield base_process.procRegistry.get(self.svcname)
-            self.svc = str(svcid)
-
-    @defer.inlineCallbacks
-    def attach(self):
-        yield self.proc.spawn()

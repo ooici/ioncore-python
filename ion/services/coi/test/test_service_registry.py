@@ -17,7 +17,7 @@ class ServiceRegistryClientTest(IonTestCase):
     """
     Testing client classes of service registry
     """
-    
+
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -26,12 +26,12 @@ class ServiceRegistryClientTest(IonTestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         yield self._stop_container()
-    
+
     @defer.inlineCallbacks
     def test_service_reg(self):
         sd1 = ServiceDesc(name='svc1')
-        
-        c = ServiceRegistryClient(self.sup)
+
+        c = ServiceRegistryClient(proc=self.sup)
         res1 = yield c.register_service(sd1)
 
         si1 = ServiceInstanceDesc(xname=self.sup.id.full, svc_name='svc1')
@@ -39,4 +39,3 @@ class ServiceRegistryClientTest(IonTestCase):
 
         ri2 = yield c.get_service_instance_name('svc1')
         self.assertEqual(ri2, self.sup.id.full)
-        

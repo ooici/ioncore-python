@@ -10,14 +10,15 @@ import logging
 
 from twisted.trial import unittest
 from twisted.internet import defer
-
 from magnet import container
 from magnet.container import Id
-from ion.data.store import Store
 
-from ion.core import base_process, bootstrap
+from ion.core import base_process, bootstrap, ioninit
 from ion.core import ioninit
+from ion.data.store import Store
 import ion.util.procutils as pu
+
+CONF = ioninit.config(__name__)
 
 class IonTestCase(unittest.TestCase):
     """
@@ -37,9 +38,9 @@ class IonTestCase(unittest.TestCase):
         @note Hardwired to connect to amoeba for broker.
         """
         mopt = {}
-        mopt['broker_host'] = 'amoeba.ucsd.edu'
-        mopt['broker_port'] = 5672
-        mopt['broker_vhost'] = '/'
+        mopt['broker_host'] = CONF['broker_host']
+        mopt['broker_port'] = CONF['broker_port']
+        mopt['broker_vhost'] = CONF['broker_vhost']
         mopt['boot_script'] = None
         mopt['script'] = None
 
@@ -72,7 +73,7 @@ class IonTestCase(unittest.TestCase):
 
     def _spawn_processes(self, procs):
         return bootstrap.spawn_processes(procs)
-        
+
     def _get_procid(self, name):
         """
         @param name  process instance label given when spawning
