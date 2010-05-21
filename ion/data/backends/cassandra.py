@@ -1,36 +1,52 @@
 #!/usr/bin/env python
 
 """
-@file ion/data/cassandrads.py
+@file ion/data/backends/cassandra.py
 @author Michael Meisinger
-@author Paul Hubbard
-@brief client interface for storing and retrieving stateful data objects.
-@note Depends on pycassa being installed and the instance on amoeba being up.
+@author Dorian Raymer 
+@brief Implementation of ion.data.store.IStore using pycassa to interface a
+Cassandra datastore backend
 """
 
-import logging
 import re
+import logging
+
+
+from twisted.internet import defer
 
 import pycassa
 
-class CassandraStore():
+from ion.data import store
+
+
+class CassandraStore(store.IStore):
     """
     Store interface for interacting with the Cassandra key/value store
     @see http://github.com/vomjom/pycassa
     """
     def __init__(self, cass_host_list=None):
-        """
-        @brief Constructor, safe to use no arguments
-        @param cass_host_list List of hostname:ports for cassandra host or cluster
-        @retval Connected object instance
-        """
+        self.kvs=None
+        self.cass_host_list = cass_host_list
+
+    def _init(self, cass_host_list):
         if not cass_host_list:
             logging.info('Connecting to Cassandra on localhost...')
         else:
             logging.info('Connecting to Cassandra at "%s"...' % str(cass_host_list))
         client = pycassa.connect(cass_host_list)
-        self._kvs = pycassa.ColumnFamily(client, 'Datasets', 'Catalog')
+        self.kvs = pycassa.ColumnFamily(client, 'Datasets', 'Catalog')
         logging.info('connected OK.')
+        return True
+
+    def init(self):
+        """
+        @brief Constructor, safe to use no arguments
+        @param cass_host_list List of hostname:ports for cassandra host or cluster
+        @retval Deferred
+        """
+        #return defer.maybeDeferred(self._init, cass_host_list, None)
+        return defer.succeed(self._init(self.cass_host_list))
+        
 
     def get(self, key):
         """
@@ -38,13 +54,14 @@ class CassandraStore():
         @param Key Cassandra key
         @retval Value from the ion dictionary, or None
         """
+        value = None
         try:
-            val = self._kvs.get(key)
+            val = self.kvs.get(key)
             logging.info('Key "%s":"%s"' % (key, val))
-            return(val['value'])
-        except:
+            value = val['value'] #this could fail if insert did it wrong
+        except pycassa.NotFoundException:
             logging.info('Key "%s" not found' % key)
-            return(None)
+        return defer.succeed(value)
 
     def put(self, key, value):
         """
@@ -55,8 +72,9 @@ class CassandraStore():
         @retval None
         """
         logging.info('writing key %s value %s' % (key, value))
-        self._kvs.insert(key, {'value':value})
+        self.kvs.insert(key, {'value':value})
         logging.info('write complete')
+        return defer.succeed(None)
 
     def query(self, regex):
         """
@@ -66,15 +84,11 @@ class CassandraStore():
         @note Uses get_range generator of unknown efficiency.
         """
         matched_list = []
-        try:
-            klist = self._kvs.get_range()
-            for x in klist:
-                if re.search(regex, x[0]):
-                    matched_list.append(x)
-            return(matched_list)
-        except:
-            logging.error('Unable to find any keys')
-            return None
+        klist = self.kvs.get_range()
+        for x in klist:
+            if re.search(regex, x[0]):
+                matched_list.append(x)
+        return defer.succeed(matched_list)
 
     def delete(self, key):
         """
@@ -83,7 +97,12 @@ class CassandraStore():
         @retval None
         @note Deletes are lazy, so key may still be visible for some time.
         """
-        try:
-            self._kvs.remove(key)
-        except:
-            logging.warn('Error removing key')
+        # Only except on specific exceptions. 
+        #try:
+        #    self.kvs.remove(key)
+        #except: # Bad to except on anything and not re-raise!!
+        #    logging.warn('Error removing key')
+        #    return defer.fail()
+        self.kvs.remove(key)
+        return defer.succeed(None)
+
