@@ -34,5 +34,5 @@ class HelloTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
 
-        hc = HelloServiceClient(sup)
+        hc = HelloServiceClient(proc=sup)
         res = yield hc.hello("Hi there, hello1")

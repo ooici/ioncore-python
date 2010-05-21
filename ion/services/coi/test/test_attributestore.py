@@ -38,7 +38,7 @@ class DatastoreServiceTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
 
-        asc1 = AttributeStoreClient(sup, svcname='as1')
+        asc1 = AttributeStoreClient(proc=sup, targetname='as1')
 
         res1 = yield asc1.put('key1','value1')
         logging.info('Result1 put: '+str(res1))
@@ -55,7 +55,7 @@ class DatastoreServiceTest(IonTestCase):
         res5 = yield asc1.get('non_existing')
         self.assertEqual(res5, None)
 
-        asc2 = AttributeStoreClient(sup, svcname='as2')
+        asc2 = AttributeStoreClient(proc=sup, targetname='as2')
 
         resx1 = yield asc2.get('key1')
         self.assertEqual(resx1, None)

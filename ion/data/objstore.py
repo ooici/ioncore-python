@@ -17,9 +17,7 @@ import logging
 from twisted.internet import defer
 
 from ion.data.dataobject import DataObject
-from ion.data.cassandrads import CassandraStore
 from ion.data.store import Store
-from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
 
 

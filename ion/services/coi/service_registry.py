@@ -38,7 +38,7 @@ class ServiceRegistryService(BaseService):
         logging.info('op_register_service: '+str(svcdesc))
 
         yield self.datastore.put(svcdesc['name'],svcdesc)
-        yield self.reply(msg, 'result', {'status':'ok'})        
+        yield self.reply(msg, 'result', {'status':'ok'})
 
     def op_get_service_desc(self, content, headers, msg):
         """
@@ -49,7 +49,7 @@ class ServiceRegistryService(BaseService):
     @defer.inlineCallbacks
     def op_register_instance(self, content, headers, msg):
         """
-        Service operation: 
+        Service operation:
         """
         svcinstdesc = content['svcinst_desc'].copy()
         logging.info('op_register_instance: '+str(svcinstdesc))
@@ -78,25 +78,27 @@ class ServiceRegistryClient(BaseServiceClient):
     finding and accessing any other services. This client knows how to find the
     service registry
     """
-    def __init__(self, proc=None, pid=None):
-        BaseServiceClient.__init__(self, "service_registry", proc, pid)
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "service_registry"
+        BaseServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def register_service(self, svc):
         yield self._check_init()
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'register_service',
+        (content, headers, msg) = yield self.rpc_send('register_service',
                         {'svc_desc':svc.encode()})
 
     @defer.inlineCallbacks
     def register_service_instance(self, svc_inst):
         yield self._check_init()
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'register_instance',
+        (content, headers, msg) = yield self.rpc_send('register_instance',
                         {'svcinst_desc':svc_inst.encode()})
 
     @defer.inlineCallbacks
     def get_service_instance(self, service_name):
         yield self._check_init()
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'get_instance',
+        (content, headers, msg) = yield self.rpc_send('get_instance',
                         {'svc_name': service_name})
         defer.returnValue(content['svcinst_desc'])
 

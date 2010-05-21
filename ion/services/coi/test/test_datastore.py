@@ -74,12 +74,12 @@ class DatastoreSvcMockTest(unittest.TestCase):
         self.assertEqual(vo2.identity,rv1[1]['identity'])
         self.assertEqual(vo3.identity,rv1[2]['identity'])
         self.assertEqual(vo4.identity,rv1[3]['identity'])
-        
+
         # Check get_ancestors
         ra1 = _opfix('get_ancestors',_cont('key1'))
         print "ra1=", ra1
         self.assertEqual(len(ra1),0)
-        
+
         ra15 = _opfix('get_ancestors',_cont('key15'))
         print "ra15=", ra15
         self.assertEqual(len(ra15),5)
@@ -106,7 +106,7 @@ class DatastoreServiceTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
 
-        osc = DatastoreClient(sup)
+        osc = DatastoreClient(proc=sup)
 
         res1 = yield osc.put('key1','value1')
         logging.info('Result1 put: '+str(res1))
@@ -116,7 +116,7 @@ class DatastoreServiceTest(IonTestCase):
 
         res3 = yield osc.put('key1','value2')
         logging.info('Result3 put: '+str(res3))
-        
+
         res4 = yield osc.put('key1','value3',res3)
         logging.info('Result4 put: '+str(res4))
 
@@ -135,6 +135,3 @@ class DatastoreServiceTest(IonTestCase):
 
         res8 = yield osc.put('key1','value10',[res6,res7])
         logging.info('Result8 put: '+str(res8))
-
-
-

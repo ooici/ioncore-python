@@ -96,8 +96,10 @@ class DatastoreClient(BaseServiceClient):
     """
     Class for the client accessing the object store service via ION Exchange
     """
-    def __init__(self, proc=None, pid=None):
-        BaseServiceClient.__init__(self, "datastore", proc, pid)
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "datastore"
+        BaseServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def put(self, key, value, parents=None):
@@ -110,14 +112,14 @@ class DatastoreClient(BaseServiceClient):
         elif parents:
             cont['parents'] = [parents]
 
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'put', cont)
+        (content, headers, msg) = yield self.rpc_send('put', cont)
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content))
 
     @defer.inlineCallbacks
     def get(self, key):
         yield self._check_init()
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'get', {'key':str(key)})
+        (content, headers, msg) = yield self.rpc_send('get', {'key':str(key)})
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content['value']))
 

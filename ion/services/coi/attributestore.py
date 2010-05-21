@@ -80,21 +80,22 @@ class AttributeStoreClient(BaseServiceClient):
     """
     Class for the client accessing the attribute store via Exchange
     """
-    def __init__(self, proc=None, pid=None, svcname=None):
-        svcname = svcname if svcname else "attributestore"
-        BaseServiceClient.__init__(self, svcname, proc, pid)
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "attributestore"
+        BaseServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def put(self, key, value):
         yield self._check_init()
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'put', {'key':str(key), 'value':value})
+        (content, headers, msg) = yield self.rpc_send('put', {'key':str(key), 'value':value})
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content))
 
     @defer.inlineCallbacks
     def get(self, key):
         yield self._check_init()
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'get', {'key':str(key)})
+        (content, headers, msg) = yield self.rpc_send('get', {'key':str(key)})
         logging.info('Service reply: '+str(content))
         defer.returnValue(content['value'])
 

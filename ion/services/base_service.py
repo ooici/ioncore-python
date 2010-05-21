@@ -13,7 +13,7 @@ from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
 from ion.core import base_process
-from ion.core.base_process import BaseProcess
+from ion.core.base_process import BaseProcess, BaseProcessClient
 import ion.util.procutils as pu
 
 class BaseService(BaseProcess):
@@ -86,7 +86,7 @@ class BaseService(BaseProcess):
         decl.update(kwargs)
         return decl
 
-class BaseServiceClient(object):
+class BaseServiceClient(BaseProcessClient):
     """
     This is the base class for service client libraries. Service client libraries
     can be used from any process or standalone (in which case they spawn their
@@ -94,34 +94,3 @@ class BaseServiceClient(object):
     can perform client side optimizations (such as caching and transformation
     of certain service results).
     """
-    def __init__(self, svcname=None, proc=None, svcpid=None):
-        """
-        Initializes a service client
-        @param svc  service name (globally known name)
-        @param proc a BaseProcess instance as originator of requests
-        @param svcpid  target exchange name (service process id or name)
-        """
-        assert svcname or svcpid, "Need either service name or process-id"
-        self.svcname = svcname
-        self.svc = svcpid
-        if not proc:
-            proc = BaseProcess()
-        self.proc = proc
-
-    @defer.inlineCallbacks
-    def _check_init(self):
-        """
-        Called in client methods to ensure that there exists a spawned process
-        to send messages from
-        """
-        if not self.proc.is_spawned():
-            yield self.proc.spawn()
-        if not self.svc:
-            assert self.svcname, 'Must hace svcname to access service'
-            svcid = self.proc.get_scoped_name('system', self.svcname)
-            #svcid = yield base_process.procRegistry.get(self.svcname)
-            self.svc = str(svcid)
-
-    @defer.inlineCallbacks
-    def attach(self):
-        yield self.proc.spawn()

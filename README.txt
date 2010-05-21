@@ -124,7 +124,9 @@ Change log:
 - The system now looks for a local config file ionlocal.config and if exists,
   overrides entries in ion.config.
 - Test cases use the config file to determine the broker host to use. If local
-  config override exists, a different broker (e.g. localhast) can be given.
+  config override exists, a different broker (e.g. localhost) can be given.
+- Added BaseProcessClient and changed BaseServiceClient and all clients and
+  all test cases (again).
 2010-05-16:
 - Removed support for BaseProcess.send_message and reply_message. Always use
   send, reply and rpc_send now.

@@ -366,3 +366,56 @@ class ProtocolFactory(ProtocolFactory):
         instance = self.processClass(receiver, spawnArgs)
         receiver.procinst = instance
         return receiver
+
+class BaseProcessClient(object):
+    """
+    This is the base class for a process client. A process client is code that
+    executes in the process space of a calling process. If no calling process
+    is given, a local one is created on the fly. This client adds some
+    glue to interact with a specific targer process
+    """
+    def __init__(self, proc=None, target=None, targetname=None, **kwargs):
+        """
+        Initializes a process client
+        @param proc a BaseProcess instance as originator of messages
+        @param target  global scoped (process id or name) to send to
+        @param targetname  system scoped exchange name to send messages to
+        """
+        if not proc:
+            proc = BaseProcess()
+        self.proc = proc
+        assert target or targetname, "Need either target or targetname"
+        self.target = target
+        if not self.target:
+            self.target = self.proc.get_scoped_name('system', targetname)
+
+    @defer.inlineCallbacks
+    def _check_init(self):
+        """
+        Called in client methods to ensure that there exists a spawned process
+        to send messages from
+        """
+        if not self.proc.is_spawned():
+            yield self.proc.spawn()
+
+    @defer.inlineCallbacks
+    def attach(self):
+        self._check_init()
+
+    def rpc_send(self, *args):
+        """
+        Sends an RPC message to the specified target via originator process
+        """
+        return self.proc.rpc_send(self.target, *args)
+
+    def send(self, *args):
+        """
+        Sends a message to the specified target via originator process
+        """
+        return self.proc.send(self.target, *args)
+
+    def reply(self, *args):
+        """
+        Replies to a message via the originator process
+        """
+        return self.proc.reply(*args)
