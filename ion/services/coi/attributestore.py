@@ -9,10 +9,13 @@
 import logging
 from twisted.internet import defer
 
+from ion.core import ioninit
 from ion.core.base_process import ProtocolFactory
 from ion.data.store import Store, IStore
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
+
+CONF = ioninit.config(__name__)
 
 class AttributeStoreService(BaseService):
     """
@@ -24,16 +27,16 @@ class AttributeStoreService(BaseService):
                                           dependencies=[])
 
     def slc_init(self):
-        # use spawn args to determine backend class and namespace
-        backendcls = self.spawnArgs.get('backend-class', None)
+        # use spawn args to determine backend class, second config file
+        backendcls = self.spawnArgs.get('backend_class', CONF.getValue('backend_class', None))
         if backendcls:
             self.backend = pu.get_class(backendcls)
         else:
             self.backend = Store
         assert issubclass(self.backend, IStore)
         self.store = self.backend()
+        # Provide rest of the spawnArgs to init the store
         self.store.init(**self.spawnArgs)
-        # @todo: Service name may be different based on what qualifier to use
         logging.info("AttributeStoreService initialized")
 
     @defer.inlineCallbacks
