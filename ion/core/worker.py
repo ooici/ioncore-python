@@ -6,7 +6,7 @@
 @brief service for registering exchange names
 """
 
-import logging, time
+import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
@@ -35,24 +35,20 @@ class WorkerProcess(BaseService):
         logging.info("slc_init worker receiver spawning")
         id = yield spawn(workReceiver)
         logging.info("slc_init worker receiver spawned:"+str(id))
-    
-    @defer.inlineCallbacks
-    def op_workx(self, content, headers, msg):
-        yield self._work(content)
 
     @defer.inlineCallbacks
     def op_work(self, content, headers, msg):
         yield self._work(content)
-        yield self.reply(msg, 'result', {'work-id':content['work-id']}, {})        
+        yield self.reply(msg, 'result', {'work-id':content['work-id']}, {})
 
     @defer.inlineCallbacks
     def _work(self,content):
         myid = self.procName + ":" + self.receiver.spawned.id.local
         workid = str(content['work-id'])
-        waittime = int(content['work'])
+        waittime = float(content['work'])
         logging.info("worker="+myid+" job="+workid+" work="+str(waittime))
         yield pu.asleep(waittime)
-        logging.info("worker="+myid+" job="+workid+" done at="+str(time.clock()))
+        logging.info("worker="+myid+" job="+workid+" done at="+str(pu.currenttime_ms()))
 
 class WorkerClient(BaseProcess):
     """Class for the client accessing the object store.
@@ -63,7 +59,7 @@ class WorkerClient(BaseProcess):
         self.worker = {}
 
     def op_result(self, content, headers, msg):
-        ts = time.clock()
+        ts = pu.currenttime_ms()
         logging.info("Work result received "+str(content)+" at "+str(ts))
         workid = content['work-id']
         worker = headers['sender']

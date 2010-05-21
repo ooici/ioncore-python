@@ -34,7 +34,7 @@ class DataPubsubService(BaseService):
         topic = {topic_name:{'name_type':'fanout', 'args':{'scope':'system'}}}
         yield bootstrap.declare_messaging(topic)
         qtopic_name = self.get_scoped_name('system',topic_name)
-        yield self.topics.put (topic_name, topic[topic_name])
+        yield self.topics.put(topic_name, topic[topic_name])
         yield self.reply(msg, 'result', {'topic_name':qtopic_name}, {})
 
     def op_define_publisher(self, content, headers, msg):
@@ -80,13 +80,16 @@ factory = ProtocolFactory(DataPubsubService)
 class DataPubsubClient(BaseServiceClient):
     """Client class for accessing the data pubsub service.
     """
-    def __init__(self, proc=None, pid=None):
-        BaseServiceClient.__init__(self, "data_pubsub", proc, pid)
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "data_pubsub"
+        BaseServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def define_topic(self, topic_name):
         yield self._check_init()
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'define_topic', {'topic_name':topic_name}, {})
+        (content, headers, msg) = yield self.rpc_send('define_topic',
+                                        {'topic_name':topic_name}, {})
         defer.returnValue(str(content['topic_name']))
 
     @defer.inlineCallbacks

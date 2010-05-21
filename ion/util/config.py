@@ -6,6 +6,9 @@
 @brief  supports work with config files
 """
 
+import logging
+import os.path
+
 class Config(object):
     """
     Helper class managing config files
@@ -48,3 +51,30 @@ class Config(object):
     def getValue3(self, key1, key2, key3, default=None):
         value = self.getValue2(key1, key2, {})
         return self._getValue(value, key3, default)
+
+    def update_from_file(self, filename):
+        if os.path.isfile(filename):
+            logging.info("Updating config from local file: "+filename)
+            # Load config override from filename
+            filecontent = open(filename,).read()
+            updates = eval(filecontent)
+            self.update(updates)
+
+    def update(self, updates):
+        """
+        Recursively updates configuration dict with values in given dict.
+        """
+        self._update_dict(self.obj, updates)
+
+    def _update_dict(self, src, upd):
+        """
+        Recursively updates a dict with values in another dict.
+        """
+        assert type(src) is dict and type(upd) is dict
+        for ukey,uval in upd.iteritems():
+            if type(uval) is dict:
+                if not ukey in src:
+                    src[ukey] = {}
+                self._update_dict(src[ukey], uval)
+            else:
+                src[ukey] = uval

@@ -21,6 +21,9 @@ logging.config.fileConfig(ic.LOGCONF_FILENAME)
 # Load configuration properties for any module to access
 ion_config = Config(ic.ION_CONF_FILENAME)
 
+# Update configuration with local override config
+ion_config.update_from_file(ic.ION_LOCAL_CONF_FILENAME)
+
 # Arguments given to the container (i.e. the python process executing this code)
 cont_args = {}
 
