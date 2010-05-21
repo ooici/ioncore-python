@@ -127,6 +127,7 @@ Change log:
   config override exists, a different broker (e.g. localhost) can be given.
 - Added BaseProcessClient and changed BaseServiceClient and all clients and
   all test cases (again).
+- Added container shell helpers under 'cc', such as cc.spawn('hello')
 2010-05-16:
 - Removed support for BaseProcess.send_message and reply_message. Always use
   send, reply and rpc_send now.

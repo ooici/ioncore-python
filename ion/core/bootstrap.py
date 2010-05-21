@@ -174,7 +174,6 @@ def bs_register_services():
         sd = ServiceDesc(name=proc['name'])
         res = yield src.register_service(sd)
 
-
 def reset_container():
     """
     Resets the container for warm restart. Simple implementation
@@ -187,7 +186,6 @@ def reset_container():
     nameRegistry = Store()
     spawnable.store = Container.store
     spawnable.Spawnable.progeny = {}
-
 
 """
 from ion.core import bootstrap as b

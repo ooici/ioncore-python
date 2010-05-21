@@ -34,6 +34,9 @@ procRegistry = Store()
 # @todo HACK: Dict of process "alias" to process declaration
 processes = {}
 
+# @todo HACK: List of process instances
+receivers = []
+
 class BaseProcess(object):
     """
     This is the base class for all processes. Processes can be spawned and
@@ -284,7 +287,6 @@ class ProcessDesc(object):
     Class that encapsulates attributes about a spawnable process; can spawn
     and init processes.
     """
-#    def __init__(self, name, module, procClass=None, node=None, spawnargs=None):
     def __init__(self, **kwargs):
         """
         Initializes ProcessDesc instance with process attributes
@@ -381,6 +383,7 @@ class ProtocolFactory(ProtocolFactory):
         receiver.group = self.name
         instance = self.processClass(receiver, spawnArgs)
         receiver.procinst = instance
+        receivers.append(receiver)
         return receiver
 
 class BaseProcessClient(object):
