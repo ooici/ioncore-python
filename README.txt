@@ -63,7 +63,7 @@ Or in the CC shell:
     send(1, {'op':'hello','content':'Hello you there!'})
 
     from ion.play.hello_service import HelloServiceClient
-    hc = HelloServiceClient() 
+    hc = HelloServiceClient()
     hc.hello()
 
 
@@ -120,6 +120,11 @@ again (see above). Please review the branch logs for any hints.
 Change log:
 ===========
 
+2010-05-20:
+- The system now looks for a local config file ionlocal.config and if exists,
+  overrides entries in ion.config.
+- Test cases use the config file to determine the broker host to use. If local
+  config override exists, a different broker (e.g. localhast) can be given.
 2010-05-16:
 - Removed support for BaseProcess.send_message and reply_message. Always use
   send, reply and rpc_send now.
