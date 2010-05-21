@@ -15,7 +15,7 @@ from twisted.internet import defer
 
 from ion.data.store import CassandraStore
 
-class DatastoreTest(unittest.TestCase):
+class CassandraStoreTest(unittest.TestCase):
     def setUp(self):
         logging.basicConfig(level=logging.WARN, \
                 format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
