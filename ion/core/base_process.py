@@ -140,9 +140,12 @@ class BaseProcess(object):
             d = self.rpc_conv.pop(payload['conv-id'])
             content = payload.get('content', None)
             res = (content, payload, msg)
-            # @todo error case: no ack
-            d.callback(res)
-            msg.ack()
+            # @todo is it OK to ack the response at this point already?
+            d1 = msg.ack()
+            if d1:
+                # Support for older carrot version where ack did not return
+                d1.addCallback(lambda res1: d.callback(res))
+                d1.addErrback(lambda c: d.errback(c))
         else:
             logging.info('BaseProcess: Message received, dispatching...')
             convid = payload.get('conv-id', None)
@@ -151,9 +154,8 @@ class BaseProcess(object):
             d = pu.dispatch_message(payload, msg, self, conv)
             def _cb(res):
                 logging.info("ACK msg")
-                msg.ack()
-            d.addCallback(_cb)
-            d.addErrback(logging.error)
+                d1 = msg.ack()
+            d.addCallbacks(_cb, logging.error)
 
     def op_none(self, content, headers, msg):
         """
@@ -181,7 +183,9 @@ class BaseProcess(object):
             rpc_deferred.setTimeout(timeout, _timeoutf, convid)
         self.rpc_conv[convid] = rpc_deferred
         d = self.send(recv, operation, content, msgheaders)
-        # Continue with deferred d. The caller can yield for the new deferred.
+        # d is a deferred. The actual send of the request message will happen
+        # after this method returns. This is OK, because functions are chained
+        # to call back the caller on the rpc_deferred when the receipt is done.
         return rpc_deferred
 
     def send(self, recv, operation, content, headers=None):

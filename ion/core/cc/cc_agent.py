@@ -111,8 +111,8 @@ class CCAgent(ResourceAgent):
         for cid,cal in self.contalive.copy().iteritems():
             if cal<self.last_identify:
                 logging.info("Container %s missing. Deemed down, remove." % (cid))
-                del self.containers[cid ]
-                del self.contalive[cid ]
+                del self.containers[cid]
+                del self.contalive[cid]
 
     @defer.inlineCallbacks
     def op_spawn(self, content, headers, msg):
