@@ -54,7 +54,7 @@ class IStore(object):
         @retval Deferred, for success of this operation
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
-    
+
     def init(self, **kwargs):
         """
         Configures this Store with arbitrary keyword arguments
@@ -100,8 +100,6 @@ class Store(IStore):
     def _delete(self, key):
         del self.kvs[key]
         return
-    
+
     def init(self, **kwargs):
-        return defer.maybeDeferred(True)
-
-
+        return defer.succeed(True)
