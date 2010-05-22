@@ -39,7 +39,7 @@ class ResourceRegistryService(BaseService):
         resdesc['lifecycle_state'] = ResourceLCState.RESLCS_NEW
         resid = pu.create_unique_id('R:')
         yield self.datastore.put(resid, resdesc)
-        yield self.reply(msg, 'result', {'res_id':str(resid)},)
+        yield self.reply_ok(msg, {'res_id':str(resid)},)
 
     def op_define_resource_type(self, content, headers, msg):
         """
@@ -55,7 +55,7 @@ class ResourceRegistryService(BaseService):
         logging.info('op_get_resource_desc: '+str(resid))
 
         res_desc = yield self.datastore.get(resid)
-        yield self.reply(msg, 'result', {'res_desc':res_desc})
+        yield self.reply_ok(msg, {'res_desc':res_desc})
 
     def op_set_resource_lcstate(self, content, headers, msg):
         """

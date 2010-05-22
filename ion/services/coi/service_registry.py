@@ -38,7 +38,7 @@ class ServiceRegistryService(BaseService):
         logging.info('op_register_service: '+str(svcdesc))
 
         yield self.datastore.put(svcdesc['name'],svcdesc)
-        yield self.reply(msg, 'result', {'status':'ok'})
+        yield self.reply_ok(msg)
 
     def op_get_service_desc(self, content, headers, msg):
         """
@@ -55,7 +55,7 @@ class ServiceRegistryService(BaseService):
         logging.info('op_register_instance: '+str(svcinstdesc))
 
         yield self.datastore.put(svcinstdesc['svc_name'], svcinstdesc)
-        yield self.reply(msg, 'result', {'status':'ok'})
+        yield self.reply_ok(msg)
 
     @defer.inlineCallbacks
     def op_get_instance(self, content, headers, msg):
@@ -66,7 +66,7 @@ class ServiceRegistryService(BaseService):
         logging.info('op_get_instance: '+str(svcname))
 
         svcid = yield self.datastore.get(svcname)
-        yield self.reply(msg, 'result', {'svcinst_desc':svcid})
+        yield self.reply_ok(msg, {'svcinst_desc':svcid})
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(ServiceRegistryService)

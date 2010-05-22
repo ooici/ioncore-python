@@ -113,6 +113,8 @@ def send(receiver, send, recv, operation, content, headers=None):
     msg['ontology'] = ''
     # Conversation instance id
     msg['conv-id'] = ''
+    # Conversation message sequence number
+    msg['conv-seq'] = 1
     # Conversation type id
     msg['protocol'] = ''
     msg['ts'] = str(currenttime_ms())
@@ -174,11 +176,11 @@ def create_unique_id(ns):
     else: nsc = 1
     id_seqs[nss] = nsc
     return nss + str(nsc)
-    
-    
+
+
 def get_class(qualclassname, mod=None):
     """Imports module and class and returns class object.
-    
+
     @param qualclassname  fully qualified classname, such as
         ion.data.dataobject.DataObject if module not given, otherwise class name
     @param mod instance of module
@@ -228,7 +230,7 @@ def currenttime_ms():
     @retval current UTC time as int with milliseconds in epoch
     """
     return int(currenttime() * 1000)
-    
+
 # Stuff for testing: Stubs, mock objects
 fakeStore = Store()
 
@@ -239,7 +241,7 @@ class FakeMessage(object):
     """
     def __init__(self, payload=None):
         self.payload = payload
-    
+
     @defer.inlineCallbacks
     def send(self, to, msg):
         self.sendto = to
@@ -267,4 +269,3 @@ class FakeReceiver(object):
         self.sendmsg = msg
         # Need to be a generator
         yield fakeStore.put('fake','fake')
-

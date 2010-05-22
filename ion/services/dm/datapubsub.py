@@ -35,7 +35,7 @@ class DataPubsubService(BaseService):
         yield bootstrap.declare_messaging(topic)
         qtopic_name = self.get_scoped_name('system',topic_name)
         yield self.topics.put(topic_name, topic[topic_name])
-        yield self.reply(msg, 'result', {'topic_name':qtopic_name}, {})
+        yield self.reply_ok(msg, {'topic_name':qtopic_name}, {})
 
     def op_define_publisher(self, content, headers, msg):
         """Service operation: Register a publisher that subsequently is
