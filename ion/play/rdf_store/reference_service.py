@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/hello_service.py
-@author Michael Meisinger
-@brief  example service definition that can be used as template
+@file ion/play/rdf_store/reference_service.py
+@author David Stuebe
+@brief  RDF Store: reference service
 """
 
 import logging
