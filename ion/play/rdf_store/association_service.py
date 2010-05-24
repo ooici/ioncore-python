@@ -54,10 +54,10 @@ class AssociationService(BaseService):
     def op_get_association(self, content, headers, msg):
         '''
         '''        
-        blob = yield self.store.get(content['key'])
+        association = yield self.store.get(content['key'])
 
         # The following line shows how to reply to a message
-        yield self.reply(msg, 'reply', blob, {})
+        yield self.reply(msg, 'reply', association, {})
 
     @defer.inlineCallbacks
     def op_del_association(self, content, headers, msg):

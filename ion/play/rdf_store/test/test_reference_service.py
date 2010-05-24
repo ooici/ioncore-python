@@ -27,7 +27,7 @@ class ReferenceTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
 
-        self.bsc = ReferenceServiceClient(proc=sup)
+        self.rsc = ReferenceServiceClient(proc=sup)
         
         self.key='key1'
         self.ref1='ref1'
@@ -42,23 +42,23 @@ class ReferenceTest(IonTestCase):
     @defer.inlineCallbacks
     def test_put_get_delete(self):
 
-        res = yield self.bsc.add_reference(self.key,self.ref1)
+        res = yield self.rsc.add_reference(self.key,self.ref1)
         self.assertEqual(res,self.key)
         
 
-        res = yield self.bsc.add_reference(self.key,self.ref2)
-        res = yield self.bsc.add_reference(self.key,self.ref4)
-        res = yield self.bsc.add_reference(self.key,self.ref3)
+        res = yield self.rsc.add_reference(self.key,self.ref2)
+        res = yield self.rsc.add_reference(self.key,self.ref4)
+        res = yield self.rsc.add_reference(self.key,self.ref3)
 
 
-        res = yield self.bsc.get_references(self.key)
+        res = yield self.rsc.get_references(self.key)
         self.assertEqual(set(res),set([self.ref1,self.ref2,self.ref3,self.ref4]))
         
-        res = yield self.bsc.del_reference(self.key,self.ref1)
+        res = yield self.rsc.del_reference(self.key,self.ref1)
         self.assertEqual(res,'success')
         
         
-        res = yield self.bsc.get_references(self.key)
+        res = yield self.rsc.get_references(self.key)
         self.assertEqual(set(res),set([self.ref2,self.ref3,self.ref4]))
         
         

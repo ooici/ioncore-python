@@ -504,6 +504,7 @@ class ObjectStore(object):
         cref = yield self.get_commitref(key)
         if commit:
                 cref = commit
+                # @Todo make sure commit is an ancestor of the head
         else:
             if not cref:
                 return

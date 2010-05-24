@@ -27,7 +27,7 @@ class AssociationTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
 
-        self.bsc = AssociationServiceClient(proc=sup)
+        self.asc = AssociationServiceClient(proc=sup)
         
         d = dict()
         d['S']='key1'
@@ -45,14 +45,14 @@ class AssociationTest(IonTestCase):
     @defer.inlineCallbacks
     def test_put_get_delete(self):
 
-        res = yield self.bsc.put_association(self.dobj)
+        res = yield self.asc.put_association(self.dobj)
         self.assertEqual(res,self.dobj_key)
         
 
-        res = yield self.bsc.get_association(self.dobj_key)
+        res = yield self.asc.get_association(self.dobj_key)
         self.assertEqual(res,self.dobj)
         
-        res = yield self.bsc.del_association(self.dobj_key)
+        res = yield self.asc.del_association(self.dobj_key)
         self.assertEqual(res,'success')
         
         
