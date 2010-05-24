@@ -24,17 +24,13 @@ class CassandraStoreTest(unittest.TestCase):
         clist = ['amoeba.ucsd.edu:9160']
         self.ds = cassandra.CassandraStore(cass_host_list=clist)
         yield self.ds.init()
-        self.key = self._mkey()
-        self.value = self._mkey()
+        self.key = str(uuid4())
+        self.value = str(uuid4())
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.ds.delete(self.key)
         del self.ds
-
-    def _mkey(self):
-        # Generate a pseudo-random string. handy, that.
-        return str(uuid4())
 
     @defer.inlineCallbacks
     def test_get_404(self):

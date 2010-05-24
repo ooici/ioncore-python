@@ -1,16 +1,15 @@
 #!/usr/bin/env python
-
 """
 @file ion/data/backends/cassandra.py
 @author Michael Meisinger
-@author Dorian Raymer 
+@author Paul Hubbard
+@author Dorian Raymer
 @brief Implementation of ion.data.store.IStore using pycassa to interface a
 Cassandra datastore backend
 """
 
 import re
 import logging
-
 
 from twisted.internet import defer
 
@@ -30,10 +29,11 @@ class CassandraStore(store.IStore):
 
     def _init(self, cass_host_list):
         if not cass_host_list:
-            logging.info('Connecting to Cassandra on localhost...')
+            logging.debug('Connecting to Cassandra on localhost...')
         else:
-            logging.info('Connecting to Cassandra at "%s"...' % str(cass_host_list))
+            logging.debug('Connecting to Cassandra at "%s"...' % str(cass_host_list))
         client = pycassa.connect(cass_host_list)
+        # @note Hardwired to column family in cassandra install!
         self.kvs = pycassa.ColumnFamily(client, 'Datasets', 'Catalog')
         logging.info('connected OK.')
         return True
@@ -46,7 +46,7 @@ class CassandraStore(store.IStore):
         """
         #return defer.maybeDeferred(self._init, cass_host_list, None)
         return defer.succeed(self._init(self.cass_host_list))
-        
+
 
     def get(self, key):
         """
@@ -97,7 +97,7 @@ class CassandraStore(store.IStore):
         @retval None
         @note Deletes are lazy, so key may still be visible for some time.
         """
-        # Only except on specific exceptions. 
+        # Only except on specific exceptions.
         #try:
         #    self.kvs.remove(key)
         #except: # Bad to except on anything and not re-raise!!
@@ -105,4 +105,3 @@ class CassandraStore(store.IStore):
         #    return defer.fail()
         self.kvs.remove(key)
         return defer.succeed(None)
-

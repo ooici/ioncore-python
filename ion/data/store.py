@@ -17,6 +17,8 @@ class IStore(object):
     """
     Interface for all store backend implementations. All operations are returning
     deferreds and operate asynchronously.
+
+    @note Pure virtual abstract base class - must override methods!
     """
     def get(self, key):
         """
