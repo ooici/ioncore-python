@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/data/test/test_store.py
+@file ion/data/backends/test/test_cassandra.py
 @author Paul Hubbard
 @author Dorian Raymer
 @test Service only test of Cassandra datastore

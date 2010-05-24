@@ -2,6 +2,8 @@
 
 """
 @file ion/data/store.py
+@package ion.data.IStore Pure virtual base class for CRUD
+@package ion.data.Store In-memory implementation of ion.data.IStore
 @author Michael Meisinger
 @brief base interface for all key-value stores in the system and default
         in memory implementation

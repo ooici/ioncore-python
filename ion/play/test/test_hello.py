@@ -6,8 +6,6 @@
 @brief test service for registering resources and client classes
 """
 
-import logging
-
 from twisted.internet import defer
 
 from ion.play.hello_service import HelloServiceClient
@@ -35,4 +33,4 @@ class HelloTest(IonTestCase):
         sup = yield self._spawn_processes(services)
 
         hc = HelloServiceClient(proc=sup)
-        res = yield hc.hello("Hi there, hello1")
+        yield hc.hello("Hi there, hello1")

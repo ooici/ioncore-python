@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file __init__.py
+@file ion/__init__.py
 @author Michael Meisinger
 
 @mainpage

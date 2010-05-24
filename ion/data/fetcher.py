@@ -2,6 +2,7 @@
 
 """
 @file ion/data/fetcher.py
+@package ion.data.fetcher Remimpliment fetcher as an LCA service
 @author Paul Hubbard
 @date 5/7/10
 @brief Porting the fetcher from DX to LCAarch as a learning exercise

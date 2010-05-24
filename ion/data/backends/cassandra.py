@@ -28,6 +28,10 @@ class CassandraStore(store.IStore):
         self.cass_host_list = cass_host_list
 
     def _init(self, cass_host_list):
+        """
+        @brief Constructor, if no args then connect to localhost
+        @param cass_host_list List of hostname:ports for cassandra host or cluster
+        """
         if not cass_host_list:
             logging.debug('Connecting to Cassandra on localhost...')
         else:
@@ -40,18 +44,16 @@ class CassandraStore(store.IStore):
 
     def init(self):
         """
-        @brief Constructor, safe to use no arguments
-        @param cass_host_list List of hostname:ports for cassandra host or cluster
+        @brief User-level constructor, uses data from self._init
         @retval Deferred
         """
         #return defer.maybeDeferred(self._init, cass_host_list, None)
         return defer.succeed(self._init(self.cass_host_list))
 
-
     def get(self, key):
         """
         @brief Return a value corresponding to a given key
-        @param Key Cassandra key
+        @param key Cassandra key
         @retval Value from the ion dictionary, or None
         """
         value = None
