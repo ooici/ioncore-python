@@ -19,7 +19,9 @@ class DataPubsubService(BaseService):
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='data_pubsub', version='0.1.0', dependencies=[])
+    declare = BaseService.service_declare(name='data_pubsub',
+                                          version='0.1.0',
+                                          dependencies=[])
 
     def slc_init(self):
         self.topics = Store()

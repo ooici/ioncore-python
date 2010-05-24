@@ -10,7 +10,8 @@ import logging
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.services.coi.resource_registry import *
+from ion.services.coi.resource_registry import ResourceDesc, ResourceLCState, \
+ ResourceRegistryClient, ResourceTypes, ResourceTypeDesc
 from ion.test.iontest import IonTestCase
 
 
