@@ -49,7 +49,7 @@ class AttributeStoreService(BaseService):
         key = str(content['key'])
         val = content['value']
         res = yield self.store.put(key, val)
-        yield self.reply(msg, 'result', {'status':'OK', 'result':res})
+        yield self.reply_ok(msg, {'result':res})
 
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
@@ -59,7 +59,7 @@ class AttributeStoreService(BaseService):
         logging.info("op_get: "+str(content))
         key = str(content['key'])
         val = yield self.store.get(key)
-        yield self.reply(msg, 'result', {'status':'OK', 'value':val})
+        yield self.reply_ok(msg, {'value':val})
 
     @defer.inlineCallbacks
     def op_query(self, content, headers, msg):

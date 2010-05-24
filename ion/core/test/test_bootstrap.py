@@ -29,7 +29,7 @@ import ion.util.procutils as pu
 class BootstrapTest1(IonTestCase):
     """ Tests the IonTestCase core classes. Starting container and services.
     """
-       
+
     @defer.inlineCallbacks
     def test_start_container(self):
         yield self._start_container()
@@ -46,7 +46,7 @@ class BootstrapTest1(IonTestCase):
         logging.info("Started magnet and core services")
 
         yield self._stop_container()
-        
+
 
 
 class BootstrapTest2(IonTestCase):
@@ -60,5 +60,3 @@ class BootstrapTest2(IonTestCase):
 
     def test_1(self):
         pass
-
-

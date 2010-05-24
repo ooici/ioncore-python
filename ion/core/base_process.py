@@ -59,6 +59,7 @@ class BaseProcess(object):
         self.procState = "UNINITIALIZED"
         spawnArgs = spawnArgs.copy() if spawnArgs else {}
         self.spawnArgs = spawnArgs
+        self.init_time = pu.currenttime_ms()
 
         # Name (human readable label) of this process.
         self.procName = self.spawnArgs.get('proc-name', __name__)
@@ -119,7 +120,7 @@ class BaseProcess(object):
             yield defer.maybeDeferred(self.plc_init)
             logging.info('----- Process %s INITIALIZED -----' % (self.procName))
 
-            yield self.reply(msg, 'inform_init', {'status':'OK'}, {})
+            yield self.reply_ok(msg)
             self.procState = "INITIALIZED"
 
     def plc_init(self):
@@ -139,9 +140,12 @@ class BaseProcess(object):
             d = self.rpc_conv.pop(payload['conv-id'])
             content = payload.get('content', None)
             res = (content, payload, msg)
-            # @todo error case: no ack
-            d.callback(res)
-            msg.ack()
+            # @todo is it OK to ack the response at this point already?
+            d1 = msg.ack()
+            if d1:
+                # Support for older carrot version where ack did not return
+                d1.addCallback(lambda res1: d.callback(res))
+                d1.addErrback(lambda c: d.errback(c))
         else:
             logging.info('BaseProcess: Message received, dispatching...')
             convid = payload.get('conv-id', None)
@@ -150,9 +154,8 @@ class BaseProcess(object):
             d = pu.dispatch_message(payload, msg, self, conv)
             def _cb(res):
                 logging.info("ACK msg")
-                msg.ack()
-            d.addCallback(_cb)
-            d.addErrback(logging.error)
+                d1 = msg.ack()
+            d.addCallbacks(_cb, logging.error)
 
     def op_none(self, content, headers, msg):
         """
@@ -160,32 +163,40 @@ class BaseProcess(object):
         """
         logging.info('Catch message')
 
-    def rpc_send(self, recv, operation, content, headers=None):
+    def rpc_send(self, recv, operation, content, headers=None, **kwargs):
         """
-        Sends a message RPC style and waits for conversation message reply.
-        @retval a deferred with the message value
+        @brief Sends a message RPC style and waits for conversation message reply.
+        @retval a Deferred with the message value on receipt
         """
         msgheaders = self._prepare_message(headers)
         convid = msgheaders['conv-id']
         # Create a new deferred that the caller can yield on to wait for RPC
         rpc_deferred = defer.Deferred()
+        # Timeout handling
+        timeout = float(kwargs.get('timeout',0))
+        def _timeoutf(d, convid, *args, **kwargs):
+            logging.info("RPC on conversation %s timed out! "%(convid))
+            # Remove RPC. Delayed result will go to catch operation
+            d = self.rpc_conv.pop(convid)
+            d.errback(defer.TimeoutError())
+        if timeout:
+            rpc_deferred.setTimeout(timeout, _timeoutf, convid)
         self.rpc_conv[convid] = rpc_deferred
         d = self.send(recv, operation, content, msgheaders)
-        # Continue with deferred d. The caller can yield for the new deferred.
+        # d is a deferred. The actual send of the request message will happen
+        # after this method returns. This is OK, because functions are chained
+        # to call back the caller on the rpc_deferred when the receipt is done.
         return rpc_deferred
 
-    @defer.inlineCallbacks
     def send(self, recv, operation, content, headers=None):
         """
-        Send a message via the process receiver to destination.
+        @brief Send a message via the process receiver to destination.
         Starts a new conversation.
+        @retval Deferred for send of message
         """
         send = self.receiver.spawned.id.full
         msgheaders = self._prepare_message(headers)
-        convid = msgheaders['conv-id']
-
-        yield pu.send(self.receiver, send, recv, operation,
-                              content, msgheaders)
+        return pu.send(self.receiver, send, recv, operation, content, msgheaders)
 
     def _prepare_message(self, headers):
         msgheaders = {}
@@ -194,6 +205,7 @@ class BaseProcess(object):
         if not 'conv-id' in msgheaders:
             convid = self._create_convid()
             msgheaders['conv-id'] = convid
+            msgheaders['conv-seq'] = 1
             self.conversations[convid] = Conversation()
         return msgheaders
 
@@ -207,7 +219,8 @@ class BaseProcess(object):
 
     def reply(self, msg, operation, content, headers=None):
         """
-        Replies to a given message, continuing the ongoing conversation
+        @brief Replies to a given message, continuing the ongoing conversation
+        @retval Deferred or None
         """
         ionMsg = msg.payload
         recv = ionMsg.get('reply-to', None)
@@ -217,7 +230,34 @@ class BaseProcess(object):
             logging.error('No reply-to given for message '+str(msg))
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
-            self.send(pu.get_process_id(recv), operation, content, headers)
+            headers['conv-seq'] = int(ionMsg.get('conv-seq',0)) + 1
+            return self.send(pu.get_process_id(recv), operation, content, headers)
+
+    def reply_ok(self, msg, content=None, headers=None):
+        """
+        Glue method that replies to a given message with a success message and
+        a given result value
+        @retval Deferred for send of reply
+        """
+        rescont = {'status':'OK'}
+        if type(content) is dict:
+            rescont.update(content)
+        else:
+            rescont['value'] = content
+        return self.reply(msg, 'result', rescont, headers)
+
+    def reply_err(self, msg, content=None, headers=None):
+        """
+        Glue method that replies to a given message with an error message and
+        an indication of the error.
+        @retval Deferred for send of reply
+        """
+        rescont = {'status':'ERROR'}
+        if type(content) is dict:
+            rescont.update(content)
+        else:
+            rescont['value'] = content
+        return self.reply(msg, 'result', rescont, headers)
 
     def get_conversation(self, headers):
         convid = headers.get('conv-id', None)
@@ -257,6 +297,7 @@ class BaseProcess(object):
         assert not childproc in self.child_procs
         self.child_procs.append(childproc)
         child_id = yield childproc.spawn(self)
+        yield procRegistry.put(str(childproc.procName), str(child_id))
         if init:
             yield childproc.init()
         defer.returnValue(child_id)
@@ -339,7 +380,8 @@ class ProcessDesc(object):
 
     @defer.inlineCallbacks
     def init(self):
-        (content, headers, msg) = yield self.supProcess.rpc_send(self.procId, 'init', {}, {'quiet':True})
+        (content, headers, msg) = yield self.supProcess.rpc_send(self.procId,
+                                                'init', {}, {'quiet':True})
         if content.get('status','ERROR') == 'OK':
             self.procState = 'INIT_OK'
         else:
@@ -385,6 +427,9 @@ class ProtocolFactory(ProtocolFactory):
         receiver.procinst = instance
         receivers.append(receiver)
         return receiver
+
+# Spawn of the process using the module name
+factory = ProtocolFactory(BaseProcess)
 
 class BaseProcessClient(object):
     """

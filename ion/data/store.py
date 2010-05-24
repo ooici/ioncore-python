@@ -8,7 +8,10 @@
 """
 
 import re
+import logging
+
 from twisted.internet import defer
+
 
 class IStore(object):
     """
@@ -20,6 +23,8 @@ class IStore(object):
         @param key  an immutable key associated with a value
         @retval Deferred, for value associated with key, or None if not existing.
         """
+        raise NotImplementedError, "Abstract Interface Not Implemented"
+
 
     def read(self, *args, **kwargs):
         return self.get(*args, **kwargs)
@@ -31,6 +36,7 @@ class IStore(object):
                 not modify this object after it was
         @retval Deferred, for success of this operation
         """
+        raise NotImplementedError, "Abstract Interface Not Implemented"
 
     def write(self, *args, **kwargs):
         return self.put(*args, **kwargs)
@@ -40,12 +46,14 @@ class IStore(object):
         @param regex  regular expression matching zero or more keys
         @retval Deferred, for list of values for keys matching the regex
         """
+        raise NotImplementedError, "Abstract Interface Not Implemented"
 
     def delete(self, key):
         """
         @param key  an immutable key associated with a value
         @retval Deferred, for success of this operation
         """
+        raise NotImplementedError, "Abstract Interface Not Implemented"
 
     def init(self, **kwargs):
         """
@@ -53,6 +61,7 @@ class IStore(object):
         @param kwargs  any keyword args
         @retval Deferred, for success of this operation
         """
+        raise NotImplementedError, "Abstract Interface Not Implemented"
 
 class Store(IStore):
     """
@@ -91,3 +100,6 @@ class Store(IStore):
     def _delete(self, key):
         del self.kvs[key]
         return
+
+    def init(self, **kwargs):
+        return defer.succeed(True)

@@ -148,8 +148,8 @@ def spawn_processes(procs, sup=None):
             supname = "bootstrap"
         else:
             supname = "supervisor."+str(sup_seq)
-        sup = BaseProcess()
-        sup.receiver.label = supname
+        suprec = base_process.factory.build({'proc-name':supname})
+        sup = suprec.procinst
         sup.receiver.group = supname
         supId = yield sup.spawn()
         yield base_process.procRegistry.put(supname, str(supId))
@@ -158,7 +158,6 @@ def spawn_processes(procs, sup=None):
     logging.info("Spawning child processes")
     for child in children:
         child_id = yield sup.spawn_child(child)
-        yield base_process.procRegistry.put(str(child.procName), str(child_id))
 
     logging.debug("process_ids: "+ str(base_process.procRegistry.kvs))
 
