@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/test/test_resource_registry.py
+@file ion/play/test/test_hello.py
+@test ion.play.hello_service Example unit tests for sample code.
 @author Michael Meisinger
-@brief test service for registering resources and client classes
 """
 
 from twisted.internet import defer
@@ -12,7 +12,8 @@ from ion.play.hello_service import HelloServiceClient
 from ion.test.iontest import IonTestCase
 
 class HelloTest(IonTestCase):
-    """Testing service classes of resource registry
+    """
+    Testing example hello service.
     """
 
     @defer.inlineCallbacks
