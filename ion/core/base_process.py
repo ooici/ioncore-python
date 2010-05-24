@@ -143,9 +143,11 @@ class BaseProcess(object):
             # @todo is it OK to ack the response at this point already?
             d1 = msg.ack()
             if d1:
-                # Support for older carrot version where ack did not return
                 d1.addCallback(lambda res1: d.callback(res))
                 d1.addErrback(lambda c: d.errback(c))
+            else:
+                # Support for older carrot version where ack did not return deferred
+                d.callback(res)
         else:
             logging.info('BaseProcess: Message received, dispatching...')
             convid = payload.get('conv-id', None)
