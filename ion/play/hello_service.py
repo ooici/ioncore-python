@@ -15,17 +15,21 @@ from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class HelloService(BaseService):
-    """Example service implementation
     """
-
+    Example service interface
+    """
     # Declaration of service
-    declare = BaseService.service_declare(name='hello', version='0.1.0', dependencies=[])
+    declare = BaseService.service_declare(name='hello',
+                                          version='0.1.0',
+                                          dependencies=[])
 
     def __init__(self, receiver, spawnArgs=None):
+        # Service class initializer. Basic config, but no yields allowed.
         BaseService.__init__(self, receiver, spawnArgs)
         logging.info('HelloService.__init__()')
 
     def slc_init(self):
+        # Service life cycle state. Initialize service here. Can use yields.
         pass
 
     @defer.inlineCallbacks
@@ -38,8 +42,8 @@ class HelloService(BaseService):
 
 class HelloServiceClient(BaseServiceClient):
     """
-    This is an exemplar service class that calls the hello service. It
-    applies the RPC pattern.
+    This is an exemplar service client that calls the hello service. It
+    makes service calls RPC style.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
@@ -50,7 +54,7 @@ class HelloServiceClient(BaseServiceClient):
     def hello(self, text='Hi there'):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('hello', text)
-        logging.info('Friends reply: '+str(content))
+        logging.info('Service reply: '+str(content))
         defer.returnValue(str(content))
 
 # Spawn of the process using the module name
