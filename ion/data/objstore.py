@@ -494,15 +494,20 @@ class ObjectStore(object):
         defer.returnValue(cref)
 
     @defer.inlineCallbacks
-    def get(self, key):
+    def get(self, key, commit=None):
         """
         @param key identifier of a mutable entity
         @retval hmmm what?
+        @note Added commit kwarg to allow retrieval of a particular commit
         """
         key = _reftostr(key)
         cref = yield self.get_commitref(key)
-        if not cref:
-            return
+        if commit:
+                cref = commit
+        else:
+            if not cref:
+                return
+
         cvals = yield self.vs.get_commit_root_entriesvalues(cref)
         dobj = yield self._build_value(cvals, True)
         defer.returnValue(dobj)
