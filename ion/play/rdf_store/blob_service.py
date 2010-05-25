@@ -30,8 +30,7 @@ class BlobService(BaseService):
 #        logging.info('HelloService.__init__()')
 
     def slc_init(self):
-        self.store=Store()
-        self.store.init
+        self.store = Store()
 
     @defer.inlineCallbacks
     def op_put_blob(self, content, headers, msg):
@@ -40,9 +39,9 @@ class BlobService(BaseService):
         For storing blobs, we really just want to store it encoded.
         Can we get the serialized value from the messaging layer?
         '''
-        logging.info('op_put_blob: '+str(content))        
+        logging.info('op_put_blob: '+str(content))
         blob = ValueObject(content)
-        
+
         yield self.store.put(blob.identity, blob.value)
 
         # The following line shows how to reply to a message
@@ -51,9 +50,9 @@ class BlobService(BaseService):
     @defer.inlineCallbacks
     def op_get_blob(self, content, headers, msg):
         '''
- 
+
         '''
-        
+
         blob = yield self.store.get(content['key'])
 
         # The following line shows how to reply to a message
@@ -62,9 +61,9 @@ class BlobService(BaseService):
     @defer.inlineCallbacks
     def op_del_blob(self, content, headers, msg):
         '''
- 
+
         '''
-        
+
         yield self.store.delete(content['key'])
 
         # The following line shows how to reply to a message
@@ -87,22 +86,22 @@ class BlobServiceClient(BaseServiceClient):
         @param blob A DataObject blob to be stored
         '''
         yield self._check_init()
-        
+
         assert isinstance(blob, DataObject)
-        
+
         (content, headers, msg) = yield self.rpc_send('put_blob', blob.encode())
         logging.info('Blob Servie Client: put_blob: '+str(content))
         defer.returnValue(content['Stored Key'])
-        
+
     @defer.inlineCallbacks
     def get_blob(self, key):
         '''
         @param key, A key for a stored blob
         '''
         yield self._check_init()
-        
+
         # assert ?
-        kd={'key':key} 
+        kd={'key':key}
         (content, headers, msg) = yield self.rpc_send('get_blob', kd)
         logging.info('Blob Servie Client: get_blob: '+str(content))
         blob=DataObject.from_encoding(content)
@@ -115,15 +114,12 @@ class BlobServiceClient(BaseServiceClient):
         @param key, A key for a stored blob
         '''
         yield self._check_init()
-        
+
         # assert ?
-        kd={'key':key} 
+        kd={'key':key}
         (content, headers, msg) = yield self.rpc_send('del_blob', kd)
         logging.info('Blob Servie Client: del_blob: '+str(content))
-        defer.returnValue(content['result'])        
+        defer.returnValue(content['result'])
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(BlobService)
-
-
-

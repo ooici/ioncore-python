@@ -2,51 +2,51 @@
 
 """
 @file ion/data/backends/cassandra.py
+@author Paul Hubbard
 @author Michael Meisinger
-@author Dorian Raymer 
+@author Dorian Raymer
 @brief Implementation of ion.data.store.IStore using pycassa to interface a
-Cassandra datastore backend
+        Cassandra datastore backend
 """
 
 import re
 import logging
 
-
 from twisted.internet import defer
 
 import pycassa
 
-from ion.data import store
+from ion.data.store import IStore
 
 
-class CassandraStore(store.IStore):
+class CassandraStore(IStore):
     """
     Store interface for interacting with the Cassandra key/value store
     @see http://github.com/vomjom/pycassa
     """
-    def __init__(self, cass_host_list=None):
-        self.kvs=None
-        self.cass_host_list = cass_host_list
+    def __init__(self, **kwargs):
+        self.kvs = None
+        self.cass_host_list = None
 
-    def _init(self, cass_host_list):
-        if not cass_host_list:
+    @classmethod
+    def create_store(cls, **kwargs):
+        """
+        @brief Factory method to create an instance of the cassandra store.
+        @param kwargs keyword arguments to configure the store.
+        @param cass_host_list List of hostname:ports for cassandra host or cluster
+        @retval Deferred, for IStore instance.
+        """
+        inst = cls(**kwargs)
+        inst.kwargs = kwargs
+        inst.cass_host_list = kwargs.get('cass_host_list', None)
+        if not inst.cass_host_list:
             logging.info('Connecting to Cassandra on localhost...')
         else:
-            logging.info('Connecting to Cassandra at "%s"...' % str(cass_host_list))
-        client = pycassa.connect(cass_host_list)
-        self.kvs = pycassa.ColumnFamily(client, 'Datasets', 'Catalog')
+            logging.info('Connecting to Cassandra at "%s"...' % str(inst.cass_host_list))
+        inst.client = pycassa.connect(inst.cass_host_list)
+        inst.kvs = pycassa.ColumnFamily(inst.client, 'Datasets', 'Catalog')
         logging.info('connected OK.')
-        return True
-
-    def init(self):
-        """
-        @brief Constructor, safe to use no arguments
-        @param cass_host_list List of hostname:ports for cassandra host or cluster
-        @retval Deferred
-        """
-        #return defer.maybeDeferred(self._init, cass_host_list, None)
-        return defer.succeed(self._init(self.cass_host_list))
-        
+        return defer.succeed(inst)
 
     def get(self, key):
         """
@@ -57,7 +57,7 @@ class CassandraStore(store.IStore):
         value = None
         try:
             val = self.kvs.get(key)
-            logging.info('Key "%s":"%s"' % (key, val))
+            #logging.info('Key "%s":"%s"' % (key, val))
             value = val['value'] #this could fail if insert did it wrong
         except pycassa.NotFoundException:
             logging.info('Key "%s" not found' % key)
@@ -71,9 +71,9 @@ class CassandraStore(store.IStore):
         @note Value is composed into OOI dictionary under keyname 'value'
         @retval None
         """
-        logging.info('writing key %s value %s' % (key, value))
+        #logging.info('writing key %s value %s' % (key, value))
         self.kvs.insert(key, {'value':value})
-        logging.info('write complete')
+        #logging.info('write complete')
         return defer.succeed(None)
 
     def query(self, regex):
@@ -83,6 +83,7 @@ class CassandraStore(store.IStore):
         @retval List, possibly empty, of keys that match.
         @note Uses get_range generator of unknown efficiency.
         """
+        #@todo This implementation is totally inefficient. MUST replace.
         matched_list = []
         klist = self.kvs.get_range()
         for x in klist:
@@ -97,7 +98,7 @@ class CassandraStore(store.IStore):
         @retval None
         @note Deletes are lazy, so key may still be visible for some time.
         """
-        # Only except on specific exceptions. 
+        # Only except on specific exceptions.
         #try:
         #    self.kvs.remove(key)
         #except: # Bad to except on anything and not re-raise!!
@@ -105,4 +106,3 @@ class CassandraStore(store.IStore):
         #    return defer.fail()
         self.kvs.remove(key)
         return defer.succeed(None)
-

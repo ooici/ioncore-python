@@ -19,11 +19,8 @@ class CassandraStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        logging.basicConfig(level=logging.WARN, \
-                format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
         clist = ['amoeba.ucsd.edu:9160']
-        self.ds = cassandra.CassandraStore(cass_host_list=clist)
-        yield self.ds.init()
+        self.ds = yield cassandra.CassandraStore.create_store(cass_host_list=clist)
         self.key = self._mkey()
         self.value = self._mkey()
 

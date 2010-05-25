@@ -30,8 +30,7 @@ class AssociationService(BaseService):
 #        logging.info('HelloService.__init__()')
 
     def slc_init(self):
-        self.store=Store()
-        self.store.init
+        self.store = Store()
 
     @defer.inlineCallbacks
     def op_put_association(self, content, headers, msg):
@@ -40,11 +39,11 @@ class AssociationService(BaseService):
         For storing blobs, we really just want to store it encoded.
         Can we get the serialized value from the messaging layer?
         '''
-        logging.info('op_put_association: '+str(content))        
+        logging.info('op_put_association: '+str(content))
         association = ValueObject(content)
-        
+
         yield self.store.put(association.identity, association.value)
-        
+
         # @ TODO add References!
 
         # The following line shows how to reply to a message
@@ -53,7 +52,7 @@ class AssociationService(BaseService):
     @defer.inlineCallbacks
     def op_get_association(self, content, headers, msg):
         '''
-        '''        
+        '''
         association = yield self.store.get(content['key'])
 
         # The following line shows how to reply to a message
@@ -62,7 +61,7 @@ class AssociationService(BaseService):
     @defer.inlineCallbacks
     def op_del_association(self, content, headers, msg):
         '''
- 
+
         '''
         # @ TODO remove References!
 
@@ -88,22 +87,22 @@ class AssociationServiceClient(BaseServiceClient):
         @param blob A DataObject blob to be stored
         '''
         yield self._check_init()
-        
+
         assert isinstance(association, DataObject)
-        
+
         (content, headers, msg) = yield self.rpc_send('put_association', association.encode())
         logging.info('Association Servie Client: put_association: '+str(content))
         defer.returnValue(content['Stored Key'])
-        
+
     @defer.inlineCallbacks
     def get_association(self, key):
         '''
         @param key, A key for a stored association
         '''
         yield self._check_init()
-        
+
         # assert ?
-        kd={'key':key} 
+        kd={'key':key}
         (content, headers, msg) = yield self.rpc_send('get_association', kd)
         logging.info('Association Servie Client: get_association: '+str(content))
         blob=DataObject.from_encoding(content)
@@ -116,15 +115,12 @@ class AssociationServiceClient(BaseServiceClient):
         @param key, A key for a stored association
         '''
         yield self._check_init()
-        
+
         # assert ?
-        kd={'key':key} 
+        kd={'key':key}
         (content, headers, msg) = yield self.rpc_send('del_association', kd)
         logging.info('Association Servie Client: del_association: '+str(content))
-        defer.returnValue(content['result'])        
+        defer.returnValue(content['result'])
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(AssociationService)
-
-
-

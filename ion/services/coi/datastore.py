@@ -27,19 +27,20 @@ class DatastoreService(BaseService):
     # Declaration of service
     declare = BaseService.service_declare(name='datastore', version='0.1.0', dependencies=[])
 
+    @defer.inlineCallbacks
     def slc_init(self):
         # use spawn args to determine backend class, second config file
         backendcls = self.spawnArgs.get('backend_class', CONF.getValue('backend_class', None))
+        backendargs = self.spawnArgs.get('backend_args', CONF.getValue('backend_args', {}))
         if backendcls:
             self.backend = pu.get_class(backendcls)
         else:
             self.backend = Store
         assert issubclass(self.backend, IStore)
-        self.store = self.backend()
-        # Provide rest of the spawnArgs to init the store
-        self.store.init(**self.spawnArgs)
 
-        self.os = ObjectStore(backend=self.backend)
+        # Provide rest of the spawnArgs to init the store
+        self.os = ObjectStore(backend=self.backend, backargs=backendargs)
+        yield self.os.init()
         logging.info("DatastoreService initialized")
 
     @defer.inlineCallbacks

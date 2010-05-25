@@ -11,6 +11,7 @@ from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.core import base_process, bootstrap
+from ion.data.backends.cassandra import CassandraStore
 from ion.data.objstore import ValueObject, TreeValue, CommitValue, RefValue, ValueRef
 from ion.data.objstore import ObjectStore, ValueStore
 from ion.test.iontest import IonTestCase
@@ -21,8 +22,10 @@ class ValueStoreTest(unittest.TestCase):
     Testing value store: store of immutable values (blobs, trees, commits)
     """
 
+    @defer.inlineCallbacks
     def setUp(self):
         self.vs = ValueStore()
+        yield self.vs.init()
 
     def test_ValueObjects(self):
         # Testing all Value Objects
@@ -31,7 +34,7 @@ class ValueStoreTest(unittest.TestCase):
         self.assertEqual(vref1.vtype, None)
         vref2 = ValueRef('other','X')
         self.assertEqual(vref2.vtype, 'X')
-        
+
         # Blob value objects
         vo1 = ValueObject('1')
         self.assertNotEqual(vo1.identity, None)
@@ -81,7 +84,7 @@ class ValueStoreTest(unittest.TestCase):
         cv2 = CommitValue(tv2.identity)
         self.assertEqual(cv1.identity, cv2.identity)
         self.assertNotEqual(cv0.identity, cv1.identity)
-        
+
         # Commit value objects with parent commits
         cv5 = CommitValue(None, (cv1,cv0))
         cv6 = CommitValue(None, cv2)
@@ -95,13 +98,13 @@ class ValueStoreTest(unittest.TestCase):
         cvc2 = CommitValue(tv2,cvc1,ts=123,committer='mike',author='some')
         self.assertEqual(cvc2.value['committer'],'mike')
         print "cvc2=", cvc2.__dict__
-        
+
         # Reference values
         rv1 = RefValue('ref1')
         print "rv1=", rv1.__dict__
         self.assertEqual(rv1.vtype, 'R')
         rv2 = RefValue('ref2')
-        
+
         # Test ValueRef generation
         vr1 = cvc1._value_ref()
         self.assertEqual(vr1.identity, cvc1.identity)
@@ -124,7 +127,7 @@ class ValueStoreTest(unittest.TestCase):
         re1 = yield self.vs.exists_value(ValueObject('1').identity)
         self.assertTrue(re1)
         self.assertEqual(rvo1.identity, r1.identity)
-        
+
         r2 = yield self.vs.put_value('2')
         rt1 = yield self.vs.put_tree((r1,r2))
         r3 = yield self.vs.put_value('3')
@@ -144,10 +147,10 @@ class ValueStoreTest(unittest.TestCase):
         rv2 = yield self.vs.get_value(rt1)
         self.assertEqual(rv2.vtype, 'T')
         self.assertEqual(rv2.value['children'][0]['ref'], r1.identity)
-        
+
         rv3 = yield self.vs.get_value('not_exist')
         self.assertEqual(rv3, None)
-        
+
         rest1 = yield self.vs.get_tree_entries(rt1)
         print "rest1=", rest1
         self.assertEqual(len(rest1), 2)
@@ -166,12 +169,12 @@ class ValueStoreTest(unittest.TestCase):
         rc1 = yield self.vs.put_commit(rt1)
         rc2 = yield self.vs.put_commit(rt2,rc1)
         rc3 = yield self.vs.put_commit(rt2,rc2,committer='me')
-        
+
         rcg1 = yield self.vs.get_commit(rc1)
         self.assertEqual(rcg1.identity, rc1.identity)
         self.assertEqual(rcg1.value['parents'], [])
         self.assertEqual(rcg1.value['roottree'], rt1.identity)
-        
+
         rcgv1 = yield self.vs.get_commit_root_entriesvalues(rc1)
         self.assertEqual(len(rcgv1), 2)
         self.assertEqual(int(rcgv1[0].value.value)+int(rcgv1[1].value.value), 3)
@@ -180,9 +183,11 @@ class ObjectStoreTest(unittest.TestCase):
     """
     Testing object store
     """
-        
+
+    @defer.inlineCallbacks
     def setUp(self):
         self.os = ObjectStore()
+        yield self.os.init()
 
         self.vo1 = ValueObject('1')
         self.vo2 = ValueObject('2')
@@ -219,7 +224,7 @@ class ObjectStoreTest(unittest.TestCase):
         re1 = yield self.os.vs.exists_value(ValueObject('1').identity)
         re1 = yield self.os.vs.exists_value(self.vo1.identity)
         self.assertTrue(re1)
-        
+
         r2 = yield self.os.put('key2','2')
         print "r2=", r2.__dict__
 
@@ -236,7 +241,7 @@ class ObjectStoreTest(unittest.TestCase):
         self.assertTrue(re2)
         self.assertEqual(self.os._num_entities()-nume,1)
         self.assertEqual(self.os._num_values()-numv,3)
-        
+
         r4 = yield self.os.put('key4','4')
         r5 = yield self.os.put('key5','5')
         rt3 = yield self.os.put('tree4-5',(r4,r5))
@@ -262,19 +267,19 @@ class ObjectStoreTest(unittest.TestCase):
         r14 = yield self.os.put('key14','14',(r12,r13))
         r15 = yield self.os.put('key15','15',r14)
 
-        # Check get        
+        # Check get
         fg0 = yield self.os.get('not_exist')
         self.assertEqual(fg0, None)
-        
+
         fg1 = yield self.os.get('key1')
         print "fg1=", fg1.__dict__
         self.assertEqual(fg1.get_attr('value'),'1')
         self.assertEqual(fg1.get_attr('value'),self.vo1.value)
         self.assertEqual(fg1.identity,self.vo1.identity)
-        
+
         fg2 = yield self.os.get('key2')
         self.assertEqual(fg2.identity,self.vo2.identity)
-        
+
         fg3 = yield self.os.get('tree1-2')
         print "fg3=", fg3.__dict__
         #self.assertEqual(fg3.get_attr(self.vo1.identity).get_attr('value'),'1')
@@ -319,3 +324,23 @@ class ObjectStoreTest(unittest.TestCase):
         #print "ra15=", ra15
         #self.assertEqual(len(ra15),5)
 
+class ObjectStoreBackendsTest(unittest.TestCase):
+    """
+    Testing value store with different backends
+    """
+
+    @defer.inlineCallbacks
+    def test_CassandraBackend(self):
+        backargs = {"cass_host_list":['amoeba.ucsd.edu:9160']}
+        os = ObjectStore(backend=CassandraStore, backargs=backargs)
+        yield os.init()
+
+        r1 = yield os.put('key1','1')
+        self.assertTrue(isinstance(r1, ValueRef))
+        self.assertFalse(hasattr(r1, 'value'))
+
+        # Check that a value object actually was placed in the values store
+        re1 = yield os.vs.exists_value(ValueObject('1').identity)
+        self.assertTrue(re1)
+
+        r2 = yield os.put('key2','2')

@@ -16,9 +16,9 @@ from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
 
-class DatastoreServiceTest(IonTestCase):
+class AttrStoreServiceTest(IonTestCase):
     """
-    Testing service classes of data store
+    Testing service classes of attribute store
     """
     @defer.inlineCallbacks
     def setUp(self):

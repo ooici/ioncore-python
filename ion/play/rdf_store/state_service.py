@@ -23,6 +23,7 @@ class StateStoreService(BaseService):
     # Declaration of service
     declare = BaseService.service_declare(name='StateStore', version='0.1.0', dependencies=[])
 
+    @defer.inlineCallbacks
     def slc_init(self):
         # use spawn args to determine backend class, second config file
         #backendcls = self.spawnArgs.get('backend_class', CONF.getValue('backend_class', None))
@@ -34,6 +35,7 @@ class StateStoreService(BaseService):
         #
         #self.os = ObjectStore(backend=self.backend)
         self.os = ObjectStore(backend=Store)
+        yield self.os.init()
         logging.info("DatastoreService initialized")
 
     @defer.inlineCallbacks
@@ -58,13 +60,13 @@ class StateStoreService(BaseService):
         """
         logging.info("op_get: "+str(content))
         key = content['key']
-        
+
         commit=None
         if 'commit' in content:
             commit=content['commit']
 
         val = yield self.os.get(key,commit)
-        
+
         if val:
             val=val.encode()
         yield self.reply(msg, 'result',val , {})
