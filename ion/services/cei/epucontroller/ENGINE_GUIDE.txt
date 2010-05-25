@@ -1,0 +1,248 @@
+-----------------------------------
+Decision Engine Implementer's Guide
+-----------------------------------
+
+This describes the details of all EPU Controller <-> Decision Engine
+interactions/expectations.
+
+This documentation is kept up to date with the EPU Controller code, it lives
+alongside of it in the repository and needs to be up to date with the code in
+the same repository branch.  Thus, someone will be able to work with a
+particular checkout of the EPU Controller using a particular version of the
+engine guide.
+
+
+---------------
+Decision Engine
+---------------
+
+Decision engine implementations must inherit from:
+
+    ion.services.cei.decisionengine.Engine
+
+... and implement all of the methods with the semantics outlined in this
+document and the relevant docstrings.
+
+The abc (abstract base class) module is not present in Python 2.5 but Engine
+should be treated as such.  It is not meant to be instantiated directly.
+
+
+--------------
+EPU Controller
+--------------
+
+Objects that the controller passes to the engine must inherit from:
+
+    ion.services.cei.epucontroller.Control
+    ion.services.cei.epucontroller.State
+
+... and implement all of the methods with the semantics outlined in this
+document and the relevant docstrings.
+
+The abc (abstract base class) module is not present in Python 2.5 but the
+Control and State should be treated as such.  They are not meant to be
+instantiated directly.
+
+
+----------------------------
+Obtaining an Engine Instance
+----------------------------
+
+To obtain the decision engine instance that the EPU Controller will operate
+with during its lifetime, it relies on this sequence of events:
+
+    from ion.services.cei.decisionengine import EngineLoader
+    engine = EngineLoader().load("package.package.class")
+
+Where "package.package.class" is a string that the EPU Controller is configured
+with when it is instantiated.  As you might guess, the string is the fully
+qualified name of a class that the loader will instantiate.
+
+
+------------------------------
+Configuration / Initialization
+------------------------------
+
+Once an instance of engine is obtained, it is expected that the initialization
+method will be called:
+
+    engine.initialize(control, state, conf=None)
+
+As outlined below, control has a 'configure' method that the engine can
+employ at any time (initially, calling it will be relegated to the engine's
+initialization routines).
+
+    control.configure(parameters)
+
+The decision engine might perform any number of steps for any amount of time
+during the initialization phase.
+
+It is illegal to call the engine's 'decide' operation until the 'initialize'
+method has returned.  It is illegal to call the engine's 'decide' operation 
+if the 'initialize' method throws an exception.
+
+
+---------------------------------
+Current EPU Controller Parameters
+---------------------------------
+
+Legal content for the parameters dict:
+
+    ----------------------------------------------------------------------------
+    KEY: "timed-pulse-irregular"
+    
+    VALUE: An integer representing the milliseconds to wait between the
+    return of the previous 'decide' invocation and the beginning of the
+    next one.  Given that the 'decide' call's duration is unknown and
+    irregular, the pulse will also be irregular (as far as the wall clock
+    is concerned).
+    
+    REQUIRED: No.
+    
+    NOTES: If no other input is offered (and currently there is no other 
+    configuration), the controller uses this pulse method with an N ms
+    of its choosing (via configuration).
+    ----------------------------------------------------------------------------
+
+
+------
+Decide
+------
+
+See docstrings for usage syntax:
+
+    ion.services.cei.decisionengine.Engine
+
+The controller may only ever have one call open to the decision engine's
+'decide' operation, it can not call it again while a call is still pending
+(even if the configured time pulse duration has been exceeded).
+
+The controller may consider the decision engine's lack of a response by
+some deadline to be an error, that is out of scope of the decision engine
+implementation requirements.
+
+The engine gets an instance of 'control' and 'state'.  Control can be used to
+launch or terminate instances, state is used to inspect the current state of
+every relevant piece of information that the EPU Controller has received from
+the Sensor Aggregator.
+
+The decision engine must use the instance of 'control' and 'state' passed to the
+'decide' method during that invocation of it.  It may not retain those
+object references and use them at other times (via forking a thread, etc.).
+
+
+-----
+State
+-----
+
+The state object is a way for the engine to find out relevant information that
+has been collected by the EPU Controller.
+
+See docstrings for query syntax:
+
+    ion.services.cei.epucontroller.State
+    
+Using the State object results in acquiring lists of StateItem objects.
+
+One can think of this as a collection of three dimensional tables, one three
+dimensional table for each type of StateItem.
+
+For each *type* of StateItem, there is a collection of data points for each
+unique *key* differentiated by *time*
+
+
+---------
+StateItem
+---------
+
+Every StateItem has four fields.
+
+   *typename* well-known, unique string (listed below) for a certain kind of
+    information 
+    
+   *key* unique identifier, depends on the type
+    
+   *time* integer, unixtime the data was obtained by EPU Controller
+    
+   *value* arbitrary
+
+Unix time suffers from the "year 2038 problem," but will be used until a better
+representation is agreed upon.  Note that one of the main purposes of the
+timestamp is only for ordering the information historically relative to other
+data.
+
+
+---------------
+StateItem Types 
+---------------
+
+    ----------------------------------------------------------------------------
+    TYPENAME: "instance-state"
+    
+    KEY: VM instance ID.  Opaque but unique string of unknown length.
+    
+    VALUE: complex dict 
+    [[ TODO, probably farm doc out to an URL or class ]]
+    ----------------------------------------------------------------------------
+
+    ----------------------------------------------------------------------------
+    TYPENAME: "queue-length"
+    
+    KEY: work queue name of the HA message queue this EPU Controller is
+    monitoring.  Opaque but unique string of unknown length.
+    
+    VALUE: integer [[ TODO ]]
+    ----------------------------------------------------------------------------
+
+
+------------------
+Launch Description
+------------------
+
+This section describes the 'launch_description' parameter that the Control
+object's 'launch' method expects.
+
+launch_description is a dict containing any 'modulation' necessary for the
+deployable type launch.
+    
+    dict key: group name of instances to launch (e.g. "head-node").  The
+    correct values to use will be different for each deployable type.
+    
+    dict value: LaunchItem instance
+    
+LaunchItem embodies the four "knobs" that a decision engine has to controller
+a launch of a particular deployable type:
+
+    num_instances: The count of nodes necessary for this group in the launch.
+    
+    allocation_id: A string identifier that the Provisioner will recognize for
+    the site where this launch will be requested.  Updates to the available
+    allocations are currently coordinated out of band.
+    
+    site: A string identifer signifying what IaaS to request this launch from.
+    The Provisioner will recognize the identifier, updates to the available
+    sites are currently coordinated out of band.
+    
+    data: This is a dict of arbitrary key/value data that will be passed in to
+    each node in this group using the contextualization opaque data mechanism. 
+
+
+-------------
+Launch Result
+-------------
+
+The Control object's 'launch' method returns a tuple: 
+(the launch_id it chose, the launch_description with the chosen IDs filled in)
+
+The LaunchItem instance(s) that was passed in has a field called 'instance_ids'
+which is a list of identifiers that the controller has chosen for this launch
+and will deliver updates about via the 'state' table in future 'decide' calls.
+
+
+
+
+
+
+
+
+
