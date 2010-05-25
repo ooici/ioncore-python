@@ -20,7 +20,7 @@ class FetcherTest(IonTestCase):
                     'class': 'FetcherService'},]
         sup = yield self._spawn_processes(services)
 
-        self.fc = FetcherClient(sup)
+        self.fc = FetcherClient(proc=sup)
 
     @defer.inlineCallbacks
     def tearDown(self):

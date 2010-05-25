@@ -82,8 +82,10 @@ class FetcherClient(BaseServiceClient):
     Client class for the fetcher.
     @note RPC style interactions
     """
-    def __init__(self, proc=None, pid=None):
-        BaseServiceClient.__init__(self, "fetcher", proc, pid)
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "fetcher"
+        BaseServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def get_url(self, requested_url):
@@ -95,8 +97,7 @@ class FetcherClient(BaseServiceClient):
         yield self._check_init()
 
         logging.info('Sending request')
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'get_url',
-                                                      requested_url)
+        (content, headers, msg) = yield self.rpc_send('get_url', requested_url)
         if 'failure' in content:
             raise ValueError('Error on URL: ' + content['failure'])
         defer.returnValue(content)

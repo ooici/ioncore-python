@@ -19,7 +19,7 @@ class ResourceRegistryClientTest(unittest.TestCase):
     """
     Testing client classes of resource registry
     """
-    
+
     def test_ResourceDesc(self):
         # Instantiate without args and then set
         rd1 = ResourceDesc()
@@ -30,13 +30,13 @@ class ResourceRegistryClientTest(unittest.TestCase):
 
         # Instantiate with name only
         rd3 = ResourceDesc(res_type=ResourceTypes.RESTYPE_GENERIC)
-    
+
     def test_ResourceTypeDesc(self):
         # Instantiate without args
         rtd1 = ResourceTypeDesc()
         rtd1.setResourceTypeDesc(name='gen',res_type=ResourceTypes.RESTYPE_GENERIC)
         print "Object identity "+str(rtd1.identity)
-        
+
         self.assertEqual(rtd1.name,'gen')
         self.assertEqual(rtd1.res_type,ResourceTypes.RESTYPE_GENERIC)
 
@@ -48,7 +48,7 @@ class ResourceRegistryClientTest(unittest.TestCase):
         self.assertEqual(rtd3.name,'new')
         self.assertEqual(rtd3.based_on,ResourceTypes.RESTYPE_GENERIC)
         self.assertEqual(rtd3.res_type,ResourceTypes.RESTYPE_UNASSIGNED)
-        
+
 class ResourceRegistryTest(IonTestCase):
     """
     Testing service classes of resource registry
@@ -57,17 +57,17 @@ class ResourceRegistryTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        yield self._start_core_services()
+        self.sup = yield self._start_core_services()
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self._stop_container()
-   
+
     @defer.inlineCallbacks
     def test_resource_reg(self):
-        
+
         rd2 = ResourceDesc(name='res2',res_type=ResourceTypes.RESTYPE_GENERIC)
-        c = ResourceRegistryClient()
+        c = ResourceRegistryClient(proc=self.sup)
         rid = yield c.register_resource(rd2)
         logging.info('Resource registered with id '+str(rid))
 
@@ -78,6 +78,3 @@ class ResourceRegistryTest(IonTestCase):
 
         rd4 = yield c.get_resource_desc('NONE')
         self.assertFalse(rd4,'resource desc not None')
-
-       
-        

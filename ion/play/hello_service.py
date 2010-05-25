@@ -17,10 +17,10 @@ from ion.services.base_service import BaseService, BaseServiceClient
 class HelloService(BaseService):
     """Example service implementation
     """
-    
+
     # Declaration of service
     declare = BaseService.service_declare(name='hello', version='0.1.0', dependencies=[])
-    
+
     def __init__(self, receiver, spawnArgs=None):
         BaseService.__init__(self, receiver, spawnArgs)
         logging.info('HelloService.__init__()')
@@ -41,13 +41,15 @@ class HelloServiceClient(BaseServiceClient):
     This is an exemplar service class that calls the hello service. It
     applies the RPC pattern.
     """
-    def __init__(self, proc=None, pid=None):
-        BaseServiceClient.__init__(self, "hello", proc, pid)
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "hello"
+        BaseServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def hello(self, text='Hi there'):
         yield self._check_init()
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'hello', text, {})
+        (content, headers, msg) = yield self.rpc_send('hello', text)
         logging.info('Friends reply: '+str(content))
         defer.returnValue(str(content))
 

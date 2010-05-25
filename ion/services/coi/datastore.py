@@ -9,10 +9,14 @@
 import logging
 from twisted.internet import defer
 
+from ion.core import ioninit
 from ion.core.base_process import ProtocolFactory
 from ion.data.objstore import ObjectStore
+from ion.data.store import Store, IStore
 from ion.services.base_service import BaseService, BaseServiceClient
+import ion.util.procutils as pu
 
+CONF = ioninit.config(__name__)
 
 class DatastoreService(BaseService):
     """
@@ -24,7 +28,18 @@ class DatastoreService(BaseService):
     declare = BaseService.service_declare(name='datastore', version='0.1.0', dependencies=[])
 
     def slc_init(self):
-        self.os = ObjectStore()
+        # use spawn args to determine backend class, second config file
+        backendcls = self.spawnArgs.get('backend_class', CONF.getValue('backend_class', None))
+        if backendcls:
+            self.backend = pu.get_class(backendcls)
+        else:
+            self.backend = Store
+        assert issubclass(self.backend, IStore)
+        self.store = self.backend()
+        # Provide rest of the spawnArgs to init the store
+        self.store.init(**self.spawnArgs)
+
+        self.os = ObjectStore(backend=self.backend)
         logging.info("DatastoreService initialized")
 
     @defer.inlineCallbacks
@@ -43,7 +58,8 @@ class DatastoreService(BaseService):
 
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
-        """Service operation: Gets a structured object from the data store.
+        """
+        Service operation: Gets a structured object from the data store.
         Equivalent to a git-pull.
         """
         logging.info("op_get: "+str(content))
@@ -69,7 +85,7 @@ class DatastoreService(BaseService):
         """
         logging.info("op_get_ancestors: "+str(content))
         key = str(content['key'])
-        
+
         resvalues = []
         cref = yield self.os.get_commitref(key)
         ancs = yield self.os.vs.get_ancestors(cref)
@@ -80,25 +96,30 @@ class DatastoreClient(BaseServiceClient):
     """
     Class for the client accessing the object store service via ION Exchange
     """
-    def __init__(self, proc=None, pid=None):
-        BaseServiceClient.__init__(self, "datastore", proc, pid)
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "datastore"
+        BaseServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def put(self, key, value, parents=None):
         yield self._check_init()
         cont = {'key':str(key), 'value':value}
-        if parents and parents is list:
-            cont['parents'] = basedon
+
+        # Parents can be a string id, a list of strings, a tuple of strings or a set of strings.
+        if type(parents) is set:
+            cont['parents'] = list(parents)
         elif parents:
             cont['parents'] = [parents]
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'put', cont)
+
+        (content, headers, msg) = yield self.rpc_send('put', cont)
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content))
 
     @defer.inlineCallbacks
     def get(self, key):
         yield self._check_init()
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'get', {'key':str(key)})
+        (content, headers, msg) = yield self.rpc_send('get', {'key':str(key)})
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content['value']))
 
@@ -107,10 +128,6 @@ class DatastoreDirectClient(BaseServiceClient):
     Class for the client accessing the an object store via an out-of-band
     backend technology, such as a Cassandra or Redis client.
     """
-
-
-class DatastoreServiceClient(BaseServiceClient):
-    pass
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(DatastoreService)

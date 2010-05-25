@@ -17,9 +17,7 @@ import logging
 from twisted.internet import defer
 
 from ion.data.dataobject import DataObject
-from ion.data.cassandrads import CassandraStore
 from ion.data.store import Store
-from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
 
 
@@ -39,7 +37,7 @@ class ValueRef(object):
     @classmethod
     def _secure_value_hash(cls, value=None):
         """
-        Generate and return a unique, secure content value hash 
+        Generate and return a unique, secure content value hash
         @param value  value to generate a secure content hash for
         @retval hash for value
         """
@@ -48,13 +46,13 @@ class ValueRef(object):
         # Create a secure unique hash of value and child references
         hash = hashlib.sha1(enc_blob).hexdigest()
         return hash
-    
+
     def _value_ref(self):
         """
         Returns a new pure ValueRef instance with the identity of this value
         """
         return ValueRef(self.identity, self.vtype)
-    
+
 class ValueObject(ValueRef):
     """
     An instance of ValueObject represents an immutable value (blob) with an
@@ -135,7 +133,7 @@ class TreeEntry(object):
         entry['name'] = name
         entry['ref'] = childref
         self.entry = entry
-    
+
     @classmethod
     def from_entry(cls, entry):
         """
@@ -171,7 +169,7 @@ class CommitValue(ValueObject):
         assert hasattr(parents, '__iter__')
         roottree = _reftostr(roottree)
         assert not roottree or type(roottree) is str
-        
+
         # Save parents (immutable tuple of str)
         value = {}
         if kwargs:
@@ -225,7 +223,7 @@ class ValueStore(object):
         if not backend:
             backend = Store
         self.backend = backend
-        
+
         # KVS with value ID -> value
         self.objstore = backend()
         logging.info("ValueStore initialized")
@@ -296,7 +294,7 @@ class ValueStore(object):
                 # @todo should we encode it first?
                 childvo = ValueObject(child)
                 yield self.put_value(childvo)
-            
+
             childrefs.append(childvo.identity)
         treevalue = TreeValue(childrefs)
         yield self.put_value(treevalue)
@@ -397,12 +395,12 @@ class ObjectStore(object):
     trees and blob values. It is always possible to get value objects.
     @see ValueStore
     """
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         """
         Initialized object store
         @see ValueStore
         """
-        self.vs = ValueStore(*args)
+        self.vs = ValueStore(*args, **kwargs)
         # KVS with entity ID -> most recent value ID
         self.entityidx = self.vs.backend()
         logging.info("ObjectStore initialized")
@@ -412,10 +410,10 @@ class ObjectStore(object):
             return len(self.entityidx.kvs)
         except:
             return 0
-        
+
     def _num_values(self):
         return self.vs._num_values()
-        
+
     @defer.inlineCallbacks
     def put(self, key, value, parents=None, **kwargs):
         """
@@ -432,7 +430,7 @@ class ObjectStore(object):
         if isinstance(value, DataObject):
             # Got DataObject. Treat it as value, make tree
             vref = yield self.vs.put_value(value.encode())
-            roottreeref = yield self.vs.put_tree(vref)           
+            roottreeref = yield self.vs.put_tree(vref)
         elif isinstance(value, CommitValue):
             # Got CommitValue. Take the root tree for new commit
             roottreeref = value.value['roottree']
@@ -441,13 +439,13 @@ class ObjectStore(object):
             roottreeref = value
         elif isinstance(value, ValueObject):
             # Got ValueObject. Make tree with value
-            roottreeref = yield self.vs.put_tree(value)           
+            roottreeref = yield self.vs.put_tree(value)
         else:
             # Got any other value. Make it a value, create a tree
             # Note: of this is an iterator, multiple values will be created
             roottreeref = yield self.vs.put_tree(value)
-    
-        key = _reftostr(key)       
+
+        key = _reftostr(key)
         # Look into repo and get most recent entity commit. If no parent was
         # specified, set as parent (note some concurrent process might do the same)
         # @todo: is this the intended behavior? what if a client does not care?
@@ -457,30 +455,30 @@ class ObjectStore(object):
             if parents == None:
                 # No parents were specified but previous exists: set as parent
                 parents = [cref]
-        
+
         # Create commit and put in store
-        cref = yield self.vs.put_commit(roottreeref, parents, ts=pu.currenttime_ms(), committer='')
+        cref = yield self.vs.put_commit(roottreeref, parents, ts=pu.currenttime_ms(), **kwargs)
 
         # Update HEAD ref for entity to new commit
         yield self.put_entity(key, cref)
 
         logging.debug("ObjStore put commit=%s, #entities=%s, #values=%s" % (cref.identity, self._num_entities(), self._num_values()))
         #logging.debug("ObjStore state: EI="+str(self.entityidx.kvs)+", OS="+str(self.objstore.kvs))
-        
+
         # Return the new commit as ValueRef
         defer.returnValue(cref)
 
     @defer.inlineCallbacks
     def put_entity(self, key, commitref):
         # Update HEAD ref for entity
-        key = _reftostr(key)       
-        commitref = _reftostr(commitref)       
+        key = _reftostr(key)
+        commitref = _reftostr(commitref)
         yield self.entityidx.put(key, commitref)
 
     @defer.inlineCallbacks
     def get_entity(self, key):
         # Retrieve most recent commit for entity
-        key = _reftostr(key)       
+        key = _reftostr(key)
         cref = yield self.entityidx.get(key)
         defer.returnValue(cref)
 
@@ -501,10 +499,10 @@ class ObjectStore(object):
         @param key identifier of a mutable entity
         @retval hmmm what?
         """
-        key = _reftostr(key)       
+        key = _reftostr(key)
         cref = yield self.get_commitref(key)
         if not cref:
-            return    
+            return
         cvals = yield self.vs.get_commit_root_entriesvalues(cref)
         dobj = yield self._build_value(cvals, True)
         defer.returnValue(dobj)
@@ -545,7 +543,7 @@ class ObjectStore(object):
                     vdo = DataObject()
                     vdo.identity = value.identity
                     vdo.set_attr('value', value.value)
-                
+
                 if len(entries) == 1:
                     defer.returnValue(vdo)
                     return
@@ -567,57 +565,3 @@ class ObjectStore(object):
             val = yield self.get(key)
             res.append(val)
         defer.returnValue(res)
-        
-#----------------------------------------------------------
-
-class CassObjectStoreService(BaseService):
-
-    def slc_init(self):
-        self.kvs = CassandraStore(cass_host_list=['amoeba.ucsd.edu:9160'])
-        logging.debug('Cassandra object store service initialized ok')
-
-    @defer.inlineCallbacks
-    def op_put(self, content, headers, msg):
-        val = content['value']
-        key = content['key']
-
-        """Service operation: Puts a structured object into the data store.
-        Equivalent to a git-push, with an already locally commited object
-        """
-        logging.info("op_put: "+str(content))
-        childrefs = content['childrefs'] if 'childrefs' in content else None
-        basedon = content['basedon'] if 'basedon' in content else None
-        if isinstance(val,ValueObject):
-            v1 = ValueObject(**val.state)
-            assert val.identity == v1.identity
-            v = val
-        else:
-            v = ValueObject(val,childrefs,basedon)
-
-        """
-        @todo use self.kvs.query or read to check for pre-exist
-        """
-        ## Use dict to store
-        #if v.identity in self.objstore:
-        #    logging.info("op_put: value was already in obj store "+str(v.identity))
-
-        # Put value in object store
-        self.kvs.put(v.identity, str(v))
-        # Put into entity index
-        self.kvs.put(key, str(v))
-
-        # There is no need to return a value
-        yield self.reply(msg, 'result', self._get_value(v), {})
-
-    @defer.inlineCallbacks
-    def op_get(self, content, headers, msg):
-        val = self.kvs.get(content['key'])
-        yield self.reply(msg, 'result', self._get_value(val), {})
-
-    def _get_value(self, vo):
-        """Creates a return dict with ValueObject state and identity"""
-        if not vo:
-            return {}
-        voc = vo.state.copy()
-        voc['identity'] = vo.identity
-        return voc
