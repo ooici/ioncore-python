@@ -9,15 +9,15 @@ Porting from LCO implementation to new LCA arch - complete rewrite.
 
 import logging
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from twisted.web import proxy
 from twisted.web.http import Request, HTTPFactory
 
 from magnet.spawnable import Receiver
-
-import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+
+
+from ion.services.base_service import BaseService
 from ion.services.dm.coordinator import CoordinatorClient
 
 class ProxyService(BaseService):
@@ -69,3 +69,5 @@ class ProxyRequest(Request):
     def process(self):
         cc = CoordinatorClient()
         msg = yield cc.get_url(self.uri)
+
+factory = ProtocolFactory(ProxyService)

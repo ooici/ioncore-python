@@ -35,6 +35,7 @@ class CoordinatorService(BaseService):
         """
         logging.debug('CoordinatorService SLC init')
 
+    @defer.inlineCallbacks
     def op_get_url(self, content, headers, msg):
         """
         @brief Method for proxy - request a (DAP) URL
