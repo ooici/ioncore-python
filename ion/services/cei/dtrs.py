@@ -59,15 +59,17 @@ class DeployableTypeRegistryService(BaseService):
 class DeployableTypeRegistryClient(BaseServiceClient):
     """Client for accessing DTRS
     """
-    def __init__(self, proc=None, pid=None):
-        BaseServiceClient.__init__(self, "dtrs", proc, pid)
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "dtrs"
+        BaseServiceClient.__init__(self, proc, **kwargs)
         
     @defer.inlineCallbacks
     def lookup(self, dt, nodes=None):
         """Lookup a deployable type
         """
-        self._check_init()
-        (content, headers, msg) = yield self.proc.rpc_send(self.svc, 'lookup', {
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('lookup', {
             'deployable_type' : dt,
             'nodes' : nodes
         })
