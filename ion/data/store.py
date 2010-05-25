@@ -2,6 +2,8 @@
 
 """
 @file ion/data/store.py
+@package ion.data.IStore Pure virtual base class for CRUD
+@package ion.data.Store In-memory implementation of ion.data.IStore
 @author Michael Meisinger
 @brief base interface for all key-value stores in the system and default
         in memory implementation
@@ -17,6 +19,8 @@ class IStore(object):
     """
     Interface and abstract base class for all store backend implementations.
     All operations are returning deferreds and operate asynchronously.
+
+    @note Pure virtual abstract base class - must override methods!
     """
     def __init__(self, **kwargs):
         """
@@ -116,4 +120,3 @@ class Store(IStore):
 
     def _delete(self, key):
         del self.kvs[key]
-

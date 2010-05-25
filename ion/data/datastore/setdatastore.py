@@ -37,7 +37,7 @@ class SetCassandraStore():
     def smembers(self, key):
         """
         @brief Return a value corresponding to a given key
-        @param Key Cassandra key
+        @param key Cassandra key
         @retval Value from the ion dictionary, or None.
         The value returned can be a python dictionary, a python set, or
         an integer, float or string.

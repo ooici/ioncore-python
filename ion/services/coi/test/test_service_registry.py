@@ -10,7 +10,8 @@ import logging
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.services.coi.service_registry import *
+from ion.services.coi.service_registry import ServiceDesc, ServiceRegistryClient,\
+ ServiceInstanceDesc
 from ion.test.iontest import IonTestCase
 
 class ServiceRegistryClientTest(IonTestCase):

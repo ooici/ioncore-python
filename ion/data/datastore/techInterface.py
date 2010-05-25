@@ -37,7 +37,7 @@ class CassandraStore():
     def get(self, key):
         """
         @brief Return a value corresponding to a given key
-        @param Key Cassandra key
+        @param key Cassandra key
         @retval Value from the ion dictionary, or None. The value returned can be
         a python dictionary, a python set, or an integer, float or string.
         """
@@ -66,7 +66,7 @@ class CassandraStore():
         a python Set, or an integer, float or string.
         @retval None
         """
-        logging.info('writing key %s value %s' % (key, value))                
+        logging.info('writing key %s value %s' % (key, value))
         if type(value) == type(dict()):
             if '__value__' in value:
                 logging.error('The dictionary key "__value__" is reserved')
@@ -82,12 +82,12 @@ class CassandraStore():
                 col=hashlib.sha224(val).hexdigest()
                 d[str(col)]=val
             d['__set__']='True'
-            
-            self._kvs.insert(key, d)        
-        
+
+            self._kvs.insert(key, d)
+
         else:
             self._kvs.insert(key, {'__value__' : value})
-        
+
         logging.info('write complete')
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/data/test_objstore.py
+@file ion/data/test/test_objstore.py
 @author Michael Meisinger
 @brief test object store
 """

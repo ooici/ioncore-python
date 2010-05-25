@@ -1,9 +1,12 @@
 #!/usr/bin/env python
-
 """
 @file ion/data/backends/cassandra.py
 @author Paul Hubbard
 @author Michael Meisinger
+<<<<<<< HEAD
+=======
+@author Paul Hubbard
+>>>>>>> 617e221edbc1767a3e0a36253b29e39cb8f94dfb
 @author Dorian Raymer
 @brief Implementation of ion.data.store.IStore using pycassa to interface a
         Cassandra datastore backend
@@ -51,7 +54,7 @@ class CassandraStore(IStore):
     def get(self, key):
         """
         @brief Return a value corresponding to a given key
-        @param Key Cassandra key
+        @param key Cassandra key
         @retval Value from the ion dictionary, or None
         """
         value = None
