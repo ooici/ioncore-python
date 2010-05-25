@@ -91,7 +91,7 @@ class CassandraStore(IStore):
         klist = self.kvs.get_range()
         for x in klist:
             if re.search(regex, x[0]):
-                matched_list.append(x)
+                matched_list.append(x[0])
         return defer.succeed(matched_list)
 
     def delete(self, key):

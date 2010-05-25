@@ -116,7 +116,7 @@ class Store(IStore):
         """
         @see IStore.delete
         """
-        return defer.maybeDeferred(self._delete, key)
-
-    def _delete(self, key):
+        # could test for existance of key. this will error otherwise
         del self.kvs[key]
+        return defer.succeed(None)
+
