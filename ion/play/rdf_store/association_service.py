@@ -106,8 +106,8 @@ class AssociationServiceClient(BaseServiceClient):
         kd={'key':key} 
         (content, headers, msg) = yield self.rpc_send('get_association', kd)
         logging.info('Association Servie Client: get_association: '+str(content))
-        blob=DataObject.from_encoding(content)
-        defer.returnValue(blob)
+        association=DataObject.from_encoding(content)
+        defer.returnValue(association)
 
 
     @defer.inlineCallbacks
@@ -128,3 +128,4 @@ factory = ProtocolFactory(AssociationService)
 
 
 
+        
