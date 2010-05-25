@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/data/test/test_store.py
+@file ion/data/backends/test/test_cassandra.py
 @author Paul Hubbard
 @author Dorian Raymer
 @test Service only test of Cassandra datastore
@@ -19,22 +19,15 @@ class CassandraStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        logging.basicConfig(level=logging.WARN, \
-                format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
         clist = ['amoeba.ucsd.edu:9160']
-        self.ds = cassandra.CassandraStore(cass_host_list=clist)
-        yield self.ds.init()
-        self.key = self._mkey()
-        self.value = self._mkey()
+        self.ds = yield cassandra.CassandraStore.create_store(cass_host_list=clist)
+        self.key = str(uuid4())
+        self.value = str(uuid4())
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.ds.delete(self.key)
         del self.ds
-
-    def _mkey(self):
-        # Generate a pseudo-random string. handy, that.
-        return str(uuid4())
 
     @defer.inlineCallbacks
     def test_get_404(self):

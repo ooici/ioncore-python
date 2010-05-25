@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-@file ion/data/test/test_fetcher.py
+@file ion/services/dm/test/test_fetcher.py
 @author Paul Hubbard
 @date 5/7/10
 @test ion.data.fetcher Test of refactored fetcher
@@ -9,14 +9,14 @@
 import logging
 from twisted.internet import defer
 
-from ion.data.fetcher import FetcherClient
+from ion.services.dm.fetcher import FetcherClient
 from ion.test.iontest import IonTestCase
 
 class FetcherTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        services = [{'name':'fetcher', 'module':'ion.data.fetcher',
+        services = [{'name':'fetcher', 'module':'ion.services.dm.fetcher',
                     'class': 'FetcherService'},]
         sup = yield self._spawn_processes(services)
 

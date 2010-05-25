@@ -120,6 +120,9 @@ again (see above). Please review the branch logs for any hints.
 Change log:
 ===========
 
+2010-05-24:
+- Modified the IStore interface to support a create_store factory method. This
+  method can yield and return a deferred. Modified and fixed IStore impls.
 2010-05-22:
 - Added timeout to BaseProcess.rpc_send. Use with kwarg timeout=<secs>
 - CC-Agent detects missing known containers and removes them from the list

@@ -14,10 +14,11 @@ try:
 except:
     import simplejson as json
 import logging
+import pickle
 from twisted.internet import defer
 
 from ion.data.dataobject import DataObject
-from ion.data.store import Store
+from ion.data.store import IStore, Store
 import ion.util.procutils as pu
 
 
@@ -212,20 +213,26 @@ class ValueStore(object):
     The GIT distributed repository model is a strong design reference.
     Think GIT repository with commits, trees, blobs
     """
-    def __init__(self, name=None, qualifier=None, backend=None):
+    def __init__(self, backend=None, backargs=None):
         """
-        @param name  name of this object store (= namespace for objects)
-        @param qualifier  namespace for the object store
         @param backend  Class object with a compliant Store or None for memory
+        @param backargs arbitrary keyword arguments, for the backend
         """
-        self.name = name
-        self.qualifier = qualifier
-        if not backend:
-            backend = Store
-        self.backend = backend
+        self.backend = backend if backend else Store
+        self.backargs = backargs if backargs else {}
+        assert issubclass(self.backend, IStore)
+        assert type(self.backargs) is dict
 
         # KVS with value ID -> value
-        self.objstore = backend()
+        self.objstore = None
+
+    @defer.inlineCallbacks
+    def init(self):
+        """
+        Initializes the ValueStore class
+        @retval Deferred
+        """
+        self.objstore = yield self.backend.create_store(**self.backargs)
         logging.info("ValueStore initialized")
 
     def _num_values(self):
@@ -246,17 +253,19 @@ class ValueStore(object):
             if  oldval:
                 logging.info("put: value was already in obj store "+str(value.identity))
             # Put value in object store
-            yield self.objstore.put(value.identity, value)
+            yield self.objstore.put(value.identity, pickle.dumps(value))
         else:
             value = ValueObject(value)
             # Put value in object store
-            yield self.objstore.put(value.identity, value)
+            yield self.objstore.put(value.identity, pickle.dumps(value))
         defer.returnValue(value._value_ref())
 
     @defer.inlineCallbacks
     def get_value(self, valid):
         valid = _reftostr(valid)
         val = yield self.objstore.get(valid)
+        if val:
+            val = pickle.loads(val)
         defer.returnValue(val)
 
     @defer.inlineCallbacks
@@ -395,14 +404,22 @@ class ObjectStore(object):
     trees and blob values. It is always possible to get value objects.
     @see ValueStore
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, backend=None, backargs=None):
         """
-        Initialized object store
+        Initializes object store
         @see ValueStore
         """
-        self.vs = ValueStore(*args, **kwargs)
+        self.vs = ValueStore(backend, backargs)
         # KVS with entity ID -> most recent value ID
-        self.entityidx = self.vs.backend()
+        self.entityidx = None
+
+    @defer.inlineCallbacks
+    def init(self):
+        """
+        Initializes the ObjectStore class
+        """
+        yield self.vs.init()
+        self.entityidx = yield self.vs.backend.create_store(**self.vs.backargs)
         logging.info("ObjectStore initialized")
 
     def _num_entities(self):
