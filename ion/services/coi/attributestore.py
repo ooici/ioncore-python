@@ -26,17 +26,19 @@ class AttributeStoreService(BaseService):
                                           version='0.1.0',
                                           dependencies=[])
 
+    @defer.inlineCallbacks
     def slc_init(self):
         # use spawn args to determine backend class, second config file
         backendcls = self.spawnArgs.get('backend_class', CONF.getValue('backend_class', None))
+        backendargs = self.spawnArgs.get('backend_args', CONF.getValue('backend_args', {}))
         if backendcls:
             self.backend = pu.get_class(backendcls)
         else:
             self.backend = Store
         assert issubclass(self.backend, IStore)
-        self.store = self.backend()
+
         # Provide rest of the spawnArgs to init the store
-        self.store.init(**self.spawnArgs)
+        self.store = yield self.backend.create_store(**backendargs)
         logging.info("AttributeStoreService initialized")
 
     @defer.inlineCallbacks
@@ -49,7 +51,7 @@ class AttributeStoreService(BaseService):
         key = str(content['key'])
         val = content['value']
         res = yield self.store.put(key, val)
-        yield self.reply(msg, 'result', {'status':'OK', 'result':res})
+        yield self.reply_ok(msg, {'result':res})
 
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
@@ -59,7 +61,7 @@ class AttributeStoreService(BaseService):
         logging.info("op_get: "+str(content))
         key = str(content['key'])
         val = yield self.store.get(key)
-        yield self.reply(msg, 'result', {'status':'OK', 'value':val})
+        yield self.reply_ok(msg, {'value':val})
 
     @defer.inlineCallbacks
     def op_query(self, content, headers, msg):

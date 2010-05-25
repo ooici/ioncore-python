@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/core/bootstrap-dx.py
+@file res/scripts/bootstrap-dx.py
 @author Paul Hubbard
 @brief main module for bootstrapping data exchange
 """
