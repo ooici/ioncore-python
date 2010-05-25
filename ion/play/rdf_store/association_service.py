@@ -25,12 +25,10 @@ class AssociationService(BaseService):
     # Declaration of service
     declare = BaseService.service_declare(name='associations', version='0.1.0', dependencies=[])
 
-#    def __init__(self, receiver, spawnArgs=None):
-#        BaseService.__init__(self, receiver, spawnArgs)
-#        logging.info('HelloService.__init__()')
-
+    @defer.inlineCallbacks
     def slc_init(self):
         self.store = Store()
+        yield self.store.create_store()
 
     @defer.inlineCallbacks
     def op_put_association(self, content, headers, msg):
