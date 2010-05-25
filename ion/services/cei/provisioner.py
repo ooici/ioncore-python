@@ -4,12 +4,13 @@
 @file ion/services/cei/provisioner.py
 @author Michael Meisinger
 @author Alex Clemesha
+@author David LaBissoniere
 @brief Starts, stops, and tracks instance and context state.
 """
 
 import logging
 import uuid
-from twisted.internet import defer, reactor
+from twisted.internet import defer, reactor, threads
 
 from ion.services.base_service import BaseService
 from ion.core import base_process
@@ -27,6 +28,7 @@ class ProvisionerService(BaseService):
 
     def slc_init(self):
         self.store = ProvisionerStore()
+        self.core = ProvisionerCore(store)
     
     @defer.inlineCallbacks
     def op_provision(self, content, headers, msg):
@@ -34,28 +36,25 @@ class ProvisionerService(BaseService):
         """
         logging.info("op_provision content:"+str(content))
         
-        document, launch_record, node_records = yield self._expand_request(content)
+        launch, nodes = yield self._expand_request(content)
         
         #eventually should have some kind of bulk insert
-        self.store.put_state(launch_record['launch_id'], 
-                launch_record['state'], launch_record)
-        for record in node_records:
+        self.store.put_state(launch['launch_id'], launch['state'], launch)
+        for record in nodes:
             self.store.put_state(record['node_id'], record['state'], record)
 
         # now we can ACK the request as it is safe in datastore
 
         # set up a callLater to fulfill the request after the ack. Would be
         # cleaner to have explicit ack control.
-        reactor.callLater(0, self._fulfill_launch, document, launch_record, node_records)
+        reactor.callLater(0, self.core.fulfill_launch, launch, nodes)
 
-    def _fulfill_launch(self, document, launch, nodes):
-        logging.info('Time to fulfill this request, kids.')
         
     @defer.inlineCallbacks
     def _expand_request(self, request):
-        """Validates request and transforms it into a document and node records.
+        """Validates request and transforms it into launch and node records.
 
-        Returns a tuple (document, launch record, node records).
+        Returns a tuple (launch record, node records).
         """
         try:
             deployable_type = request['deployable_type']
@@ -76,7 +75,7 @@ class ProvisionerService(BaseService):
         doc = dt['document']
         node_groups = dt['nodes']
 
-        launch_record = _one_launch_record(launch_id, deployable_type,
+        launch_record = _one_launch_record(launch_id, doc, deployable_type,
                 subscribers)
 
         node_records = []
@@ -85,7 +84,7 @@ class ProvisionerService(BaseService):
             for node_id in node_ids:
                 node_records.append(_one_node_record(node_id, group, 
                     group_name, launch_record))
-        result = (doc, launch_record, node_records)
+        result = (launch_record, node_records)
         yield defer.returnValue(result)
 
     def op_terminate(self, content, headers, msg):
@@ -118,14 +117,86 @@ class ProvisionerService(BaseService):
         logging.info("Receipt has been taken.  content:"+str(content))
          
 
-def _one_launch_record(launch_id, dt, subscribers, state=states.Requested):
+class ProvisionerCore(object):
+    """Provisioner functionality that is not specific to the service.
+    """
+
+    def __init__(store):
+        self.store = store
+
+        #TODO how about a config file
+        nimbus_key = os.environ['NIMBUS_KEY']
+        nimbus_secret = os.environ['NIMBUS_SECRET']
+        nimbus_test_driver = NimbusNodeDriver(nimbus_key, secret=nimbus_secret,
+                host='https://nimbus.ci.uchicago.edu', port=8445)
+
+        self.node_drivers = {'nimbus-test' : nimbus_test_driver}
+        
+        self.ctx_client = ContextClient(
+                'https://nimbus.ci.uchicago.edu:8888/ContextBroker/ctx/', 
+                nimbus_key, nimbus_secret)
+        self.cluster_driver = ClusterDriver(ctx_client)
+
+    @defer.inlineCallbacks
+    def fulfill_launch(self, launch, nodes):
+
+        docstr = launch['document']
+        doc = NimbusClusterDocument(docstr)
+        
+        launch_groups = _get_launch_groups(nodes)
+        
+        context = None
+        if doc.needs_contextualization:
+            context = yield threads.deferToThread(_create_context)
+            logging.info('Created new context: ' + context.uri)
+
+            launch['context'] = context
+            launch['state'] = states.Pending #could have special launch states?
+            yield self.store.put_state(launch['launch_id'], launch['state'], launch)
+        cluster = cluster_driver.new_bare_cluster(context.uri)
+        specs = doc.build_specs(context)
+
+        #assumption here is that a launch group does not span sites or
+        #allocations. That may be a feature for later.
+
+        for spec in specs:
+            launch_group = launch_groups[spec.name]
+            site = launch_group[0]['site']
+
+            driver = self.drivers[site]
+
+            cluster.add_node(cluster_driver.launch_node_spec(spec, driver))
+
+
+    def _get_launch_groups(self, nodes):
+        """Breaks nodes into groups that can be launched in a single request.
+
+        Returns a dict of node lists, keyed by ctx-name.
+        """
+        sorted_nodes = list(nodes.iteritems())
+        keyf = lambda n: n['ctx_name']
+        sorted_nodes.sort(key=keyf)
+        groups = []
+        for key, group in groupby(nodes, keyf):
+            groups[key] = list(group)
+        return groups
+
+    def _create_context(self):
+        """Synchronous call to context broker.
+        """
+        return self.ctx_client.create_context()
+
+def _one_launch_record(launch_id, document, dt, subscribers, 
+        state=states.Requested):
     return {'launch_id' : launch_id,
+            'document' : document,
             'deployable_type' : dt,
             'subscribers' : subscribers,
             'state' : state,
             }
 
-def _one_node_record(node_id, group, group_name, launch, state=states.Requested):
+def _one_node_record(node_id, group, group_name, launch, 
+        state=states.Requested):
     return {'launch_id' : launch['launch_id'],
             'node_id' : node_id,
             'state' : state,
