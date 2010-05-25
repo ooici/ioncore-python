@@ -9,7 +9,7 @@
 import logging
 
 from twisted.trial import unittest
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from magnet import container
 from magnet.container import Id
 
@@ -61,6 +61,10 @@ class IonTestCase(unittest.TestCase):
         reinitialization.
         """
         logging.info("Closing ION container")
+        dcs = reactor.getDelayedCalls()
+        logging.info("Cancelling %s delayed reactor calls!" % len(dcs))
+        for dc in dcs:
+            dc.cancel()
         self.cont_conn.transport.loseConnection()
         container.Container._started = False
         container.Container.store = Store()
