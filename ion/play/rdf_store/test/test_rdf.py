@@ -98,9 +98,6 @@ class RdfTest(unittest.TestCase):
         self.assertEqual(state4,state3)
 
         
-
-        
-        
     def test_RdfAssociation(self):
         
         blob1 = RdfBlob.create(self.val1)

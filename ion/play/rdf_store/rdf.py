@@ -199,10 +199,16 @@ class RdfState(RdfBase):
 
 class RdfObject(object):
 
-    def __init__(self,rdf):
+    def __init__(self,backend=backend,backendargs=backendargs):
         
-        assert isinstance(rdf,(RdfState,RdfEntity))
-        self.rdf=rdf
+        
+        self.backend=backend
+        self.backendargs=backendargs
+        assert issubclass(self.backend, IStore)
+        assert type(self.backargs) is dict
+        
+        
+        self.rdf=rdf=None
         
         self.blobs={}  # ID:Blob
         self.associations={} # ID:Association
@@ -213,4 +219,16 @@ class RdfObject(object):
         s={subject.TYPE:subject.key}
         p={predicate.TYPE:predicate.key}
         o={object.TYPE:object.key}
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
             
