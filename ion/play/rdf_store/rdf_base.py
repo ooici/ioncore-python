@@ -359,3 +359,7 @@ class WorkSpace(object):
             size = len(self.references[item.key])
         return size
 
+    def diff(self, other):
+        assert isinstance(other, workspace)
+        # @Todo Impliment me!
+        return WorkSpace()

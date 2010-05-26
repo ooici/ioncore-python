@@ -7,7 +7,7 @@ from twisted.internet import defer
 from ion.data.store import Store, IStore
 from ion.data.set_store import SetStore, ISetStore
 
-from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfBase, RdfEntity, RdfState
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfBase, RdfEntity, RdfState, WorkSpace
 
 class RdfStore(object):
 
@@ -51,25 +51,28 @@ class RdfStore(object):
         yield self.a_refs.init()
         yield self.e_refs.init()
         
-    def add_association(self, rdf, subject, predicate, object):
-        
-        assert isinstance(rdf,(RdfEntity, RdfState))
-        
-        rdfa = RdfAssociation.create(subject,predicate,object)
-        
-        yield self.blobs.put_blob(subject)
-        yield self.blobs.put_blob(predicate)
-        yield self.blobs.put_blob(object)
-        
-        yield self.associations.put_association(rdfa)
-        yield self.a_refs.put_reference(subject, rdfa)
-        yield self.a_refs.put_reference(predicate, rdfa)    
-        yield self.a_refs.put_reference(object, rdfa)    
-
-        rdf.add(rdfa)
+    def checkout(self,key):
+        # calls to repos...
+        # pass result to WorkSpace.load()
+        # service will pass the whole workspace for now
+        return WorkSpace()
         
         
-    def discard_association(self,)
+        
+    def commit(self,workspace):
+        # Commit a workspace to the repository
+        # Service will pass the whole workspace for now!
+        pass
+    
+    # To be implemented later! Make it distributed so services can work locally!
+    def push(self,key,**kwargs):
+        pass
+    
+    def pull(self,key,**kwargs):
+        pass
+    
+    
+    
         
         
         
