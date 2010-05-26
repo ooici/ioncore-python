@@ -26,7 +26,7 @@ class SetDataStoreInterfaceTest(unittest.TestCase):
         self.value2 = self._mkey()
 
     def tearDown(self):
-        self.ds.delete(self.key)
+        self.ds.remove(self.key)
         del self.ds
 
     def _mkey(self):

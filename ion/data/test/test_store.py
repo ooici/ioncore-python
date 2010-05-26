@@ -21,15 +21,22 @@ class IStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        
-        self.ds = yield Store.create_store()
+        self.ds = yield self._setup_backend()
         self.key = str(uuid4())
         self.value = str(uuid4())
 
-    @defer.inlineCallbacks
+    def _setup_backend(self):
+        """return a deferred which returns a initiated instance of a
+        backend
+        """
+        d = Store.create_store()
+        return d
+
+    #@defer.inlineCallbacks
     def tearDown(self):
-        yield self.ds.delete(self.key)
-        del self.ds
+        #yield self.ds.remove(self.key)
+        #del self.ds #shouldn't need
+        pass
 
     @defer.inlineCallbacks
     def test_get_404(self):
@@ -41,11 +48,12 @@ class IStoreTest(unittest.TestCase):
     def test_write_and_delete(self):
         # Hmm, simplest op, just looking for exceptions
         yield self.ds.put(self.key, self.value)
+        yield self.ds.remove(self.key)
 
     @defer.inlineCallbacks
     def test_delete(self):
         yield self.ds.put(self.key, self.value)
-        yield self.ds.delete(self.key)
+        yield self.ds.remove(self.key)
         rc = yield self.ds.get(self.key)
         self.failUnlessEqual(rc, None)
 
@@ -55,6 +63,7 @@ class IStoreTest(unittest.TestCase):
         yield self.ds.put(self.key, self.value)
         b = yield self.ds.get(self.key)
         self.failUnlessEqual(self.value, b)
+        yield self.ds.remove(self.key)
 
     @defer.inlineCallbacks
     def test_query(self):
@@ -67,10 +76,8 @@ class IStoreTest(unittest.TestCase):
 
 class CassandraStoreTest(IStoreTest):
 
-    @defer.inlineCallbacks
-    def setUp(self):
+    def _setup_backend(self):
         clist = ['amoeba.ucsd.edu:9160']
-        self.ds = yield cassandra.CassandraStore.create_store(cass_host_list=clist)
-        self.key = str(uuid4())
-        self.value = str(uuid4())
+        d = cassandra.CassandraStore.create_store(cass_host_list=clist)
+        return d
 

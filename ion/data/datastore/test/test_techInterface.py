@@ -27,9 +27,9 @@ class TechInterfaceTest(unittest.TestCase):
         self.set.add(self._mkey())
         self.set.add(self._mkey())
         self.set.add(self._mkey())
-        
+
     def tearDown(self):
-        self.ds.delete(self.key)
+        self.ds.remove(self.key)
         del self.ds
 
     def _mkey(self):
@@ -47,10 +47,10 @@ class TechInterfaceTest(unittest.TestCase):
 
     def test_delete(self):
         self.ds.put(self.key, self.value)
-        self.ds.delete(self.key)
+        self.ds.remove(self.key)
         rc = self.ds.get(self.key)
         self.failUnlessEqual(rc, None)
-        
+
     def test_val_put_get_delete(self):
         # Write, then read to verify same
         self.ds.put(self.key, self.value)
@@ -62,13 +62,13 @@ class TechInterfaceTest(unittest.TestCase):
         self.ds.put(self.key,self.dict)
         b = self.ds.get(self.key)
         self.failUnlessEqual(self.dict, b)
-        
+
     def test_set_put_get_delete(self):
         # Write the dict, then read to verify the same
         self.ds.put(self.key,self.set)
         b = self.ds.get(self.key)
         self.failUnlessEqual(self.set, b)
-        
+
     def test_incr(self):
         a=self.ds.incr(self.key)
         self.failUnlessEqual(1, a)
@@ -76,9 +76,9 @@ class TechInterfaceTest(unittest.TestCase):
         self.failUnlessEqual(2, a)
 
 
-    
-    
-    
+
+
+
     def test_query(self):
         # Write a key, query for it, verify contents
         self.ds.put(self.key, self.value)
