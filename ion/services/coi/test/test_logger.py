@@ -8,14 +8,9 @@
 
 import logging
 from twisted.internet import defer
-from twisted.trial import unittest
 
-from ion.core import base_process
-from ion.data.objstore import ValueObject, TreeValue, CommitValue, RefValue, ValueRef
-from ion.data.objstore import ObjectStore, ValueStore
-from ion.services.coi.logger import LoggerService, LoggerClient
+from ion.services.coi.logger import LoggerClient
 from ion.test.iontest import IonTestCase
-import ion.util.procutils as pu
 
 
 class LoggerServiceTest(IonTestCase):
