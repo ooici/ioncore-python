@@ -28,7 +28,7 @@ class ISetStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self.ds.delete(self.key)
+        yield self.ds.remove(self.key)
         del self.ds
 
     @defer.inlineCallbacks
@@ -45,7 +45,7 @@ class ISetStoreTest(unittest.TestCase):
     @defer.inlineCallbacks
     def test_delete(self):
         yield self.ds.sadd(self.key, self.value1)
-        yield self.ds.delete(self.key)
+        yield self.ds.remove(self.key)
         rc = yield self.ds.smembers(self.key)
         self.failUnlessEqual(rc, None)
 

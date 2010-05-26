@@ -85,7 +85,7 @@ class ISetStore(object):
         @retval Deferred, integer representing the the cardinality of the set
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
-    
+
     def query(self, regex):
         """
         @param regex  regular expression matching zero or more keys
@@ -93,7 +93,7 @@ class ISetStore(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def delete(self, key):
+    def remove(self, key):
         """
         @param key  an immutable key associated with a value
         @retval Deferred, for success of this operation
@@ -132,7 +132,7 @@ class SetStore(ISetStore):
         """
         return defer.maybeDeferred(self._sremove, key, value)
 
-        
+
     def _sremove(self, key,value):
         self.kss[key].discard(value)
 
@@ -157,11 +157,11 @@ class SetStore(ISetStore):
     def _query(self, regex):
         return [re.search(regex,m).group() for m in self.kss.keys() if re.search(regex,m)]
 
-    def delete(self, key):
+    def remove(self, key):
         """
-        @see IStore.delete
+        @see IStore.remove
         """
-        return defer.maybeDeferred(self._delete, key)
+        return defer.maybeDeferred(self._remove, key)
 
-    def _delete(self, key):
+    def _remove(self, key):
         del self.kss[key]
