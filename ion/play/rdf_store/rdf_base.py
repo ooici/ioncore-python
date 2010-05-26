@@ -197,29 +197,29 @@ class RdfState(RdfBase):
 
 
 
-class RdfObject(object):
-
-    def __init__(self,backend=backend,backendargs=backendargs):
-        
-        
-        self.backend=backend
-        self.backendargs=backendargs
-        assert issubclass(self.backend, IStore)
-        assert type(self.backargs) is dict
-        
-        
-        self.rdf=rdf=None
-        
-        self.blobs={}  # ID:Blob
-        self.associations={} # ID:Association
-        self.entity={} # ID:Entity
-
-    def add_association(self,subject,predicate,object):
-        
-        s={subject.TYPE:subject.key}
-        p={predicate.TYPE:predicate.key}
-        o={object.TYPE:object.key}
-            
+#class RdfObject(object):
+#
+#    def __init__(self,backend=backend,backendargs=backendargs):
+#        
+#        
+#        self.backend=backend
+#        self.backendargs=backendargs
+#        assert issubclass(self.backend, IStore)
+#        assert type(self.backargs) is dict
+#        
+#        
+#        self.rdf=rdf=None
+#        
+#        self.blobs={}  # ID:Blob
+#        self.associations={} # ID:Association
+#        self.entity={} # ID:Entity
+#
+#    def add_association(self,subject,predicate,object):
+#        
+#        s={subject.TYPE:subject.key}
+#        p={predicate.TYPE:predicate.key}
+#        o={object.TYPE:object.key}
+#            
             
             
             

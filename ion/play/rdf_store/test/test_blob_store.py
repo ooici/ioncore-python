@@ -10,11 +10,11 @@ import logging
 
 from twisted.internet import defer
 
-from ion.play.rdf_store.blob_service import BlobServiceClient
+from ion.play.rdf_store.blob_store import BlobStore
 from ion.test.iontest import IonTestCase
 
-from ion.data.dataobject import DataObject
-from ion.data.objstore import ValueObject
+from ion.play.rdf_store.rdf_base import RdfBlob
+
 
 class BlobTest(IonTestCase):
     """Testing service classes of resource registry
@@ -22,38 +22,37 @@ class BlobTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._start_container()
-        services = [{'name':'blob1','module':'ion.play.rdf_store.blob_service','class':'BlobService'},]
+        self.bsc=BlobStore()
+        yield self.bsc.init()
+        
+        self.blob=RdfBlob.create('fancy value!')
 
-        sup = yield self._spawn_processes(services)
-
-        self.bsc = BlobServiceClient(proc=sup)
-        
-        d = dict()
-        d['a']=1
-        d['b']='b'
-        d['c']=3.14159
-        
-        self.dobj=DataObject.from_encoding(d)
-        blob = ValueObject(self.dobj.encode())
-        self.dobj_key=blob.identity
-        
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stop_container()
+        yield self.bsc.delete_blob(self.blob.key)
+        del self.bsc
+        
+    @defer.inlineCallbacks
+    def test_get_404(self):
+        # Make sure we can't read the not-written
+        rc = yield self.bsc.get_blob(self.blob.key)
+        self.failUnlessEqual(rc, None)
+
+    @defer.inlineCallbacks
+    def test_write_and_delete(self):
+        # Hmm, simplest op, just looking for exceptions
+        yield self.bsc.put_blob(self.blob)
+
+    @defer.inlineCallbacks
+    def test_delete(self):
+        yield self.bsc.put_blob(self.blob)
+        yield self.bsc.delete_blob(self.blob)
+        rc = yield self.bsc.get_blob(self.blob.key)
+        self.failUnlessEqual(rc, None)
 
     @defer.inlineCallbacks
     def test_put_get_delete(self):
-
-        res = yield self.bsc.put_blob(self.dobj)
-        self.assertEqual(res,self.dobj_key)
-        
-
-        res = yield self.bsc.get_blob(self.dobj_key)
-        self.assertEqual(res,self.dobj)
-        
-        res = yield self.bsc.del_blob(self.dobj_key)
-        self.assertEqual(res,'success')
-        
-        
-        
+        # Write, then read to verify same
+        yield self.bsc.put_blob(self.blob)
+        b = yield self.bsc.get_blob(self.blob.key)
+        self.failUnlessEqual(self.blob, b)

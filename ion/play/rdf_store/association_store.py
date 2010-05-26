@@ -8,43 +8,47 @@
 
 import logging
 from twisted.internet import defer
-from magnet.spawnable import Receiver
 
-import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.data.store import Store, IStore
+from ion.play.rdf_store.rdf_base import RdfAssociation
 
-from ion.data.dataobject import DataObject
-from ion.data.store import Store
-from ion.data.objstore import ValueObject
-
-class AssociationService(BaseService):
+class AssociationStore(object):
     """Example service implementation
     """
 
-    # Declaration of service
-    declare = BaseService.service_declare(name='associations', version='0.1.0', dependencies=[])
+    def __init__(self, backend=None, backargs=None):
+        """
+        @param backend  Class object with a compliant Store or None for memory
+        @param backargs arbitrary keyword arguments, for the backend
+        """
+        self.backend = backend if backend else Store
+        self.backargs = backargs if backargs else {}
+        assert issubclass(self.backend, IStore)
+        assert type(self.backargs) is dict
+
+        # KVS with value ID -> value
+        self.store = None
+
+    #@TODO make this also a class method so it is easier to start - one call?
+    @defer.inlineCallbacks
+    def init(self):
+        """
+        Initializes the ValueStore class
+        @retval Deferred
+        """
+        self.store = yield self.backend.create_store(**self.backargs)
+        logging.info("AssociationStore initialized")
+
 
     @defer.inlineCallbacks
-    def slc_init(self):
-        self.store = Store()
-        yield self.store.create_store()
-
-    @defer.inlineCallbacks
-    def op_put_association(self, content, headers, msg):
+    def put_association(self, association):
         '''
-        content is a DataObject encoding - a Dictionary!
-        For storing blobs, we really just want to store it encoded.
-        Can we get the serialized value from the messaging layer?
         '''
-        logging.info('op_put_association: '+str(content))
-        association = ValueObject(content)
-
-        yield self.store.put(association.identity, association.value)
+        assert isinstance(association, RdfAssociation)
+        yield self.store.put(association)
 
         # @ TODO add References!
 
-        # The following line shows how to reply to a message
         yield self.reply(msg, 'reply', {'Stored Key':association.identity}, {})
 
     @defer.inlineCallbacks
