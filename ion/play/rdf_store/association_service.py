@@ -25,12 +25,10 @@ class AssociationService(BaseService):
     # Declaration of service
     declare = BaseService.service_declare(name='associations', version='0.1.0', dependencies=[])
 
-#    def __init__(self, receiver, spawnArgs=None):
-#        BaseService.__init__(self, receiver, spawnArgs)
-#        logging.info('HelloService.__init__()')
-
+    @defer.inlineCallbacks
     def slc_init(self):
         self.store = Store()
+        yield self.store.create_store()
 
     @defer.inlineCallbacks
     def op_put_association(self, content, headers, msg):
@@ -65,7 +63,7 @@ class AssociationService(BaseService):
         '''
         # @ TODO remove References!
 
-        yield self.store.delete(content['key'])
+        yield self.store.remove(content['key'])
 
         # The following line shows how to reply to a message
         yield self.reply(msg, 'reply', {'result':'success'}, {})
@@ -105,8 +103,8 @@ class AssociationServiceClient(BaseServiceClient):
         kd={'key':key}
         (content, headers, msg) = yield self.rpc_send('get_association', kd)
         logging.info('Association Servie Client: get_association: '+str(content))
-        blob=DataObject.from_encoding(content)
-        defer.returnValue(blob)
+        association=DataObject.from_encoding(content)
+        defer.returnValue(association)
 
 
     @defer.inlineCallbacks
@@ -124,3 +122,4 @@ class AssociationServiceClient(BaseServiceClient):
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(AssociationService)
+

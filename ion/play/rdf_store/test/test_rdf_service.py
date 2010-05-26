@@ -7,7 +7,7 @@
 """
 
 import logging
-
+from twisted.trial import unittest
 from twisted.internet import defer
 
 from ion.play.rdf_store.reference_service import ReferenceServiceClient
@@ -17,6 +17,7 @@ from ion.data.dataobject import DataObject
 from ion.data.objstore import ValueObject
 
 from ion.play.rdf_store.rdf_service import RdfStore
+
 
 class ReferenceTest(IonTestCase):
     """Testing service classes of resource registry
@@ -28,7 +29,7 @@ class ReferenceTest(IonTestCase):
         
         print 'Started Container'
         self.rdfs=RdfStore()
-        self.rdfs.init()
+        yield self.rdfs.init()
         
         self.key='key1'
         self.ref1='ref1'

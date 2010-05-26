@@ -71,7 +71,7 @@ class AttributeStoreService(BaseService):
         # @todo implement
 
     @defer.inlineCallbacks
-    def op_delete(self, content, headers, msg):
+    def op_remove(self, content, headers, msg):
         """
         Service operation: Delete a value.
         """

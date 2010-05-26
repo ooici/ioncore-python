@@ -64,7 +64,7 @@ class BlobService(BaseService):
 
         '''
 
-        yield self.store.delete(content['key'])
+        yield self.store.remove(content['key'])
 
         # The following line shows how to reply to a message
         yield self.reply(msg, 'reply', {'result':'success'}, {})
