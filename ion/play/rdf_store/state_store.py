@@ -9,8 +9,9 @@
 import logging
 from twisted.internet import defer
 
-from ion.data.objstore import ObjectStore
+from ion.data.objstore import ObjectStore, ValueObject
 from ion.data.store import IStore, Store
+from ion.data.dataobject import DataObject
 
 from ion.play.rdf_store.rdf_base import RdfState, RdfEntity
 
@@ -49,28 +50,24 @@ class StateStore(object):
             parents=state.commitRefs
         else:
             parents=None
-            
-        rc=yield self.objstore.put(state.key, state.object, parents=parents)
+        
+        obj = ValueObject(list(state.object))
+        
+        rc=yield self.objstore.put(state.key, obj, parents=parents)
 
         defer.returnValue(rc)
         
 
     @defer.inlineCallbacks
-    def get_state(self, state):
+    def get_state(self, key,parents=None):
         '''
         '''
-        if not getattr(state, 'commitRefs', False):
-            parents=state.commitRefs
-        else:
-            parents=None
-        print 'parents', parents
-        print 'Key', state.key
-        dobj=yield self.objstore.get(state.key, commit=parents)
-        print 'dataobject1',dobj.value
-        print 'dataobject2',dobj.identity
+            
+        dobj=yield self.objstore.get(key, commit=parents)
+        
 
         if dobj:
-            state.object=dobj.value
+            state=RdfState.load(key,set(dobj.value),[dobj.commitRef])
         else:
             state=None
 

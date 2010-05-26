@@ -528,6 +528,10 @@ class ObjectStore(object):
 
         cvals = yield self.vs.get_commit_root_entriesvalues(cref)
         dobj = yield self._build_value(cvals, True)
+        
+        # @Note Add the commit Ref to the object returned!
+        if dobj:
+            dobj.set_attr('commitRef',cref)
         defer.returnValue(dobj)
 
     @defer.inlineCallbacks

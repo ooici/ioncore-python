@@ -27,6 +27,7 @@ class StateTest(IonTestCase):
         self.states=StateStore()
         yield self.states.init()
         
+        # make some associations with dummy payload
         self.assoc1 = RdfAssociation.load('key1',{'a':'dict'})
         self.assoc2 = RdfAssociation.load('key2',{'a':'dict'})
 
@@ -39,8 +40,7 @@ class StateTest(IonTestCase):
     @defer.inlineCallbacks
     def test_get_404(self):
         # Make sure we can't read the not-written
-        print 'hello1'
-        rc = yield self.states.get_state(RdfEntity.create(None))
+        rc = yield self.states.get_state('random key not in store')
         self.failUnlessEqual(rc, None)
 
     @defer.inlineCallbacks
@@ -52,9 +52,27 @@ class StateTest(IonTestCase):
     @defer.inlineCallbacks
     def test_put_get(self):
         # Write, then read to verify same
-        yield self.states.put_state(self.entity1)
-        e = yield self.states.get_state(RdfEntity.create(None,self.entity1.key))
-        self.failUnlessEqual(self.entity1, e)
+        
+        # Write a state
+        rc=yield self.states.put_state(self.entity1)
+        print 'commited',rc.identity
+        
+        # Read it back and check the object contents
+        s1 = yield self.states.get_state(self.entity1.key)
+        self.assertEqual(self.entity1.object, s1.object)
+        
+        # add an new association to the state and put it back again
+        s1.add(self.assoc2)
+        rc=yield self.states.put_state(s1)
+        print 'commited',rc.identity
+
+        # Get the new one back
+        s2 = yield self.states.get_state(self.entity1.key)
+        self.assertEqual(s2.object, s1.object)
+        
+        # Get the old one back!
+        #s3=yield self.states.get_state(s1.key, s1.commitRefs)
+        #self.assertEqual(s3.object,self.entity1.object)
         
         
         
