@@ -324,6 +324,30 @@ class ObjectStoreTest(unittest.TestCase):
         #print "ra15=", ra15
         #self.assertEqual(len(ra15),5)
 
+
+class ObjectStoreTest1(ObjectStoreTest):
+    """
+    Testing object store with different backend.
+    """
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        backargs = {"cass_host_list":['amoeba.ucsd.edu:9160']}
+        self.os = ObjectStore(backend=CassandraStore, backargs=backargs)
+        yield self.os.init()
+
+        self.vo1 = ValueObject('1')
+        self.vo2 = ValueObject('2')
+        self.vo3 = ValueObject('3')
+        self.vo4 = ValueObject('4')
+        self.vo5 = ValueObject('5')
+
+        self.tv1 = TreeValue((self.vo1, self.vo2))
+        self.tv2 = TreeValue((self.vo3, self.vo4))
+        self.tv3 = TreeValue(self.vo5)
+        self.tv4 = TreeValue(self.tv1)
+
+
 class ObjectStoreBackendsTest(unittest.TestCase):
     """
     Testing value store with different backends

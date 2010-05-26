@@ -120,9 +120,12 @@ again (see above). Please review the branch logs for any hints.
 Change log:
 ===========
 
-2010-05-24:
+2010-05-25:
+- Made Cassandra backend parameterizable with keyspace/colfamily and added
+  SuperColumn support.
 - Modified the IStore interface to support a create_store factory method. This
   method can yield and return a deferred. Modified and fixed IStore impls.
+  Changed delete to remove to be more compliant with standard collections.
 2010-05-22:
 - Added timeout to BaseProcess.rpc_send. Use with kwarg timeout=<secs>
 - CC-Agent detects missing known containers and removes them from the list

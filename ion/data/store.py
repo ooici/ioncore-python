@@ -48,12 +48,6 @@ class IStore(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def read(self, *args, **kwargs):
-        """
-        Inheritance safe alias for get
-        """
-        return self.get(*args, **kwargs)
-
     def put(self, key, value):
         """
         @param key  an immutable key to be associated with a value
@@ -63,12 +57,6 @@ class IStore(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def write(self, *args, **kwargs):
-        """
-        Inheritance safe alias for put
-        """
-        return self.put(*args, **kwargs)
-
     def query(self, regex):
         """
         @param regex  regular expression matching zero or more keys
@@ -76,7 +64,7 @@ class IStore(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def delete(self, key):
+    def remove(self, key):
         """
         @param key  an immutable key associated with a value
         @retval Deferred, for success of this operation
@@ -112,11 +100,11 @@ class Store(IStore):
     def _query(self, regex):
         return [re.search(regex,m).group() for m in self.kvs.keys() if re.search(regex,m)]
 
-    def delete(self, key):
+    def remove(self, key):
         """
-        @see IStore.delete
+        @see IStore.remove
         """
-        return defer.maybeDeferred(self._delete, key)
+        return defer.maybeDeferred(self._remove, key)
 
-    def _delete(self, key):
+    def _remove(self, key):
         del self.kvs[key]
