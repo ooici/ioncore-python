@@ -4,6 +4,7 @@
 @file ion/data/backends/test/test_cassandra.py
 @author Paul Hubbard
 @author Dorian Raymer
+@author David Stuebe
 @test Service test of IStore Implementation
 """
 

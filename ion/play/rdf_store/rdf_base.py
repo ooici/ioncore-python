@@ -3,7 +3,7 @@
 """
 @file ion/play/rdf_store/rdf_service.py
 @author David Stuebe
-@brief  RDF Store: rdf service
+@brief  RDF Base class for the objects used in the rdf store.
 """
 
 import logging

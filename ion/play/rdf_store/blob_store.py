@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/rdf_store/blob_service.py
+@file ion/play/rdf_store/blob_store.py
 @author David Stuebe
 @brief  RDF Store: blob service
 """

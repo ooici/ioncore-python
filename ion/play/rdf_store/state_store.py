@@ -1,105 +1,80 @@
 #!/usr/bin/env python
 
+"""
+@file ion/play/rdf_store/blob_service.py
+@author David Stuebe
+@brief  RDF Store: blob service
+"""
+
 import logging
 from twisted.internet import defer
 
-from ion.core import ioninit
-from ion.core.base_process import ProtocolFactory
 from ion.data.objstore import ObjectStore
-from ion.data.store import Store, IStore
-from ion.services.base_service import BaseService, BaseServiceClient
-import ion.util.procutils as pu
+from ion.data.store import IStore, Store
 
-from ion.data.dataobject import DataObject
+from ion.play.rdf_store.rdf_base import RdfState, RdfEntity
 
-CONF = ioninit.config(__name__)
 
-class StateStoreService(BaseService):
+class StateStore(object):
+    """Example service implementation
     """
-    Service to store and retrieve structured objects. Updating an object
-    will modify the object's state but keep the state history in place. It is
-    always possible to get value objects
-    """
-    # Declaration of service
-    declare = BaseService.service_declare(name='StateStore', version='0.1.0', dependencies=[])
-
-    @defer.inlineCallbacks
-    def slc_init(self):
-        # use spawn args to determine backend class, second config file
-        #backendcls = self.spawnArgs.get('backend_class', CONF.getValue('backend_class', None))
-        #if backendcls:
-        #    self.backend = pu.get_class(backendcls)
-        #else:
-        #    self.backend = Store
-        #assert issubclass(self.backend, IStore)
-        #
-        #self.os = ObjectStore(backend=self.backend)
-        self.os = ObjectStore(backend=Store)
-        yield self.os.init()
-        logging.info("DatastoreService initialized")
-
-    @defer.inlineCallbacks
-    def op_put(self, content, headers, msg):
+    def __init__(self, backend=None, backargs=None):
         """
-        Service operation: Puts a structured object into the data store.
-        Equivalent to a git-push, with an already locally commited object.
-        Replies with a result with the identity of the commit value
+        @param backend  Class object with a compliant Store or None for memory
+        @param backargs arbitrary keyword arguments, for the backend
         """
-        logging.info("op_put: "+str(content))
-        key = content['key']
-        val = DataObject.from_encoding(content['value'])
-        parents = content['parents'] if 'parents' in content else None
-        commitref = yield self.os.put(key, val, parents, committer=headers['sender'])
-        yield self.reply(msg, 'result', commitref.identity)
+        self.backend = backend if backend else Store
+        self.backargs = backargs if backargs else {}
+        assert issubclass(self.backend, IStore)
+        assert type(self.backargs) is dict
+
+        # KVS with value ID -> value
+        self.objstore = ObjectStore(backend=None, backargs=None)
+
+    #@TODO make this also a class method so it is easier to start - one call?
+    @defer.inlineCallbacks
+    def init(self):
+        """
+        Initializes the ObjectStore class
+        @retval Deferred
+        """
+        yield self.objstore.init()
+        logging.info("BlobStore initialized")
+        
+    @defer.inlineCallbacks
+    def put_state(self, state):
+        '''
+        '''
+        if not getattr(state, 'commitRefs', False):
+            parents=state.commitRefs
+        else:
+            parents=None
+            
+        rc=yield self.objstore.put(state.key, state.object, parents=parents)
+
+        defer.returnValue(rc)
+        
 
     @defer.inlineCallbacks
-    def op_get(self, content, headers, msg):
-        """
-        Service operation: Gets a structured object from the data store.
-        Equivalent to a git-pull.
-        """
-        logging.info("op_get: "+str(content))
-        key = content['key']
+    def get_state(self, state):
+        '''
+        '''
+        if not getattr(state, 'commitRefs', False):
+            parents=state.commitRefs
+        else:
+            parents=None
+        print 'parents', parents
+        print 'Key', state.key
+        dobj=yield self.objstore.get(state.key, commit=parents)
+        print 'dataobject1',dobj.value
+        print 'dataobject2',dobj.identity
 
-        commit=None
-        if 'commit' in content:
-            commit=content['commit']
+        if dobj:
+            state.object=dobj.value
+        else:
+            state=None
 
-        val = yield self.os.get(key,commit)
+        defer.returnValue(state)
 
-        if val:
-            val=val.encode()
-        yield self.reply(msg, 'result',val , {})
 
-factory = ProtocolFactory(StateStoreService)
 
-class StateServiceClient(BaseServiceClient):
-    """
-    Class for the client accessing the object store service via ION Exchange
-    """
-    def __init__(self, proc=None, **kwargs):
-        if not 'targetname' in kwargs:
-            kwargs['targetname'] = "StateStore"
-        BaseServiceClient.__init__(self, proc, **kwargs)
-
-    @defer.inlineCallbacks
-    def put(self, key, value, parents=None):
-        yield self._check_init()
-        cont = {'key':str(key), 'value':{'state':list(value)}}
-
-        # Parents can be a string id, a list of strings, a tuple of strings or a set of strings.
-        if type(parents) is set:
-            cont['parents'] = list(parents)
-        elif parents:
-            cont['parents'] = [parents]
-
-        (content, headers, msg) = yield self.rpc_send('put', cont)
-        logging.info('Service reply: '+str(content))
-        defer.returnValue(str(content))
-
-    @defer.inlineCallbacks
-    def get(self, key,commit=None):
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('get', {'key':str(key),'commit':commit})
-        logging.info('Service reply: '+str(content))
-        defer.returnValue(set(content['state']))

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/test/test_resource_registry.py
-@author Michael Meisinger
-@brief test service for registering resources and client classes
+@fileion/play/rdf_store/blob_store.py
+@author David Stuebe
+@brief  RDF Base class tests
 """
 
 import logging
