@@ -10,6 +10,7 @@
 
 import logging
 import uuid
+from itertools import groupby, izip
 from twisted.internet import defer, reactor, threads
 
 from ion.services.base_service import BaseService
@@ -38,17 +39,14 @@ class ProvisionerService(BaseService):
         
         launch, nodes = yield self._expand_request(content)
         
-        #eventually should have some kind of bulk insert
-        self.store.put_state(launch['launch_id'], launch['state'], launch)
-        for record in nodes:
-            self.store.put_state(record['node_id'], record['state'], record)
+        self.store.put_record(launch, states.Requested)
+        self.store.put_records(nodes, states.Requested)
 
         # now we can ACK the request as it is safe in datastore
 
         # set up a callLater to fulfill the request after the ack. Would be
         # cleaner to have explicit ack control.
         reactor.callLater(0, self.core.fulfill_launch, launch, nodes)
-
         
     @defer.inlineCallbacks
     def _expand_request(self, request):
@@ -149,10 +147,11 @@ class ProvisionerCore(object):
         if doc.needs_contextualization:
             context = yield threads.deferToThread(_create_context)
             logging.info('Created new context: ' + context.uri)
-
+            
             launch['context'] = context
-            launch['state'] = states.Pending #could have special launch states?
-            yield self.store.put_state(launch['launch_id'], launch['state'], launch)
+            #could have special launch states?
+            yield self.store.put_record(launch, states.Pending)
+        
         cluster = cluster_driver.new_bare_cluster(context.uri)
         specs = doc.build_specs(context)
 
@@ -162,11 +161,21 @@ class ProvisionerCore(object):
         for spec in specs:
             launch_group = launch_groups[spec.name]
             site = launch_group[0]['site']
-
             driver = self.drivers[site]
-
-            cluster.add_node(cluster_driver.launch_node_spec(spec, driver))
-
+            
+            iaas_nodes = yield threads.deferToThread(
+                    cluster_driver.launch_node_spec, spec, driver)
+            
+            # TODO so many failure cases missing
+            
+            cluster.add_node(iaas_nodes)
+                
+            for node_rec, iaas_node in izip(launch_group, iaas_nodes):
+                node_rec['public_ip'] = iaas_node.public_ip
+                node_rec['private_ip'] = iaas_node.private_ip
+                node_rec['extra'] = iaas_node.extra.copy()
+            
+            self.store.put_records(launch_group, states.Pending)
 
     def _get_launch_groups(self, nodes):
         """Breaks nodes into groups that can be launched in a single request.

@@ -24,20 +24,29 @@ class ProvisionerStoreTests(IonTestCase):
     def tearDown(self):
         self.store = None
     
+
     @defer.inlineCallbacks
     def test_put_get_states(self):
+
+        launch_id = new_id()
         
-        record = {'a' : 'fooo', 'b' : 'fooooop'}
-        id1 = str(uuid.uuid4())
-        id2 = str(uuid.uuid4())
+        records = [{'launch_id' : launch_id, 'node_id' : new_id(), 
+            'state' : states.Requested} for i in range(5)]
+
+        yield self.store.put_records(records)
+
+        result = yield self.store.get_all()
+        self.assertEqual(len(result), len(records))
+
+        one_rec = records[0]
+        yield self.store.put_record(one_rec, states.Pending)
+        result = yield self.store.get_all()
+        self.assertEqual(len(result), len(records)+1)
         
-        yield self.store.put_state(id1, states.Pending, record)
-        yield self.store.put_state(id1, states.Pending, record)
-        top_state = yield self.store.put_state(id1, states.Running, record)
-        yield self.store.put_state(id1, states.Pending, record)
-        
-        yield self.store.put_state(id2, states.Pending, record)
-        
-        records = yield self.store.get_states(id1)
-        self.assertEqual(len(records), 4)
-        self.assertEqual(records[0][0], top_state)
+        result = yield self.store.get_all(launch_id, one_rec['node_id'])
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]['state'], states.Pending)
+        self.assertEqual(result[1]['state'], states.Requested)
+
+def new_id():
+    return str(uuid.uuid4())
