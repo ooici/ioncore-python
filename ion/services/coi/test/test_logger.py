@@ -29,29 +29,33 @@ class LoggerServiceTest(IonTestCase):
     @defer.inlineCallbacks
     def test_log(self):
         services = [
-            {'name':'logger_test','module':'ion.services.coi.logger','class':'LoggerService'},
+            {
+                'name':'logger_test',
+                'module':'ion.services.coi.logger',
+                'class':'LoggerService'
+            },
         ]
         sup = yield self._spawn_processes(services)
 
         results = []
         logc = LoggerClient(proc=sup)
-        r = yield logc.logmsg('info','INFO log message 1','X','Y')
-        results.append(r)
-        logging.info('INFO logging: '+str(r))
+        run = yield logc.logmsg('info', 'INFO log message 1', 'X', 'Y')
+        results.append(run)
+        logging.info('INFO logging: '+str(run))
 
-        r = yield logc.logmsg('info','DEBUG log message 2','X','Y')
-        results.append(r)
-        logging.info('DEBUG logging: '+str(r))
+        run = yield logc.logmsg('info', 'DEBUG log message 2', 'X', 'Y')
+        results.append(run)
+        logging.info('DEBUG logging: '+str(run))
 
-        r = yield logc.logmsg('info','WARN log message 3','X','Y')
-        results.append(r)
-        logging.info('WARN logging: '+str(r))
+        run = yield logc.logmsg('info', 'WARN log message 3', 'X', 'Y')
+        results.append(run)
+        logging.info('WARN logging: '+str(run))
 
-        r = yield logc.logmsg('info','ERROR log message 4','X','Y')
-        results.append(r)
-        logging.info('ERROR logging: '+str(r))
+        run = yield logc.logmsg('info', 'ERROR log message 4', 'X', 'Y')
+        results.append(run)
+        logging.info('ERROR logging: '+str(run))
 
-        r = yield logc.logmsg('info','CRITICAL log message 5','X','Y')
-        results.append(r)
-        logging.info('CRITICAL logging: '+str(r))
+        run = yield logc.logmsg('info', 'CRITICAL log message 5', 'X', 'Y')
+        results.append(run)
+        logging.info('CRITICAL logging: '+str(run))
 
