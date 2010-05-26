@@ -147,7 +147,10 @@ class SBE49InstrumentDriver():
         """
         Execute the given command
         """
-        return (1, command)
+        if command in instrumentCommands:
+            return (1, command)
+        else:
+            return (0, command)
         
 class SBE49InstrumentAgent(InstrumentAgent):
 

@@ -81,6 +81,15 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability of the SBE49 driver to execute commands through the
         InstrumentAgentClient class
         """
-        response = yield self.IAClient.execute(['start', 'pumpon', 'stop'])
-        logging.debug("response is %s", response)
+        response = yield self.IAClient.execute(['start', 'badcommand', 'stop'])
+        self.assert_(isinstance(response, dict))
+        self.assert_('badcommand' in response)
+        self.assert_('start' in response)
+        self.assert_('stop' in response)
+        self.assert_(isinstance(response['start'], dict))
+        self.assert_(isinstance(response['stop'], dict))
+        self.assert_(isinstance(response['badcommand'], dict))
+        self.assert_(response['start']['status'] == 'OK')
+        self.assert_(response['stop']['status'] == 'OK')
+        self.assert_(response['badcommand']['status'] == 'ERROR')
         
