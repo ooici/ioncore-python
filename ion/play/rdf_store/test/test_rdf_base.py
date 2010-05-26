@@ -8,15 +8,8 @@
 
 import logging
 from twisted.trial import unittest
-from twisted.internet import defer
 
-from ion.data.dataobject import DataObject
-from ion.data.objstore import ValueObject
-
-from ion.play.rdf_store.rdf import RdfBase, RdfAssociation, RdfBlob, RdfEntity, RdfObject, RdfState, RdfObject
-
-
-
+from ion.play.rdf_store.rdf_base import RdfBase, RdfAssociation, RdfBlob, RdfEntity, RdfState
 
 class RdfTest(unittest.TestCase):
     """Testing service classes of resource registry

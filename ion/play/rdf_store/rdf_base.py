@@ -7,17 +7,9 @@
 """
 
 import logging
-from twisted.internet import defer
-from magnet.spawnable import Receiver
 
-import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
-from ion.core import bootstrap
-from ion.services.base_service import BaseService, BaseServiceClient
-
-from ion.data.dataobject import DataObject
-from ion.data.store import Store
-from ion.data.objstore import ValueObject, ValueRef
+# Use the Json serialization and hashing
+from ion.data.objstore import ValueRef
 
 from uuid import uuid4
 
@@ -197,32 +189,6 @@ class RdfState(RdfBase):
 
 
 
-#class RdfObject(object):
-#
-#    def __init__(self,backend=backend,backendargs=backendargs):
-#        
-#        
-#        self.backend=backend
-#        self.backendargs=backendargs
-#        assert issubclass(self.backend, IStore)
-#        assert type(self.backargs) is dict
-#        
-#        
-#        self.rdf=rdf=None
-#        
-#        self.blobs={}  # ID:Blob
-#        self.associations={} # ID:Association
-#        self.entity={} # ID:Entity
-#
-#    def add_association(self,subject,predicate,object):
-#        
-#        s={subject.TYPE:subject.key}
-#        p={predicate.TYPE:predicate.key}
-#        o={object.TYPE:object.key}
-#            
-            
-            
-            
             
             
             
