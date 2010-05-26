@@ -17,11 +17,12 @@ from ion.services.base_service import BaseService, BaseServiceClient
 
 from ion.data.dataobject import DataObject
 from ion.data.store import Store
-from ion.data.objstore import ValueObject
+from ion.data.objstore import ValueObject, ValueRef
 
 from ion.play.rdf_store.association_service import AssociationServiceClient
 from ion.play.rdf_store.blob_service import BlobServiceClient
 from ion.play.rdf_store.reference_service import ReferenceServiceClient
+
 
 
 class RdfStore(object):
