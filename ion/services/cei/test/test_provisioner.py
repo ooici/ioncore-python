@@ -47,12 +47,12 @@ class ProvisionerServiceTest(IonTestCase):
                 'nodes' : { 
                     'head-node' : {
                         'id' : [_new_id()],
-                        'site' : 'ec2-west',
+                        'site' : 'nimbus-test',
                         'allocation' : 'small',
                     },
                     'worker-node' : {
-                        'id' : [_new_id(), _new_id()],
-                        'site' : 'ec2-west',
+                        'id' : [_new_id(), _new_id(), _new_id()],
+                        'site' : 'nimbus-test',
                         'allocation' : 'small',
                     },
                 },
@@ -61,5 +61,5 @@ class ProvisionerServiceTest(IonTestCase):
         
         yield supervisor.send(pId, "provision", request)
 
-        yield pu.asleep(5) #async wait
+        yield pu.asleep(10) #async wait
 

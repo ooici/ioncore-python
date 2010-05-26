@@ -8,10 +8,16 @@
 @brief Starts, stops, and tracks instance and context state.
 """
 
+import os
 import logging
 import uuid
 from itertools import groupby, izip
 from twisted.internet import defer, reactor, threads
+
+from nimboss.node import NimbusNodeDriver
+from nimboss.ctx import ContextClient
+from nimboss.cluster import ClusterDriver
+from nimboss.nimbus import NimbusClusterDocument
 
 from ion.services.base_service import BaseService
 from ion.core import base_process
@@ -29,7 +35,7 @@ class ProvisionerService(BaseService):
 
     def slc_init(self):
         self.store = ProvisionerStore()
-        self.core = ProvisionerCore(store)
+        self.core = ProvisionerCore(self.store)
     
     @defer.inlineCallbacks
     def op_provision(self, content, headers, msg):
@@ -119,21 +125,21 @@ class ProvisionerCore(object):
     """Provisioner functionality that is not specific to the service.
     """
 
-    def __init__(store):
+    def __init__(self, store):
         self.store = store
 
         #TODO how about a config file
         nimbus_key = os.environ['NIMBUS_KEY']
         nimbus_secret = os.environ['NIMBUS_SECRET']
         nimbus_test_driver = NimbusNodeDriver(nimbus_key, secret=nimbus_secret,
-                host='https://nimbus.ci.uchicago.edu', port=8445)
+                host='nimbus.ci.uchicago.edu', port=8444)
 
         self.node_drivers = {'nimbus-test' : nimbus_test_driver}
         
         self.ctx_client = ContextClient(
                 'https://nimbus.ci.uchicago.edu:8888/ContextBroker/ctx/', 
                 nimbus_key, nimbus_secret)
-        self.cluster_driver = ClusterDriver(ctx_client)
+        self.cluster_driver = ClusterDriver(self.ctx_client)
 
     @defer.inlineCallbacks
     def fulfill_launch(self, launch, nodes):
@@ -145,14 +151,14 @@ class ProvisionerCore(object):
         
         context = None
         if doc.needs_contextualization:
-            context = yield threads.deferToThread(_create_context)
+            context = yield threads.deferToThread(self._create_context)
             logging.info('Created new context: ' + context.uri)
             
             launch['context'] = context
             #could have special launch states?
             yield self.store.put_record(launch, states.Pending)
         
-        cluster = cluster_driver.new_bare_cluster(context.uri)
+        cluster = self.cluster_driver.new_bare_cluster(context.uri)
         specs = doc.build_specs(context)
 
         #assumption here is that a launch group does not span sites or
@@ -161,14 +167,20 @@ class ProvisionerCore(object):
         for spec in specs:
             launch_group = launch_groups[spec.name]
             site = launch_group[0]['site']
-            driver = self.drivers[site]
+            driver = self.node_drivers[site]
+
+            logging.info('Launching group '+spec.name)
             
             iaas_nodes = yield threads.deferToThread(
-                    cluster_driver.launch_node_spec, spec, driver)
+                    self.cluster_driver.launch_node_spec, spec, driver)
             
             # TODO so many failure cases missing
             
             cluster.add_node(iaas_nodes)
+
+            # underlying node driver may return a list or an object
+            if not hasattr(iaas_nodes, '__iter__'):
+                iaas_nodes = [iaas_nodes]
                 
             for node_rec, iaas_node in izip(launch_group, iaas_nodes):
                 node_rec['public_ip'] = iaas_node.public_ip
@@ -177,23 +189,23 @@ class ProvisionerCore(object):
             
             self.store.put_records(launch_group, states.Pending)
 
-    def _get_launch_groups(self, nodes):
-        """Breaks nodes into groups that can be launched in a single request.
-
-        Returns a dict of node lists, keyed by ctx-name.
-        """
-        sorted_nodes = list(nodes.iteritems())
-        keyf = lambda n: n['ctx_name']
-        sorted_nodes.sort(key=keyf)
-        groups = []
-        for key, group in groupby(nodes, keyf):
-            groups[key] = list(group)
-        return groups
-
     def _create_context(self):
         """Synchronous call to context broker.
         """
         return self.ctx_client.create_context()
+
+def _get_launch_groups(nodes):
+    """Breaks nodes into groups that can be launched in a single request.
+
+    Returns a dict of node lists, keyed by ctx-name.
+    """
+    sorted_nodes = list(nodes)
+    keyf = lambda n: n['ctx_name']
+    sorted_nodes.sort(key=keyf)
+    groups = {}
+    for key, group in groupby(nodes, keyf):
+        groups[key] = list(group)
+    return groups
 
 def _one_launch_record(launch_id, document, dt, subscribers, 
         state=states.Requested):
@@ -212,7 +224,7 @@ def _one_node_record(node_id, group, group_name, launch,
             'state_desc' : None,
             'site' : group['site'],
             'allocation' : group['allocation'],
-            'ctx-name' : group_name,
+            'ctx_name' : group_name,
             }
         
 # Spawn of the process using the module name

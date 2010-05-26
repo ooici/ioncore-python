@@ -43,7 +43,7 @@ class TestDeployableTypeRegistryService(IonTestCase):
         client = DeployableTypeRegistryClient(pid=dtrsId)
         nodes = {
             'head-node' : {'site' : 'ec2-west'},
-            'worker-node' : {'site' : 'nimbus-uc'}}
+            'worker-node' : {'site' : 'nimbus-test'}}
 
         result = yield client.lookup('base-cluster', nodes=nodes)
         doc = result['document']
