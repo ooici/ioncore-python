@@ -18,7 +18,7 @@ class ISetStoreTest(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         
-        self.ds = yield SetStore.create_set_store()
+        self.ds = yield SetStore.create_store()
         self.key = str(uuid4())
         self.value1 = str(uuid4())
         self.value2 = str(uuid4())
@@ -32,7 +32,7 @@ class ISetStoreTest(unittest.TestCase):
     def test_get_404(self):
         # Make sure we can't read the not-written
         rc = yield self.ds.smembers(self.key)
-        self.failUnlessEqual(rc, None)
+        self.failUnlessEqual(rc, set())
 
     @defer.inlineCallbacks
     def test_write_and_delete(self):
@@ -44,7 +44,7 @@ class ISetStoreTest(unittest.TestCase):
         yield self.ds.sadd(self.key, self.value1)
         yield self.ds.remove(self.key)
         rc = yield self.ds.smembers(self.key)
-        self.failUnlessEqual(rc, None)
+        self.failUnlessEqual(rc, set())
 
     @defer.inlineCallbacks
     def test_put_get_delete(self):

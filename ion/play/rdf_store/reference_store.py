@@ -8,122 +8,73 @@
 
 import logging
 from twisted.internet import defer
-from magnet.spawnable import Receiver
 
-import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.data.set_store import SetStore, ISetStore
 
-from ion.data.dataobject import DataObject
-from ion.data.store import Store
-from ion.data.objstore import ValueObject
-
-class ReferenceService(BaseService):
+class ReferenceStore(object):
     """Example service implementation
     """
+    def __init__(self, backend=None, backargs=None):
+        """
+        @param backend  Class object with a compliant Store or None for memory
+        @param backargs arbitrary keyword arguments, for the backend
+        """
+        self.backend = backend if backend else SetStore
+        self.backargs = backargs if backargs else {}
+        assert issubclass(self.backend, ISetStore)
+        assert type(self.backargs) is dict
 
-    # Declaration of service
-    declare = BaseService.service_declare(name='references', version='0.1.0', dependencies=[])
+        # KVS with value ID -> value
+        self.setstore = None
 
-#    def __init__(self, receiver, spawnArgs=None):
-#        BaseService.__init__(self, receiver, spawnArgs)
-#        logging.info('HelloService.__init__()')
-
-    def slc_init(self):
-        self.kss={}
+    #@TODO make this also a class method so it is easier to start - one call?
+    @defer.inlineCallbacks
+    def init(self):
+        """
+        Initializes the ValueStore class
+        @retval Deferred
+        """
+        self.setstore = yield self.backend.create_store(**self.backargs)
+        logging.info("Reference Store (Sets) initialized")
 
     @defer.inlineCallbacks
-    def op_add_reference(self, content, headers, msg):
+    def add_references(self, key, references):
         '''
         '''
-        logging.info('op_add_reference: '+str(content))        
-        key = content['key']
-        reference = content['reference']
+        if not getattr(references, '__iter__', False):
+            references = (references,)
+
+        for ref in references:
+            rc=yield self.setstore.sadd(key,ref)
+        # @Todo What do I do with multiple returns from a yield?
+
+        defer.returnValue(rc)
         
-        if key in self.kss:
-            self.kss[key].add(reference)
-        else:
-            self.kss[key]=set([reference])
-
-        # The following line shows how to reply to a message
-        yield self.reply(msg, 'reply', {'Referenced Key':key}, {})
-
     @defer.inlineCallbacks
-    def op_get_references(self, content, headers, msg):
+    def remove_references(self, key, references):
         '''
         '''
-        logging.info('op_get_references: '+str(content)) 
-        key = content['key']
-        ref=self.kss[key]
-        ref=list(ref)
-        yield self.reply(msg, 'reply', {'references':ref}, {})
+        if not getattr(references, '__iter__', False):
+            references = (references,)
 
-    @defer.inlineCallbacks
-    def op_del_reference(self, content, headers, msg):
-        '''
- 
-        '''
-        key = content['key']
-        reference = content['reference']
-        
-        self.kss[key].discard(reference)
-        
-        # The following line shows how to reply to a message
-        yield self.reply(msg, 'reply', {'result':'success'}, {})
+        for ref in references:
+            rc = yield self.setstore.sremove(key,ref)
+            
+        defer.returnValue(rc)
 
 
-class ReferenceServiceClient(BaseServiceClient):
-    """
-    This is an exemplar service class that calls the hello service. It
-    applies the RPC pattern.
-    """
-    def __init__(self, proc=None, **kwargs):
-        if not 'targetname' in kwargs:
-            kwargs['targetname'] = "references"
-        BaseServiceClient.__init__(self, proc, **kwargs)
-
-    @defer.inlineCallbacks
-    def add_reference(self, key,reference):
-        '''
-        @param reference A DataObject reference to be stored
-        '''
-        yield self._check_init()
-
-        kd={'key':key,'reference':reference} 
-
-        (content, headers, msg) = yield self.rpc_send('add_reference', kd)
-        logging.info('reference Servie Client: put_reference: '+str(content))
-        defer.returnValue(content['Referenced Key'])
-        
     @defer.inlineCallbacks
     def get_references(self, key):
         '''
-        @param key, A key for a stored reference
         '''
-        yield self._check_init()
-        
-        # assert ?
-        kd={'key':key} 
-        (content, headers, msg) = yield self.rpc_send('get_references', kd)
-        logging.info('reference Servie Client: get_references: '+str(content))
-        defer.returnValue(content['references'])
+        rc = yield self.setstore.smembers(key)
+            
+        defer.returnValue(rc)
 
 
     @defer.inlineCallbacks
-    def del_reference(self, key,reference):
-        '''
-        @param key, A key for a stored reference
-        '''
-        yield self._check_init()
-        
-        # assert ?
-        kd={'key':key,'reference':reference} 
-        (content, headers, msg) = yield self.rpc_send('del_reference', kd)
-        logging.info('reference Servie Client: del_reference: '+str(content))
-        defer.returnValue(content['result'])        
-
-# Spawn of the process using the module name
-factory = ProtocolFactory(ReferenceService)
-
+    def delete(self, key):
+        rc=yield self.setstore.remove(key)
+        defer.returnValue(rc)
 
 

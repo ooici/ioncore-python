@@ -30,7 +30,7 @@ class ISetStore(object):
         pass
 
     @classmethod
-    def create_set_store(cls, **kwargs):
+    def create_store(cls, **kwargs):
         """
         @brief Factory method to create an instance of the store.
         @param kwargs arbitrary keyword arguments interpreted by the subclass to
@@ -112,7 +112,7 @@ class SetStore(ISetStore):
         """
         @see ISetStore.smembers
         """
-        return defer.maybeDeferred(self.kss.get, key, None)
+        return defer.maybeDeferred(self.kss.get, key, set())
 
     def sadd(self, key, member):
         """
@@ -163,11 +163,9 @@ class SetStore(ISetStore):
         """
         @see IStore.remove
         """
-        return defer.maybeDeferred(self._remove, key)
-
-    def _remove(self, key):
         if self.kss.has_key(key):
             del self.kss[key]
+        return defer.succeed(None)
 
 
 
