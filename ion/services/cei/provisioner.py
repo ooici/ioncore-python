@@ -35,7 +35,8 @@ class ProvisionerService(BaseService):
 
     def slc_init(self):
         self.store = ProvisionerStore()
-        self.core = ProvisionerCore(self.store)
+        self.notifier = ProvisionerNotifier(self)
+        self.core = ProvisionerCore(self.store, self.notifier)
     
     @defer.inlineCallbacks
     def op_provision(self, content, headers, msg):
@@ -43,7 +44,7 @@ class ProvisionerService(BaseService):
         """
         logging.info("op_provision content:"+str(content))
         
-        launch, nodes = yield self._expand_request(content)
+        launch, nodes = yield self.core.expand_request(content)
         
         self.store.put_record(launch, states.Requested)
         self.store.put_records(nodes, states.Requested)
@@ -53,43 +54,6 @@ class ProvisionerService(BaseService):
         # set up a callLater to fulfill the request after the ack. Would be
         # cleaner to have explicit ack control.
         reactor.callLater(0, self.core.fulfill_launch, launch, nodes)
-        
-    @defer.inlineCallbacks
-    def _expand_request(self, request):
-        """Validates request and transforms it into launch and node records.
-
-        Returns a tuple (launch record, node records).
-        """
-        try:
-            deployable_type = request['deployable_type']
-            nodes = request['nodes']
-            launch_id = request['launch_id']
-            subscribers = request['subscribers'] #what will this look like?
-        except KeyError:
-            logging.error('Request was malformed')
-            #TODO error handling, what?
-            yield defer.fail()
-
-        #TODO how to do this lookup once for the service?
-        dtrs_id = yield base_process.procRegistry.get("dtrs")
-        dtrs = DeployableTypeRegistryClient(pid=dtrs_id)
-
-        dt = yield dtrs.lookup(deployable_type, nodes)
-
-        doc = dt['document']
-        node_groups = dt['nodes']
-
-        launch_record = _one_launch_record(launch_id, doc, deployable_type,
-                subscribers)
-
-        node_records = []
-        for (group_name, group) in node_groups.iteritems():
-            node_ids = group['id']
-            for node_id in node_ids:
-                node_records.append(_one_node_record(node_id, group, 
-                    group_name, launch_record))
-        result = (launch_record, node_records)
-        yield defer.returnValue(result)
 
     def op_terminate(self, content, headers, msg):
         """Service operation: Terminate a taskable resource
@@ -125,8 +89,9 @@ class ProvisionerCore(object):
     """Provisioner functionality that is not specific to the service.
     """
 
-    def __init__(self, store):
+    def __init__(self, store, notifier):
         self.store = store
+        self.notifier = notifier
 
         #TODO how about a config file
         nimbus_key = os.environ['NIMBUS_KEY']
@@ -141,6 +106,43 @@ class ProvisionerCore(object):
                 nimbus_key, nimbus_secret)
         self.cluster_driver = ClusterDriver(self.ctx_client)
 
+    @defer.inlineCallbacks
+    def expand_request(self, request):
+        """Validates request and transforms it into launch and node records.
+
+        Returns a tuple (launch record, node records).
+        """
+        try:
+            deployable_type = request['deployable_type']
+            nodes = request['nodes']
+            launch_id = request['launch_id']
+            subscribers = request['subscribers'] #what will this look like?
+        except KeyError:
+            logging.error('Request was malformed')
+            #TODO error handling, what?
+            yield defer.fail()
+
+        #TODO how to do this lookup once for the service?
+        dtrs_id = yield base_process.procRegistry.get("dtrs")
+        dtrs = DeployableTypeRegistryClient(pid=dtrs_id)
+
+        dt = yield dtrs.lookup(deployable_type, nodes)
+
+        doc = dt['document']
+        node_groups = dt['nodes']
+
+        launch_record = _one_launch_record(launch_id, doc, deployable_type,
+                subscribers)
+
+        node_records = []
+        for (group_name, group) in node_groups.iteritems():
+            node_ids = group['id']
+            for node_id in node_ids:
+                node_records.append(_one_node_record(node_id, group, 
+                    group_name, launch_record))
+        result = (launch_record, node_records)
+        yield defer.returnValue(result)
+    
     @defer.inlineCallbacks
     def fulfill_launch(self, launch, nodes):
 
@@ -193,6 +195,15 @@ class ProvisionerCore(object):
         """Synchronous call to context broker.
         """
         return self.ctx_client.create_context()
+
+class ProvisionerNotifier(object):
+    """Abstraction for sending node updates to subscribers.
+    """
+    def __init__(self, process):
+        self.process = process
+
+    def send_record(self, record, subscribers=None):
+        pass
 
 def _get_launch_groups(nodes):
     """Breaks nodes into groups that can be launched in a single request.
