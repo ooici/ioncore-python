@@ -98,7 +98,11 @@ class Store(IStore):
         return defer.maybeDeferred(self._query, regex)
 
     def _query(self, regex):
-        return [re.search(regex,m).group() for m in self.kvs.keys() if re.search(regex,m)]
+        keys = [re.search(regex,m).group() for m in self.kvs.keys() if re.search(regex,m)]
+        match_list=[]
+        for key in keys:
+            match_list.append((key, self.kvs.get(key)))
+        return match_list
 
     def remove(self, key):
         """

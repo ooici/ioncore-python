@@ -13,6 +13,7 @@ logging.debug('Loaded: '+ __name__)
 
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 from ion.core.base_process import ProtocolFactory
+from ion.services.coi.resource_registry import ResourceLCState as LCS
 
 
 instrumentCommands = (
@@ -146,11 +147,15 @@ class SBE49InstrumentDriver():
         """
         Execute the given command
         """
-        return (1, command)
+        if command in instrumentCommands:
+            return (1, command)
+        else:
+            return (0, command)
         
 class SBE49InstrumentAgent(InstrumentAgent):
 
     __driver = SBE49InstrumentDriver()
+    lifecycleState = LCS.RESLCS_NEW
     
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
@@ -158,6 +163,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         React to a request for parameter values,
         @return A reply message containing a dictionary of name/value pairs
         """
+        assert(isinstance(content, list))
         response = {}
         for key in content:
             response[key] = self.__driver.fetch_param(key)
@@ -170,6 +176,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         @return Message with a list of settings
         that were changed and what their new values are upon success.
         """
+        assert(isinstance(content, dict))
         for key in content:
             self.__driver.set_param(key, content[key])
         # Exception will bubble up if there is one, otherwise report success
@@ -198,8 +205,20 @@ class SBE49InstrumentAgent(InstrumentAgent):
         Execute a specific command on the instrument, reply with a confirmation
         message including output of command, or simple ACK that command
         was executed.
+        @param content Should be a list where first element is the command,
+            the rest are the arguments
         """
-        yield self.reply(msg, 'execute', self.__driver.execute(content), {})
+        assert(isinstance(content, unicode))
+        execResult = self.__driver.execute(content)
+        assert(len(execResult) == 2)
+        (errorCode, response) = execResult
+        assert(isinstance(errorCode, int))
+        if errorCode == 1:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg,
+                                 "Error code %s, response: %s" % (errorCode,
+                                                                  response))
     
     @defer.inlineCallbacks
     def op_getStatus(self, content, headers, msg):

@@ -7,7 +7,10 @@
 @brief base class for all resource agent processes
 """
 
+from twisted.internet import defer
+
 from ion.core.base_process import BaseProcess
+from ion.core.base_process import BaseProcessClient
 from ion.services.coi.resource_registry import ResourceLCState
 
 class ResourceAgent(BaseProcess):
@@ -44,3 +47,35 @@ class ResourceAgent(BaseProcess):
     def op_getCapabilities(self, content, headers, msg):
         """
         """
+
+class ResourceAgentClient(BaseProcessClient):
+    """
+    A parent class to handle common resource agent requests. Consider
+    subclassing this one when creating a new agent client
+    """
+    @defer.inlineCallbacks
+    def setLifecycleState(self, value):
+        """
+        Set the lifecycle state of the instrument agent
+        @param value A ion.services.coi.resource_registry.ResourceLCState value
+        """
+        assert((value == ResourceLCState.RESLCS_NEW) or
+               (value == ResourceLCState.RESLCS_ACTIVE) or
+               (value == ResourceLCState.RESLCS_INACTIVE) or
+               (value == ResourceLCState.RESLCS_DECOM) or
+               (value == ResourceLCState.RESLCS_RETIRED) or
+               (value == ResourceLCState.RESLCS_DEVELOPED) or
+               (value == ResourceLCState.RESLCS_COMMISSIONED))
+        
+        (content, headers, msg) = yield self.rpc_send('setLifecycleState',
+                                                      value)
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def getLifecycleState(self):
+        """
+        Obtain the lifecycle state of the instrument agent
+        @return A ion.services.coi.resource_registry.ResourceLCState value
+        """
+        (content, headers, msg) = yield self.rpc_send('getLifecycleState', '')
+        defer.returnValue(content)
