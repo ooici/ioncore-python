@@ -5,24 +5,17 @@
 @author Michael Meisinger
 @author Stephen Pasco
 @author Steve Foley
-@todo Simplify spawn call?
-@todo Clean out unnecessary imports
 @todo Test registry of resource into registry
 """
 
 import logging
-from twisted.python import log
 from twisted.internet import defer
 
-from ion.data.store import Store
-from ion.services.base_service import BaseServiceClient
+from ion.services.coi.resource_registry import ResourceLCState as LCS
 from ion.test.iontest import IonTestCase
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 from ion.agents.instrumentagents.SBE49 import instrumentCommands as IAcommands
 from ion.agents.instrumentagents.SBE49 import instrumentParameters as IAparameters
-from ion.agents.instrumentagents.SBE49 import SBE49InstrumentAgent as SBE49IA
-
-import ion.util.procutils as pu
 
 class TestInstrumentAgent(IonTestCase):
 
@@ -50,10 +43,9 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability to gather capabilities from the SBE49 instrument
         capabilities
         """
-        (content, headers, message) = \
-         yield self.IAClient.rpc_send('getCapabilities', ())
-        self.assert_(set(IAcommands) == set(content['commands']))
-        self.assert_(set(IAparameters) == set(content['parameters']))
+        result = yield self.IAClient.getCapabilities()
+        self.assert_(set(IAcommands) == set(result['commands']))
+        self.assert_(set(IAparameters) == set(result['parameters']))
 
     @defer.inlineCallbacks
     def testGetSetSBE49Params(self):
@@ -61,34 +53,43 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability of the SBE49 driver to send and receive get, set,
         and other messages. Best called as RPC message pairs.
         """
-        (content, headers, message) = \
-            yield self.IAClient.rpc_send('get', ('baudrate','outputformat'))
-        self.assertEqual(content, {'baudrate' : 9600,
-                                   'outputformat' : 0})
+        response = yield self.IAClient.get(['baudrate','outputformat'])
+        self.assertEqual(response, {'baudrate' : 9600, 'outputformat' : 0})
 
-        (content, headers, message) = \
-            yield self.IAClient.rpc_send('set', {'baudrate': 19200,
-                                                 'outputformat': 1})
-        self.assertEqual(content, {'baudrate' : 19200,
-                                   'outputformat' : 1})
+        response = yield self.IAClient.set({'baudrate': 19200,
+                                            'outputformat': 1})
+        self.assertEqual(response, {'baudrate' : 19200, 'outputformat' : 1})
 
-        (content, headers, message) = \
-            yield self.IAClient.rpc_send('get', ('baudrate', 'outputformat'))
-        self.assertEqual(content, {'baudrate' : 19200,
-                                   'outputformat' : 1})
+        response = yield self.IAClient.get(['baudrate', 'outputformat'])
+        self.assertEqual(response, {'baudrate' : 19200, 'outputformat' : 1})
 
-        (content, headers, message) = \
-            yield self.IAClient.rpc_send('setLifecycleState', 'undeveloped')
-        self.assertEqual(content, 'undeveloped')
+        response = yield self.IAClient.setLifecycleState(LCS.RESLCS_INACTIVE)
+        self.assertEqual(response, LCS.RESLCS_INACTIVE)
 
-        (content, headers, message) = \
-            yield self.IAClient.rpc_send('getLifecycleState', '')
-        self.assertEqual(content, 'undeveloped')
+        response = yield self.IAClient.getLifecycleState()
+        self.assertEqual(response, LCS.RESLCS_INACTIVE)
 
-        (content, headers, message) = \
-            yield self.IAClient.rpc_send('setLifecycleState', 'developed')
-        self.assertEqual(content, 'developed')
+        response = yield self.IAClient.setLifecycleState(LCS.RESLCS_ACTIVE)
+        self.assertEqual(response, LCS.RESLCS_ACTIVE)
 
-        (content, headers, message) = \
-        yield self.IAClient.rpc_send('getLifecycleState', '')
-        self.assertEqual(content, 'developed')
+        response = yield self.IAClient.getLifecycleState()
+        self.assertEqual(response, LCS.RESLCS_ACTIVE)
+
+    @defer.inlineCallbacks
+    def testExecute(self):
+        """
+        Test the ability of the SBE49 driver to execute commands through the
+        InstrumentAgentClient class
+        """
+        response = yield self.IAClient.execute(['start', 'badcommand', 'stop'])
+        self.assert_(isinstance(response, dict))
+        self.assert_('badcommand' in response)
+        self.assert_('start' in response)
+        self.assert_('stop' in response)
+        self.assert_(isinstance(response['start'], dict))
+        self.assert_(isinstance(response['stop'], dict))
+        self.assert_(isinstance(response['badcommand'], dict))
+        self.assert_(response['start']['status'] == 'OK')
+        self.assert_(response['stop']['status'] == 'OK')
+        self.assert_(response['badcommand']['status'] == 'ERROR')
+        
