@@ -41,85 +41,48 @@ class AssociationStore(object):
 
 
     @defer.inlineCallbacks
-    def put_association(self, association):
+    def put_associations(self, associations):
         '''
         '''
-        assert isinstance(association, RdfAssociation)
-        yield self.store.put(association)
+        if not getattr(associations, '__iter__', False):
+            associations = (associations,)
 
-        yield self.reply(msg, 'reply', {'Stored Key':association.identity}, {})
+        for association in associations:
+            assert isinstance(association, RdfAssociation)
+            rc=yield self.store.put(association.key,association.object)
 
-    @defer.inlineCallbacks
-    def op_get_association(self, content, headers, msg):
-        '''
-        '''
-        association = yield self.store.get(content['key'])
-
-        # The following line shows how to reply to a message
-        yield self.reply(msg, 'reply', association, {})
-
-    @defer.inlineCallbacks
-    def op_del_association(self, content, headers, msg):
-        '''
-
-        '''
-        yield self.store.remove(content['key'])
-
-        # The following line shows how to reply to a message
-        yield self.reply(msg, 'reply', {'result':'success'}, {})
-
-
-class AssociationServiceClient(BaseServiceClient):
-    """
-    This is an exemplar service class that calls the hello service. It
-    applies the RPC pattern.
-    """
-    def __init__(self, proc=None, **kwargs):
-        if not 'targetname' in kwargs:
-            kwargs['targetname'] = "associations"
-        BaseServiceClient.__init__(self, proc, **kwargs)
-
-    @defer.inlineCallbacks
-    def put_association(self, association):
-        '''
-        @param blob A DataObject blob to be stored
-        '''
-        yield self._check_init()
-
-        assert isinstance(association, DataObject)
-
-        (content, headers, msg) = yield self.rpc_send('put_association', association.encode())
-        logging.info('Association Servie Client: put_association: '+str(content))
-        defer.returnValue(content['Stored Key'])
-
-    @defer.inlineCallbacks
-    def get_association(self, key):
-        '''
-        @param key, A key for a stored association
-        '''
-        yield self._check_init()
-
-        # assert ?
-        kd={'key':key}
-        (content, headers, msg) = yield self.rpc_send('get_association', kd)
-        logging.info('Association Servie Client: get_association: '+str(content))
-        association=DataObject.from_encoding(content)
-        defer.returnValue(association)
+        defer.returnValue(rc)
 
 
     @defer.inlineCallbacks
-    def del_association(self, key):
+    def get_associations(self, keys):
         '''
-        @param key, A key for a stored association
         '''
-        yield self._check_init()
+        if not getattr(keys, '__iter__', False):
+            keys = (keys,)
+        
+        associations=[]
+        #@ How to make this asynchronis?
+        for key in keys:
+            association = yield self.store.get(key)
+            if association:
+                association = RdfAssociation.load(key,association)
+                associations.append(association)
+            else:
+                logging.debug("Key not found in AssociationStore!")                    
 
-        # assert ?
-        kd={'key':key}
-        (content, headers, msg) = yield self.rpc_send('del_association', kd)
-        logging.info('Association Servie Client: del_association: '+str(content))
-        defer.returnValue(content['result'])
+        defer.returnValue(associations)
 
-# Spawn of the process using the module name
-factory = ProtocolFactory(AssociationService)
+    @defer.inlineCallbacks
+    def delete_associations(self, keys):
+        '''
+        '''
+        if not getattr(keys, '__iter__', False):
+            keys = (keys,)
+
+        for key in keys:           
+            rc=yield self.store.remove(key)
+
+        defer.returnValue(rc)
+
 

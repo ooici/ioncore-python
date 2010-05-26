@@ -10,11 +10,11 @@ import logging
 
 from twisted.internet import defer
 
-from ion.play.rdf_store.association_service import AssociationServiceClient
+from ion.play.rdf_store.association_store import AssociationStore
 from ion.test.iontest import IonTestCase
 
-from ion.data.dataobject import DataObject
-from ion.data.objstore import ValueObject
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation
+
 
 class AssociationTest(IonTestCase):
     """Testing service classes of resource registry
@@ -22,38 +22,40 @@ class AssociationTest(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._start_container()
-        services = [{'name':'association1','module':'ion.play.rdf_store.association_service','class':'AssociationService'},]
+        self.astore = AssociationStore()
+        yield self.astore.init()
+        
+        b1=RdfBlob.create('fancy value!1')
+        b2=RdfBlob.create('fancy value!2')
+        b3=RdfBlob.create('fancy value!3')
+        self.assoc=RdfAssociation.create(b1,b2,b3)
 
-        sup = yield self._spawn_processes(services)
-
-        self.asc = AssociationServiceClient(proc=sup)
-        
-        d = dict()
-        d['S']='key1'
-        d['O']='key2'
-        d['P']='key3'
-        
-        self.dobj=DataObject.from_encoding(d)
-        assoc = ValueObject(self.dobj.encode())
-        self.dobj_key=assoc.identity
-        
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stop_container()
+        yield self.astore.delete_associations(self.assoc.key)
+        del self.astore
+        
+    @defer.inlineCallbacks
+    def test_get_404(self):
+        # Make sure we can't read the not-written
+        rc = yield self.astore.get_associations(self.assoc.key)
+        self.failUnlessEqual(rc, [])
+
+    @defer.inlineCallbacks
+    def test_write_and_delete(self):
+        # Hmm, simplest op, just looking for exceptions
+        yield self.astore.put_associations(self.assoc)
+
+    @defer.inlineCallbacks
+    def test_delete(self):
+        yield self.astore.put_associations(self.assoc)
+        yield self.astore.delete_associations(self.assoc.key)
+        rc = yield self.astore.get_associations(self.assoc.key)
+        self.failUnlessEqual(rc, [])
 
     @defer.inlineCallbacks
     def test_put_get_delete(self):
-
-        res = yield self.asc.put_association(self.dobj)
-        self.assertEqual(res,self.dobj_key)
-        
-
-        res = yield self.asc.get_association(self.dobj_key)
-        self.assertEqual(res,self.dobj)
-        
-        res = yield self.asc.del_association(self.dobj_key)
-        self.assertEqual(res,'success')
-        
-        
-        
+        # Write, then read to verify same
+        yield self.astore.put_associations(self.assoc)
+        b = yield self.astore.get_associations(self.assoc.key)
+        self.failUnlessEqual([self.assoc], b)
