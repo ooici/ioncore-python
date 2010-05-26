@@ -65,6 +65,15 @@ class RdfTest(unittest.TestCase):
         entity4 = RdfEntity.load(entity2.key,entity2.object)
         self.assertEqual(entity4,entity3)
         
+        
+        # Test discarding one
+        entity4.discard(l[4])
+        l.pop()
+        entity5= RdfEntity.create(l,key=entity2.key)
+
+        self.assertEqual(entity4,entity5)
+        
+        
     def test_RdfState(self):
         
         blob2 = RdfBlob.create(self.val2)
@@ -89,6 +98,15 @@ class RdfTest(unittest.TestCase):
 
         state4 = RdfState.load(state2.key,state2.object,state2.commitRefs)
         self.assertEqual(state4,state3)
+        
+        # Test discarding one
+        state4.discard(l[4])
+        l.pop()
+        state5= RdfState.create(self.key1,l,self.key2)
+
+        self.assertEqual(state4,state5)
+
+        
 
         
     def test_RdfAssociation(self):
@@ -112,11 +130,7 @@ class RdfTest(unittest.TestCase):
         # None are equal...
         self.assertNotEqual(assoc1,assoc3)
 
-        print 'association 3:', assoc3.object
+        assoc5 = RdfAssociation.load(assoc3.key,assoc3.object)
         
-        assoc = RdfAssociation.load(assoc3.key,assoc3.object)
-        
-        print 'association factory:', assoc.object
-        print 'assoc type', assoc
-        
+        self.assertEqual(assoc3,assoc5)
 

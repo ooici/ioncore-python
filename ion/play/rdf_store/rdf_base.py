@@ -98,9 +98,9 @@ class RdfAssociation(RdfBase):
         assert isinstance(predicate, RdfBase)
         assert isinstance(object, RdfBase)
         
-        s={subject.type:subject.key}
-        p={predicate.type:predicate.key}
-        o={object.type:object.key}
+        s=(subject.type,subject.key)
+        p=(predicate.type,predicate.key)
+        o=(object.type,object.key)
         
         a={ RdfBase.SUBJECT:s,
             RdfBase.PREDICATE:p,
@@ -119,8 +119,59 @@ class RdfAssociation(RdfBase):
         
 
 
+class RdfWorkSpace(RdfBase):
+    '''
+    Add some storage and methods for higher level rdf objects.
+    Things in the RdfWorkSpace sets are like things in your working directory in git.
+    '''
 
-class RdfEntity(RdfBase):
+    def __init__(self):
+        
+        self.workspace={
+            self.ASSOCIATION:{},
+            self.BLOB:{},
+            self.ENTITY:{},
+            self.STATE:{}
+        }
+
+        self.references={}
+
+    def add(self,triple):
+        
+        assert type(triple) is tuple
+        assert len(triple) ==3
+        
+        rdfa = RdfAssociation.create(triple[0],triple[1],triple[2])
+        self.object.add(rdfa.key)
+        
+        for item in triple:
+            
+            self.workspace[item.type][item.key]=item
+            
+            # add a reference to the thing!
+            if item.key in self.references[item.key]:
+                self.references[item.key].add(rdfa.key)
+            else:
+                self.references[item.key]=set([rdfa.key])
+        
+        
+    def discard(self, association):
+        assert isinstance(association,RdfAssociation)
+        self.object.discard(association.key)
+        
+        for item in association.object:
+            type_key = association.object[item]
+           
+            type = type_key[0]
+            key  = type_key[1]
+            
+            self.references[key].discard(association.key)
+            
+            if len(self.references[key]) == 0:
+               del self.workspace[type][key]
+
+
+class RdfEntity(RdfWorkSpace):
     '''
     An RdfEntity can only be created - Never returned from the State Service
     The State service only returns States!
@@ -137,12 +188,12 @@ class RdfEntity(RdfBase):
         if not getattr(associations, '__iter__', False):
             associations = (associations,)
         assert hasattr(associations, '__iter__')
-        l=list()
+        s=set()
         for a in associations:
             assert isinstance(a, RdfAssociation)
-            l.append(a.key)        
+            s.add(a.key)
         inst=cls()
-        RdfBase.__init__(inst,l,RdfBase.ENTITY,key)
+        RdfBase.__init__(inst,s,RdfBase.ENTITY,key)
         return inst
 
     @classmethod
@@ -150,9 +201,16 @@ class RdfEntity(RdfBase):
         inst=cls()
         RdfBase.__init__(inst,entity,RdfBase.ENTITY,key=key)
         return inst
+    
+    @classmethod
+    def reference(cls, key):
+        inst=cls()
+        RdfBase.__init__(inst,None,RdfBase.ENTITY,key=key)
+        return inst
+    
+
         
-        
-class RdfState(RdfBase):
+class RdfState(RdfWorkSpace):
     '''
     The state of an RDF Resource returned from the State Service
     '''
@@ -171,12 +229,12 @@ class RdfState(RdfBase):
         if not getattr(associations, '__iter__', False):
             associations = (associations,)
         assert hasattr(associations, '__iter__')
-        l=list()
+        s=set()
         for a in associations:
             assert isinstance(a, RdfAssociation)
-            l.append(a.key)        
+            s.add(a.key)        
         inst=cls()
-        RdfBase.__init__(inst,l,RdfBase.STATE,key=key,commitRefs=commitRefs)
+        RdfBase.__init__(inst,s,RdfBase.STATE,key=key,commitRefs=commitRefs)
         return inst
 
     @classmethod
@@ -185,10 +243,15 @@ class RdfState(RdfBase):
         RdfBase.__init__(inst, state, RdfBase.STATE, key=key, commitRefs=commitRefs)
         return inst
 
+    @classmethod
+    def reference(cls, key, commitRefs):
+        inst=cls()
+        RdfBase.__init__(inst, None, RdfBase.STATE, key=key, commitRefs=commitRefs)
+        return inst
 
 
-
-
+    
+    
             
             
             

@@ -47,8 +47,6 @@ class AssociationStore(object):
         assert isinstance(association, RdfAssociation)
         yield self.store.put(association)
 
-        # @ TODO add References!
-
         yield self.reply(msg, 'reply', {'Stored Key':association.identity}, {})
 
     @defer.inlineCallbacks
@@ -65,8 +63,6 @@ class AssociationStore(object):
         '''
 
         '''
-        # @ TODO remove References!
-
         yield self.store.remove(content['key'])
 
         # The following line shows how to reply to a message

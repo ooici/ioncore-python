@@ -7,7 +7,7 @@ from twisted.internet import defer
 from ion.data.store import Store, IStore
 from ion.data.set_store import SetStore, ISetStore
 
-from ion.play.rdf_store.rdf_base import RdfBlob
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfBase, RdfEntity, RdfState
 
 class RdfStore(object):
 
@@ -32,7 +32,7 @@ class RdfStore(object):
         #Declare the stores
         self.blobs = BlobStore(backend=store_be,backendargs=store_bea)
         self.associations=AssociationStore(backend=store_be,backendargs=store_bea)
-        self.entities=EntityStore(backend=store_be,backendargs=store_bea)
+        self.state=EntityStore(backend=store_be,backendargs=store_bea)
         #Declare the Set Stores
         self.a_refs=ReferenceStore(backend=set_be,backendargs=set_bea)
         self.e_refs=ReferenceStore(backend=set_be,backendargs=set_bea)
@@ -47,16 +47,43 @@ class RdfStore(object):
         """
         yield self.blobs.init()
         yield self.associations.init()
-        yield self.entities.init()
+        yield self.states.init()
         yield self.a_refs.init()
         yield self.e_refs.init()
         
-    def add_association(self,subject,predicate,object):
+    def add_association(self, rdf, subject, predicate, object):
         
-        s={subject.TYPE:subject.key}
-        p={predicate.TYPE:predicate.key}
-        o={object.TYPE:object.key}
+        assert isinstance(rdf,(RdfEntity, RdfState))
+        
+        rdfa = RdfAssociation.create(subject,predicate,object)
+        
+        yield self.blobs.put_blob(subject)
+        yield self.blobs.put_blob(predicate)
+        yield self.blobs.put_blob(object)
+        
+        yield self.associations.put_association(rdfa)
+        yield self.a_refs.put_reference(subject, rdfa)
+        yield self.a_refs.put_reference(predicate, rdfa)    
+        yield self.a_refs.put_reference(object, rdfa)    
+
+        rdf.add(rdfa)
+        
+        
+    def discard_association(self,)
+        
+        
+        
+    
             
-            
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
             
             
