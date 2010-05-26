@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/data/backends/test/test_cassandra.py
-@author Paul Hubbard
-@author Dorian Raymer
-@test Service test of IStore Implementation
+@file ion/data/backends/test/test_set_store.py
 """
 
 import logging
@@ -26,10 +23,10 @@ class ISetStoreTest(unittest.TestCase):
         self.value1 = str(uuid4())
         self.value2 = str(uuid4())
 
-    @defer.inlineCallbacks
     def tearDown(self):
-        yield self.ds.delete(self.key)
-        del self.ds
+        #yield self.ds.delete(self.key)
+        #del self.ds
+        pass
 
     @defer.inlineCallbacks
     def test_get_404(self):
@@ -45,7 +42,7 @@ class ISetStoreTest(unittest.TestCase):
     @defer.inlineCallbacks
     def test_delete(self):
         yield self.ds.sadd(self.key, self.value1)
-        yield self.ds.delete(self.key)
+        yield self.ds.remove(self.key)
         rc = yield self.ds.smembers(self.key)
         self.failUnlessEqual(rc, None)
 

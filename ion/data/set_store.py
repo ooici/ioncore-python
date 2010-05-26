@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/data/store.py
+@file ion/data/set_store.py
 @package ion.data.ISetStore Pure virtual base class for Sets
 @package ion.data.SetStore In-memory implementation of ion.data.ISetStore
 @author Michael Meisinger
@@ -54,11 +54,11 @@ class ISetStore(object):
     #    """
     #    return self.get(*args, **kwargs)
 
-    def sadd(self, key, value):
+    def sadd(self, key, member):
         """
-        @brief Add a value to the set stored at key
+        @brief Add a member to the set stored at key
         @param key Lookup key
-        @param value The value to add in the set
+        @param member The member to add in the set
         @retval Deferred, for success of this operation
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
@@ -69,11 +69,11 @@ class ISetStore(object):
     #    """
     #    return self.put(*args, **kwargs)
 
-    def sremove(self, key,value):
+    def sremove(self, key, member):
         """
-        @brief delete a value from the set at key
+        @brief delete a member from the set at key
         @param key for the set
-        @param value, the value to remove from the set
+        @param member, the member to remove from the set
         @retval Deferred, for success of this operation
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
@@ -85,7 +85,7 @@ class ISetStore(object):
         @retval Deferred, integer representing the the cardinality of the set
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
-    
+
     def query(self, regex):
         """
         @param regex  regular expression matching zero or more keys
@@ -93,7 +93,7 @@ class ISetStore(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def delete(self, key):
+    def remove(self, key):
         """
         @param key  an immutable key associated with a value
         @retval Deferred, for success of this operation
@@ -114,27 +114,27 @@ class SetStore(ISetStore):
         """
         return defer.maybeDeferred(self.kss.get, key, None)
 
-    def sadd(self, key, value):
+    def sadd(self, key, member):
         """
         @see ISetStore.sadd
         """
-        return defer.maybeDeferred(self._sadd, key, value)
+        return defer.maybeDeferred(self._sadd, key, member)
 
-    def _sadd(self,key,value):
+    def _sadd(self, key, member):
         if key in self.kss:
-            self.kss[key].add(value)
+            self.kss[key].add(member)
         else:
-            self.kss[key]=set([value])
+            self.kss[key]=set([member])
 
-    def sremove(self, key,value):
+    def sremove(self, key, member):
         """
         @see ISetStore.sremove
         """
-        return defer.maybeDeferred(self._sremove, key, value)
+        return defer.maybeDeferred(self._sremove, key, member)
 
-        
-    def _sremove(self, key,value):
-        self.kss[key].discard(value)
+    def _sremove(self, key, member):
+        if self.kss.has_key(key):
+            self.kss[key].discard(member)
 
     def scard(self, key):
         """
@@ -146,7 +146,9 @@ class SetStore(ISetStore):
         """
         @see ISetStore.scard
         """
-        return len(self.kss[key])
+        if self.kss.has_key(key):
+            return len(self.kss[key])
+        return 0
 
     def query(self, regex):
         """
@@ -157,11 +159,16 @@ class SetStore(ISetStore):
     def _query(self, regex):
         return [re.search(regex,m).group() for m in self.kss.keys() if re.search(regex,m)]
 
-    def delete(self, key):
+    def remove(self, key):
         """
-        @see IStore.delete
+        @see IStore.remove
         """
-        return defer.maybeDeferred(self._delete, key)
+        return defer.maybeDeferred(self._remove, key)
 
-    def _delete(self, key):
-        del self.kss[key]
+    def _remove(self, key):
+        if self.kss.has_key(key):
+            del self.kss[key]
+
+
+
+
