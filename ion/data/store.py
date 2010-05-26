@@ -117,6 +117,7 @@ class Store(IStore):
         @see IStore.delete
         """
         # could test for existance of key. this will error otherwise
-        del self.kvs[key]
+        if self.kvs.has_key(key):
+            del self.kvs[key]
         return defer.succeed(None)
 
