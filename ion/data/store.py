@@ -5,6 +5,8 @@
 @package ion.data.IStore Pure virtual base class for CRUD
 @package ion.data.Store In-memory implementation of ion.data.IStore
 @author Michael Meisinger
+@author David Stuebe
+@author Dorian Raymer
 @brief base interface for all key-value stores in the system and default
         in memory implementation
 """

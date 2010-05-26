@@ -47,28 +47,28 @@ class InstrumentAgentClient(ResourceAgentClient):
     """
 
     @defer.inlineCallbacks    
-    def get(self, valueList):
+    def get(self, paramList):
         """
-        Obtain a list of parameter values from the instrument
-        @param valueList A list of the values to fetch
+        Obtain a list of parameter names from the instrument
+        @param paramList A list of the values to fetch
         @return A dict of the names and values requested
         """
-        assert(isinstance(valueList, list))
-        (content, headers, message) = yield self.rpc_send('get', valueList)
+        assert(isinstance(paramList, list))
+        (content, headers, message) = yield self.rpc_send('get', paramList)
         assert(isinstance(content, dict))
         defer.returnValue(content)
     
     @defer.inlineCallbacks
-    def set(self, valueDict):
+    def set(self, paramDict):
         """
         Set a collection of values on an instrument
-        @param valueDict A dict of parameter names and the values they are
+        @param paramDict A dict of parameter names and the values they are
             being set to
         @return A dict of the successful set operations that were performed
         @todo Add exceptions for error conditions
         """
-        assert(isinstance(valueDict, dict))
-        (content, headers, message) = yield self.rpc_send('set', valueDict)
+        assert(isinstance(paramDict, dict))
+        (content, headers, message) = yield self.rpc_send('set', paramDict)
         assert(isinstance(content, dict))
         defer.returnValue(content)
     
@@ -79,13 +79,30 @@ class InstrumentAgentClient(ResourceAgentClient):
         when a command fails, but will not roll back.
         @param command_list An ordered list of commands to execute
         @return Dictionary of responses to each execute command
-        @todo Alter semantics of this call as needed
+        @todo Alter semantics of this call as needed...maybe arguments?
         @todo Add exceptions as needed
         """
         result = {}
         assert(isinstance(commandList, list))
         for command in commandList:
-            (content, headers, message) = yield self.rpc_send('execute', command)
+            (content, headers, message) = yield self.rpc_send('execute',
+                                                              command)
             result[command] = content
         assert(isinstance(result, dict))
         defer.returnValue(result)
+
+    @defer.inlineCallbacks    
+    def getCapabilities(self):
+        """
+        Obtain a list of capabilities from the instrument
+        @return A dict with commands and parameter lists that are supported
+            such as {'commands':[], 'parameters':[]}
+        """
+        (content, headers, message) = yield self.rpc_send('getCapabilities',
+                                                          ())
+        assert(isinstance(content, dict))
+        assert('commands' in content)
+        assert('parameters' in content)
+        assert(isinstance(content['commands'], list))
+        assert(isinstance(content['parameters'], list))
+        defer.returnValue(content)

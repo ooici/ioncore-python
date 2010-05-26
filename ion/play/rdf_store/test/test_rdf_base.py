@@ -1,22 +1,15 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/test/test_resource_registry.py
-@author Michael Meisinger
-@brief test service for registering resources and client classes
+@fileion/play/rdf_store/blob_store.py
+@author David Stuebe
+@brief  RDF Base class tests
 """
 
 import logging
 from twisted.trial import unittest
-from twisted.internet import defer
 
-from ion.data.dataobject import DataObject
-from ion.data.objstore import ValueObject
-
-from ion.play.rdf_store.rdf import RdfBase, RdfAssociation, RdfBlob, RdfEntity, RdfObject, RdfState, RdfObject
-
-
-
+from ion.play.rdf_store.rdf_base import RdfBase, RdfAssociation, RdfBlob, RdfEntity, RdfState, WorkSpace
 
 class RdfTest(unittest.TestCase):
     """Testing service classes of resource registry
@@ -27,7 +20,7 @@ class RdfTest(unittest.TestCase):
         
         self.val1='a'
         self.val2='b'
-        self.val3='b'
+        self.val3='c'
     
     def test_RdfBase(self):
         
@@ -72,6 +65,15 @@ class RdfTest(unittest.TestCase):
         entity4 = RdfEntity.load(entity2.key,entity2.object)
         self.assertEqual(entity4,entity3)
         
+        
+        # Test discarding one
+        entity4.remove(l[4])
+        l.pop()
+        entity5= RdfEntity.create(l,key=entity2.key)
+
+        self.assertEqual(entity4,entity5)
+        
+        
     def test_RdfState(self):
         
         blob2 = RdfBlob.create(self.val2)
@@ -96,6 +98,15 @@ class RdfTest(unittest.TestCase):
 
         state4 = RdfState.load(state2.key,state2.object,state2.commitRefs)
         self.assertEqual(state4,state3)
+        
+        # Test discarding one
+        state4.remove(l[4])
+        l.pop()
+        state5= RdfState.create(self.key1,l,self.key2)
+
+        self.assertEqual(state4,state5)
+
+        
 
         
     def test_RdfAssociation(self):
@@ -119,11 +130,36 @@ class RdfTest(unittest.TestCase):
         # None are equal...
         self.assertNotEqual(assoc1,assoc3)
 
-        print 'association 3:', assoc3.object
+        assoc5 = RdfAssociation.load(assoc3.key,assoc3.object)
         
-        assoc = RdfAssociation.load(assoc3.key,assoc3.object)
+        self.assertEqual(assoc3,assoc5)
+
+
+    def test_WorkSpace(self):
         
-        print 'association factory:', assoc.object
-        print 'assoc type', assoc
+        blob1 = RdfBlob.create(self.val1)
+        blob2 = RdfBlob.create(self.val2)
+        blob3 = RdfBlob.create(self.val3)
+        
+        assoc1 = RdfAssociation.create(blob1,blob2,blob3)
+        
+        a_t = (assoc1, (blob1, blob2, blob3))
+        
+        w = WorkSpace.create([a_t])
+        print ''
+        w.print_status()
+        print 'refs to blob1', w.len_refs(blob1)
+        
+        self.assertEqual(w.len_refs(blob1),1)
+        
+        self.assertEqual(w.len_associations(),1)
+        self.assertEqual(w.len_blobs(),3)
+        self.assertEqual(w.len_entities(),0)
+        self.assertEqual(w.len_states(),0)
+
+
+        w.remove_association(assoc1)
+        w.print_status()
+        print 'refs to blob1', w.len_refs(blob1)
         
 
