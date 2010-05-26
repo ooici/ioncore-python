@@ -13,6 +13,7 @@ logging.debug('Loaded: '+ __name__)
 
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 from ion.core.base_process import ProtocolFactory
+from ion.services.coi.resource_registry import ResourceLCState as LCS
 
 
 instrumentCommands = (
@@ -151,6 +152,7 @@ class SBE49InstrumentDriver():
 class SBE49InstrumentAgent(InstrumentAgent):
 
     __driver = SBE49InstrumentDriver()
+    lifecycleState = LCS.RESLCS_NEW
     
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
@@ -158,6 +160,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         React to a request for parameter values,
         @return A reply message containing a dictionary of name/value pairs
         """
+        assert(isinstance(content, list))
         response = {}
         for key in content:
             response[key] = self.__driver.fetch_param(key)
@@ -170,6 +173,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         @return Message with a list of settings
         that were changed and what their new values are upon success.
         """
+        assert(isinstance(content, dict))
         for key in content:
             self.__driver.set_param(key, content[key])
         # Exception will bubble up if there is one, otherwise report success

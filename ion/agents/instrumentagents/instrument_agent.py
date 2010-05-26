@@ -1,13 +1,10 @@
 #!/usr/bin/env python
 
+import logging
 from twisted.internet import defer
 
-from magnet.spawnable import spawn
-
 from ion.agents.resource_agent import ResourceAgent
-from ion.core.base_process import BaseProcessClient
-from ion.core.base_process import ProtocolFactory
-
+from ion.agents.resource_agent import ResourceAgentClient
 
 class InstrumentAgent(ResourceAgent):
     """
@@ -43,8 +40,52 @@ class InstrumentAgent(ResourceAgent):
         """
         """
 
-class InstrumentAgentClient(BaseProcessClient):
+class InstrumentAgentClient(ResourceAgentClient):
     """
     The base class for an Instrument Agent Client. It is a service
     that allows for RPC messaging
     """
+
+    @defer.inlineCallbacks    
+    def get(self, valueList):
+        """
+        Obtain a list of parameter values from the instrument
+        @param valueList A list of the values to fetch
+        @return A dict of the names and values requested
+        """
+        assert(isinstance(valueList, list))
+        (content, headers, message) = yield self.rpc_send('get', valueList)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+    
+    @defer.inlineCallbacks
+    def set(self, valueDict):
+        """
+        Set a collection of values on an instrument
+        @param valueDict A dict of parameter names and the values they are
+            being set to
+        @return A dict of the successful set operations that were performed
+        @todo Add exceptions for error conditions
+        """
+        assert(isinstance(valueDict, dict))
+        (content, headers, message) = yield self.rpc_send('set', valueDict)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+    
+    @defer.inlineCallbacks
+    def execute(self, commandList):
+        """
+        Execute the commands in the order of the list. Processing will cease
+        when a command fails, but will not roll back.
+        @param command_list An ordered list of commands to execute
+        @return Dictionary of responses to each execute command
+        @todo Alter semantics of this call as needed
+        @todo Add exceptions as needed
+        """
+        result = {}
+        assert(isinstance(commandList, list))
+        for command in commandList:
+            (content, headers, message) = yield self.rpc_send('execute', command)
+            result[command] = content
+        assert(isinstance(result, dict))
+        defer.returnValue(result)
