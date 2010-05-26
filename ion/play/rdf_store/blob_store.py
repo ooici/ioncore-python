@@ -41,28 +41,48 @@ class BlobStore(object):
         logging.info("BlobStore initialized")
         
     @defer.inlineCallbacks
-    def put_blob(self, blob):
+    def put_blobs(self, blobs):
         '''
         '''
-        assert isinstance(blob, RdfBlob)
-        rc=yield self.store.put(blob.key, blob.object)
+        if not getattr(blobs, '__iter__', False):
+            blobs = (blobs,)
+
+        for blob in blobs:
+            assert isinstance(blob, RdfBlob)
+            rc=yield self.store.put(blob.key, blob.object)
+        # @Todo What do I do with multiple returns from a yield?
         defer.returnValue(rc)
         
 
     @defer.inlineCallbacks
-    def get_blob(self, key):
+    def get_blobs(self, keys):
         '''
         '''
-        blob = yield self.store.get(key)
-        if blob:
-            blob = RdfBlob.load(key,blob)
-        defer.returnValue(blob)
+        if not getattr(keys, '__iter__', False):
+            keys = (keys,)
+        
+        blobs=[]
+        #@ How to make this asynchronis?
+        for key in keys:
+            blob = yield self.store.get(key)
+            if blob:
+                blob = RdfBlob.load(key,blob)
+                blobs.append(blob)
+            else:
+                logging.debug("Key not found in BlobStore!")                    
+
+        defer.returnValue(blobs)
 
     @defer.inlineCallbacks
-    def delete_blob(self, key):
+    def delete_blobs(self, keys):
         '''
         '''
-        rc=yield self.store.delete(key)
+        if not getattr(keys, '__iter__', False):
+            keys = (keys,)
+
+        for key in keys:           
+            rc=yield self.store.remove(key)
+
         defer.returnValue(rc)
 
 
