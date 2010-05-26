@@ -43,10 +43,9 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability to gather capabilities from the SBE49 instrument
         capabilities
         """
-        (content, headers, message) = \
-         yield self.IAClient.rpc_send('getCapabilities', ())
-        self.assert_(set(IAcommands) == set(content['commands']))
-        self.assert_(set(IAparameters) == set(content['parameters']))
+        result = yield self.IAClient.getCapabilities()
+        self.assert_(set(IAcommands) == set(result['commands']))
+        self.assert_(set(IAparameters) == set(result['parameters']))
 
     @defer.inlineCallbacks
     def testGetSetSBE49Params(self):
@@ -76,3 +75,12 @@ class TestInstrumentAgent(IonTestCase):
         response = yield self.IAClient.getLifecycleState()
         self.assertEqual(response, LCS.RESLCS_ACTIVE)
 
+    @defer.inlineCallbacks
+    def testExecute(self):
+        """
+        Test the ability of the SBE49 driver to execute commands through the
+        InstrumentAgentClient class
+        """
+        response = yield self.IAClient.execute(['start', 'pumpon', 'stop'])
+        logging.debug("response is %s", response)
+        

@@ -202,8 +202,20 @@ class SBE49InstrumentAgent(InstrumentAgent):
         Execute a specific command on the instrument, reply with a confirmation
         message including output of command, or simple ACK that command
         was executed.
+        @param content Should be a list where first element is the command,
+            the rest are the arguments
         """
-        yield self.reply(msg, 'execute', self.__driver.execute(content), {})
+        assert(isinstance(content, unicode))
+        execResult = self.__driver.execute(content)
+        assert(len(execResult) == 2)
+        (errorCode, response) = execResult
+        assert(isinstance(errorCode, int))
+        if errorCode == 1:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg,
+                                 "Error code %s, response: %s" % (errorCode,
+                                                                  response))
     
     @defer.inlineCallbacks
     def op_getStatus(self, content, headers, msg):
