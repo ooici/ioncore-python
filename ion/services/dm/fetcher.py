@@ -5,7 +5,7 @@
 @package ion.services.dm.fetcher Remimpliment fetcher as an LCA service
 @author Paul Hubbard
 @date 5/7/10
-@brief Porting the fetcher from DX to LCAarch as a learning exercise
+@brief Porting the fetcher from DX to LCAarch.
 """
 
 import logging
@@ -19,10 +19,7 @@ from ion.services.base_service import BaseService, BaseServiceClient
 class FetcherService(BaseService):
     """
     Fetcher, implemented as a service.
-    @see FetcherService.op_get_url
-    """
 
-    """
     Service declaration - seems similar to the Zope methods
     @todo Dependencies - perhaps pub-sub?
     @note These are not class methods!
@@ -40,7 +37,7 @@ class FetcherService(BaseService):
         logging.info('Fetcher starting')
 
     def slc_init(self):
-        logging.debug('Service lifecycle init invoked')
+        pass
 
     @defer.inlineCallbacks
     def op_get_url(self, content, headers, msg):
@@ -74,9 +71,12 @@ class FetcherService(BaseService):
 
     @defer.inlineCallbacks
     def op_get_dap_dataset(self, content, headers, msg):
+        """
+        The core of the fetcher: function to grab an entire DAP dataset and
+        send it off into the cloud.
+        """
         logging.warn('Implement me!')
-        yield self.reply(msg, 'reply', {'value':'no code!'}, {})
-
+        yield self.reply_err(msg, 'reply', {'value':'no code!'}, {})
 
 class FetcherClient(BaseServiceClient):
     """
@@ -103,13 +103,38 @@ class FetcherClient(BaseServiceClient):
             raise ValueError('Error on URL: ' + content['failure'])
         defer.returnValue(content)
 
-#    @defer.inlineCallbacks
-    def get_dap_dataset(self, requested_url, dest_address):
+    def _rewrite_headers(self, old_headers):
         """
-        @todo Look up fetcher in dns
-        @todo send to same
+        Rewrite the message headers so that the reply-to points to the original
+        sender and uses the same conversation id. Easy way to implement third-
+        party messaging/coordination.
         """
-        pass
+        new_headers = {}
+        try:
+            new_headers['reply-to'] = old_headers['reply-to']
+            new_headers['conv-id'] = old_headers['conv-id']
+        except KeyError, ke:
+            logging.exception('missing header!')
+            raise ke
+
+        return new_headers
+
+    @defer.inlineCallbacks
+    def forward_get_url(self, content, headers):
+        """
+        Forward a message to the fetcher.
+        Reach in and rewrite the reply-to and conversation id headers, so
+        that the fetcher can reply directly to the proxy and bypass the
+        coordinator.
+        """
+        yield self.send('get_url', content, self._rewrite_headers(headers))
+
+    @defer.inlineCallbacks
+    def forward_get_dap_dataset(self, content, headers):
+        """
+        Same as forward_get_url, different verb.
+        """
+        yield self.send('get_dap_dataset', content, self._rewrite_headers(headers))
 
 # If loaded as a module, spawn the process
 factory = ProtocolFactory(FetcherService)
