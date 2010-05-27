@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+"""
+@file ion/agents/instrumentagents/instrument_agent.py
+@author Steve Foley
+@brief Instrument Agent, Driver, and Client class definitions
+"""
 import logging
 import inspect
 from twisted.internet import defer
@@ -7,12 +12,46 @@ from twisted.internet import defer
 from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
 
+class InstrumentDriver():
+    """
+    A base driver class. This is intended to provide the common parts of
+    the interface that instrument drivers should follow in order to use
+    common InstrumentAgent methods. This should never really be instantiated.
+    """
+    def fetch_param(self, param):
+        """
+        Using the instrument protocol, fetch a parameter from the instrument
+        @param param The parameter to fetch
+        @return The value of the fetched parameter
+        """
+        
+    def set_param(self, param, value):
+        """
+        Using the instrument protocol, set a parameter on the instrument
+        @param param The parameter to set
+        @param value The value to set
+        @return A small dict of parameter and value on success, empty dict on
+            failure
+        """
+        
+    def execute(self, command):
+        """
+        Using the instrument protocol, execute the requested command
+        @param command The command to execute
+        @return Result code of some sort
+        """
+        
 class InstrumentAgent(ResourceAgent):
     """
     The base class for developing Instrument Agents. This defines
-    the interface to use for an instrumen agent.
+    the interface to use for an instrument agent and some boiler plate
+    function implementations that may be good enough for most agents.
+    Child instrument agents should supply instrument-specific getTranslator
+    and getCapabilities routines.
     """
-
+    
+    driver = None
+    
     @defer.inlineCallbacks
     def op_getTranslator(self, content, headers, msg):
         """
@@ -21,7 +60,87 @@ class InstrumentAgent(ResourceAgent):
         This should be a stub that is subclassed by the specific IA, possibly
         even the driver.
         """
-        yield self.reply_ok(msg, lambda s: s)        
+        yield self.reply_ok(msg, lambda s: s)
+        
+    @defer.inlineCallbacks
+    def op_get(self, content, headers, msg):
+        """
+        React to a request for parameter values,
+        @return A reply message containing a dictionary of name/value pairs
+        """
+        assert(isinstance(content, list))
+        response = {}
+        for key in content:
+            response[key] = self.driver.fetch_param(key)
+        if response != {}:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg, 'No values found')
+    
+    @defer.inlineCallbacks    
+    def op_set(self, content, headers, msg):
+        """
+        Set parameters to the requested values.
+        @return Message with a list of settings
+            that were changed and what their new values are upon success.
+            On failure, return the bad key, but previous keys were already set
+        """
+        assert(isinstance(content, dict))
+        response = {}
+        for key in content:
+            result = {}
+            result = self.driver.set_param(key, content[key])
+            if result == {}:
+                yield self.reply_err(msg, "Could not set %s" % key)
+            else:
+                response.update(result)
+        assert(response != {})
+        yield self.reply_ok(msg, response)
+            
+    @defer.inlineCallbacks
+    def op_getLifecycleState(self, content, headers, msg):
+        """
+        Query the lifecycle state of the object
+        @return Message with the lifecycle state
+        """
+        yield self.reply(msg, 'getLifecycleState', self.lifecycleState, {})
+        
+    @defer.inlineCallbacks
+    def op_setLifecycleState(self, content, headers, msg):
+        """
+        Set the lifecycle state
+        @return Message with the lifecycle state that was set
+        """
+        self.lifecycleState = content
+        yield self.reply(msg, 'setLifecycleState', content, {})
+    
+    @defer.inlineCallbacks
+    def op_execute(self, content, headers, msg):
+        """
+        Execute a specific command on the instrument, reply with a confirmation
+        message including output of command, or simple ACK that command
+        was executed.
+        @param content Should be a list where first element is the command,
+            the rest are the arguments
+        """
+        assert(isinstance(content, unicode))
+        execResult = self.driver.execute(content)
+        assert(len(execResult) == 2)
+        (errorCode, response) = execResult
+        assert(isinstance(errorCode, int))
+        if errorCode == 1:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg,
+                                 "Error code %s, response: %s" % (errorCode,
+                                                                  response))
+    
+    @defer.inlineCallbacks
+    def op_getStatus(self, content, headers, msg):
+        """
+        Obtain the status of an instrument. This includes non-parameter
+        and non-lifecycle state of the instrument.
+        """
 
 class InstrumentAgentClient(ResourceAgentClient):
     """
