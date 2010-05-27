@@ -9,6 +9,7 @@
 """
 
 import logging
+import inspect
 from twisted.internet import defer
 
 from ion.services.coi.resource_registry import ResourceLCState as LCS
@@ -54,15 +55,27 @@ class TestInstrumentAgent(IonTestCase):
         and other messages. Best called as RPC message pairs.
         """
         response = yield self.IAClient.get(['baudrate','outputformat'])
-        self.assertEqual(response, {'baudrate' : 9600, 'outputformat' : 0})
+        self.assert_(response['status'] == 'OK')
+        self.assertEqual(response['baudrate'], 9600)
+        self.assertEqual(response['outputformat'], 0)
 
         response = yield self.IAClient.set({'baudrate': 19200,
                                             'outputformat': 1})
-        self.assertEqual(response, {'baudrate' : 19200, 'outputformat' : 1})
-
+        self.assert_(response['status'] == 'OK')
+        self.assertEqual(response['baudrate'], 19200)
+        self.assertEqual(response['outputformat'], 1)
+        
         response = yield self.IAClient.get(['baudrate', 'outputformat'])
-        self.assertEqual(response, {'baudrate' : 19200, 'outputformat' : 1})
-
+        self.assert_(response['status'] == 'OK')
+        self.assertEqual(response['baudrate'], 19200)
+        self.assertEqual(response['outputformat'], 1)
+        
+        # Try setting something bad
+        response = yield self.IAClient.set({'baudrate': 19200,
+                                            'badvalue': 1})
+        self.assert_(response['status'] == 'ERROR')
+        self.assert_('baudrate' not in response)
+        
         response = yield self.IAClient.setLifecycleState(LCS.RESLCS_INACTIVE)
         self.assertEqual(response, LCS.RESLCS_INACTIVE)
 
@@ -93,3 +106,13 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(response['stop']['status'] == 'OK')
         self.assert_(response['badcommand']['status'] == 'ERROR')
         
+    @defer.inlineCallbacks
+    def testTranslator(self):
+        """
+        Test to see if the translator function is coming back cleanly
+        @todo make this not a stub when we can pass functions through AMQP
+        """
+        yield
+        #xlateFn = yield self.IAClient.getTranslator()
+        #self.assert_(inspect.isroutine(xlateFn))
+        #self.assert_(xlateFn('foo') == 'foo')

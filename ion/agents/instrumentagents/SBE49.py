@@ -140,9 +140,12 @@ class SBE49InstrumentDriver():
         """
         operate in instrument protocol to set a parameter
         """
-        self.__instrumentParameters[param] = value
-        return {param: value}
-    
+        if (param in self.__instrumentParameters):
+            self.__instrumentParameters[param] = value
+            return {param: value}
+        else:
+            return {}
+            
     def execute(self, command):
         """
         Execute the given command
@@ -157,6 +160,14 @@ class SBE49InstrumentAgent(InstrumentAgent):
     __driver = SBE49InstrumentDriver()
     lifecycleState = LCS.RESLCS_NEW
     
+    @staticmethod
+    def __translator(input):
+        """
+        A function (to be returned upon request) that will translate the
+        very raw data from the instrument into the common archive format
+        """
+        return input
+    
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
         """
@@ -167,21 +178,31 @@ class SBE49InstrumentAgent(InstrumentAgent):
         response = {}
         for key in content:
             response[key] = self.__driver.fetch_param(key)
-        yield self.reply(msg, 'get', response, {})
+        if response != {}:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg, 'No values found')
     
     @defer.inlineCallbacks    
     def op_set(self, content, headers, msg):
         """
         Set parameters to the requested values.
         @return Message with a list of settings
-        that were changed and what their new values are upon success.
+            that were changed and what their new values are upon success.
+            On failure, return the bad key, but previous keys were already set
         """
         assert(isinstance(content, dict))
+        response = {}
         for key in content:
-            self.__driver.set_param(key, content[key])
-        # Exception will bubble up if there is one, otherwise report success
-        yield self.reply(msg, 'set', content, {})
-    
+            result = {}
+            result = self.__driver.set_param(key, content[key])
+            if result == {}:
+                yield self.reply_err(msg, "Could not set %s" % key)
+            else:
+                response.update(result)
+        assert(response != {})
+        yield self.reply_ok(msg, response)
+            
     @defer.inlineCallbacks
     def op_getLifecycleState(self, content, headers, msg):
         """
@@ -237,5 +258,14 @@ class SBE49InstrumentAgent(InstrumentAgent):
                          {'commands': instrumentCommands,
                           'parameters': instrumentParameters}, {})
 
+    @defer.inlineCallbacks
+    def op_getTranslator(self, content, headers, msg):
+        """
+        Return the translator function that will convert the very raw format
+        of the instrument into a common OOI repository-ready format
+        """
+        yield self.reply_err(msg, "Not Implemented!")
+#        yield self.reply_ok(msg, self.__translator)
+        
 # Spawn of the process using the module name
 factory = ProtocolFactory(SBE49InstrumentAgent)
