@@ -140,19 +140,33 @@ class SBE49InstrumentDriver():
         """
         operate in instrument protocol to set a parameter
         """
-        self.__instrumentParameters[param] = value
-        return {param: value}
-    
+        if (param in self.__instrumentParameters):
+            self.__instrumentParameters[param] = value
+            return {param: value}
+        else:
+            return {}
+            
     def execute(self, command):
         """
         Execute the given command
         """
-        return (1, command)
+        if command in instrumentCommands:
+            return (1, command)
+        else:
+            return (0, command)
         
 class SBE49InstrumentAgent(InstrumentAgent):
 
     __driver = SBE49InstrumentDriver()
     lifecycleState = LCS.RESLCS_NEW
+    
+    @staticmethod
+    def __translator(input):
+        """
+        A function (to be returned upon request) that will translate the
+        very raw data from the instrument into the common archive format
+        """
+        return input
     
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
@@ -164,21 +178,31 @@ class SBE49InstrumentAgent(InstrumentAgent):
         response = {}
         for key in content:
             response[key] = self.__driver.fetch_param(key)
-        yield self.reply(msg, 'get', response, {})
+        if response != {}:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg, 'No values found')
     
     @defer.inlineCallbacks    
     def op_set(self, content, headers, msg):
         """
         Set parameters to the requested values.
         @return Message with a list of settings
-        that were changed and what their new values are upon success.
+            that were changed and what their new values are upon success.
+            On failure, return the bad key, but previous keys were already set
         """
         assert(isinstance(content, dict))
+        response = {}
         for key in content:
-            self.__driver.set_param(key, content[key])
-        # Exception will bubble up if there is one, otherwise report success
-        yield self.reply(msg, 'set', content, {})
-    
+            result = {}
+            result = self.__driver.set_param(key, content[key])
+            if result == {}:
+                yield self.reply_err(msg, "Could not set %s" % key)
+            else:
+                response.update(result)
+        assert(response != {})
+        yield self.reply_ok(msg, response)
+            
     @defer.inlineCallbacks
     def op_getLifecycleState(self, content, headers, msg):
         """
@@ -202,8 +226,20 @@ class SBE49InstrumentAgent(InstrumentAgent):
         Execute a specific command on the instrument, reply with a confirmation
         message including output of command, or simple ACK that command
         was executed.
+        @param content Should be a list where first element is the command,
+            the rest are the arguments
         """
-        yield self.reply(msg, 'execute', self.__driver.execute(content), {})
+        assert(isinstance(content, unicode))
+        execResult = self.__driver.execute(content)
+        assert(len(execResult) == 2)
+        (errorCode, response) = execResult
+        assert(isinstance(errorCode, int))
+        if errorCode == 1:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg,
+                                 "Error code %s, response: %s" % (errorCode,
+                                                                  response))
     
     @defer.inlineCallbacks
     def op_getStatus(self, content, headers, msg):
@@ -222,5 +258,14 @@ class SBE49InstrumentAgent(InstrumentAgent):
                          {'commands': instrumentCommands,
                           'parameters': instrumentParameters}, {})
 
+    @defer.inlineCallbacks
+    def op_getTranslator(self, content, headers, msg):
+        """
+        Return the translator function that will convert the very raw format
+        of the instrument into a common OOI repository-ready format
+        """
+        yield self.reply_err(msg, "Not Implemented!")
+#        yield self.reply_ok(msg, self.__translator)
+        
 # Spawn of the process using the module name
 factory = ProtocolFactory(SBE49InstrumentAgent)

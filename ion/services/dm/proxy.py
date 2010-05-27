@@ -41,6 +41,7 @@ class ProxyService(BaseService):
         proxy stack.
         """
         # @todo Move tcp port to DX configuration file
+        """
         tcp_port = 10001
         logging.debug('Setting up TCP listener on port %d...' % tcp_port)
         hf = HTTPFactory()
@@ -48,7 +49,8 @@ class ProxyService(BaseService):
         hf.protocol = proxy.Proxy
         reactor.listenTCP(tcp_port, hf)
         logging.debug('Proxy listener running.')
-
+        """
+        
     @defer.inlineCallbacks
     def op_get_url(self, content, headers, msg):
         logging.warn('Implement get_url method!')
