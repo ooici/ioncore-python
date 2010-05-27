@@ -49,6 +49,7 @@ class StateStore(object):
         if not getattr(states, '__iter__', False):
             states = (states,)
         
+        key_commit_list=[]
         for state in states:
         
             if not getattr(state, 'commitRefs', False):
@@ -59,6 +60,8 @@ class StateStore(object):
             obj = ValueObject(list(state.object))
         
             rc=yield self.objstore.put(state.key, obj, parents=parents)
+
+        key_commit_list.append((state.key,rc))
 
         defer.returnValue(rc)
         

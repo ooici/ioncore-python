@@ -103,17 +103,47 @@ class RdfStore(object):
         
         if wdiff.len_associations() == 0:
             logging.info('Nothing to commit')
-        else:            
+        else:
+            # Commit the new stuff in wdiff
+            blobs = workspace.get_blobs()
+            yield self.blobs.put_blobs(blobs)
+            
+            associations = workspace.get_associations()
+            yield self.associations.put_associations(associations)
+            
+            references=workspace.get_references()
+            for key in references:
+                yield self.a_refs.add_references(key,references[key])
+            
+            # Don't put states and entities - they already exist!
+            
+            # Get the current state from the workspace (list of association keys)
             alist = workspace.get_association_list()
             key = workspace.key
             commitRefs = workspace.commitRefs
             
+            if commitRefs:
+                update=RdfState.load(key,set(alist),commitRefs)
+            else:
+                update=RdfEntity.load(key,set(alist))
             
-            rdfstate=RdfState.load(workspace.key,)
-        
-        
-        
-        
+            # Returns list of key/commit tuples (length arg to put_states)    
+            key_commit= yield self.state.put_states(update)
+            assert key == key_commit[0][0]
+            commit=key_commit[0][1]
+            
+            # Add a reference from the commit to each association
+            for a in alist:
+                yield self.e_refs.add_references( [(key,commit)])
+                
+            wdiff.len_associations()
+            workspace.commitRefs=commit
+            workspace.modified=False
+            logging.info('Committed to Key# '+key)
+            logging.info('Commit Ref# ',+commit)
+            logging.info('Commited Associations:'+str(wdiff.len_associations()))
+            logging.info('Commited Blobs:'+str(wdiff.len_blobs()))
+
         
     @defer.inlineCallbacks     
     def diff_commit(self,workspace,commit=None):
@@ -159,7 +189,7 @@ class RdfStore(object):
             
         defer.returnValue(ws)        
     
-    @defer.inlineCallbacks 
+#    @defer.inlineCallbacks 
     def merge(self,state1, state2):
         pass
         

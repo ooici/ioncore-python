@@ -193,6 +193,9 @@ class RdfEntity(RdfESBase):
     @classmethod
     def load(cls, key, entity):
         inst=cls()
+        if not key:
+            key=str(uuid4())
+            
         RdfBase.__init__(inst,entity,RdfBase.ENTITY,key=key)
         return inst
     
@@ -271,9 +274,6 @@ class WorkSpace(object):
 
         self.references={}
 
-    def get_association_list(self):
-        
-        return self.workspace[RdfBase.ASSOCIATION].keys()
 
     def add_triple(self,triple):
         association = RdfAssociation.create(triple[0],triple[1],triple[2])
@@ -300,7 +300,10 @@ class WorkSpace(object):
                 ref  = item.key
             else:
                 # Use the commit
-                ref =  item.commitRefs
+                ref =  item.commitRefs[0]
+                if len(item.commitRefs) >1:
+                    logging.info('WorkSpace:add_association Illegal attempt to reference a merge state!')
+                    assert len(item.commitRefs) ==1
             
             self.workspace[item.type][ref]=item
             
@@ -366,7 +369,38 @@ class WorkSpace(object):
         
         for stateRef in stateRefs:
             inst.workspace[RdfBase.STATE][stateRef.key]=stateRef
+            
+
+        # Set the reference count for each item based on the associations
+        inst._set_references()
+            
+            
         return inst
+
+
+    def _set_references(self):
+        associations = self.get_associations()
+        
+        for a in associations:
+            for item in a.object:
+                type_keycommit=a.object[item]
+                
+                type = type_keycommit[0]
+                key = type_keycommit[1][0]
+                commit = tuple(type_keycommit[1][1])
+
+                if type == RdfBase.STATE:
+                    ref = commit
+                else:
+                    ref =key
+                
+                if ref in self.references:
+                    self.references[ref].add(a.key)
+                else:
+                    self.references[ref]=set([a.key])  
+        
+
+
 
     @classmethod
     def create(cls, associations_triples, key=None):
@@ -392,14 +426,42 @@ class WorkSpace(object):
     def len_associations(self):
         return len(self.workspace[RdfBase.ASSOCIATION])
 
+    def get_associations(self):
+        return self.workspace[RdfBase.ASSOCIATION].values()
+
+    def get_association_list(self):
+        return self.workspace[RdfBase.ASSOCIATION].keys()
+
     def len_blobs(self):
         return len(self.workspace[RdfBase.BLOB])
 
+    def get_blobs(self):
+        return self.workspace[RdfBase.BLOB].values()
+
+    def get_blob_list(self):
+        return self.workspace[RdfBase.BLOB].keys()
+        
     def len_entities(self):
         return len(self.workspace[RdfBase.ENTITY])
+        
+    def get_entities(self):
+        return self.workspace[RdfBase.ENTITY].values()
+        
+    def get_entity_list(self):
+        return self.workspace[RdfBase.ENTITY].keys()
 
     def len_states(self):
         return len(self.workspace[RdfBase.STATE])
+
+    def get_states(self):
+        return self.workspace[RdfBase.STATE].values()
+
+    def get_state_list(self):
+        return self.workspace[RdfBase.STATE].keys()
+
+    def get_references(self):
+        return self.references
+
 
     def print_status(self):
         print '# of Associations in workspace', self.len_associations()
