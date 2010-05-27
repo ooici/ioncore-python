@@ -98,9 +98,9 @@ class RdfAssociation(RdfBase):
         assert isinstance(predicate, RdfBase)
         assert isinstance(object, RdfBase)
         
-        s=(subject.type,subject.key)
-        p=(predicate.type,predicate.key)
-        o=(object.type,object.key)
+        s=(subject.type,(subject.key, subject.commitRefs))
+        p=(predicate.type,(predicate.key, predicate.commitRefs))
+        o=(object.type,(object.key, object.commitRefs))
         
         a={ RdfBase.SUBJECT:s,
             RdfBase.PREDICATE:p,
@@ -110,6 +110,31 @@ class RdfAssociation(RdfBase):
         RdfBase.__init__(inst,a,RdfBase.ASSOCIATION)
         return inst
 
+    @classmethod
+    def sort_keys(cls, alist):
+        
+        # put it in a tuple if we got only one
+        if not getattr(alist, '__iter__', False):
+            alist = (alist,)
+        
+        types={
+            RdfBase.ASSOCIATION:set(),
+            RdfBase.BLOB:set(),
+            RdfBase.ENTITY:set(),
+            RdfBase.STATE:set()
+        }
+        for a in alist:
+            # make sure we got associations
+            print 'association',a
+            assert isinstance(a,RdfAssociation)
+            
+            for item in a.object:
+                type_keycommit=a.object[item]
+                
+                key = type_keycommit[1][0]
+                commit = tuple(type_keycommit[1][1])
+                types[type_keycommit[0]].add((key, commit))
+        return types # This is an ugly data structure!
 
     @classmethod
     def load(cls, key, association):
@@ -169,6 +194,9 @@ class RdfEntity(RdfESBase):
     @classmethod
     def load(cls, key, entity):
         inst=cls()
+        if not key:
+            key=str(uuid4())
+            
         RdfBase.__init__(inst,entity,RdfBase.ENTITY,key=key)
         return inst
     
@@ -190,10 +218,13 @@ class RdfState(RdfESBase):
 
     @classmethod
     def create(cls,key,associations,commitRefs):
-        
+
+        if not commitRefs:
+            logging.info('RdfState.create: commitRefs argument is None!')
+            assert commitRefs != None
+            
         if not getattr(commitRefs, '__iter__', False):
             commitRefs = (commitRefs,)
-        assert hasattr(commitRefs, '__iter__')
         assert len(commitRefs)>0
 
         s=set()
@@ -230,7 +261,7 @@ class WorkSpace(object):
 
     def __init__(self):
         
-        self.commitRefs=None
+        self.commitRefs=[]
         self.key=None
         
         self.modified=None
@@ -244,27 +275,44 @@ class WorkSpace(object):
 
         self.references={}
 
+
     def add_triple(self,triple):
         association = RdfAssociation.create(triple[0],triple[1],triple[2])
         self.add_association(association,triple)
     
     def add_association(self,association,triple):        
         
+        # Note that the workspace is modified
+        self.modified=True
+        
         assert type(triple) is tuple
         assert len(triple) ==3
 
+        # Add the association to the workspace's list of associations
         self.workspace[association.type][association.key]=association
+        # Make a reference counter for this association
         if not self.references.has_key(association.key):
             self.references[association.key]=set()
             
+            
         for item in triple:
-            self.workspace[item.type][item.key]=item
+            if not item.type == RdfBase.STATE:
+                # Use the Key
+                ref  = item.key
+            else:
+                # Use the commit
+                ref =  item.commitRefs[0]
+                if len(item.commitRefs) >1:
+                    logging.info('WorkSpace:add_association Illegal attempt to reference a merge state!')
+                    assert len(item.commitRefs) ==1
+            
+            self.workspace[item.type][ref]=item
             
             # add a reference to the thing!
-            if item.key in self.references:
-                self.references[item.key].add(association.key)
+            if ref in self.references:
+                self.references[ref].add(association.key)
             else:
-                self.references[item.key]=set([association.key])    
+                self.references[ref]=set([association.key])    
     
     def remove_association(self, association):
         
@@ -273,19 +321,36 @@ class WorkSpace(object):
         # Note that the workspace is modified
         self.modified=True
         
-        if len(self.references[association.key]) == 0:
-            del self.workspace[association.type][association.key]
+        if len(self.references[association.key]) > 0:
+            logging.info('Illegal attempt to remove an association ignored')
+            return
+            
+        del self.workspace[association.type][association.key]
         
         for item in association.object:
-            type_key = association.object[item]
+            type_keycommit = association.object[item]
            
-            type = type_key[0]
-            key  = type_key[1]
+            type = type_keycommit[0]
+            if not type == RdfBase.STATE:
+                # Use the Key
+                ref  = type_keycommit[1][0]
+            else:
+                # Use the commit
+                ref =  type_keycommit[1][1]
+                # We can safely delete the state from the workspace... in the store is another matter!
+                
+            self.references[ref].discard(association.key)
             
-            self.references[key].discard(association.key)
+            if len(self.references[ref]) == 0:
+               del self.workspace[type][ref]
             
-            if len(self.references[key]) == 0:
-               del self.workspace[type][key]
+    def copy(self):
+        ws=self.load(RdfState.load(self.key,self.get_association_list(),self.commitRefs),
+                                  self.get_associations(),
+                                  self.get_entities(),
+                                  self.get_states(),
+                                  self.get_blobs())
+        return ws
             
     @classmethod
     def load(cls,rdf, associations, entityRefs, stateRefs, blobs):
@@ -303,7 +368,7 @@ class WorkSpace(object):
         if rdf.commitRefs:
             inst.commitRefs=rdf.commitRefs
         
-        self.modified=False
+        inst.modified=False
         
         for association in associations:
             inst.workspace[RdfBase.ASSOCIATION][association.key]=association
@@ -316,7 +381,42 @@ class WorkSpace(object):
         
         for stateRef in stateRefs:
             inst.workspace[RdfBase.STATE][stateRef.key]=stateRef
+            
+
+        # Set the reference count for each item based on the associations
+        inst._set_references()
+            
+            
         return inst
+
+
+    def _set_references(self):
+        associations = self.get_associations()
+        
+        for a in associations:
+            
+            if not self.references.has_key(a.key):
+                self.references[a.key]=set()
+            
+            for item in a.object:
+                type_keycommit=a.object[item]
+                
+                type = type_keycommit[0]
+                key = type_keycommit[1][0]
+                commit = tuple(type_keycommit[1][1])
+
+                if type == RdfBase.STATE:
+                    ref = commit
+                else:
+                    ref =key
+                
+                if ref in self.references:
+                    self.references[ref].add(a.key)
+                else:
+                    self.references[ref]=set([a.key])  
+        
+
+
 
     @classmethod
     def create(cls, associations_triples, key=None):
@@ -326,9 +426,14 @@ class WorkSpace(object):
         inst=cls()
         inst.key=key
         
+        if not getattr(associations_triples, '__iter__', False):
+            associations_triples = (associations_triples,)
+        
         for pair in associations_triples:
+            assert type(pair) is tuple
             association=pair[0]
             triple=pair[1]
+            assert type(triple) is tuple
             
             inst.add_association(association,triple)
         
@@ -337,16 +442,47 @@ class WorkSpace(object):
     def len_associations(self):
         return len(self.workspace[RdfBase.ASSOCIATION])
 
+    def get_associations(self):
+        return self.workspace[RdfBase.ASSOCIATION].values()
+
+    def get_association_list(self):
+        return self.workspace[RdfBase.ASSOCIATION].keys()
+
     def len_blobs(self):
         return len(self.workspace[RdfBase.BLOB])
 
+    def get_blobs(self):
+        return self.workspace[RdfBase.BLOB].values()
+
+    def get_blob_list(self):
+        return self.workspace[RdfBase.BLOB].keys()
+        
     def len_entities(self):
         return len(self.workspace[RdfBase.ENTITY])
+        
+    def get_entities(self):
+        return self.workspace[RdfBase.ENTITY].values()
+        
+    def get_entity_list(self):
+        return self.workspace[RdfBase.ENTITY].keys()
 
     def len_states(self):
         return len(self.workspace[RdfBase.STATE])
 
+    def get_states(self):
+        return self.workspace[RdfBase.STATE].values()
+
+    def get_state_list(self):
+        return self.workspace[RdfBase.STATE].keys()
+
+    def get_references(self):
+        return self.references
+
+
     def print_status(self):
+        print 'WorkSpace key',self.key
+        print 'WorkSpace CommitRefs',self.commitRefs
+        print 'WorkSpace Modified',self.modified
         print '# of Associations in workspace', self.len_associations()
         print '# of Blobs in workspace', self.len_blobs()
         print '# of Entities in workspace', self.len_entities()
@@ -358,8 +494,3 @@ class WorkSpace(object):
         if item.key in self.references:
             size = len(self.references[item.key])
         return size
-
-    def diff(self, other):
-        assert isinstance(other, workspace)
-        # @Todo Impliment me!
-        return WorkSpace()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/agents/instrument_agents/SBE49_instrument_agent.py
+@file ion/agents/instrumentagents/SBE49_instrument_agent.py
 @author Steve Foley
 @brief CI interface for SeaBird SBE-49 CTD
 """
@@ -12,6 +12,7 @@ logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+ __name__)
 
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
+from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
 from ion.core.base_process import ProtocolFactory
 from ion.services.coi.resource_registry import ResourceLCState as LCS
 
@@ -82,7 +83,7 @@ instrumentParameters = (
 Someday the driver may inherit from a common (RS-232?) object if there is a need...
 """
 
-class SBE49InstrumentDriver():
+class SBE49InstrumentDriver(InstrumentDriver):
     """
     Maybe some day these values are looked up from a registry of common
         controlled vocabulary
@@ -156,8 +157,11 @@ class SBE49InstrumentDriver():
             return (0, command)
         
 class SBE49InstrumentAgent(InstrumentAgent):
-
-    __driver = SBE49InstrumentDriver()
+    """
+    Sea-Bird 49 specific instrument driver
+    Inherits basic get, set, getStatus, getCapabilities, etc. from parent
+    """
+    driver = SBE49InstrumentDriver()
     lifecycleState = LCS.RESLCS_NEW
     
     @staticmethod
@@ -167,97 +171,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         very raw data from the instrument into the common archive format
         """
         return input
-    
-    @defer.inlineCallbacks
-    def op_get(self, content, headers, msg):
-        """
-        React to a request for parameter values,
-        @return A reply message containing a dictionary of name/value pairs
-        """
-        assert(isinstance(content, list))
-        response = {}
-        for key in content:
-            response[key] = self.__driver.fetch_param(key)
-        if response != {}:
-            yield self.reply_ok(msg, response)
-        else:
-            yield self.reply_err(msg, 'No values found')
-    
-    @defer.inlineCallbacks    
-    def op_set(self, content, headers, msg):
-        """
-        Set parameters to the requested values.
-        @return Message with a list of settings
-            that were changed and what their new values are upon success.
-            On failure, return the bad key, but previous keys were already set
-        """
-        assert(isinstance(content, dict))
-        response = {}
-        for key in content:
-            result = {}
-            result = self.__driver.set_param(key, content[key])
-            if result == {}:
-                yield self.reply_err(msg, "Could not set %s" % key)
-            else:
-                response.update(result)
-        assert(response != {})
-        yield self.reply_ok(msg, response)
-            
-    @defer.inlineCallbacks
-    def op_getLifecycleState(self, content, headers, msg):
-        """
-        Query the lifecycle state of the object
-        @return Message with the lifecycle state
-        """
-        yield self.reply(msg, 'getLifecycleState', self.lifecycleState, {})
         
-    @defer.inlineCallbacks
-    def op_setLifecycleState(self, content, headers, msg):
-        """
-        Set the lifecycle state
-        @return Message with the lifecycle state that was set
-        """
-        self.lifecycleState = content
-        yield self.reply(msg, 'setLifecycleState', content, {})
-    
-    @defer.inlineCallbacks
-    def op_execute(self, content, headers, msg):
-        """
-        Execute a specific command on the instrument, reply with a confirmation
-        message including output of command, or simple ACK that command
-        was executed.
-        @param content Should be a list where first element is the command,
-            the rest are the arguments
-        """
-        assert(isinstance(content, unicode))
-        execResult = self.__driver.execute(content)
-        assert(len(execResult) == 2)
-        (errorCode, response) = execResult
-        assert(isinstance(errorCode, int))
-        if errorCode == 1:
-            yield self.reply_ok(msg, response)
-        else:
-            yield self.reply_err(msg,
-                                 "Error code %s, response: %s" % (errorCode,
-                                                                  response))
-    
-    @defer.inlineCallbacks
-    def op_getStatus(self, content, headers, msg):
-        """
-        Obtain the status of an instrument. This includes non-parameter
-        and non-lifecycle state of the instrument.
-        """
-    
-    @defer.inlineCallbacks
-    def op_getCapabilities(self, content, headers, msg):
-        """
-        Obtain a list of capabilities that this instrument has. This is
-        simply a command and parameter list at this point
-        """
-        yield self.reply(msg, 'getCapabilties',
-                         {'commands': instrumentCommands,
-                          'parameters': instrumentParameters}, {})
-
     @defer.inlineCallbacks
     def op_getTranslator(self, content, headers, msg):
         """
@@ -267,5 +181,15 @@ class SBE49InstrumentAgent(InstrumentAgent):
         yield self.reply_err(msg, "Not Implemented!")
 #        yield self.reply_ok(msg, self.__translator)
         
+    @defer.inlineCallbacks
+    def op_getCapabilities(self, content, headers, msg):
+        """
+        Obtain a list of capabilities that this instrument has. This is
+        simply a command and parameter list at this point
+        """
+        yield self.reply(msg, 'getCapabilties',
+                         {'commands': instrumentCommands,
+                          'parameters': instrumentParameters}, {})
+    
 # Spawn of the process using the module name
 factory = ProtocolFactory(SBE49InstrumentAgent)
