@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+import inspect
 from twisted.internet import defer
 
 from ion.agents.resource_agent import ResourceAgent
@@ -12,33 +13,15 @@ class InstrumentAgent(ResourceAgent):
     the interface to use for an instrumen agent.
     """
 
-    def op_get(self, content, headers, msg):
+    @defer.inlineCallbacks
+    def op_getTranslator(self, content, headers, msg):
         """
+        Obtain a function that translates the raw data format of the actual
+        device into a generic data format that can be sent to the repository.
+        This should be a stub that is subclassed by the specific IA, possibly
+        even the driver.
         """
-
-    def op_set(self, content, headers, msg):
-        """
-        """
-
-    def op_getLifecycleState(self, content, headers, msg):
-        """
-        """
-
-    def op_setLifecycleState(self, content, headers, msg):
-        """
-        """
-
-    def op_execute(self, content, headers, msg):
-        """
-        """
-
-    def op_getStatus(self, content, headers, msg):
-        """
-        """
-
-    def op_getCapabilities(self, content, headers, msg):
-        """
-        """
+        yield self.reply_ok(msg, lambda s: s)        
 
 class InstrumentAgentClient(ResourceAgentClient):
     """
@@ -106,3 +89,15 @@ class InstrumentAgentClient(ResourceAgentClient):
         assert(isinstance(content['commands'], list))
         assert(isinstance(content['parameters'], list))
         defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def getTranslator(self):
+        """
+        Get the translator routine that will convert the raw format of the
+        device into a common, repository-ready one
+        @return Function code that takes in data in the streamed format and
+            and puts it into the repository ready format
+        """
+        (content, headers, message) = yield self.rpc_send('getTranslator', ())
+        #assert(inspect.isroutine(content))
+        defer.returnValue(content)  

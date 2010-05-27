@@ -160,6 +160,14 @@ class SBE49InstrumentAgent(InstrumentAgent):
     __driver = SBE49InstrumentDriver()
     lifecycleState = LCS.RESLCS_NEW
     
+    @staticmethod
+    def __translator(input):
+        """
+        A function (to be returned upon request) that will translate the
+        very raw data from the instrument into the common archive format
+        """
+        return input
+    
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
         """
@@ -250,5 +258,14 @@ class SBE49InstrumentAgent(InstrumentAgent):
                          {'commands': instrumentCommands,
                           'parameters': instrumentParameters}, {})
 
+    @defer.inlineCallbacks
+    def op_getTranslator(self, content, headers, msg):
+        """
+        Return the translator function that will convert the very raw format
+        of the instrument into a common OOI repository-ready format
+        """
+        yield self.reply_err(msg, "Not Implemented!")
+#        yield self.reply_ok(msg, self.__translator)
+        
 # Spawn of the process using the module name
 factory = ProtocolFactory(SBE49InstrumentAgent)
