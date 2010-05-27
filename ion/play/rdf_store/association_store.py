@@ -54,6 +54,15 @@ class AssociationStore(object):
         defer.returnValue(rc)
 
 
+
+
+    @defer.inlineCallbacks
+    def read_state(self, state):
+        assert isinstance(state, RdfESBase)
+        
+        associations = yield get_associations(state.object)
+        defer.returnValue(associations)
+
     @defer.inlineCallbacks
     def get_associations(self, keys):
         '''

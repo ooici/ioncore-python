@@ -13,7 +13,7 @@ from ion.data.objstore import ObjectStore, ValueObject
 from ion.data.store import IStore, Store
 from ion.data.dataobject import DataObject
 
-from ion.play.rdf_store.rdf_base import RdfState, RdfEntity
+from ion.play.rdf_store.rdf_base import RdfState, RdfEntity, RdfESBase
 
 
 class StateStore(object):
@@ -40,38 +40,59 @@ class StateStore(object):
         @retval Deferred
         """
         yield self.objstore.init()
-        logging.info("BlobStore initialized")
+        logging.info("StateStore initialized")
         
     @defer.inlineCallbacks
-    def put_state(self, state):
+    def put_states(self, states):
         '''
         '''
-        if not getattr(state, 'commitRefs', False):
-            parents=state.commitRefs
-        else:
-            parents=None
+        if not getattr(states, '__iter__', False):
+            states = (states,)
         
-        obj = ValueObject(list(state.object))
+        for state in states:
         
-        rc=yield self.objstore.put(state.key, obj, parents=parents)
+            if not getattr(state, 'commitRefs', False):
+                parents=state.commitRefs
+            else:
+                parents=None
+        
+            obj = ValueObject(list(state.object))
+        
+            rc=yield self.objstore.put(state.key, obj, parents=parents)
 
         defer.returnValue(rc)
         
 
     @defer.inlineCallbacks
-    def get_state(self, key,parents=None):
+    def get_key(self, key,commit=None):
         '''
         '''
             
-        dobj=yield self.objstore.get(key, commit=parents)
+        dobj=yield self.objstore.get(key, commit=commit)
         
 
         if dobj:
             state=RdfState.load(key,set(dobj.value),[dobj.commitRef])
         else:
+            logging.info("StateStore Key/Commit Not Found!")
             state=None
 
         defer.returnValue(state)
 
 
+    @defer.inlineCallbacks
+    def get_states(self, stateRefs):
+        '''
+        '''
+            
+        if not getattr(stateRefs, '__iter__', False):
+            stateRefs = (stateRefs,)
+        
+        states=[]
+        for stateRef in stateRefs:
+            assert isinstance(stateRef, RdfESBase)
+            state = yield self.get_key(stateRef.key,stateRef.commitRefs)
+            states.append(state)
+
+        defer.returnValue(state)
 
