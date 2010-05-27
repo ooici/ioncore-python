@@ -158,7 +158,7 @@ class RdfStore(object):
         assert isinstance(workspace, WorkSpace)
         state=None
         # Trust the modified flag in the workspace
-        if workspace.modified:
+        if workspace.modified or commit:
             # Get the Key
             key = workspace.key
 
@@ -166,7 +166,7 @@ class RdfStore(object):
             if not commit:   
                 commit=workspace.commitRefs
 
-            # Get the state of key/commit  
+            # Get the state of key/commit
             state= yield self.states.get_key(key,commit)
             if not state:
                 logging.info('RdfStore:diff - key/commit does not yet exist!')
@@ -183,19 +183,16 @@ class RdfStore(object):
             
             if state != ws_state:
                 # Must get the difference between the association lists
-                #ws = workspace.copy()
-                ws=WorkSpace.load(ws_state,
-                                  workspace.get_associations(),
-                                  workspace.get_entities(),
-                                  workspace.get_states(),
-                                  workspace.get_blobs())
-
+                ws=workspace.copy()
+                
                 associations = workspace.get_associations()
                 for a in associations:
                     # a is an association in the current workspace, check if it is in the state
                     if a.key in state.object:
-                        print 'aaaaaaaaaa',a
                         ws.remove_association(a)
+
+                # Could test for differences between the Blobs, but probably not worth it!
+
             else:
                 # there is no difference - return an empty workspace
                 ws=WorkSpace.create([])

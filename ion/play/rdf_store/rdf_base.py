@@ -321,8 +321,11 @@ class WorkSpace(object):
         # Note that the workspace is modified
         self.modified=True
         
-        if len(self.references[association.key]) == 0:
-            del self.workspace[association.type][association.key]
+        if len(self.references[association.key]) > 0:
+            logging.info('Illegal attempt to remove an association ignored')
+            return
+            
+        del self.workspace[association.type][association.key]
         
         for item in association.object:
             type_keycommit = association.object[item]
@@ -340,6 +343,14 @@ class WorkSpace(object):
             
             if len(self.references[ref]) == 0:
                del self.workspace[type][ref]
+            
+    def copy(self):
+        ws=self.load(RdfState.load(self.key,self.get_association_list(),self.commitRefs),
+                                  self.get_associations(),
+                                  self.get_entities(),
+                                  self.get_states(),
+                                  self.get_blobs())
+        return ws
             
     @classmethod
     def load(cls,rdf, associations, entityRefs, stateRefs, blobs):
@@ -385,7 +396,7 @@ class WorkSpace(object):
         for a in associations:
             
             if not self.references.has_key(a.key):
-                self.references[association.key]=set()
+                self.references[a.key]=set()
             
             for item in a.object:
                 type_keycommit=a.object[item]
