@@ -40,13 +40,13 @@ class StateTest(IonTestCase):
     @defer.inlineCallbacks
     def test_get_404(self):
         # Make sure we can't read the not-written
-        rc = yield self.states.get_state('random key not in store')
+        rc = yield self.states.get_key('random key not in store')
         self.failUnlessEqual(rc, None)
 
     @defer.inlineCallbacks
     def test_write_and_delete(self):
         # Hmm, simplest op, just looking for exceptions
-        yield self.states.put_state(self.entity1)
+        yield self.states.put_states(self.entity1)
     
 
     @defer.inlineCallbacks
@@ -54,20 +54,20 @@ class StateTest(IonTestCase):
         # Write, then read to verify same
         
         # Write a state
-        rc=yield self.states.put_state(self.entity1)
+        rc=yield self.states.put_states(self.entity1)
         print 'commited',rc.identity
         
         # Read it back and check the object contents
-        s1 = yield self.states.get_state(self.entity1.key)
+        s1 = yield self.states.get_states(self.entity1)
         self.assertEqual(self.entity1.object, s1.object)
         
         # add an new association to the state and put it back again
         s1.add(self.assoc2)
-        rc=yield self.states.put_state(s1)
+        rc=yield self.states.put_states(s1)
         print 'commited',rc.identity
 
         # Get the new one back
-        s2 = yield self.states.get_state(self.entity1.key)
+        s2 = yield self.states.get_key(self.entity1.key)
         self.assertEqual(s2.object, s1.object)
         
         # Get the old one back!

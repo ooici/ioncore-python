@@ -54,6 +54,15 @@ class AssociationStore(object):
         defer.returnValue(rc)
 
 
+
+
+    @defer.inlineCallbacks
+    def read_state(self, state):
+        assert isinstance(state, RdfESBase)
+        
+        associations = yield get_associations(state.object)
+        defer.returnValue(associations)
+
     @defer.inlineCallbacks
     def get_associations(self, keys):
         '''
@@ -64,6 +73,11 @@ class AssociationStore(object):
         associations=[]
         #@ How to make this asynchronis?
         for key in keys:
+            
+            # an association returns a tuple - key,commit
+            if type(key) is tuple:
+                key = key[0]
+                
             association = yield self.store.get(key)
             if association:
                 association = RdfAssociation.load(key,association)

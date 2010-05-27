@@ -7,7 +7,14 @@ from twisted.internet import defer
 from ion.data.store import Store, IStore
 from ion.data.set_store import SetStore, ISetStore
 
-from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfBase, RdfEntity, RdfState, WorkSpace
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfBase, RdfEntity, RdfState, WorkSpace, RdfESBase
+
+from ion.play.rdf_store.state_store import StateStore
+from ion.play.rdf_store.association_store import AssociationStore
+from ion.play.rdf_store.blob_store import BlobStore
+from ion.play.rdf_store.reference_store import ReferenceStore
+
+
 
 class RdfStore(object):
 
@@ -25,17 +32,17 @@ class RdfStore(object):
 
         self.set_be = set_be if set_be else SetStore
         self.set_bea = set_bea if set_bea else {}
-        assert issubclass(self.store_be, ISetStore)
-        assert type(self.store_bea) is dict
+        assert issubclass(self.set_be, ISetStore)
+        assert type(self.set_bea) is dict
 
 
         #Declare the stores
-        self.blobs = BlobStore(backend=store_be,backendargs=store_bea)
-        self.associations=AssociationStore(backend=store_be,backendargs=store_bea)
-        self.state=EntityStore(backend=store_be,backendargs=store_bea)
+        self.blobs = BlobStore(backend=store_be,backargs=store_bea)
+        self.associations=AssociationStore(backend=store_be,backargs=store_bea)
+        self.states=StateStore(backend=store_be,backargs=store_bea)
         #Declare the Set Stores
-        self.a_refs=ReferenceStore(backend=set_be,backendargs=set_bea)
-        self.e_refs=ReferenceStore(backend=set_be,backendargs=set_bea)
+        self.a_refs=ReferenceStore(backend=set_be,backargs=set_bea)
+        self.e_refs=ReferenceStore(backend=set_be,backargs=set_bea)
         
         
     #@TODO make this also a class method so it is easier to start - one call?
@@ -51,19 +58,156 @@ class RdfStore(object):
         yield self.a_refs.init()
         yield self.e_refs.init()
         
-    def checkout(self,key):
+    @defer.inlineCallbacks
+    def checkout_state(self,state):
+        assert isinstance(state, RdfESBase)
+
+        # if it is just a reference to the state, get the state
+        if not state.object:
+            state = yield self.associations.read_state(state)
+        
+        # sort the associations into blobs, states, associations and entities
+        alist = state.object
+        aset=yield self.associations.get_associations(alist)
+        
+        sortedkeys=RdfAssociation.sort_keys(aset)
+
+        # Get the blobs
+        #print 'sortedkeys',sortedkeys
+        bset= yield self.blobs.get_blobs(sortedkeys[RdfBase.BLOB])
+        
+        sset= yield self.states.get_states(sortedkeys[RdfBase.STATE])
+        
+        eset= yield self.states.get_states(sortedkeys[RdfBase.ENTITY])
+        
+        ws=WorkSpace.load(state,aset,eset,sset,bset)
+        
+        defer.returnValue(ws)
+        
+        
+    @defer.inlineCallbacks        
+    def checkout(self,key,commit=None):
         # calls to repos...
         # pass result to WorkSpace.load()
         # service will pass the whole workspace for now
-        return WorkSpace()
+        state= yield self.states.get_key(key,commit)
         
+        ws = yield self.checkout_state(state)
         
+        defer.returnValue(ws)
         
+    @defer.inlineCallbacks    
     def commit(self,workspace):
         # Commit a workspace to the repository
-        # Service will pass the whole workspace for now!
-        pass
+        
+        assert isinstance(workspace, WorkSpace)
+        # Get the difference between the workspace and its parent
+        wdiff = yield self.diff_commit(workspace)
+        
+        if wdiff.len_associations() == 0:
+            logging.info('Nothing to commit')
+        else:
+            # Commit the new stuff in wdiff
+            blobs = workspace.get_blobs()
+            yield self.blobs.put_blobs(blobs)
+            
+            associations = workspace.get_associations()
+            yield self.associations.put_associations(associations)
+            
+            references=workspace.get_references()
+            for key in references:
+                yield self.a_refs.add_references(key,references[key])
+            
+            # Don't put states and entities - they already exist!
+            
+            # Get the current state from the workspace (list of association keys)
+            alist = workspace.get_association_list()
+            key = workspace.key
+            commitRefs = workspace.commitRefs
+            
+            if commitRefs:
+                update=RdfState.load(key,set(alist),commitRefs)
+            else:
+                update=RdfEntity.load(key,set(alist))
+                if key == None:
+                    # It was generated in RdfEntity.load because this is a new thing
+                    key = update.key
+                    
+            
+            # Returns list of key/commit tuples (length arg to put_states)    
+            key_commit= yield self.states.put_states(update)
+            assert key == key_commit[0][0]
+            commit=key_commit[0][1]
+            
+            # Add a reference from the commit to each association
+            for a in alist:
+                yield self.e_refs.add_references(a,[(key,commit)])
+                
+            wdiff.len_associations()
+            workspace.commitRefs=[commit]
+            workspace.modified=False
+            logging.info('Committed to Key# ' + key)
+            logging.info('Commit Ref# ' + str(commit))
+            logging.info('Commited Associations:'+ str(wdiff.len_associations()))
+            logging.info('Commited Blobs:' + str(wdiff.len_blobs()))
+
+        
+    @defer.inlineCallbacks     
+    def diff_commit(self,workspace,commit=[]):
+        
+        assert isinstance(workspace, WorkSpace)
+        state=None
+        # Trust the modified flag in the workspace
+        if workspace.modified:
+            # Get the Key
+            key = workspace.key
+
+            # if commit not passed, get from the workspace
+            if not commit:   
+                commit=workspace.commitRefs
+
+            # Get the state of key/commit  
+            state= yield self.states.get_key(key,commit)
+            if not state:
+                logging.info('RdfStore:diff - key/commit does not yet exist!')
+                # 'everything' is different, return the workspace!
+                ws=workspace
+        else:
+            # there is no difference - return an empty workspace
+            ws=WorkSpace.create([])
+            
+            
+        # IF state, compare the associations and diff the workspace
+        if state:
+            ws_state=RdfState.load(workspace.key,workspace.get_association_list(),workspace.commitRefs)
+            
+            if state != ws_state:
+                # Must get the difference between the association lists
+                #ws = workspace.copy()
+                ws=WorkSpace.load(ws_state,
+                                  workspace.get_associations(),
+                                  workspace.get_entities(),
+                                  workspace.get_states(),
+                                  workspace.get_blobs())
+
+                associations = workspace.get_associations()
+                for a in associations:
+                    # a is an association in the current workspace, check if it is in the state
+                    if a.key in state.object:
+                        print 'aaaaaaaaaa',a
+                        ws.remove_association(a)
+            else:
+                # there is no difference - return an empty workspace
+                ws=WorkSpace.create([])
+            
+        defer.returnValue(ws)        
     
+#    @defer.inlineCallbacks 
+    def merge(self,state1, state2):
+        pass
+        
+        
+            
     # To be implemented later! Make it distributed so services can work locally!
     def push(self,key,**kwargs):
         pass
@@ -72,10 +216,14 @@ class RdfStore(object):
         pass
     
     
-    
+    def walk(self,rdfbase,association_match):
+        
+        ws = WorkSpace()
+        return ws
         
         
-        
+    def garbage_collection(self):
+        pass
     
             
         

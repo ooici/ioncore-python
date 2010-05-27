@@ -134,6 +134,19 @@ class RdfTest(unittest.TestCase):
         
         self.assertEqual(assoc3,assoc5)
 
+        alist=[assoc1,assoc2,assoc3,assoc4,assoc5]
+        
+        sortedkeys=RdfAssociation.sort_keys(alist)
+        print ''
+        for item in sortedkeys:
+            
+            print 'Kind: ',item,' count:', len(sortedkeys[item])
+
+        self.assertEqual(2,len(sortedkeys[RdfBase.ASSOCIATION]))
+        self.assertEqual(1,len(sortedkeys[RdfBase.STATE]))
+        self.assertEqual(3,len(sortedkeys[RdfBase.BLOB]))
+        self.assertEqual(1,len(sortedkeys[RdfBase.ENTITY]))
+
 
     def test_WorkSpace(self):
         
