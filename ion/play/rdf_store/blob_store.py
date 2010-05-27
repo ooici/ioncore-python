@@ -64,6 +64,10 @@ class BlobStore(object):
         blobs=[]
         #@ How to make this asynchronis?
         for key in keys:
+            # an association returns a tuple - key,commit
+            if type(key) is tuple:
+                key = key[0]
+                
             blob = yield self.store.get(key)
             if blob:
                 blob = RdfBlob.load(key,blob)

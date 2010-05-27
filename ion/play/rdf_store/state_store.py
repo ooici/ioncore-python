@@ -60,10 +60,10 @@ class StateStore(object):
             obj = ValueObject(list(state.object))
         
             rc=yield self.objstore.put(state.key, obj, parents=parents)
+        
+        key_commit_list.append((state.key,rc.identity))
 
-        key_commit_list.append((state.key,rc))
-
-        defer.returnValue(rc)
+        defer.returnValue(key_commit_list)
         
 
     @defer.inlineCallbacks
@@ -71,6 +71,13 @@ class StateStore(object):
         '''
         '''
             
+        # if we got a commit to fetch, make sure we got a single key - usually a single stre in a list...
+        if commit:
+            if getattr(commit, '__iter__', False):
+                assert len(commit)==1
+                commit = commit[0]
+                    
+                
         dobj=yield self.objstore.get(key, commit=commit)
         
 
@@ -93,9 +100,16 @@ class StateStore(object):
         
         states=[]
         for stateRef in stateRefs:
-            assert isinstance(stateRef, RdfESBase)
-            state = yield self.get_key(stateRef.key,stateRef.commitRefs)
-            states.append(state)
+            if isinstance(stateRef, RdfESBase):
+                key = stateRef.key
+                commit = stateRef.commitRefs
+            elif isinstance(stateRef, tuple):
+                key = stateRef[0]
+                commit=stateRef[1]
+                
+            state = yield self.get_key(key,commit)
+            if state:
+                states.append(state)
 
-        defer.returnValue(state)
+        defer.returnValue(states)
 

@@ -125,7 +125,8 @@ class RdfAssociation(RdfBase):
         }
         for a in alist:
             # make sure we got associations
-            assert isinstance(a,cls)
+            print 'association',a
+            assert isinstance(a,RdfAssociation)
             
             for item in a.object:
                 type_keycommit=a.object[item]
@@ -260,7 +261,7 @@ class WorkSpace(object):
 
     def __init__(self):
         
-        self.commitRefs=None
+        self.commitRefs=[]
         self.key=None
         
         self.modified=None
@@ -356,7 +357,7 @@ class WorkSpace(object):
         if rdf.commitRefs:
             inst.commitRefs=rdf.commitRefs
         
-        self.modified=False
+        inst.modified=False
         
         for association in associations:
             inst.workspace[RdfBase.ASSOCIATION][association.key]=association
@@ -382,6 +383,10 @@ class WorkSpace(object):
         associations = self.get_associations()
         
         for a in associations:
+            
+            if not self.references.has_key(a.key):
+                self.references[association.key]=set()
+            
             for item in a.object:
                 type_keycommit=a.object[item]
                 
@@ -464,6 +469,9 @@ class WorkSpace(object):
 
 
     def print_status(self):
+        print 'WorkSpace key',self.key
+        print 'WorkSpace CommitRefs',self.commitRefs
+        print 'WorkSpace Modified',self.modified
         print '# of Associations in workspace', self.len_associations()
         print '# of Blobs in workspace', self.len_blobs()
         print '# of Entities in workspace', self.len_entities()

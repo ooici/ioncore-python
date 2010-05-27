@@ -44,6 +44,7 @@ class ReferenceStore(object):
         if not getattr(references, '__iter__', False):
             references = (references,)
 
+        rc = None
         for ref in references:
             rc=yield self.setstore.sadd(key,ref)
         # @Todo What do I do with multiple returns from a yield?
