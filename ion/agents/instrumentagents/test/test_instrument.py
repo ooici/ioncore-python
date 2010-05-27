@@ -9,6 +9,7 @@
 """
 
 import logging
+import inspect
 from twisted.internet import defer
 
 from ion.services.coi.resource_registry import ResourceLCState as LCS
@@ -105,3 +106,13 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(response['stop']['status'] == 'OK')
         self.assert_(response['badcommand']['status'] == 'ERROR')
         
+    @defer.inlineCallbacks
+    def testTranslator(self):
+        """
+        Test to see if the translator function is coming back cleanly
+        @todo make this not a stub when we can pass functions through AMQP
+        """
+        yield
+        #xlateFn = yield self.IAClient.getTranslator()
+        #self.assert_(inspect.isroutine(xlateFn))
+        #self.assert_(xlateFn('foo') == 'foo')
