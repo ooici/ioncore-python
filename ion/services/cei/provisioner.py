@@ -49,6 +49,10 @@ class ProvisionerService(BaseService):
         self.store.put_record(launch, states.Requested)
         self.store.put_records(nodes, states.Requested)
 
+        subscribers = launch['subscribers']
+        if subscribers:
+            self.notifier.send_records(nodes, subscribers)
+
         # now we can ACK the request as it is safe in datastore
 
         # set up a callLater to fulfill the request after the ack. Would be
@@ -145,7 +149,10 @@ class ProvisionerCore(object):
     
     @defer.inlineCallbacks
     def fulfill_launch(self, launch, nodes):
+        """Follows through on bringing a launch to the Pending state
+        """
 
+        subscribers = launch['subscribers']
         docstr = launch['document']
         doc = NimbusClusterDocument(docstr)
         
@@ -188,8 +195,16 @@ class ProvisionerCore(object):
                 node_rec['public_ip'] = iaas_node.public_ip
                 node_rec['private_ip'] = iaas_node.private_ip
                 node_rec['extra'] = iaas_node.extra.copy()
+                node_rec['state'] = states.Pending
             
-            self.store.put_records(launch_group, states.Pending)
+            yield self.store_and_notify(launch_group, subscribers)
+    
+    @defer.inlineCallbacks
+    def store_and_notify(self, records, subscribers, newstate=None):
+        """Convenience method to store records and notify subscribers.
+        """
+        yield self.store.put_records(records, newstate)
+        yield self.notifier.send_records(records, subscribers)
 
     def _create_context(self):
         """Synchronous call to context broker.
@@ -202,8 +217,21 @@ class ProvisionerNotifier(object):
     def __init__(self, process):
         self.process = process
 
-    def send_record(self, record, subscribers=None):
-        pass
+    @defer.inlineCallbacks
+    def send_record(self, record, subscribers, operation='node_update'):
+        """Send a single node record to all subscribers.
+        """
+        logging.debug('Sending status record about node %s to %s', 
+                record['node_id'], repr(subscribers))
+        for sub in subscribers:
+            yield self.process.send(sub, operation, record)
+
+    @defer.inlineCallbacks
+    def send_records(self, records, subscribers, operation='node_update'):
+        """Send a set of node records to all subscribers.
+        """
+        for rec in records:
+            yield self.send_record(rec, subscribers, operation)
 
 def _get_launch_groups(nodes):
     """Breaks nodes into groups that can be launched in a single request.
