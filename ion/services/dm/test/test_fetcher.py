@@ -40,6 +40,8 @@ class FetcherTest(IonTestCase):
         logging.debug('sending request for "%s"...' % src_url)
         res = yield self.fc.get_head(src_url)
         msg = res['value']
+        if res['status'] == 'ERROR':
+            raise ValueError('Error on fetch: ' + msg)
         defer.returnValue(msg)
 
     @defer.inlineCallbacks
@@ -64,6 +66,14 @@ class FetcherTest(IonTestCase):
     def test_404(self):
         try:
             d = yield self._get_page('http://ooici.net/404-fer-sure')
+            self.fail('Should have gotten an exception for 404 error!')
+        except ValueError, e:
+            pass
+
+    @defer.inlineCallbacks
+    def test_header_404(self):
+        try:
+            d = yield self._get_phead('http://ooici.net/404-fer-sure')
             self.fail('Should have gotten an exception for 404 error!')
         except ValueError, e:
             pass
