@@ -28,20 +28,11 @@ class FetcherService(BaseService):
     """
     logging.info('Declaring fetcher...')
     declare = BaseService.service_declare(name='fetcher',
-                                          version='0.1.0',
+                                          version='0.1.1',
                                           dependencies=[])
     """
     @todo Declare fetcher name into dns-equivalent...
     """
-
-    def __init__(self, receiver, spawnArgs=None):
-        BaseService.__init__(self, receiver, spawnArgs)
-        logging.info('Fetcher starting')
-
-    def slc_init(self):
-        pass
-
-
     def _reassemble_headers(self, result):
         """
         @brief Convert an array of tuples into http headers
@@ -52,7 +43,6 @@ class FetcherService(BaseService):
             hstr = hstr + '%s: %s\n' % (x[0], x[1])
 
         return hstr
-
 
     @defer.inlineCallbacks
     def _http_op(self, operation, src_url, msg):
