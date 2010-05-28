@@ -48,35 +48,45 @@ class RdfStoreTest(IonTestCase):
     #    self.failUnlessEqual(rc, set())
 
     def _compare_ws(self,ws1,ws2):
-        #self.assertEqual(ws1.get_associations(),ws2.get_associations())
-        #self.assertEqual(ws1.get_blobs(),ws2.get_blobs())
-        ents = ws1.get_entities()
-        if ents:
-            print 'ws1 entity!'
-            for ent in ents:
-                print ent 
-        ents = ws2.get_entities()
-        if ents:
-            print 'ws2 entity!'
-            for ent in ents:
-                print ent 
+        self.assertEqual(ws1.get_associations(),ws2.get_associations())
+        self.assertEqual(ws1.get_blobs(),ws2.get_blobs())
+        #ents = ws1.get_entities()
+        #if ents:
+        #    print 'ws1 entity!'
+        #    for ent in ents:
+        #        print ent 
+        #ents = ws2.get_entities()
+        #if ents:
+        #    print 'ws2 entity!'
+        #    for ent in ents:
+        #        print ent 
         self.assertEqual(ws1.get_entities(),ws2.get_entities())
         
-        ents = ws1.get_states()
-        if ents:
-            print 'ws1 state!'
-            for ent in ents:
-                print ent 
-        ents = ws2.get_states()
-        if ents:
-            print 'ws2 state!'
-            for ent in ents:
-                print ent 
+        #ents = ws1.get_states()
+        #if ents:
+        #    print 'ws1 state!'
+        #    for ent in ents:
+        #        print ent 
+        #ents = ws2.get_states()
+        #if ents:
+        #    print 'ws2 state!'
+        #    for ent in ents:
+        #        print ent 
         
         
         self.assertEqual(ws1.get_states(),ws2.get_states())
         self.assertEqual(ws1.key,ws2.key)
+        # compare the keys in the references
+        self.assertEqual(set(ws1.get_references().keys()),set(ws2.get_references().keys()))
+        # compare the values
+        print 'ws1:'
+        print ws1.get_references().values()
+        print 'ws2:'
+        print ws2.get_references().values()
+        
         self.assertEqual(ws1.get_references(),ws2.get_references())
+
+#        self.assertEqual(set(ws1.get_references().values()),set(ws2.get_references().values()))
         self.assertEqual(ws1.commitRefs,ws2.commitRefs)
 
     #@defer.inlineCallbacks
@@ -220,6 +230,9 @@ class RdfStoreTest(IonTestCase):
         ws2_in.print_status()
 
         ws2_out = yield self.rdfs.checkout(self.key)
+
+        print 'ws2_out.commitRefs',ws2_out.commitRefs
+        print 'ws2_in.commitRefs',ws2_in.commitRefs
 
         print '===== Checkout ws2_out status ========'
         ws2_out.print_status()

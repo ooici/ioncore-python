@@ -136,10 +136,10 @@ class RdfAssociation(RdfBase):
             alist = (alist,)
         
         types={
-            RdfBase.ASSOCIATION:set(),
-            RdfBase.BLOB:set(),
-            RdfBase.ENTITY:set(),
-            RdfBase.STATE:set()
+            RdfBase.ASSOCIATION:[],
+            RdfBase.BLOB:[],
+            RdfBase.ENTITY:[],
+            RdfBase.STATE:[]
         }
         for a in alist:
             # make sure we got associations
@@ -149,8 +149,8 @@ class RdfAssociation(RdfBase):
                 type_keycommit=a.object[item]
                 
                 key = type_keycommit[1][0]
-                commit = tuple(type_keycommit[1][1])
-                types[type_keycommit[0]].add((key, commit))
+                commit = type_keycommit[1][1]
+                types[type_keycommit[0]].append((key, commit))
         return types # This is an ugly data structure!
 
     @classmethod
@@ -421,15 +421,12 @@ class WorkSpace(object):
                     del self.workspace[type][ref]
             
     def copy(self):
-        
-        print 'orig:',self.commitRefs
         ws=self.load(RdfState.load(self.key,self.get_association_list(),self.commitRefs),
                                   self.get_associations(),
                                   self.get_entities(),
                                   self.get_states(),
                                   self.get_blobs())
         
-        print 'copy:',ws.commitRefs
         return ws
             
     @classmethod
@@ -477,7 +474,9 @@ class WorkSpace(object):
             
             if not self.references.has_key(a.key):
                 self.references[a.key]=set(['self'])
-            
+            else: 
+                self.references[a.key].add('self')
+                
             for item in a.object:
                 type_keycommit=a.object[item]
                 
@@ -486,7 +485,9 @@ class WorkSpace(object):
                 commit = tuple(type_keycommit[1][1])
 
                 if type == RdfBase.STATE:
-                    ref = commit
+                    if not len(commit) ==1:
+                        raise RuntimeError('Can not reference a merged state - it must be committed first')
+                    ref = commit[0]
                 else:
                     ref =key
                 

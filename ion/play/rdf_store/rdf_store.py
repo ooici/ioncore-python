@@ -202,8 +202,6 @@ class RdfStore(object):
                     # a is an association in the current workspace, check if it is in the state
                     if a.key in state.object:
                         
-                        print a
-                        
                         ws.remove_association(a)
 
                 # Could test for differences between the Blobs, but probably not worth it!
