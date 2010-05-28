@@ -47,10 +47,10 @@ class FetcherService(BaseService):
     @defer.inlineCallbacks
     def _http_op(self, operation, src_url, msg):
         """
-        @brief Inner method for GET and HEAD
+        @brief Inner method for GET and HEAD, does fetch and reply
         @param operation 'GET' or 'HEAD'
         @param src_url Source URL
-        @retval HTTP result code and page plus headers
+        @retval send_ok or send_err as required
         """
         assert(operation in ['GET', 'HEAD'])
 
@@ -119,7 +119,7 @@ class FetcherClient(BaseServiceClient):
 
         logging.info('Sending HEAD request to fetcher...')
         (content, headers, msg) = yield self.rpc_send('get_head', requested_url)
-        if 'failure' in content:
+        if 'ERROR' in content:
             raise ValueError('Error on URL: ' + content['failure'])
         defer.returnValue(content)
 
@@ -135,7 +135,7 @@ class FetcherClient(BaseServiceClient):
 
         logging.info('Sending request')
         (content, headers, msg) = yield self.rpc_send('get_url', requested_url)
-        if 'failure' in content:
+        if 'ERROR' in content:
             raise ValueError('Error on URL: ' + content['failure'])
         defer.returnValue(content)
 

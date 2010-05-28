@@ -31,6 +31,8 @@ class FetcherTest(IonTestCase):
         logging.debug('sending request for "%s"...' % src_url)
         res = yield self.fc.get_url(src_url)
         msg = res['value']
+        if res['status'] == 'ERROR':
+            raise ValueError('Error on fetch: ' + msg)
         defer.returnValue(msg)
 
     @defer.inlineCallbacks
