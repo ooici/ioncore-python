@@ -40,7 +40,7 @@ class FetcherService(BaseService):
         """
         hstr = ''
         for x in result.getheaders():
-            hstr = hstr + '%s: %s\n' % (x[0], x[1])
+            hstr = hstr + '%s: %s\r\n' % (x[0], x[1])
 
         return hstr
 
