@@ -143,7 +143,7 @@ class RdfAssociation(RdfBase):
         return inst
         
 
-
+#@Todo - change to mixin class
 class RdfESBase(RdfBase):
     '''
     Make a common class for Entity and State to inherit from
