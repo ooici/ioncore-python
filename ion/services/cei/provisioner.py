@@ -156,7 +156,7 @@ class ProvisionerCore(object):
         docstr = launch['document']
         doc = NimbusClusterDocument(docstr)
         
-        launch_groups = _get_launch_groups(nodes)
+        launch_groups = group_records(nodes, 'ctx_name')
         
         context = None
         if doc.needs_contextualization:
@@ -233,16 +233,21 @@ class ProvisionerNotifier(object):
         for rec in records:
             yield self.send_record(rec, subscribers, operation)
 
-def _get_launch_groups(nodes):
-    """Breaks nodes into groups that can be launched in a single request.
+def group_records(records, *args):
+    """Breaks records into groups of distinct values for the specified keys
 
-    Returns a dict of node lists, keyed by ctx-name.
+    Returns a dict of record lists, keyed by the distinct values.
     """
-    sorted_nodes = list(nodes)
-    keyf = lambda n: n['ctx_name']
-    sorted_nodes.sort(key=keyf)
+    sorted_records = list(records)
+    if not args:
+        raise ValueError('Must specify at least one key to group by')
+    if len(args) == 1:
+        keyf = lambda record: record[args[0]]
+    else:
+        keyf = lambda record: tuple([record[key] for key in args])
+    sorted_records.sort(key=keyf)
     groups = {}
-    for key, group in groupby(nodes, keyf):
+    for key, group in groupby(sorted_records, keyf):
         groups[key] = list(group)
     return groups
 

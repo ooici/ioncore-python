@@ -15,7 +15,7 @@ from magnet.spawnable import spawn
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
-from ion.services.cei.provisioner import ProvisionerService
+from ion.services.cei.provisioner import ProvisionerService, group_records
 
 def _new_id():
     return str(uuid.uuid4())
@@ -63,3 +63,25 @@ class ProvisionerServiceTest(IonTestCase):
 
         yield pu.asleep(10) #async wait
 
+class ProvisionerCoreTest(IonTestCase):
+    def test_group_records(self):
+        records = [
+                {'site' : 'chicago', 'allocation' : 'big', 'name' : 'sandwich'},
+                {'name' : 'pizza', 'allocation' : 'big', 'site' : 'knoxville'},
+                {'name' : 'burrito', 'allocation' : 'small', 'site' : 'chicago'}
+                ]
+
+        groups = group_records(records, 'site')
+        self.assertEqual(len(groups.keys()), 2)
+        chicago = groups['chicago']
+        self.assertTrue(isinstance(chicago, list))
+        self.assertEqual(len(chicago), 2)
+        self.assertEqual(len(groups['knoxville']), 1)
+
+        groups = group_records(records, 'site', 'allocation')
+        self.assertEqual(len(groups.keys()), 3)
+        chicago_big = groups[('chicago','big')]
+        self.assertEqual(chicago_big[0]['allocation'], 'big')
+        self.assertEqual(chicago_big[0]['site'], 'chicago')
+        for group in groups.itervalues():
+            self.assertEqual(len(group), 1)
