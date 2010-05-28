@@ -60,7 +60,7 @@ class AssociationStore(object):
     def read_state(self, state):
         assert isinstance(state, RdfMixin)
         
-        associations = yield get_associations(state.object)
+        associations = yield self.get_associations(state.object)
         defer.returnValue(associations)
 
     @defer.inlineCallbacks

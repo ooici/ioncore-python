@@ -82,7 +82,10 @@ class StateStore(object):
         
 
         if dobj:
-            state=RdfState.load(key,set(dobj.value),[dobj.commitRef])
+            if commit:
+                state=RdfState.load(key,set(dobj.value),[dobj.commitRef])
+            else:
+                state=RdfEntity.load(key,set(dobj.value),commitRefs=[dobj.commitRef])
         else:
             logging.info("StateStore Key/Commit Not Found!")
             state=None
@@ -110,6 +113,9 @@ class StateStore(object):
             state = yield self.get_key(key,commit)
             if state:
                 states.append(state)
+                
+        if len(states)==1:
+            states=states[0]
 
         defer.returnValue(states)
 

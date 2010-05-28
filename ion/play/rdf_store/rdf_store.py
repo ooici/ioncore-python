@@ -64,11 +64,11 @@ class RdfStore(object):
 
         # if it is just a reference to the state, get the state
         if not state.object:
-            state = yield self.associations.read_state(state)
+            state = yield self.states.get_states(state)
         
         # sort the associations into blobs, states, associations and entities
-        alist = state.object
-        aset=yield self.associations.get_associations(alist)
+        
+        aset=yield self.associations.read_state(state)
         
         sortedkeys=RdfAssociation.sort_keys(aset)
 
@@ -76,9 +76,16 @@ class RdfStore(object):
         #print 'sortedkeys',sortedkeys
         bset= yield self.blobs.get_blobs(sortedkeys[RdfBase.BLOB])
         
-        sset= yield self.states.get_states(sortedkeys[RdfBase.STATE])
+        sset=[]
+        for key_commit in sortedkeys[RdfBase.STATE]:
+            sset.append( RdfState.reference(key_commit[0],key_commit[1]) )
+            
+        #sset= yield self.states.get_states(sortedkeys[RdfBase.STATE])
         
-        eset= yield self.states.get_states(sortedkeys[RdfBase.ENTITY])
+        eset=[]
+        for key_commit in sortedkeys[RdfBase.ENTITY]:
+            eset.append( RdfEntity.reference(key_commit[0]) )
+        #eset= yield self.states.get_states(sortedkeys[RdfBase.ENTITY])
         
         ws=WorkSpace.load(state,aset,eset,sset,bset)
         
@@ -175,7 +182,12 @@ class RdfStore(object):
         else:
             # there is no difference - return an empty workspace
             ws=WorkSpace.create([])
-            
+         
+        # Force the comparison!   
+        key = workspace.key
+        if not commit:   
+                commit=workspace.commitRefs
+        state= yield self.states.get_key(key,commit)
             
         # IF state, compare the associations and diff the workspace
         if state:
@@ -189,6 +201,9 @@ class RdfStore(object):
                 for a in associations:
                     # a is an association in the current workspace, check if it is in the state
                     if a.key in state.object:
+                        
+                        print a
+                        
                         ws.remove_association(a)
 
                 # Could test for differences between the Blobs, but probably not worth it!

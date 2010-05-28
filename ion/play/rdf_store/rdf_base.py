@@ -52,12 +52,22 @@ class RdfBase(object):
         @param DataObject Instance
         @retval True or False
         """
-        assert isinstance(other, RdfBase)
-        a= self.key == other.key
-        b= self.type == other.type
-        c= self.object == other.object
-        d= self.commitRefs == other.commitRefs
-        return a and b and c and d
+        if not isinstance(other, RdfBase):
+            #print 'cat'
+            return False
+        if not self.key == other.key:
+            #print 'dog'
+            return False
+        if not self.type == other.type:
+            #print 'wolf'
+            return False
+        if not self.commitRefs == other.commitRefs:
+            #print 'groundhog'
+            return False
+        if not self.object == other.object:
+            #print 'shit'
+            return False        
+        return True
     
     def __ne__(self,other):
         """
@@ -67,6 +77,14 @@ class RdfBase(object):
         """
         return not self.__eq__(other)
 
+    def __str__(self):
+        
+        strng ='''\012===== Rdf Type: ''' + str(self.type) +''' =======\012'''
+        strng+='''= Key: "''' + str(self.key) + '''"\012'''
+        strng+='''= Object Content: "''' + str(self.object) + '''"\012'''
+        strng+='''= Commit References: "''' + str(self.commitRefs) + '''"\012'''
+        strng+='''============================================\012'''
+        return strng
 
 class RdfBlob(RdfBase):
     
@@ -125,7 +143,6 @@ class RdfAssociation(RdfBase):
         }
         for a in alist:
             # make sure we got associations
-            print 'association',a
             assert isinstance(a,RdfAssociation)
             
             for item in a.object:
@@ -188,18 +205,18 @@ class RdfEntity(RdfBase,RdfMixin):
         return inst
 
     @classmethod
-    def load(cls, key, entity):
+    def load(cls, key, entity,commitRefs=[]):
         inst=cls()
         if not key:
             key=str(uuid4())
             
-        RdfBase.__init__(inst,entity,RdfBase.ENTITY,key=key)
+        RdfBase.__init__(inst,entity,RdfBase.ENTITY,key=key,commitRefs=commitRefs)
         return inst
     
     @classmethod
     def reference(cls, key):
         inst=cls()
-        RdfBase.__init__(inst,None,RdfBase.ENTITY,key=key)
+        RdfBase.__init__(inst,set(),RdfBase.ENTITY,key=key)
         return inst
     
 
@@ -220,7 +237,7 @@ class RdfState(RdfBase, RdfMixin):
             assert commitRefs != None
             
         if not getattr(commitRefs, '__iter__', False):
-            commitRefs = (commitRefs,)
+            commitRefs = [commitRefs]
         assert len(commitRefs)>0
 
         s=set()
@@ -245,7 +262,7 @@ class RdfState(RdfBase, RdfMixin):
     @classmethod
     def reference(cls, key, commitRefs):
         inst=cls()
-        RdfBase.__init__(inst, None, RdfBase.STATE, key=key, commitRefs=commitRefs)
+        RdfBase.__init__(inst, set(), RdfBase.STATE, key=key, commitRefs=commitRefs)
         return inst
 
 
@@ -271,6 +288,49 @@ class WorkSpace(object):
 
         self.references={}
 
+    def __eq__(self, other):
+        
+        if not isinstance(other, WorkSpace):
+            return False
+
+        if not ws1.commitRefs == ws2.commitRefs:
+            return False        
+
+        if not ws1.key == ws2.key:
+            return False
+        
+        if not ws1.get_associations() == ws2.get_associations():
+            return False
+        
+        if not ws1.get_blobs() == ws2.get_blobs():
+            return False
+        
+        if not ws1.get_entities() == ws2.get_entities():
+            return False
+        
+        if not ws1.get_states() == ws2.get_states():
+            return False
+        
+        if not ws1.get_references() == ws2.get_references():
+            return False
+        return True
+        
+    def __hash__(self):
+        '''
+        @ Note This should not be a hashable object - it can not be used as a dict key
+        http://docs.python.org/reference/datamodel.html?highlight=__cmp__#object.__hash__
+        '''
+        return None
+        
+
+    def __ne__(self,other):
+        """
+        @brief Object Comparison
+        @param other DataObject Instance
+        @retval Bool 
+        """
+        return not self.__eq__(other)
+
 
     def add_triple(self,triple):
         association = RdfAssociation.create(triple[0],triple[1],triple[2])
@@ -284,11 +344,26 @@ class WorkSpace(object):
         assert type(triple) is tuple
         assert len(triple) ==3
 
+        # Check to make sure the association and the tuples match! This is a bit exessive?
+        if not association.object[RdfBase.SUBJECT][0] == triple[0].type:
+            raise RuntimeError('Association Subject does not match triple subject type')
+        if not association.object[RdfBase.PREDICATE][0] == triple[1].type:
+            raise RuntimeError('Association predicate does not match triple predicate type')
+        if not association.object[RdfBase.OBJECT][0] == triple[2].type:
+            raise RuntimeError('Association object does not match triple object type')
+
+        if not association.object[RdfBase.SUBJECT][1] == (triple[0].key,triple[0].commitRefs):
+            raise RuntimeError('Association Subject does not match triple subject identity')
+        if not association.object[RdfBase.PREDICATE][1] == (triple[1].key,triple[1].commitRefs):
+            raise RuntimeError('Association predicate does not match triple predicate identity')
+        if not association.object[RdfBase.OBJECT][1] == (triple[2].key,triple[2].commitRefs):
+            raise RuntimeError('Association object does not match triple object identity')
+
         # Add the association to the workspace's list of associations
         self.workspace[association.type][association.key]=association
         # Make a reference counter for this association
         if not self.references.has_key(association.key):
-            self.references[association.key]=set()
+            self.references[association.key]=set(['self'])
             
             
         for item in triple:
@@ -313,15 +388,15 @@ class WorkSpace(object):
     def remove_association(self, association):
         
         assert isinstance(association, RdfAssociation)
-        
-        # Note that the workspace is modified
-        self.modified=True
-        
+         
         if len(self.references[association.key]) > 0:
-            logging.info('Illegal attempt to remove an association ignored')
+            self.references[association.key].discard('self')
             return
             
-        del self.workspace[association.type][association.key]
+        # Note that the workspace is modified
+        self.modified=True    
+        
+        del self.workspace[RdfBase.ASSOCIATION][association.key]
         
         for item in association.object:
             type_keycommit = association.object[item]
@@ -338,14 +413,23 @@ class WorkSpace(object):
             self.references[ref].discard(association.key)
             
             if len(self.references[ref]) == 0:
-               del self.workspace[type][ref]
+                
+                if type == RdfBase.ASSOCIATION:
+                    assoc = self.get_associations(keys=ref)
+                    self.remove_association(assoc[0])
+                else: 
+                    del self.workspace[type][ref]
             
     def copy(self):
+        
+        print 'orig:',self.commitRefs
         ws=self.load(RdfState.load(self.key,self.get_association_list(),self.commitRefs),
                                   self.get_associations(),
                                   self.get_entities(),
                                   self.get_states(),
                                   self.get_blobs())
+        
+        print 'copy:',ws.commitRefs
         return ws
             
     @classmethod
@@ -392,7 +476,7 @@ class WorkSpace(object):
         for a in associations:
             
             if not self.references.has_key(a.key):
-                self.references[a.key]=set()
+                self.references[a.key]=set(['self'])
             
             for item in a.object:
                 type_keycommit=a.object[item]
@@ -435,11 +519,47 @@ class WorkSpace(object):
         
         return inst
         
+    def make_rdf_reference(self,head=False):
+        
+        if not self.key:
+            raise RuntimeError('A workspace must have a key before it can be referenced')
+            
+        key = self.key
+        
+        alist=[]
+        if not self.modified:
+            alist = self.get_association_list()
+
+        commit=[]        
+        if not head:
+            commit = self.commitRefs
+    
+        if not self.key:
+            raise RuntimeError('A workspace must have a key before it can be referenced as an RdfState')
+            
+        if commit:
+            ref = RdfState.load(key,set(alist),commit)
+        else:
+            ref = RdfEntity.load(key,set(alist))
+            
+        return ref
+        
+            
+        
+        
     def len_associations(self):
         return len(self.workspace[RdfBase.ASSOCIATION])
 
-    def get_associations(self):
-        return self.workspace[RdfBase.ASSOCIATION].values()
+    def get_associations(self,keys=None):
+        if keys:
+            if not getattr(keys, '__iter__', False):
+                keys = (keys,)
+            ret=[]
+            for key in keys:
+                ret.append(self.workspace[RdfBase.ASSOCIATION].get(key))
+        else:
+            ret=self.workspace[RdfBase.ASSOCIATION].values()
+        return ret
 
     def get_association_list(self):
         return self.workspace[RdfBase.ASSOCIATION].keys()
@@ -447,8 +567,16 @@ class WorkSpace(object):
     def len_blobs(self):
         return len(self.workspace[RdfBase.BLOB])
 
-    def get_blobs(self):
-        return self.workspace[RdfBase.BLOB].values()
+    def get_blobs(self,keys=None):
+        if keys:
+            if not getattr(keys, '__iter__', False):
+                keys = (keys,)
+            ret=[]
+            for key in keys:
+                ret.append(self.workspace[RdfBase.BLOB].get(key))
+        else:
+            ret=self.workspace[RdfBase.BLOB].values()
+        return ret
 
     def get_blob_list(self):
         return self.workspace[RdfBase.BLOB].keys()
@@ -456,8 +584,16 @@ class WorkSpace(object):
     def len_entities(self):
         return len(self.workspace[RdfBase.ENTITY])
         
-    def get_entities(self):
-        return self.workspace[RdfBase.ENTITY].values()
+    def get_entities(self,keys=None):
+        if keys:
+            if not getattr(keys, '__iter__', False):
+                keys = (keys,)
+            ret=[]
+            for key in keys:
+                ret.append(self.workspace[RdfBase.ENTITY].get(key))
+        else:
+            ret=self.workspace[RdfBase.ENTITY].values()
+        return ret
         
     def get_entity_list(self):
         return self.workspace[RdfBase.ENTITY].keys()
@@ -465,8 +601,16 @@ class WorkSpace(object):
     def len_states(self):
         return len(self.workspace[RdfBase.STATE])
 
-    def get_states(self):
-        return self.workspace[RdfBase.STATE].values()
+    def get_states(self,keys=None):
+        if keys:
+            if not getattr(keys, '__iter__', False):
+                keys = (keys,)
+            ret=[]
+            for key in keys:
+                ret.append(self.workspace[RdfBase.STATE].get(key))
+        else:
+            ret=self.workspace[RdfBase.STATE].values()
+        return ret
 
     def get_state_list(self):
         return self.workspace[RdfBase.STATE].keys()

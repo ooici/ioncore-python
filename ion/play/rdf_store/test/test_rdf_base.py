@@ -30,6 +30,7 @@ class RdfTest(unittest.TestCase):
         base1 = RdfBase(self.val3,RdfBase.BLOB)
         base2 = RdfBase(self.val3,RdfBase.BLOB)
         self.assertEqual(base1,base2)
+        print base1
 
     def test_RdfBlob(self):
         
@@ -162,6 +163,15 @@ class RdfTest(unittest.TestCase):
         print ''
         w.print_status()
         print 'refs to blob1', w.len_refs(blob1)
+        
+        # How do you make this work?
+        #self.assertFailure(w.make_rdf_reference(),RuntimeError())
+        
+        w.key=5
+        ref = w.make_rdf_reference()
+        
+        comp = RdfEntity.create(assoc1,key=5)
+        
         
         self.assertEqual(w.len_refs(blob1),1)
         
