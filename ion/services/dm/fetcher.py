@@ -11,7 +11,9 @@
 import logging
 
 from twisted.internet import defer
-from twisted.web import client
+import httplib as http
+import urlparse
+import logging
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
@@ -39,35 +41,65 @@ class FetcherService(BaseService):
     def slc_init(self):
         pass
 
+
+    def _reassemble_headers(self, result):
+        """
+        @brief Convert an array of tuples into http headers
+        @todo check for library routine to do this.
+        """
+        hstr = ''
+        for x in result.getheaders():
+            hstr = hstr + '%s: %s\n' % (x[0], x[1])
+
+        return hstr
+
+
+    @defer.inlineCallbacks
+    def _http_op(self, operation, src_url, msg):
+        """
+        @brief Inner method for GET and HEAD
+        @param operation 'GET' or 'HEAD'
+        @param src_url Source URL
+        @retval HTTP result code and page plus headers
+        """
+        assert(operation in ['GET', 'HEAD'])
+
+        src = urlparse.urlsplit(src_url)
+        try:
+            conn = http.HTTPConnection(src.netloc)
+            # @bug Need to merge path with query, no canned fn in urlparse lib
+            conn.request(operation, src.path)
+            res = conn.getresponse()
+        except gaierror, ge:
+            logging.exception()
+            yield self.reply_err(msg, content=str(ge))
+
+        # Did it succeed?
+        if res.status == 200:
+            hstr = self._reassemble_headers(res)
+            # @note read on HEAD returns no data
+            hstr = hstr + '\n' + res.read()
+
+            yield self.reply_ok(msg, content=hstr)
+
+        yield self.reply_err(msg, content='%s: %s' % (res.status, res.reason))
+
+    @defer.inlineCallbacks
+    def op_get_head(self, content, headers, msg):
+        """
+        A lot of DAP clients break the spec and use the HEAD http verb.
+        Sigh.
+
+        Much easier to implement in httplib than twisted.
+        """
+        yield self._http_op('HEAD', content, msg)
+
     @defer.inlineCallbacks
     def op_get_url(self, content, headers, msg):
-        self.got_err = False
-        def error_callback(failure):
-            """
-            Inline function to catch and note getPage errors.
-            """
-            self.got_err = True
-            self.failure = failure
-
-        # Payload is just the URL itself
-        src_url = content.encode('ascii')
-        hostname = src_url.split('/')[2]
-
-        logging.debug('Fetching page "%s"...' % src_url)
-
-        d = client.getPage(src_url, headers={'Host': hostname})
-        d.addErrback(error_callback)
-        page = yield d
-        if not self.got_err:
-            logging.debug('Fetch complete, sending to caller')
-            yield self.reply(msg, 'reply', {'value':page}, {})
-            logging.debug('get_url complete!')
-
-        # Did catch an error
-        logging.error('Error on page fetch: ' + str(self.failure))
-        yield self.reply(msg, 'reply',
-                                 {'failure': str(self.failure),
-                                'value':None})
+        """
+        Refactored page puller using httplib instead of client.getPage
+        """
+        yield self._http_op('GET', content, msg)
 
     @defer.inlineCallbacks
     def op_get_dap_dataset(self, content, headers, msg):
@@ -87,6 +119,20 @@ class FetcherClient(BaseServiceClient):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "fetcher"
         BaseServiceClient.__init__(self, proc, **kwargs)
+
+    @defer.inlineCallbacks
+    def get_head(self, requested_url):
+        """
+        HTTP HEAD verb for a given URL. Not in the DAP spec, but used regardless.
+        """
+        yield self._check_init()
+
+        logging.info('Sending HEAD request to fetcher...')
+        (content, headers, msg) = yield self.rpc_send('get_head', requested_url)
+        if 'failure' in content:
+            raise ValueError('Error on URL: ' + content['failure'])
+        defer.returnValue(content)
+
 
     @defer.inlineCallbacks
     def get_url(self, requested_url):

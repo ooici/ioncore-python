@@ -34,6 +34,13 @@ class FetcherTest(IonTestCase):
         defer.returnValue(msg)
 
     @defer.inlineCallbacks
+    def _get_phead(self, src_url):
+        logging.debug('sending request for "%s"...' % src_url)
+        res = yield self.fc.get_head(src_url)
+        msg = res['value']
+        defer.returnValue(msg)
+
+    @defer.inlineCallbacks
     def test_single_get(self):
         """
         Simplest test, fetch a fixed local page.
@@ -41,7 +48,15 @@ class FetcherTest(IonTestCase):
         """
         res = yield self._get_page('http://amoeba.ucsd.edu/tmp/test1.txt')
         msg = res.strip()
-        self.failUnlessEqual(msg, 'Now is the time for all good men to come to the aid of their country.')
+        self.failUnlessSubstring('Now is the time for all good men', msg)
+
+    @defer.inlineCallbacks
+    def test_page_head(self):
+        """
+        Similar to get, but using HEAD verb to just pull headers.
+        """
+        res = yield self._get_phead('http://amoeba.ucsd.edu/tmp/test1.txt')
+        self.failUnlessSubstring('content-length', res)
 
     @defer.inlineCallbacks
     def test_404(self):
