@@ -53,19 +53,14 @@ class RdfBase(object):
         @retval True or False
         """
         if not isinstance(other, RdfBase):
-            #print 'cat'
             return False
         if not self.key == other.key:
-            #print 'dog'
             return False
         if not self.type == other.type:
-            #print 'wolf'
             return False
         if not self.commitRefs == other.commitRefs:
-            #print 'groundhog'
             return False
         if not self.object == other.object:
-            #print 'shit'
             return False        
         return True
     
@@ -110,6 +105,9 @@ class RdfAssociation(RdfBase):
     def __init__(self):
         pass
 
+    def get_dictionary(self):
+        return self.object
+
     @classmethod
     def create(cls, subject, predicate, object):
         assert isinstance(subject, RdfBase)
@@ -150,7 +148,9 @@ class RdfAssociation(RdfBase):
                 
                 key = type_keycommit[1][0]
                 commit = type_keycommit[1][1]
-                types[type_keycommit[0]].append((key, commit))
+                
+                if not (key, commit) in types[type_keycommit[0]]:
+                    types[type_keycommit[0]].append((key, commit))
         return types # This is an ugly data structure!
 
     @classmethod
@@ -332,7 +332,11 @@ class WorkSpace(object):
         return not self.__eq__(other)
 
 
-    def add_triple(self,triple):
+    def add_triple(self,triple,*args):
+        
+        if isinstance(triple,RdfBase):
+            triple=(args[0],triple,args[1])
+        
         association = RdfAssociation.create(triple[0],triple[1],triple[2])
         self.add_association(association,triple)
     
@@ -519,6 +523,68 @@ class WorkSpace(object):
             inst.add_association(association,triple)
         
         return inst
+
+
+    # @Notes this method is the basis for a RDF Store client method to create resources
+    @classmethod
+    def resource_properties(cls, resource_name, property_dictionary, association_dictionary, key=None, commitRef=[]):
+        '''
+        @brief A method to create or update a resource description with properties and values.
+        @brief The association_ditionary provides a way to specify associations to other existing resources.
+        '''
+        inst=cls()
+
+        # Set keys and state...
+        if key and commitRefs:
+            res_instance=RdfState.reference(key,commitRefs)
+        elif key:
+            res_instance=RdfEntity.reference(key)
+        else:
+            res_instance=RdfEntity.create(None)
+        
+        inst.key=res_instance.key
+        inst.commitRefs=res_instance.commitRefs
+        
+        
+        # make some blobs that we need
+        bprop = RdfBlob.create('OOI:Property')
+        bval = RdfBlob.create('OOI:Value')
+        binstof = RdfBlob.create('OOI:InstanceOf')
+
+        bresname = RdfBlob.create(resource_name)
+        
+        # start adding triples
+        # Resource UUID:instanceOf:resource name
+        inst.add_triple(res_instance,binstof,bresname)
+        
+        # Add properties to the resource instance
+        for prop in property_dictionary:
+            
+            inst.add_triple(bresname,bprop,RdfBlob.create(prop))
+            
+            inst.add_triple(RdfBlob.create(prop),bval,RdfBlob.create(property_dictionary[prop]))
+        
+        # add associations to the resource instance
+        for predicate in association_dictionary:
+            inst.add_triple(res_instance,RdfBlob.create(predicate),RdfBlob.create(association_dictionary[predicate]))
+        
+        return inst
+        
+        
+    def fetch_associated(self,type_key_commit):
+        
+        type=type_key_commit[0]
+        key=type_key_commit[1][0]
+        commit=type_key_commit[1][1]
+
+        if not type == RdfBase.STATE:
+            # Use the Key
+            ref  = key
+        else:
+            # Use the commit
+            ref =  commitRefs[0]
+            
+        return self.workspace[type][ref]
         
     def make_rdf_reference(self,head=False):
         
@@ -619,6 +685,12 @@ class WorkSpace(object):
     def get_references(self):
         return self.references
 
+    def len_refs(self,item):
+        assert isinstance(item,RdfBase)
+        size=0
+        if item.key in self.references:
+            size = len(self.references[item.key])
+        return size
 
     def print_status(self):
         print 'WorkSpace key',self.key
@@ -629,9 +701,26 @@ class WorkSpace(object):
         print '# of Entities in workspace', self.len_entities()
         print '# of States in workspace', self.len_states()
 
-    def len_refs(self,item):
-        assert isinstance(item,RdfBase)
-        size=0
-        if item.key in self.references:
-            size = len(self.references[item.key])
-        return size
+    def print_workspace(self):
+        
+        for assoc in self.get_associations():
+            strng=''
+            dict = assoc.get_dictionary()
+            for item in dict:
+                if strng:
+                    strng+=':'
+                    
+                spo=self.fetch_associated(dict[item])
+           
+                if spo.type == RdfBase.BLOB:
+                    strng+='Blob "'+str(spo.object) + '"'
+                elif spo.type == RdfBase.ASSOCIATION:
+                    strng+='Association ID "'+str(spo.key) + '"'
+                elif spo.type == RdfBase.STATE:
+                    strng+='State Id&CommitRefs "'+str(spo.key)+','+ str(spo.commitRefs) + '"'
+                elif spo.type == RdfBase.ENTITY:
+                    strng+='Entity Id "'+str(spo.key)+'"'
+        
+            print 'Association ID', assoc.key
+            print strng
+

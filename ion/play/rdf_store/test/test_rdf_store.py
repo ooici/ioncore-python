@@ -78,12 +78,8 @@ class RdfStoreTest(IonTestCase):
         self.assertEqual(ws1.key,ws2.key)
         # compare the keys in the references
         self.assertEqual(set(ws1.get_references().keys()),set(ws2.get_references().keys()))
-        # compare the values
-        print 'ws1:'
-        print ws1.get_references().values()
-        print 'ws2:'
-        print ws2.get_references().values()
         
+        # Compare the full dictionary of references
         self.assertEqual(ws1.get_references(),ws2.get_references())
 
 #        self.assertEqual(set(ws1.get_references().values()),set(ws2.get_references().values()))
@@ -193,20 +189,12 @@ class RdfStoreTest(IonTestCase):
 
         ws2_in = ws1_out.copy()
         
-        print '===== Print the Diff YYY ========'
-        ws_diff = yield self.rdfs.diff_commit(ws2_in)
-        ws_diff.print_status()
-        
         
         # Add another associtation
         triple4 = (RdfBlob.create('junk'),RdfBlob.create('in'),RdfBlob.create('my trunk!'))
         assoc4=RdfAssociation.create(triple4[0],triple4[1],triple4[2])
         
         ws2_in.add_association(assoc4,triple4)
-
-        print '===== Print the Diff XXX ========'
-        ws_diff = yield self.rdfs.diff_commit(ws1_out)
-        ws_diff.print_status()
 
         # add an association to ws1 as an entity.
         #Add a reference to a particular state         
@@ -231,9 +219,6 @@ class RdfStoreTest(IonTestCase):
 
         ws2_out = yield self.rdfs.checkout(self.key)
 
-        print 'ws2_out.commitRefs',ws2_out.commitRefs
-        print 'ws2_in.commitRefs',ws2_in.commitRefs
-
         print '===== Checkout ws2_out status ========'
         ws2_out.print_status()
         
@@ -246,8 +231,13 @@ class RdfStoreTest(IonTestCase):
         self._compare_ws(ws1_a,ws1_out)
 
         print '===== Print the Diff against ws1 commit ========'
-        ws_diff = yield self.rdfs.diff_commit(ws2_in, ws1_in.commitRefs)
-        ws_diff.print_status()
+        ws_diff1 = yield self.rdfs.diff_commit(ws2_in, ws1_in.commitRefs)
+        ws_diff1.print_status()
+        
+        ws_diff2 = yield self.rdfs.diff_commit(ws2_out, ws1_in.commitRefs)
+        ws_diff2.print_status()
+        
+        self._compare_ws(ws_diff1,ws_diff2)
         
         print '===== Complete ========'
         

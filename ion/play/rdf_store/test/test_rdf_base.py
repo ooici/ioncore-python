@@ -185,4 +185,20 @@ class RdfTest(unittest.TestCase):
         w.print_status()
         print 'refs to blob1', w.len_refs(blob1)
         
+        w.print_workspace()
 
+        
+        props={
+            'nane':'ctd',
+            'model':'sbe911',
+            'serial number':'932u8y74',
+            'sensor ID':'293ulkskdj',
+            'Manufacture':'SeaBird',
+            'Point of Contact':'John Graybeal'
+        }
+        
+        associations={}
+        
+        res_description=WorkSpace.resource_properties('OOI:Instrument',props,associations)
+
+        res_description.print_workspace()
