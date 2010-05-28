@@ -13,7 +13,7 @@ from ion.data.objstore import ObjectStore, ValueObject
 from ion.data.store import IStore, Store
 from ion.data.dataobject import DataObject
 
-from ion.play.rdf_store.rdf_base import RdfState, RdfEntity, RdfESBase
+from ion.play.rdf_store.rdf_base import RdfState, RdfEntity, RdfMixin
 
 
 class StateStore(object):
@@ -100,7 +100,7 @@ class StateStore(object):
         
         states=[]
         for stateRef in stateRefs:
-            if isinstance(stateRef, RdfESBase):
+            if isinstance(stateRef, RdfMixin):
                 key = stateRef.key
                 commit = stateRef.commitRefs
             elif isinstance(stateRef, tuple):

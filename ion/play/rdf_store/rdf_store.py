@@ -7,7 +7,7 @@ from twisted.internet import defer
 from ion.data.store import Store, IStore
 from ion.data.set_store import SetStore, ISetStore
 
-from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfBase, RdfEntity, RdfState, WorkSpace, RdfESBase
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfBase, RdfEntity, RdfState, WorkSpace, RdfMixin
 
 from ion.play.rdf_store.state_store import StateStore
 from ion.play.rdf_store.association_store import AssociationStore
@@ -60,7 +60,7 @@ class RdfStore(object):
         
     @defer.inlineCallbacks
     def checkout_state(self,state):
-        assert isinstance(state, RdfESBase)
+        assert isinstance(state, RdfMixin)
 
         # if it is just a reference to the state, get the state
         if not state.object:

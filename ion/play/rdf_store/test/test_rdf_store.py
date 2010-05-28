@@ -16,7 +16,7 @@ from twisted.internet import defer
 from ion.play.rdf_store.rdf_store import RdfStore
 from ion.test.iontest import IonTestCase
 
-from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfEntity, RdfESBase, RdfState, WorkSpace
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfEntity, RdfMixin, RdfState, WorkSpace
 
 
 class RdfStoreTest(IonTestCase):

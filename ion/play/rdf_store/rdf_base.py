@@ -144,14 +144,10 @@ class RdfAssociation(RdfBase):
         
 
 #@Todo - change to mixin class
-class RdfESBase(RdfBase):
+class RdfMixin(object):
     '''
     Make a common class for Entity and State to inherit from
     '''
-
-    def __init__(self):
-        pass
-
     def add(self, association):
         assert isinstance(association,RdfAssociation)
         self.object.add(association.key)
@@ -164,7 +160,7 @@ class RdfESBase(RdfBase):
     def __len__(self):
         return len(self.object)
 
-class RdfEntity(RdfESBase):
+class RdfEntity(RdfBase,RdfMixin):
     '''
     An RdfEntity can only be created - Never returned from the State Service
     The State service only returns States!
@@ -208,7 +204,7 @@ class RdfEntity(RdfESBase):
     
 
         
-class RdfState(RdfESBase):
+class RdfState(RdfBase, RdfMixin):
     '''
     The state of an RDF Resource returned from the State Service
     '''
