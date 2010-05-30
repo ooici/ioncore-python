@@ -3,19 +3,128 @@
 """
 @file ion/data/test/test_objstore.py
 @author Michael Meisinger
+@author Dorian Raymer
 @brief test object store
 """
 
 import logging
+
 from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.core import base_process, bootstrap
-from ion.data.backends.cassandra import CassandraStore
+
 from ion.data.objstore import ValueObject, TreeValue, CommitValue, RefValue, ValueRef
 from ion.data.objstore import ObjectStore, ValueStore
-from ion.test.iontest import IonTestCase
+
+from ion.data import objstore
+
+
 import ion.util.procutils as pu
+
+class BaseObjectTest(unittest.TestCase):
+
+    obj_type_str = None
+    obj_cls = objstore.BaseObject
+
+
+class BlobObjectTest(unittest.TestCase):
+
+    def setUp(self):
+        self.blob = objstore.Blob('foo')
+        self.encoded = "blob 3\x00foo"
+
+    def test_type(self):
+        self.failUnlessEqual(self.blob.type, 'blob')
+
+    def test_hash(self):
+        thash = objstore.sha1(self.encoded)
+        self.failUnlessEqual(self.blob.hash, thash)
+
+    def test_encode(self):
+        b = objstore.Blob('foo')
+        self.failUnlessEqual(
+                b.encode(),
+                self.encoded
+                )
+
+    def test_from_raw(self):
+        """encoded is header + raw content body
+        """
+        blob = self.blob
+        encoded = self.encoded
+        header_sep_index = encoded.find('\x00') 
+        header = encoded[:header_sep_index]
+        type, content_length = header.split()
+        raw_content = encoded[header_sep_index+1:]
+        test = objstore.Blob.from_raw(raw_content)
+        self.failUnlessEqual(blob.hash, test.hash)
+
+
+
+
+class TreeObjectTest(unittest.TestCase):
+
+    def setUp(self):
+        self.tree = objstore.Tree(
+                ('100644', 'thing', 'd670460b4b4aece5915caf5c68d12f560a9fe3e4'),
+                ('100644', 'scaleing.py', 'cd9231fa06abb69a380d3f4490a9e261e03beb5a'))
+        self.encoded = """tree 112\x00100644 thing\x00d670460b4b4aece5915caf5c68d12f560a9fe3e4100644 scaleing.py\x00cd9231fa06abb69a380d3f4490a9e261e03beb5a""" 
+
+    def test_type(self):
+        self.failUnlessEqual(self.tree.type, 'tree')
+
+    def test_hash(self):
+        thash = objstore.sha1(self.encoded)
+        self.failUnlessEqual(self.tree.hash, thash)
+
+    def test_encode(self):
+        self.failUnlessEqual(self.tree.encode(), self.encoded)
+
+    def test_from_raw(self):
+        """encoded is header + raw content body
+        """
+        tree = self.tree
+        encoded = self.encoded
+        header_sep_index = encoded.find('\x00') 
+        header = encoded[:header_sep_index]
+        type, content_length = header.split()
+        raw_content = encoded[header_sep_index+1:]
+        test = objstore.Tree.from_raw(raw_content)
+        self.failUnlessEqual(tree.hash, test.hash)
+
+
+class CommitObjectTest(unittest.TestCase):
+
+    def setUp(self):
+        self.tree = '80655da8d80aaaf92ce5357e7828dc09adb00993'
+        self.parent = 'd8fd39d0bbdd2dcf322d8b11390a4c5825b11495'
+        self.parent2 = '28fd39d0bbdd2dcf322d8b11390a4c5825b11495'
+        self.commit = objstore.Commit(self.tree, [self.parent], log="foo bar")
+        _body = "tree %s\nparent %s\n\n%s" % (self.tree, self.parent, "foo bar",)
+        self.encoded = "commit %d\x00%s" % (len(_body), _body,)
+
+    def test_type(self):
+        self.failUnlessEqual(self.commit.type, 'commit')
+
+    def test_hash(self):
+        thash = objstore.sha1(self.encoded)
+        self.failUnlessEqual(self.commit.hash, thash)
+
+    def test_encode(self):
+        self.failUnlessEqual(self.commit.encode(), self.encoded)
+
+    def test_from_raw(self):
+        raw_content = self.commit._body
+        test = objstore.Commit.from_raw(raw_content)
+        self.failUnlessEqual(self.commit.hash, test.hash)
+
+
+class CAStoreTest(unittest.TestCase):
+
+    def test_blob(self):
+        c1 = 'test content'
+        b =  objstore.Blob(c1)
 
 class ValueStoreTest(unittest.TestCase):
     """
@@ -325,46 +434,5 @@ class ObjectStoreTest(unittest.TestCase):
         #self.assertEqual(len(ra15),5)
 
 
-class ObjectStoreTest1(ObjectStoreTest):
-    """
-    Testing object store with different backend.
-    """
-
-    @defer.inlineCallbacks
-    def setUp(self):
-        backargs = {"cass_host_list":['amoeba.ucsd.edu:9160']}
-        self.os = ObjectStore(backend=CassandraStore, backargs=backargs)
-        yield self.os.init()
-
-        self.vo1 = ValueObject('1')
-        self.vo2 = ValueObject('2')
-        self.vo3 = ValueObject('3')
-        self.vo4 = ValueObject('4')
-        self.vo5 = ValueObject('5')
-
-        self.tv1 = TreeValue((self.vo1, self.vo2))
-        self.tv2 = TreeValue((self.vo3, self.vo4))
-        self.tv3 = TreeValue(self.vo5)
-        self.tv4 = TreeValue(self.tv1)
 
 
-class ObjectStoreBackendsTest(unittest.TestCase):
-    """
-    Testing value store with different backends
-    """
-
-    @defer.inlineCallbacks
-    def test_CassandraBackend(self):
-        backargs = {"cass_host_list":['amoeba.ucsd.edu:9160']}
-        os = ObjectStore(backend=CassandraStore, backargs=backargs)
-        yield os.init()
-
-        r1 = yield os.put('key1','1')
-        self.assertTrue(isinstance(r1, ValueRef))
-        self.assertFalse(hasattr(r1, 'value'))
-
-        # Check that a value object actually was placed in the values store
-        re1 = yield os.vs.exists_value(ValueObject('1').identity)
-        self.assertTrue(re1)
-
-        r2 = yield os.put('key2','2')

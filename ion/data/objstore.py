@@ -6,9 +6,14 @@
 @author David Stuebe
 @brief storing immutable values (blobs, trees, commit) and storing structured
         mutable objects mapped to graphs of immutable values
+
+@todo Decide if Objects(BaseObject) pass around object instances, or their
+hashes.
 """
 
+import re
 import hashlib
+import struct
 try:
     import json
 except:
@@ -21,6 +26,24 @@ from ion.data.dataobject import DataObject
 from ion.data.store import IStore, Store
 import ion.util.procutils as pu
 
+def sha1hex(b):
+    return hashlib.sha1(b).hexdigest()
+
+def sha1bin(b):
+    return hashlib.sha1(b).digest()
+
+def sha1(b, hex=True):
+    if hex:
+        return sha1hex(b)
+    return sha1bin(b)
+
+
+def bin_sha_to_hex(bytes):
+    """binary form (20 byte) of sha1 digest to hex string (40 char)
+    """
+    hex_bytes = struct.unpack('!20B', bytes)
+    almosthex = map(hex, hex_bytes)
+    return ''.join([y[-2:] for y in ['00'+x.strip('0x') for x in almosthex]])
 
 class ValueRef(object):
     """
@@ -85,6 +108,249 @@ class ValueObject(ValueRef):
         """
         hash = ValueRef._secure_value_hash(self.value)
         return hash
+
+class BaseObject(object):
+    """Base object of content addressable value store
+    """
+
+    @property
+    def type(self):
+        """
+        @brief Objects stored in the CAStore will have a type. The classes
+        that inherit from BaseObject (below in this file) are the
+        fundamental types. 
+        """
+        return self.__class__.__name__.lower()
+
+    @property
+    def value(self):
+        """
+        @brief Bytes that actually go into the store (i.e. content
+        addressable key/value store).
+        """
+        return self.encode()
+
+    @property
+    def hash(self):
+        return sha1hex(self.value)
+
+    def encode(self):
+        """
+        @brief type [content length][null][content]
+        @note _body is returns the store-able format, analogous to
+        'wire-format'
+        """
+        length = len(self._body)
+        encoded = "%s %d\x00%s" % (self.type, length, self._body)
+        return encoded
+
+    def __str__(self):
+        return self.hash
+
+
+class Blob(BaseObject):
+    """
+    Blob Object stores any blob of bytes (string, or serialized object).
+    """
+
+    def __init__(self, content):
+        """
+        @param content serializable blob (str or bytes)
+        @note once _body is set, it should not change
+        """
+        self._body = content
+    
+    @property
+    def content(self):
+        """
+        @brief use this to retrieve actual content
+        """
+        return self._body
+
+    @classmethod
+    def from_raw(cls, content):
+        return cls(content)
+
+class Tree(BaseObject):
+    """
+    Tree Object
+    """
+
+    def __init__(self, *children):
+        """
+        @param children (mode, name, obj_hash)
+        @note mode is 6 bytes. Git uses this for the file mode
+
+        @note XXX For organizational convenience, child objects could be
+        represented by an Entity class...a container for the object, name,
+        and mode (state bit map). The entity would be completely abstract
+        (arbitrary) in the context of the CAStore, but it might be part of
+        the data model in a higher-level application.
+        """
+        self.children = children
+        
+    @property
+    def _body(self):
+        """
+        format for each child in body of tree object
+        [6-bytes][space][name][null char][hash]
+        @note should hash be string or binary of sha1 hexdigest?
+        """
+        body = "" #use buffer
+        for (mode, name, obj_hash) in self.children:
+            body += "%s %s\x00%s" % (mode, name, obj_hash,)
+        return body
+
+    @classmethod
+    def from_raw(cls, raw):
+        """
+        @brief New instance from raw (encoded) store-able value
+        Like a protocol processor. Translates raw/serialized form into live
+        object.
+        """
+        children = cls._from_raw_re(raw)
+        return cls(*children)
+
+    @staticmethod
+    def _from_raw_re(raw):
+        """
+        @note as long as the name of a tree element is not anything weird,
+        this should work...but it's hard to ensure it will always work!
+        """
+        #          [mode]     [name]    [hash(str)]
+        pattern = "([0-9]*)[ ]([\S]*)\x00(\w{40})" #40char string sha1 version
+        matches = re.findall(pattern, raw)
+        return matches
+
+
+class Commit(BaseObject):
+    """
+    Commit Object
+    """
+
+    def __init__(self, tree, parents=[], log=""):
+        """
+        @param tree hash or object
+        @param parent commit hash or object
+        @param log Record of commit reason/context/change/etc.
+        """
+        #if tree isinstance(Tree):
+        #    tree = tree.hash
+        self.tree = tree
+        self.parents = parents
+        self.log = str(log) #or unicode? or what?
+
+
+    @property
+    def _body(self):
+        """
+        @brief encoded store-able format 
+        General format:
+        [type][ ][hash][\n]
+        [\n]
+        [log]
+
+        Example:
+        tree [tree_obj_hash]\n
+        parent [parent_hash]\n\n
+        \n
+        
+        """
+        body = ""
+        body += "%s %s\n" % ('tree', self.tree,)
+        for parent in self.parents:
+            body += "%s %s\n" % ('parent', parent,)
+        body += "\n%s" % self.log
+        return body
+
+    @classmethod
+    def from_raw(cls, raw):
+        """
+        Split raw into list (on new-line). Process until first blank line
+        is encountered.
+        """
+        tree = None
+        parents = []
+        log = ''
+        parts = raw.split('\n')
+        while True:
+            part = parts.pop(0)
+            if part:
+                type, hash = part.split()
+                if type == 'tree':
+                    tree = hash
+                elif type == 'parent':
+                    parents.append(hash)
+            else:
+                log = '\n'.join(parts)
+                break
+        return cls(tree, parents, log=log)
+
+class CAStore(object):
+    """
+    Content Addressable Store
+    Manages and provides organizational utilities for a set of objects
+    (blobs, trees, commits, etc.)
+    """
+    TYPES = {
+            Blob.type:Blob,
+            Tree.type:Tree,
+            Commit.type:Commit,
+            }
+
+    def __init__(self, namespace, backend):
+        """
+        @param namespace prefix qualifying context for this CAS with in the
+        general space of the backend store.
+        @param backend storage interface
+        """
+        self._prefix = namespace
+        self.backend = backend
+
+    def _make_full_key(self, key):
+        """
+        fully qualified key, prefixed with store namespace
+        XXX separation char?
+        """
+        return self._prefix + key
+
+    def _decode_header(self, raw):
+        """
+        @brief decode raw object read from backend store
+        @param raw object in some encoding
+        """
+        #read until null char; split on space
+        sep = raw.find('\x00')
+        head = raw[:sep]
+        type, content_length = head.split()
+        content = raw[sep+1:]
+        obj = self.TYPES[type].from_raw(content)
+        return obj
+
+
+    def put(self, obj):
+        """
+        @param obj hashable object to store
+        """
+        value = obj.value #compress arg
+        key = self._make_full_key(obj.hash)
+        d = self.backend.put(key, value)
+        return d
+
+    def get(self, obj_hash):
+        """
+        @param obj_hash key where an object is stored (object hash)
+        """
+        key = self._make_full_key(obj_hash)
+        d = self.backend.get(key)
+        def getcb(raw):
+            value = self._decode_header(raw)
+            return value
+        d.addCallback(getcb)
+        # d.addErrback
+        return d
+
+
 
 class TreeValue(ValueObject):
     """
@@ -212,6 +478,12 @@ class ValueStore(object):
     Class to store and retrieve immutable values.
     The GIT distributed repository model is a strong design reference.
     Think GIT repository with commits, trees, blobs
+
+    @note XXX This is an adapter layer around a basic key value store. This
+    is not responsible for managing the lifecycle of the underlying store
+    interface (at least not implicitly). In general the backend store
+    interface is asynchronous (deferred) because it is connection oriented,
+    so it does need a manager. 
     """
     def __init__(self, backend=None, backargs=None):
         """
