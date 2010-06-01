@@ -11,19 +11,20 @@
 import os
 import logging
 import uuid
-from itertools import groupby, izip
+from itertools import izip
 from twisted.internet import defer, reactor, threads
 
 from nimboss.node import NimbusNodeDriver
 from nimboss.ctx import ContextClient
 from nimboss.cluster import ClusterDriver
 from nimboss.nimbus import NimbusClusterDocument
+from libcloud.types import NodeState as NimbossNodeState
 
 from ion.services.base_service import BaseService
 from ion.core import base_process
 from ion.core.base_process import ProtocolFactory
 from ion.services.cei.dtrs import DeployableTypeRegistryClient
-from ion.services.cei.provisioner_store import ProvisionerStore
+from ion.services.cei.provisioner_store import ProvisionerStore, group_records
 from ion.services.cei import states
 
 class ProvisionerService(BaseService):
@@ -64,6 +65,13 @@ class ProvisionerService(BaseService):
         """
         pass
 
+    @defer.inlineCallbacks
+    def op_query(self, content, headers, msg):
+        """Service operation: query IaaS  and send updates to subscribers.
+        """
+        # immediate ACK is desired
+        reactor.callLater(0, self.core.query_nodes, content)
+    
     def _get_iaas_info(self, iaas_service):
         """
         Get information from 'iaas_service' about
@@ -88,10 +96,18 @@ class ProvisionerService(BaseService):
     def op_receipt_taken(self, content, headers, msg):
         logging.info("Receipt has been taken.  content:"+str(content))
          
+_NIMBOSS_STATE_MAP = {
+        #TODO when broker is polled, these states will end at Started
+        NimbossNodeState.RUNNING : states.Running, 
+        NimbossNodeState.REBOOTING : states.Running, #TODO hmm
+        NimbossNodeState.PENDING : states.Pending,
+        NimbossNodeState.TERMINATED : states.Terminated,
+        NimbossNodeState.UNKNOWN : states.ErrorRetrying}
 
 class ProvisionerCore(object):
     """Provisioner functionality that is not specific to the service.
     """
+
 
     def __init__(self, store, notifier):
         self.store = store
@@ -192,6 +208,7 @@ class ProvisionerCore(object):
                 iaas_nodes = [iaas_nodes]
                 
             for node_rec, iaas_node in izip(launch_group, iaas_nodes):
+                node_rec['iaas_id'] = iaas_node.id
                 node_rec['public_ip'] = iaas_node.public_ip
                 node_rec['private_ip'] = iaas_node.private_ip
                 node_rec['extra'] = iaas_node.extra.copy()
@@ -206,10 +223,65 @@ class ProvisionerCore(object):
         yield self.store.put_records(records, newstate)
         yield self.notifier.send_records(records, subscribers)
 
+    @defer.inlineCallbacks
+    def query_nodes(self, request):
+        """Performs querys of IaaS and broker, sends updates to subscribers.
+        """
+        # Right now we just query everything. Could be made more granular later
+
+        for site in self.node_drivers.iterkeys():
+            nodes = yield self.store.get_site_nodes(site, 
+                    before_state=states.Terminated)
+            if nodes:
+                yield self.query_one_site(site, nodes)
+
+
+    @defer.inlineCallbacks
+    def query_one_site(self, site, nodes):
+        node_driver = self.node_drivers[site]
+
+        logging.info('Querying site "%s"', site)
+        nimboss_nodes = yield threads.deferToThread(node_driver.list_nodes)
+        nimboss_nodes = dict((node.id, node) for node in nimboss_nodes)
+
+        # note we are walking the nodes from datastore, NOT from nimboss
+        for node in nodes:
+            state = node['state']
+            if state < states.Pending or state > states.Terminated:
+                continue
+            
+            nimboss_id = node['iaas_id']
+            nimboss_node = nimboss_nodes.pop(nimboss_id, None)
+            if not nimboss_node:
+                # this state is unknown to underlying IaaS. What could have
+                # happened? IaaS error? Recovery from loss of net to IaaS?
+
+                logging.warn('node %s: in data store but unknown to IaaS. '+
+                        'Marking as terminated.', node['node_id'])
+
+                # we must mark it as terminated TODO should this be failed?
+                node['state'] = states.Terminated
+                #TODO should make state_desc more formal?
+                node['state_desc'] = 'node disappeared'
+
+                launch = yield self.store.get_launch(node['launch_id'])
+                yield self.store_and_notify([node], launch['subscribers'])
+            nimboss_state = _NIMBOSS_STATE_MAP[nimboss_node.state]
+            if nimboss_state > node['state']:
+                #TODO nimboss could go backwards in state.
+                node['state'] = nimboss_state
+                launch = yield self.store.get_launch(node['launch_id'])
+                yield self.store_and_notify([node], launch['subscribers'])
+        #TODO nimboss_nodes now contains any other running instances that
+        # are unknown to the datastore (or were started after the query)
+        # Could do some analysis of these nodes
+
     def _create_context(self):
         """Synchronous call to context broker.
         """
         return self.ctx_client.create_context()
+
+
 
 class ProvisionerNotifier(object):
     """Abstraction for sending node updates to subscribers.
@@ -232,24 +304,6 @@ class ProvisionerNotifier(object):
         """
         for rec in records:
             yield self.send_record(rec, subscribers, operation)
-
-def group_records(records, *args):
-    """Breaks records into groups of distinct values for the specified keys
-
-    Returns a dict of record lists, keyed by the distinct values.
-    """
-    sorted_records = list(records)
-    if not args:
-        raise ValueError('Must specify at least one key to group by')
-    if len(args) == 1:
-        keyf = lambda record: record[args[0]]
-    else:
-        keyf = lambda record: tuple([record[key] for key in args])
-    sorted_records.sort(key=keyf)
-    groups = {}
-    for key, group in groupby(sorted_records, keyf):
-        groups[key] = list(group)
-    return groups
 
 def _one_launch_record(launch_id, document, dt, subscribers, 
         state=states.Requested):

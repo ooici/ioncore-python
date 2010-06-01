@@ -9,6 +9,7 @@
 import logging
 import uuid
 import time
+from itertools import groupby
 from twisted.internet import defer
 
 try: 
@@ -51,6 +52,27 @@ class ProvisionerStore(object):
         return [self.put_record(r, newstate=newstate, timestamp=ts) 
                 for r in records]
 
+    @defer.inlineCallbacks
+    def get_site_nodes(self, site, before_state=None):
+        """Retrieves the latest node record for all nodes at a site.
+        """
+        #for performance, we would probably want to store these
+        # records denormalized in the store, by site id
+        all = yield self.get_all()
+        groups = group_records(all, 'node_id')
+        site_nodes = []
+        for node_id, records in groups.iteritems():
+            if node_id and records[0]['site'] == site:
+                site_nodes.append(records[0])
+        defer.returnValue(site_nodes)
+
+    @defer.inlineCallbacks
+    def get_launch(self, launch):
+        """Retrieves the latest launch record, from the launch_id.
+        """
+        records = yield self.get_all(launch, '')
+        defer.returnValue(records[0])
+
     def get_all(self, launch=None, node=None):
         """Retrieves the states about an instance or launch.
 
@@ -69,3 +91,21 @@ class ProvisionerStore(object):
         matches.sort(reverse=True)
         records = [r[1] for r in matches]
         return defer.succeed(records)
+
+def group_records(records, *args):
+    """Breaks records into groups of distinct values for the specified keys
+
+    Returns a dict of record lists, keyed by the distinct values.
+    """
+    sorted_records = list(records)
+    if not args:
+        raise ValueError('Must specify at least one key to group by')
+    if len(args) == 1:
+        keyf = lambda record: record.get(args[0], None)
+    else:
+        keyf = lambda record: tuple([record.get(key, None) for key in args])
+    sorted_records.sort(key=keyf)
+    groups = {}
+    for key, group in groupby(sorted_records, keyf):
+        groups[key] = list(group)
+    return groups

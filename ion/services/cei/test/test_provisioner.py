@@ -63,6 +63,13 @@ class ProvisionerServiceTest(IonTestCase):
 
         yield pu.asleep(10) #async wait
 
+        yield supervisor.send(pId, "query", '')
+        yield pu.asleep(5) #async wait
+        yield supervisor.send(pId, "query", '')
+        yield pu.asleep(5) #async wait
+        yield supervisor.send(pId, "query", '')
+        yield pu.asleep(5) #async wait
+
 class ProvisionerCoreTest(IonTestCase):
     def test_group_records(self):
         records = [
