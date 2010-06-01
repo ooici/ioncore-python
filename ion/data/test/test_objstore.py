@@ -17,6 +17,7 @@ from ion.core import base_process, bootstrap
 from ion.data.objstore import ValueObject, TreeValue, CommitValue, RefValue, ValueRef
 from ion.data.objstore import ObjectStore, ValueStore
 
+from ion.data import store
 from ion.data import objstore
 
 
@@ -48,17 +49,11 @@ class BlobObjectTest(unittest.TestCase):
                 self.encoded
                 )
 
-    def test_from_raw(self):
+    def test_decode_full(self):
         """encoded is header + raw content body
         """
-        blob = self.blob
-        encoded = self.encoded
-        header_sep_index = encoded.find('\x00') 
-        header = encoded[:header_sep_index]
-        type, content_length = header.split()
-        raw_content = encoded[header_sep_index+1:]
-        test = objstore.Blob.from_raw(raw_content)
-        self.failUnlessEqual(blob.hash, test.hash)
+        test = objstore.Blob.decode_full(self.encoded)
+        self.failUnlessEqual(self.blob.hash, test.hash)
 
 
 
@@ -67,8 +62,8 @@ class TreeObjectTest(unittest.TestCase):
 
     def setUp(self):
         self.tree = objstore.Tree(
-                ('100644', 'thing', 'd670460b4b4aece5915caf5c68d12f560a9fe3e4'),
-                ('100644', 'scaleing.py', 'cd9231fa06abb69a380d3f4490a9e261e03beb5a'))
+                ('thing', 'd670460b4b4aece5915caf5c68d12f560a9fe3e4', '100644'),
+                ('scaleing.py', 'cd9231fa06abb69a380d3f4490a9e261e03beb5a', '100644'))
         self.encoded = """tree 112\x00100644 thing\x00d670460b4b4aece5915caf5c68d12f560a9fe3e4100644 scaleing.py\x00cd9231fa06abb69a380d3f4490a9e261e03beb5a""" 
 
     def test_type(self):
@@ -81,17 +76,11 @@ class TreeObjectTest(unittest.TestCase):
     def test_encode(self):
         self.failUnlessEqual(self.tree.encode(), self.encoded)
 
-    def test_from_raw(self):
+    def test_decode_full(self):
         """encoded is header + raw content body
         """
-        tree = self.tree
-        encoded = self.encoded
-        header_sep_index = encoded.find('\x00') 
-        header = encoded[:header_sep_index]
-        type, content_length = header.split()
-        raw_content = encoded[header_sep_index+1:]
-        test = objstore.Tree.from_raw(raw_content)
-        self.failUnlessEqual(tree.hash, test.hash)
+        test = objstore.Tree.decode_full(self.encoded)
+        self.failUnlessEqual(self.tree.hash, test.hash)
 
 
 class CommitObjectTest(unittest.TestCase):
@@ -114,17 +103,26 @@ class CommitObjectTest(unittest.TestCase):
     def test_encode(self):
         self.failUnlessEqual(self.commit.encode(), self.encoded)
 
-    def test_from_raw(self):
-        raw_content = self.commit._body
-        test = objstore.Commit.from_raw(raw_content)
+    def test_decode_full(self):
+        test = objstore.Commit.decode_full(self.encoded)
         self.failUnlessEqual(self.commit.hash, test.hash)
 
 
 class CAStoreTest(unittest.TestCase):
 
+    @defer.inlineCallbacks
+    def setUp(self):
+        backend_store = yield store.Store.create_store()
+        self.cas = objstore.CAStore(backend_store)
+
+    @defer.inlineCallbacks
     def test_blob(self):
         c1 = 'test content'
         b =  objstore.Blob(c1)
+        yield self.cas.put(b)
+        b_out = yield self.cas.get(b.hash)
+        self.failUnlessEqual(b.hash, b_out.hash)
+
 
 class ValueStoreTest(unittest.TestCase):
     """
