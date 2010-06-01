@@ -13,7 +13,7 @@ from ion.data.objstore import ObjectStore, ValueObject
 from ion.data.store import IStore, Store
 from ion.data.dataobject import DataObject
 
-from ion.play.rdf_store.rdf_base import RdfState, RdfEntity, RdfESBase
+from ion.play.rdf_store.rdf_base import RdfState, RdfEntity, RdfMixin
 
 
 class StateStore(object):
@@ -82,7 +82,10 @@ class StateStore(object):
         
 
         if dobj:
-            state=RdfState.load(key,set(dobj.value),[dobj.commitRef])
+            if commit:
+                state=RdfState.load(key,set(dobj.value),[dobj.commitRef])
+            else:
+                state=RdfEntity.load(key,set(dobj.value),commitRefs=[dobj.commitRef])
         else:
             logging.info("StateStore Key/Commit Not Found!")
             state=None
@@ -100,7 +103,7 @@ class StateStore(object):
         
         states=[]
         for stateRef in stateRefs:
-            if isinstance(stateRef, RdfESBase):
+            if isinstance(stateRef, RdfMixin):
                 key = stateRef.key
                 commit = stateRef.commitRefs
             elif isinstance(stateRef, tuple):
@@ -110,6 +113,9 @@ class StateStore(object):
             state = yield self.get_key(key,commit)
             if state:
                 states.append(state)
+                
+        if len(states)==1:
+            states=states[0]
 
         defer.returnValue(states)
 
