@@ -12,13 +12,28 @@ import logging
 from twisted.internet import defer, reactor
 from twisted.web import proxy
 from twisted.web.http import Request, HTTPFactory
-
 from magnet.spawnable import Receiver
 from ion.core.base_process import ProtocolFactory
 
 
 from ion.services.base_service import BaseService
 from ion.services.dm.coordinator import CoordinatorClient
+
+class ProxyRequest(Request):
+    """
+    Used by Proxy to implement a simple web proxy.
+    We override process() method to send a dap_get request to the controller
+    which forwards it to the fetcher.
+
+    @see http://twistedmatrix.com/documents/current/api/twisted.web.proxy.ProxyRequest.html
+    """
+    @defer.inlineCallbacks
+    def process(self):
+        logging.debug('Processing request to %s' % self.uri)
+        cc = CoordinatorClient()
+        msg = yield cc.get_url(self.uri)
+        logging.debug('Returning %d bytes of data' % len(msg))
+        defer.returnValue(msg)
 
 class ProxyService(BaseService):
     """
@@ -41,7 +56,7 @@ class ProxyService(BaseService):
         proxy stack.
         """
         # @todo Move tcp port to DX configuration file
-        """
+
         tcp_port = 10001
         logging.debug('Setting up TCP listener on port %d...' % tcp_port)
         hf = HTTPFactory()
@@ -49,27 +64,5 @@ class ProxyService(BaseService):
         hf.protocol = proxy.Proxy
         reactor.listenTCP(tcp_port, hf)
         logging.debug('Proxy listener running.')
-        """
-        
-    @defer.inlineCallbacks
-    def op_get_url(self, content, headers, msg):
-        logging.warn('Implement get_url method!')
-        yield self.reply_err(msg, {'value': 'Not implemented'}, {})
-
-class ProxyRequest(Request):
-    """
-    Used by Proxy to implement a simple web proxy.
-    We override process() method to
-    - send a dap_get request to the controller, reading in return an address
-    - connect a listener to the address, and return the payload as the document.
-    """
-    def __init__(self, channel, queued, reactor=reactor):
-        Request.__init__(self, channel, queued)
-        self.reactor = reactor
-
-    @defer.inlineCallbacks
-    def process(self):
-        cc = CoordinatorClient()
-        msg = yield cc.get_url(self.uri)
 
 factory = ProtocolFactory(ProxyService)

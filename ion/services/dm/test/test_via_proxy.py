@@ -54,7 +54,7 @@ class IntegrationTest(IonTestCase):
         Simplest test, fetch a fixed local page.
         @note Contents of same in /var/www/tmp on amoeba.ucsd.edu
         """
-        raise unittest.SkipTest('code not implemented yet')
+        #raise unittest.SkipTest('code not implemented yet')
 
         res = self._get_page('http://amoeba.ucsd.edu/tmp/test1.txt')
         msg = res.strip()

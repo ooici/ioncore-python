@@ -31,6 +31,17 @@ class FetcherTest(IonTestCase):
         logging.debug('sending request for "%s"...' % src_url)
         res = yield self.fc.get_url(src_url)
         msg = res['value']
+        if res['status'] == 'ERROR':
+            raise ValueError('Error on fetch: ' + msg)
+        defer.returnValue(msg)
+
+    @defer.inlineCallbacks
+    def _get_phead(self, src_url):
+        logging.debug('sending request for "%s"...' % src_url)
+        res = yield self.fc.get_head(src_url)
+        msg = res['value']
+        if res['status'] == 'ERROR':
+            raise ValueError('Error on fetch: ' + msg)
         defer.returnValue(msg)
 
     @defer.inlineCallbacks
@@ -41,12 +52,28 @@ class FetcherTest(IonTestCase):
         """
         res = yield self._get_page('http://amoeba.ucsd.edu/tmp/test1.txt')
         msg = res.strip()
-        self.failUnlessEqual(msg, 'Now is the time for all good men to come to the aid of their country.')
+        self.failUnlessSubstring('Now is the time for all good men', msg)
+
+    @defer.inlineCallbacks
+    def test_page_head(self):
+        """
+        Similar to get, but using HEAD verb to just pull headers.
+        """
+        res = yield self._get_phead('http://amoeba.ucsd.edu/tmp/test1.txt')
+        self.failUnlessSubstring('content-length', res)
 
     @defer.inlineCallbacks
     def test_404(self):
         try:
             d = yield self._get_page('http://ooici.net/404-fer-sure')
+            self.fail('Should have gotten an exception for 404 error!')
+        except ValueError, e:
+            pass
+
+    @defer.inlineCallbacks
+    def test_header_404(self):
+        try:
+            d = yield self._get_phead('http://ooici.net/404-fer-sure')
             self.fail('Should have gotten an exception for 404 error!')
         except ValueError, e:
             pass
