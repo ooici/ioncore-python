@@ -25,6 +25,32 @@ class AuthorizationService(BaseService):
         """Service operation: 
         """
 
+
+    """
+    Begin experimental methods RU create backend module.py files if needed. keep the "business logic" separate from the message interface
+    """
+
+    def op_authenticate_user(self, content, headers, msg):
+        """ RU Service operation: .
+        """
+
+    def op_authenticate_service_provider(self, content, headers, msg):
+        """ RU Service operation: .
+        """
+
+    def op_add_service_provider(self, content, headers, msg):
+        """ RU Service operation: .
+        """
+
+    def op_update_service_provider(self, content, headers, msg):
+        """ RU Service operation: .
+        """
+
+    def op_revoke_service_provider(self, content, headers, msg):
+        """ RU Service operation: .
+        """
+
+
 # Spawn of the process using the module name
 factory = ProtocolFactory(AuthorizationService)
 
