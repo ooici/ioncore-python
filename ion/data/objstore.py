@@ -528,6 +528,10 @@ class ObjectStore(object):
 
         cvals = yield self.vs.get_commit_root_entriesvalues(cref)
         dobj = yield self._build_value(cvals, True)
+        
+        # @Note Add the commit Ref to the object returned!
+        if dobj:
+            dobj.set_attr('commitRef',cref)
         defer.returnValue(dobj)
 
     @defer.inlineCallbacks
@@ -588,3 +592,23 @@ class ObjectStore(object):
             val = yield self.get(key)
             res.append(val)
         defer.returnValue(res)
+
+    @defer.inlineCallbacks
+    def remove(self, key):
+        """
+        @brief removes the entiti with the given key from the object store
+        @param key identifier of a mutable entity
+        @retval Deferred
+        """
+        key = _reftostr(key)
+        yield self.entityidx.remove(key)
+        defer.returnValue(dobj)
+
+    @defer.inlineCallbacks
+    def size(self):
+        """
+        @brief returns the number of structured objects in the store
+        @param key identifier of a mutable entity
+        @retval Deferred, for number of objects in store
+        """
+        defer.succeed(self._num_entities())

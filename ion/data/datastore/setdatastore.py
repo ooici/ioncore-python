@@ -92,7 +92,7 @@ class SetCassandraStore():
         except:
             logging.warn("Error calculating cardinality")
 
-    def delete(self, key):
+    def remove(self, key):
         """
         @brief remove the entire set and key from the data store
         @param key which is mapped to the set

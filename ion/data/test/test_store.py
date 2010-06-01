@@ -4,7 +4,8 @@
 @file ion/data/backends/test/test_cassandra.py
 @author Paul Hubbard
 @author Dorian Raymer
-@test Service only test of Cassandra datastore
+@author David Stuebe
+@test Service test of IStore Implementation
 """
 
 import logging
@@ -14,74 +15,73 @@ from twisted.trial import unittest
 from twisted.internet import defer
 
 from ion.data.backends import cassandra
+from ion.data.store import Store
 
-class CassandraStoreTest(unittest.TestCase):
+
+class IStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        clist = ['amoeba.ucsd.edu:9160']
-        self.ds = yield cassandra.CassandraStore.create_store(cass_host_list=clist)
+        self.ds = yield self._setup_backend()
         self.key = str(uuid4())
         self.value = str(uuid4())
 
-    @defer.inlineCallbacks
+    def _setup_backend(self):
+        """return a deferred which returns a initiated instance of a
+        backend
+        """
+        d = Store.create_store()
+        return d
+
+    #@defer.inlineCallbacks
     def tearDown(self):
-        yield self.ds.remove(self.key)
-        del self.ds
+        #yield self.ds.remove(self.key)
+        #del self.ds #shouldn't need
+        pass
 
     @defer.inlineCallbacks
     def test_get_404(self):
         # Make sure we can't read the not-written
         rc = yield self.ds.get(self.key)
-        self.assertEqual(rc, None)
+        self.failUnlessEqual(rc, None)
 
     @defer.inlineCallbacks
     def test_write_and_delete(self):
         # Hmm, simplest op, just looking for exceptions
         yield self.ds.put(self.key, self.value)
+        yield self.ds.remove(self.key)
 
     @defer.inlineCallbacks
-    def test_remove(self):
+    def test_delete(self):
         yield self.ds.put(self.key, self.value)
         yield self.ds.remove(self.key)
         rc = yield self.ds.get(self.key)
-        self.assertEqual(rc, None)
-        yield self.ds.remove(self.key)
-        yield self.ds.remove('non_exist23231')
+        self.failUnlessEqual(rc, None)
 
     @defer.inlineCallbacks
     def test_put_get_delete(self):
         # Write, then read to verify same
         yield self.ds.put(self.key, self.value)
         b = yield self.ds.get(self.key)
-        self.assertEqual(self.value, b)
+        self.failUnlessEqual(self.value, b)
+        yield self.ds.remove(self.key)
 
     @defer.inlineCallbacks
     def test_query(self):
         # Write a key, query for it, verify contents
         yield self.ds.put(self.key, self.value)
         rl = yield self.ds.query(self.key)
-        self.assertEqual(rl[0][0], self.key)
+#        print 'type rl',type(rl)
+#        print 'type rl[0]', type(rl[0])
+#        print 'type rl[0][0]', type(rl[0][0])
+        self.failUnlessEqual(rl[0][0], self.key)
 
-class CassandraStoreNSTest(CassandraStoreTest):
-    @defer.inlineCallbacks
-    def setUp(self):
-        clist = ['amoeba.ucsd.edu:9160']
-        self.ds = yield cassandra.CassandraStore.create_store(
-            cass_host_list=clist,
-            namespace='n')
-        self.key = str(uuid4())
-        self.value = str(uuid4())
 
-class CassandraStoreSCTest(CassandraStoreTest):
-    @defer.inlineCallbacks
-    def setUp(self):
+
+class CassandraStoreTest(IStoreTest):
+
+    def _setup_backend(self):
         clist = ['amoeba.ucsd.edu:9160']
-        self.ds = yield cassandra.CassandraStore.create_store(
-            cass_host_list=clist,
-            keyspace='DatastoreTest',
-            colfamily='DS1',
-            cf_super=True,
-            namespace='n')
-        self.key = str(uuid4())
-        self.value = str(uuid4())
+        d = cassandra.CassandraStore.create_store(cass_host_list=clist)
+        return d
+

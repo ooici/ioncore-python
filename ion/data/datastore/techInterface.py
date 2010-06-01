@@ -125,7 +125,7 @@ class CassandraStore():
             logging.error('Unable to find any keys')
             return None
 
-    def delete(self, key):
+    def remove(self, key):
         """
         @brief delete a key/value pair
         @param key Key to delete

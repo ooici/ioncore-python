@@ -3,7 +3,8 @@
 """
 @file ion/services/coi/datastore.py
 @author Michael Meisinger
-@brief service for storing and retrieving stateful data objects.
+@brief service for storing and retrieving stateful data objects and associations
+        between data objects
 """
 
 import logging
@@ -69,8 +70,22 @@ class DatastoreService(BaseService):
         yield self.reply(msg, 'result', val.encode(), {})
 
     @defer.inlineCallbacks
+    def op_remove(self, content, headers, msg):
+        """
+        Service operation: Removes a structured object from the data store.
+        Not that this does not remove any actual values of versions and blobs
+        form the underlying value store. If no more references exist, these
+        blobs can be garbage collected over time.
+        """
+        logging.info("op_remove: "+str(content))
+        key = content['key']
+        val = yield self.os.remove(key)
+        yield self.reply_ok(msg)
+
+    @defer.inlineCallbacks
     def op_get_values(self, content, headers, msg):
-        """Service operation: Gets values from the object store.
+        """
+        Service operation: Gets values from the object store.
         """
         logging.info("op_get_values: "+str(content))
         keys = content['keys']
@@ -82,7 +97,8 @@ class DatastoreService(BaseService):
 
     @defer.inlineCallbacks
     def op_get_ancestors(self, content, headers, msg):
-        """Service operation: Gets all ancestors of a value.
+        """
+        Service operation: Gets all ancestors of a value.
         """
         logging.info("op_get_ancestors: "+str(content))
         key = str(content['key'])
@@ -92,6 +108,23 @@ class DatastoreService(BaseService):
         ancs = yield self.os.vs.get_ancestors(cref)
         yield self.reply(msg, 'result', ancs)
 
+    @defer.inlineCallbacks
+    def op_put_blobs(self, content, headers, msg):
+        """
+        Service operation: Store a set of blobs values.
+        """
+
+    @defer.inlineCallbacks
+    def op_get_blobs(self, content, headers, msg):
+        """
+        Service operation: Retrieve a set of blobs values.
+        """
+
+    @defer.inlineCallbacks
+    def op_gc_blobs(self, content, headers, msg):
+        """
+        Service operation: Garbage collect and pack values.
+        """
 
 class DatastoreClient(BaseServiceClient):
     """
@@ -121,6 +154,13 @@ class DatastoreClient(BaseServiceClient):
     def get(self, key):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('get', {'key':str(key)})
+        logging.info('Service reply: '+str(content))
+        defer.returnValue(str(content['value']))
+
+    @defer.inlineCallbacks
+    def remove(self, key):
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('remove', {'key':str(key)})
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content['value']))
 

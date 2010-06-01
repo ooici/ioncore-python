@@ -5,6 +5,8 @@
 @package ion.data.IStore Pure virtual base class for CRUD
 @package ion.data.Store In-memory implementation of ion.data.IStore
 @author Michael Meisinger
+@author David Stuebe
+@author Dorian Raymer
 @brief base interface for all key-value stores in the system and default
         in memory implementation
 """
@@ -48,12 +50,6 @@ class IStore(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def read(self, *args, **kwargs):
-        """
-        Inheritance safe alias for get
-        """
-        return self.get(*args, **kwargs)
-
     def put(self, key, value):
         """
         @param key  an immutable key to be associated with a value
@@ -63,12 +59,6 @@ class IStore(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def write(self, *args, **kwargs):
-        """
-        Inheritance safe alias for put
-        """
-        return self.put(*args, **kwargs)
-
     def query(self, regex):
         """
         @param regex  regular expression matching zero or more keys
@@ -76,7 +66,7 @@ class IStore(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def delete(self, key):
+    def remove(self, key):
         """
         @param key  an immutable key associated with a value
         @retval Deferred, for success of this operation
@@ -110,13 +100,17 @@ class Store(IStore):
         return defer.maybeDeferred(self._query, regex)
 
     def _query(self, regex):
-        return [re.search(regex,m).group() for m in self.kvs.keys() if re.search(regex,m)]
+        keys = [re.search(regex,m).group() for m in self.kvs.keys() if re.search(regex,m)]
+        match_list=[]
+        for key in keys:
+            match_list.append((key, self.kvs.get(key)))
+        return match_list
 
-    def delete(self, key):
+    def remove(self, key):
         """
-        @see IStore.delete
+        @see IStore.remove
         """
-        return defer.maybeDeferred(self._delete, key)
-
-    def _delete(self, key):
-        del self.kvs[key]
+        # could test for existance of key. this will error otherwise
+        if self.kvs.has_key(key):
+            del self.kvs[key]
+        return defer.succeed(None)
