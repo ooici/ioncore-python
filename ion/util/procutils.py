@@ -222,8 +222,7 @@ def currenttime():
     """
     @retval current UTC time as float with seconds in epoch and fraction
     """
-    now = datetime.utcnow()
-    return time.mktime(now.timetuple()) + now.microsecond / 1000000.0
+    return time.time()
 
 def currenttime_ms():
     """

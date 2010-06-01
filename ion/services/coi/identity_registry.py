@@ -55,7 +55,7 @@ class IdentityRegistryService(BaseService):
     def op_define_identity(self, content, headers, msg):
         """Service operation: .
         """
-
+    @defer.inlineCallbacks
     def op_register_user(self, content, headers, msg):
         """Service operation: .
         """
