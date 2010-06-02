@@ -31,9 +31,6 @@ ion_messaging = {}
 cc_agent = Config(CONF.getValue('ccagent_cfg')).getObject()
 ion_core_services = Config(CONF.getValue('coreservices_cfg')).getObject()
 
-# Messaging names
-nameRegistry = Store()
-
 @defer.inlineCallbacks
 def start():
     """
@@ -121,9 +118,6 @@ def declare_messaging(messagingCfg, cgroup=None):
         logging.info("Messaging name config: name="+msgName+', '+str(msgResource))
         yield Container.configure_messaging(msgName, msgResource)
 
-        # save name in the name registry
-        yield nameRegistry.put(msgName, msgResource)
-
 # Sequence number of supervisors
 sup_seq = 0
 
@@ -182,9 +176,11 @@ def reset_container():
     # to their defaults. Even further, reset imported names in other modules
     # to the new objects.
     base_process.procRegistry = Store()
-    nameRegistry = Store()
+    base_process.processes = {}
+    base_process.receivers = []
     spawnable.store = Container.store
     spawnable.Spawnable.progeny = {}
+
 
 """
 from ion.core import bootstrap as b
