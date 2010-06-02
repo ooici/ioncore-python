@@ -120,6 +120,9 @@ again (see above). Please review the branch logs for any hints.
 Change log:
 ===========
 
+2010-06-02:
+- BaseProcess self members renamed to conform to PEP8
+- Added process shutdown to BaseProcess
 2010-05-25:
 - Made Cassandra backend parameterizable with keyspace/colfamily and added
   SuperColumn support.
