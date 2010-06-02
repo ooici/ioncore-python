@@ -37,17 +37,16 @@ class ProxyService(BaseService):
         proxy stack.
         @todo Move tcp port to DX configuration file
         """
-        tcp_port = 10001
+        tcp_port = 8000
         logging.debug('Setting up proxy on port %d...' % tcp_port)
         """
         based on BaseHTTPServer.test and tweaked a bit.
         """
         server_address = ('', tcp_port)
         ProxyHandler.protocol_version = 'HTTP/1.0'
-        httpd = ThreadingHTTPServer(server_address, ProxyHandler)
-        p = Process(target=httpd.serve_forever)
-        p.start()
-#        p.join()
-        logging.debug('Proxy listener running.')
+#        httpd = ThreadingHTTPServer(server_address, ProxyHandler)
+#        p = Process(target=httpd.serve_forever)
+#        p.start()
+#        logging.debug('Proxy listener running.')
 
 factory = ProtocolFactory(ProxyService)

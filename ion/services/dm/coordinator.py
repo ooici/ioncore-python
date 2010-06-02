@@ -47,6 +47,7 @@ class CoordinatorService(BaseService):
         @param msg Not used
         @todo Cache logic - right now just trapdoors all reqs to fetcher
         """
+        logging.debug('Coordinator forwarding URL request to fetcher')
         yield self.fc.forward_get_url(content, headers)
 
     @defer.inlineCallbacks

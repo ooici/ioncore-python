@@ -39,7 +39,7 @@ class IntegrationTest(IonTestCase):
         yield self._stop_container()
 
     def _get_page(self, src_url):
-        ph = urllib2.ProxyHandler({'http':'http://localhost:10001'})
+        ph = urllib2.ProxyHandler({'http':'http://localhost:8000'})
         opener = urllib2.build_opener(ph)
         urllib2.install_opener(opener)
 
@@ -54,11 +54,10 @@ class IntegrationTest(IonTestCase):
         Simplest test, fetch a fixed local page.
         @note Contents of same in /var/www/tmp on amoeba.ucsd.edu
         """
-        #raise unittest.SkipTest('code not implemented yet')
-
+        raise unittest.SkipTest('code not implemented yet')
         res = self._get_page('http://amoeba.ucsd.edu/tmp/test1.txt')
-        msg = res.strip()
-        self.failUnlessEqual(msg, 'Now is the time for all good men to come to the aid of their country.')
+        self.failUnlessSubstring('Now is the time for all good men to come to the aid of their country.',
+                                 msg)
 
     @defer.inlineCallbacks
     def _test_404(self):

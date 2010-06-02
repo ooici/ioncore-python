@@ -163,6 +163,7 @@ class FetcherClient(BaseServiceClient):
         that the fetcher can reply directly to the proxy and bypass the
         coordinator.
         """
+        logging.debug('Fetcher forwarding URL')
         yield self.send('get_url', content, self._rewrite_headers(headers))
 
     @defer.inlineCallbacks

@@ -26,6 +26,7 @@ __version__ = '0.1.0'
 
 import BaseHTTPServer, socket, SocketServer, urlparse
 
+import logging
 from ion.services.dm.coordinator import CoordinatorClient
 from twisted.internet import defer
 
@@ -37,6 +38,7 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
     rbufsize = 0                        # self.rfile Be unbuffered
 
     def do_CONNECT(self):
+        logging.debug('connect method firing')
         self.log_request(200)
         self.wfile.write(self.protocol_version +
                          " 200 Connection established\r\n")
@@ -52,6 +54,7 @@ class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
             return
 
         cc = CoordinatorClient()
+        logging.debug('Sending URL request to coordinator...')
         msg = yield cc.get_url(self.path)
         self.connection.send(msg)
 
