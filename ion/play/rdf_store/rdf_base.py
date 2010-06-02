@@ -46,7 +46,19 @@ class RdfBase(object):
         http://docs.python.org/reference/datamodel.html?highlight=__cmp__#object.__hash__
         '''
 
-        return None
+        return self.rdf_id()
+    
+    def rdf_id(self):
+        
+        if self.type == self.STATE:
+            if not len(self.commitRefs)==1:
+                raise RuntimeError('A RdfState Object must have exactly one commit ref to have a unique id!')
+            ref = self.commitRefs[0]
+        else:
+            ref = self.key
+            
+        return ref
+        
         
     def __eq__(self,other):
         """
@@ -268,6 +280,20 @@ class RdfState(RdfBase, RdfMixin):
         return inst
 
 
+class RdfDefs(object):
+    
+    PROPERTY = RdfBlob.create('OOI:Property')
+    VALUE = RdfBlob.create('OOI:Value')
+    INSTANCEOF = RdfBlob.create('OOI:InstanceOf')
+    MEMBER = RdfBlob.create('OOI:Member')
+    CLASS = RdfBlob.create('OOI:Class')
+    TYPE = RdfBlob.create('OOI:Type')
+
+    IDENTITY_RESOURCES = RdfBlob.create('OOI:Identity Resources')
+    RESOURCES = RdfBlob.create('OOI:Resources')
+    ROOT = RdfBlob.create('OOI:ROOT')
+    IDENTITY = RdfBlob.create('OOI:Identity')
+
     
 class WorkSpace(object):
     '''
@@ -325,6 +351,7 @@ class WorkSpace(object):
         return None
         
 
+
     def __ne__(self,other):
         """
         @brief Object Comparison
@@ -376,15 +403,9 @@ class WorkSpace(object):
         for item in triple:
             assert isinstance(item,RdfBase)
             
-            if not item.type == RdfBase.STATE:
-                # Use the Key
-                ref  = item.key
-            else:
-                # Use the commit
-                ref =  item.commitRefs[0]
-                if len(item.commitRefs) >1:
-                    logging.info('WorkSpace:add_association Illegal attempt to reference a merge state!')
-                    assert len(item.commitRefs) ==1
+
+            # Convienence method to get a hashable id for an RdfBase object
+            ref = item.rdf_id()
             
             self.workspace[item.type][ref]=item
             
@@ -551,23 +572,18 @@ class WorkSpace(object):
         inst.commitRefs=res_instance.commitRefs
         
         
-        # make some blobs that we need
-        bprop = RdfBlob.create('OOI:Property')
-        bval = RdfBlob.create('OOI:Value')
-        binstof = RdfBlob.create('OOI:InstanceOf')
-
         bresname = RdfBlob.create(resource_name)
-        
+       
         # start adding triples
         # Resource UUID:instanceOf:resource name
-        inst.add_triple(res_instance,binstof,bresname)
+        inst.add_triple(res_instance,RdfDefs.INSTANCEOF,bresname)
         
         
         # Add properties to the resource instance
         for prop in property_dictionary:
             
-            inst.add_triple(res_instance,bprop,RdfBlob.create(prop))
-            inst.add_triple(RdfBlob.create(prop),bval,RdfBlob.create(property_dictionary[prop]))
+            inst.add_triple(res_instance,RdfDefs.PROPERTY,RdfBlob.create(prop))
+            inst.add_triple(RdfBlob.create(prop),RdfDefs.VALUE,RdfBlob.create(property_dictionary[prop]))
         
         # add associations to the resource instance
         for mytuple in association_tuple_list:
@@ -577,6 +593,7 @@ class WorkSpace(object):
                 if item == 'this':
                     item = res_instance
                 elif not isinstance(item,RdfBase):
+                    # make a blob out of it!
                     item = RdfBlob.create(item)
                 
                 insert.append(item)
@@ -640,12 +657,18 @@ class WorkSpace(object):
         if keys:
             if not getattr(keys, '__iter__', False):
                 keys = (keys,)
-            ret=[]
+            ret=set()
             for key in keys:
-                ret.append(self.workspace[RdfBase.ASSOCIATION].get(key))
+                ret.add(self.workspace[RdfBase.ASSOCIATION].get(key))
         else:
-            ret=self.workspace[RdfBase.ASSOCIATION].values()
+            ret=set()
+            for item in self.workspace[RdfBase.ASSOCIATION].values():
+                print item
+                ret.add(item)
+            
         return ret
+
+
 
     def get_association_list(self):
         return self.workspace[RdfBase.ASSOCIATION].keys()
