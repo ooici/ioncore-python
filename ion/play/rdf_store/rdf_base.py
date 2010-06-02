@@ -12,6 +12,7 @@ import logging
 from ion.data.objstore import ValueRef
 
 from uuid import uuid4
+import hashlib
 
 class RdfBase(object):
     
@@ -44,6 +45,7 @@ class RdfBase(object):
         @ Note This should not be a hashable object - it can not be used as a dict key
         http://docs.python.org/reference/datamodel.html?highlight=__cmp__#object.__hash__
         '''
+
         return None
         
     def __eq__(self,other):
@@ -335,6 +337,7 @@ class WorkSpace(object):
     def add_triple(self,triple,*args):
         
         if isinstance(triple,RdfBase):
+            # Why does it end up correct in this order?
             triple=(args[0],triple,args[1])
         
         association = RdfAssociation.create(triple[0],triple[1],triple[2])
@@ -371,6 +374,8 @@ class WorkSpace(object):
             
             
         for item in triple:
+            assert isinstance(item,RdfBase)
+            
             if not item.type == RdfBase.STATE:
                 # Use the Key
                 ref  = item.key
@@ -527,7 +532,7 @@ class WorkSpace(object):
 
     # @Notes this method is the basis for a RDF Store client method to create resources
     @classmethod
-    def resource_properties(cls, resource_name, property_dictionary, association_dictionary, key=None, commitRef=[]):
+    def resource_properties(cls, resource_name, property_dictionary, association_tuple_list, key=None, commitRefs=[]):
         '''
         @brief A method to create or update a resource description with properties and values.
         @brief The association_ditionary provides a way to specify associations to other existing resources.
@@ -557,16 +562,30 @@ class WorkSpace(object):
         # Resource UUID:instanceOf:resource name
         inst.add_triple(res_instance,binstof,bresname)
         
+        
         # Add properties to the resource instance
         for prop in property_dictionary:
             
-            inst.add_triple(bresname,bprop,RdfBlob.create(prop))
-            
+            inst.add_triple(res_instance,bprop,RdfBlob.create(prop))
             inst.add_triple(RdfBlob.create(prop),bval,RdfBlob.create(property_dictionary[prop]))
         
         # add associations to the resource instance
-        for predicate in association_dictionary:
-            inst.add_triple(res_instance,RdfBlob.create(predicate),RdfBlob.create(association_dictionary[predicate]))
+        for mytuple in association_tuple_list:
+            
+            insert = []
+            for item in mytuple:
+                if item == 'this':
+                    item = res_instance
+                elif not isinstance(item,RdfBase):
+                    item = RdfBlob.create(item)
+                
+                insert.append(item)
+            
+            insert = tuple(insert)
+                
+            
+            # @Todo - make this smart to put entity references/state references
+            inst.add_triple(insert)
         
         return inst
         

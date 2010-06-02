@@ -226,7 +226,11 @@ class RdfStore(object):
         pass
     
     
-    def walk(self,rdfbase,association_match):
+    def walk(self,association_match):
+        
+        
+        
+        
         
         ws = WorkSpace()
         return ws
