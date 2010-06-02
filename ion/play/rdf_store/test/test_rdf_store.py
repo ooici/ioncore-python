@@ -16,7 +16,7 @@ from twisted.internet import defer
 from ion.play.rdf_store.rdf_store import RdfStore
 from ion.test.iontest import IonTestCase
 
-from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfEntity, RdfMixin, RdfState, WorkSpace
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfEntity, RdfMixin, RdfState, WorkSpace, RdfDefs
 
 
 class RdfStoreTest(IonTestCase):
@@ -240,4 +240,63 @@ class RdfStoreTest(IonTestCase):
         self._compare_ws(ws_diff1,ws_diff2)
         
         print '===== Complete ========'
+        
+        
+        
+    @defer.inlineCallbacks
+    def test_resource_walking(self):
+        
+        # Some tricky stuff to setup a first container...
+        resources=WorkSpace()
+        resources.add_triple((RdfDefs.ROOT,RdfDefs.CLASS,RdfDefs.RESOURCES ))        
+        yield self.rdfs.commit(resources)
+
+        resources_ref=resources.make_rdf_reference(head=True)
+        resources.add_triple((resources_ref,RdfDefs.INSTANCEOF, RdfDefs.ROOT))
+                
+        # A user
+        props={
+            'user name':'David Stuebe',
+            'id':'12390usdkln23lys7',
+            'group':'OOI:Developers',
+            'email':'stu3b3@gmail.com',
+        }
+        associations=[('this',RdfDefs.MEMBER,RdfDefs.IDENTITY_RESOURCES)]
+        ds_id=WorkSpace.resource_properties(RdfDefs.IDENTITY.object,props,associations)
+        yield self.rdfs.commit(ds_id)
+        ds_ref=ds_id.make_rdf_reference(head=True)
+        
+        # Another user
+        props={
+            'user name':'Michael Meisinger',
+            'id':'asdlkmxluewku920yusoiy2',
+            'email':'mmeisinger@ucsd.edu',
+            'group':'OOI:Developers',
+        }
+        associations=[('this',RdfDefs.MEMBER,RdfDefs.IDENTITY_RESOURCES)]
+        mm_id=WorkSpace.resource_properties(RdfDefs.IDENTITY.object,props,associations)
+        yield self.rdfs.commit(mm_id)
+        mm_ref=mm_id.make_rdf_reference(head=True)
+        
+        props={}
+        
+        associations=[
+            ('this',RdfDefs.CLASS,RdfDefs.IDENTITY_RESOURCES),
+            ('this',RdfDefs.MEMBER,mm_ref),
+            ('this',RdfDefs.MEMBER,ds_ref)
+        ]
+        
+        ids=WorkSpace.resource_properties('OOI:Identities',props,associations)
+        yield self.rdfs.commit(ids)
+        ids_ref=ids.make_rdf_reference(head=True)
+        
+        
+        resources.add_triple((RdfDefs.RESOURCES,RdfDefs.MEMBER,ids_ref))
+        yield self.rdfs.commit(resources)
+        
+        
+        search = yield self.rdfs.walk((RdfDefs.CLASS,RdfDefs.IDENTITY_RESOURCES,RdfDefs.IDENTITY_RESOURCES))
+        
+        
+        
         

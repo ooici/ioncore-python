@@ -139,7 +139,7 @@ class RdfStore(object):
                 if key == None:
                     # It was generated in RdfEntity.load because this is a new thing
                     key = update.key
-                    
+                    workspace.key=key
             
             # Returns list of key/commit tuples (length arg to put_states)    
             key_commit= yield self.states.put_states(update)
@@ -225,11 +225,29 @@ class RdfStore(object):
     def pull(self,key,**kwargs):
         pass
     
-    
-    def walk(self,rdfbase,association_match):
+    @defer.inlineCallbacks 
+    def walk(self,association_match):
+        
+        if not len(association_match)==3:
+            raise RuntimeError('Association_match must be a tuple of length 3')
         
         ws = WorkSpace()
-        return ws
+        
+        aset=set()
+        for item in association_match:
+            ref = item.rdf_id()
+            akeys=yield self.a_refs.get_references(ref) # Change to union method in ref store!
+            aset=aset.union(akeys)
+    
+            
+        assocs = yield self.associations.get_associations(aset)
+        
+        for assoc in assocs:
+            print assoc
+        
+        
+        
+        defer.returnValue(ws)        
         
         
     def garbage_collection(self):
