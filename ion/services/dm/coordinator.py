@@ -15,6 +15,7 @@ from magnet.spawnable import Receiver
 import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
+from ion.services.dm.fetcher import FetcherClient
 
 class CoordinatorService(BaseService):
     """
@@ -32,21 +33,33 @@ class CoordinatorService(BaseService):
     def slc_init(self):
         """
         Service life cycle state. Initialize service here. Can use yields.
+        @todo Create instances of clients here for later - fetcher, attr store, etc
         """
         logging.debug('CoordinatorService SLC init')
+        self.fc = FetcherClient(proc=self)
 
     @defer.inlineCallbacks
     def op_get_url(self, content, headers, msg):
         """
         @brief Method for proxy - request a (DAP) URL
-        @param content ?
-        @param headers ?
-        @param msg ?
-        @retval Return message with http payload or error
-        @note RPC message pattern for this one?
+        @param content URL to fetch
+        @param headers conv-id and reply-to should point to proxy/requester
+        @param msg Not used
+        @todo Cache logic - right now just trapdoors all reqs to fetcher
         """
-        logging.error('Implement me!')
-        yield self.reply_err(msg, {'value': 'Not implemented '}, {})
+        yield self.fc.forward_get_url(content, headers)
+
+    @defer.inlineCallbacks
+    def op_get_dap_dataset(self, content, headers, msg):
+        """
+        @brief Similar to op_get_url. Fetches an entire DAP dataset.
+        @param content URL to fetch
+        @param headers conv-id and reply-to should point to proxy/requester
+        @param msg Not used
+        @todo Cache logic - right now just trapdoors all reqs to fetcher
+        """
+        yield self.fc.forward_get_dap_dataset(content, headers)
+
 
 class CoordinatorClient(BaseServiceClient):
     """
