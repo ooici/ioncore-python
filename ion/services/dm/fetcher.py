@@ -40,7 +40,7 @@ class FetcherService(BaseService):
         """
         hstr = ''
         for x in result.getheaders():
-            hstr = hstr + '%s: %s\n' % (x[0], x[1])
+            hstr = hstr + '%s: %s\r\n' % (x[0], x[1])
 
         return hstr
 
@@ -163,6 +163,7 @@ class FetcherClient(BaseServiceClient):
         that the fetcher can reply directly to the proxy and bypass the
         coordinator.
         """
+        logging.debug('Fetcher forwarding URL')
         yield self.send('get_url', content, self._rewrite_headers(headers))
 
     @defer.inlineCallbacks

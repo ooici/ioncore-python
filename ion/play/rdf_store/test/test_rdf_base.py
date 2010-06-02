@@ -189,7 +189,7 @@ class RdfTest(unittest.TestCase):
 
         
         props={
-            'nane':'ctd',
+            'name':'ctd',
             'model':'sbe911',
             'serial number':'932u8y74',
             'sensor ID':'293ulkskdj',
@@ -197,7 +197,11 @@ class RdfTest(unittest.TestCase):
             'Point of Contact':'John Graybeal'
         }
         
-        associations={}
+        
+        tuple1=('this',RdfBlob.create('OOI:Owner'),RdfEntity.reference('***Id of an Owner Entity/Statess'))
+        tuple2=('this',RdfBlob.create('OOI:typeOf'),RdfEntity.reference('ID Instrument Resources'))
+        
+        associations=[tuple1,tuple2]
         
         res_description=WorkSpace.resource_properties('OOI:Instrument',props,associations)
 
