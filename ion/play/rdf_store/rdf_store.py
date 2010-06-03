@@ -215,7 +215,19 @@ class RdfStore(object):
 #    @defer.inlineCallbacks 
     def merge(self,state1, state2):
         pass
+
+    @defer.inlineCallbacks    
+    def get_ancestors(self, key, commitRef=None):
         
+        if commitRef:
+            cref = commitRef
+            # @Todo make sure commit is an ancestor of the head
+        else:
+            cref = yield self.states.objstore.get_commitref(key)
+
+        
+        ancestors_list = yield self.states.objstore.vs.get_ancestors(cref)
+        defer.returnValue(ancestors_list)  
         
             
     # To be implemented later! Make it distributed so services can work locally!
@@ -281,8 +293,11 @@ class RdfStore(object):
                 #print association
 
                 for position in tomatch:
+                    #print position
+                    #print tomatch[position]
                     if not association.match(tomatch[position],position=position):
                         aset.remove(association)
+                        break
 
 
         
