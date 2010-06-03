@@ -59,7 +59,7 @@ class StateStore(object):
         
             obj = ValueObject(list(state.object))
         
-            print 'PARENTS!!:',parents
+            #print 'PARENTS!!:',parents
         
             rc=yield self.objstore.put(state.key, obj, parents=parents)
         
