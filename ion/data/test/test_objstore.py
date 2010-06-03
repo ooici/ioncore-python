@@ -55,16 +55,13 @@ class BlobObjectTest(unittest.TestCase):
         test = objstore.Blob.decode_full(self.encoded)
         self.failUnlessEqual(self.blob.hash, test.hash)
 
-
-
-
 class TreeObjectTest(unittest.TestCase):
 
     def setUp(self):
         self.tree = objstore.Tree(
-                ('thing', 'd670460b4b4aece5915caf5c68d12f560a9fe3e4', '100644'),
-                ('scaleing.py', 'cd9231fa06abb69a380d3f4490a9e261e03beb5a', '100644'))
-        self.encoded = """tree 112\x00100644 thing\x00d670460b4b4aece5915caf5c68d12f560a9fe3e4100644 scaleing.py\x00cd9231fa06abb69a380d3f4490a9e261e03beb5a""" 
+                ('thing', '\x08\xcfa\x01Ao\x0c\xe0\xdd\xa3\xc8\x0eb\x7f38T\xc4\x08\\', '100644'),
+                ('scaleing.py', '\xcd\x921\xfa\x06\xab\xb6\x9a8\r?D\x90\xa9\xe2a\xe0;\xebZ', '100644'))
+        self.encoded = """tree 72\x00100644 thing\x00\x08\xcfa\x01Ao\x0c\xe0\xdd\xa3\xc8\x0eb\x7f38T\xc4\x08\\100644 scaleing.py\x00\xcd\x921\xfa\x06\xab\xb6\x9a8\r?D\x90\xa9\xe2a\xe0;\xebZ""" 
 
     def test_type(self):
         self.failUnlessEqual(self.tree.type, 'tree')
@@ -81,7 +78,6 @@ class TreeObjectTest(unittest.TestCase):
         """
         test = objstore.Tree.decode_full(self.encoded)
         self.failUnlessEqual(self.tree.hash, test.hash)
-
 
 class CommitObjectTest(unittest.TestCase):
 
@@ -112,6 +108,9 @@ class CAStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        """
+        Test the store mechanics with the in-memory Store backend.
+        """
         backend_store = yield store.Store.create_store()
         self.cas = objstore.CAStore(backend_store)
 
@@ -122,6 +121,80 @@ class CAStoreTest(unittest.TestCase):
         yield self.cas.put(b)
         b_out = yield self.cas.get(b.hash)
         self.failUnlessEqual(b.hash, b_out.hash)
+
+    @defer.inlineCallbacks
+    def test_tree(self):
+        b =  objstore.Blob('test content')
+        yield self.cas.put(b)
+        t1 = objstore.Tree((objstore.Entity('test', b.hash)))
+        yield self.cas.put(t1)
+        t1_out = yield self.cas.get(t1.hash)
+        self.failUnlessEqual(t1_out.value, t1.value)
+
+    @defer.inlineCallbacks
+    def test_tree2(self):
+        b =  objstore.Blob('test content')
+        b2 =  objstore.Blob('deja vu')
+        b3 =  objstore.Blob('jamais vu')
+        yield self.cas.put(b)
+        yield self.cas.put(b2)
+        yield self.cas.put(b3)
+        t1 = objstore.Tree(objstore.Entity('test', b.hash),
+                            objstore.Entity('hello', b2.hash))
+        yield self.cas.put(t1)
+        t2 = objstore.Tree(objstore.Entity('thing', b3.hash),
+                            objstore.Entity('tree', t1.hash))
+        yield self.cas.put(t2)
+        t1_out = yield self.cas.get(t1.hash)
+        self.failUnlessEqual(t1_out.value, t1.value)
+        t2_out = yield self.cas.get(t2.hash)
+        self.failUnlessEqual(t2_out.value, t2.value)
+
+    @defer.inlineCallbacks
+    def test_commit(self):
+        b =  objstore.Blob('test content')
+        b2 =  objstore.Blob('deja vu')
+        b3 =  objstore.Blob('jamais vu')
+        yield self.cas.put(b)
+        yield self.cas.put(b2)
+        yield self.cas.put(b3)
+        t1 = objstore.Tree(objstore.Entity('test', b.hash),
+                            objstore.Entity('hello', b2.hash))
+        yield self.cas.put(t1)
+        t2 = objstore.Tree(objstore.Entity('thing', b3.hash),
+                            objstore.Entity('tree', t1.hash))
+        yield self.cas.put(t2)
+        c = objstore.Commit(t2.hash, log='first commit')
+        yield self.cas.put(c)
+        c_out = yield self.cas.get(c.hash)
+        self.failUnlessEqual(c.value, c_out.value)
+
+    @defer.inlineCallbacks
+    def test_commit2(self):
+        b =  objstore.Blob('test content')
+        b2 =  objstore.Blob('deja vu')
+        b3 =  objstore.Blob('jamais vu')
+        yield self.cas.put(b)
+        yield self.cas.put(b2)
+        yield self.cas.put(b3)
+        t1 = objstore.Tree(objstore.Entity('test', b.hash),
+                            objstore.Entity('hello', b2.hash))
+        yield self.cas.put(t1)
+        t2 = objstore.Tree(objstore.Entity('thing', b3.hash),
+                            objstore.Entity('tree', t1.hash))
+        yield self.cas.put(t2)
+        c = objstore.Commit(t2.hash, log='first commit')
+        yield self.cas.put(c)
+
+        b3new = objstore.Blob('I remember, now!')
+        yield self.cas.put(b3new)
+
+        t2new = objstore.Tree(objstore.Entity('thing', b3new.hash),
+                            objstore.Entity('tree', t1.hash))
+        cnew = objstore.Commit(t2new.hash, parents=[c.hash], log='know what i knew but forgot')
+        yield self.cas.put(cnew)
+        cnew_out = yield self.cas.get(cnew.hash)
+        self.failUnlessEqual(cnew.value, cnew_out.value)
 
 
 class ValueStoreTest(unittest.TestCase):

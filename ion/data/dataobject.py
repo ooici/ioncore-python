@@ -126,3 +126,15 @@ class DataObject(object):
     @classmethod
     def create_unique_id(cls):
         return str(uuid4())[:9]
+
+
+class StorableObject(DataObject):
+    """
+    Example of object with attributes that are also data objects such that
+    this Storable can be encoded as a tree of trees/blobs and decoded back
+    to this usable object (possibly incrementally, as attributes are
+    accessed.
+    """
+
+
+

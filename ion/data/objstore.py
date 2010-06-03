@@ -37,17 +37,17 @@ def sha1hex(b):
 def sha1bin(b):
     return hashlib.sha1(b).digest()
 
-def sha1(b, hex=True):
-    if hex:
-        return sha1hex(b)
-    return sha1bin(b)
+def sha1(b, bin=True):
+    if bin:
+        return sha1bin(b)
+    return sha1hex(b)
 
-def sha_bin_to_hex(bytes):
+def sha1_to_hex(bytes):
     """binary form (20 bytes) of sha1 digest to hex string (40 char)
     """
     hex_bytes = struct.unpack('!20B', bytes)
     almosthex = map(hex, hex_bytes)
-    return ''.join([y[-2:] for y in ['00'+x.strip('0x') for x in almosthex]])
+    return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
 
 
 class ValueRef(object):
@@ -137,7 +137,6 @@ class ICAStoreObject(Interface):
         @retval Storable, hashable value representing an object.
         """
 
-
 class BaseObject(object):
     """Base object of content addressable value store
     """
@@ -145,6 +144,9 @@ class BaseObject(object):
 
     @classmethod
     def get_type(cls):
+        """@note was considering a scheme where the type is taken as the 
+        name of the class. 
+        """
         return cls.__name__.lower()
 
     @property
@@ -157,13 +159,11 @@ class BaseObject(object):
 
     @property
     def hash(self):
-        return sha1hex(self.value)
+        return sha1(self.value, bin=False)
 
     def encode(self):
         """
-        @brief type [content length][null][content]
-        @note _body is returns the store-able format, analogous to
-        'wire-format'
+        @brief Encode this instance.
         """
         body = self._encode_body()
         header = self._encode_header(body)
@@ -173,8 +173,16 @@ class BaseObject(object):
     @staticmethod
     def decode(value, types):
         """
-        @brief Decode fully encoded object. Start by processing header
-        portion, then delegate to the type specified in the header.
+        @brief Decode an encoded object. This is a general entry-point
+        that starts off the decoding process using the definitive
+        decode_header implementation. Once the header is decoded, the type
+        name is known (type being Storable Object Type, implemented as a class
+        that extends BaseObject) and the actual type (class) is retrieved
+        (from the provided types dict) to which the rest of the decoding is
+        delegated.
+        @param value An encoded storable object.
+        @param types A dictionary of type_name:type_class where type_class
+        is a derived class of BaseObject (Blob, Tree, Commit, ...).
         @retval A new instance of the encoded object
         """
         type, body = BaseObject._decode_header(value)
@@ -184,7 +192,9 @@ class BaseObject(object):
     @classmethod
     def decode_full(cls, encoded_obj):
         """
-        @brief Decoded known object type.
+        @brief Decoded known object type. This makes it so you can test
+        decoding specific object types with out passing a dict of types (as
+        in the encode method).
         """
         type, body = BaseObject._decode_header(encoded_obj)
         assert type == cls.type
@@ -227,7 +237,6 @@ class BaseObject(object):
         """
         pass
 
-
 class Blob(BaseObject):
     """
     Blob Object stores any blob of bytes (string, or serialized object).
@@ -237,7 +246,7 @@ class Blob(BaseObject):
     def __init__(self, content):
         """
         @param content serializable blob (str or bytes)
-        @note once _body is set, it should not change
+        @note once content is set, it should not change
         """
         self.content = content
     
@@ -251,7 +260,7 @@ class Blob(BaseObject):
     @classmethod
     def _decode_body(cls, encoded_body):
         """
-        @brief Decoding an encoded object body is the same as create a new
+        @brief Decoding an encoded object body is the same as creating a new
         instance with the context contained in encoded_body.
         @note The Blob object type decoding is trivial, as any higher-level
         encoding is ignored here (by virtue of being a blob).
@@ -259,13 +268,15 @@ class Blob(BaseObject):
         """
         return cls(encoded_body)
 
-
 class Tree(BaseObject):
     """
     Tree Object
+
+    @todo implement __iter__
     """
     type = 'tree'
 
+    entityFactory = Entity
 
     def __init__(self, *children):
         """
@@ -278,16 +289,22 @@ class Tree(BaseObject):
         (arbitrary) in the context of the CAStore, but it might be part of
         the data model in a higher-level application.
         """
-        self.children = children
+        entities = []
+        for child in children:
+            if not isinstance(child, self.entityFactory):
+                child = self.entityFactory(*child)
+            entities.append(child)
+        self.children = entities
         
     def _encode_body(self):
         """
         format for each child in body of tree object
-        [6-bytes][space][name][null char][hash]
+        [6 bytes][space][name][null char][hash]
         @note should hash be string or binary of sha1 hexdigest?
         """
         body = "" #use buffer
         for (name, obj_hash, mode) in self.children:
+            assert len(obj_hash) == 20 #bin sha1 (not hex)
             body += "%s %s\x00%s" % (mode, name, obj_hash,)
         return body
 
@@ -299,13 +316,16 @@ class Tree(BaseObject):
         object.
         @retval New instance of Tree.
         """
-        children = cls._decode_body_re(encoded_body)
+        #children = cls._decode_body_re(encoded_body)
+        children = cls._decode_body_parser(encoded_body)
         return cls(*children)
 
     @staticmethod
     def _decode_body_re(raw):
         """
-        @brief Parse encoded Tree using regular expression.
+        @brief Parse encoded Tree using regular expression. This is an easy
+        way to decode Tree objects that use hex string sha1 format (as
+        opposed to bin sha1 format).
         @note as long as the name of a tree element is not anything weird,
         this should work...but it's hard to ensure it will always work!
         Alternative parser could be implemented without re.
@@ -316,6 +336,36 @@ class Tree(BaseObject):
         smatches = [(name, hash, mode) for mode, name, hash in matches]
         return smatches
 
+    @staticmethod
+    def _decode_body_parser(raw):
+        raw = list(raw)
+        def read_to_null(raw):
+            buf = ''
+            while raw:
+                char = raw.pop(0)
+                if char == NULL_CHR:
+                    break
+                buf += char
+            return buf, raw
+
+        def read_sha1(raw):
+            hash, raw = ''.join(raw[0:20]), raw[20:]
+            return hash, raw
+
+        children = []
+        while True:
+            mode_name, raw = read_to_null(raw)
+            mode, name = mode_name.split()
+            hash, raw = read_sha1(raw)
+            children.append((name, hash, mode))
+            if not raw:
+                break
+        return children
+
+    @classmethod
+    def child(cls, name, obj, mode=None):
+        return cls.entityFactory(name, obj, mode)
+
 
 class Commit(BaseObject):
     """
@@ -323,10 +373,10 @@ class Commit(BaseObject):
     """
     type = 'commit'
 
-    def __init__(self, tree, parents=[], log=""):
+    def __init__(self, tree, parents=[], log="", **other):
         """
         @param tree hash or object
-        @param parent commit hash or object
+        @param parent commit hash or object. Sha1 hash in hex form.
         @param log Record of commit reason/context/change/etc.
         """
         #if tree isinstance(Tree):
@@ -334,7 +384,7 @@ class Commit(BaseObject):
         self.tree = tree
         self.parents = parents
         self.log = str(log) #or unicode? or what?
-
+        self.other = other
 
     def _encode_body(self):
         """
@@ -368,16 +418,20 @@ class Commit(BaseObject):
         raw = encoded_body
         tree = None
         parents = []
+        other = {}
         log = ''
         parts = raw.split('\n')
         while True:
             part = parts.pop(0)
             if part:
-                type, hash = part.split()
+                space = part.find(' ')
+                type, rest = part[:space], part[space+1:]
                 if type == 'tree':
-                    tree = hash
+                    tree = rest
                 elif type == 'parent':
-                    parents.append(hash)
+                    parents.append(rest)
+                else:
+                    other[type] = rest
             else:
                 #First blank line indicates we are now at the log.
                 #Join the remaining parts back together with \n
@@ -385,7 +439,7 @@ class Commit(BaseObject):
                 #Verify with sha1 hash
                 log = '\n'.join(parts)
                 break
-        return cls(tree, parents, log=log)
+        return cls(tree, parents, log=log, **other)
 
 class Entity(tuple):
     """
@@ -393,15 +447,40 @@ class Entity(tuple):
     a convenience container for the format of an element of a tree.
     """
 
-    def __init__(self, name, hash, mode='100645'):
-        tuple.__init__(self, [name, hash, mode])
+    def __init__(self, name, obj, mode='100644'):
+        tuple.__init__(self, [name, obj, mode])
         self.mode = mode
         self.name = name
-        self.hash = hash
+        self.hash = obj
 
-    def __new__(cls, name, hash, mode='100644'):
-        return tuple.__new__(cls, [name, hash, mode])
+    def __new__(cls, name, obj, mode='100644'):
 
+        return tuple.__new__(cls, [name, obj, mode])
+
+class StoreContextWrapper(object):
+    """
+    Context wrapper around backend store.
+    """
+
+    def __init__(self, backend, prefix):
+        self.backend = backend
+        self.prefix = prefix
+
+    def _key(self, id):
+        return self.prefix + id
+
+    def get(self, id):
+        return self.backend.get(self._key(id))
+
+    def put(self, id, val):
+        return self.backend.put(self._key(id), val)
+
+    def remove(self, id):
+        return self.backend.remove(self._key(id))
+
+    def query(self, regex):
+        pattern = "%s(%s)" % (self.prefix, regex,)
+        return self.backend.query(pattern)
 
 class CAStore(object):
     """
@@ -415,36 +494,21 @@ class CAStore(object):
             Commit.type:Commit,
             }
 
-    class Objects:
-        """
-        interface to store blobs, trees, commits, etc.
-        """
-
-    class Refs:
-        """
-        interface to references of commits
-        """
-
     def __init__(self, backend, namespace='', compression=None):
         """
-        @param namespace prefix qualifying context for this CAS with in the
+        @param namespace root prefix qualifying context for this CAS with in the
         general space of the backend store.
         @param backend storage interface
         """
-        self.backend = backend
-        self._prefix = namespace
-
-    def _make_full_key(self, key):
-        """
-        fully qualified key, prefixed with store namespace
-        XXX separation char?
-        """
-        return self._prefix + key
+        self._backend = backend
+        self.root_namespace = namespace
+        self.objstore = StoreContextWrapper(backend, namespace + 'objects/')
+        self.refstore = StoreContextWrapper(backend, namespace + 'refs/')
 
     def decode(self, encoded_obj):
         """
         @brief decode raw object read from backend store
-        @param raw object in some encoding
+        @param encoded_obj encoded object of one of the type in self.TYPES
         """
         obj = BaseObject.decode(encoded_obj, self.TYPES)
         return obj
@@ -453,6 +517,9 @@ class CAStore(object):
         """
         @brief Compute the hash of an object (which is used as a key)
         """
+        value = obj.value
+        hash = sha1(value)
+        return hash
 
     def put(self, obj):
         """
@@ -467,23 +534,107 @@ class CAStore(object):
         store.
         """
         value = obj.value #compress arg
-        hash = obj.hash 
-        key = self._make_full_key(obj.hash)
-        d = self.backend.put(key, value)
+        hash = sha1(value)
+        id = sha1_to_hex(hash)
+        d = self.objstore.put(id, value)
         return d
 
-    def get(self, obj_hash):
+    def get(self, id):
         """
-        @param obj_hash key where an object is stored (object hash)
+        @param id key where an object is stored (object hash)
         @retval Instance of store object.
         """
-        key = self._make_full_key(obj_hash)
-        d = self.backend.get(key)
+        d = self.objstore.get(id)
         def _decode_cb(raw):
             return self.decode(raw)
         d.addCallback(_decode_cb)
         # d.addErrback
         return d
+
+    def _obj_exists(self, id):
+        """Store (backend) interface does not have an 'exists' method; this
+        has to be implemented by trying to get the whole object, which
+        could be just as inefficient as writing over the existing object.
+        """
+
+class EntityProxy(object):
+
+    def __init__(self, name, hash, mode='100644'):
+        tuple.__init__(self, [name, hash, mode])
+        self.mode = mode
+        self.name = name
+        self.hash = hash
+
+    def __new__(cls, name, hash, mode='100644'):
+        return tuple.__new__(cls, [name, hash, mode])
+
+class BlobProxy(object):
+    """
+    Inverse of regular Blob object.
+    Start with the object id (hash), fetching the content when needed
+    """
+
+    def __init__(self, backend, id):
+        """
+        @param backend (or objstore) active backend to read from
+        @param id the object hash
+        """
+        self.objstore = backend
+        self.id = id
+        self._content = None
+
+    def get_content(self):
+        """
+        @retval a Deferred that will fire with the content
+        """
+        if not self._content:
+            d = self.objstore.get(self.id)
+            def store_result(content):
+                self._content = content
+                return content
+            d.addCallback(store_result)
+        else:
+            d = defer.succeed(self._content)
+        return d
+
+class TreeProxy(object):
+    """
+    Live tree of real objects
+    """
+
+    def __init__(self, backend, *child):
+        """
+        @param child An element of the tree (a child entity).
+        """
+        self.backend = backend
+        self.children = child
+
+class WorkingTree(object):
+    """
+    Tree of objects that may or may not be written to backend store
+    """
+
+    def __init__(self, backend, name=''):
+        """
+        @param backend Instance of CAStore.
+        @param name of working tree; could have more than one.
+        """
+        self.backend = backend
+        self.name = name
+        self.entitys = {}
+
+    def add(self, entity):
+        """
+        @param entity Instance of Entity or EntityProxy.
+        """
+
+    def update(self, entity):
+        """
+        """
+
+    def remove(self, entity):
+        """
+        """
 
 class Frontend(CAStore):
     """
@@ -492,6 +643,19 @@ class Frontend(CAStore):
     def __init__(self, backend, namespace=''):
         CAStore.__init__(self, backend, namespace)
 
+    def _get_symbolic_ref(self, name='HEAD'):
+        self.backend.get(name)
+
+    def _set_symbolic_ref(self, name='HEAD', ref=''):
+        """
+        """
+
+    def _checkout(self):
+        """
+        Checkout is used to establish a context for the present. The
+        default is to get the HEAD reference; the HEAD reference is the id
+        of a commit object designated as the latest commit to use.
+        """
 
     def _get_named_entity(self, name):
         """
