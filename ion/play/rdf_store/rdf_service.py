@@ -66,18 +66,27 @@ class RdfServiceClient(BaseServiceClient):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "RdfService"
         BaseServiceClient.__init__(self, proc, **kwargs)
+        self.rdfs=RdfStore()
+        logging.info('RdfServiceClient.__init__()')
+
 
     @defer.inlineCallbacks
-    def push(self, text='Hi there push'):
+    def slc_init(self):
+        yield self.rdfs.init()
+
+
+    @defer.inlineCallbacks
+    def push(self, key):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('push', text)
+        
+        (content, headers, msg) = yield self.rpc_send('push', key)
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content))
 
     @defer.inlineCallbacks
-    def pull(self, text='Hi there pull'):
+    def pull(self, key):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('pull', text)
+        (content, headers, msg) = yield self.rpc_send('pull', key)
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content))
 
