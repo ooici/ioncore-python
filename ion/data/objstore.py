@@ -2,6 +2,7 @@
 
 """
 @file ion/data/objstore.py
+@author Dorian Raymer
 @author Michael Meisinger
 @author David Stuebe
 @brief storing immutable values (blobs, trees, commit) and storing structured
@@ -31,16 +32,18 @@ import ion.util.procutils as pu
 
 NULL_CHR = "\x00"
 
-def sha1hex(b):
-    return hashlib.sha1(b).hexdigest()
+def sha1hex(val):
+    return hashlib.sha1(val).hexdigest()
 
-def sha1bin(b):
-    return hashlib.sha1(b).digest()
+def sha1bin(val):
+    return hashlib.sha1(val).digest()
 
-def sha1(b, bin=True):
+def sha1(val, bin=True):
+    if isinstance(val, BaseObject):
+        val = val.value
     if bin:
-        return sha1bin(b)
-    return sha1hex(b)
+        return sha1bin(val)
+    return sha1hex(val)
 
 def sha1_to_hex(bytes):
     """binary form (20 bytes) of sha1 digest to hex string (40 char)
@@ -114,6 +117,21 @@ class ValueObject(ValueRef):
         hash = ValueRef._secure_value_hash(self.value)
         return hash
 
+class Entity(tuple):
+    """
+    Represents a child element of a tree object. Not an object itself, but
+    a convenience container for the format of an element of a tree.
+    """
+
+    def __init__(self, name, obj, mode='100644'):
+        tuple.__init__(self, [name, obj, mode])
+        self.mode = mode
+        self.name = name
+        self.hash = obj
+
+    def __new__(cls, name, obj, mode='100644'):
+
+        return tuple.__new__(cls, [name, obj, mode])
 
 class ICAStoreObject(Interface):
     """
@@ -154,6 +172,7 @@ class BaseObject(object):
         """
         @brief Bytes that actually go into the store (i.e. content
         addressable key/value store).
+        @todo cache encoding() result to avoid re-computing the same thing.
         """
         return self.encode()
 
@@ -302,7 +321,7 @@ class Tree(BaseObject):
         [6 bytes][space][name][null char][hash]
         @note should hash be string or binary of sha1 hexdigest?
         """
-        body = "" #use buffer
+        body = "" #@todo use buffer
         for (name, obj_hash, mode) in self.children:
             assert len(obj_hash) == 20 #bin sha1 (not hex)
             body += "%s %s\x00%s" % (mode, name, obj_hash,)
@@ -316,7 +335,11 @@ class Tree(BaseObject):
         object.
         @retval New instance of Tree.
         """
+        #No longer using this parser (this one works on trees that encode a
+        #40 char hex sha1
         #children = cls._decode_body_re(encoded_body)
+
+        #This one works on trees that encode the 20 byte binary sha1
         children = cls._decode_body_parser(encoded_body)
         return cls(*children)
 
@@ -338,6 +361,12 @@ class Tree(BaseObject):
 
     @staticmethod
     def _decode_body_parser(raw):
+        """
+        @brief Parse encoded Tree using a two part processing loop. First
+        look for a null character; the bytes before the null are the mode +
+        name seperated by a space character. The 20 bytes that follow make
+        up the sha1 hash.
+        """
         raw = list(raw)
         def read_to_null(raw):
             buf = ''
@@ -441,21 +470,6 @@ class Commit(BaseObject):
                 break
         return cls(tree, parents, log=log, **other)
 
-class Entity(tuple):
-    """
-    Represents a child element of a tree object. Not an object itself, but
-    a convenience container for the format of an element of a tree.
-    """
-
-    def __init__(self, name, obj, mode='100644'):
-        tuple.__init__(self, [name, obj, mode])
-        self.mode = mode
-        self.name = name
-        self.hash = obj
-
-    def __new__(cls, name, obj, mode='100644'):
-
-        return tuple.__new__(cls, [name, obj, mode])
 
 class StoreContextWrapper(object):
     """
@@ -537,13 +551,17 @@ class CAStore(object):
         hash = sha1(value)
         id = sha1_to_hex(hash)
         d = self.objstore.put(id, value)
+        d.addCallback(lambda _: id)
         return d
 
     def get(self, id):
         """
         @param id key where an object is stored (object hash)
         @retval Instance of store object.
+        @todo flexible handling of id (bin sha1 or hex sha1)
         """
+        if len(id) == 20:
+            id = sha1_to_hex(id)
         d = self.objstore.get(id)
         def _decode_cb(raw):
             return self.decode(raw)
