@@ -17,51 +17,68 @@ import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
-class HelloService(BaseService):
+class RdfService(BaseService):
     """
     Example service interface
     """
     # Declaration of service
-    declare = BaseService.service_declare(name='hello',
+    declare = BaseService.service_declare(name='RdfService',
                                           version='0.1.0',
                                           dependencies=[])
 
     def __init__(self, receiver, spawnArgs=None):
         # Service class initializer. Basic config, but no yields allowed.
         BaseService.__init__(self, receiver, spawnArgs)
-        logging.info('HelloService.__init__()')
+        logging.info('RdfService.__init__()')
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
 
     @defer.inlineCallbacks
-    def op_hello(self, content, headers, msg):
-        logging.info('op_hello: '+str(content))
+    def op_push(self, content, headers, msg):
+        logging.info('op_push: '+str(content))
+
+        # The following line shows how to reply to a message
+        yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
+
+    @defer.inlineCallbacks
+    def op_pull(self, content, headers, msg):
+        logging.info('op_pull: '+str(content))
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
 
 
-class HelloServiceClient(BaseServiceClient):
+
+class RdfServiceClient(BaseServiceClient):
     """
     This is an exemplar service client that calls the hello service. It
     makes service calls RPC style.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "hello"
+            kwargs['targetname'] = "RdfService"
         BaseServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
-    def hello(self, text='Hi there'):
+    def push(self, text='Hi there push'):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('hello', text)
+        (content, headers, msg) = yield self.rpc_send('push', text)
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content))
 
+    @defer.inlineCallbacks
+    def pull(self, text='Hi there pull'):
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('pull', text)
+        logging.info('Service reply: '+str(content))
+        defer.returnValue(str(content))
+
+
+
 # Spawn of the process using the module name
-factory = ProtocolFactory(HelloService)
+factory = ProtocolFactory(RdfService)
 
 
 

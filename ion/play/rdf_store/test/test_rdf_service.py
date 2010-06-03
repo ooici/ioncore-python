@@ -9,10 +9,10 @@
 
 from twisted.internet import defer
 
-from ion.play.hello_service import HelloServiceClient
+from ion.play.rdf_store.rdf_service import RdfServiceClient
 from ion.test.iontest import IonTestCase
 
-class HelloTest(IonTestCase):
+class RdfServiceTest(IonTestCase):
     """
     Testing example hello service.
     """
@@ -29,10 +29,12 @@ class HelloTest(IonTestCase):
     def test_hello(self):
 
         services = [
-            {'name':'hello1','module':'ion.play.hello_service','class':'HelloService'},
+            {'name':'RdfService1','module':'ion.play.rdf_store.rdf_service','class':'RdfService'},
         ]
 
         sup = yield self._spawn_processes(services)
 
-        hc = HelloServiceClient(proc=sup)
-        yield hc.hello("Hi there, hello1")
+        rsc = RdfServiceClient(proc=sup)
+        yield rsc.push("Hi there, PushMe")
+        
+        yield rsc.pull("Hi there, PullMe")
