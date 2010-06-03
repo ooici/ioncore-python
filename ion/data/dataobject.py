@@ -53,8 +53,8 @@ class DataObject(object):
         @param value Value of the attribute. Can be dict, str, int, float, DataObject or list
         @retval None
         """
-        assert isinstance(name, unicode) or isinstance(name, str)
-        assert isinstance(value, unicode) or isinstance(value, str) or isinstance(value, dict) or isinstance(value, int) or isinstance(value, float) or isinstance(value, list) or isinstance(value, DataObject)
+        assert isinstance(name, (unicode, str))
+        assert isinstance(value, (unicode, str, dict, int, float, list, DataObject))
         
         name = unicode(name) # because Json returns unicode, always use unicode
         setattr(self, name, value)

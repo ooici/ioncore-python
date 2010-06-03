@@ -43,7 +43,8 @@ class WorkerTest(IonTestCase):
         logging.info("Supervisor: "+repr(sup))
 
         wc = WorkerClient()
-        wcId = yield spawn(wc.receiver)
+        wcId = yield wc.spawn()
+        yield wc.init()
 
         wq_name = Container.id + ".worker1"
         for i in range(1,11):
@@ -74,7 +75,8 @@ class WorkerTest(IonTestCase):
         logging.info("Supervisor: "+repr(sup))
 
         wc = WorkerClient()
-        wcId = yield spawn(wc.receiver)
+        wcId = yield wc.spawn()
+        yield wc.init()
 
         wq_name = Container.id + ".fanout1"
         for i in range(1,6):

@@ -12,6 +12,7 @@ import logging
 from ion.data.objstore import ValueRef
 
 from uuid import uuid4
+import hashlib
 
 class RdfBase(object):
     
@@ -35,6 +36,8 @@ class RdfBase(object):
             self.key=ValueRef._secure_value_hash(object)
 
         # The commit reference for a particular state
+        if not getattr(commitRefs, '__iter__', False):
+                commitRefs = [commitRefs]
         self.commitRefs=commitRefs
 
 
@@ -44,7 +47,21 @@ class RdfBase(object):
         @ Note This should not be a hashable object - it can not be used as a dict key
         http://docs.python.org/reference/datamodel.html?highlight=__cmp__#object.__hash__
         '''
+
         return None
+    
+    def rdf_id(self):
+        
+        if self.type == self.STATE:
+            print self
+            if not len(self.commitRefs)==1:
+                raise RuntimeError('A RdfState Object must have exactly one commit ref to have a unique id!')
+            ref = self.commitRefs[0]
+        else:
+            ref = self.key
+            
+        return ref
+        
         
     def __eq__(self,other):
         """
@@ -114,9 +131,40 @@ class RdfAssociation(RdfBase):
         assert isinstance(predicate, RdfBase)
         assert isinstance(object, RdfBase)
         
-        s=(subject.type,(subject.key, subject.commitRefs))
-        p=(predicate.type,(predicate.key, predicate.commitRefs))
-        o=(object.type,(object.key, object.commitRefs))
+        
+
+        # Checking type may cause problems if an association is made to an entity which has been committed?
+        if len(subject.commitRefs)==1 and subject.type==RdfBase.STATE:
+            s=(subject.type,(subject.key, subject.commitRefs[0]))
+        elif len(subject.commitRefs)==0:
+            s=(subject.type,(subject.key, None))
+        else:
+            print 'Illegal Subject:'
+            print subject
+            raise RuntimeError('Can not create association to a merged state')
+ 
+        if len(object.commitRefs)==1 and object.type==RdfBase.STATE:
+            o=(object.type,(object.key, object.commitRefs[0]))
+        elif len(object.commitRefs)==0:
+            o=(object.type,(object.key, None))
+        else:
+            print 'Illegal Object:'
+            print object
+            raise RuntimeError('Can not create association to a merged state')
+ 
+        if len(predicate.commitRefs)==1 and predicate.type==RdfBase.STATE:
+            p=(predicate.type,(predicate.key, predicate.commitRefs[0]))
+        elif len(predicate.commitRefs)==0:
+            p=(predicate.type,(predicate.key, None))
+        else:
+            print 'Illegal Predicate:'
+            print predicate
+            raise RuntimeError('Can not create association to a merged state')
+        
+        
+        #s=(subject.type,(subject.key, subject.commitRefs.pop()))
+        #p=(predicate.type,(predicate.key, predicate.commitRefs.pop()))
+        #o=(object.type,(object.key, object.commitRefs.pop()))
         
         a={ RdfBase.SUBJECT:s,
             RdfBase.PREDICATE:p,
@@ -125,6 +173,7 @@ class RdfAssociation(RdfBase):
         inst = cls()
         RdfBase.__init__(inst,a,RdfBase.ASSOCIATION)
         return inst
+
 
     @classmethod
     def sort_keys(cls, alist):
@@ -159,6 +208,39 @@ class RdfAssociation(RdfBase):
         RdfBase.__init__(inst,association, RdfBase.ASSOCIATION, key=key)
         return inst
         
+    def match(self, match, position=None):
+    
+        assert isinstance(match, RdfBase)
+        
+        if not position:
+            position = [RdfBase.SUBJECT,RdfBase.PREDICATE,RdfBase.OBJECT]
+        
+        if not getattr(position, '__iter__', False):
+            position = (position,)
+        
+        rc=False
+        for pos in position:
+            type__key_commit = self.object[pos]
+            type=type__key_commit[0]
+            key=type__key_commit[1][0]
+            commit=type__key_commit[1][1]
+
+            if type != match.type:
+                continue
+
+            if key != match.rdf_id():
+                continue
+            
+            if commit:
+                if commit == match.commitRefs:
+                    rc = True
+                    break
+            else:
+                
+                rc = True
+                break
+        return rc
+
 
 #@Todo - change to mixin class
 class RdfMixin(object):
@@ -266,6 +348,20 @@ class RdfState(RdfBase, RdfMixin):
         return inst
 
 
+class RdfDefs(object):
+    
+    PROPERTY = RdfBlob.create('OOI:Property')
+    VALUE = RdfBlob.create('OOI:Value')
+    INSTANCEOF = RdfBlob.create('OOI:InstanceOf')
+    MEMBER = RdfBlob.create('OOI:Member')
+    CLASS = RdfBlob.create('OOI:Class')
+    TYPE = RdfBlob.create('OOI:Type')
+
+    IDENTITY_RESOURCES = RdfBlob.create('OOI:Identity Resources')
+    RESOURCES = RdfBlob.create('OOI:Resources')
+    ROOT = RdfBlob.create('OOI:ROOT')
+    IDENTITY = RdfBlob.create('OOI:Identity')
+
     
 class WorkSpace(object):
     '''
@@ -299,16 +395,16 @@ class WorkSpace(object):
         if not ws1.key == ws2.key:
             return False
         
-        if not ws1.get_associations() == ws2.get_associations():
+        if not ws1.get_associations().sort() == ws2.get_associations().sort():
             return False
         
-        if not ws1.get_blobs() == ws2.get_blobs():
+        if not ws1.get_blobs().sort() == ws2.get_blobs().sort():
             return False
         
-        if not ws1.get_entities() == ws2.get_entities():
+        if not ws1.get_entities().sort() == ws2.get_entities().sort():
             return False
         
-        if not ws1.get_states() == ws2.get_states():
+        if not ws1.get_states().sort() == ws2.get_states().sort():
             return False
         
         if not ws1.get_references() == ws2.get_references():
@@ -323,6 +419,7 @@ class WorkSpace(object):
         return None
         
 
+
     def __ne__(self,other):
         """
         @brief Object Comparison
@@ -332,11 +429,11 @@ class WorkSpace(object):
         return not self.__eq__(other)
 
 
-    def add_triple(self,triple,*args):
-        
-        if isinstance(triple,RdfBase):
-            triple=(args[0],triple,args[1])
-        
+    def add_triple(self,triple):
+         
+        if not len(triple)==3:
+            raise RuntimeError('WorkSpace:add_triple takes an iterable of length 3, object which inherit from RdfBase')
+            
         association = RdfAssociation.create(triple[0],triple[1],triple[2])
         self.add_association(association,triple)
     
@@ -356,11 +453,16 @@ class WorkSpace(object):
         if not association.object[RdfBase.OBJECT][0] == triple[2].type:
             raise RuntimeError('Association object does not match triple object type')
 
-        if not association.object[RdfBase.SUBJECT][1] == (triple[0].key,triple[0].commitRefs):
+#        if not association.object[RdfBase.SUBJECT][1] == (triple[0].key,triple[0].commitRefs):
+        if not association.object[RdfBase.SUBJECT][1][0] == triple[0].key:
             raise RuntimeError('Association Subject does not match triple subject identity')
-        if not association.object[RdfBase.PREDICATE][1] == (triple[1].key,triple[1].commitRefs):
+#        if not association.object[RdfBase.PREDICATE][1] == (triple[1].key,triple[1].commitRefs):
+        if not association.object[RdfBase.PREDICATE][1][0] == triple[1].key:
+            print association.object[RdfBase.PREDICATE]
+            print triple[1]
             raise RuntimeError('Association predicate does not match triple predicate identity')
-        if not association.object[RdfBase.OBJECT][1] == (triple[2].key,triple[2].commitRefs):
+#        if not association.object[RdfBase.OBJECT][1] == (triple[2].key,triple[2].commitRefs):
+        if not association.object[RdfBase.OBJECT][1][0] == triple[2].key:
             raise RuntimeError('Association object does not match triple object identity')
 
         # Add the association to the workspace's list of associations
@@ -371,15 +473,9 @@ class WorkSpace(object):
             
             
         for item in triple:
-            if not item.type == RdfBase.STATE:
-                # Use the Key
-                ref  = item.key
-            else:
-                # Use the commit
-                ref =  item.commitRefs[0]
-                if len(item.commitRefs) >1:
-                    logging.info('WorkSpace:add_association Illegal attempt to reference a merge state!')
-                    assert len(item.commitRefs) ==1
+            assert isinstance(item,RdfBase)
+            # Convienence method to get a hashable id for an RdfBase object
+            ref = item.rdf_id()
             
             self.workspace[item.type][ref]=item
             
@@ -392,37 +488,41 @@ class WorkSpace(object):
     def remove_association(self, association):
         
         assert isinstance(association, RdfAssociation)
-         
-        if len(self.references[association.key]) > 0:
-            self.references[association.key].discard('self')
+                
+        self.references[association.key].discard('self')
+        # Note that the workspace is modified
+        self.modified=True
+        
+        if len(self.references[association.key]) == 0:
+            del self.workspace[RdfBase.ASSOCIATION][association.key]
+        else:
             return
             
-        # Note that the workspace is modified
-        self.modified=True    
-        
-        del self.workspace[RdfBase.ASSOCIATION][association.key]
         
         for item in association.object:
             type_keycommit = association.object[item]
-           
+
             type = type_keycommit[0]
-            if not type == RdfBase.STATE:
+            if type == RdfBase.STATE:
                 # Use the Key
-                ref  = type_keycommit[1][0]
+                ref  = type_keycommit[1][1]
+                
             else:
                 # Use the commit
-                ref =  type_keycommit[1][1]
+                ref =  type_keycommit[1][0]
                 # We can safely delete the state from the workspace... in the store is another matter!
-                
+            
             self.references[ref].discard(association.key)
             
             if len(self.references[ref]) == 0:
-                
+                                
                 if type == RdfBase.ASSOCIATION:
                     assoc = self.get_associations(keys=ref)
                     self.remove_association(assoc[0])
                 else: 
                     del self.workspace[type][ref]
+                    del self.references[ref]
+
             
     def copy(self):
         ws=self.load(RdfState.load(self.key,self.get_association_list(),self.commitRefs),
@@ -461,7 +561,7 @@ class WorkSpace(object):
             inst.workspace[RdfBase.ENTITY][entityRef.key]=entityRef
         
         for stateRef in stateRefs:
-            inst.workspace[RdfBase.STATE][stateRef.key]=stateRef
+            inst.workspace[RdfBase.STATE][stateRef.commitRefs[0]]=stateRef
             
 
         # Set the reference count for each item based on the associations
@@ -486,12 +586,10 @@ class WorkSpace(object):
                 
                 type = type_keycommit[0]
                 key = type_keycommit[1][0]
-                commit = tuple(type_keycommit[1][1])
+                commit = type_keycommit[1][1]
 
                 if type == RdfBase.STATE:
-                    if not len(commit) ==1:
-                        raise RuntimeError('Can not reference a merged state - it must be committed first')
-                    ref = commit[0]
+                    ref = commit
                 else:
                     ref =key
                 
@@ -521,13 +619,13 @@ class WorkSpace(object):
             assert type(triple) is tuple
             
             inst.add_association(association,triple)
-        
+                
         return inst
 
 
     # @Notes this method is the basis for a RDF Store client method to create resources
     @classmethod
-    def resource_properties(cls, resource_name, property_dictionary, association_dictionary, key=None, commitRef=[]):
+    def resource_properties(cls, resource_name, property_dictionary, association_tuple_list, key=None, commitRefs=[]):
         '''
         @brief A method to create or update a resource description with properties and values.
         @brief The association_ditionary provides a way to specify associations to other existing resources.
@@ -546,27 +644,36 @@ class WorkSpace(object):
         inst.commitRefs=res_instance.commitRefs
         
         
-        # make some blobs that we need
-        bprop = RdfBlob.create('OOI:Property')
-        bval = RdfBlob.create('OOI:Value')
-        binstof = RdfBlob.create('OOI:InstanceOf')
-
         bresname = RdfBlob.create(resource_name)
-        
+       
         # start adding triples
         # Resource UUID:instanceOf:resource name
-        inst.add_triple(res_instance,binstof,bresname)
+        inst.add_triple((res_instance,RdfDefs.INSTANCEOF,bresname))
+        
         
         # Add properties to the resource instance
         for prop in property_dictionary:
             
-            inst.add_triple(bresname,bprop,RdfBlob.create(prop))
-            
-            inst.add_triple(RdfBlob.create(prop),bval,RdfBlob.create(property_dictionary[prop]))
+            inst.add_triple((res_instance,RdfDefs.PROPERTY,RdfBlob.create(prop)))
+            inst.add_triple((RdfBlob.create(prop),RdfDefs.VALUE,RdfBlob.create(property_dictionary[prop])))
         
         # add associations to the resource instance
-        for predicate in association_dictionary:
-            inst.add_triple(res_instance,RdfBlob.create(predicate),RdfBlob.create(association_dictionary[predicate]))
+        for mytuple in association_tuple_list:
+            
+            insert = []
+            for item in mytuple:
+                if item == 'this':
+                    item = res_instance
+                elif not isinstance(item,RdfBase):
+                    # make a blob out of it!
+                    item = RdfBlob.create(item)
+                
+                insert.append(item)
+            
+            insert = tuple(insert)
+                
+            # @Todo - make this smart to put entity references/state references
+            inst.add_triple(insert)
         
         return inst
         
@@ -582,11 +689,11 @@ class WorkSpace(object):
             ref  = key
         else:
             # Use the commit
-            ref =  commitRefs[0]
+            ref =  commitRefs
             
         return self.workspace[type][ref]
         
-    def make_rdf_reference(self,head=False):
+    def make_rdf_reference(self,head=True):
         
         if not self.key:
             raise RuntimeError('A workspace must have a key before it can be referenced')
@@ -600,9 +707,11 @@ class WorkSpace(object):
         commit=[]        
         if not head:
             commit = self.commitRefs
+            if not commit:
+                raise RuntimeError('A workspace must have a commitRef before it can be referenced as an RdfState')
     
         if not self.key:
-            raise RuntimeError('A workspace must have a key before it can be referenced as an RdfState')
+            raise RuntimeError('A workspace must have a key before it can be referenced as an Rdf State or Entity')
             
         if commit:
             ref = RdfState.load(key,set(alist),commit)
@@ -625,8 +734,10 @@ class WorkSpace(object):
             for key in keys:
                 ret.append(self.workspace[RdfBase.ASSOCIATION].get(key))
         else:
-            ret=self.workspace[RdfBase.ASSOCIATION].values()
+            ret=self.workspace[RdfBase.ASSOCIATION].values()            
         return ret
+
+
 
     def get_association_list(self):
         return self.workspace[RdfBase.ASSOCIATION].keys()
@@ -706,7 +817,10 @@ class WorkSpace(object):
         for assoc in self.get_associations():
             strng=''
             dict = assoc.get_dictionary()
-            for item in dict:
+            # Set the order correctly!
+            dkeys=(RdfBase.SUBJECT,RdfBase.PREDICATE,RdfBase.OBJECT)
+            
+            for item in dkeys:
                 if strng:
                     strng+=':'
                     
