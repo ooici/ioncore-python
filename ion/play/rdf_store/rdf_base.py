@@ -46,7 +46,7 @@ class RdfBase(object):
         http://docs.python.org/reference/datamodel.html?highlight=__cmp__#object.__hash__
         '''
 
-        return self.rdf_id()
+        return None
     
     def rdf_id(self):
         
@@ -140,6 +140,7 @@ class RdfAssociation(RdfBase):
         RdfBase.__init__(inst,a,RdfBase.ASSOCIATION)
         return inst
 
+
     @classmethod
     def sort_keys(cls, alist):
         
@@ -173,6 +174,34 @@ class RdfAssociation(RdfBase):
         RdfBase.__init__(inst,association, RdfBase.ASSOCIATION, key=key)
         return inst
         
+    def match(self, match, position=None):
+    
+        assert isinstance(match, RdfBase)
+        
+        if not position:
+            position = [RdfBase.SUBJECT,RdfBase.PREDICATE,RdfBase.OBJECT]
+        
+        if not getattr(position, '__iter__', False):
+            position = (position,)
+        
+        rc=False
+        for pos in position:
+            type__key_commit = self.object[pos]
+            type=type__key_commit[0]
+            key=type__key_commit[1][0]
+            commit=type__key_commit[1][1]
+
+            if type != match.type:
+                continue
+
+            if key != match.key:
+                continue
+            
+            if commit == match.commitRefs:
+                rc = True
+                break
+        return rc
+
 
 #@Todo - change to mixin class
 class RdfMixin(object):
@@ -327,16 +356,16 @@ class WorkSpace(object):
         if not ws1.key == ws2.key:
             return False
         
-        if not ws1.get_associations() == ws2.get_associations():
+        if not ws1.get_associations().sort() == ws2.get_associations().sort():
             return False
         
-        if not ws1.get_blobs() == ws2.get_blobs():
+        if not ws1.get_blobs().sort() == ws2.get_blobs().sort():
             return False
         
-        if not ws1.get_entities() == ws2.get_entities():
+        if not ws1.get_entities().sort() == ws2.get_entities().sort():
             return False
         
-        if not ws1.get_states() == ws2.get_states():
+        if not ws1.get_states().sort() == ws2.get_states().sort():
             return False
         
         if not ws1.get_references() == ws2.get_references():
@@ -361,12 +390,11 @@ class WorkSpace(object):
         return not self.__eq__(other)
 
 
-    def add_triple(self,triple,*args):
-        
-        if isinstance(triple,RdfBase):
-            # Why does it end up correct in this order?
-            triple=(args[0],triple,args[1])
-        
+    def add_triple(self,triple):
+         
+        if not len(triple)==3:
+            raise RuntimeError('WorkSpace:add_triple takes an iterable of length 3, object which inherit from RdfBase')
+            
         association = RdfAssociation.create(triple[0],triple[1],triple[2])
         self.add_association(association,triple)
     
@@ -418,9 +446,9 @@ class WorkSpace(object):
     def remove_association(self, association):
         
         assert isinstance(association, RdfAssociation)
-         
+                
+        self.references[association.key].discard('self')
         if len(self.references[association.key]) > 0:
-            self.references[association.key].discard('self')
             return
             
         # Note that the workspace is modified
@@ -430,7 +458,7 @@ class WorkSpace(object):
         
         for item in association.object:
             type_keycommit = association.object[item]
-           
+            
             type = type_keycommit[0]
             if not type == RdfBase.STATE:
                 # Use the Key
@@ -547,7 +575,7 @@ class WorkSpace(object):
             assert type(triple) is tuple
             
             inst.add_association(association,triple)
-        
+                
         return inst
 
 
@@ -576,14 +604,14 @@ class WorkSpace(object):
        
         # start adding triples
         # Resource UUID:instanceOf:resource name
-        inst.add_triple(res_instance,RdfDefs.INSTANCEOF,bresname)
+        inst.add_triple((res_instance,RdfDefs.INSTANCEOF,bresname))
         
         
         # Add properties to the resource instance
         for prop in property_dictionary:
             
-            inst.add_triple(res_instance,RdfDefs.PROPERTY,RdfBlob.create(prop))
-            inst.add_triple(RdfBlob.create(prop),RdfDefs.VALUE,RdfBlob.create(property_dictionary[prop]))
+            inst.add_triple((res_instance,RdfDefs.PROPERTY,RdfBlob.create(prop)))
+            inst.add_triple((RdfBlob.create(prop),RdfDefs.VALUE,RdfBlob.create(property_dictionary[prop])))
         
         # add associations to the resource instance
         for mytuple in association_tuple_list:
@@ -600,7 +628,6 @@ class WorkSpace(object):
             
             insert = tuple(insert)
                 
-            
             # @Todo - make this smart to put entity references/state references
             inst.add_triple(insert)
         
@@ -657,15 +684,11 @@ class WorkSpace(object):
         if keys:
             if not getattr(keys, '__iter__', False):
                 keys = (keys,)
-            ret=set()
+            ret=[]
             for key in keys:
-                ret.add(self.workspace[RdfBase.ASSOCIATION].get(key))
+                ret.append(self.workspace[RdfBase.ASSOCIATION].get(key))
         else:
-            ret=set()
-            for item in self.workspace[RdfBase.ASSOCIATION].values():
-                print item
-                ret.add(item)
-            
+            ret=self.workspace[RdfBase.ASSOCIATION].values()            
         return ret
 
 
@@ -748,7 +771,10 @@ class WorkSpace(object):
         for assoc in self.get_associations():
             strng=''
             dict = assoc.get_dictionary()
-            for item in dict:
+            # Set the order correctly!
+            dkeys=(RdfBase.SUBJECT,RdfBase.PREDICATE,RdfBase.OBJECT)
+            
+            for item in dkeys:
                 if strng:
                     strng+=':'
                     
