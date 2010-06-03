@@ -15,7 +15,8 @@ from magnet.spawnable import spawn
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
-from ion.services.cei.provisioner import ProvisionerService, group_records
+from ion.services.cei.provisioner import ProvisionerService
+from ion.services.cei.provisioner_store import group_records
 
 def _new_id():
     return str(uuid.uuid4())
