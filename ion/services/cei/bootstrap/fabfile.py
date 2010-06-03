@@ -3,7 +3,7 @@ import os
 import sys
 from fabric.api import env, run, local, put, cd, hide
 
-env.user = os.environ.get('FAB_USER') or "root"
+env.user = os.environ.get('FAB_USER') or "ubuntu"
 try:
     env.key_filename=os.environ['FAB_KEY']
 except KeyError:
@@ -19,7 +19,7 @@ def bootstrap():
 
 def update():
     with hide('stdout'):
-        run("apt-get -q update")
+        run("sudo apt-get -q update")
 
 def install_chef():
     run("sudo apt-get install -y ruby-dev libopenssl-ruby rubygems")
@@ -30,7 +30,7 @@ def install_chef():
 def put_chef_data():
     run("sudo mkdir /opt/chef && sudo chown ubuntu:ubuntu /opt/chef")
     # checkout the latest cookbooks:
-    run("apt-get install -y git-core")
+    run("sudo apt-get install -y git-core")
     run("git clone http://github.com/clemesha-ooi/ooi-cookbooks.git /opt/chef/cookbooks")
     # put the role and config files:
     put("chefconf.rb", "/opt/chef/")
