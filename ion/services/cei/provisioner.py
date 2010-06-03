@@ -57,7 +57,6 @@ class ProvisionerService(BaseService):
         """
         pass
 
-    @defer.inlineCallbacks
     def op_query(self, content, headers, msg):
         """Service operation: query IaaS  and send updates to subscribers.
         """
