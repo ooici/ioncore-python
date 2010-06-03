@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """
 @file ion/data/test/test_objstore.py
 @author Michael Meisinger
@@ -12,17 +11,10 @@ import logging
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.core import base_process, bootstrap
-
-from ion.data.objstore import ValueObject, TreeValue, CommitValue, RefValue, ValueRef
-from ion.data.objstore import ObjectStore, ValueStore
-
 from ion.data import store
 from ion.data import objstore
 from ion.data.objstore import sha1
 
-
-import ion.util.procutils as pu
 
 class BlobObjectTest(unittest.TestCase):
 
