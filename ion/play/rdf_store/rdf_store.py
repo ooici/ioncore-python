@@ -230,21 +230,82 @@ class RdfStore(object):
         
         if not len(association_match)==3:
             raise RuntimeError('Association_match must be a tuple of length 3')
-        
-        ws = WorkSpace()
-        
-        aset=set()
-        for item in association_match:
-            ref = item.rdf_id()
-            akeys=yield self.a_refs.get_references(ref) # Change to union method in ref store!
-            aset=aset.union(akeys)
-    
+                
+                
+        # Get the set of association keys which referece the intersection of the search criteria
+        keyset=set()
+        tomatch={}
+        if association_match[0]!='*':
+            sref = association_match[0].rdf_id()
+            skeys=yield self.a_refs.get_references(sref)
+            keyset=skeys
             
-        assocs = yield self.associations.get_associations(aset)
+            tomatch[RdfBase.SUBJECT]=association_match[0]
+        else:
+            skeys='*'
         
-        for assoc in assocs:
-            print assoc
+        if association_match[1]!='*':
+            pref = association_match[1].rdf_id()
+            pkeys=yield self.a_refs.get_references(pref)
+            keyset=pkeys
+
+            tomatch[RdfBase.PREDICATE]=association_match[1]
+        else:
+            pkeys='*'
+            
+        if association_match[2]!='*':
+            oref = association_match[2].rdf_id()
+            okeys=yield self.a_refs.get_references(oref)
+            keyset=okeys
+            
+            tomatch[RdfBase.OBJECT]=association_match[2]
+        else:
+            okeys='*'
         
+        if okeys!='*' and pkeys!='*' and skeys!='*':
+            keyset=set.intersection(skeys,pkeys,okeys)   # Change to union method in ref store!
+        elif okeys!='*' and pkeys!='*':
+            keyset=set.intersection(pkeys,okeys)
+        elif pkeys!='*' and skeys!='*':
+            keyset=set.intersection(pkeys,skeys)
+        elif okeys!='*' and skeys!='*':
+            keyset=set.intersection(okeys,skeys)
+        elif okeys=='*' and pkeys=='*' and skeys=='*':
+            raise RuntimeError('Can not pass 3 wild cards to DataStore:walk. At least one of the triple must a referenced object')
+            
+        if keyset:
+            aset = yield self.associations.get_associations(keyset)
+            
+            # Filter for correct order
+            for association in aset:
+                #print association
+
+                for position in tomatch:
+                    if not association.match(tomatch[position],position=position):
+                        aset.remove(association)
+
+
+        
+            sortedkeys=RdfAssociation.sort_keys(aset)
+
+            # Get the blobs
+            #print 'sortedkeys',sortedkeys
+            bset= yield self.blobs.get_blobs(sortedkeys[RdfBase.BLOB])
+            
+            sset=[]
+            for key_commit in sortedkeys[RdfBase.STATE]:
+                sset.append( RdfState.reference(key_commit[0],key_commit[1]) )
+                    
+            eset=[] 
+            for key_commit in sortedkeys[RdfBase.ENTITY]:
+                eset.append( RdfEntity.reference(key_commit[0]) )
+
+            state=RdfEntity.create(aset)
+        
+            ws=WorkSpace.load(state,aset,eset,sset,bset)        
+        else:
+            ws=WorkSpace()
+
         
         
         defer.returnValue(ws)        

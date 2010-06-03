@@ -48,8 +48,8 @@ class RdfStoreTest(IonTestCase):
     #    self.failUnlessEqual(rc, set())
 
     def _compare_ws(self,ws1,ws2):
-        self.assertEqual(ws1.get_associations(),ws2.get_associations())
-        self.assertEqual(ws1.get_blobs(),ws2.get_blobs())
+        self.assertEqual(ws1.get_associations().sort(),ws2.get_associations().sort())
+        self.assertEqual(ws1.get_blobs().sort(),ws2.get_blobs().sort())
         #ents = ws1.get_entities()
         #if ents:
         #    print 'ws1 entity!'
@@ -60,7 +60,7 @@ class RdfStoreTest(IonTestCase):
         #    print 'ws2 entity!'
         #    for ent in ents:
         #        print ent 
-        self.assertEqual(ws1.get_entities(),ws2.get_entities())
+        self.assertEqual(ws1.get_entities().sort(),ws2.get_entities().sort())
         
         #ents = ws1.get_states()
         #if ents:
@@ -74,7 +74,7 @@ class RdfStoreTest(IonTestCase):
         #        print ent 
         
         
-        self.assertEqual(ws1.get_states(),ws2.get_states())
+        self.assertEqual(ws1.get_states().sort(),ws2.get_states().sort())
         self.assertEqual(ws1.key,ws2.key)
         # compare the keys in the references
         self.assertEqual(set(ws1.get_references().keys()),set(ws2.get_references().keys()))
@@ -295,8 +295,11 @@ class RdfStoreTest(IonTestCase):
         yield self.rdfs.commit(resources)
         
         
-        search = yield self.rdfs.walk((RdfDefs.CLASS,RdfDefs.IDENTITY_RESOURCES,RdfDefs.IDENTITY_RESOURCES))
+        search = yield self.rdfs.walk(('*',RdfDefs.CLASS,RdfDefs.IDENTITY_RESOURCES))
+        print '=== Printing Search Results (One)==='
+        search.print_workspace()
         
-        
-        
+        search = yield self.rdfs.walk((RdfDefs.CLASS,'*',RdfDefs.IDENTITY_RESOURCES))
+        print '=== Printing Search Results (Empty)==='
+        search.print_workspace()
         
