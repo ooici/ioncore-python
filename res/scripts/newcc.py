@@ -32,7 +32,7 @@ def main():
     procsfile = ioninit.cont_args.get('processes', None)
 
     if procsfile:
-        procs = Config(procsfile)
+        procs = Config(procsfile).getObject()
         logging.info("Also starting "+str(procs))
         yield bootstrap.spawn_processes(procs, sup=sup)
 
