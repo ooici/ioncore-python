@@ -1,8 +1,12 @@
 {
   "capabilitycontainer":{
     "broker":"amoeba.ucsd.edu",
-    "bootscript":"examples/boot.py"
+    "bootscript":"res/scripts/newcc.py",
+    "sysname":"cei",
+    "lcaarch_branch":"cei-lcaarch",
+    "lcaarch_commit_hash":"HEAD"
   },
   "username":"cc",
-  "recipes":["setuptools", "twisted", "txamqp", "user", "capabilitycontainer"]
+  "recipes":["git", "setuptools", "twisted", "txamqp", "user", "capabilitycontainer"]
 }
+
