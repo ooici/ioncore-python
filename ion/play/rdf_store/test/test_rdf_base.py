@@ -9,6 +9,8 @@
 import logging
 from twisted.trial import unittest
 
+import pickle
+
 from ion.play.rdf_store.rdf_base import RdfBase, RdfAssociation, RdfBlob, RdfEntity, RdfState, WorkSpace
 
 class RdfTest(unittest.TestCase):
@@ -205,4 +207,13 @@ class RdfTest(unittest.TestCase):
         
         res_description=WorkSpace.resource_properties('OOI:Instrument',props,associations)
 
+        print '========Original Workspace ============='
         res_description.print_workspace()
+        
+        p = pickle.dumps(res_description)
+        
+        up = pickle.loads(p)
+        print '========Pickled Copy of Workspace ============='
+        up.print_workspace()
+        
+        

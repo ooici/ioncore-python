@@ -17,6 +17,9 @@ import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
+from ion.play.rdf_store.rdf_store import RdfStore
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfEntity, RdfMixin, RdfState, WorkSpace, RdfDefs
+
 class RdfService(BaseService):
     """
     Example service interface
@@ -29,11 +32,14 @@ class RdfService(BaseService):
     def __init__(self, receiver, spawnArgs=None):
         # Service class initializer. Basic config, but no yields allowed.
         BaseService.__init__(self, receiver, spawnArgs)
+        self.rdfs=RdfStore()
         logging.info('RdfService.__init__()')
 
+    @defer.inlineCallbacks
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
-        pass
+        yield self.rdfs.init()
+    
 
     @defer.inlineCallbacks
     def op_push(self, content, headers, msg):
