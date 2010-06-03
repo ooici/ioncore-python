@@ -52,12 +52,14 @@ class StateStore(object):
         key_commit_list=[]
         for state in states:
         
-            if not getattr(state, 'commitRefs', False):
+            if state.commitRefs:
                 parents=state.commitRefs
             else:
                 parents=None
         
             obj = ValueObject(list(state.object))
+        
+            print 'PARENTS!!:',parents
         
             rc=yield self.objstore.put(state.key, obj, parents=parents)
         

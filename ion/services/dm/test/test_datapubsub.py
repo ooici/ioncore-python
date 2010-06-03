@@ -59,34 +59,34 @@ class PubSubTest(IonTestCase):
         ]
 
         sup = yield self._spawn_processes(services)
-        
+
         dpsc = DataPubsubClient(sup)
         topic_name = yield dpsc.define_topic("topic1")
         logging.info('Service reply: '+str(topic_name))
-        
+
         dc1 = DataConsumer()
         dc1_id = yield dc1.spawn()
         yield dc1.attach(topic_name)
-        
+
         dmsg = self._get_datamsg({}, [1,2,1,4,3,2])
         yield sup.send(topic_name, 'data', dmsg)
 
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
-        
+
         self.assertEqual(dc1.receive_cnt, 1)
 
         # Create a second data consumer
         dc2 = DataConsumer()
         dc2_id = yield dc2.spawn()
         yield dc2.attach(topic_name)
-        
+
         dmsg = self._get_datamsg({}, [1,2,1,4,3,2])
         yield sup.send(topic_name, 'data', dmsg, {})
 
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
-        
+
         self.assertEqual(dc1.receive_cnt, 2)
         self.assertEqual(dc2.receive_cnt, 1)
 
@@ -96,13 +96,13 @@ class PubSubTest(IonTestCase):
         # topics. One process is an event-detector and data-filter, sending
         # event messages to an event queue and a new data message to a different
         # data queue
-        
+
         services = [
             {'name':'data_pubsub','module':'ion.services.dm.datapubsub','class':'DataPubsubService'},
         ]
 
         sup = yield self._spawn_processes(services)
-        
+
         dpsc = DataPubsubClient(sup)
         topic_raw = yield dpsc.define_topic("topic_raw")
         topic_qc = yield dpsc.define_topic("topic_qc")
@@ -113,7 +113,7 @@ class PubSubTest(IonTestCase):
         yield dc1.attach(topic_raw)
         dp = DataProcess(proc)
         dc1.set_ondata(dp.get_ondata())
-        
+
         dc2 = DataConsumer()
         dc2_id = yield dc2.spawn()
         yield dc2.attach(topic_qc)
@@ -128,7 +128,7 @@ class PubSubTest(IonTestCase):
 
         # Need to await the delivery of data messages into the consumers
         yield pu.asleep(2)
-        
+
         self.assertEqual(dc1.receive_cnt, 1)
         self.assertEqual(dc2.receive_cnt, 1)
         self.assertEqual(dc3.receive_cnt, 2)
@@ -138,7 +138,7 @@ class PubSubTest(IonTestCase):
 
         # Need to await the delivery of data messages into the consumers
         yield pu.asleep(2)
-        
+
         self.assertEqual(dc1.receive_cnt, 2)
         self.assertEqual(dc2.receive_cnt, 2)
         self.assertEqual(dc3.receive_cnt, 4)
@@ -151,17 +151,18 @@ class PubSubTest(IonTestCase):
 
 
 class DataConsumer(BaseProcess):
-    
+
     def set_ondata(self, ondata):
         self.ondata = ondata
-        
+
     @defer.inlineCallbacks
     def attach(self, topic_name):
+        yield self.init()
         self.dataReceiver = Receiver(__name__, topic_name)
         self.dataReceiver.handle(self.receive)
         self.dr_id = yield spawn(self.dataReceiver)
         logging.info("DataConsumer.attach "+str(self.dr_id)+" to topic "+str(topic_name))
-        
+
         self.receive_cnt = 0
         self.received_msg = []
         self.ondata = None
@@ -180,19 +181,16 @@ class DataConsumer(BaseProcess):
                     yield self.send(self.get_scoped_name('system',topic), 'data', msg, {})
 
 class DataProcess(object):
-    
+
     def __init__(self, procdef):
         self.proc_def = procdef
-    
+
     def get_ondata(self):
         return self.execute_process
-    
+
     def execute_process(self, content, headers):
         loc = {'content':content,'headers':headers}
         exec self.proc_def in globals(), loc
         if 'result' in loc:
             return loc['result']
         return None
-
-
-

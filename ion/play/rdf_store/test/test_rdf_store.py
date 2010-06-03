@@ -16,7 +16,7 @@ from twisted.internet import defer
 from ion.play.rdf_store.rdf_store import RdfStore
 from ion.test.iontest import IonTestCase
 
-from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfEntity, RdfMixin, RdfState, WorkSpace
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfEntity, RdfMixin, RdfState, WorkSpace, RdfDefs
 
 
 class RdfStoreTest(IonTestCase):
@@ -48,8 +48,8 @@ class RdfStoreTest(IonTestCase):
     #    self.failUnlessEqual(rc, set())
 
     def _compare_ws(self,ws1,ws2):
-        self.assertEqual(ws1.get_associations(),ws2.get_associations())
-        self.assertEqual(ws1.get_blobs(),ws2.get_blobs())
+        self.assertEqual(ws1.get_associations().sort(),ws2.get_associations().sort())
+        self.assertEqual(ws1.get_blobs().sort(),ws2.get_blobs().sort())
         #ents = ws1.get_entities()
         #if ents:
         #    print 'ws1 entity!'
@@ -60,7 +60,7 @@ class RdfStoreTest(IonTestCase):
         #    print 'ws2 entity!'
         #    for ent in ents:
         #        print ent 
-        self.assertEqual(ws1.get_entities(),ws2.get_entities())
+        self.assertEqual(ws1.get_entities().sort(),ws2.get_entities().sort())
         
         #ents = ws1.get_states()
         #if ents:
@@ -74,7 +74,7 @@ class RdfStoreTest(IonTestCase):
         #        print ent 
         
         
-        self.assertEqual(ws1.get_states(),ws2.get_states())
+        self.assertEqual(ws1.get_states().sort(),ws2.get_states().sort())
         self.assertEqual(ws1.key,ws2.key)
         # compare the keys in the references
         self.assertEqual(set(ws1.get_references().keys()),set(ws2.get_references().keys()))
@@ -199,7 +199,7 @@ class RdfStoreTest(IonTestCase):
         # add an association to ws1 as an entity.
         #Add a reference to a particular state         
         triple5 = (RdfBlob.create('junk'),ws2_in.make_rdf_reference(head=True),RdfBlob.create('my trunk!'))
-        triple6 = (RdfBlob.create('junk'),RdfBlob.create('my trunk!'),ws2_in.make_rdf_reference())
+        triple6 = (RdfBlob.create('junk'),RdfBlob.create('my trunk!'),ws2_in.make_rdf_reference(head=False))
         ws2_in.add_triple(triple5)
         ws2_in.add_triple(triple6)
         
@@ -239,5 +239,80 @@ class RdfStoreTest(IonTestCase):
         
         self._compare_ws(ws_diff1,ws_diff2)
         
+        
+        print '===== Ancestor List ========'
+        
+        anc = yield self.rdfs.get_ancestors(ws2_out.key)
+        print anc[0].value
+        
+        triple7 = (RdfBlob.create('junked'),ws2_in.make_rdf_reference(head=True),RdfBlob.create('my trunk!'))
+        ws2_out.add_triple(triple7)
+        yield self.rdfs.commit(ws2_out)
+        anc = yield self.rdfs.get_ancestors(ws2_out.key)
+        print anc[0].value
+        
+        
         print '===== Complete ========'
+        
+        
+        
+    @defer.inlineCallbacks
+    def test_resource_walking(self):
+        
+        # Some tricky stuff to setup a first container...
+        resources=WorkSpace()
+        resources.add_triple((RdfDefs.ROOT,RdfDefs.CLASS,RdfDefs.RESOURCES ))        
+        yield self.rdfs.commit(resources)
+
+        resources_ref=resources.make_rdf_reference(head=True)
+        resources.add_triple((resources_ref,RdfDefs.INSTANCEOF, RdfDefs.ROOT))
+                
+        # A user
+        props={
+            'user name':'David Stuebe',
+            'id':'12390usdkln23lys7',
+            'group':'OOI:Developers',
+            'email':'stu3b3@gmail.com',
+        }
+        associations=[('this',RdfDefs.MEMBER,RdfDefs.IDENTITY_RESOURCES)]
+        ds_id=WorkSpace.resource_properties(RdfDefs.IDENTITY.object,props,associations)
+        yield self.rdfs.commit(ds_id)
+        ds_ref=ds_id.make_rdf_reference(head=True)
+        
+        # Another user
+        props={
+            'user name':'Michael Meisinger',
+            'id':'asdlkmxluewku920yusoiy2',
+            'email':'mmeisinger@ucsd.edu',
+            'group':'OOI:Developers',
+        }
+        associations=[('this',RdfDefs.MEMBER,RdfDefs.IDENTITY_RESOURCES)]
+        mm_id=WorkSpace.resource_properties(RdfDefs.IDENTITY.object,props,associations)
+        yield self.rdfs.commit(mm_id)
+        mm_ref=mm_id.make_rdf_reference(head=True)
+        
+        props={}
+        
+        associations=[
+            ('this',RdfDefs.CLASS,RdfDefs.IDENTITY_RESOURCES),
+            ('this',RdfDefs.MEMBER,mm_ref),
+            ('this',RdfDefs.MEMBER,ds_ref)
+        ]
+        
+        ids=WorkSpace.resource_properties('OOI:Identities',props,associations)
+        yield self.rdfs.commit(ids)
+        ids_ref=ids.make_rdf_reference(head=True)
+        
+        
+        resources.add_triple((RdfDefs.RESOURCES,RdfDefs.MEMBER,ids_ref))
+        yield self.rdfs.commit(resources)
+        
+        
+        search = yield self.rdfs.walk(('*',RdfDefs.CLASS,RdfDefs.IDENTITY_RESOURCES))
+        print '=== Printing Search Results (One)==='
+        search.print_workspace()
+        
+        search = yield self.rdfs.walk((RdfDefs.CLASS,'*',RdfDefs.IDENTITY_RESOURCES))
+        print '=== Printing Search Results (Empty)==='
+        search.print_workspace()
         
