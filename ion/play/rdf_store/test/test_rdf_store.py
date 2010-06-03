@@ -295,9 +295,11 @@ class RdfStoreTest(IonTestCase):
         yield self.rdfs.commit(resources)
         
         
-        search = yield self.rdfs.walk((RdfDefs.CLASS,'*',RdfDefs.IDENTITY_RESOURCES))
-        
-        print '=== Printing Search Results==='
+        search = yield self.rdfs.walk(('*',RdfDefs.CLASS,RdfDefs.IDENTITY_RESOURCES))
+        print '=== Printing Search Results (One)==='
         search.print_workspace()
         
+        search = yield self.rdfs.walk((RdfDefs.CLASS,'*',RdfDefs.IDENTITY_RESOURCES))
+        print '=== Printing Search Results (Empty)==='
+        search.print_workspace()
         
