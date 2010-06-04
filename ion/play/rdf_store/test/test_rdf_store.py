@@ -199,7 +199,7 @@ class RdfStoreTest(IonTestCase):
         # add an association to ws1 as an entity.
         #Add a reference to a particular state         
         triple5 = (RdfBlob.create('junk'),ws2_in.make_rdf_reference(head=True),RdfBlob.create('my trunk!'))
-        triple6 = (RdfBlob.create('junk'),RdfBlob.create('my trunk!'),ws2_in.make_rdf_reference())
+        triple6 = (RdfBlob.create('junk'),RdfBlob.create('my trunk!'),ws2_in.make_rdf_reference(head=False))
         ws2_in.add_triple(triple5)
         ws2_in.add_triple(triple6)
         
@@ -238,6 +238,19 @@ class RdfStoreTest(IonTestCase):
         ws_diff2.print_status()
         
         self._compare_ws(ws_diff1,ws_diff2)
+        
+        
+        print '===== Ancestor List ========'
+        
+        anc = yield self.rdfs.get_ancestors(ws2_out.key)
+        print anc[0].value
+        
+        triple7 = (RdfBlob.create('junked'),ws2_in.make_rdf_reference(head=True),RdfBlob.create('my trunk!'))
+        ws2_out.add_triple(triple7)
+        yield self.rdfs.commit(ws2_out)
+        anc = yield self.rdfs.get_ancestors(ws2_out.key)
+        print anc[0].value
+        
         
         print '===== Complete ========'
         

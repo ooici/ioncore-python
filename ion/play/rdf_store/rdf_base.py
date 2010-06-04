@@ -36,6 +36,8 @@ class RdfBase(object):
             self.key=ValueRef._secure_value_hash(object)
 
         # The commit reference for a particular state
+        if not getattr(commitRefs, '__iter__', False):
+                commitRefs = [commitRefs]
         self.commitRefs=commitRefs
 
 
@@ -51,6 +53,7 @@ class RdfBase(object):
     def rdf_id(self):
         
         if self.type == self.STATE:
+            print self
             if not len(self.commitRefs)==1:
                 raise RuntimeError('A RdfState Object must have exactly one commit ref to have a unique id!')
             ref = self.commitRefs[0]
@@ -128,9 +131,40 @@ class RdfAssociation(RdfBase):
         assert isinstance(predicate, RdfBase)
         assert isinstance(object, RdfBase)
         
-        s=(subject.type,(subject.key, subject.commitRefs))
-        p=(predicate.type,(predicate.key, predicate.commitRefs))
-        o=(object.type,(object.key, object.commitRefs))
+        
+
+        # Checking type may cause problems if an association is made to an entity which has been committed?
+        if len(subject.commitRefs)==1 and subject.type==RdfBase.STATE:
+            s=(subject.type,(subject.key, subject.commitRefs[0]))
+        elif len(subject.commitRefs)==0:
+            s=(subject.type,(subject.key, None))
+        else:
+            print 'Illegal Subject:'
+            print subject
+            raise RuntimeError('Can not create association to a merged state')
+ 
+        if len(object.commitRefs)==1 and object.type==RdfBase.STATE:
+            o=(object.type,(object.key, object.commitRefs[0]))
+        elif len(object.commitRefs)==0:
+            o=(object.type,(object.key, None))
+        else:
+            print 'Illegal Object:'
+            print object
+            raise RuntimeError('Can not create association to a merged state')
+ 
+        if len(predicate.commitRefs)==1 and predicate.type==RdfBase.STATE:
+            p=(predicate.type,(predicate.key, predicate.commitRefs[0]))
+        elif len(predicate.commitRefs)==0:
+            p=(predicate.type,(predicate.key, None))
+        else:
+            print 'Illegal Predicate:'
+            print predicate
+            raise RuntimeError('Can not create association to a merged state')
+        
+        
+        #s=(subject.type,(subject.key, subject.commitRefs.pop()))
+        #p=(predicate.type,(predicate.key, predicate.commitRefs.pop()))
+        #o=(object.type,(object.key, object.commitRefs.pop()))
         
         a={ RdfBase.SUBJECT:s,
             RdfBase.PREDICATE:p,
@@ -194,10 +228,15 @@ class RdfAssociation(RdfBase):
             if type != match.type:
                 continue
 
-            if key != match.key:
+            if key != match.rdf_id():
                 continue
             
-            if commit == match.commitRefs:
+            if commit:
+                if commit == match.commitRefs:
+                    rc = True
+                    break
+            else:
+                
                 rc = True
                 break
         return rc
@@ -414,11 +453,16 @@ class WorkSpace(object):
         if not association.object[RdfBase.OBJECT][0] == triple[2].type:
             raise RuntimeError('Association object does not match triple object type')
 
-        if not association.object[RdfBase.SUBJECT][1] == (triple[0].key,triple[0].commitRefs):
+#        if not association.object[RdfBase.SUBJECT][1] == (triple[0].key,triple[0].commitRefs):
+        if not association.object[RdfBase.SUBJECT][1][0] == triple[0].key:
             raise RuntimeError('Association Subject does not match triple subject identity')
-        if not association.object[RdfBase.PREDICATE][1] == (triple[1].key,triple[1].commitRefs):
+#        if not association.object[RdfBase.PREDICATE][1] == (triple[1].key,triple[1].commitRefs):
+        if not association.object[RdfBase.PREDICATE][1][0] == triple[1].key:
+            print association.object[RdfBase.PREDICATE]
+            print triple[1]
             raise RuntimeError('Association predicate does not match triple predicate identity')
-        if not association.object[RdfBase.OBJECT][1] == (triple[2].key,triple[2].commitRefs):
+#        if not association.object[RdfBase.OBJECT][1] == (triple[2].key,triple[2].commitRefs):
+        if not association.object[RdfBase.OBJECT][1][0] == triple[2].key:
             raise RuntimeError('Association object does not match triple object identity')
 
         # Add the association to the workspace's list of associations
@@ -430,8 +474,6 @@ class WorkSpace(object):
             
         for item in triple:
             assert isinstance(item,RdfBase)
-            
-
             # Convienence method to get a hashable id for an RdfBase object
             ref = item.rdf_id()
             
@@ -448,35 +490,39 @@ class WorkSpace(object):
         assert isinstance(association, RdfAssociation)
                 
         self.references[association.key].discard('self')
-        if len(self.references[association.key]) > 0:
+        # Note that the workspace is modified
+        self.modified=True
+        
+        if len(self.references[association.key]) == 0:
+            del self.workspace[RdfBase.ASSOCIATION][association.key]
+        else:
             return
             
-        # Note that the workspace is modified
-        self.modified=True    
-        
-        del self.workspace[RdfBase.ASSOCIATION][association.key]
         
         for item in association.object:
             type_keycommit = association.object[item]
-            
+
             type = type_keycommit[0]
-            if not type == RdfBase.STATE:
+            if type == RdfBase.STATE:
                 # Use the Key
-                ref  = type_keycommit[1][0]
+                ref  = type_keycommit[1][1]
+                
             else:
                 # Use the commit
-                ref =  type_keycommit[1][1]
+                ref =  type_keycommit[1][0]
                 # We can safely delete the state from the workspace... in the store is another matter!
-                
+            
             self.references[ref].discard(association.key)
             
             if len(self.references[ref]) == 0:
-                
+                                
                 if type == RdfBase.ASSOCIATION:
                     assoc = self.get_associations(keys=ref)
                     self.remove_association(assoc[0])
                 else: 
                     del self.workspace[type][ref]
+                    del self.references[ref]
+
             
     def copy(self):
         ws=self.load(RdfState.load(self.key,self.get_association_list(),self.commitRefs),
@@ -515,7 +561,7 @@ class WorkSpace(object):
             inst.workspace[RdfBase.ENTITY][entityRef.key]=entityRef
         
         for stateRef in stateRefs:
-            inst.workspace[RdfBase.STATE][stateRef.key]=stateRef
+            inst.workspace[RdfBase.STATE][stateRef.commitRefs[0]]=stateRef
             
 
         # Set the reference count for each item based on the associations
@@ -540,12 +586,10 @@ class WorkSpace(object):
                 
                 type = type_keycommit[0]
                 key = type_keycommit[1][0]
-                commit = tuple(type_keycommit[1][1])
+                commit = type_keycommit[1][1]
 
                 if type == RdfBase.STATE:
-                    if not len(commit) ==1:
-                        raise RuntimeError('Can not reference a merged state - it must be committed first')
-                    ref = commit[0]
+                    ref = commit
                 else:
                     ref =key
                 
@@ -645,11 +689,11 @@ class WorkSpace(object):
             ref  = key
         else:
             # Use the commit
-            ref =  commitRefs[0]
+            ref =  commitRefs
             
         return self.workspace[type][ref]
         
-    def make_rdf_reference(self,head=False):
+    def make_rdf_reference(self,head=True):
         
         if not self.key:
             raise RuntimeError('A workspace must have a key before it can be referenced')
@@ -663,9 +707,11 @@ class WorkSpace(object):
         commit=[]        
         if not head:
             commit = self.commitRefs
+            if not commit:
+                raise RuntimeError('A workspace must have a commitRef before it can be referenced as an RdfState')
     
         if not self.key:
-            raise RuntimeError('A workspace must have a key before it can be referenced as an RdfState')
+            raise RuntimeError('A workspace must have a key before it can be referenced as an Rdf State or Entity')
             
         if commit:
             ref = RdfState.load(key,set(alist),commit)

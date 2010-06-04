@@ -24,6 +24,8 @@ instrumentCommands = (
     "pumpon",
     "pumpoff",
     "getsample",
+    "start_direct_access",
+    "stop_direct_access",
     "test_temperature_converted",
     "test_conductivity_converted",
     "test_pressure_converted",
@@ -155,6 +157,17 @@ class SBE49InstrumentDriver(InstrumentDriver):
             return (1, command)
         else:
             return (0, command)
+    
+    def get_status(self, args):
+        """
+        Return the non-parameter and non-lifecycle status of the instrument.
+        This may include a snippit of config or important summary of what the
+        instrument may be doing...or even something else.
+        @param args a list of arguments that may be given for the status
+            retreival.
+        @return Return a tuple of (status_code, dict)
+        """
+        return (1, {'result': 'a-ok'})
         
 class SBE49InstrumentAgent(InstrumentAgent):
     """
