@@ -21,7 +21,6 @@ def rewrite_url(dsUrl, newHostname='localhost'):
     @param dsUrl Original URL to rewrite
     @param newHostname Default is localhost, TCP name of server
     @retval String with rewritten URL.
-    @see ooidx.test.test_rewrite_url for the unit tests for this.
     """
 
     ml = urlparse.urlsplit(dsUrl)
@@ -70,7 +69,6 @@ def base_dap_url(src_url):
     mset = re.search('(http|https)://([^/]+)(.+)(\.d(a|d)s|\.dods|\.asc(ii)*)(\?.+)*',
                     src_url)
     if mset == None:
-#        logging.debug('Checking for match with base URL')
         # This regex works on just plain DAP URLs - dds/das/dods optional
         mset = re.search('(http|https)://([^/]+)(.+)(\.dds|\.das|\.dods|\.asc(i)*)*(\?.+)*', src_url)
         if mset == None:
@@ -78,11 +76,12 @@ def base_dap_url(src_url):
             return None
         try:
             return mset.group(1) + '://' + mset.group(2) + mset.group(3)
-        except:
+        except IndexError, ie:
             logging.exception('DAP URL does not match expected pattern!')
-            return None
+            raise ie
+
     try:
         return mset.group(1) + '://' + mset.group(2) + mset.group(3)
-    except:
-        logging.error('DAP URL does not match expected pattern!')
-        return None
+    except IndexError, ie:
+        logging.exception('DAP URL does not match expected pattern!')
+        raise ie

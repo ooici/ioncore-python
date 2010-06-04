@@ -36,7 +36,10 @@ class FetcherService(BaseService):
     def _reassemble_headers(self, result):
         """
         @brief Convert an array of tuples into http headers
+        @param result HTTP result
+        @retval Multiline string with trailing empty line
         @todo check for library routine to do this.
+        @note output has an blank line at the end (\r\n)
         """
         hstr = ''
         for x in result.getheaders():
@@ -51,6 +54,7 @@ class FetcherService(BaseService):
         @param operation 'GET' or 'HEAD'
         @param src_url Source URL
         @retval send_ok or send_err as required
+        @note This routine sends the reply back to the caller!
         """
         assert(operation in ['GET', 'HEAD'])
 
@@ -69,11 +73,16 @@ class FetcherService(BaseService):
             hstr = self._reassemble_headers(res)
             # @note read on HEAD returns no data
             hstr = hstr + '\n' + res.read()
-
             yield self.reply_ok(msg, content=hstr)
 
         yield self.reply_err(msg, content='%s: %s' % (res.status, res.reason))
 
+    @defer.inlineCallbacks
+    def _get_page(self, url, get_headers=False):
+        """
+        Inner routine to grab a page, with or without http headers.
+        """
+        
     @defer.inlineCallbacks
     def op_get_head(self, content, headers, msg):
         """
@@ -97,6 +106,7 @@ class FetcherService(BaseService):
         The core of the fetcher: function to grab an entire DAP dataset and
         send it off into the cloud.
         """
+
         logging.warn('Implement me!')
         yield self.reply_err(msg, 'reply', {'value':'no code!'}, {})
 

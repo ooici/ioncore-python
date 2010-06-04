@@ -85,6 +85,14 @@ class BaseUrlTester(unittest.TestCase):
         b = base_dap_url('http://foo.example.com/ds.nc')
         self.assertEqual(b, 'http://foo.example.com/ds.nc')
 
+    def test_exceptional_urls(self):
+        """
+        these should raise a valueerror exception. Pun!
+        """
+        raise unittest.SkipTest("Can't find a URL to trigger this!")
+        
+        self.failUnlessRaises(ValueError, base_dap_url,
+                              'http://foo.bar.com/')
 class RewriteTester(unittest.TestCase):
     """
     Test url rewriter, no communications required.
