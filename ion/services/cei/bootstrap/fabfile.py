@@ -37,5 +37,5 @@ def put_chef_data():
     put("chefroles.json", "/opt/chef/")
 
 def run_chef_solo():
-    run("chef-solo -l debug -c /opt/chef/chefconf.rb -j /opt/chef/chefroles.json")
+    run("sudo chef-solo -l debug -c /opt/chef/chefconf.rb -j /opt/chef/chefroles.json")
 

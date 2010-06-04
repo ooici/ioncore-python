@@ -7,6 +7,12 @@
     "lcaarch_commit_hash":"HEAD"
   },
   "username":"cc",
-  "recipes":["git", "setuptools", "twisted", "txamqp", "user", "capabilitycontainer"]
+  "services":{
+    "provisioner":"{'name':'provisioner','module':'ion.services.cei.provisioner','class':'ProvisionerService'}",
+    "controller":"{'name':'controller','module':'ion.services.cei.controller','class':'ControllerService'}",
+    "sensor_aggregator":"{'name':'sensor_aggregator','module':'ion.services.cei.sensor_aggregator','class':'SensorAggregatorService'}"
+  },
+  "recipes":["setuptools", "twisted", "txamqp", "user", "capabilitycontainer"]
 }
+
 
