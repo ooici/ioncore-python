@@ -100,12 +100,19 @@ class BaseProcess(object):
         """
         Spawns this process using the process' receiver. Self spawn can
         only be called once per instance.
-        @note this method is not called when spawned by magnet
+        @note this method is not called when spawned through magnet. This makes
+        it tricky to do consistent initialization on spawn.
         """
         assert not self.receiver.spawned, "Process already spawned"
         self.id = yield spawn(self.receiver)
         logging.debug('spawn()=' + str(self.id))
+        yield defer.maybeDeferred(self.plc_spawn)
         defer.returnValue(self.id)
+
+    def plc_spawn(self):
+        """
+        Process life cycle event: on spawn of process (once)
+        """
 
     def is_spawned(self):
         return self.receiver.spawned != None
