@@ -1,4 +1,12 @@
-
+"""
+@file git.py
+@author Dorian Raymer
+@brief Example application showing the CAStore implementation power.
+Read git objects using ion.data.objstore CAStore and Storable objects.
+@todo To really show off, need to be able to read git packfiles (otherwise,
+most repositories history's will be unreadable...only their last commit will
+[probably] be readable)
+"""
 import os
 import zlib
 import time
@@ -129,7 +137,4 @@ class Git(GitDB):
 
 
         
-
-
-
 

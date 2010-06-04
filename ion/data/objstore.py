@@ -45,22 +45,26 @@ def sha1_to_hex(bytes):
     return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
 
 
-
 class Entity(tuple):
     """
     Represents a child element of a tree object. Not an object itself, but
     a convenience container for the format of an element of a tree.
+
+    @note Want flexibility on what obj is: Tree is encoded with the obj's
+    sha1 hash (bin version).
     """
 
-    def __init__(self, name, obj, mode='100644'):
-        tuple.__init__(self, [name, obj, mode])
-        self.mode = mode
-        self.name = name
-        self.hash = obj
-
     def __new__(cls, name, obj, mode='100644'):
-
-        return tuple.__new__(cls, [name, obj, mode])
+        """
+        @note By overriding __new__, we can instantiate a tuple with these
+        3 specific arguments (normally, tuple takes only one argument)
+        """
+        if isinstance(obj, BaseObject):
+            obj_id = sha1(obj)
+        else:
+            #can only assume it is the sha1(obj) id
+            obj_id = obj
+        return tuple.__new__(cls, [name, obj_id, mode])
 
 class ICAStoreObject(Interface):
     """
@@ -335,7 +339,10 @@ class Tree(BaseObject):
 
     @classmethod
     def child(cls, name, obj, mode=None):
-        return cls.entityFactory(name, obj, mode)
+        """
+        @brief A factory for creating child entities for a Tree.
+        """
+        return cls.childFactory(name, obj, mode)
 
 
 class Commit(BaseObject):
@@ -464,8 +471,8 @@ class CAStore(object):
         """
         self._backend = backend
         self.root_namespace = namespace
-        self.objstore = StoreContextWrapper(backend, namespace + 'objects/')
-        self.refstore = StoreContextWrapper(backend, namespace + 'refs/')
+        self.objstore = StoreContextWrapper(backend, namespace + '.objects.')
+        self.refstore = StoreContextWrapper(backend, namespace + '.refs.')
 
     def decode(self, encoded_obj):
         """
@@ -522,15 +529,31 @@ class CAStore(object):
         could be just as inefficient as writing over the existing object.
         """
 
-class EntityProxy(object):
+class EntityProxy(Entity):
+    """
+    @brief Used for reading from the store
+    """
 
-    def __init__(self, name, hash, mode='100644'):
-        tuple.__init__(self, [name, hash, mode])
-        self.mode = mode
-        self.name = name
+    def __init__(self, backend, name, hash, mode=None):
+        self.backend = backend
         self.hash = hash
+        self._obj = None
 
-    def __new__(cls, name, hash, mode='100644'):
+    def get_obj(self):
+        """
+        @brief Get object from backend store, cache result.
+        @retval Deferred that fires with obj
+        """
+        if not self._obj:
+            d = self.backend.get(self.hash)
+            def set_obj(obj):
+                self._obj = obj
+                return obj
+            d.addCallback(set_obj)
+            return d
+        return defer.succeed(self._obj)
+
+    def __new__(cls, backend, name, hash, mode=None):
         return tuple.__new__(cls, [name, hash, mode])
 
 class BlobProxy(object):
@@ -637,6 +660,10 @@ class Frontend(CAStore):
         d = self.put(t)
         #d.addCallback(
 
+    def get_info(self, id):
+        """
+        @brief get an objects type
+        """
 
 
 

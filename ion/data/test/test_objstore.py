@@ -105,9 +105,9 @@ class CAStoreTest(unittest.TestCase):
     def test_blob(self):
         c1 = 'test content'
         b =  objstore.Blob(c1)
-        yield self.cas.put(b)
-        b_out = yield self.cas.get(b.hash)
-        self.failUnlessEqual(b.hash, b_out.hash)
+        bid = yield self.cas.put(b)
+        b_out = yield self.cas.get(bid)
+        self.failUnlessEqual(sha1(b), sha1(b_out))
 
     @defer.inlineCallbacks
     def test_tree(self):
