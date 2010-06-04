@@ -16,11 +16,11 @@ import hashlib
 import struct
 import logging
 
-from zope.interface import Interface, Attribute, implements
+from zope.interface import Interface
+from zope.interface import implements
+from zope.interface import Attribute 
 
 from twisted.internet import defer
-
-from ion.data.dataobject import DataObject
 
 NULL_CHR = "\x00"
 
@@ -53,6 +53,12 @@ class Entity(tuple):
     @note Want flexibility on what obj is: Tree is encoded with the obj's
     sha1 hash (bin version).
     """
+
+    def __init__(self, name, obj, mode=None):
+        """
+        @todo XXX rethink this
+        """
+        self.obj = obj
 
     def __new__(cls, name, obj, mode='100644'):
         """
@@ -287,7 +293,8 @@ class Tree(BaseObject):
 
         #This one works on trees that encode the 20 byte binary sha1
         children = cls._decode_body_parser(encoded_body)
-        return cls(*children)
+        entities = [cls.child(*c) for c in children]
+        return cls(*entities)
 
     @staticmethod
     def _decode_body_re(raw):
@@ -342,7 +349,7 @@ class Tree(BaseObject):
         """
         @brief A factory for creating child entities for a Tree.
         """
-        return cls.childFactory(name, obj, mode)
+        return cls.entityFactory(name, obj, mode)
 
 
 class Commit(BaseObject):
@@ -473,6 +480,7 @@ class CAStore(object):
         self.root_namespace = namespace
         self.objstore = StoreContextWrapper(backend, namespace + '.objects.')
         self.refstore = StoreContextWrapper(backend, namespace + '.refs.')
+        self.infostore = StoreContextWrapper(backend, namespace + '.info.')
 
     def decode(self, encoded_obj):
         """
@@ -528,142 +536,5 @@ class CAStore(object):
         has to be implemented by trying to get the whole object, which
         could be just as inefficient as writing over the existing object.
         """
-
-class EntityProxy(Entity):
-    """
-    @brief Used for reading from the store
-    """
-
-    def __init__(self, backend, name, hash, mode=None):
-        self.backend = backend
-        self.hash = hash
-        self._obj = None
-
-    def get_obj(self):
-        """
-        @brief Get object from backend store, cache result.
-        @retval Deferred that fires with obj
-        """
-        if not self._obj:
-            d = self.backend.get(self.hash)
-            def set_obj(obj):
-                self._obj = obj
-                return obj
-            d.addCallback(set_obj)
-            return d
-        return defer.succeed(self._obj)
-
-    def __new__(cls, backend, name, hash, mode=None):
-        return tuple.__new__(cls, [name, hash, mode])
-
-class BlobProxy(object):
-    """
-    Inverse of regular Blob object.
-    Start with the object id (hash), fetching the content when needed
-    """
-
-    def __init__(self, backend, id):
-        """
-        @param backend (or objstore) active backend to read from
-        @param id the object hash
-        """
-        self.objstore = backend
-        self.id = id
-        self._content = None
-
-    def get_content(self):
-        """
-        @retval a Deferred that will fire with the content
-        """
-        if not self._content:
-            d = self.objstore.get(self.id)
-            def store_result(content):
-                self._content = content
-                return content
-            d.addCallback(store_result)
-        else:
-            d = defer.succeed(self._content)
-        return d
-
-class TreeProxy(object):
-    """
-    Live tree of real objects
-    """
-
-    def __init__(self, backend, *child):
-        """
-        @param child An element of the tree (a child entity).
-        """
-        self.backend = backend
-        self.children = child
-
-class WorkingTree(object):
-    """
-    Tree of objects that may or may not be written to backend store
-    """
-
-    def __init__(self, backend, name=''):
-        """
-        @param backend Instance of CAStore.
-        @param name of working tree; could have more than one.
-        """
-        self.backend = backend
-        self.name = name
-        self.entitys = {}
-
-    def add(self, entity):
-        """
-        @param entity Instance of Entity or EntityProxy.
-        """
-
-    def update(self, entity):
-        """
-        """
-
-    def remove(self, entity):
-        """
-        """
-
-class Frontend(CAStore):
-    """
-    """
-
-    def __init__(self, backend, namespace=''):
-        CAStore.__init__(self, backend, namespace)
-
-    def _get_symbolic_ref(self, name='HEAD'):
-        self.backend.get(name)
-
-    def _set_symbolic_ref(self, name='HEAD', ref=''):
-        """
-        """
-
-    def _checkout(self):
-        """
-        Checkout is used to establish a context for the present. The
-        default is to get the HEAD reference; the HEAD reference is the id
-        of a commit object designated as the latest commit to use.
-        """
-
-    def _get_named_entity(self, name):
-        """
-        @brief Get object by name.
-        @param name represents an object in a tree
-        """
-
-    def _put_raw_data_value(self, name, value):
-        """
-        @brief Write a piece of raw data
-        """
-        b = Blob(value)
-        t = Tree(Entity(name, b.hash))
-        d = self.put(t)
-        #d.addCallback(
-
-    def get_info(self, id):
-        """
-        @brief get an objects type
-        """
-
 
 

@@ -13,8 +13,9 @@ from twisted.trial import unittest
 
 from ion.data import store
 from ion.data import objstore
-from ion.data.objstore import sha1
+from ion.data import frontend
 
+sha1 = objstore.sha1
 
 class BlobObjectTest(unittest.TestCase):
 
@@ -92,6 +93,9 @@ class CommitObjectTest(unittest.TestCase):
 
 
 class CAStoreTest(unittest.TestCase):
+    """@brief Test of basic fundamental capabilities of the CA Store and
+    the store objects.
+    """
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -184,6 +188,77 @@ class CAStoreTest(unittest.TestCase):
         cnewid = yield self.cas.put(cnew)
         cnew_out = yield self.cas.get(cnewid)
         self.failUnlessEqual(cnew.value, cnew_out.value)
+
+
+
+class FrontendTest(unittest.TestCase):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        """
+        Test the store mechanics with the in-memory Store backend.
+        """
+        self.name = 'frontend_test'
+        backend_store = yield store.Store.create_store()
+        self.cas = yield frontend.Frontend.new(backend_store, self.name)
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        """
+        @note This raises a good point for the IStore interface:
+            - Namespaceing
+            - removing recursively
+            - removing a pattern
+        """
+        yield self.cas.infostore.remove('name')
+
+    @defer.inlineCallbacks
+    def test_make_tree(self):
+        """
+        @brief Rough script for development; Not a unit.
+        """
+
+        b =  objstore.Blob('test content')
+        b2 =  objstore.Blob('deja vu')
+        b3 =  objstore.Blob('jamais vu')
+        yield self.cas.put(b)
+        yield self.cas.put(b2)
+        yield self.cas.put(b3)
+        t1 = objstore.Tree(objstore.Entity('test', sha1(b)),
+                            objstore.Entity('hello', sha1(b2)))
+        t1id = yield self.cas.put(t1)
+        t2 = objstore.Tree(objstore.Entity('thing', sha1(b3)),
+                            objstore.Entity('tree', sha1(t1)))
+        t2id = yield self.cas.put(t2)
+        c = objstore.Commit(t2id, log='first commit')
+        cid = yield self.cas.put(c)
+        c_out = yield self.cas.get(cid)
+        b3new = objstore.Blob('I remember, now!')
+        b3newid = yield self.cas.put(b3new)
+
+        t2new = objstore.Tree(objstore.Entity('thing', sha1(b3new)),
+                            objstore.Entity('tree', sha1(t1)))
+        t2newid = yield self.cas.put(t2new)
+        cnew = objstore.Commit(t2newid, parents=[cid], log='know what i knew but forgot')
+        cnewid = yield self.cas.put(cnew)
+        yield self.cas.update_ref(cnewid)
+
+        wt = yield self.cas.checkout()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
