@@ -2,18 +2,21 @@
 
 """
 @file ion/services/dm/fetcher.py
-@package ion.services.dm.fetcher Remimpliment fetcher as an LCA service
+@package ion.services.dm.fetcher The fetcher grabs data via http (DAP)
 @author Paul Hubbard
 @date 5/7/10
-@brief Porting the fetcher from DX to LCAarch.
+@brief External data gateway, minimal-state service that grabs single
+pages or DAP datasets via HTTP. Also supports the not-in-the-spec HEAD
+method for badly written DAP clients.
 """
 
 import logging
 
 from twisted.internet import defer
 import httplib as http
+from socket import gaierror
 import urlparse
-import logging
+import simplejson as json
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
@@ -29,7 +32,7 @@ class FetcherService(BaseService):
     """
     logging.info('Declaring fetcher...')
     declare = BaseService.service_declare(name='fetcher',
-                                          version='0.1.1',
+                                          version='0.1.2',
                                           dependencies=[])
     """
     @todo Declare fetcher name into dns-equivalent...
@@ -78,20 +81,21 @@ class FetcherService(BaseService):
 
         yield self.reply_err(msg, content='%s: %s' % (res.status, res.reason))
 
-    @defer.inlineCallbacks
-    def _get_page(self, url, get_headers=False):
+    def get_page(self, url, get_headers=False):
         """
         Inner routine to grab a page, with or without http headers.
         May raise gaierror or ValueError
+        @todo Merge this and _http_op
+        @note See ion.services.dm.test.test_fetcher.GetPageTester
         """
-        src = urlparse.urlsplit(src_url)
+        src = urlparse.urlsplit(url)
         try:
             conn = http.HTTPConnection(src.netloc)
             # @bug Need to merge path with query, no canned fn in urlparse lib
             conn.request('GET', src.path)
             res = conn.getresponse()
         except gaierror, ge:
-            logging.exception()
+            logging.error('Socket error fetching page')
             raise ge
 
         if res.status == 200:
@@ -128,20 +132,20 @@ class FetcherService(BaseService):
         The core of the fetcher: function to grab an entire DAP dataset and
         send it off into the cloud.
         """
-        base_url = base_dap_url(url)
+        base_url = base_dap_url(content)
         das_url = base_url + '.das'
         dds_url = base_url + '.dds'
         dods_url = base_url + '.dods'
 
         logging.debug('Starting fetch of "%s"' % base_url)
         try:
-            das = self._get_page(das_url)
-            dds = self._get_page(dds_url)
-            dods = self._get_page(dods_url, get_headers=True)
-        except ValueError, ve:
+            das = self.get_page(das_url)
+            dds = self.get_page(dds_url)
+            dods = self.get_page(dods_url, get_headers=True)
+        except ValueError:
             logging.exception('Error on fetch of ' + base_url)
             yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
-        except gaierror, ge:
+        except gaierror:
             logging.exception('Error on fetch of ' + base_url)
             yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
 
