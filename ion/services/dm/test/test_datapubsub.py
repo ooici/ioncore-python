@@ -22,7 +22,7 @@ proc = """
 # This is a data processing function that takes a sample message, filters for
 # out of range values, adds to an event queue, and computes a new sample packet
 # where outlyers are zero'ed out
-print "In data process"
+#print "In data process"
 data = content['data']
 resdata = []
 messages = []
@@ -36,7 +36,7 @@ for (ts,samp) in data:
 
 messages.append(('topic_qc',{'metadata':{},'data':resdata}))
 
-print "messages", messages
+#print "messages", messages
 result = messages
 """
 
