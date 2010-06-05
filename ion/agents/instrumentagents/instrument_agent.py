@@ -6,6 +6,7 @@
 @brief Instrument Agent, Driver, and Client class definitions
 """
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.agents.resource_agent import ResourceAgent

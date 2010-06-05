@@ -8,6 +8,7 @@
 
 import os
 import logging
+logging = logging.getLogger(__name__)
 
 from twisted.application.service import ServiceMaker
 

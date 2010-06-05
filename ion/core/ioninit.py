@@ -6,7 +6,8 @@
 @brief definitions and code that needs to run for any use of ion
 """
 
-import logging.config
+import logging
+logging = logging.getLogger(__name__).config
 import magnet
 import re
 

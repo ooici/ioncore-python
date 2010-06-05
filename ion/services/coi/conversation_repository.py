@@ -6,7 +6,8 @@
 @brief Service that receives all sent messages in the system
 """
 
-import logging.config
+import logging
+logging = logging.getLogger(__name__).config
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 

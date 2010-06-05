@@ -6,7 +6,8 @@
 @brief service backend for logging. Plays nicely with logging package
 """
 
-import logging.config
+import logging
+logging = logging.getLogger(__name__).config
 from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory

@@ -11,6 +11,7 @@
 
 from twisted.trial import unittest
 import logging
+logging = logging.getLogger(__name__)
 from uuid import uuid4
 from ion.data.datastore.setdatastore import SetCassandraStore
 

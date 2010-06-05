@@ -8,6 +8,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from uuid import uuid4
 
 from twisted.trial import unittest

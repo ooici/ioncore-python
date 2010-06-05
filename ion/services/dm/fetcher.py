@@ -9,11 +9,13 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 
 from twisted.internet import defer
 import httplib as http
 import urlparse
 import logging
+logging = logging.getLogger(__name__)
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient

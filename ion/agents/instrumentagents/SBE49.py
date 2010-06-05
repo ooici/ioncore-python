@@ -6,6 +6,7 @@
 @brief CI interface for SeaBird SBE-49 CTD
 """
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
 logging.basicConfig(level=logging.DEBUG)

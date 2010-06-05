@@ -11,6 +11,7 @@ not use OOI messaging.
 """
 
 import logging
+logging = logging.getLogger(__name__)
 import urllib2
 
 from twisted.internet import defer

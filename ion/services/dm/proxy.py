@@ -8,6 +8,7 @@ Porting from LCO implementation to new LCA arch - complete rewrite.
 """
 
 import logging
+logging = logging.getLogger(__name__)
 
 from magnet.spawnable import Receiver
 from ion.core.base_process import ProtocolFactory
