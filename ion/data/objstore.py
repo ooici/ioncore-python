@@ -49,6 +49,8 @@ class Entity(tuple):
     """
     Represents a child element of a tree object. Not an object itself, but
     a convenience container for the format of an element of a tree.
+    A tuple is immutable, so this is a safe way to encode the elements of a
+    Tree.
 
     @note Want flexibility on what obj is: Tree is encoded with the obj's
     sha1 hash (bin version).
@@ -58,7 +60,11 @@ class Entity(tuple):
         """
         @todo XXX rethink this
         """
+        if not isinstance(obj, BaseObject):
+            obj = None
+        self.name = name
         self.obj = obj
+        self.obj_id = self[1]
 
     def __new__(cls, name, obj, mode='100644'):
         """
@@ -71,6 +77,20 @@ class Entity(tuple):
             #can only assume it is the sha1(obj) id
             obj_id = obj
         return tuple.__new__(cls, [name, obj_id, mode])
+
+    def load(self, backend):
+        """
+        @brief experimental way to dynamically load objects from id's.
+        """
+        if not self.obj:
+            def cb(obj):
+                self.obj = obj
+                return obj.load(backend)
+
+            d = backend.get(self.obj_id)
+            d.addCallback(cb)
+            return d
+        return defer.succeed(None)
 
 class ICAStoreObject(Interface):
     """
@@ -239,6 +259,12 @@ class Blob(BaseObject):
         """
         return cls(encoded_body)
 
+    def load(self, backend):
+        """
+        @brief leaf of load recursion. Do nothing.
+        """
+        return defer.succeed(self.content)
+
 class Tree(BaseObject):
     """
     Tree Object
@@ -252,7 +278,6 @@ class Tree(BaseObject):
     def __init__(self, *children):
         """
         @param children (name, obj_hash, mode)
-        @note mode is 6 bytes. Git uses this for the file mode
 
         @note XXX For organizational convenience, child objects could be
         represented by an Entity class...a container for the object, name,
@@ -261,11 +286,17 @@ class Tree(BaseObject):
         the data model in a higher-level application.
         """
         entities = []
+        names = {}
         for child in children:
             if not isinstance(child, self.entityFactory):
                 child = self.entityFactory(*child)
             entities.append(child)
+            names[child.name] = child
         self.children = entities
+        self._names = names
+
+    def __getitem__(self, key):
+        return self._names[key].obj
         
     def _encode_body(self):
         """
@@ -351,6 +382,11 @@ class Tree(BaseObject):
         """
         return cls.entityFactory(name, obj, mode)
 
+    def load(self, backend):
+        """
+        @brief Call load on all entities.
+        """
+        return defer.DeferredList([child.load(backend) for child in self.children])
 
 class Commit(BaseObject):
     """
@@ -364,9 +400,12 @@ class Commit(BaseObject):
         @param parent commit hash or object. Sha1 hash in hex form.
         @param log Record of commit reason/context/change/etc.
         """
-        #if tree isinstance(Tree):
-        #    tree = tree.hash
+        if isinstance(tree, BaseObject):
+            tree_obj, tree = tree, sha1hex(tree)
+        else:
+            tree_obj = None
         self.tree = tree
+        self.tree_obj = tree_obj
         self.parents = parents
         self.log = str(log) #or unicode? or what?
         self.other = other

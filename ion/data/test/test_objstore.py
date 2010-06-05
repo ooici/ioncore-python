@@ -244,6 +244,7 @@ class FrontendTest(unittest.TestCase):
         yield self.cas.update_ref(cnewid)
 
         wt = yield self.cas.checkout()
+        yield wt.load_objects()
 
 
 

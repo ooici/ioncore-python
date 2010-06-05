@@ -89,6 +89,32 @@ class TreeProxy(objstore.Tree):
         for child in self.children:
             child_obj = yield child.get_obj(self.backend)
 
+class ActiveTree(object):
+
+    def __init__(self, backend, tree=None):
+        self.backend = backend
+        self.tree = tree
+
+    @classmethod
+    def load(cls, backend, tree):
+        """
+        @brief Create ActiveTree from existing
+        """
+        if not isinstance(tree, objstore.BaseObject):
+            # Assume it's an id
+            d = backend.get(tree)
+            d.addCallback()
+
+    @classmethod
+    def new(cls, backend):
+        """
+        @brief Create empty ActiveTree.
+        """
+
+    def __call__(self):
+        """
+        snap shot?
+        """
 
 class WorkingTree(object):
     """
@@ -104,12 +130,11 @@ class WorkingTree(object):
         self.backend = backend
         self._init_tree = tree
         self._init_commit = commit
-        self.entitys = {}
 
-    @defer.inlineCallbacks
     def load_objects(self):
         """
         """
+        return self._init_tree.load(self.backend)
 
     @classmethod
     def load_commit(cls, backend, commit):
@@ -143,7 +168,7 @@ class Frontend(objstore.CAStore):
         """
         objstore.CAStore.__init__(self, backend, namespace)
         self.working_tree = None
-        self.TYPES['tree'] = TreeProxy
+        #self.TYPES['tree'] = TreeProxy
 
     @classmethod
     def new(cls, backend, name):
