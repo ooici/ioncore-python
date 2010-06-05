@@ -12,7 +12,7 @@
     "controller":"{'name':'controller','module':'ion.services.cei.controller','class':'ControllerService'}",
     "sensor_aggregator":"{'name':'sensor_aggregator','module':'ion.services.cei.sensor_aggregator','class':'SensorAggregatorService'}"
   },
-  "recipes":["setuptools", "twisted", "txamqp", "user", "capabilitycontainer"]
+  "recipes":["setuptools", "twisted", "txamqp", "user", "sensor_aggregator", "capabilitycontainer"]
 }
 
 
