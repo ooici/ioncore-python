@@ -140,7 +140,7 @@ if __name__ == '__main__':
         sys.exit(1)
     logging.basicConfig(level=logging.DEBUG, \
                 format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
-    signal.signal(signal.SIGTERM, sigint_handler)
+    signal.signal(signal.SIGINT, sigint_handler)
     dee = DecisionEngineExerciser(sys.argv[1])
     setcontroller(dee)
     dee.run_forever()
