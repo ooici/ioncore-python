@@ -86,6 +86,11 @@ class ProvisionerService(BaseService):
 
     def op_receipt_taken(self, content, headers, msg):
         logging.info("Receipt has been taken.  content:"+str(content))
+
+    @defer.inlineCallbacks
+    def op_cei_test(self, content, headers, msg):
+        sa = yield self.get_scoped_name('system', 'sensor_aggregator')
+        yield self.send(sa, 'cei_test', content)
         
 
 class ProvisionerNotifier(object):
