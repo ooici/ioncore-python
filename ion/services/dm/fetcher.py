@@ -108,7 +108,6 @@ class FetcherService(BaseService):
         else:
             raise ValueError('Error fetching "%s"' % url)
 
-
     @defer.inlineCallbacks
     def op_get_head(self, content, headers, msg):
         """
@@ -151,6 +150,7 @@ class FetcherService(BaseService):
 
         logging.info('Fetch of "%s" complete, sending to listeners' % base_url)
         dset_msg = {}
+        dset_msg['source_url'] = base_url
         dset_msg['das'] = json.dumps(das)
         dset_msg['dds'] = json.dumps(dds)
         dset_msg['value'] = dods
