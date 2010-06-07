@@ -24,6 +24,8 @@ instrumentCommands = (
     "pumpon",
     "pumpoff",
     "getsample",
+    "start_direct_access",
+    "stop_direct_access",
     "test_temperature_converted",
     "test_conductivity_converted",
     "test_pressure_converted",

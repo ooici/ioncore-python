@@ -8,9 +8,36 @@
 
 import logging
 from twisted.internet import defer
+from socket import gaierror
 
-from ion.services.dm.fetcher import FetcherClient
+from ion.services.dm.fetcher import FetcherClient, FetcherService
 from ion.test.iontest import IonTestCase
+
+class GetPageTester(IonTestCase):
+    """
+    Just instantiate the FetcherService class and exercise the inner get_page
+    method.
+    """
+    def setUp(self):
+        self.mf = FetcherService()
+
+    def test_single_page_with_headers(self):
+        page = self.mf.get_page('http://amoeba.ucsd.edu/tmp/test1.txt', get_headers=True)
+        self.failUnlessSubstring('content-length', page)
+        self.failUnlessSubstring('is the time for all', page)
+
+    def test_no_headers(self):
+        page = self.mf.get_page('http://amoeba.ucsd.edu/tmp/test1.txt')
+        self.failIfSubstring('content-length', page)
+        self.failUnlessSubstring('is the time for all', page)
+
+    def test_bad_host(self):
+        self.failUnlessRaises(gaierror, self.mf.get_page,
+                              'http://foo.bar.baz/')
+
+    def test_404(self):
+        self.failUnlessRaises(ValueError, self.mf.get_page,
+                              'http://amoeba.ucsd.edu/tmp/bad-filename')
 
 class FetcherTest(IonTestCase):
     @defer.inlineCallbacks

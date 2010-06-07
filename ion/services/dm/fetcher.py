@@ -2,21 +2,25 @@
 
 """
 @file ion/services/dm/fetcher.py
-@package ion.services.dm.fetcher Remimpliment fetcher as an LCA service
+@package ion.services.dm.fetcher The fetcher grabs data via http (DAP)
 @author Paul Hubbard
 @date 5/7/10
-@brief Porting the fetcher from DX to LCAarch.
+@brief External data gateway, minimal-state service that grabs single
+pages or DAP datasets via HTTP. Also supports the not-in-the-spec HEAD
+method for badly written DAP clients.
 """
 
 import logging
 
 from twisted.internet import defer
 import httplib as http
+from socket import gaierror
 import urlparse
-import logging
+import simplejson as json
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
+from ion.services.dm.url_manipulation import base_dap_url
 
 class FetcherService(BaseService):
     """
@@ -28,7 +32,7 @@ class FetcherService(BaseService):
     """
     logging.info('Declaring fetcher...')
     declare = BaseService.service_declare(name='fetcher',
-                                          version='0.1.1',
+                                          version='0.1.2',
                                           dependencies=[])
     """
     @todo Declare fetcher name into dns-equivalent...
@@ -36,7 +40,10 @@ class FetcherService(BaseService):
     def _reassemble_headers(self, result):
         """
         @brief Convert an array of tuples into http headers
+        @param result HTTP result
+        @retval Multiline string with trailing empty line
         @todo check for library routine to do this.
+        @note output has an blank line at the end (\r\n)
         """
         hstr = ''
         for x in result.getheaders():
@@ -51,6 +58,7 @@ class FetcherService(BaseService):
         @param operation 'GET' or 'HEAD'
         @param src_url Source URL
         @retval send_ok or send_err as required
+        @note This routine sends the reply back to the caller!
         """
         assert(operation in ['GET', 'HEAD'])
 
@@ -69,10 +77,37 @@ class FetcherService(BaseService):
             hstr = self._reassemble_headers(res)
             # @note read on HEAD returns no data
             hstr = hstr + '\n' + res.read()
-
             yield self.reply_ok(msg, content=hstr)
 
         yield self.reply_err(msg, content='%s: %s' % (res.status, res.reason))
+
+    def get_page(self, url, get_headers=False):
+        """
+        Inner routine to grab a page, with or without http headers.
+        May raise gaierror or ValueError
+        @todo Merge this and _http_op
+        @note See ion.services.dm.test.test_fetcher.GetPageTester
+        """
+        src = urlparse.urlsplit(url)
+        try:
+            conn = http.HTTPConnection(src.netloc)
+            # @bug Need to merge path with query, no canned fn in urlparse lib
+            conn.request('GET', src.path)
+            res = conn.getresponse()
+        except gaierror, ge:
+            logging.error('Socket error fetching page')
+            raise ge
+
+        if res.status == 200:
+            if get_headers:
+                hstr = self._reassemble_headers(res)
+                hstr = hstr + '\r\n' + res.read()
+                return hstr
+            else:
+                return(res.read())
+        else:
+            raise ValueError('Error fetching "%s"' % url)
+
 
     @defer.inlineCallbacks
     def op_get_head(self, content, headers, msg):
@@ -97,8 +132,30 @@ class FetcherService(BaseService):
         The core of the fetcher: function to grab an entire DAP dataset and
         send it off into the cloud.
         """
-        logging.warn('Implement me!')
-        yield self.reply_err(msg, 'reply', {'value':'no code!'}, {})
+        base_url = base_dap_url(content)
+        das_url = base_url + '.das'
+        dds_url = base_url + '.dds'
+        dods_url = base_url + '.dods'
+
+        logging.debug('Starting fetch of "%s"' % base_url)
+        try:
+            das = self.get_page(das_url)
+            dds = self.get_page(dds_url)
+            dods = self.get_page(dods_url, get_headers=True)
+        except ValueError:
+            logging.exception('Error on fetch of ' + base_url)
+            yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
+        except gaierror:
+            logging.exception('Error on fetch of ' + base_url)
+            yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
+
+        logging.info('Fetch of "%s" complete, sending to listeners' % base_url)
+        dset_msg = {}
+        dset_msg['das'] = json.dumps(das)
+        dset_msg['dds'] = json.dumps(dds)
+        dset_msg['value'] = dods
+
+        yield self.reply_ok(msg, dset_msg)
 
 class FetcherClient(BaseServiceClient):
     """
