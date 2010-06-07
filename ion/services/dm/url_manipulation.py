@@ -72,7 +72,7 @@ def base_dap_url(src_url):
         # This regex works on just plain DAP URLs - dds/das/dods optional
         mset = re.search('(http|https)://([^/]+)(.+)(\.dds|\.das|\.dods|\.asc(i)*)*(\?.+)*', src_url)
         if mset == None:
-            logging.warning('No URL match in "%s" % src_url')
+            logging.info('No URL match in "%s" % src_url')
             return None
         try:
             return mset.group(1) + '://' + mset.group(2) + mset.group(3)

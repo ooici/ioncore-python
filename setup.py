@@ -33,7 +33,7 @@ try:
     setupdict['packages'] = find_packages()
     setupdict['test_suite'] = 'lcaarch.test'
     setupdict['install_requires'] = ['Twisted', 'magnet', 'pycassa', 'numpy',
-                                     'Paste', 'Pydap', 'simplejson',
+                                     'Paste', 'Pydap', 'simplejson', 'httplib2',
                                      'pydap.handlers.netcdf',
                                      'pydap.responses.netcdf']
     setupdict['include_package_data'] = True

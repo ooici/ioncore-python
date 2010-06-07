@@ -6,7 +6,7 @@
 @author Paul Hubbard
 @date 6/7/10
 """
-
+import logging
 from twisted.internet import defer
 
 from ion.services.dm.persister import PersisterClient, PersisterService
@@ -34,4 +34,5 @@ class PersisterTester(IonTestCase):
         sup = yield self._spawn_processes(services)
 
         pc = PersisterClient(proc=sup)
-        #yield pc.persist_dap_dataset(foo)
+        rc = yield pc.persist_dap_dataset('none')
+        logging.warn(rc)

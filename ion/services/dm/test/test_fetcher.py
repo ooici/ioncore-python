@@ -32,7 +32,7 @@ class GetPageTester(IonTestCase):
         self.failUnlessSubstring('is the time for all', page)
 
     def test_bad_host(self):
-        self.failUnlessRaises(gaierror, self.mf.get_page,
+        self.failUnlessRaises(ValueError, self.mf.get_page,
                               'http://foo.bar.baz/')
 
     def test_404(self):
