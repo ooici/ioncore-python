@@ -17,6 +17,19 @@ def bootstrap():
     put_chef_data()
     run_chef_solo()
 
+def bootstrap_cei():
+    put_provisioner_secrets()
+    bootstrap()
+
+def put_provisioner_secrets():
+    key = os.environ.get('NIMBUS_KEY')
+    secret = os.environ.get('NIMBUS_SECRET')
+    if not key and not secret:
+        print "ERROR.  Please export NIMBUS_KEY and NIMBUS_SECRET"
+        sys.exit(1)
+    run("sudo sh -c 'echo export NIMBUS_KEY=%s >> /opt/cei_environment'" % key)
+    run("sudo sh -c 'echo export NIMBUS_SECRET=%s >> /opt/cei_environment'" % secret)
+
 def update():
     with hide('stdout'):
         run("sudo apt-get -q update")

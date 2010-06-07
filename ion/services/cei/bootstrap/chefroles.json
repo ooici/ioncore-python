@@ -9,10 +9,10 @@
   "username":"cc",
   "services":{
     "provisioner":"{'name':'provisioner','module':'ion.services.cei.provisioner','class':'ProvisionerService'}",
-    "controller":"{'name':'controller','module':'ion.services.cei.controller','class':'ControllerService'}",
+    "epu_controller":"{'name':'epu_controller','module':'ion.services.cei.epu_controller','class':'EPUControllerService'}",
     "sensor_aggregator":"{'name':'sensor_aggregator','module':'ion.services.cei.sensor_aggregator','class':'SensorAggregatorService'}"
   },
-  "recipes":["setuptools", "twisted", "txamqp", "user", "capabilitycontainer"]
+  "recipes":["setuptools", "twisted", "txamqp", "user", "provisioner", "sensor_aggregator", "capabilitycontainer"]
 }
 
 
