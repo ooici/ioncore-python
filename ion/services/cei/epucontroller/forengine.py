@@ -114,8 +114,21 @@ class State(object):
     def __init__(self):
         pass
     
+    def get_all(self, typename):
+        """
+        Get all data about a particular type.
+        
+        @retval list(StateItem) StateItem instances that match the type
+        or an empty list if nothing matches.
+        @exception KeyError if typename is unknown
+        
+        """
+        raise NotImplementedError
+    
     def get(self, typename, key):
         """
+        Get all data about a particular key of a particular type.
+        
         @retval list(StateItem) StateItem instances that match the key query
         or an empty list if nothing matches.
         @exception KeyError if typename is unknown

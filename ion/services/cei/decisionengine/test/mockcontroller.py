@@ -83,6 +83,16 @@ class DeeState(State):
         super(DeeState, self).__init__()
         self.instance_states = {}
         self.queue_lengths = {}
+        
+    def get_all(typename):
+        if typename == "instance-state":
+            data = self.instance_states
+        elif typename == "queue-length":
+            data = self.queue_lengths
+        else:
+            raise KeyError("Unknown typename: '%s'" % typename)
+        
+        return data.values()
     
     def get(typename, key):
         if typename == "instance-state":
@@ -92,7 +102,6 @@ class DeeState(State):
         else:
             raise KeyError("Unknown typename: '%s'" % typename)
         
-        # simplest possible implementation
         ret = []
         if data.has_key(key):
             ret.append(data[key])
