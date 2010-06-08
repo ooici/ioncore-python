@@ -18,8 +18,6 @@ from ion.data.datastore.setdatastore import SetCassandraStore
 
 class SetDataStoreInterfaceTest(unittest.TestCase):
     def setUp(self):
-        logging.basicConfig(level=logging.WARN, \
-                format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
         clist = ['amoeba.ucsd.edu:9160']
         self.ds = SetCassandraStore(cass_host_list=clist)
         self.key = self._mkey()

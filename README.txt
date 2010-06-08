@@ -120,6 +120,13 @@ again (see above). Please review the branch logs for any hints.
 Change log:
 ===========
 
+2010-06-07:
+- Redefined logging import to set as module level logger. Each module has now
+  a different logger that can be configured separately. Don't configure
+  manually though.
+- Added possibility to modify logging levels by module/package, with support
+  for package hierarchy. See res/logging/loglevels.cfg for standard entries.
+  Do not modify. Add file res/logging/loglevelslocal.cfg for local override.
 2010-06-02:
 - BaseProcess self members renamed to conform to PEP8
 - Added process shutdown to BaseProcess

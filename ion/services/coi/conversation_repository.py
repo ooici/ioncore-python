@@ -7,7 +7,6 @@
 """
 
 import logging
-logging = logging.getLogger(__name__).config
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
@@ -16,6 +15,7 @@ from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 logserv = logging.getLogger('convRepos')
+logging = logging.getLogger(__name__)
 
 class ConversationRepositoryService(BaseService):
     """Conversation repository service interface
@@ -55,4 +55,3 @@ class ConversationRepositoryService(BaseService):
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(ConversationRepositoryService)
-
