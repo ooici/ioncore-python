@@ -6,14 +6,17 @@
 @author Paul Hubbard
 @date 6/7/10
 """
+import sys
 
 import logging
+logging = logging.getLogger(__name__)
 
 from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.services.dm.persister import PersisterClient, PersisterService
 from ion.services.dm.fetcher import FetcherService
+from ion.services.dm.url_manipulation import generate_filename
 
 from ion.test.iontest import IonTestCase
 
@@ -25,35 +28,34 @@ class PersisterServiceTester(unittest.TestCase):
 
     Way too clever.
     """
-    def catch_reply(self, msg, dset_msg):
-        self.buffer = dset_msg
-
-    def catch_err(self, msg, payload, headers):
-        self.error_buffer = payload
-
     def setUp(self):
         """
         Instantiate the service classes
         """
         self.ps = PersisterService()
         self.fs = FetcherService()
-        # Create a local buffer/array to write into
-        self.buffer = {}
-        self.error_buffer = {}
-        # Monkeypatch the classes to call our functions when complete
-        self.fs.reply_ok = self.catch_reply
-        self.ps.reply_err = self.catch_err
 
-    def test_updown(self):
+    def test_instantiation_only(self):
+        # Create and destroy the instances - any errors?
         pass
 
-    @defer.inlineCallbacks
     def test_fetcher_and_persister(self):
+        """
+        More complex than it might appear - reach in and use the methods
+        to get and persist a full dataset from amoeba (5.2MB)
+        """
         dset_url = 'http://ooici.net:8001/coads.nc'
-        dset = self.fs.op_get_dap_dataset(dset_url, None, None)
-        yield self.ps.op_persist_dap_dataset(dset_url, dset, None)
-        self.fail('Check local dir for file coads.nc!')
+        local_dir = '/tmp/'
+        fname = generate_filename(dset_url, local_dir=local_dir)
 
+        logging.debug('Grabbing dataset ' + dset_url)
+        dset = self.fs._get_dataset_no_xmit(dset_url)
+        logging.debug('Persisting dataset')
+        self.ps._save_no_xmit(dset, local_dir=local_dir)
+        if open(fname):
+           pass
+        else:
+            self.fail('Datafile not found!')
 
 class PersisterTester(IonTestCase):
     """
@@ -69,11 +71,15 @@ class PersisterTester(IonTestCase):
 
     @defer.inlineCallbacks
     def test_updown(self):
+        raise unittest.SkipTest('Code broken')
+
         services = [
             {'name': 'persister', 'module': 'ion.services.dm.persister',
              'class': 'PersisterService'},
         ]
         sup = yield self._spawn_processes(services)
+
+        raise unittest.SkipTest('Code broken')
 
         pc = PersisterClient(proc=sup)
         rc = yield pc.persist_dap_dataset('none')

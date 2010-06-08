@@ -31,7 +31,7 @@ def rewrite_url(dsUrl, newHostname='localhost'):
     chg_path = chg_host._replace(path=os.path.basename(chg_host.path))
     return chg_path.geturl()
 
-def generate_filename(dataset_url):
+def generate_filename(dataset_url, local_dir='../../dap_server/data/'):
     """
     @brief Given a URL, generate a local filesystem name for same. Used by
     persister for write and cache for purge operations. It's a stinky hack, really.
@@ -39,6 +39,8 @@ def generate_filename(dataset_url):
     @retval Local filename
     @todo Complete refactor - directories, etc
     """
+    assert(local_dir[-1:] == '/')
+
     basicName = os.path.basename(dataset_url)
 
     #file name safe characters
@@ -50,7 +52,7 @@ def generate_filename(dataset_url):
     @bug Hardwired relative path
     @todo Move path to configuration file
     """
-    return '../../dap_server/data/' + datasetid
+    return local_dir + datasetid
 
 def base_dap_url(src_url):
     """

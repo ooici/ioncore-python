@@ -20,6 +20,8 @@ from pydap.lib import walk, fix_slice, parse_qs, fix_shn
 from pydap.responses import netcdf
 
 import logging
+logging = logging.getLogger(__name__)
+
 import time
 import sys
 
@@ -41,28 +43,35 @@ class PersisterService(BaseService):
     @defer.inlineCallbacks
     def op_persist_dap_dataset(self, content, headers, msg):
         logging.info('called to persist a dap dataset!')
-        
+
         assert(isinstance(content, dict))
 
         try:
-            dds = json.loads(content['dds'])
-            das = json.loads(content['das'])
-            dods = content['value']
-            source_url = content['source_url']
+            rc = self._save_no_xmit(content)
         except KeyError:
-            logging.error('Unable to find required fields in dataset!')
             yield self.reply_err(msg, {'value':'Missing headers'}, {})
-
-        logging.debug('DAS snippet: ' + das[:80])
-        logging.debug('DDS snippet: ' + dds[:80])
-
-        rc = self._save_dataset(das, dds, dods, source_url)
+            return
         if rc:
             yield self.reply_err(msg, {'value': 'Error saving!'}, {})
 
         yield self.reply_ok(msg)
 
-    def _save_dataset(self, das, dds, dods, source_url):
+    def _save_no_xmit(self, content, local_dir=None):
+        try:
+            dds = json.loads(content['dds'])
+            das = json.loads(content['das'])
+            dods = content['value']
+            source_url = content['source_url']
+        except KeyError, ke:
+            logging.error('Unable to find required fields in dataset!')
+            raise ke
+
+        logging.debug('DAS snippet: ' + das[:80])
+        logging.debug('DDS snippet: ' + dds[:80])
+
+        return(self._save_dataset(das, dds, dods, source_url, local_dir=local_dir))
+
+    def _save_dataset(self, das, dds, dods, source_url, local_dir=None):
         dataset = DDSParser(dds).parse()
         dataset = DASParser(das, dataset).parse()
 
@@ -105,7 +114,7 @@ class PersisterService(BaseService):
         dds, xdrdata = dods.split('\nData:\n', 1)
         dataset.data = DapUnpacker(xdrdata, dataset).getvalue()
 
-        fname = generate_filename(source_url)
+        fname = generate_filename(source_url, local_dir=local_dir)
         logging.info('Saving DAP dataset "%s" to "%s"' % (source_url, fname))
 
         netcdf.save(dataset, fname)

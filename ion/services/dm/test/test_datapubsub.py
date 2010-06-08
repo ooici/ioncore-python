@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/test/test_resource_registry.py
+@file ion/services/coi/test/test_datapubsub.py
 @author Michael Meisinger
 @brief test service for registering topics for data pub sub
 """
