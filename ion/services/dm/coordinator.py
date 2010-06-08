@@ -9,6 +9,7 @@ Rewrite from LCO version; refactor/rewrite for new LCA arch.
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 

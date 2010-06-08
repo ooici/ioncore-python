@@ -11,6 +11,7 @@ method for badly written DAP clients.
 """
 
 import logging
+logging = logging.getLogger(__name__)
 
 from twisted.internet import defer
 import httplib as http

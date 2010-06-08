@@ -10,6 +10,7 @@ import re
 import string
 import urlparse
 import logging
+logging = logging.getLogger(__name__)
 import os.path
 
 def rewrite_url(dsUrl, newHostname='localhost'):

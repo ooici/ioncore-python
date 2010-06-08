@@ -10,6 +10,7 @@ The associations can be walked to find content.
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 

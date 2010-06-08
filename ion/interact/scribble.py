@@ -7,6 +7,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 
 from ion.interact.conversation import ConversationTypeSpec
 
