@@ -8,6 +8,7 @@
 
 import os
 import logging
+logging = logging.getLogger(__name__)
 import uuid
 from itertools import izip
 from twisted.internet import defer, threads
@@ -17,7 +18,7 @@ from nimboss.ctx import ContextClient
 from nimboss.cluster import ClusterDriver
 from nimboss.nimbus import NimbusClusterDocument
 from libcloud.types import NodeState as NimbossNodeState
-
+from libcloud.base import Node as NimbossNode
 from ion.core import base_process
 from ion.services.cei.dtrs import DeployableTypeRegistryClient
 from ion.services.cei.provisioner_store import ProvisionerStore, group_records
@@ -53,7 +54,7 @@ class ProvisionerCore(object):
         self.cluster_driver = ClusterDriver(self.ctx_client)
 
     @defer.inlineCallbacks
-    def expand_request(self, request):
+    def expand_provision_request(self, request):
         """Validates request and transforms it into launch and node records.
 
         Returns a tuple (launch record, node records).
@@ -120,7 +121,7 @@ class ProvisionerCore(object):
             site = launch_group[0]['site']
             driver = self.node_drivers[site]
 
-            logging.info('Launching group '+spec.name)
+            logging.info('Launching group %s - %s nodes', spec.name, spec.count)
             
             iaas_nodes = yield threads.deferToThread(
                     self.cluster_driver.launch_node_spec, spec, driver)
@@ -132,6 +133,10 @@ class ProvisionerCore(object):
             # underlying node driver may return a list or an object
             if not hasattr(iaas_nodes, '__iter__'):
                 iaas_nodes = [iaas_nodes]
+
+            if len(iaas_nodes) != len(launch_group):
+                logging.error('%s nodes from iaas but %s from datastore', 
+                        len(iaas_nodes), len(launch_group))
                 
             for node_rec, iaas_node in izip(launch_group, iaas_nodes):
                 node_rec['iaas_id'] = iaas_node.id
@@ -172,10 +177,10 @@ class ProvisionerCore(object):
         # note we are walking the nodes from datastore, NOT from nimboss
         for node in nodes:
             state = node['state']
-            if state < states.Pending or state > states.Terminated:
+            if state < states.Pending or state >= states.Terminated:
                 continue
             
-            nimboss_id = node['iaas_id']
+            nimboss_id = node.get('iaas_id')
             nimboss_node = nimboss_nodes.pop(nimboss_id, None)
             if not nimboss_node:
                 # this state is unknown to underlying IaaS. What could have
@@ -191,20 +196,67 @@ class ProvisionerCore(object):
 
                 launch = yield self.store.get_launch(node['launch_id'])
                 yield self.store_and_notify([node], launch['subscribers'])
-            nimboss_state = _NIMBOSS_STATE_MAP[nimboss_node.state]
-            if nimboss_state > node['state']:
-                #TODO nimboss could go backwards in state.
-                node['state'] = nimboss_state
-                launch = yield self.store.get_launch(node['launch_id'])
-                yield self.store_and_notify([node], launch['subscribers'])
+            else:
+                nimboss_state = _NIMBOSS_STATE_MAP[nimboss_node.state]
+                if nimboss_state > node['state']:
+                    #TODO nimboss could go backwards in state.
+                    node['state'] = nimboss_state
+                    launch = yield self.store.get_launch(node['launch_id'])
+                    yield self.store_and_notify([node], launch['subscribers'])
         #TODO nimboss_nodes now contains any other running instances that
         # are unknown to the datastore (or were started after the query)
         # Could do some analysis of these nodes
+
+    @defer.inlineCallbacks
+    def mark_launch_terminating(self, launch_id):
+        """Mark a launch as Terminating in data store.
+        """
+        launch = yield self.store.get_launch(launch_id)
+        nodes = yield self.store.get_launch_nodes(launch_id)
+        yield self.store_and_notify(nodes, launch['subscribers'], 
+                states.Terminating)
+    
+    @defer.inlineCallbacks
+    def terminate_launch(self, launch_id):
+        """Destroy all nodes in a launch and mark as terminated in store.
+        """
+        launch = yield self.store.get_launch(launch_id)
+        nodes = yield self.store.get_launch_nodes(launch_id)
+
+        for node in nodes:
+            state = node['state']
+            if state < states.Pending or state >= states.Terminated:
+                continue
+            #would be nice to do this as a batch operation
+            nimboss_node = self._to_nimboss_node(node)
+            driver = self.node_drivers[node['site']]
+            yield threads.deferToThread(driver.destroy_node, nimboss_node)
+        
+            yield self.store_and_notify([node], launch['subscribers'], 
+                    states.Terminated)
+
+    @defer.inlineCallbacks
+    def terminate_launches(self, launch_ids):
+        """Destroy all node in a set of launches.
+        """
+        for launch in launch_ids:
+            yield self.terminate_launch(launch)
 
     def _create_context(self):
         """Synchronous call to context broker.
         """
         return self.ctx_client.create_context()
+
+    def _to_nimboss_node(self, node):
+        """Nimboss drivers need a Node object for termination.
+        """
+        #TODO this is unfortunately tightly coupled with EC2 libcloud driver
+        # right now. We are building a fake Node object that only has the
+        # attribute needed for termination (id). Would need to be fleshed out
+        # to work with other drivers.
+        return NimbossNode(id=node['iaas_id'], name=None, state=None,
+                public_ip=None, private_ip=None, 
+                driver=self.node_drivers[node['site']])
 
 def _one_launch_record(launch_id, document, dt, subscribers, 
         state=states.Requested):

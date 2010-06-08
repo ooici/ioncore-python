@@ -42,9 +42,10 @@ class ProvisionerServiceTest(IonTestCase):
         supervisor = yield self._spawn_processes(procs)
 
         pId = yield self.procRegistry.get("provisioner")
-
+        
+        launch_id = _new_id()
         request = {'deployable_type' : 'base-cluster',
-                'launch_id' : _new_id(),
+                'launch_id' : launch_id,
                 'nodes' : { 
                     'head-node' : {
                         'id' : [_new_id()],
@@ -66,7 +67,7 @@ class ProvisionerServiceTest(IonTestCase):
 
         yield supervisor.send(pId, "query", '')
         yield pu.asleep(5) #async wait
-        yield supervisor.send(pId, "query", '')
+        yield supervisor.send(pId, 'terminate', launch_id)
         yield pu.asleep(5) #async wait
         yield supervisor.send(pId, "query", '')
         yield pu.asleep(5) #async wait

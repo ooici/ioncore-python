@@ -10,6 +10,7 @@
 
 import os
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer, reactor
 
 from ion.services.base_service import BaseService
@@ -35,9 +36,9 @@ class ProvisionerService(BaseService):
     def op_provision(self, content, headers, msg):
         """Service operation: Provision a taskable resource
         """
-        logging.info("op_provision content:"+str(content))
+        logging.debug("op_provision content:"+str(content))
         
-        launch, nodes = yield self.core.expand_request(content)
+        launch, nodes = yield self.core.expand_provision_request(content)
         
         self.store.put_record(launch, states.Requested)
         self.store.put_records(nodes, states.Requested)
@@ -51,11 +52,21 @@ class ProvisionerService(BaseService):
         # set up a callLater to fulfill the request after the ack. Would be
         # cleaner to have explicit ack control.
         reactor.callLater(0, self.core.fulfill_launch, launch, nodes)
-
+    
+    @defer.inlineCallbacks
     def op_terminate(self, content, headers, msg):
-        """Service operation: Terminate a taskable resource
+        """Service operation: Terminate one or more launches
         """
-        pass
+        logging.debug('op_terminate content:'+str(content))
+
+        #expecting one or more launch IDs
+        if not isinstance(content, list):
+            content = [content]
+
+        for launch in content:
+            yield self.core.mark_launch_terminating(launch)
+
+        reactor.callLater(0, self.core.terminate_launches, content)
 
     def op_query(self, content, headers, msg):
         """Service operation: query IaaS  and send updates to subscribers.
