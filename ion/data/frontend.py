@@ -90,6 +90,23 @@ class TreeProxy(objstore.Tree):
             child_obj = yield child.get_obj(self.backend)
 
 class ActiveTree(object):
+    """
+    The tree concept is the thing mediating the mapping between the pure
+    data storage model and the higher level application data model.
+    A tree [or, in general, a graph] is an environment, the child element
+    of a tree node is the entity of the environment. The entity can be a
+    tree itself, so internally, it is another environment hosting other
+    entities. The elements of a tree node are a 2-tuple (key/value pair
+    where the key is a name and the value is an entity object). The name is
+    an external identifier that has no intrinsic meaning to the tree model.
+    The entity is a fundamental object of the tree model.
+
+    The node entity is a container/collection of name:entity pairs.
+
+    Content:
+        Pure data content - leaf nodes
+
+    """
 
     def __init__(self, backend, tree=None):
         self.backend = backend
