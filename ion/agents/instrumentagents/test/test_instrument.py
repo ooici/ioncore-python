@@ -9,6 +9,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 import inspect
 from twisted.internet import defer
 

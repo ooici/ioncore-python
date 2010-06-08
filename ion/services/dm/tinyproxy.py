@@ -27,6 +27,7 @@ __version__ = '0.1.0'
 import BaseHTTPServer, socket, SocketServer, urlparse
 
 import logging
+logging = logging.getLogger(__name__)
 from ion.services.dm.coordinator import CoordinatorClient
 from twisted.internet import defer
 
