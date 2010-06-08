@@ -17,7 +17,10 @@ from twisted.internet import defer
 import httplib as http
 from socket import gaierror
 import urlparse
-import simplejson as json
+try:
+    import json
+except:
+    import simplejson as json
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient

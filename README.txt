@@ -127,6 +127,7 @@ Change log:
 - Added possibility to modify logging levels by module/package, with support
   for package hierarchy. See res/logging/loglevels.cfg for standard entries.
   Do not modify. Add file res/logging/loglevelslocal.cfg for local override.
+  Default logging level for all ion code: WARNING
 2010-06-02:
 - BaseProcess self members renamed to conform to PEP8
 - Added process shutdown to BaseProcess

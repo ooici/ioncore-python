@@ -7,7 +7,8 @@
 """
 
 import logging
-logging = logging.getLogger(__name__), time
+logging = logging.getLogger(__name__)
+import time
 from twisted.internet import defer
 from twisted.trial import unittest
 from magnet.container import Container
