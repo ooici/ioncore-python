@@ -112,7 +112,6 @@ class FetcherService(BaseService):
         else:
             raise ValueError('Error fetching "%s"' % url)
 
-
     @defer.inlineCallbacks
     def op_get_head(self, content, headers, msg):
         """
@@ -130,13 +129,12 @@ class FetcherService(BaseService):
         """
         yield self._http_op('GET', content, msg)
 
-    @defer.inlineCallbacks
-    def op_get_dap_dataset(self, content, headers, msg):
+    def _get_dataset_no_xmit(self, source_url):
         """
         The core of the fetcher: function to grab an entire DAP dataset and
-        send it off into the cloud.
+        return it as a dictionary.
         """
-        base_url = base_dap_url(content)
+        base_url = base_dap_url(source_url)
         das_url = base_url + '.das'
         dds_url = base_url + '.dds'
         dods_url = base_url + '.dods'
@@ -146,20 +144,37 @@ class FetcherService(BaseService):
             das = self.get_page(das_url)
             dds = self.get_page(dds_url)
             dods = self.get_page(dods_url, get_headers=True)
-        except ValueError:
+        except ValueError, ve:
             logging.exception('Error on fetch of ' + base_url)
-            yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
-        except gaierror:
+            raise ve
+        except gaierror, ge:
             logging.exception('Error on fetch of ' + base_url)
-            yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
+            raise ge
 
-        logging.info('Fetch of "%s" complete, sending to listeners' % base_url)
+        logging.debug('Fetch completed OK.')
+
         dset_msg = {}
+        dset_msg['source_url'] = base_url
         dset_msg['das'] = json.dumps(das)
         dset_msg['dds'] = json.dumps(dds)
         dset_msg['value'] = dods
+        return(dset_msg)
 
-        yield self.reply_ok(msg, dset_msg)
+    @defer.inlineCallbacks
+    def op_get_dap_dataset(self, content, headers, msg):
+
+        try:
+            dmesg = self._get_dataset_no_xmit(content)
+        except ValueError, ve:
+            yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
+            return
+        except gaierror, ge:
+            yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
+            return
+
+        logging.info('Sending dataset')
+        yield self.reply_ok(msg, dmsg)
+        logging.debug('Send complete')
 
 class FetcherClient(BaseServiceClient):
     """
