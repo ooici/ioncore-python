@@ -24,7 +24,6 @@ class EPUControllerService(BaseService):
         engineclass = "ion.services.cei.decisionengine.default.DefaultEngine"
         self.core = ControllerCore(self.provisioner_client, engineclass)
         
-        # TODO: Twistify this
         self.core.begin_controlling()
 
     @defer.inlineCallbacks

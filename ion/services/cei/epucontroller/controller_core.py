@@ -4,6 +4,7 @@ import uuid
 from collections import defaultdict
 from ion.services.cei.decisionengine import EngineLoader
 import ion.services.cei.states as InstanceStates
+from twisted.internet.task import LoopingCall
 
 from forengine import Control
 from forengine import State
@@ -36,11 +37,9 @@ class ControllerCore(object):
     def begin_controlling(self):
         """Call the decision engine at the appropriate times.
         """
-        
-        # TODO: Twistify this
-        while True:
-            time.sleep(self.control.sleep_seconds)
-            self.engine.decide(self.control, self.state)
+        self.control_loop = LoopingCall(self.engine.decide, self.control, 
+                self.state)
+        self.control_loop.start(self.control.sleep_seconds)
 
 class ControllerCoreState(State):
     """Keeps data, also what is passed to decision engine.
