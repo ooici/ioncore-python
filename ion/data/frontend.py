@@ -89,7 +89,27 @@ class TreeProxy(objstore.Tree):
         for child in self.children:
             child_obj = yield child.get_obj(self.backend)
 
-class ActiveTree(object):
+class ActiveObject(object):
+    """
+    Container/proxy for storable/retrievable object.
+    """
+
+    def __init__(self, backend, id=None, obj=None):
+        """
+        @param backend Live sa store instance. 
+        @param id object hash.
+        @param obj instance of decoded object.
+        """
+        self.backend = backend
+        self.id = id
+        self.obj = obj
+    
+    def load():
+        """
+        """
+
+
+class ActiveTree(ActiveObject):
     """
     The tree concept is the thing mediating the mapping between the pure
     data storage model and the higher level application data model.
@@ -131,6 +151,14 @@ class ActiveTree(object):
     def __call__(self):
         """
         snap shot?
+        """
+
+    def __getitem__(self, name):
+        """
+        @brief Retrieve an object by the name associated with it in this
+        tree.
+        @param name of object
+        @retval object associated with name.
         """
 
 class WorkingTree(object):
@@ -234,28 +262,34 @@ class Frontend(objstore.CAStore):
         """
         """
 
+
     def update_ref(self, commit_id, ref='master'):
         """
+        @brief Update association of reference name to commit id.
         @retval Deferred
         """
         return self.refstore.put(ref, commit_id)
 
-    def get_head(self, head='master'):
+    def get_head(self, name='master'):
         """
+        @brief Get reference named 'name'. The head references represent
+        commit ancestry chains. Master is the name of the main commit
+        linage. A branch is represents a divergent commit linage. Any head
+        reference besides the one named 'master' is a branch head.
         @retval commit object id
         @todo get('heads.master') instead of just get('head')
         @note if head is not there, *IStore says return None*
         """
-        return self.refstore.get(head)
+        return self.refstore.get(name)
 
     @defer.inlineCallbacks
     def checkout(self, head=None):
         """
         @retval Instance of WorkingTree
         """
-        head = yield self.get_head()
-        if head:
-            commit = yield self.get(head)
+        ref = yield self.get_head()
+        if ref:
+            commit = yield self.get(ref)
             tree = yield self.get(commit.tree)
             wt = WorkingTree(self, tree, commit)
         else:
