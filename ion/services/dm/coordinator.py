@@ -9,6 +9,7 @@ Rewrite from LCO version; refactor/rewrite for new LCA arch.
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
@@ -19,7 +20,7 @@ from ion.services.dm.fetcher import FetcherClient
 
 class CoordinatorService(BaseService):
     """
-    Brains behind DX, and also the primary external interface.
+    Brains behind DX, and also the primary interface.
     """
     # Define ourselves for the CC
     declare = BaseService.service_declare(name='coordinator',

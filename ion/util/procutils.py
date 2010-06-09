@@ -12,6 +12,7 @@ import re
 from datetime import datetime
 import time
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer, reactor
 from magnet.container import Id
 

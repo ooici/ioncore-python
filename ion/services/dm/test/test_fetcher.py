@@ -7,13 +7,13 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
-from socket import gaierror
 
 from ion.services.dm.fetcher import FetcherClient, FetcherService
 from ion.test.iontest import IonTestCase
 
-class GetPageTester(IonTestCase):
+class FetcherServiceTester(IonTestCase):
     """
     Just instantiate the FetcherService class and exercise the inner get_page
     method.
@@ -32,7 +32,7 @@ class GetPageTester(IonTestCase):
         self.failUnlessSubstring('is the time for all', page)
 
     def test_bad_host(self):
-        self.failUnlessRaises(gaierror, self.mf.get_page,
+        self.failUnlessRaises(ValueError, self.mf.get_page,
                               'http://foo.bar.baz/')
 
     def test_404(self):
@@ -92,15 +92,15 @@ class FetcherTest(IonTestCase):
     @defer.inlineCallbacks
     def test_404(self):
         try:
-            d = yield self._get_page('http://ooici.net/404-fer-sure')
+            yield self._get_page('http://ooici.net/404-fer-sure')
             self.fail('Should have gotten an exception for 404 error!')
-        except ValueError, e:
+        except ValueError:
             pass
 
     @defer.inlineCallbacks
     def test_header_404(self):
         try:
-            d = yield self._get_phead('http://ooici.net/404-fer-sure')
+            yield self._get_phead('http://ooici.net/404-fer-sure')
             self.fail('Should have gotten an exception for 404 error!')
-        except ValueError, e:
+        except ValueError:
             pass

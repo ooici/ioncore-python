@@ -14,6 +14,7 @@ try:
 except:
     import simplejson as json
 import logging
+logging = logging.getLogger(__name__)
 import pickle
 from twisted.internet import defer
 

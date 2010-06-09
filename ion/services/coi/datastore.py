@@ -8,6 +8,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit

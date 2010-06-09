@@ -7,6 +7,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 
 # Use the Json serialization and hashing
 from ion.data.objstore import ValueRef
