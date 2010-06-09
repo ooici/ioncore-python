@@ -22,13 +22,22 @@ def bootstrap_cei():
     bootstrap()
 
 def put_provisioner_secrets():
-    key = os.environ.get('NIMBUS_KEY')
-    secret = os.environ.get('NIMBUS_SECRET')
-    if not key and not secret:
+    nimbus_key = os.environ.get('NIMBUS_KEY')
+    nimbus_secret = os.environ.get('NIMBUS_SECRET')
+    if not nimbus_key or not nimbus_secret:
         print "ERROR.  Please export NIMBUS_KEY and NIMBUS_SECRET"
         sys.exit(1)
-    run("sudo sh -c 'echo export NIMBUS_KEY=%s >> /opt/cei_environment'" % key)
-    run("sudo sh -c 'echo export NIMBUS_SECRET=%s >> /opt/cei_environment'" % secret)
+
+    ec2_key = os.environ.get('AWS_ACCESS_KEY_ID')
+    ec2_secret = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    if not ec2_key or not ec2_secret:
+        print "ERROR.  Please export AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
+        sys.exit(1)
+
+    run("sudo sh -c 'echo export NIMBUS_KEY=%s >> /opt/cei_environment'" % nimbus_key)
+    run("sudo sh -c 'echo export NIMBUS_SECRET=%s >> /opt/cei_environment'" % nimbus_secret)
+    run("sudo sh -c 'echo export AWS_ACCESS_KEY_ID=%s >> /opt/cei_environment'" % ec2_key)
+    run("sudo sh -c 'echo export AWS_SECRET_ACCESS_KEY=%s >> /opt/cei_environment'" % ec2_secret)
 
 def update():
     with hide('stdout'):
