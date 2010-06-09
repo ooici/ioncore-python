@@ -20,8 +20,9 @@ from ion.core import ioninit
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
 
+#TODO ugggggggggghhhhhhhhh
 CONF = ioninit.config(__name__)
-REGISTRY = Config(CONF['deployable_types']).getObject()
+execfile(CONF['deployable_types'])
 
 class DeployableTypeRegistryService(BaseService):
     """Deployable Type Registry service interface
@@ -38,7 +39,7 @@ class DeployableTypeRegistryService(BaseService):
         dtId = content['deployable_type']
         nodes = content.get('nodes')
         try:
-            dt = REGISTRY[dtId]
+            dt = _REGISTRY[dtId]
         except KeyError:
             #TODO how to throw errors..?
             logging.error('Invalid deployable type specified: ' + dtId)
