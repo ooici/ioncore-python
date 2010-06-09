@@ -11,7 +11,7 @@ import os
 import zlib
 import time
 
-from ion.data import objstore
+from ion.data.datastore import cas
 
 class GitObjectStore(object):
 
@@ -45,7 +45,7 @@ class GitRefStore(object):
         return os.listdir(self._full_path(''))
 
 
-class GitDB(objstore.CAStore):
+class GitDB(cas.CAStore):
     """
     Git is the information manager from hell.
 
