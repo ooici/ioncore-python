@@ -173,7 +173,7 @@ class FetcherService(BaseService):
             return
 
         logging.info('Sending dataset')
-        yield self.reply_ok(msg, dmsg)
+        yield self.reply_ok(msg, dmesg)
         logging.debug('Send complete')
 
 class FetcherClient(BaseServiceClient):

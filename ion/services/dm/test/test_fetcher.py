@@ -46,7 +46,6 @@ class FetcherTest(IonTestCase):
         services = [{'name':'fetcher', 'module':'ion.services.dm.fetcher',
                     'class': 'FetcherService'},]
         sup = yield self._spawn_processes(services)
-
         self.fc = FetcherClient(proc=sup)
 
     @defer.inlineCallbacks
@@ -55,7 +54,7 @@ class FetcherTest(IonTestCase):
 
     @defer.inlineCallbacks
     def _get_page(self, src_url):
-        logging.debug('sending request for "%s"...' % src_url)
+        logging.debug('sending GET request for "%s"...' % src_url)
         res = yield self.fc.get_url(src_url)
         msg = res['value']
         if res['status'] == 'ERROR':
@@ -64,12 +63,16 @@ class FetcherTest(IonTestCase):
 
     @defer.inlineCallbacks
     def _get_phead(self, src_url):
-        logging.debug('sending request for "%s"...' % src_url)
+        logging.debug('sending HEAD request for "%s"...' % src_url)
         res = yield self.fc.get_head(src_url)
         msg = res['value']
         if res['status'] == 'ERROR':
             raise ValueError('Error on fetch: ' + msg)
         defer.returnValue(msg)
+
+    ###############################################
+    def test_instantiation_only(self):
+        pass
 
     @defer.inlineCallbacks
     def test_single_get(self):
@@ -78,8 +81,8 @@ class FetcherTest(IonTestCase):
         @note Contenst of same in /var/www/tmp on amoeba.ucsd.edu
         """
         res = yield self._get_page('http://amoeba.ucsd.edu/tmp/test1.txt')
-        msg = res.strip()
-        self.failUnlessSubstring('Now is the time for all good men', msg)
+        self.failUnlessSubstring('Now is the time for all good men', res)
+        self.failUnlessSubstring('content-length', res)
 
     @defer.inlineCallbacks
     def test_page_head(self):
