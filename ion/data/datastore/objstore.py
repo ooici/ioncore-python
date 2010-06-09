@@ -9,7 +9,7 @@ import logging
 from twisted.internet import defer
 from twisted.python import reflect
 
-from ion.data import objstore
+from ion.data.datastore import cas
 from ion.data import dataobject 
 
 class ContentStoreError(Exception):
@@ -17,13 +17,13 @@ class ContentStoreError(Exception):
     """
 
 
-class EntityProxy(objstore.Entity):
+class EntityProxy(cas.Entity):
     """
     @brief Used for reading from the store
     """
 
     def __init__(self, name, hash, mode=None):
-        objstore.Entity.__init__(self, name, hash, mode)
+        cas.Entity.__init__(self, name, hash, mode)
         self._obj = None
 
     def get_obj(self, backend):
@@ -49,7 +49,7 @@ class BlobProxy(object):
 
     def __init__(self, backend, id):
         """
-        @param backend (or objstore) active backend to read from
+        @param backend (or cas) active backend to read from
         @param id the object hash
         """
         self.objstore = backend
@@ -70,7 +70,7 @@ class BlobProxy(object):
             d = defer.succeed(self._content)
         return d
 
-class TreeProxy(objstore.Tree):
+class TreeProxy(cas.Tree):
     """
     Live tree of real objects
     """
@@ -137,7 +137,7 @@ class ActiveTree(ActiveObject):
         """
         @brief Create ActiveTree from existing
         """
-        if not isinstance(tree, objstore.BaseObject):
+        if not isinstance(tree, cas.BaseObject):
             # Assume it's an id
             d = backend.get(tree)
             d.addCallback()
@@ -202,7 +202,7 @@ class WorkingTree(object):
         """
         """
 
-class Frontend(objstore.CAStore):
+class Frontend(cas.CAStore):
     """
     """
 
@@ -211,7 +211,7 @@ class Frontend(objstore.CAStore):
         @note Design decision on qualifying/naming a store name space (like
         a git repository tree)
         """
-        objstore.CAStore.__init__(self, backend, namespace)
+        cas.CAStore.__init__(self, backend, namespace)
         self.working_tree = None
         #self.TYPES['tree'] = TreeProxy
 

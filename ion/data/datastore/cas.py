@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-@file ion/data/objstore.py
+@file ion/data/datastore/cas.py
 @author Dorian Raymer
 @author Michael Meisinger
 @author David Stuebe
