@@ -1,23 +1,25 @@
 #!/usr/bin/env python
 
-"""
-@file ion/services/cei/epu_worker.py
-@author Alex Clemesha
-@brief Consumes work messages and performs work described in each message.
-"""
-
 import logging
+from twisted.internet import defer
 from magnet.spawnable import Receiver
 from ion.services.base_service import BaseService
+from ion.core.base_process import ProtocolFactory
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
 
 class EPUWorkerService(BaseService):
-    """EPU Worker service interface
+    """EPU Worker service.
     """
-    pass
+    declare = BaseService.service_declare(name='epu_worker', version='0.1.0', dependencies=[])
+
+    @defer.inlineCallbacks
+    def op_work(self, content, headers, msg):
+        logging.info("doing work  content:"+str(content))
+        # time.spleep(content['work'])
+        yield self.reply(msg, 'result', {'result':'work_complete'}, {})        
+ 
 
 # Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = EPUWorkerService(receiver)
+factory = ProtocolFactory(EPUWorkerService)
