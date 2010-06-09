@@ -45,8 +45,18 @@ class ProvisionerCore(object):
         nimbus_secret = os.environ['NIMBUS_SECRET']
         nimbus_test_driver = NimbusNodeDriver(nimbus_key, secret=nimbus_secret,
                 host='nimbus.ci.uchicago.edu', port=8444)
+        nimbus_uc_driver = NimbusNodeDriver(nimbus_key, secret=nimbus_secret,
+                host='tp-vm1.ci.uchicago.edu', port=8445)
+       
+        ec2_key = os.environ['AWS_ACCESS_KEY_ID']
+        ec2_secret = os.environ['AWS_SECRET_ACCESS_KEY']
+        ec2_east_driver = EC2NodeDriver(ec2_key, ec2_secret)
 
-        self.node_drivers = {'nimbus-test' : nimbus_test_driver}
+        self.node_drivers = {
+                'nimbus-test' : nimbus_test_driver,
+                'nimbus-uc' : nimbus_uc_driver,
+                'ec2-east' : ec2_east_driver,
+                }
         
         self.ctx_client = ContextClient(
                 'https://nimbus.ci.uchicago.edu:8888/ContextBroker/ctx/', 
