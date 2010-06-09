@@ -7,6 +7,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
@@ -15,6 +16,7 @@ from magnet.container import Id
 
 from ion.core import base_process, bootstrap, ioninit
 from ion.core import ioninit
+from ion.core.base_process import BaseProcess
 from ion.data.store import Store
 import ion.util.procutils as pu
 
@@ -47,11 +49,13 @@ class IonTestCase(unittest.TestCase):
         self.cont_conn = yield container.startContainer(mopt)
         bootstrap.init_container()
         self.procRegistry = base_process.procRegistry
+        self.test_sup = yield bootstrap.create_supervisor()
         logging.info("============Magnet container started, "+repr(self.cont_conn))
 
     @defer.inlineCallbacks
     def _start_core_services(self):
-        sup = yield bootstrap.bootstrap(None, bootstrap.ion_core_services)
+        sup = yield bootstrap.spawn_processes(bootstrap.ion_core_services,
+                                              self.test_sup)
         logging.info("============Core ION services started============")
         defer.returnValue(sup)
 
@@ -61,6 +65,7 @@ class IonTestCase(unittest.TestCase):
         reinitialization.
         """
         logging.info("Closing ION container")
+        self.test_sup = None
         dcs = reactor.getDelayedCalls()
         logging.info("Cancelling %s delayed reactor calls!" % len(dcs))
         for dc in dcs:
@@ -71,12 +76,21 @@ class IonTestCase(unittest.TestCase):
         bootstrap.reset_container()
         logging.info("============ION container closed============")
 
+    def _shutdown_processes(self, proc=None):
+        """
+        Shuts down spawned test processes.
+        """
+        if proc:
+            return proc.shutdown()
+        else:
+            return self.test_sup.shutdown()
 
     def _declare_messaging(self, messaging):
         return bootstrap.declare_messaging(messaging)
 
-    def _spawn_processes(self, procs):
-        return bootstrap.spawn_processes(procs)
+    def _spawn_processes(self, procs, sup=None):
+        sup = sup if sup else self.test_sup
+        return bootstrap.spawn_processes(procs, sup)
 
     def _get_procid(self, name):
         """
@@ -84,3 +98,31 @@ class IonTestCase(unittest.TestCase):
         @retval process id of the process (locally) identified by name
         """
         return self.procRegistry.get(name)
+
+
+class ReceiverProcess(BaseProcess):
+    """
+    A simple process that can send messages and tracks all received
+    messages
+    """
+    def __init__(self, *args, **kwargs):
+        BaseProcess.__init__(self, *args, **kwargs)
+        self.inbox = defer.DeferredQueue()
+
+    def _dispatch_message(self, payload, msg, target, conv):
+        """
+        Dispatch of messages to operations within this process instance. The
+        default behavior is to dispatch to 'op_*' functions, where * is the
+        'op' message attribute.
+        @retval deferred
+        """
+        logging.info('ReceiverProcess: Received message op=%s from sender=%s' %
+                     (msg.payload['op'], msg.payload['sender']))
+        self.inbox.put(msg)
+        return defer.succeed(True)
+
+    def await_message(self):
+        """
+        @retval Deferred for arriving message
+        """
+        return self.inbox.get()

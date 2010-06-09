@@ -6,6 +6,7 @@
 @brief definitions and code that needs to run for any use of ion
 """
 
+import logging
 import logging.config
 import magnet
 import re
@@ -52,3 +53,34 @@ def check_magnet_version():
         logging.error("*********** ATTENTION! Magnet %s required. Is %s ***********" % (ic.MIN_MAGNET, magnet.__version__))
 
 check_magnet_version()
+
+def set_log_levels(levelfilekey=None):
+    """
+    Sets logging levels of per module loggers to given values. Loggers of
+    packages are higher in the chain of module specific loggers.
+    If called with None argument, will read the global and local files with
+    log levels. Otherwise, read the file indicated by filename and if it exists,
+    set the log levels as given.
+    """
+    if levelfilekey == None:
+        set_log_levels('loglevels')
+        set_log_levels('loglevelslocal')
+    else:
+        levellistkey = ion_config.getValue2(__name__, levelfilekey, None)
+        levellist = None
+        try:
+            filecontent = open(levellistkey,).read()
+            # Eval file content in the namespace of the logging module, such
+            # that constants like DEBUG are resolved correctly
+            levellist = eval(filecontent, logging.__dict__)
+        except IOError, ioe:
+            pass
+        except Exception, ex:
+            print ex
+        if not levellist:
+            return
+        assert type(levellist) is list
+        for level in levellist:
+            logging.getLogger(level[0]).setLevel(level[1])
+
+set_log_levels()

@@ -7,10 +7,11 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.data.store import Store, IStore
-from ion.play.rdf_store.rdf_base import RdfAssociation
+from ion.play.rdf_store.rdf_base import RdfAssociation, RdfMixin
 
 class AssociationStore(object):
     """Example service implementation
@@ -58,9 +59,9 @@ class AssociationStore(object):
 
     @defer.inlineCallbacks
     def read_state(self, state):
-        assert isinstance(state, RdfESBase)
+        assert isinstance(state, RdfMixin)
         
-        associations = yield get_associations(state.object)
+        associations = yield self.get_associations(state.object)
         defer.returnValue(associations)
 
     @defer.inlineCallbacks

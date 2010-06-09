@@ -7,6 +7,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
@@ -23,8 +24,8 @@ class WorkerProcess(BaseService):
 
     @defer.inlineCallbacks
     def slc_init(self):
-        msg_name = self.spawnArgs['service-name']
-        scope = self.spawnArgs['scope']
+        msg_name = self.spawn_args['service-name']
+        scope = self.spawn_args['scope']
         logging.info("slc_init name received:"+msg_name)
         msg_name1 = self.get_scoped_name(scope, msg_name)
         logging.info("slc_init name used:"+msg_name1)
@@ -43,7 +44,7 @@ class WorkerProcess(BaseService):
 
     @defer.inlineCallbacks
     def _work(self,content):
-        myid = self.procName + ":" + self.receiver.spawned.id.local
+        myid = self.proc_name + ":" + self.receiver.spawned.id.local
         workid = str(content['work-id'])
         waittime = float(content['work'])
         logging.info("worker="+myid+" job="+workid+" work="+str(waittime))

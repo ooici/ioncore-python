@@ -8,6 +8,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit
@@ -31,8 +32,8 @@ class DatastoreService(BaseService):
     @defer.inlineCallbacks
     def slc_init(self):
         # use spawn args to determine backend class, second config file
-        backendcls = self.spawnArgs.get('backend_class', CONF.getValue('backend_class', None))
-        backendargs = self.spawnArgs.get('backend_args', CONF.getValue('backend_args', {}))
+        backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', None))
+        backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', {}))
         if backendcls:
             self.backend = pu.get_class(backendcls)
         else:

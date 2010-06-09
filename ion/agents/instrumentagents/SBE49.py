@@ -6,10 +6,8 @@
 @brief CI interface for SeaBird SBE-49 CTD
 """
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+ __name__)
 
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
@@ -24,6 +22,8 @@ instrumentCommands = (
     "pumpon",
     "pumpoff",
     "getsample",
+    "start_direct_access",
+    "stop_direct_access",
     "test_temperature_converted",
     "test_conductivity_converted",
     "test_pressure_converted",
@@ -36,7 +36,7 @@ instrumentCommands = (
 Maybe some day these values are looked up from a registry of common
 controlled vocabulary
 """
-instrumentParameters = (    
+instrumentParameters = (
     "baudrate",
     "outputformat",
     "outputsal",
@@ -88,7 +88,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
     Maybe some day these values are looked up from a registry of common
         controlled vocabulary
     """
-    __instrumentParameters = {    
+    __instrumentParameters = {
         "baudrate": 9600,
         "outputformat": 0,
         "outputsal": "Y",
@@ -130,13 +130,13 @@ class SBE49InstrumentDriver(InstrumentDriver):
         "ptcb1": 0.0,
         "ptcb2": 0.0
     }
-    
+
     def fetch_param(self, param):
         """
         operate in instrument protocol to get parameter
         """
         return self.__instrumentParameters[param]
-    
+
     def set_param(self, param, value):
         """
         operate in instrument protocol to set a parameter
@@ -146,7 +146,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             return {param: value}
         else:
             return {}
-            
+
     def execute(self, command):
         """
         Execute the given command
@@ -155,7 +155,18 @@ class SBE49InstrumentDriver(InstrumentDriver):
             return (1, command)
         else:
             return (0, command)
-        
+
+    def get_status(self, args):
+        """
+        Return the non-parameter and non-lifecycle status of the instrument.
+        This may include a snippit of config or important summary of what the
+        instrument may be doing...or even something else.
+        @param args a list of arguments that may be given for the status
+            retreival.
+        @return Return a tuple of (status_code, dict)
+        """
+        return (1, {'result': 'a-ok'})
+
 class SBE49InstrumentAgent(InstrumentAgent):
     """
     Sea-Bird 49 specific instrument driver
@@ -163,7 +174,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
     """
     driver = SBE49InstrumentDriver()
     lifecycleState = LCS.RESLCS_NEW
-    
+
     @staticmethod
     def __translator(input):
         """
@@ -171,7 +182,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         very raw data from the instrument into the common archive format
         """
         return input
-        
+
     @defer.inlineCallbacks
     def op_getTranslator(self, content, headers, msg):
         """
@@ -180,7 +191,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         """
         yield self.reply_err(msg, "Not Implemented!")
 #        yield self.reply_ok(msg, self.__translator)
-        
+
     @defer.inlineCallbacks
     def op_getCapabilities(self, content, headers, msg):
         """
@@ -190,6 +201,6 @@ class SBE49InstrumentAgent(InstrumentAgent):
         yield self.reply(msg, 'getCapabilties',
                          {'commands': instrumentCommands,
                           'parameters': instrumentParameters}, {})
-    
+
 # Spawn of the process using the module name
 factory = ProtocolFactory(SBE49InstrumentAgent)

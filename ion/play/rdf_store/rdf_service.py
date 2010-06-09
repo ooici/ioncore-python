@@ -2,58 +2,108 @@
 
 """
 @file ion/play/rdf_store/rdf_service.py
+@package ion.play.rdf_store.rdf_service 
 @author David Stuebe
-@brief  RDF Store: rdf service
+@brief A service that provides git symantics for push pull commit and diff to
+the rdf workspace composed of associations and objects.
+The associations can be walked to find content.
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
-from ion.core import bootstrap
 from ion.services.base_service import BaseService, BaseServiceClient
 
-from ion.data.dataobject import DataObject
-from ion.data.store import Store
-from ion.data.objstore import ValueObject, ValueRef
+from ion.play.rdf_store.rdf_store import RdfStore
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfEntity, RdfMixin, RdfState, WorkSpace, RdfDefs
 
-from ion.play.rdf_store.association_service import AssociationServiceClient
-from ion.play.rdf_store.blob_service import BlobServiceClient
-from ion.play.rdf_store.reference_service import ReferenceServiceClient
+class RdfService(BaseService):
+    """
+    Example service interface
+    """
+    # Declaration of service
+    declare = BaseService.service_declare(name='RdfService',
+                                          version='0.1.0',
+                                          dependencies=[])
 
+    def __init__(self, receiver, spawnArgs=None):
+        # Service class initializer. Basic config, but no yields allowed.
+        BaseService.__init__(self, receiver, spawnArgs)
+        self.rdfs=RdfStore()
+        logging.info('RdfService.__init__()')
 
-
-class RdfStore(object):
-    
-    def __init__(self):
-        self.asc=None     # Association Service Client
-        self.bsc=None     # Blob Service Client
-        self.asc_ref=None # Association Reference Service Client
-        self.ssc=None     # State Service Client
-        self.ssc_ref=None # State Reference Service Client
-        print 'Initialized RdfStore'
-    
     @defer.inlineCallbacks
-    def init(self):
-        services = [{'name':'blob1','module':'ion.play.rdf_store.blob_service','class':'BlobService'},]
-        sup = yield bootstrap.spawn_processes(services)
-        print 'blob sup', sup
-        self.bsc = BlobServiceClient(proc=sup)
-        print 'blob service client', self.bsc
+    def slc_init(self):
+        # Service life cycle state. Initialize service here. Can use yields.
+        yield self.rdfs.init()
+    
 
-        services = [{'name':'association1','module':'ion.play.rdf_store.association_service','class':'AssociationService'},]
-        sup = yield bootstrap.spawn_processes(services)
-        self.bsc = AssociationServiceClient(proc=sup)
+    @defer.inlineCallbacks
+    def op_push(self, content, headers, msg):
+        logging.info('op_push: '+str(content))
 
-        services = [{'name':'reference1','module':'ion.play.rdf_store.reference_service','class':'ReferenceService'},]
-        sup = yield bootstrap.spawn_processes(services)
-        self.ssc_ref = ReferenceServiceClient(proc=sup)
+        # The following line shows how to reply to a message
+        yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
 
-        services = [{'name':'reference2','module':'ion.play.rdf_store.reference_service','class':'ReferenceService'},]
-        sup = yield bootstrap.spawn_processes(services)
-        self.asc_ref = ReferenceServiceClient(proc=sup)
+    @defer.inlineCallbacks
+    def op_pull(self, content, headers, msg):
+        logging.info('op_pull: '+str(content))
+
+        # The following line shows how to reply to a message
+        yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
+
+
+
+class RdfServiceClient(BaseServiceClient):
+    """
+    This is an exemplar service client that calls the hello service. It
+    makes service calls RPC style.
+    """
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "RdfService"
+        BaseServiceClient.__init__(self, proc, **kwargs)
+        self.rdfs=RdfStore()
+        logging.info('RdfServiceClient.__init__()')
+
+
+    @defer.inlineCallbacks
+    def slc_init(self):
+        yield self.rdfs.init()
+
+
+    @defer.inlineCallbacks
+    def push(self, key):
+        yield self._check_init()
         
-        
-        
+        (content, headers, msg) = yield self.rpc_send('push', key)
+        logging.info('Service reply: '+str(content))
+        defer.returnValue(str(content))
+
+    @defer.inlineCallbacks
+    def pull(self, key):
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('pull', key)
+        logging.info('Service reply: '+str(content))
+        defer.returnValue(str(content))
+
+
+
+# Spawn of the process using the module name
+factory = ProtocolFactory(RdfService)
+
+
+
+"""
+from ion.play import hello_service as h
+spawn(h)
+send(1, {'op':'hello','content':'Hello you there!'})
+
+from ion.play.hello_service import HelloServiceClient
+hc = HelloServiceClient(1)
+hc.hello()
+"""

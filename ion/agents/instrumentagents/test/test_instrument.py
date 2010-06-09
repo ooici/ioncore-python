@@ -9,6 +9,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 import inspect
 from twisted.internet import defer
 
@@ -105,6 +106,17 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(response['start']['status'] == 'OK')
         self.assert_(response['stop']['status'] == 'OK')
         self.assert_(response['badcommand']['status'] == 'ERROR')
+        
+    @defer.inlineCallbacks
+    def testStatus(self):
+        """
+        Test to see if the status response is correct
+        """
+        response = yield self.IAClient.getStatus(['some_arg'])
+        logging.debug("testStatus response: %s", response)
+        self.assert_(isinstance(response, dict))
+        self.assertEqual(response['status'], "OK")
+        self.assertEqual(response['result'], 'a-ok')
         
     @defer.inlineCallbacks
     def testTranslator(self):

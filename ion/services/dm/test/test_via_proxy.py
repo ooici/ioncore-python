@@ -11,6 +11,7 @@ not use OOI messaging.
 """
 
 import logging
+logging = logging.getLogger(__name__)
 import urllib2
 
 from twisted.internet import defer
@@ -22,7 +23,6 @@ from twisted.trial import unittest
 class IntegrationTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
-        yield self._start_container()
         services = [{'name':'fetcher',
                      'module':'ion.services.dm.fetcher',
                      'class': 'FetcherService'},
@@ -32,6 +32,7 @@ class IntegrationTest(IonTestCase):
                     {'name':'proxy',
                      'module': 'ion.services.dm.proxy',
                      'class': 'ProxyService'},]
+        yield self._start_container()
         yield self._spawn_processes(services)
 
     @defer.inlineCallbacks
@@ -39,11 +40,11 @@ class IntegrationTest(IonTestCase):
         yield self._stop_container()
 
     def _get_page(self, src_url):
-        ph = urllib2.ProxyHandler({'http':'http://localhost:10001'})
+        ph = urllib2.ProxyHandler({'http':'http://localhost:8000'})
         opener = urllib2.build_opener(ph)
         urllib2.install_opener(opener)
 
-        logging.debug('sending request for "%s"...' % src_url)
+        logging.debug('sending request for "%s" via proxy...' % src_url)
         fh = urllib2.urlopen(src_url)
         page = fh.read()
         fh.close()
@@ -55,11 +56,10 @@ class IntegrationTest(IonTestCase):
         @note Contents of same in /var/www/tmp on amoeba.ucsd.edu
         """
         raise unittest.SkipTest('code not implemented yet')
-
         res = self._get_page('http://amoeba.ucsd.edu/tmp/test1.txt')
-        msg = res.strip()
-        self.failUnlessEqual(msg, 'Now is the time for all good men to come to the aid of their country.')
+        self.failUnlessSubstring('Now is the time for all good men to come to the aid of their country.',
+                                 msg)
 
     @defer.inlineCallbacks
-    def test_404(self):
+    def _test_404(self):
         raise unittest.SkipTest('code not implemented yet')

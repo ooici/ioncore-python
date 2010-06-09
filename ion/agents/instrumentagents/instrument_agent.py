@@ -6,7 +6,7 @@
 @brief Instrument Agent, Driver, and Client class definitions
 """
 import logging
-import inspect
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.agents.resource_agent import ResourceAgent
@@ -69,6 +69,7 @@ class InstrumentAgent(ResourceAgent):
         @return A reply message containing a dictionary of name/value pairs
         """
         assert(isinstance(content, list))
+        assert(self.driver != None)
         response = {}
         for key in content:
             response[key] = self.driver.fetch_param(key)
@@ -86,6 +87,7 @@ class InstrumentAgent(ResourceAgent):
             On failure, return the bad key, but previous keys were already set
         """
         assert(isinstance(content, dict))
+        assert(self.driver != None)
         response = {}
         for key in content:
             result = {}
@@ -102,6 +104,7 @@ class InstrumentAgent(ResourceAgent):
         """
         Query the lifecycle state of the object
         @return Message with the lifecycle state
+        @todo Should actually work with registry for lifecycle state
         """
         yield self.reply(msg, 'getLifecycleState', self.lifecycleState, {})
         
@@ -110,6 +113,7 @@ class InstrumentAgent(ResourceAgent):
         """
         Set the lifecycle state
         @return Message with the lifecycle state that was set
+        @todo Should actually work with registry for lifecycle state
         """
         self.lifecycleState = content
         yield self.reply(msg, 'setLifecycleState', content, {})
@@ -122,8 +126,11 @@ class InstrumentAgent(ResourceAgent):
         was executed.
         @param content Should be a list where first element is the command,
             the rest are the arguments
+        @return ACK message with response on success, ERR message with string
+            indicating code and response message on fail
         """
         assert(isinstance(content, unicode))
+        assert(self.driver != None)
         execResult = self.driver.execute(content)
         assert(len(execResult) == 2)
         (errorCode, response) = execResult
@@ -140,8 +147,17 @@ class InstrumentAgent(ResourceAgent):
         """
         Obtain the status of an instrument. This includes non-parameter
         and non-lifecycle state of the instrument.
+        @param content A list of arguments to make up the status request
+        @return ACK message with response on success, ERR message on failure
         """
-
+        assert(isinstance(content, list))
+        assert(self.driver != None)
+        response = self.driver.get_status(content)
+        if ((isinstance(response, tuple)) and (response[0] == 1)):
+            yield self.reply_ok(msg, response[1])
+        else:
+            yield self.reply_err(msg, 'No values found')
+            
 class InstrumentAgentClient(ResourceAgentClient):
     """
     The base class for an Instrument Agent Client. It is a service
@@ -193,6 +209,17 @@ class InstrumentAgentClient(ResourceAgentClient):
         assert(isinstance(result, dict))
         defer.returnValue(result)
 
+    @defer.inlineCallbacks
+    def getStatus(self, argList):
+        """
+        Obtain the non-parameter and non-lifecycle status of the instrument
+        """
+        assert(isinstance(argList, list))
+        (content, headers, message) = yield self.rpc_send('getStatus',
+                                                              argList)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+        
     @defer.inlineCallbacks    
     def getCapabilities(self):
         """

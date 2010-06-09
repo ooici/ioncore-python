@@ -2,12 +2,13 @@
 
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.data.store import Store, IStore
 from ion.data.set_store import SetStore, ISetStore
 
-from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfBase, RdfEntity, RdfState, WorkSpace, RdfESBase
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfBase, RdfEntity, RdfState, WorkSpace, RdfMixin
 
 from ion.play.rdf_store.state_store import StateStore
 from ion.play.rdf_store.association_store import AssociationStore
@@ -60,15 +61,15 @@ class RdfStore(object):
         
     @defer.inlineCallbacks
     def checkout_state(self,state):
-        assert isinstance(state, RdfESBase)
+        assert isinstance(state, RdfMixin)
 
         # if it is just a reference to the state, get the state
         if not state.object:
-            state = yield self.associations.read_state(state)
+            state = yield self.states.get_states(state)
         
         # sort the associations into blobs, states, associations and entities
-        alist = state.object
-        aset=yield self.associations.get_associations(alist)
+        
+        aset=yield self.associations.read_state(state)
         
         sortedkeys=RdfAssociation.sort_keys(aset)
 
@@ -76,9 +77,16 @@ class RdfStore(object):
         #print 'sortedkeys',sortedkeys
         bset= yield self.blobs.get_blobs(sortedkeys[RdfBase.BLOB])
         
-        sset= yield self.states.get_states(sortedkeys[RdfBase.STATE])
+        sset=[]
+        for key_commit in sortedkeys[RdfBase.STATE]:
+            sset.append( RdfState.reference(key_commit[0],key_commit[1]) )
+            
+        #sset= yield self.states.get_states(sortedkeys[RdfBase.STATE])
         
-        eset= yield self.states.get_states(sortedkeys[RdfBase.ENTITY])
+        eset=[]
+        for key_commit in sortedkeys[RdfBase.ENTITY]:
+            eset.append( RdfEntity.reference(key_commit[0]) )
+        #eset= yield self.states.get_states(sortedkeys[RdfBase.ENTITY])
         
         ws=WorkSpace.load(state,aset,eset,sset,bset)
         
@@ -132,7 +140,7 @@ class RdfStore(object):
                 if key == None:
                     # It was generated in RdfEntity.load because this is a new thing
                     key = update.key
-                    
+                    workspace.key=key
             
             # Returns list of key/commit tuples (length arg to put_states)    
             key_commit= yield self.states.put_states(update)
@@ -175,7 +183,12 @@ class RdfStore(object):
         else:
             # there is no difference - return an empty workspace
             ws=WorkSpace.create([])
-            
+         
+        # Force the comparison!   
+        key = workspace.key
+        if not commit:   
+                commit=workspace.commitRefs
+        state= yield self.states.get_key(key,commit)
             
         # IF state, compare the associations and diff the workspace
         if state:
@@ -189,6 +202,7 @@ class RdfStore(object):
                 for a in associations:
                     # a is an association in the current workspace, check if it is in the state
                     if a.key in state.object:
+                        
                         ws.remove_association(a)
 
                 # Could test for differences between the Blobs, but probably not worth it!
@@ -202,7 +216,19 @@ class RdfStore(object):
 #    @defer.inlineCallbacks 
     def merge(self,state1, state2):
         pass
+
+    @defer.inlineCallbacks    
+    def get_ancestors(self, key, commitRef=None):
         
+        if commitRef:
+            cref = commitRef
+            # @Todo make sure commit is an ancestor of the head
+        else:
+            cref = yield self.states.objstore.get_commitref(key)
+
+        
+        ancestors_list = yield self.states.objstore.vs.get_ancestors(cref)
+        defer.returnValue(ancestors_list)  
         
             
     # To be implemented later! Make it distributed so services can work locally!
@@ -212,11 +238,93 @@ class RdfStore(object):
     def pull(self,key,**kwargs):
         pass
     
-    
-    def walk(self,rdfbase,association_match):
+    @defer.inlineCallbacks 
+    def walk(self,association_match):
         
-        ws = WorkSpace()
-        return ws
+        if not len(association_match)==3:
+            raise RuntimeError('Association_match must be a tuple of length 3')
+                
+                
+        # Get the set of association keys which referece the intersection of the search criteria
+        keyset=set()
+        tomatch={}
+        if association_match[0]!='*':
+            sref = association_match[0].rdf_id()
+            skeys=yield self.a_refs.get_references(sref)
+            keyset=skeys
+            
+            tomatch[RdfBase.SUBJECT]=association_match[0]
+        else:
+            skeys='*'
+        
+        if association_match[1]!='*':
+            pref = association_match[1].rdf_id()
+            pkeys=yield self.a_refs.get_references(pref)
+            keyset=pkeys
+
+            tomatch[RdfBase.PREDICATE]=association_match[1]
+        else:
+            pkeys='*'
+            
+        if association_match[2]!='*':
+            oref = association_match[2].rdf_id()
+            okeys=yield self.a_refs.get_references(oref)
+            keyset=okeys
+            
+            tomatch[RdfBase.OBJECT]=association_match[2]
+        else:
+            okeys='*'
+        
+        if okeys!='*' and pkeys!='*' and skeys!='*':
+            keyset=set.intersection(skeys,pkeys,okeys)   # Change to union method in ref store!
+        elif okeys!='*' and pkeys!='*':
+            keyset=set.intersection(pkeys,okeys)
+        elif pkeys!='*' and skeys!='*':
+            keyset=set.intersection(pkeys,skeys)
+        elif okeys!='*' and skeys!='*':
+            keyset=set.intersection(okeys,skeys)
+        elif okeys=='*' and pkeys=='*' and skeys=='*':
+            raise RuntimeError('Can not pass 3 wild cards to DataStore:walk. At least one of the triple must a referenced object')
+            
+        if keyset:
+            aset = yield self.associations.get_associations(keyset)
+            
+            # Filter for correct order
+            for association in aset:
+                #print association
+
+                for position in tomatch:
+                    #print position
+                    #print tomatch[position]
+                    if not association.match(tomatch[position],position=position):
+                        aset.remove(association)
+                        break
+
+
+        
+            sortedkeys=RdfAssociation.sort_keys(aset)
+
+            # Get the blobs
+            #print 'sortedkeys',sortedkeys
+            bset= yield self.blobs.get_blobs(sortedkeys[RdfBase.BLOB])
+            
+            sset=[]
+            for key_commit in sortedkeys[RdfBase.STATE]:
+                sset.append( RdfState.reference(key_commit[0],key_commit[1]) )
+                    
+            eset=[] 
+            for key_commit in sortedkeys[RdfBase.ENTITY]:
+                eset.append( RdfEntity.reference(key_commit[0]) )
+
+            state=RdfEntity.create(aset)
+        
+            ws=WorkSpace.load(state,aset,eset,sset,bset)        
+        else:
+            ws=WorkSpace()
+
+        
+        
+        defer.returnValue(ws)        
         
         
     def garbage_collection(self):

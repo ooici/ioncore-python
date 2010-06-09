@@ -10,6 +10,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 import pycassa
 
 

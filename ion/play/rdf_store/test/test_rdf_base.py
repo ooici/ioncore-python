@@ -7,7 +7,10 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.trial import unittest
+
+import pickle
 
 from ion.play.rdf_store.rdf_base import RdfBase, RdfAssociation, RdfBlob, RdfEntity, RdfState, WorkSpace
 
@@ -30,6 +33,7 @@ class RdfTest(unittest.TestCase):
         base1 = RdfBase(self.val3,RdfBase.BLOB)
         base2 = RdfBase(self.val3,RdfBase.BLOB)
         self.assertEqual(base1,base2)
+        print base1
 
     def test_RdfBlob(self):
         
@@ -163,6 +167,15 @@ class RdfTest(unittest.TestCase):
         w.print_status()
         print 'refs to blob1', w.len_refs(blob1)
         
+        # How do you make this work?
+        #self.assertFailure(w.make_rdf_reference(),RuntimeError())
+        
+        w.key=5
+        ref = w.make_rdf_reference()
+        
+        comp = RdfEntity.create(assoc1,key=5)
+        
+        
         self.assertEqual(w.len_refs(blob1),1)
         
         self.assertEqual(w.len_associations(),1)
@@ -175,4 +188,33 @@ class RdfTest(unittest.TestCase):
         w.print_status()
         print 'refs to blob1', w.len_refs(blob1)
         
+        w.print_workspace()
 
+        
+        props={
+            'name':'ctd',
+            'model':'sbe911',
+            'serial number':'932u8y74',
+            'sensor ID':'293ulkskdj',
+            'Manufacture':'SeaBird',
+            'Point of Contact':'John Graybeal'
+        }
+        
+        
+        tuple1=('this',RdfBlob.create('OOI:Owner'),RdfEntity.reference('***Id of an Owner Entity/Statess'))
+        tuple2=('this',RdfBlob.create('OOI:typeOf'),RdfEntity.reference('ID Instrument Resources'))
+        
+        associations=[tuple1,tuple2]
+        
+        res_description=WorkSpace.resource_properties('OOI:Instrument',props,associations)
+
+        print '========Original Workspace ============='
+        res_description.print_workspace()
+        
+        p = pickle.dumps(res_description)
+        
+        up = pickle.loads(p)
+        print '========Pickled Copy of Workspace ============='
+        up.print_workspace()
+        
+        

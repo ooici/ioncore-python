@@ -120,6 +120,19 @@ again (see above). Please review the branch logs for any hints.
 Change log:
 ===========
 
+2010-06-07:
+- Redefined logging import to set as module level logger. Each module has now
+  a different logger that can be configured separately. Don't configure
+  manually though.
+- Added possibility to modify logging levels by module/package, with support
+  for package hierarchy. See res/logging/loglevels.cfg for standard entries.
+  Do not modify. Add file res/logging/loglevelslocal.cfg for local override.
+  Default logging level for all ion code: WARNING
+2010-06-02:
+- BaseProcess self members renamed to conform to PEP8
+- Added process shutdown to BaseProcess
+- Added container UNIX shell argument -a processes=<path to filename> used
+  by newcc.py script, with a list of processes to startup in standard format
 2010-05-25:
 - Made Cassandra backend parameterizable with keyspace/colfamily and added
   SuperColumn support.

@@ -12,6 +12,7 @@ import re
 from datetime import datetime
 import time
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer, reactor
 from magnet.container import Id
 
@@ -222,8 +223,7 @@ def currenttime():
     """
     @retval current UTC time as float with seconds in epoch and fraction
     """
-    now = datetime.utcnow()
-    return time.mktime(now.timetuple()) + now.microsecond / 1000000.0
+    return time.time()
 
 def currenttime_ms():
     """

@@ -10,14 +10,13 @@
 
 from twisted.trial import unittest
 import logging
+logging = logging.getLogger(__name__)
 from uuid import uuid4
 
 from ion.data.datastore.techInterface import CassandraStore
 
 class TechInterfaceTest(unittest.TestCase):
     def setUp(self):
-        logging.basicConfig(level=logging.WARN, \
-                format='%(asctime)s %(levelname)s [%(funcName)s] %(message)s')
         clist = ['amoeba.ucsd.edu:9160']
         self.ds = CassandraStore(cass_host_list=clist)
         self.key = self._mkey()

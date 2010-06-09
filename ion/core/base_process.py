@@ -8,6 +8,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 
 from twisted.internet import defer
 from magnet.container import Container
@@ -42,37 +43,36 @@ class BaseProcess(object):
     This is the base class for all processes. Processes can be spawned and
     have a unique identifier. Each process has one main process receiver and can
     define additional receivers as needed. This base class provides a lot of
-    mechanics for developing processes, such as sending and receiving messages.
-
-    @todo tighter integration with Spawnable
+    mechanics for processes, such as sending and receiving messages, RPC style
+    calls, spawning and terminating child processes. Subclasses may use the
+    plc-* process life cycle events.
     """
     # Conversation ID counter
     convIdCnt = 0
 
-    def __init__(self, receiver=None, spawnArgs=None):
+    def __init__(self, receiver=None, spawnArgs=None, **kwargs):
         """
         Initialize process using an optional receiver and optional spawn args
         @param receiver  instance of a Receiver for process control
         @param spawnArgs  standard and additional spawn arguments
         """
-        #logging.debug('BaseProcess.__init__()')
-        self.procState = "UNINITIALIZED"
+        self.proc_state = "UNINITIALIZED"
         spawnArgs = spawnArgs.copy() if spawnArgs else {}
-        self.spawnArgs = spawnArgs
-        self.init_time = pu.currenttime_ms()
+        self.spawn_args = spawnArgs
+        self.proc_init_time = pu.currenttime_ms()
 
         # Name (human readable label) of this process.
-        self.procName = self.spawnArgs.get('proc-name', __name__)
+        self.proc_name = self.spawn_args.get('proc-name', __name__)
 
         # The system unique ID; propagates from root supv to all child procs
         sysname = ioninit.cont_args.get('sysname', Container.id)
-        self.sysName = self.spawnArgs.get('sys-name', sysname)
+        self.sys_name = self.spawn_args.get('sys-name', sysname)
 
         # The process ID of the supervisor process
-        self.procSupId = pu.get_process_id(self.spawnArgs.get('sup-id', None))
+        self.proc_supid = pu.get_process_id(self.spawn_args.get('sup-id', None))
 
         if not receiver:
-            receiver = Receiver(self.procName)
+            receiver = Receiver(self.proc_name)
         self.receiver = receiver
         receiver.handle(self.receive)
 
@@ -90,7 +90,7 @@ class BaseProcess(object):
         self.child_procs = []
 
         logging.info("Process init'd: proc-name=%s, sup-id=%s, sys-name=%s" % (
-                self.procName, self.procSupId, self.sysName))
+                self.proc_name, self.proc_supid, self.sys_name))
 
     def add_receiver(self, receiver):
         key = receiver.name
@@ -101,12 +101,19 @@ class BaseProcess(object):
         """
         Spawns this process using the process' receiver. Self spawn can
         only be called once per instance.
-        @note this method is not called when spawned by magnet
+        @note this method is not called when spawned through magnet. This makes
+        it tricky to do consistent initialization on spawn.
         """
         assert not self.receiver.spawned, "Process already spawned"
         self.id = yield spawn(self.receiver)
         logging.debug('spawn()=' + str(self.id))
+        yield defer.maybeDeferred(self.plc_spawn)
         defer.returnValue(self.id)
+
+    def plc_spawn(self):
+        """
+        Process life cycle event: on spawn of process (once)
+        """
 
     def is_spawned(self):
         return self.receiver.spawned != None
@@ -116,12 +123,14 @@ class BaseProcess(object):
         """
         Init operation, on receive of the init message
         """
-        if self.procState == "UNINITIALIZED":
+        if self.proc_state == "UNINITIALIZED":
             yield defer.maybeDeferred(self.plc_init)
-            logging.info('----- Process %s INITIALIZED -----' % (self.procName))
+            logging.info('----- Process %s INITIALIZED -----' % (self.proc_name))
 
-            yield self.reply_ok(msg)
-            self.procState = "INITIALIZED"
+            if msg != None:
+                # msg is None only if called from local process self.init()
+                yield self.reply_ok(msg)
+            self.proc_state = "INITIALIZED"
 
     def plc_init(self):
         """
@@ -129,35 +138,90 @@ class BaseProcess(object):
         """
         logging.info('BaseProcess.plc_init()')
 
+    @defer.inlineCallbacks
+    def op_shutdown(self, content, headers, msg):
+        """
+        Init operation, on receive of the init message
+        """
+        assert self.proc_state == "INITIALIZED", "Process must be initalized"
+
+        if len(self.child_procs) > 0:
+            logging.info("Shutting down child processes")
+        while len(self.child_procs) > 0:
+            child = self.child_procs.pop()
+            res = yield self.shutdown_child(child)
+
+        yield defer.maybeDeferred(self.plc_shutdown)
+        logging.info('----- Process %s TERMINATED -----' % (self.proc_name))
+
+        if msg != None:
+                # msg is None only if called from local process self.shutdown()
+            yield self.reply_ok(msg)
+        self.proc_state = "TERMINATED"
+
+    def plc_shutdown(self):
+        """
+        Process life cycle event: on shutdown of process (once)
+        """
+        logging.info('BaseProcess.plc_shutdown()')
+
     def receive(self, payload, msg):
         """
         This is the main entry point for received messages. Messages are
-        dispatched to operation handling methods. RPC is caught and completed.
+        distinguished into RPC replies (by conversation ID) and other received
+        messages.
         """
         # Check if this response is in reply to an RPC call
         if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
-            logging.info('BaseProcess: Received RPC reply. content=' +str(payload['content']))
-            d = self.rpc_conv.pop(payload['conv-id'])
-            content = payload.get('content', None)
-            res = (content, payload, msg)
-            # @todo is it OK to ack the response at this point already?
-            d1 = msg.ack()
-            if d1:
-                d1.addCallback(lambda res1: d.callback(res))
-                d1.addErrback(lambda c: d.errback(c))
-            else:
-                # Support for older carrot version where ack did not return deferred
-                d.callback(res)
+            self._receive_rpc(payload, msg)
         else:
-            logging.info('BaseProcess: Message received, dispatching...')
-            convid = payload.get('conv-id', None)
-            conv = self.conversations.get(convid, None) if convid else None
-            # Perform a dispatch of message by operation
-            d = pu.dispatch_message(payload, msg, self, conv)
-            def _cb(res):
-                logging.info("ACK msg")
-                d1 = msg.ack()
-            d.addCallbacks(_cb, logging.error)
+            self._receive_msg(payload, msg)
+
+    def _receive_rpc(self, payload, msg):
+        """
+        Handling of RPC replies.
+        """
+        logging.info('BaseProcess: Received RPC reply. content=' +str(payload['content']))
+        d = self.rpc_conv.pop(payload['conv-id'])
+        content = payload.get('content', None)
+        res = (content, payload, msg)
+        # @todo is it OK to ack the response at this point already?
+        d1 = msg.ack()
+        if d1:
+            d1.addCallback(lambda res1: d.callback(res))
+            d1.addErrback(lambda c: d.errback(c))
+            return d1
+        else:
+            # Support for older carrot version where ack did not return deferred
+            d.callback(res)
+            return d
+
+    def _receive_msg(self, payload, msg):
+        """
+        Handling of non-RPC messages. Messages are dispatched according to
+        message attributes.
+        """
+        logging.info('BaseProcess: Message received, dispatching...')
+        convid = payload.get('conv-id', None)
+        conv = self.conversations.get(convid, None) if convid else None
+        # Perform a dispatch of message by operation
+        d = self._dispatch_message(payload, msg, self, conv)
+        def _cb(res):
+            logging.info("ACK msg")
+            d1 = msg.ack()
+        d.addCallbacks(_cb, logging.error)
+        return d
+
+    def _dispatch_message(self, payload, msg, target, conv):
+        """
+        Dispatch of messages to operations within this process instance. The
+        default behavior is to dispatch to 'op_*' functions, where * is the
+        'op' message attribute.
+        @retval deferred
+        """
+        assert payload['op'] == 'init' or self.proc_state == "INITIALIZED"
+        d = pu.dispatch_message(payload, msg, target, conv)
+        return d
 
     def op_none(self, content, headers, msg):
         """
@@ -277,7 +341,7 @@ class BaseProcess(object):
         if scope == 'local':
             scoped_name =  str(Container.id) + "." + name
         elif scope == 'system':
-            scoped_name =  self.sysName + "." + name
+            scoped_name =  self.sys_name + "." + name
         elif scope == 'global':
             pass
         else:
@@ -299,7 +363,7 @@ class BaseProcess(object):
         assert not childproc in self.child_procs
         self.child_procs.append(childproc)
         child_id = yield childproc.spawn(self)
-        yield procRegistry.put(str(childproc.procName), str(child_id))
+        yield procRegistry.put(str(childproc.proc_name), str(child_id))
         if init:
             yield childproc.init()
         defer.returnValue(child_id)
@@ -310,12 +374,15 @@ class BaseProcess(object):
     def spawn_link(self, childproc, supervisor):
         pass
 
+    def shutdown_child(self, childproc):
+        return childproc.shutdown()
+
     def get_child_def(self, name):
         """
         @retval the ProcessDesc instance of a child process by name
         """
         for child in self.child_procs:
-            if child.procName == name:
+            if child.proc_name == name:
                 return child
 
     def get_child_id(self, name):
@@ -323,7 +390,24 @@ class BaseProcess(object):
         @retval the process id a child process by name
         """
         child = self.get_child_def(name)
-        return child.procId if child else None
+        return child.proc_id if child else None
+
+    def init(self):
+        """
+        Initializes this process instance. Typically a call should not be
+        necessary because the init message is received from the supervisor
+        process. It may be necessary for the root supervisor and for test
+        processes.
+        @retval Deferred
+        """
+        return self.op_init(None, None, None)
+
+    def shutdown(self):
+        """
+        Recursivey terminates all child processes and then itself.
+        @retval Deferred
+        """
+        return self.op_shutdown(None, None, None)
 
 class ProcessDesc(object):
     """
@@ -339,13 +423,13 @@ class ProcessDesc(object):
         @param node  ID of container to spawn process on (optional)
         @param spawnargs  dict of additional spawn arguments (optional)
         """
-        self.procName = kwargs.get('name', None)
-        self.procModule = kwargs.get('module', None)
-        self.procClass = kwargs.get('class', kwargs.get('procclass', None))
-        self.procNode = kwargs.get('node', None)
-        self.spawnArgs = kwargs.get('spawnargs', None)
-        self.procId = None
-        self.procState = 'DEFINED'
+        self.proc_name = kwargs.get('name', None)
+        self.proc_module = kwargs.get('module', None)
+        self.proc_class = kwargs.get('class', kwargs.get('procclass', None))
+        self.proc_node = kwargs.get('node', None)
+        self.spawn_args = kwargs.get('spawnargs', None)
+        self.proc_id = None
+        self.proc_state = 'DEFINED'
 
     @defer.inlineCallbacks
     def spawn(self, supProc=None):
@@ -353,41 +437,51 @@ class ProcessDesc(object):
         Spawns this process description with the initialized attributes.
         @param supProc  the process instance that should be set as supervisor
         """
-        assert self.procState == 'DEFINED', "Cannot spawn process twice"
-        self.supProcess = supProc
-        if self.procNode == None:
-            logging.info('Spawning name=%s node=%s' % (self.procName, self.procNode))
+        assert self.proc_state == 'DEFINED', "Cannot spawn process twice"
+        self.sup_process = supProc
+        if self.proc_node == None:
+            logging.info('Spawning name=%s node=%s' %
+                         (self.proc_name, self.proc_node))
 
             # Importing service module
-            proc_mod = pu.get_module(self.procModule)
-            self.procModObj = proc_mod
+            proc_mod = pu.get_module(self.proc_module)
+            self.proc_mod_obj = proc_mod
 
             # Spawn instance of a process
             # During spawn, the supervisor process id, system name and proc name
             # get provided as spawn args, in addition to any give spawn args.
-            spawnargs = {'proc-name':self.procName,
-                         'sup-id':self.supProcess.receiver.spawned.id.full,
-                         'sys-name':self.supProcess.sysName}
-            if self.spawnArgs:
-                spawnargs.update(self.spawnArgs)
-            #logging.debug("spawn(%s, args=%s)" % (self.procModule, spawnargs))
+            spawnargs = {'proc-name':self.proc_name,
+                         'sup-id':self.sup_process.receiver.spawned.id.full,
+                         'sys-name':self.sup_process.sys_name}
+            if self.spawn_args:
+                spawnargs.update(self.spawn_args)
+            #logging.debug("spawn(%s, args=%s)" % (self.proc_module, spawnargs))
             proc_id = yield spawn(proc_mod, None, spawnargs)
-            self.procId = proc_id
-            self.procState = 'SPAWNED'
+            self.proc_id = proc_id
+            self.proc_state = 'SPAWNED'
 
-            #logging.info("Process "+self.procClass+" ID: "+str(proc_id))
+            #logging.info("Process "+self.proc_class+" ID: "+str(proc_id))
         else:
-            logging.error('Cannot spawn '+self.procClass+' on node='+str(self.procNode))
-        defer.returnValue(self.procId)
+            logging.error('Cannot spawn '+self.proc_class+' on node='+str(self.proc_node))
+        defer.returnValue(self.proc_id)
 
     @defer.inlineCallbacks
     def init(self):
-        (content, headers, msg) = yield self.supProcess.rpc_send(self.procId,
+        (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
                                                 'init', {}, {'quiet':True})
         if content.get('status','ERROR') == 'OK':
-            self.procState = 'INIT_OK'
+            self.proc_state = 'INIT_OK'
         else:
-            self.procState = 'INIT_ERROR'
+            self.proc_state = 'INIT_ERROR'
+
+    @defer.inlineCallbacks
+    def shutdown(self):
+        (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
+                                                'shutdown', {}, {'quiet':True})
+        if content.get('status','ERROR') == 'OK':
+            self.proc_state = 'TERMINATED'
+        else:
+            self.proc_state = 'SHUTDOWN_ERROR'
 
 
 class ProtocolFactory(ProtocolFactory):

@@ -3,6 +3,7 @@
 from twisted.trial import unittest
 from twisted.internet import defer
 import logging
+logging = logging.getLogger(__name__)
 from ion.data.dataobject import DataObject
 
 # To Test messages using DataObjects

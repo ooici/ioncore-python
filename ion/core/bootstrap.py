@@ -8,6 +8,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from magnet import spawnable
@@ -30,9 +31,6 @@ ion_messaging = {}
 # Static definition of service names
 cc_agent = Config(CONF.getValue('ccagent_cfg')).getObject()
 ion_core_services = Config(CONF.getValue('coreservices_cfg')).getObject()
-
-# Messaging names
-nameRegistry = Store()
 
 @defer.inlineCallbacks
 def start():
@@ -121,9 +119,6 @@ def declare_messaging(messagingCfg, cgroup=None):
         logging.info("Messaging name config: name="+msgName+', '+str(msgResource))
         yield Container.configure_messaging(msgName, msgResource)
 
-        # save name in the name registry
-        yield nameRegistry.put(msgName, msgResource)
-
 # Sequence number of supervisors
 sup_seq = 0
 
@@ -133,27 +128,15 @@ def spawn_processes(procs, sup=None):
     Spawns a set of processes.
     @param procs  list of processes (as description dict) to start up
     @param sup  spawned BaseProcess instance acting as supervisor
-    @retval supervisor BaseProcess instance
+    @retval Deferred, for supervisor BaseProcess instance
     """
-    global sup_seq
     children = []
     for procDef in procs:
         child = ProcessDesc(**procDef)
         children.append(child)
 
-    if not sup:
-        # Makes the boostrap a process
-        logging.info("Spawning supervisor")
-        if sup_seq == 0:
-            supname = "bootstrap"
-        else:
-            supname = "supervisor."+str(sup_seq)
-        suprec = base_process.factory.build({'proc-name':supname})
-        sup = suprec.procinst
-        sup.receiver.group = supname
-        supId = yield sup.spawn()
-        yield base_process.procRegistry.put(supname, str(supId))
-        sup_seq += 1
+    if sup == None:
+        sup = yield create_supervisor()
 
     logging.info("Spawning child processes")
     for child in children:
@@ -162,6 +145,29 @@ def spawn_processes(procs, sup=None):
     logging.debug("process_ids: "+ str(base_process.procRegistry.kvs))
 
     defer.returnValue(sup)
+
+@defer.inlineCallbacks
+def create_supervisor():
+    """
+    Creates a supervisor process
+    @retval Deferred, for supervisor BaseProcess instance
+    """
+    global sup_seq
+    # Makes the boostrap a process
+    logging.info("Spawning supervisor")
+    if sup_seq == 0:
+        supname = "bootstrap"
+    else:
+        supname = "supervisor."+str(sup_seq)
+    suprec = base_process.factory.build({'proc-name':supname})
+    sup = suprec.procinst
+    sup.receiver.group = supname
+    supId = yield sup.spawn()
+    yield sup.init()
+    yield base_process.procRegistry.put(supname, str(supId))
+    sup_seq += 1
+    defer.returnValue(sup)
+
 
 @defer.inlineCallbacks
 def bs_register_services():
@@ -182,9 +188,11 @@ def reset_container():
     # to their defaults. Even further, reset imported names in other modules
     # to the new objects.
     base_process.procRegistry = Store()
-    nameRegistry = Store()
+    base_process.processes = {}
+    base_process.receivers = []
     spawnable.store = Container.store
     spawnable.Spawnable.progeny = {}
+
 
 """
 from ion.core import bootstrap as b
