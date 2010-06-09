@@ -7,6 +7,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 import uuid
 import time
 from itertools import groupby
@@ -72,6 +73,18 @@ class ProvisionerStore(object):
         """
         records = yield self.get_all(launch, '')
         defer.returnValue(records[0])
+
+    @defer.inlineCallbacks
+    def get_launch_nodes(self, launch):
+        """Retrieves the latest node records, from the launch_id.
+        """
+        records = yield self.get_all(launch)
+        groups = group_records(records, 'node_id')
+        nodes = []
+        for node_id, records in groups.iteritems():
+            if node_id:
+                nodes.append(records[0])
+        defer.returnValue(nodes)
 
     def get_all(self, launch=None, node=None):
         """Retrieves the states about an instance or launch.
