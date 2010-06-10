@@ -109,6 +109,8 @@ class ICAStoreObject(Interface):
         """
         @brief Hash (sha1) of storable value
         @todo Decide if this should really be part of the interface
+        @note This method is depricated in favor of calling sha1(obj)
+        so that the form, binary or hex can be specified.
         """
 
     def encode():
@@ -121,6 +123,11 @@ class ICAStoreObject(Interface):
     def decode(value, types):
         """
         @brief Decode value into an instance of a StoreObject class
+        """
+        
+    def __str__():
+        """
+        @brief Pretty print object as string for inspection
         """
 
 class BaseObject(object):
@@ -228,6 +235,7 @@ class BaseObject(object):
         """
         pass
 
+
 class Blob(BaseObject):
     """
     Blob is a container for blob of bytes (string, or serialized object).
@@ -247,6 +255,15 @@ class Blob(BaseObject):
         (serialized) form.
         """
         return self.content
+
+    def __str__(self):
+        head = '='*10
+        strng  = """\n%s Rdf Type: %s %s\n""" % (head, str(self.get_type()), head)
+        strng += """= Key: "%s"\n""" % str( self.hash )
+        strng += """= Content: "%s"\n""" % str(self.content)
+        strng += head*2
+        return strng
+
 
     @classmethod
     def _decode_body(cls, encoded_body):
@@ -309,6 +326,15 @@ class Tree(BaseObject):
             assert len(obj_hash) == 20 #bin sha1 (not hex)
             body += "%s %s\x00%s" % (mode, name, obj_hash,)
         return body
+
+    def __str__(self):
+        head = "="*10
+        strng ="""\n%s Rdf Type: %s %s\n""" % (head,str(self.get_type()),head)
+        strng+="""= Key: "%s"\n""" % str( self.hash )
+        for entity in self.children:  
+            strng+="""= name: "%s", id: "%s"\n""" % (entity[0],sha1_to_hex(entity[1]))
+        strng+=head*2
+        return strng
 
     @classmethod
     def _decode_body(cls, encoded_body):
