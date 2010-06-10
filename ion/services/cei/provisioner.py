@@ -51,7 +51,8 @@ class ProvisionerService(BaseService):
 
         # set up a callLater to fulfill the request after the ack. Would be
         # cleaner to have explicit ack control.
-        reactor.callLater(0, self.core.fulfill_launch, launch, nodes)
+        #reactor.callLater(0, self.core.fulfill_launch, launch, nodes)
+        self.core.fulfill_launch(launch, nodes)
     
     @defer.inlineCallbacks
     def op_terminate(self, content, headers, msg):
@@ -66,7 +67,8 @@ class ProvisionerService(BaseService):
         for launch in content:
             yield self.core.mark_launch_terminating(launch)
 
-        reactor.callLater(0, self.core.terminate_launches, content)
+        #reactor.callLater(0, self.core.terminate_launches, content)
+        self.core.terminate_launches(content)
 
     def op_query(self, content, headers, msg):
         """Service operation: query IaaS  and send updates to subscribers.

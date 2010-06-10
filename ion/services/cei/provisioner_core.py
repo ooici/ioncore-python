@@ -19,6 +19,7 @@ from nimboss.cluster import ClusterDriver
 from nimboss.nimbus import NimbusClusterDocument
 from libcloud.types import NodeState as NimbossNodeState
 from libcloud.base import Node as NimbossNode
+from libcloud.drivers.ec2 import EC2NodeDriver
 from ion.core import base_process
 from ion.services.cei.dtrs import DeployableTypeRegistryClient
 from ion.services.cei.provisioner_store import ProvisionerStore, group_records
@@ -134,7 +135,8 @@ class ProvisionerCore(object):
             logging.info('Launching group %s - %s nodes', spec.name, spec.count)
             
             iaas_nodes = yield threads.deferToThread(
-                    self.cluster_driver.launch_node_spec, spec, driver)
+                    self.cluster_driver.launch_node_spec, spec, driver, 
+                    ex_keyname='ooi')
             
             # TODO so many failure cases missing
             
