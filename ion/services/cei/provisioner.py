@@ -8,12 +8,11 @@
 @brief Starts, stops, and tracks instance and context state.
 """
 
-import os
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer, reactor
 
-from ion.services.base_service import BaseService
+from ion.services.base_service import BaseService, BaseServiceClient
 from ion.core import base_process
 from ion.core.base_process import ProtocolFactory
 from ion.services.cei.provisioner_store import ProvisionerStore
@@ -124,7 +123,7 @@ class ProvisionerClient(BaseServiceClient):
                     'site' : item.site,
                     'allocation' : item.allocation_id,
                     'data' : item.data}
-        sa = yield self.get_scoped_name('system', 'sensor_aggregator')]
+        sa = yield self.get_scoped_name('system', 'sensor_aggregator')
         request = {'deployable_type' : deployable_type,
                 'launch_id' : launch_id,
                 'nodes' : nodes,

@@ -119,7 +119,7 @@ class InstanceStateParser(object):
     def state_item(self, content):
         logging.debug("received new instance state message: '%s'" % content)
         try:
-           instance_id = self._expected("node_id")
+            instance_id = self._expected("node_id")
             state = self._expected("state")
         except KeyError:
             logging.error("could not capture sensor info (full message: '%s')" % content)
