@@ -30,3 +30,12 @@ class AssociationObjectTest(unittest.TestCase):
     def test_type(self):
         self.failUnlessEqual(self.association.type, 'association')
         
+    def test_match(self):
+        self.assert_(self.association.match(cas.Blob('ASubject')))
+        self.assertNot(self.association.match(cas.Blob('BSubject')))
+        self.assertNot(self.association.match(cas.Blob('BSubject'),position=rdfstore.OBJECT))
+        self.assert_(self.association.match(cas.Blob('ASubject'),position=rdfstore.SUBJECT))
+        self.assert_(self.association.match(cas.Blob('APredicate'),position=rdfstore.PREDICATE))
+        self.assertNot(self.association.match(cas.Blob('ASubject'),position=rdfstore.PREDICATE))        
+        self.assertRaises(KeyError,self.association.match,cas.Blob('ASubject'),position='blahblahblah')
+        
