@@ -68,7 +68,7 @@ class ControllerCoreState(State):
         if state_item:
             self.queue_lengths[state_item.key].append(state_item)
 
-    def get_all(typename):
+    def get_all(self, typename):
         """
         Get all data about a particular type.
         
@@ -87,7 +87,7 @@ class ControllerCoreState(State):
         
         return data.values()
             
-    def get(typename, key):
+    def get(self, typename, key):
         """Get all data about a particular key of a particular type.
         
         State API method, see the decision engine implementer's guide.
