@@ -18,9 +18,9 @@ class DefaultEngine(Engine):
         
         # todo: get all of this from conf
         self.preserve_n = 2
-        self.available_allocations = ["123"]
-        self.available_sites = ["456"]
-        self.available_types = ["789"]
+        self.available_allocations = ["small"]
+        self.available_sites = ["ec2-east"]
+        self.available_types = ["epu_work_consumer"]
         
     def initialize(self, control, state, conf=None):
         """Engine API method"""
@@ -49,11 +49,8 @@ class DefaultEngine(Engine):
             
     def _launch_one(self, control):
         launch_description = {}
-        launch_description["head-node"] = \
+        launch_description["work_consumer"] = \
                 LaunchItem(1, self._allocation(), self._site(), None)
-        numworkers = random.randint(3,30)
-        launch_description["worker-nodes"] = \
-                LaunchItem(numworkers, self._allocation(), self._site(), None)
         control.launch(self._deployable_type(), launch_description)
         
     def _deployable_type(self):
