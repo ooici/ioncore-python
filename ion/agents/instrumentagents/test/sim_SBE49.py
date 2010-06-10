@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Seabird SBE49 Instrument Simulator - Provides basic simulation of a 
 Seabird SBE-49 instrument.  This is not part of the product description,
