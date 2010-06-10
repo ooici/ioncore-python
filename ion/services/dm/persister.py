@@ -26,7 +26,6 @@ import time
 import sys
 
 from twisted.internet import defer
-from magnet.spawnable import Receiver
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient

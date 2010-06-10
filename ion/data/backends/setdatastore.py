@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/data/datastore/setDataStore.py
+@file ion/data/backends/setDataStore.py
 @author Paul Hubbard
 @author Matt Rodriguez
 @author David Stuebe

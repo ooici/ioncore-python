@@ -57,8 +57,7 @@ class IntegrationTest(IonTestCase):
         """
         raise unittest.SkipTest('code not implemented yet')
         res = self._get_page('http://amoeba.ucsd.edu/tmp/test1.txt')
-        self.failUnlessSubstring('Now is the time for all good men to come to the aid of their country.',
-                                 msg)
+        self.failUnlessSubstring('Now is the time', res)
 
     @defer.inlineCallbacks
     def _test_404(self):
