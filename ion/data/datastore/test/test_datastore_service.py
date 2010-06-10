@@ -9,10 +9,10 @@
 
 from twisted.internet import defer
 
-from ion.play.rdf_store.rdf_service import RdfServiceClient
+from ion.data.datastore.datastore_service import DataStoreServiceClient
 from ion.test.iontest import IonTestCase
 
-class RdfServiceTest(IonTestCase):
+class DataStoreServiceTest(IonTestCase):
     """
     Testing example hello service.
     """
@@ -29,12 +29,12 @@ class RdfServiceTest(IonTestCase):
     def test_hello(self):
 
         services = [
-            {'name':'RdfService1','module':'ion.play.rdf_store.rdf_service','class':'RdfService'},
+            {'name':'DataStoreService1','module':'ion.data.datastore.datastore_service','class':'DataStoreService'},
         ]
 
         sup = yield self._spawn_processes(services)
 
-        rsc = RdfServiceClient(proc=sup)
+        rsc = DataStoreServiceClient(proc=sup)
         yield rsc.push("Hi there, PushMe")
         
         yield rsc.pull("Hi there, PullMe")
