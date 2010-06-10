@@ -258,7 +258,7 @@ class Blob(BaseObject):
 
     def __str__(self):
         head = '='*10
-        strng  = """\n%s Rdf Type: %s %s\n""" % (head, str(self.get_type()), head)
+        strng  = """\n%s Store Type: %s %s\n""" % (head, str(self.get_type()), head)
         strng += """= Key: "%s"\n""" % str( self.hash )
         strng += """= Content: "%s"\n""" % str(self.content)
         strng += head*2
@@ -329,7 +329,7 @@ class Tree(BaseObject):
 
     def __str__(self):
         head = "="*10
-        strng ="""\n%s Rdf Type: %s %s\n""" % (head,str(self.get_type()),head)
+        strng ="""\n%s Store Type: %s %s\n""" % (head,str(self.get_type()),head)
         strng+="""= Key: "%s"\n""" % str( self.hash )
         for entity in self.children:  
             strng+="""= name: "%s", id: "%s"\n""" % (entity[0],sha1_to_hex(entity[1]))
@@ -435,6 +435,15 @@ class Commit(BaseObject):
         self.parents = parents
         self.log = str(log) #or unicode? or what?
         self.other = other
+
+    def __str__(self):
+        head = "="*10
+        strng ="""\n%s Store Type: %s %s\n""" % (head,str(self.get_type()),head)
+        strng+="""= Key: "%s"\n""" % str( self.hash )
+        strng+="""= Tree: "%s"\n""" % self.tree
+        strng+="""= Log: "%s"\n""" % self.log
+        strng+=head*2
+        return strng
 
     def _encode_body(self):
         """
