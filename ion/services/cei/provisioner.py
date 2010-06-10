@@ -123,7 +123,7 @@ class ProvisionerClient(BaseServiceClient):
                     'site' : item.site,
                     'allocation' : item.allocation_id,
                     'data' : item.data}
-        sa = yield self.get_scoped_name('system', 'sensor_aggregator')
+        sa = yield self.proc.get_scoped_name('system', 'sensor_aggregator')
         request = {'deployable_type' : deployable_type,
                 'launch_id' : launch_id,
                 'nodes' : nodes,
