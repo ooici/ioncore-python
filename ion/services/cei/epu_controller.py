@@ -35,7 +35,7 @@ class EPUControllerService(BaseService):
         logging.debug('Starting provisioner query loop - %s second interval', 
                 query_sleep_seconds)
         self.query_loop = LoopingCall(self.provisioner_client.query)
-        self.query_loop(query_sleep_seconds)
+        self.query_loop.start(query_sleep_seconds)
 
     @defer.inlineCallbacks
     def op_sensor_info(self, content, headers, msg):
