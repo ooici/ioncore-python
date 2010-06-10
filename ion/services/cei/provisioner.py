@@ -105,6 +105,33 @@ class ProvisionerService(BaseService):
         sa = yield self.get_scoped_name('system', 'sensor_aggregator')
         yield self.send(sa, 'cei_test', content)
         
+class ProvisionerClient(BaseServiceClient):
+    """
+    Client for provisioning deployable types
+    """
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "provisioner"
+        BaseServiceClient.__init__(self, proc, **kwargs)
+
+    @defer.inlineCallbacks
+    def provision(self, launch_id, deployable_type, launch_description):
+        yield self._check_init()
+
+        nodes = {}
+        for nodename, item in launch_description:
+            nodes[nodename] = {'id' : item.instance_ids,
+                    'site' : item.site,
+                    'allocation' : item.allocation_id,
+                    'data' : item.data}
+        sa = yield self.get_scoped_name('system', 'sensor_aggregator')]
+        request = {'deployable_type' : deployable_type,
+                'launch_id' : launch_id,
+                'nodes' : nodes,
+                'subscribers' : [sa]}
+        logging.debug('Sending provision request: ' + str(request))
+
+        (content, headers, msg) = yield self.send('provision', request)
 
 class ProvisionerNotifier(object):
     """Abstraction for sending node updates to subscribers.
