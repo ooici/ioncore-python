@@ -181,7 +181,8 @@ class ControllerCoreControl(Control):
                 self.state.new_launch(new_instance_id)
                 item.instance_ids.append(new_instance_id)
                 
-        self.provisioner.provision(launch_id, launch_description)
+        self.provisioner.provision(launch_id, deployable_type_id, 
+                launch_description)
         return (launch_id, launch_description)
     
     def destroy_instances(self, instance_list):
