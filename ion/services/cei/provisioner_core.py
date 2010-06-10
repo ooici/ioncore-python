@@ -19,6 +19,7 @@ from nimboss.cluster import ClusterDriver
 from nimboss.nimbus import NimbusClusterDocument
 from libcloud.types import NodeState as NimbossNodeState
 from libcloud.base import Node as NimbossNode
+from libcloud.drivers.ec2 import EC2NodeDriver
 from ion.core import base_process
 from ion.services.cei.dtrs import DeployableTypeRegistryClient
 from ion.services.cei.provisioner_store import ProvisionerStore, group_records
@@ -45,8 +46,18 @@ class ProvisionerCore(object):
         nimbus_secret = os.environ['NIMBUS_SECRET']
         nimbus_test_driver = NimbusNodeDriver(nimbus_key, secret=nimbus_secret,
                 host='nimbus.ci.uchicago.edu', port=8444)
+        nimbus_uc_driver = NimbusNodeDriver(nimbus_key, secret=nimbus_secret,
+                host='tp-vm1.ci.uchicago.edu', port=8445)
+       
+        ec2_key = os.environ['AWS_ACCESS_KEY_ID']
+        ec2_secret = os.environ['AWS_SECRET_ACCESS_KEY']
+        ec2_east_driver = EC2NodeDriver(ec2_key, ec2_secret)
 
-        self.node_drivers = {'nimbus-test' : nimbus_test_driver}
+        self.node_drivers = {
+                'nimbus-test' : nimbus_test_driver,
+                'nimbus-uc' : nimbus_uc_driver,
+                'ec2-east' : ec2_east_driver,
+                }
         
         self.ctx_client = ContextClient(
                 'https://nimbus.ci.uchicago.edu:8888/ContextBroker/ctx/', 
@@ -124,7 +135,8 @@ class ProvisionerCore(object):
             logging.info('Launching group %s - %s nodes', spec.name, spec.count)
             
             iaas_nodes = yield threads.deferToThread(
-                    self.cluster_driver.launch_node_spec, spec, driver)
+                    self.cluster_driver.launch_node_spec, spec, driver, 
+                    ex_keyname='ooi')
             
             # TODO so many failure cases missing
             

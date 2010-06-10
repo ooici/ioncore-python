@@ -1,0 +1,68 @@
+import logging
+import random
+
+from ion.services.cei.decisionengine import Engine
+from ion.services.cei.epucontroller import LaunchItem
+import ion.services.cei.states as InstanceStates
+
+
+class DefaultEngine(Engine):
+    """
+    A decision engine that makes sure there is exactly N instances of a
+    deployable type.
+    
+    """
+    
+    def __init__(self):
+        super(DefaultEngine, self).__init__()
+        
+        # todo: get all of this from conf
+        self.preserve_n = 2
+        self.available_allocations = ["123"]
+        self.available_sites = ["456"]
+        self.available_types = ["789"]
+        
+    def initialize(self, control, state, conf=None):
+        """Engine API method"""
+        parameters = {"timed-pulse-irregular":800}
+        control.configure(parameters)
+
+    def decide(self, control, state):
+        """Engine API method"""
+        all_instance_lists = state.get_all("instance-state")
+        
+        bad_states = [InstanceStates.Terminating, InstanceStates.Terminated, InstanceStates.Failed]
+        valid_count = 0
+        for instance_list in all_instance_lists:
+            ok = True
+            for state_item in instance_list:
+                if state_item.value in bad_states:
+                    ok = False
+                    break
+            if ok:
+                valid_count += 1
+        
+        while valid_count < self.preserve_n:
+            logging.info("Requesting new instance")
+            self._launch_one(control)
+            valid_count += 1
+            
+    def _launch_one(self, control):
+        launch_description = {}
+        launch_description["head-node"] = \
+                LaunchItem(1, self._allocation(), self._site(), None)
+        numworkers = random.randint(3,30)
+        launch_description["worker-nodes"] = \
+                LaunchItem(numworkers, self._allocation(), self._site(), None)
+        control.launch(self._deployable_type(), launch_description)
+        
+    def _deployable_type(self):
+        return self.available_types[0]
+        
+    def _allocation(self):
+        return self.available_allocations[0]
+        
+    def _site(self):
+        return self.available_sites[0]
+        
+    

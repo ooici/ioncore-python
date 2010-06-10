@@ -51,7 +51,8 @@ class ProvisionerService(BaseService):
 
         # set up a callLater to fulfill the request after the ack. Would be
         # cleaner to have explicit ack control.
-        reactor.callLater(0, self.core.fulfill_launch, launch, nodes)
+        #reactor.callLater(0, self.core.fulfill_launch, launch, nodes)
+        self.core.fulfill_launch(launch, nodes)
     
     @defer.inlineCallbacks
     def op_terminate(self, content, headers, msg):
@@ -66,7 +67,8 @@ class ProvisionerService(BaseService):
         for launch in content:
             yield self.core.mark_launch_terminating(launch)
 
-        reactor.callLater(0, self.core.terminate_launches, content)
+        #reactor.callLater(0, self.core.terminate_launches, content)
+        self.core.terminate_launches(content)
 
     def op_query(self, content, headers, msg):
         """Service operation: query IaaS  and send updates to subscribers.
@@ -103,6 +105,33 @@ class ProvisionerService(BaseService):
         sa = yield self.get_scoped_name('system', 'sensor_aggregator')
         yield self.send(sa, 'cei_test', content)
         
+class ProvisionerClient(BaseServiceClient):
+    """
+    Client for provisioning deployable types
+    """
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "provisioner"
+        BaseServiceClient.__init__(self, proc, **kwargs)
+
+    @defer.inlineCallbacks
+    def provision(self, launch_id, deployable_type, launch_description):
+        yield self._check_init()
+
+        nodes = {}
+        for nodename, item in launch_description:
+            nodes[nodename] = {'id' : item.instance_ids,
+                    'site' : item.site,
+                    'allocation' : item.allocation_id,
+                    'data' : item.data}
+        sa = yield self.get_scoped_name('system', 'sensor_aggregator')]
+        request = {'deployable_type' : deployable_type,
+                'launch_id' : launch_id,
+                'nodes' : nodes,
+                'subscribers' : [sa]}
+        logging.debug('Sending provision request: ' + str(request))
+
+        (content, headers, msg) = yield self.send('provision', request)
 
 class ProvisionerNotifier(object):
     """Abstraction for sending node updates to subscribers.
@@ -111,7 +140,7 @@ class ProvisionerNotifier(object):
         self.process = process
 
     @defer.inlineCallbacks
-    def send_record(self, record, subscribers, operation='node_update'):
+    def send_record(self, record, subscribers, operation='node_status'):
         """Send a single node record to all subscribers.
         """
         logging.debug('Sending status record about node %s to %s', 
@@ -120,7 +149,7 @@ class ProvisionerNotifier(object):
             yield self.process.send(sub, operation, record)
 
     @defer.inlineCallbacks
-    def send_records(self, records, subscribers, operation='node_update'):
+    def send_records(self, records, subscribers, operation='node_status'):
         """Send a set of node records to all subscribers.
         """
         for rec in records:
