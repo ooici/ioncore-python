@@ -6,7 +6,6 @@
 @author Paul Hubbard
 @date 6/7/10
 """
-import sys
 
 import logging
 logging = logging.getLogger(__name__)

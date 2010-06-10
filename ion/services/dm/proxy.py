@@ -10,7 +10,6 @@ Porting from LCO implementation to new LCA arch - complete rewrite.
 import logging
 logging = logging.getLogger(__name__)
 
-from magnet.spawnable import Receiver
 from ion.core.base_process import ProtocolFactory
 
 from ion.services.base_service import BaseService
@@ -45,8 +44,8 @@ class ProxyService(BaseService):
         """
         server_address = ('', tcp_port)
         ProxyHandler.protocol_version = 'HTTP/1.0'
-#        httpd = ThreadingHTTPServer(server_address, ProxyHandler)
-#        p = Process(target=httpd.serve_forever)
+        httpd = ThreadingHTTPServer(server_address, ProxyHandler)
+        p = Process(target=httpd.serve_forever)
 #        p.start()
 #        logging.debug('Proxy listener running.')
 

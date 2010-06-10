@@ -1,14 +1,31 @@
-#!/usr/bin/env python
+"""
+Seabird SBE49 Instrument Simulator - Provides basic simulation of a 
+Seabird SBE-49 instrument.  This is not part of the product description,
+but rather is being used to help develop instrument agents and drivers.
+This program can be fleshed out as needed.  
 
-#from twisted.internet.protocol import Protocol, Factory
+@file sim_SBE49.py
+@author Dave Everett 
+@date 6/8/10
+"""
+
 from twisted.internet import protocol
 from twisted.internet import reactor
 from twisted.internet import task
-#from twisted.internet.task import LoopingCall
 
 class Instrument(protocol.Protocol):
+    """
+    The instrument protocol class. Simulate a Seabird SBE49 by receiving 
+    commands over a TCP connection and responding as much as possible
+    as would a Seabird SBD49.
+    """
 
-    numPolledSamples = 0
+    numTestSamples = 0  # variable to hold number of test samples taken
+    maxTestSamples = 10 # maximumm number of test stamples to take
+    testInterval = 1    # interval between samples in test commands (TT, etc.)
+    autoInterval = 5    # interval between samples in autonomous mode
+    testRunning = 'false'
+    autoRunning = 'false'
     prompt = 'S>'
     mode = 'auto'
     pumpInfo = 'SBE 49 FastCAT V 1.3a SERIAL NO. 0055'
@@ -24,7 +41,8 @@ class Instrument(protocol.Protocol):
           'temperature advance = 0.0625 seconds\n' +
           'celltm alpha = 0.03\n' +
           'celltm tau = 7.0\n' +
-          'real-time temperature and conductivity correction enabled for converted data\n' +
+          'real-time temperature and conductivity correction enabled for '
+          'converted data\n' +
           prompt,
         'setdefaults' : prompt, 
         'baud' : prompt, 
@@ -44,16 +62,6 @@ class Instrument(protocol.Protocol):
         'pumpon' : prompt, 
         'pumpoff' : prompt, 
         'ts' : '20.9028,  0.00012,    0.139,   0.0103\n' + prompt, 
-        'tt' : '20.8355\n' + 
-          '20.8359\n' +
-          '20.8360\n' +
-          '20.8360\n' +
-          prompt,
-        'tc' : prompt, 
-        'tp' : prompt, 
-        'ttr' : prompt, 
-        'tcr' : prompt, 
-        'tpr' : prompt, 
         'dcal' : pumpInfo + '\n' +
           'temperature: 26-apr-01\n' + 
           '    TA0 = -3.178124e-06\n' + 
@@ -86,84 +94,157 @@ class Instrument(protocol.Protocol):
           prompt,
         '' : prompt, 
     }
+    testCommands = {
+        'tt' : prompt,
+        'tc' : prompt, 
+        'tp' : prompt, 
+        'ttr' : prompt, 
+        'tcr' : prompt, 
+        'tpr' : prompt, 
+    }
    
     def connectionMade(self):
+        """
+        @brief A client has made a connection: call factory to pass
+        this instance, because the factory has the timer (LoopingCall). 
+        @param none 
+        @retval none 
+        """
         self.factory.clientConnectionMade(self)
+
+        # Print prompt
+        self.transport.write(self.prompt)
  
     def dataReceived(self, data):
         """
-        test data for membership in command 
+        @brief Data as been recieved from client. Determine what command was 
+        sent and attempt to respond as would an SBE49.
+        @param Data from client.
+        @retval none 
         """
+
+        # Strip off the newlines and other extraneous whitespace, and convert 
+        # to lower case.
         data = data.strip()
         data = data.lower()
-        print "received: %s" % (data)
+
         if len(data) == 0:
+            """
+            @note If zero length data received, probably just operator mashing 
+            on return key: just return the prompt (just as SBE59 would).
+            """
             self.transport.write("S>")
-        elif data == "ts":
-            # Not worrying about mode right now
-            self.factory.takePolledSample()
+        elif data in self.testCommands:
+            """
+            @note If a "testing" command is received, and the instrument is 
+            not already running a test, start sending samples 
+            at the configured test interval until the configured maximum 
+            number of test samples have been sent. 
+            """
+            if self.testRunning == 'false':
+                print "Starting test samples"
+                self.factory.startTestSamples() 
+                self.testRunning = 'true'
         elif data == "start":
-            if self.mode == 'auto':
-                # Need way to have a timer 
-                print "Starting samples"
-                self.factory.startSamples()
-                #self.transport.write(self.sampleData + self.prompt)
+            """
+            @note If start command is received, and the SBE49 is in autonomous 
+            mode, and the instrument is not already running a test, start 
+            sending samples at the configured interval. 
+            """
+            if self.mode == 'auto' and self.autoRunning == 'false':
+                print "Starting auto samples"
+                self.autoRunning = 'true'
+                # The factory handles the sending at intervals.
+                self.factory.startAutoSamples()
             else:
+                # Currently we don't simulate auto/polled: we just handle the 
+                # start/stop as if we're in auto mode (mode defaults to auto 
+                # and doesn't change). But, in the future we might want to 
+                # simulate the modes: wouldn't be hard.
                 self.transport.write(self.commands[data])
         elif data == "stop":
-            if self.mode == 'auto':
-                print "Stopping samples"
-                self.factory.stopSamples()
-            # Print prompt
+            """
+            @note If stop command is received, and the SBE49 is in autonomous 
+            mode,  and the instrument is running a test, stop sending samples 
+            at the configured interval. 
+            """
+            if self.mode == 'auto' and self.autoRunning == 'true':
+                print "Stopping auto samples"
+                self.factory.stopAutoSamples()
+                self.autoRunning = 'false'
+
+            # Print prompt whether we stopped or not
             self.transport.write(self.prompt)
         elif data in self.commands:
+            # Any command that falls to this point gets handled with the general
+            # command response that is in the commands dictionary. 
             self.transport.write(self.commands[data])
         else:
-            print "Invalid command received"
+            print "Invalid command received: %s" % (data)
             self.transport.write("?CMD")
 
-        """
-        if data == "pumpOn":
-            print "Got something"
-            self.transport.write(self.commands["pumpOn"])
-        elif data == "pumpOff":
-            self.transport.write(self.commands["pumpOff"])
-        elif data == "DS":
-            self.transport.write(self.commands["DS"])
-        """
-
 class InstrumentFactory(protocol.Factory):
+    """
+    Assign the Instrument class to protocol, and then instantiate two timers 
+    for handling autonomous mode (where the instrument sends data at intervals
+    until stopped), and test commands (where the instrument sends 100 samples 
+    periodically).  In autonomous mode, the timer is started and stopped based 
+    on commands from the client.  In the case of test commands, the timer is
+    started when the command is received, and then a counter is incremented 
+    for each sample, and when the counter reaches 100, the timer is stopped.
+    """
+
     protocol = Instrument
     def __init__(self):
-        self.lc_polledSampler = task.LoopingCall(self.polledSampler)
-        self.lc = task.LoopingCall(self.takeSample)
+        self.lc_testSampler = task.LoopingCall(self.testSampler)
+        self.lc_autoSampler = task.LoopingCall(self.autoSampler)
 
     def clientConnectionMade(self, client):
+        # A client has connected: save the client instance. This currently
+        # only supports one  client
         self.client = client 
+    
+    def startTestSamples(self):
+        # start the test sample timer 
+        self.lc_testSampler.start(self.client.testInterval)
 
-    def takePolledSample(self):
-        self.lc_polledSampler.start(1)
+    def startAutoSamples(self):
+        # start the autonomous sample timer 
+        self.lc_autoSampler.start(self.client.autoInterval)
 
-    def startSamples(self):
-        self.lc.start(5)
+    def stopAutoSamples(self):
+        # stop the autonomous sample timer
+        self.lc_autoSampler.stop()
 
-    def stopSamples(self):
-        self.lc.stop()
-
-    def polledSampler(self):
-        self.client.numPolledSamples += 1
+    def testSampler(self):
+        # Increment the number of samples, then "take a sample" by responding 
+        # with canned sample data.  If the number of samples reaches max,
+        # stop the timer, reset the number of samples to 0, and send the 
+        # to the client.
+        self.client.numTestSamples += 1
         self.client.transport.write(self.client.sampleData)
-        if self.client.numPolledSamples == 10:
-            self.client.numPolledSamples = 0
-            self.lc_polledSampler.stop()
+        if self.client.numTestSamples == self.client.maxTestSamples:
+            print "Stopping test samples"
+            self.client.numTestSamples = 0
+            self.client.testRunning = 'false' 
+            self.lc_testSampler.stop()
             self.client.transport.write(self.client.prompt)
         
-    def takeSample(self):
+    def autoSampler(self):
+        # Send a sample to the client.  This happens until the client sends a 
+        # stop command.
         self.client.transport.write(self.client.sampleData)
         
 def main():
+    """
+    @brief Instantiate the reactor to listen on TCP port 9000, passing the 
+    InstrumentFactory as an argument.  When a connection is made, and new
+    instance of an instrument is constructed.  Currently, the factory only
+    supports one client (i.e., there is not an array of clients, and so
+    if an new client connects while another is connected, the client variable
+    in the factory will be overwritten). 
+    """
     f = InstrumentFactory()
-    #f.protocol = Instrument 
     reactor.listenTCP(9000, f)
     reactor.run()
 
