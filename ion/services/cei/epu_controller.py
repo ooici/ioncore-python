@@ -20,8 +20,8 @@ class EPUControllerService(BaseService):
     def slc_init(self):
         # todo: make this class configurable
         engineclass = "ion.services.cei.decisionengine.default.DefaultEngine"
-        self.core = ControllerCore(self.provisioner_client, engineclass)
         self.provisioner_client = ProvisionerClient(self)
+        self.core = ControllerCore(self.provisioner_client, engineclass)
         
         self.core.begin_controlling()
 
