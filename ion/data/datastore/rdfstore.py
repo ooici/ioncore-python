@@ -20,7 +20,7 @@ class Association(cas.Tree):
     
     type='association'
     
-    entityFactory = Entity
+    entityFactory = cas.Entity
     
     spo = { # Subject, Predicate, Object
         'subject':0,
@@ -29,13 +29,11 @@ class Association(cas.Tree):
     }
     
     
-    def __init__(self, triple):
+    def __init__(self, subject, predicate, object):
         
+        triple = (subject, predicate, object)
         entities = []
         names = {}
-        
-        if len(triple) != 3:
-            raise RuntimeError('Association.__init__: called with illegal argument, triple must be length 3!')
         
         for item in self.spo:
             member = triple[self.spo[item]]
@@ -51,3 +49,5 @@ class Association(cas.Tree):
         
             entities.append(child)
             names[child.name] = child
+        self.children = entities
+        self._names = names
