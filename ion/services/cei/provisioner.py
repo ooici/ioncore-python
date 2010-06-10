@@ -118,7 +118,7 @@ class ProvisionerClient(BaseServiceClient):
         yield self._check_init()
 
         nodes = {}
-        for nodename, item in launch_description:
+        for nodename, item in launch_description.iteritems():
             nodes[nodename] = {'id' : item.instance_ids,
                     'site' : item.site,
                     'allocation' : item.allocation_id,
