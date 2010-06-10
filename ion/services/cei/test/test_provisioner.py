@@ -15,7 +15,7 @@ from magnet.spawnable import spawn
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
-from ion.services.cei.provisioner import ProvisionerService
+from ion.services.cei.provisioner import ProvisionerService, ProvisionerClient
 from ion.services.cei.provisioner_store import group_records
 
 def _new_id():
@@ -44,33 +44,25 @@ class ProvisionerServiceTest(IonTestCase):
         pId = yield self.procRegistry.get("provisioner")
         
         launch_id = _new_id()
-        request = {'deployable_type' : 'base-cluster',
-                'launch_id' : launch_id,
-                'nodes' : { 
-                    'head-node' : {
-                        'id' : [_new_id()],
-                        'site' : 'nimbus-test',
-                        'allocation' : 'small',
-                    },
-                    'worker-node' : {
-                        'id' : [_new_id(), _new_id(), _new_id()],
-                        'site' : 'nimbus-test',
-                        'allocation' : 'small',
-                    },
-                },
-                'subscribers' : [],
-                }
+        deployable_type = 'base-cluster'
+        nodes = {'head-node' : FakeLaunchItem(1, 'nimbus-test', 'small', None),
+                'worker-node' : FakeLaunchItem(3, 'nimbus-test', 'small', None)}
         
-        yield supervisor.send(pId, "provision", request)
+        client = ProvisionerClient(pid=pId)
+        yield client.provision(launch_id, deployable_type, nodes)
 
         yield pu.asleep(10) #async wait
+        yield client.query()
+        yield pu.asleep(5) #async wait
+        yield client.query()
+        yield pu.asleep(5) #async wait
 
-        yield supervisor.send(pId, "query", '')
-        yield pu.asleep(5) #async wait
-        yield supervisor.send(pId, 'terminate', launch_id)
-        yield pu.asleep(5) #async wait
-        yield supervisor.send(pId, "query", '')
-        yield pu.asleep(5) #async wait
+class FakeLaunchItem(object):
+    def __init__(self, count, site, allocation_id, data):
+        self.instance_ids = [str(uuid.uuid4()) for i in range(count)]
+        self.site = site 
+        self.allocation_id = allocation_id
+        self.data = data
 
 class ProvisionerCoreTest(IonTestCase):
     def test_group_records(self):

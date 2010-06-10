@@ -37,6 +37,8 @@ class ControllerCore(object):
     def begin_controlling(self):
         """Call the decision engine at the appropriate times.
         """
+        logging.debug('Starting engine decision loop - %s second interval', 
+                self.control.sleep_seconds)
         self.control_loop = LoopingCall(self.engine.decide, self.control, 
                 self.state)
         self.control_loop.start(self.control.sleep_seconds)

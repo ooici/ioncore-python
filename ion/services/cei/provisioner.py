@@ -106,6 +106,8 @@ class ProvisionerClient(BaseServiceClient):
 
     @defer.inlineCallbacks
     def provision(self, launch_id, deployable_type, launch_description):
+        """Provisions a deployable type
+        """
         yield self._check_init()
 
         nodes = {}
@@ -120,8 +122,18 @@ class ProvisionerClient(BaseServiceClient):
                 'nodes' : nodes,
                 'subscribers' : [sa]}
         logging.debug('Sending provision request: ' + str(request))
-
         yield self.send('provision', request)
+        
+    @defer.inlineCallbacks
+    def query(self):
+        """Triggers a query operation in the provisioner. Node updates
+        are not sent in reply, but are instead sent to subscribers 
+        (most likely a sensor aggregator).
+        """
+        yield self._check_init()
+        logging.debug('Sending query request to provisioner')
+        yield self.send('query', None)
+
 
 class ProvisionerNotifier(object):
     """Abstraction for sending node updates to subscribers.
