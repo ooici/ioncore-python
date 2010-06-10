@@ -9,7 +9,6 @@
 import os
 import logging
 logging = logging.getLogger(__name__)
-import uuid
 from itertools import izip
 from twisted.internet import defer, threads
 
@@ -22,7 +21,7 @@ from libcloud.base import Node as NimbossNode
 from libcloud.drivers.ec2 import EC2NodeDriver
 from ion.core import base_process
 from ion.services.cei.dtrs import DeployableTypeRegistryClient
-from ion.services.cei.provisioner_store import ProvisionerStore, group_records
+from ion.services.cei.provisioner_store import group_records
 from ion.services.cei import states
 
 _NIMBOSS_STATE_MAP = {

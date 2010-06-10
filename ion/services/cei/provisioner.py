@@ -1,11 +1,9 @@
 #!/usr/bin/env python
-
-import os
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer, reactor
 
-from ion.services.base_service import BaseService
+from ion.services.base_service import BaseService, BaseServiceClient
 from ion.core import base_process
 from ion.core.base_process import ProtocolFactory
 from ion.services.cei.provisioner_store import ProvisionerStore
@@ -111,19 +109,19 @@ class ProvisionerClient(BaseServiceClient):
         yield self._check_init()
 
         nodes = {}
-        for nodename, item in launch_description:
+        for nodename, item in launch_description.iteritems():
             nodes[nodename] = {'id' : item.instance_ids,
                     'site' : item.site,
                     'allocation' : item.allocation_id,
                     'data' : item.data}
-        sa = yield self.get_scoped_name('system', 'sensor_aggregator')]
+        sa = yield self.proc.get_scoped_name('system', 'sensor_aggregator')
         request = {'deployable_type' : deployable_type,
                 'launch_id' : launch_id,
                 'nodes' : nodes,
                 'subscribers' : [sa]}
         logging.debug('Sending provision request: ' + str(request))
 
-        (content, headers, msg) = yield self.send('provision', request)
+        yield self.send('provision', request)
 
 class ProvisionerNotifier(object):
     """Abstraction for sending node updates to subscribers.

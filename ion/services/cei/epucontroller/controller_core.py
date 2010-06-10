@@ -68,7 +68,7 @@ class ControllerCoreState(State):
         if state_item:
             self.queue_lengths[state_item.key].append(state_item)
 
-    def get_all(typename):
+    def get_all(self, typename):
         """
         Get all data about a particular type.
         
@@ -87,7 +87,7 @@ class ControllerCoreState(State):
         
         return data.values()
             
-    def get(typename, key):
+    def get(self, typename, key):
         """Get all data about a particular key of a particular type.
         
         State API method, see the decision engine implementer's guide.
@@ -119,8 +119,8 @@ class InstanceStateParser(object):
     def state_item(self, content):
         logging.debug("received new instance state message: '%s'" % content)
         try:
-           instance_id = self._expected("node_id")
-            state = self._expected("state")
+            instance_id = self._expected(content, "node_id")
+            state = self._expected(content, "state")
         except KeyError:
             logging.error("could not capture sensor info (full message: '%s')" % content)
             return None
@@ -172,12 +172,12 @@ class ControllerCoreControl(Control):
         @exception Exception message not sent
         """
         
-        launch_id = uuid.uuid4()
+        launch_id = str(uuid.uuid4())
         logging.info("Request for DP '%s' is a new launch with id '%s'" % (deployable_type_id, launch_id))
         for group,item in launch_description.iteritems():
             logging.info(" - %s is %d %s from %s" % (group, item.num_instances, item.allocation_id, item.site))
             for i in range(item.num_instances):
-                new_instance_id = uuid.uuid4()
+                new_instance_id = str(uuid.uuid4())
                 self.state.new_launch(new_instance_id)
                 item.instance_ids.append(new_instance_id)
                 
