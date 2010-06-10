@@ -130,7 +130,7 @@ class ProvisionerClient(BaseServiceClient):
                 'subscribers' : [sa]}
         logging.debug('Sending provision request: ' + str(request))
 
-        (content, headers, msg) = yield self.send('provision', request)
+        yield self.send('provision', request)
 
 class ProvisionerNotifier(object):
     """Abstraction for sending node updates to subscribers.
