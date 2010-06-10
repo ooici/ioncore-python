@@ -4,7 +4,8 @@
     "bootscript":"res/scripts/newcc.py",
     "sysname":"cei",
     "lcaarch_branch":"cei-lcaarch",
-    "lcaarch_commit_hash":"HEAD"
+    "lcaarch_commit_hash":"HEAD",
+    "log_level":"DEBUG"
   },
   "username":"cc",
   "services":{
