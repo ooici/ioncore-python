@@ -21,15 +21,10 @@ class SensorAggregatorService(BaseService):
     declare = BaseService.service_declare(name='sensor_aggregator', version='0.1.0', dependencies=[])
 
     @defer.inlineCallbacks
-    def op_provisioner_iaas_info(self, content, headers, msg):
-        logging.info("op_provisioner_iaas_info  content:"+str(content))
-        # do "Aggregation", etc here
-        yield self.reply(msg, 'result', {'result':'receipt-taking-success'}, {})        
-    @defer.inlineCallbacks
-    def op_cei_test(self, content, headers, msg):
+    def op_node_status(self, content, headers, msg):
         epu_controller = yield self.get_scoped_name('system', 'epu_controller')
-        logging.info('SA CEI test!')
-        yield self.send(epu_controller, 'cei_test', content)
+        logging.info('SensorAggregatorService.node_status called.')
+        yield self.send(epu_controller, 'sensor_info', content)
 
 # Direct start of the service as a process with its default name
 factory = ProtocolFactory(SensorAggregatorService)
