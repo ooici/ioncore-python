@@ -43,6 +43,14 @@ class BlobObjectTest(unittest.TestCase):
         test = cas.Blob.decode_full(self.encoded)
         self.failUnlessEqual(sha1(self.blob.value), sha1(test.value))
 
+    def test_blob_str(self):
+        string = str(self.blob)
+        test = '\n========== Store Type: blob ==========\n'
+        test += '= Key: "19102815663d23f8b75a47e7a01965dcdc96468c"\n'
+        test += '= Content: "foo"\n'
+        test += '='*20
+        self.assertEqual(string,test)
+
 class TreeObjectTest(unittest.TestCase):
 
     def setUp(self):
@@ -67,6 +75,15 @@ class TreeObjectTest(unittest.TestCase):
         test = cas.Tree.decode_full(self.encoded)
         self.failUnlessEqual(sha1(self.tree), sha1(test))
 
+    def test_tree_print(self):
+        string = str(self.tree)
+        test = '\n========== Store Type: tree ==========\n'
+        test += '= Key: "b47a541cee0f0b8fd8a5af0fad8821de87772b1e"\n'
+        test += '= name: "thing", id: "08cf6101416f0ce0dda3c80e627f333854c4085c"\n'
+        test += '= name: "scaleing.py", id: "cd9231fa06abb69a380d3f4490a9e261e03beb5a"\n'
+        test += '='*20
+        self.assertEqual(string,test)
+
 class CommitObjectTest(unittest.TestCase):
 
     def setUp(self):
@@ -90,6 +107,16 @@ class CommitObjectTest(unittest.TestCase):
     def test_decode_full(self):
         test = cas.Commit.decode_full(self.encoded)
         self.failUnlessEqual(sha1(self.commit), sha1(test))
+    
+    def test_commit_print(self):
+        string = str(self.commit)
+        test = '\n========== Store Type: commit ==========\n'
+        test += '= Key: "252f7b9b624170607c13e9370a560d75d0a9b9ea"\n'
+        test += '= Tree: "80655da8d80aaaf92ce5357e7828dc09adb00993"\n'
+        test += '= Log: "foo bar"\n'
+        test += '='*20
+        self.assertEqual(string,test)
+
 
 
 class CAStoreTest(unittest.TestCase):
