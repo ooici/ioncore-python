@@ -27,7 +27,7 @@ class ControllerCore(object):
         
         # Keeping message differentiation first, before state_item is parsed.
         # There needs to always be a methodical way to differentiate.
-        if content.has_key("instance_id"):
+        if content.has_key("node_id"):
             self.state.new_instancestate(content)
         elif content.has_key("queue_id"):
             self.state.new_queuelen(content)
@@ -119,7 +119,7 @@ class InstanceStateParser(object):
     def state_item(self, content):
         logging.debug("received new instance state message: '%s'" % content)
         try:
-            instance_id = self._expected("instance_id")
+           instance_id = self._expected("node_id")
             state = self._expected("state")
         except KeyError:
             logging.error("could not capture sensor info (full message: '%s')" % content)

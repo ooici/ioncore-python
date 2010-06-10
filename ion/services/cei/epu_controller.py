@@ -6,6 +6,7 @@ from magnet.spawnable import Receiver
 from ion.services.base_service import BaseService
 from ion.core.base_process import ProtocolFactory
 from ion.services.cei.epucontroller import ControllerCore
+from ion.services.cei.provisioner import ProvisionerClient
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
@@ -27,22 +28,8 @@ class EPUControllerService(BaseService):
         self.core.begin_controlling()
 
     @defer.inlineCallbacks
-    def op_sensor_aggregator_info(self, content, headers, msg):
+    def op_sensor_info(self, content, headers, msg):
         self.core.new_sensor_info(content)
-
-class ProvisionerClient(object):
-    """Abstraction for sending messages to the provisioner.
-    """
-
-    def __init__(self, process):
-        self.process = process
-
-    @defer.inlineCallbacks
-    def provision(self, launch_id, launch_description):
-        logging.debug("Sending provision request, id '%s', content '%s'" % (launch_id, launch_description))
-        
-        # TODO
-        #yield self.process.send(sub, operation, record)
 
 # Direct start of the service as a process with its default name
 factory = ProtocolFactory(EPUControllerService)
