@@ -172,12 +172,12 @@ class ControllerCoreControl(Control):
         @exception Exception message not sent
         """
         
-        launch_id = uuid.uuid4()
+        launch_id = str(uuid.uuid4())
         logging.info("Request for DP '%s' is a new launch with id '%s'" % (deployable_type_id, launch_id))
         for group,item in launch_description.iteritems():
             logging.info(" - %s is %d %s from %s" % (group, item.num_instances, item.allocation_id, item.site))
             for i in range(item.num_instances):
-                new_instance_id = uuid.uuid4()
+                new_instance_id = str(uuid.uuid4())
                 self.state.new_launch(new_instance_id)
                 item.instance_ids.append(new_instance_id)
                 
