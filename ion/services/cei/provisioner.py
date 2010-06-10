@@ -1,13 +1,5 @@
 #!/usr/bin/env python
 
-"""
-@file ion/services/cei/provisioner.py
-@author Michael Meisinger
-@author Alex Clemesha
-@author David LaBissoniere
-@brief Starts, stops, and tracks instance and context state.
-"""
-
 import os
 import logging
 logging = logging.getLogger(__name__)

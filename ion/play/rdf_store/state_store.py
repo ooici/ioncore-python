@@ -7,6 +7,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.data.objstore import ObjectStore, ValueObject
@@ -59,7 +60,7 @@ class StateStore(object):
         
             obj = ValueObject(list(state.object))
         
-            print 'PARENTS!!:',parents
+            #print 'PARENTS!!:',parents
         
             rc=yield self.objstore.put(state.key, obj, parents=parents)
         

@@ -7,13 +7,13 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
-from socket import gaierror
 
 from ion.services.dm.fetcher import FetcherClient, FetcherService
 from ion.test.iontest import IonTestCase
 
-class GetPageTester(IonTestCase):
+class FetcherServiceTester(IonTestCase):
     """
     Just instantiate the FetcherService class and exercise the inner get_page
     method.
@@ -32,7 +32,7 @@ class GetPageTester(IonTestCase):
         self.failUnlessSubstring('is the time for all', page)
 
     def test_bad_host(self):
-        self.failUnlessRaises(gaierror, self.mf.get_page,
+        self.failUnlessRaises(ValueError, self.mf.get_page,
                               'http://foo.bar.baz/')
 
     def test_404(self):
@@ -46,7 +46,6 @@ class FetcherTest(IonTestCase):
         services = [{'name':'fetcher', 'module':'ion.services.dm.fetcher',
                     'class': 'FetcherService'},]
         sup = yield self._spawn_processes(services)
-
         self.fc = FetcherClient(proc=sup)
 
     @defer.inlineCallbacks
@@ -55,7 +54,7 @@ class FetcherTest(IonTestCase):
 
     @defer.inlineCallbacks
     def _get_page(self, src_url):
-        logging.debug('sending request for "%s"...' % src_url)
+        logging.debug('sending GET request for "%s"...' % src_url)
         res = yield self.fc.get_url(src_url)
         msg = res['value']
         if res['status'] == 'ERROR':
@@ -64,12 +63,16 @@ class FetcherTest(IonTestCase):
 
     @defer.inlineCallbacks
     def _get_phead(self, src_url):
-        logging.debug('sending request for "%s"...' % src_url)
+        logging.debug('sending HEAD request for "%s"...' % src_url)
         res = yield self.fc.get_head(src_url)
         msg = res['value']
         if res['status'] == 'ERROR':
             raise ValueError('Error on fetch: ' + msg)
         defer.returnValue(msg)
+
+    ###############################################
+    def test_instantiation_only(self):
+        pass
 
     @defer.inlineCallbacks
     def test_single_get(self):
@@ -78,8 +81,8 @@ class FetcherTest(IonTestCase):
         @note Contenst of same in /var/www/tmp on amoeba.ucsd.edu
         """
         res = yield self._get_page('http://amoeba.ucsd.edu/tmp/test1.txt')
-        msg = res.strip()
-        self.failUnlessSubstring('Now is the time for all good men', msg)
+        self.failUnlessSubstring('Now is the time for all good men', res)
+        self.failUnlessSubstring('content-length', res)
 
     @defer.inlineCallbacks
     def test_page_head(self):
@@ -92,15 +95,15 @@ class FetcherTest(IonTestCase):
     @defer.inlineCallbacks
     def test_404(self):
         try:
-            d = yield self._get_page('http://ooici.net/404-fer-sure')
+            yield self._get_page('http://ooici.net/404-fer-sure')
             self.fail('Should have gotten an exception for 404 error!')
-        except ValueError, e:
+        except ValueError:
             pass
 
     @defer.inlineCallbacks
     def test_header_404(self):
         try:
-            d = yield self._get_phead('http://ooici.net/404-fer-sure')
+            yield self._get_phead('http://ooici.net/404-fer-sure')
             self.fail('Should have gotten an exception for 404 error!')
-        except ValueError, e:
+        except ValueError:
             pass

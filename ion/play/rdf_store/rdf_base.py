@@ -7,6 +7,7 @@
 """
 
 import logging
+logging = logging.getLogger(__name__)
 
 # Use the Json serialization and hashing
 from ion.data.objstore import ValueRef
@@ -53,7 +54,7 @@ class RdfBase(object):
     def rdf_id(self):
         
         if self.type == self.STATE:
-            print self
+            #print self
             if not len(self.commitRefs)==1:
                 raise RuntimeError('A RdfState Object must have exactly one commit ref to have a unique id!')
             ref = self.commitRefs[0]
@@ -139,8 +140,8 @@ class RdfAssociation(RdfBase):
         elif len(subject.commitRefs)==0:
             s=(subject.type,(subject.key, None))
         else:
-            print 'Illegal Subject:'
-            print subject
+            logging.debug('Illegal Subject:')
+            logging.debug(str(subject))
             raise RuntimeError('Can not create association to a merged state')
  
         if len(object.commitRefs)==1 and object.type==RdfBase.STATE:
@@ -148,8 +149,8 @@ class RdfAssociation(RdfBase):
         elif len(object.commitRefs)==0:
             o=(object.type,(object.key, None))
         else:
-            print 'Illegal Object:'
-            print object
+            logging.debug('Illegal Object:')
+            logging.debug(str(object))
             raise RuntimeError('Can not create association to a merged state')
  
         if len(predicate.commitRefs)==1 and predicate.type==RdfBase.STATE:
@@ -157,8 +158,8 @@ class RdfAssociation(RdfBase):
         elif len(predicate.commitRefs)==0:
             p=(predicate.type,(predicate.key, None))
         else:
-            print 'Illegal Predicate:'
-            print predicate
+            logging.debug('Illegal Predicate:')
+            logging.debug(str(predicate))
             raise RuntimeError('Can not create association to a merged state')
         
         
@@ -458,8 +459,6 @@ class WorkSpace(object):
             raise RuntimeError('Association Subject does not match triple subject identity')
 #        if not association.object[RdfBase.PREDICATE][1] == (triple[1].key,triple[1].commitRefs):
         if not association.object[RdfBase.PREDICATE][1][0] == triple[1].key:
-            print association.object[RdfBase.PREDICATE]
-            print triple[1]
             raise RuntimeError('Association predicate does not match triple predicate identity')
 #        if not association.object[RdfBase.OBJECT][1] == (triple[2].key,triple[2].commitRefs):
         if not association.object[RdfBase.OBJECT][1][0] == triple[2].key:
@@ -804,13 +803,13 @@ class WorkSpace(object):
         return size
 
     def print_status(self):
-        print 'WorkSpace key',self.key
-        print 'WorkSpace CommitRefs',self.commitRefs
-        print 'WorkSpace Modified',self.modified
-        print '# of Associations in workspace', self.len_associations()
-        print '# of Blobs in workspace', self.len_blobs()
-        print '# of Entities in workspace', self.len_entities()
-        print '# of States in workspace', self.len_states()
+        logging.info('WorkSpace key',self.key)
+        logging.info('WorkSpace CommitRefs',self.commitRefs)
+        logging.info('WorkSpace Modified',self.modified)
+        logging.info('# of Associations in workspace', self.len_associations())
+        logging.info('# of Blobs in workspace', self.len_blobs())
+        logging.info('# of Entities in workspace', self.len_entities())
+        logging.info('# of States in workspace', self.len_states())
 
     def print_workspace(self):
         
@@ -835,6 +834,6 @@ class WorkSpace(object):
                 elif spo.type == RdfBase.ENTITY:
                     strng+='Entity Id "'+str(spo.key)+'"'
         
-            print 'Association ID', assoc.key
-            print strng
+            logging.info('Association ID', assoc.key)
+            logging.info(strng)
 
