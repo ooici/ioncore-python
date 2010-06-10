@@ -128,7 +128,7 @@ class InstanceStateParser(object):
             return None
         return StateItem("instance-state", instance_id, time.time(), state)
         
-    def _expected(self, key):
+    def _expected(self, content, key):
         if content.has_key(key):
             return str(content[key])
         else:
