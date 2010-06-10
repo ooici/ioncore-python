@@ -91,7 +91,6 @@ class CommitObjectTest(unittest.TestCase):
         test = cas.Commit.decode_full(self.encoded)
         self.failUnlessEqual(sha1(self.commit), sha1(test))
 
-
 class CAStoreTest(unittest.TestCase):
     """@brief Test of basic fundamental capabilities of the CA Store and
     the store objects.
@@ -188,80 +187,4 @@ class CAStoreTest(unittest.TestCase):
         cnewid = yield self.cas.put(cnew)
         cnew_out = yield self.cas.get(cnewid)
         self.failUnlessEqual(cnew.value, cnew_out.value)
-
-
-
-class FrontendTest(unittest.TestCase):
-
-    @defer.inlineCallbacks
-    def setUp(self):
-        """
-        Test the store mechanics with the in-memory Store backend.
-        """
-        self.name = 'frontend_test'
-        backend_store = yield store.Store.create_store()
-        self.cas = yield objstore.Frontend.new(backend_store, self.name)
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        """
-        @note This raises a good point for the IStore interface:
-            - Namespaceing
-            - removing recursively
-            - removing a pattern
-        """
-        yield self.cas.infostore.remove('name')
-
-    @defer.inlineCallbacks
-    def test_make_tree(self):
-        """
-        @brief Rough script for development; Not a unit.
-        """
-
-        b =  cas.Blob('test content')
-        b2 =  cas.Blob('deja vu')
-        b3 =  cas.Blob('jamais vu')
-        yield self.cas.put(b)
-        yield self.cas.put(b2)
-        yield self.cas.put(b3)
-        t1 = cas.Tree(cas.Entity('test', sha1(b)),
-                            cas.Entity('hello', sha1(b2)))
-        t1id = yield self.cas.put(t1)
-        t2 = cas.Tree(cas.Entity('thing', sha1(b3)),
-                            cas.Entity('tree', sha1(t1)))
-        t2id = yield self.cas.put(t2)
-        c = cas.Commit(t2id, log='first commit')
-        cid = yield self.cas.put(c)
-        c_out = yield self.cas.get(cid)
-        b3new = cas.Blob('I remember, now!')
-        b3newid = yield self.cas.put(b3new)
-
-        t2new = cas.Tree(cas.Entity('thing', sha1(b3new)),
-                            cas.Entity('tree', sha1(t1)))
-        t2newid = yield self.cas.put(t2new)
-        cnew = cas.Commit(t2newid, parents=[cid], log='know what i knew but forgot')
-        cnewid = yield self.cas.put(cnew)
-        yield self.cas.update_ref(cnewid)
-
-        wt = yield self.cas.checkout()
-        yield wt.load_objects()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

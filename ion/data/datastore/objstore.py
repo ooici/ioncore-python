@@ -12,10 +12,23 @@ from twisted.python import reflect
 from ion.data.datastore import cas
 from ion.data import dataobject 
 
-class ContentStoreError(Exception):
+class ObjectStoreError(Exception):
     """
+    Base ObjectStore Exception
     """
 
+class UUID(cas.Blob):
+
+    type = 'uuid'
+
+
+
+class Tree(cas.Tree):
+
+    def load(self, backend):
+        """
+        load the entities/children of this tree
+        """
 
 class EntityProxy(cas.Entity):
     """
@@ -319,6 +332,294 @@ class Frontend(cas.CAStore):
         """
         @brief get an objects type
         """
+
+class BaseObjectChassis(object):
+    """
+    """
+
+    def __init__(self, objstore, refs, meta, commit=None):
+        """
+        """
+        self.objstore = objstore
+        self.refs = cas.StoreContextWrapper(objstore.backend, namespace + '.refs.')
+        self.meta = cas.StoreContextWrapper(objstore.backend, namespace + '.meta.')
+
+    @defer.inlineCallbacks
+    def _init_metadata(self):
+        """
+        @brief write basic information about this store
+        @note self.objs.put(namespace, id) is used so that the uuid
+        representing an object is the key to the uuid object.
+        """
+        uuid_obj = UUID(self.namespace)
+        id = yield self.put(uuid_obj)
+        yield self.objs.put(self.namespace, id)
+        defer.returnValue(self) # Return this instance
+
+    def _get_object_meta(self):
+        d = self.meta.get('')
+
+        def _raise_if_none(res):
+            if not bool(res):
+                raise ObjectStoreError("Store meta not found")
+            return res
+        d.addCallback(_raise_if_none)
+        return d
+
+class ObjectChassis(BaseObjectChassis):
+    """
+    This establishes a context for accessing/modifying/committing an
+    "Object" or "Resource Entity" structure...thing.
+
+    """
+
+    def update_ref(self, commit_id, ref='master'):
+        """
+        @brief Update association of reference name to commit id.
+        @retval Deferred
+        """
+
+    def get_head(self, name='master'):
+        """
+        @brief Get reference named 'name'. The head references represent
+        commit ancestry chains. Master is the name of the main commit
+        linage. A branch is represents a divergent commit linage. Any head
+        reference besides the one named 'master' is a branch head.
+        @retval commit object id
+        @todo get('heads.master') instead of just get('head')
+        @note if head is not there, *IStore says return None*
+        """
+
+    @defer.inlineCallbacks
+    def checkout(self, head=None):
+        """
+        @retval Instance of WorkingTree
+        """
+        ref = yield self.get_head()
+        if ref:
+            commit = yield self.get(ref)
+            tree = yield self.get(commit.tree)
+            wt = WorkingTree(self, tree, commit)
+        else:
+            wt = WorkingTree(self)
+        defer.returnValue(wt)
+
+    def load():
+        """
+        """
+
+    def add(self, element):
+        """
+        @param entity Instance of Entity or EntityProxy.
+        """
+
+    def update(self, element):
+        """
+        """
+
+    def remove(self, element):
+        """
+        """
+
+    def commit(self, working_tree=None):
+        """
+        """
+
+
+
+class BaseObjectStore(cas.CAStore):
+    """
+    @brief Interactive interface to an Object Store instance (who's raw
+    data lives on some 'backend'. An instance of this object sets the
+    context for creating/modifying/retrieving "Object" or "Resource
+    Entity" structures from a general key/value store. Each structure is
+    accessed by a UUID. 
+     - Each structure is comparable to a git repository
+    Each structure is a model composed of references to content objects
+    (blobs, etc.).
+    """
+
+    def __init__(self, backend, partition=''):
+        """
+        @param backend instance providing ion.data.store.IStore interface.
+        @param partition Logical name spacing in an otherwise flat
+        key/value space.
+        @note Design decision on qualifying/naming a store name space (like
+        a git repository tree)
+        """
+        cas.CAStore.__init__(self, backend, partition)
+        self.partition = partition
+        self.storemeta = cas.StoreContextWrapper(backend, partition + '.meta.')
+        self.type = reflect.fullyQualifiedName(self.__class__)
+        self.TYPES[UUID.type] = UUID
+
+    @classmethod
+    def new(cls, backend, name):
+        """
+        @brief Initialize an Object Store in the backend.  
+        This is a major operation, like formating a blank hard drive; In
+        general, this only needs to be done once to a backend.
+        @retval A Deferred that succeeds with a new instance.
+        """
+        inst = cls(backend, name)
+        d = inst._store_exists()
+
+        def _succeed(result):
+            if not result:
+                d = inst._init_store_metadata()
+                return d 
+            return _fail(result)
+
+        def _fail(result):
+            return defer.fail(ObjectStoreError('Partition name already exists'))
+
+        d.addCallback(_succeed)
+        d.addErrback(lambda r: _fail(r))
+        return d
+
+    @classmethod
+    def load(cls, backend, name):
+        """
+        @brief Connect to an existing object store namespace that lives
+        inthe given backend.
+        @retval A Deferred that succeeds with an instance of ObjectStore
+        """
+        inst = cls(backend, name)
+        d = inst._store_exists()
+
+        def _succeed(result):
+            if result:
+                return inst
+            return defer.fail(ObjectStoreError("Partition name does not exist"))
+
+        def _fail(result):
+            return defer.fail(ObjectStoreError("Error checking partition named %s" % name))
+
+        d.addCallback(_succeed)
+        d.addErrback(lambda r: _fail(r))
+
+    @defer.inlineCallbacks
+    def _init_store_metadata(self):
+        """
+        @brief write basic information about this store
+        """
+        yield self.storemeta.put('type', self.type)
+        defer.returnValue(self) # Return this instance
+
+    def _get_store_meta(self):
+        d = self.storemeta.get('type')
+
+        def _raise_if_none(res):
+            if not bool(res):
+                raise ObjectStoreError("Store meta not found")
+            return res
+        d.addCallback(_raise_if_none)
+        return d
+
+    def _store_exists(self):
+        """
+        @brief Verify the backend IStore contains the keys that represent
+        this stores namespace.
+        @retval A Deferred 
+        """
+        d = self._get_store_meta()
+        d.addCallback(lambda res: True)
+        d.addErrback(lambda res: False)
+        return d
+
+
+class ObjectStore(BaseObjectStore):
+
+    def create(self, name):
+        """
+        @param name of object store object to create...
+        @brief Create a new object named 'name'. This name should not exist
+        yet in the object store.
+        @retval A Deferred that succeeds with a new instance.
+        @note Could just use an idempotent declare/get thing instead of
+        error-ing on create
+        """
+        d = self._object_exists()
+
+        def _succeed(result):
+            if not result:
+                # create object chassis
+                return self._create_object(name)
+            return _fail(result)
+
+        def _fail(result):
+            return defer.fail(ObjectStoreError('Object name already exists'))
+
+        d.addCallback(_succeed)
+        d.addErrback(lambda r: _fail(r))
+        return d
+
+    def _create_object(self, name):
+        """
+        @note Not Using Object Store Partition Namespace Yet.
+        Might not need to
+        """
+        refs = cas.StoreContextWrapper(self.backend, name + '.refs.')
+        meta = cas.StoreContextWrapper(self.backend, name + '.meta.')
+        return ObjectChassis(self, refs, meta)
+
+    @defer.inlineCallbacks
+    def _object_exists(self, name):
+        """
+        @brief does object store object exist?
+        @param name in this context is the id of the cas uuid object.
+        @retval A Deferred
+        """
+        obj = yield self.get(name)
+        if obj:
+            exists = True
+        else:
+            exists = False
+        defer.returnValue(exists)
+
+    def clone(self, name):
+        """
+        @brief Clone an object from the object store. The semantic of clone
+        as opposed to get is very important. Objects in the object store
+        represent mutable models of immutable constituents. Getting is not
+        the appropriate verb because you are not getting something
+        canonical; this makes much sense when you consider the compliment put
+        idea. There is no put, there is commit, and update ref,
+        """
+        uuid = self.get(name)
+
+
+@defer.inlineCallbacks
+def _test(ns):
+    from ion.data import store
+    s = yield store.Store.create_store()
+    obs = yield BaseObjectStore.new(s, 'test_partition')
+    ns.update(locals())
+
+
+"""
+@note Two organizational strategies:
+    1 BaseObjectStore/ObjectStore class methods as factories for creating
+      and loading ObjectStore instances.
+    2 ObjectStore Factory for setting up an ObjsectStore instance.
+
+With 1, ObjectStore would have method names for creating/checking Stores
+and also the actual Objects in the ObjectStore.
+"""
+
+
+class ObjectStoreFactory(object):
+    """
+    Sets up an object store
+    """
+
+    def __init__(self, backend):
+        """
+        """
+        self.backend = backend
+
+
+
 
 
 

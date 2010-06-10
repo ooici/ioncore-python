@@ -478,6 +478,11 @@ class StoreContextWrapper(object):
     """
 
     def __init__(self, backend, prefix):
+        """
+        @param backend instance that provides ion.data.store.IStore
+        interface.
+        @param prefix segment of namespace (the context).
+        """
         self.backend = backend
         self.prefix = prefix
 
@@ -500,9 +505,10 @@ class StoreContextWrapper(object):
 class CAStore(object):
     """
     Content Addressable Store
-    Manages and provides organizational utilities for a set of objects
-    (blobs, trees, commits, etc.)
     """
+
+    BaseStorableType = BaseObject
+
     TYPES = {
             Blob.type:Blob,
             Tree.type:Tree,
@@ -511,22 +517,22 @@ class CAStore(object):
 
     def __init__(self, backend, namespace='', compression=None):
         """
+        @param backend instance that provides the ion.data.store.IStore
+        interface.
         @param namespace root prefix qualifying context for this CAS with in the
         general space of the backend store.
-        @param backend storage interface
         """
         self._backend = backend
-        self.root_namespace = namespace
-        self.objstore = StoreContextWrapper(backend, namespace + '.objects.')
-        self.refstore = StoreContextWrapper(backend, namespace + '.refs.')
-        self.infostore = StoreContextWrapper(backend, namespace + '.info.')
+        self.namespace = namespace
+        #self.objs = StoreContextWrapper(backend, namespace + '.objs.')
+        self.objs = StoreContextWrapper(backend, '') # Flat ns for content objs
 
     def decode(self, encoded_obj):
         """
         @brief decode raw object read from backend store
         @param encoded_obj encoded object of one of the type in self.TYPES
         """
-        obj = BaseObject.decode(encoded_obj, self.TYPES)
+        obj = self.BaseStorableType.decode(encoded_obj, self.TYPES)
         return obj
 
     def hash_object(self, obj):
@@ -551,7 +557,7 @@ class CAStore(object):
         value = obj.value #compress arg
         hash = sha1(value)
         id = sha1_to_hex(hash)
-        d = self.objstore.put(id, value)
+        d = self.objs.put(id, value)
         d.addCallback(lambda _: id)
         return d
 
@@ -563,7 +569,7 @@ class CAStore(object):
         """
         if len(id) == 20:
             id = sha1_to_hex(id)
-        d = self.objstore.get(id)
+        d = self.objs.get(id)
         def _decode_cb(raw):
             return self.decode(raw)
         d.addCallback(_decode_cb)
