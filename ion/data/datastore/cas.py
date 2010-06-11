@@ -44,6 +44,10 @@ def sha1_to_hex(bytes):
     almosthex = map(hex, hex_bytes)
     return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
 
+class CAStoreError(Exception):
+    """
+    Exception class for CAStore
+    """
 
 class Entity(tuple):
     """
@@ -520,7 +524,7 @@ class CAStore(object):
         @param namespace root prefix qualifying context for this CAS with in the
         general space of the backend store.
         """
-        self._backend = backend
+        self.backend = backend
         self.namespace = namespace
         #self.objs = StoreContextWrapper(backend, namespace + '.objs.')
         self.objs = StoreContextWrapper(backend, '') # Flat ns for content objs
@@ -569,6 +573,8 @@ class CAStore(object):
             id = sha1_to_hex(id)
         d = self.objs.get(id)
         def _decode_cb(raw):
+            if not raw:
+                raise CAStoreError("Object with id: %s not found" % id)
             return self.decode(raw)
         d.addCallback(_decode_cb)
         # d.addErrback

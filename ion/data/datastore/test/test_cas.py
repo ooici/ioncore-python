@@ -215,3 +215,13 @@ class CAStoreTest(unittest.TestCase):
         cnew_out = yield self.cas.get(cnewid)
         self.failUnlessEqual(cnew.value, cnew_out.value)
 
+    @defer.inlineCallbacks
+    def test_not_found(self):
+        try:
+            obj = yield self.cas.get(sha1('not there'))
+            self.fail()
+        except cas.CAStoreError:
+            pass
+
+
+

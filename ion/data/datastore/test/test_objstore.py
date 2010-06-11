@@ -37,7 +37,7 @@ class CreateObjectStoreTest(unittest.TestCase):
             pass
 
 
-class BaseObjectStoreTest(unittest.TestCase):
+class ObjectStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -46,9 +46,8 @@ class BaseObjectStoreTest(unittest.TestCase):
         """
         self.name = 'test_namespace'
         backend_store = yield store.Store.create_store()
-        self.cas = yield objstore.BaseObjectStore.new(backend_store, self.name)
+        self.objstore = yield objstore.ObjectStore.new(backend_store, self.name)
 
-    @defer.inlineCallbacks
     def tearDown(self):
         """
         @note This raises a good point for the IStore interface:
@@ -56,11 +55,13 @@ class BaseObjectStoreTest(unittest.TestCase):
             - removing recursively
             - removing a pattern
         """
-        yield self.cas.infostore.remove('name')
-
 
     @defer.inlineCallbacks
-    def test_make_tree(self):
+    def test_create_object(self):
+        obj = yield self.objstore.create('thing')
+
+    @defer.inlineCallbacks
+    def xtest_make_tree(self):
         """
         @brief Rough script for development; Not a unit.
         """
@@ -85,12 +86,12 @@ class BaseObjectStoreTest(unittest.TestCase):
 
         t2new = cas.Tree(cas.Entity('thing', sha1(b3new)),
                             cas.Entity('tree', sha1(t1)))
-        t2newid = yield self.cas.put(t2new)
+        t2newid = yield self.objstore.put(t2new)
         cnew = cas.Commit(t2newid, parents=[cid], log='know what i knew but forgot')
-        cnewid = yield self.cas.put(cnew)
-        yield self.cas.update_ref(cnewid)
+        cnewid = yield self.objstore.put(cnew)
+        yield self.objstore.update_ref(cnewid)
 
-        wt = yield self.cas.checkout()
+        wt = yield self.objstore.checkout()
         yield wt.load_objects()
 
 

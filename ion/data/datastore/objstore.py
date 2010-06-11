@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 """
-@file ion/data/frontend.py
+@file ion/data/datastore/objstore.py
 @author Dorian Raymer
+@author David Stuebe
+@author Michael Meisinger
 """
 
 import logging
@@ -10,97 +12,72 @@ from twisted.internet import defer
 from twisted.python import reflect
 
 from ion.data.datastore import cas
-from ion.data import dataobject 
 
 class ObjectStoreError(Exception):
     """
     Base ObjectStore Exception
     """
 
-class UUID(cas.Blob):
-
-    type = 'uuid'
-
-
-
-class Tree(cas.Tree):
+class Entity(cas.Entity):
 
     def load(self, backend):
         """
-        load the entities/children of this tree
+        @brief experimental way to dynamically load objects from id's.
         """
+        if not self.obj:
+            def cb(obj):
+                self.obj = obj
+                return obj.load(backend)
 
-class EntityProxy(cas.Entity):
-    """
-    @brief Used for reading from the store
-    """
-
-    def __init__(self, name, hash, mode=None):
-        cas.Entity.__init__(self, name, hash, mode)
-        self._obj = None
-
-    def get_obj(self, backend):
-        """
-        @brief Get object from backend store, cache result.
-        @retval Deferred that fires with obj
-        """
-        if not self._obj:
-            d = backend.get(self[1])
-            def set_obj(obj):
-                self._obj = obj
-                return obj
-            d.addCallback(set_obj)
+            d = backend.get(self.obj_id)
+            d.addCallback(cb)
             return d
-        return defer.succeed(self._obj)
+        return defer.succeed(None)
 
-
-class BlobProxy(object):
+class UUID(cas.Blob):
     """
-    Inverse of regular Blob object.
-    Start with the object id (hash), fetching the content when needed
+    Names of objects are UUIDs and are stored as content objects.
     """
 
-    def __init__(self, backend, id):
-        """
-        @param backend (or cas) active backend to read from
-        @param id the object hash
-        """
-        self.objstore = backend
-        self.id = id
-        self._content = None
+    type = 'uuid'
 
-    def get_content(self):
-        """
-        @retval a Deferred that will fire with the content
-        """
-        if not self._content:
-            d = self.objstore.get(self.id)
-            def store_result(content):
-                self._content = content
-                return content
-            d.addCallback(store_result)
-        else:
-            d = defer.succeed(self._content)
-        return d
+class Blob(cas.Blob):
 
-class TreeProxy(cas.Tree):
-    """
-    Live tree of real objects
-    """
-
-    entityFactory = EntityProxy
-
-    def __init__(self, backend, *children):
+    def load(self, backend):
         """
-        @param child An element of the tree (a child entity).
+        @brief leaf of load recursion. Do nothing.
         """
-        self.backend = backend
-        self.children = children
+        return defer.succeed(self.content)
 
-    @defer.inlineCallbacks
-    def load_children(self):
-        for child in self.children:
-            child_obj = yield child.get_obj(self.backend)
+class Tree(cas.Tree):
+
+    entityFactory = Entity
+
+    def load(self, backend):
+        """
+        @brief Call load on all entities.
+        """
+        return defer.DeferredList([child.load(backend) for child in self.children])
+
+    def __getitem__(self, name):
+        """
+        lazy loading
+        """
+
+class Commit(cas.Commit):
+
+    def load(self, backend, recursive=False):
+        """
+        """
+        if not self.tree_obj:
+            d = backend.get(self.tree)
+            def cb(obj):
+                self.tree_obj = obj
+                if recursive:
+                    return obj.load(backend)
+            d.addCallback(cb)
+            return d
+        return defer.succeed(None)
 
 class ActiveObject(object):
     """
@@ -120,7 +97,6 @@ class ActiveObject(object):
     def load():
         """
         """
-
 
 class ActiveTree(ActiveObject):
     """
@@ -215,134 +191,24 @@ class WorkingTree(object):
         """
         """
 
-class Frontend(cas.CAStore):
-    """
-    """
-
-    def __init__(self, backend, namespace=''):
-        """
-        @note Design decision on qualifying/naming a store name space (like
-        a git repository tree)
-        """
-        cas.CAStore.__init__(self, backend, namespace)
-        self.working_tree = None
-        #self.TYPES['tree'] = TreeProxy
-
-    @classmethod
-    def new(cls, backend, name):
-        """
-        @brief Create a new store named 'name'. This name should not exist
-        yet in the backend.
-        """
-        new = cls(backend, name)
-        d = new._store_exists()
-
-        def init(result):
-            if result:
-                return defer.fail(ContentStoreError('Name already Exists'))
-
-            d = new._init_store_metadata()
-            return d
-
-        d.addCallback(init)
-        d.addCallback(lambda r: new)
-        return d
-
-    @defer.inlineCallbacks
-    def _init_store_metadata(self):
-        """
-        @brief write basic information about this store
-        """
-        yield self.infostore.put('name', self.root_namespace)
-        yield self.infostore.put('type', reflect.fullyQualifiedName(self.__class__))
-        yield self.infostore.put('head', 'master')
-
-    def _store_exists(self):
-        """
-        @brief check to see if name corresponds to a store in the backend.
-        @retval Deferred that returns True if the name exists; False
-        otherwise.
-        """
-        d = self.infostore.get('name')
-        d.addCallback(lambda r: bool(r))
-        return d
-
-    def _get_symbolic_ref(self, name='HEAD'):
-        """
-        """
-
-    def _set_symbolic_ref(self, name='HEAD', ref=''):
-        """
-        """
-
-
-    def update_ref(self, commit_id, ref='master'):
-        """
-        @brief Update association of reference name to commit id.
-        @retval Deferred
-        """
-        return self.refstore.put(ref, commit_id)
-
-    def get_head(self, name='master'):
-        """
-        @brief Get reference named 'name'. The head references represent
-        commit ancestry chains. Master is the name of the main commit
-        linage. A branch is represents a divergent commit linage. Any head
-        reference besides the one named 'master' is a branch head.
-        @retval commit object id
-        @todo get('heads.master') instead of just get('head')
-        @note if head is not there, *IStore says return None*
-        """
-        return self.refstore.get(name)
-
-    @defer.inlineCallbacks
-    def checkout(self, head=None):
-        """
-        @retval Instance of WorkingTree
-        """
-        ref = yield self.get_head()
-        if ref:
-            commit = yield self.get(ref)
-            tree = yield self.get(commit.tree)
-            wt = WorkingTree(self, tree, commit)
-        else:
-            wt = WorkingTree(self)
-        defer.returnValue(wt)
-
-    def commit(self, working_tree=None):
-        """
-        """
-
-    def _get_named_entity(self, name):
-        """
-        @brief Get object by name.
-        @param name represents an object in a tree
-        """
-
-    def _put_raw_data_value(self, name, value):
-        """
-        @brief Write a piece of raw data
-        """
-        b = Blob(value)
-        t = Tree(Entity(name, b.hash))
-        d = self.put(t)
-        #d.addCallback(
-
-    def get_info(self, id):
-        """
-        @brief get an objects type
-        """
-
 class BaseObjectChassis(object):
     """
     """
 
     def __init__(self, objstore, refs, meta, commit=None):
         """
+        @note
+        objstore vs. objs
+        objstore implements ICAStore; objs is just the raw key/value
+        (namespaced) interface to the content objects.
+        refs is not a refstore (yet); it is just the namespaced key/value
+        store for accessing the refs. Same for meta.
+        objstore expects/returns cas.BaseObject types
+        refs & meta don't necessarily have types (yet).
         """
         self.objstore = objstore
-        self.refs = cas.StoreContextWrapper(objstore.backend, namespace + '.refs.')
-        self.meta = cas.StoreContextWrapper(objstore.backend, namespace + '.meta.')
+        self.refs = refs
+        self.meta = meta
 
     @defer.inlineCallbacks
     def _init_metadata(self):
@@ -357,6 +223,10 @@ class BaseObjectChassis(object):
         defer.returnValue(self) # Return this instance
 
     def _get_object_meta(self):
+        """
+        @brief Common meta info on this object.
+        It's like the misc mutable stuff in .git
+        """
         d = self.meta.get('')
 
         def _raise_if_none(res):
@@ -373,11 +243,14 @@ class ObjectChassis(BaseObjectChassis):
 
     """
 
-    def update_ref(self, commit_id, ref='master'):
+    def update_head(self, commit_id, head='master'):
         """
+        @param commit_id Id of CAStore commit object.
         @brief Update association of reference name to commit id.
+        In general, head is a ref, but other refs are not yet implemented.
         @retval Deferred
         """
+        self.refs(head, commit_id)
 
     def get_head(self, name='master'):
         """
@@ -389,13 +262,13 @@ class ObjectChassis(BaseObjectChassis):
         @todo get('heads.master') instead of just get('head')
         @note if head is not there, *IStore says return None*
         """
+        return self.refs.get(name)
 
     @defer.inlineCallbacks
-    def checkout(self, head=None):
+    def checkout(self, head='master'):
         """
-        @retval Instance of WorkingTree
         """
-        ref = yield self.get_head()
+        ref = yield self.get_head(head)
         if ref:
             commit = yield self.get(ref)
             tree = yield self.get(commit.tree)
@@ -403,10 +276,6 @@ class ObjectChassis(BaseObjectChassis):
         else:
             wt = WorkingTree(self)
         defer.returnValue(wt)
-
-    def load():
-        """
-        """
 
     def add(self, element):
         """
@@ -438,6 +307,12 @@ class BaseObjectStore(cas.CAStore):
     Each structure is a model composed of references to content objects
     (blobs, etc.).
     """
+    TYPES = {
+            UUID.type:UUID,
+            Blob.type:Blob,
+            Tree.type:Tree,
+            Commit.type:Commit,
+            }
 
     def __init__(self, backend, partition=''):
         """
@@ -451,7 +326,6 @@ class BaseObjectStore(cas.CAStore):
         self.partition = partition
         self.storemeta = cas.StoreContextWrapper(backend, partition + '.meta.')
         self.type = reflect.fullyQualifiedName(self.__class__)
-        self.TYPES[UUID.type] = UUID
 
     @classmethod
     def new(cls, backend, name):
@@ -539,11 +413,10 @@ class ObjectStore(BaseObjectStore):
         @note Could just use an idempotent declare/get thing instead of
         error-ing on create
         """
-        d = self._object_exists()
+        d = self._object_exists(name)
 
         def _succeed(result):
             if not result:
-                # create object chassis
                 return self._create_object(name)
             return _fail(result)
 
@@ -570,15 +443,16 @@ class ObjectStore(BaseObjectStore):
         @param name in this context is the id of the cas uuid object.
         @retval A Deferred
         """
-        obj = yield self.get(name)
-        if obj:
+        try:
+            obj = yield self.get(cas.sha1(name))
             exists = True
-        else:
+        except cas.CAStoreError:
             exists = False
         defer.returnValue(exists)
 
     def clone(self, name):
         """
+        @param name uuid of object store object.
         @brief Clone an object from the object store. The semantic of clone
         as opposed to get is very important. Objects in the object store
         represent mutable models of immutable constituents. Getting is not
@@ -593,7 +467,8 @@ class ObjectStore(BaseObjectStore):
 def _test(ns):
     from ion.data import store
     s = yield store.Store.create_store()
-    obs = yield BaseObjectStore.new(s, 'test_partition')
+    obs = yield ObjectStore.new(s, 'test_partition')
+    obj = yield obs.create('thing')
     ns.update(locals())
 
 
