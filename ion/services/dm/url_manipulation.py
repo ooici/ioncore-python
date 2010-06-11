@@ -12,8 +12,14 @@ import urlparse
 import logging
 logging = logging.getLogger(__name__)
 import os.path
+from ion.core import ioninit
 
-def rewrite_url(dsUrl, newHostname='localhost'):
+# Read our configuration from the ion.config file.
+config = ioninit.config(__name__)
+LOCAL_DIR = config.getValue('local_dir', '../../dap_server/data/')
+CACHE_HOSTNAME = config.getValue('cache_hostname', 'localhost')
+
+def rewrite_url(dsUrl, newHostname=CACHE_HOSTNAME):
     """
     @brief Given a DAP URL, presume that we host it locally and rewrite it
     to reflect same. Changes hostname to localhost, removes any port,
@@ -31,15 +37,19 @@ def rewrite_url(dsUrl, newHostname='localhost'):
     chg_path = chg_host._replace(path=os.path.basename(chg_host.path))
     return chg_path.geturl()
 
-def generate_filename(dataset_url, local_dir='../../dap_server/data/'):
+def generate_filename(dataset_url, local_dir=LOCAL_DIR):
     """
     @brief Given a URL, generate a local filesystem name for same. Used by
     persister for write and cache for purge operations. It's a stinky hack, really.
     @param dataset_url Original URL
+    @param local_dir Local directory to write to
     @retval Local filename
     @todo Complete refactor - directories, etc
     """
-    assert(local_dir[-1:] == '/')
+    assert(len(local_dir) > 0)
+
+    if local_dir[-1:] != '/':
+        local_dir = local_dir + '/'
 
     basicName = os.path.basename(dataset_url)
 
@@ -47,11 +57,6 @@ def generate_filename(dataset_url, local_dir='../../dap_server/data/'):
     datasetid = ''.join([char for char in basicName if char in
             (string.letters + string.digits + "_-.")])
 
-    """
-    Relative paths work on both mac and EC2, duh.
-    @bug Hardwired relative path
-    @todo Move path to configuration file
-    """
     return local_dir + datasetid
 
 def base_dap_url(src_url):

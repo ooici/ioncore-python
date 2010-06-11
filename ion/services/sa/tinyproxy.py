@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/tinyproxy.py
-@package ion.services.dm.proxy Build proxy on raw sockets
+@file ion/services/sa/tinyproxy.py
+@package ion.services.sa.proxy Build proxy on raw sockets
 @author SUZUKI Hisao
 @date 5/28/10
 @see http://www.okisoft.co.jp/esc/python/proxy/

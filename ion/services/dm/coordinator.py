@@ -15,7 +15,7 @@ from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.services.dm.fetcher import FetcherClient
+from ion.services.sa.fetcher import FetcherClient
 
 class CoordinatorService(BaseService):
     """
