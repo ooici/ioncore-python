@@ -18,6 +18,7 @@ from ion.core import ioninit
 config = ioninit.config(__name__)
 LOCAL_DIR = config.getValue('local_dir', '../../dap_server/data/')
 CACHE_HOSTNAME = config.getValue('cache_hostname', 'localhost')
+CACHE_PORTNUM = config.getValue('cache_port', '80')
 
 def rewrite_url(dsUrl, newHostname=CACHE_HOSTNAME):
     """
@@ -28,6 +29,7 @@ def rewrite_url(dsUrl, newHostname=CACHE_HOSTNAME):
     @param dsUrl Original URL to rewrite
     @param newHostname Default is localhost, TCP name of server
     @retval String with rewritten URL.
+    @todo add CACHE_PORTNUM
     """
 
     ml = urlparse.urlsplit(dsUrl)
