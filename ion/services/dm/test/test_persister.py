@@ -39,7 +39,7 @@ class TransportTester(IonTestCase):
 
     @defer.inlineCallbacks
     def test_one(self):
-        raise unittest.SkipTest('Waiting for carrot to use latin-1 instead of utf-8')
+        raise unittest.SkipTest('Waiting for CISWCORE-14')
 
         services = [
              {'name': 'fetcher', 'module': 'ion.services.sa.fetcher',
@@ -59,7 +59,7 @@ class TransportTester(IonTestCase):
 
     @defer.inlineCallbacks
     def test_two(self):
-        raise unittest.SkipTest('Waiting for carrot to use latin-1 instead of utf-8')
+        raise unittest.SkipTest('Waiting for CISWCORE-14')
 
         """
         Try a manual pull of XDR and send to known-good service.
@@ -133,7 +133,7 @@ class PersisterTester(IonTestCase):
 
     @defer.inlineCallbacks
     def test_fetcher_and_persister_services(self):
-        raise unittest.SkipTest('Waiting for carrot to use latin-1 instead of utf-8')
+        raise unittest.SkipTest('Waiting for CISWCORE-14')
 
         services = [
             {'name': 'persister', 'module': 'ion.services.dm.persister',

@@ -30,16 +30,10 @@ class IngestService(BaseService):
         """
         Given a DAP message, pull out a dictionary of attributes
         via pydap calls on the metadata.
+        @note Just returns the dictionary of attributes and pydap objects
         """
-        try:
-            dataset = self._do_ingest(content)
-        except KeyError, ke:
-            raise ke
-
-        """
-        @note Just returns the dictionary of attributes
-        """
-        self.reply_ok(msg, dataset.attributes, {})
+        dataset = self._do_ingest(content)
+        self.reply_ok(msg, dataset, {})
 
     def _do_ingest(self, content):
         """
