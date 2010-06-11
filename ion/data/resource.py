@@ -139,6 +139,7 @@ class ResourceObject(object):
         is a derived class of BaseObject (Blob, Tree, Commit, ...).
         @retval A new instance of the encoded object
         """
+
         type, body = ResourceObject._decode_header(value)
         obj = types[type]._decode_body(body)
         return obj
@@ -284,5 +285,75 @@ class IdentityResource(ResourceObject):
         return cls(**e)
         
 types['identity']=IdentityResource
+
+
+class TypedAttribute(object):
+
+    def __init__(self, name, type, default=None):
+        self.name = '_' + name
+        self.type = type
+        self.value = default if default else type()
+
+    def __get__(self, inst, cls):
+        return getattr(inst, self.name, self.value)
+
+    def __set__(self, inst, value):
+        self.value = value
+        setattr(inst, self.name, value)
+        setattr(inst, '_' + self.name, self.encode())
+
+    def encode(self):
+        """
+        encded:
+        "str email\x00handle@domain.tld"
+        """
+        encoded = "%s %s%s%s" % (self.type.__name__, self.name, NULL_CHR, self.value,)
+        return encoded
+
+class BaseResource(object):
+    """
+    """
+
+class IdentityResource(BaseResource):
+
+    name = TypedAttribute('name', Str, 'Dorian Raymer')
+    email = TypedAttribute('email', str)
+    birth = TypedAttribute('birth', str)
+    weight = TypedAttribute('w', int)
+
+    def encode(self, thing):
+        """
+        encded:
+        "str email\x00handle@domain.tld"
+        """
+        encoded = "%s %s%s%s" % (thing.type, thing.name, NULL_CHR, thing,)
+        return encoded
+
+
+class IdentityResource(dict):
+
+    def __init__(self, name, email='a@b.com', birth=0):
+        """
+        """
+        dict.__init__(self, (('name', name), ('email', email), ('birth', birth)))
+        self.name = name
+
+    def encode(self):
+        encoded = []
+        for k in self:
+            v = self[k]
+            encoded.append("%s %s%s%s" % (k, NULL_CHR, type(v).__name__, v,))
+        return encoded
+
+
+
+
+
+
+
+
+
+
+
 
 

@@ -191,11 +191,38 @@ class WorkingTree(object):
         """
         """
 
+
+class DumbObject(dict):
+
+    def __init__(self, name, email='a@b.com', birth=0):
+        """
+        """
+        dict.__init__(self, (('name', name), ('email', email), ('birth', birth)))
+        self.name = name
+
+    def encode(self):
+        encoded = []
+        for k in self:
+            v = self[k]
+            encoded.append("%s %s%s%s" % (k, NULL_CHR, type(v).__name__, v,))
+        return encoded
+
+    def save(self):
+        """
+        """
+
+    def load(self, atts):
+        """
+        """
+        for k, v in atts.items():
+            self[k] = v
+
 class BaseObjectChassis(object):
     """
     """
+    baseClass = None
 
-    def __init__(self, objstore, refs, meta, commit=None):
+    def __init__(self, objstore, refs, meta, baseClass, commit=None):
         """
         @note
         objstore vs. objs
@@ -272,9 +299,9 @@ class ObjectChassis(BaseObjectChassis):
         if ref:
             commit = yield self.get(ref)
             tree = yield self.get(commit.tree)
-            wt = WorkingTree(self, tree, commit)
+            self.resObj = self.baseClass.load()
         else:
-            wt = WorkingTree(self)
+            #wt = WorkingTree(self)
         defer.returnValue(wt)
 
     def add(self, element):
@@ -404,7 +431,7 @@ class BaseObjectStore(cas.CAStore):
 
 class ObjectStore(BaseObjectStore):
 
-    def create(self, name):
+    def create(self, name, baseClass):
         """
         @param name of object store object to create...
         @brief Create a new object named 'name'. This name should not exist
@@ -417,7 +444,7 @@ class ObjectStore(BaseObjectStore):
 
         def _succeed(result):
             if not result:
-                return self._create_object(name)
+                return self._create_object(name, baseClass)
             return _fail(result)
 
         def _fail(result):
@@ -427,14 +454,14 @@ class ObjectStore(BaseObjectStore):
         d.addErrback(lambda r: _fail(r))
         return d
 
-    def _create_object(self, name):
+    def _create_object(self, name, baseClass):
         """
         @note Not Using Object Store Partition Namespace Yet.
         Might not need to
         """
         refs = cas.StoreContextWrapper(self.backend, name + '.refs.')
         meta = cas.StoreContextWrapper(self.backend, name + '.meta.')
-        return ObjectChassis(self, refs, meta)
+        return ObjectChassis(self, refs, meta, baseClass)
 
     @defer.inlineCallbacks
     def _object_exists(self, name):
