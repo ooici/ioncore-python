@@ -63,6 +63,7 @@ class FetcherService(BaseService):
         @param src_url Source URL
         @retval send_ok or send_err as required
         @note This routine sends the reply back to the caller!
+        @note called by derived class ion.services.dm.cache.CacheService
         """
         assert(operation in ['GET', 'HEAD'])
 

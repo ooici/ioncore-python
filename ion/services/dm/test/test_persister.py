@@ -12,10 +12,6 @@ logging = logging.getLogger(__name__)
 
 import httplib as http
 import urlparse
-try:
-    import json
-except:
-    import simplejson as json
 
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -148,11 +144,11 @@ class PersisterTester(IonTestCase):
         sup = yield self._spawn_processes(services)
 
         dset_url = 'http://ooici.net:8001/coads.nc'
-        local_dir = '/tmp/'
-        fname = generate_filename(dset_url, local_dir=local_dir)
+#        local_dir = '/tmp/'
+#        fname = generate_filename(dset_url, local_dir=local_dir)
 
         pc = PersisterClient(proc=sup)
-        fc = FetcherClient(proc=sup)
+#        fc = FetcherClient(proc=sup)
         fs = FetcherService()
 
         logging.debug('Grabbing dataset ' + dset_url)
