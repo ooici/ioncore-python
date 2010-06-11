@@ -14,8 +14,6 @@ from ion.core.base_process import ProtocolFactory
 
 from ion.services.base_service import BaseService
 from ion.services.sa.tinyproxy import ProxyHandler, ThreadingHTTPServer
-from multiprocessing import Process
-
 
 class ProxyService(BaseService):
     """
@@ -45,8 +43,7 @@ class ProxyService(BaseService):
         server_address = ('', tcp_port)
         ProxyHandler.protocol_version = 'HTTP/1.0'
         httpd = ThreadingHTTPServer(server_address, ProxyHandler)
-        p = Process(target=httpd.serve_forever)
-#        p.start()
+#        httpd.serve_forever()
 #        logging.debug('Proxy listener running.')
 
 factory = ProtocolFactory(ProxyService)
