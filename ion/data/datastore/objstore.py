@@ -11,6 +11,7 @@ import logging
 from twisted.internet import defer
 from twisted.python import reflect
 
+from ion.data import resource
 from ion.data.datastore import cas
 
 class ObjectStoreError(Exception):
@@ -29,7 +30,7 @@ class Entity(cas.Entity):
                 self.obj = obj
                 return obj.load(backend)
 
-            d = backend.get(self.obj_id)
+            d = backend.get(self[1])
             d.addCallback(cb)
             return d
         return defer.succeed(None)
@@ -79,150 +80,13 @@ class Commit(cas.Commit):
             return d
         return defer.succeed(None)
 
-class ActiveObject(object):
-    """
-    Container/proxy for storable/retrievable object.
-    """
-
-    def __init__(self, backend, id=None, obj=None):
-        """
-        @param backend Live sa store instance. 
-        @param id object hash.
-        @param obj instance of decoded object.
-        """
-        self.backend = backend
-        self.id = id
-        self.obj = obj
-    
-    def load():
-        """
-        """
-
-class ActiveTree(ActiveObject):
-    """
-    The tree concept is the thing mediating the mapping between the pure
-    data storage model and the higher level application data model.
-    A tree [or, in general, a graph] is an environment, the child element
-    of a tree node is the entity of the environment. The entity can be a
-    tree itself, so internally, it is another environment hosting other
-    entities. The elements of a tree node are a 2-tuple (key/value pair
-    where the key is a name and the value is an entity object). The name is
-    an external identifier that has no intrinsic meaning to the tree model.
-    The entity is a fundamental object of the tree model.
-
-    The node entity is a container/collection of name:entity pairs.
-
-    Content:
-        Pure data content - leaf nodes
-
-    """
-
-    def __init__(self, backend, tree=None):
-        self.backend = backend
-        self.tree = tree
-
-    @classmethod
-    def load(cls, backend, tree):
-        """
-        @brief Create ActiveTree from existing
-        """
-        if not isinstance(tree, cas.BaseObject):
-            # Assume it's an id
-            d = backend.get(tree)
-            d.addCallback()
-
-    @classmethod
-    def new(cls, backend):
-        """
-        @brief Create empty ActiveTree.
-        """
-
-    def __call__(self):
-        """
-        snap shot?
-        """
-
-    def __getitem__(self, name):
-        """
-        @brief Retrieve an object by the name associated with it in this
-        tree.
-        @param name of object
-        @retval object associated with name.
-        """
-
-class WorkingTree(object):
-    """
-    Tree of objects that may or may not be written to backend store
-    One way this object is created is by loading a commit.
-    """
-
-    def __init__(self, backend, tree=None, commit=None):
-        """
-        @param backend Instance of CAStore.
-        @param name of working tree; could have more than one.
-        """
-        self.backend = backend
-        self._init_tree = tree
-        self._init_commit = commit
-
-    def load_objects(self):
-        """
-        """
-        return self._init_tree.load(self.backend)
-
-    @classmethod
-    def load_commit(cls, backend, commit):
-        """
-        """
-        tree_id = commit.tree
-        tree = backend.get(tree_id)
-        return cls(backend, tree, commit)
-
-    def add(self, entity):
-        """
-        @param entity Instance of Entity or EntityProxy.
-        """
-
-    def update(self, entity):
-        """
-        """
-
-    def remove(self, entity):
-        """
-        """
-
-
-class DumbObject(dict):
-
-    def __init__(self, name, email='a@b.com', birth=0):
-        """
-        """
-        dict.__init__(self, (('name', name), ('email', email), ('birth', birth)))
-        self.name = name
-
-    def encode(self):
-        encoded = []
-        for k in self:
-            v = self[k]
-            encoded.append("%s %s%s%s" % (k, NULL_CHR, type(v).__name__, v,))
-        return encoded
-
-    def save(self):
-        """
-        """
-
-    def load(self, atts):
-        """
-        """
-        for k, v in atts.items():
-            self[k] = v
 
 class BaseObjectChassis(object):
     """
     """
-    baseClass = None
+    baseClass = resource.BaseResource
 
-    def __init__(self, objstore, refs, meta, baseClass, commit=None):
+    def __init__(self, objstore, refs, meta, objectClass=None, commit=None):
         """
         @note
         objstore vs. objs
@@ -236,6 +100,20 @@ class BaseObjectChassis(object):
         self.objstore = objstore
         self.refs = refs
         self.meta = meta
+        if not objectClass:
+            objectClass = self.baseClass
+        self.objectClass = objectClass
+        self.index = None
+        self.cur_commit = None
+
+    @classmethod
+    def new(cls, objstore, refs, meta, objectClass):
+        """
+        """
+        inst = cls(objstore, refs, meta, objectClass)
+        d = inst.meta.put('objectClass', reflect.fullyQualifiedName(objectClass))
+        d.addCallback(lambda _: inst)
+        return d
 
     @defer.inlineCallbacks
     def _init_metadata(self):
@@ -244,10 +122,6 @@ class BaseObjectChassis(object):
         @note self.objs.put(namespace, id) is used so that the uuid
         representing an object is the key to the uuid object.
         """
-        uuid_obj = UUID(self.namespace)
-        id = yield self.put(uuid_obj)
-        yield self.objs.put(self.namespace, id)
-        defer.returnValue(self) # Return this instance
 
     def _get_object_meta(self):
         """
@@ -277,7 +151,7 @@ class ObjectChassis(BaseObjectChassis):
         In general, head is a ref, but other refs are not yet implemented.
         @retval Deferred
         """
-        self.refs(head, commit_id)
+        return self.refs.put(head, commit_id)
 
     def get_head(self, name='master'):
         """
@@ -292,18 +166,42 @@ class ObjectChassis(BaseObjectChassis):
         return self.refs.get(name)
 
     @defer.inlineCallbacks
-    def checkout(self, head='master'):
+    def checkout(self, head='master', commit_id=None):
         """
         """
-        ref = yield self.get_head(head)
-        if ref:
-            commit = yield self.get(ref)
-            tree = yield self.get(commit.tree)
-            self.resObj = self.baseClass.load()
+        if commit_id:
+            ref = commit_id
         else:
-            #wt = WorkingTree(self)
-        defer.returnValue(wt)
+            ref = yield self.get_head(head)
+        if ref:
+            commit = yield self.objstore.get(ref)
+            tree = yield self.objstore.get(commit.tree)
+            yield tree.load(self.objstore)
+            obj_parts = [(child[0], child.obj.content) for child in tree.children]
+            obj_class_name = yield self.meta.get('objectClass')
+            self.index = self.objectClass.decode(obj_class_name, obj_parts)()
+        else:
+            self.index = self.objectClass()
+        self.cur_commit = ref
+        defer.returnValue(self.index)
 
+    @defer.inlineCallbacks
+    def write_tree(self):
+        """
+        write current index
+        """
+        obs = self.index.encode()
+        blobs = [(name, Blob(val)) for name, val in obs]
+        for n, b in blobs:
+            yield self.objstore.put(b)
+        childs = [Entity(name, blob) for name, blob in blobs]
+        tree = Tree(*childs)
+        tree_id = yield self.objstore.put(tree)
+        defer.returnValue(tree_id)
+
+    def write_blob(self, val):
+        return self.objstore.put(Blob(val))
+        
     def add(self, element):
         """
         @param entity Instance of Entity or EntityProxy.
@@ -317,9 +215,36 @@ class ObjectChassis(BaseObjectChassis):
         """
         """
 
+    @defer.inlineCallbacks
     def commit(self, working_tree=None):
         """
         """
+        id = yield self.write_tree()
+        if self.cur_commit:
+            parents = [self.cur_commit]
+        else:
+            parents = []
+        commit = Commit(id, parents)
+        commit_id = yield self.objstore.put(commit)
+        yield self.update_head(commit_id)
+        defer.returnValue(commit_id)
+
+    @defer.inlineCallbacks
+    def get_commit_history(self):
+        commits = []
+        id = yield self.get_head()
+        if not id:
+            defer.returnValue([])
+        while True:
+            c = yield self.objstore.get(id)
+            commits.append(c)
+            if c.parents:
+                # ignore multiples...
+                id = c.parents[0]
+                continue
+            break
+        defer.returnValue(commits)
+
 
 
 
@@ -443,17 +368,19 @@ class ObjectStore(BaseObjectStore):
         d = self._object_exists(name)
 
         def _succeed(result):
+            print result
             if not result:
                 return self._create_object(name, baseClass)
-            return _fail(result)
+            return defer.fail(ObjectStoreError('Error creating %s object %s' % (baseClass.__name__, name,)))
 
         def _fail(result):
-            return defer.fail(ObjectStoreError('Object name already exists'))
+            return defer.fail(ObjectStoreError(result))
 
         d.addCallback(_succeed)
         d.addErrback(lambda r: _fail(r))
         return d
 
+    @defer.inlineCallbacks
     def _create_object(self, name, baseClass):
         """
         @note Not Using Object Store Partition Namespace Yet.
@@ -461,7 +388,11 @@ class ObjectStore(BaseObjectStore):
         """
         refs = cas.StoreContextWrapper(self.backend, name + '.refs.')
         meta = cas.StoreContextWrapper(self.backend, name + '.meta.')
-        return ObjectChassis(self, refs, meta, baseClass)
+        uuid_obj = UUID(name)
+        id = yield self.put(uuid_obj)
+        yield self.objs.put(name, id)
+        obj = yield ObjectChassis.new(self, refs, meta, baseClass)
+        defer.returnValue(obj)
 
     @defer.inlineCallbacks
     def _object_exists(self, name):
@@ -484,7 +415,7 @@ class ObjectStore(BaseObjectStore):
         as opposed to get is very important. Objects in the object store
         represent mutable models of immutable constituents. Getting is not
         the appropriate verb because you are not getting something
-        canonical; this makes much sense when you consider the compliment put
+        canonical; this makes much sense when you consider the compliment 'put'
         idea. There is no put, there is commit, and update ref,
         """
         uuid = self.get(name)
@@ -495,7 +426,20 @@ def _test(ns):
     from ion.data import store
     s = yield store.Store.create_store()
     obs = yield ObjectStore.new(s, 'test_partition')
-    obj = yield obs.create('thing')
+    obj = yield obs.create('thing', resource.IdentityResource)
+    ind = yield obj.checkout()
+    ind.name = 'Carlos S'
+    ind.email = 'carlos@ooici.biz'
+    yield obj.commit()
+    ind = yield obj.checkout()
+    ind.name = 'wwww S'
+    ind.email = 'carlos@ooici.biz'
+    yield obj.commit()
+    ind = yield obj.checkout()
+    ind.name = 'Carly S'
+    ind.email = 'carlos@ooici.com'
+    yield obj.commit()
+    ind = yield obj.checkout()
     ns.update(locals())
 
 

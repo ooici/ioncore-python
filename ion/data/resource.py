@@ -289,48 +289,100 @@ types['identity']=IdentityResource
 
 class TypedAttribute(object):
 
-    def __init__(self, name, type, default=None):
-        self.name = '_' + name
+    def __init__(self, type, default=None):
+        self.name = None
         self.type = type
-        self.value = default if default else type()
+        self.default = default if default else type()
+        self.cache = None
 
     def __get__(self, inst, cls):
-        return getattr(inst, self.name, self.value)
+        #inst.getEvent(self.name)
+        value = getattr(inst, self.name, self.default)
+        return value
 
     def __set__(self, inst, value):
-        self.value = value
+        #inst.setEvent(self.name, value)
+        if not isinstance(value, self.type):
+            raise TypeError("Must be a %s" % self.type)
         setattr(inst, self.name, value)
-        setattr(inst, '_' + self.name, self.encode())
 
-    def encode(self):
-        """
-        encded:
-        "str email\x00handle@domain.tld"
-        """
-        encoded = "%s %s%s%s" % (self.type.__name__, self.name, NULL_CHR, self.value,)
-        return encoded
+    @classmethod
+    def decode(cls, value):
+        stype, default = value.split(NULL_CHR)
+        type = eval(stype)
+        return cls(type, type(default))
+
+
+class TypedMeta(type):
+
+    def __new__(cls, name, bases, dict):
+        slots = []
+        for key, value in dict.items():
+            if isinstance(value, TypedAttribute):
+                value.name = '_' + key
+                slots.append(value.name)
+        dict['__slots__'] = slots
+        return type.__new__(cls, name, bases, dict)
 
 class BaseResource(object):
     """
     """
+    __metaclass__ = TypedMeta
+
+    def __init__(self, **kwargs):
+        """
+        """
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
+    def setEvent(self, name, value):
+        """
+        """
+
+    def getEvent(self, name):
+        """
+        """
+
+    @property
+    def attributes(self):
+        names = []
+        for key in self.__slots__:
+            names.append(key[1:])
+        return names
+
+
+    def encode(self):
+        """
+        """
+        encoded = []
+        for name in self.attributes:
+            value = getattr(self, name)
+            encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
+        return encoded
+
+    @classmethod
+    def decode(cls, baseType, attrs):
+        """
+        decode resource object[s]
+        """
+        d = dict([(name, TypedAttribute.decode(value)) for name, value in attrs])
+        return type(baseType, (cls,), d)
+
 
 class IdentityResource(BaseResource):
 
-    name = TypedAttribute('name', Str, 'Dorian Raymer')
-    email = TypedAttribute('email', str)
-    birth = TypedAttribute('birth', str)
-    weight = TypedAttribute('w', int)
+    name = TypedAttribute(str)
+    email = TypedAttribute(str)
 
-    def encode(self, thing):
-        """
-        encded:
-        "str email\x00handle@domain.tld"
-        """
-        encoded = "%s %s%s%s" % (thing.type, thing.name, NULL_CHR, thing,)
-        return encoded
+class DeviceResource(BaseResource):
+
+    mfg = TypedAttribute(str)
+    serial = TypedAttribute(int)
+    voltage = TypedAttribute(float)
 
 
-class IdentityResource(dict):
+class xIdentityResource(dict):
 
     def __init__(self, name, email='a@b.com', birth=0):
         """
@@ -348,12 +400,12 @@ class IdentityResource(dict):
 
 
 
-class BaseResource(object):
+class xBaseResource(object):
     """
+    resource = TypedAttribute(str)
+    lcs = TypedAttribute(LifeCycleState)
+    uuid = TypedAttribute(str)
     """
-    resource = TypedProperty(str)
-    lcs = TypedProperty(LifeCycleState)
-    uuid = TypedProperty(str)
     
     def stage(self):
         """
@@ -372,15 +424,15 @@ class BaseResource(object):
     
     
     
-class IdentityResource(BaseResource):
-    """
+class xIdentityResource(BaseResource):
     """
     
-    uname = TypedProperty(str)
-    email = TypedProperty(str)
-    first = TypedProperty(str)
-    last = TypedProperty(str)
+    uname = TypedAttribute(str)
+    email = TypedAttribute(str)
+    first = TypedAttribute(str)
+    last = TypedAttribute(str)
     
+    """
 
     
 
