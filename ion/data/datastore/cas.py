@@ -7,8 +7,9 @@
 @brief storing immutable values (blobs, trees, commit) and storing structured
         mutable objects mapped to graphs of immutable values
 
-@todo Decide if Objects(BaseObject) pass around object instances, or their
-hashes.
+@note This file is almost Twisted independent; the only exception is in
+CAStore -- ion.data.store.IStore specifies methods that return
+twisted.internet.defer.Deferred objects.
 """
 
 import re
@@ -20,7 +21,6 @@ from zope.interface import Interface
 from zope.interface import implements
 from zope.interface import Attribute 
 
-from twisted.internet import defer
 
 NULL_CHR = "\x00"
 
@@ -58,13 +58,16 @@ class Entity(tuple):
 
     def __init__(self, name, obj, mode=None):
         """
-        @todo XXX rethink this
+        @param name something to associate with obj
+        @param obj a storable object or it's id.
+        @brief Only store obj if it is really an instance of BaseObject.
+        @note Tree uses this to represent it's child elements. Tree treats
+        this like a tuple. This extension of tuple enforces the order of
+        name, obj, mode.
         """
         if not isinstance(obj, BaseObject):
             obj = None
-        self.name = name
         self.obj = obj
-        self.obj_id = self[1]
 
     def __new__(cls, name, obj, mode='100644'):
         """
@@ -77,20 +80,6 @@ class Entity(tuple):
             #can only assume it is the sha1(obj) id
             obj_id = obj
         return tuple.__new__(cls, [name, obj_id, mode])
-
-    def load(self, backend):
-        """
-        @brief experimental way to dynamically load objects from id's.
-        """
-        if not self.obj:
-            def cb(obj):
-                self.obj = obj
-                return obj.load(backend)
-
-            d = backend.get(self.obj_id)
-            d.addCallback(cb)
-            return d
-        return defer.succeed(None)
 
 class ICAStoreObject(Interface):
     """
@@ -105,14 +94,6 @@ class ICAStoreObject(Interface):
         @brief Bytes to write into store.
         """
 
-    def hash():
-        """
-        @brief Hash (sha1) of storable value
-        @todo Decide if this should really be part of the interface
-        @note This method is depricated in favor of calling sha1(obj)
-        so that the form, binary or hex can be specified.
-        """
-
     def encode():
         """
         @brief Full encoding (header + body) of storable content. This
@@ -124,11 +105,6 @@ class ICAStoreObject(Interface):
         """
         @brief Decode value into an instance of a StoreObject class
         """
-        
-    def __str__():
-        """
-        @brief Pretty print object as string for inspection
-        """
 
 class BaseObject(object):
     """Base object of content addressable value store
@@ -138,6 +114,7 @@ class BaseObject(object):
     implements(ICAStoreObject)
 
     type = None
+    _value_cache = None
 
     @classmethod
     def get_type(cls):
@@ -151,13 +128,10 @@ class BaseObject(object):
         """
         @brief Bytes that actually go into the store (i.e. content
         addressable key/value store).
-        @todo cache encoding() result to avoid re-computing the same thing.
         """
-        return self.encode()
-
-    @property
-    def hash(self):
-        return sha1(self.value, bin=False)
+        if not self._value_cache:
+            self._value_cache = self.encode()
+        return self._value_cache
 
     def encode(self):
         """
@@ -258,8 +232,8 @@ class Blob(BaseObject):
 
     def __str__(self):
         head = '='*10
-        strng  = """\n%s Store Type: %s %s\n""" % (head, str(self.get_type()), head)
-        strng += """= Key: "%s"\n""" % str( self.hash )
+        strng  = """\n%s Store Type: %s %s\n""" % (head, self.type, head,)
+        strng += """= Key: "%s"\n""" % sha1hex(self.value)
         strng += """= Content: "%s"\n""" % str(self.content)
         strng += head*2
         return strng
@@ -275,12 +249,6 @@ class Blob(BaseObject):
         @retval New instance of Blob.
         """
         return cls(encoded_body)
-
-    def load(self, backend):
-        """
-        @brief leaf of load recursion. Do nothing.
-        """
-        return defer.succeed(self.content)
 
 class Tree(BaseObject):
     """
@@ -308,7 +276,7 @@ class Tree(BaseObject):
             if not isinstance(child, self.entityFactory):
                 child = self.entityFactory(*child)
             entities.append(child)
-            names[child.name] = child
+            names[child[0]] = child
         self.children = entities
         self._names = names
 
@@ -329,10 +297,10 @@ class Tree(BaseObject):
 
     def __str__(self):
         head = "="*10
-        strng ="""\n%s Store Type: %s %s\n""" % (head,str(self.get_type()),head)
-        strng+="""= Key: "%s"\n""" % str( self.hash )
+        strng ="""\n%s Store Type: %s %s\n""" % (head, self.type, head,)
+        strng+="""= Key: "%s"\n""" % sha1hex(self.value)
         for entity in self.children:  
-            strng+="""= name: "%s", id: "%s"\n""" % (entity[0],sha1_to_hex(entity[1]))
+            strng+="""= name: "%s", id: "%s"\n""" % (entity[0], sha1_to_hex(entity[1]),)
         strng+=head*2
         return strng
 
@@ -408,11 +376,6 @@ class Tree(BaseObject):
         """
         return cls.entityFactory(name, obj, mode)
 
-    def load(self, backend):
-        """
-        @brief Call load on all entities.
-        """
-        return defer.DeferredList([child.load(backend) for child in self.children])
 
 class Commit(BaseObject):
     """
@@ -438,8 +401,8 @@ class Commit(BaseObject):
 
     def __str__(self):
         head = "="*10
-        strng ="""\n%s Store Type: %s %s\n""" % (head,str(self.get_type()),head)
-        strng+="""= Key: "%s"\n""" % str( self.hash )
+        strng ="""\n%s Store Type: %s %s\n""" % (head, self.type, head,)
+        strng+="""= Key: "%s"\n""" % sha1hex(self.value)
         strng+="""= Tree: "%s"\n""" % self.tree
         strng+="""= Log: "%s"\n""" % self.log
         strng+=head*2
