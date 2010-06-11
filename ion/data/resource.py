@@ -348,11 +348,41 @@ class IdentityResource(dict):
 
 
 
+class BaseResource(object):
+    """
+    """
+    resource = TypedProperty(str)
+    lcs = TypedProperty(LifeCycleState)
+    uuid = TypedProperty(str)
+    
+    def stage(self):
+        """
+        """
+        blobs=[]
+        trees=[]
+        atts=self.__dict__
 
+        for k, v in atts.items():
+            b=cas.Blob(v)
+            blobs.append()
+            trees.append(cas.Tree(k,b))
+            blobs.append(b)
+    
+        return blobs, trees
+    
+    
+    
+class IdentityResource(BaseResource):
+    """
+    """
+    
+    uname = TypedProperty(str)
+    email = TypedProperty(str)
+    first = TypedProperty(str)
+    last = TypedProperty(str)
+    
 
-
-
-
+    
 
 
 
