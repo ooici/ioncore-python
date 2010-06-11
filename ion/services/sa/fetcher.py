@@ -90,7 +90,7 @@ class FetcherService(BaseService):
         Inner routine to grab a page, with or without http headers.
         May raise gaierror or ValueError
         @todo Merge this and _http_op
-        @note See ion.services.dm.test.test_fetcher.GetPageTester
+        @note See ion.services.sa.test.test_fetcher.GetPageTester
         """
         src = urlparse.urlsplit(url)
         try:

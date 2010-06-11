@@ -9,6 +9,7 @@
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
+from socket import gaierror
 
 from ion.services.sa.fetcher import FetcherClient, FetcherService
 from ion.test.iontest import IonTestCase
@@ -32,8 +33,14 @@ class FetcherServiceTester(IonTestCase):
         self.failUnlessSubstring('is the time for all', page)
 
     def test_bad_host(self):
-        self.failUnlessRaises(ValueError, self.mf.get_page,
-                              'http://foo.bar.baz/')
+        try:
+            self.mf.get_page('http://foo.bar.baz/')
+        except gaierror, ge:
+            pass
+        except ValueError, ve:
+            pass
+        else:
+            self.fail('Should have raised an exception!')
 
     def test_404(self):
         self.failUnlessRaises(ValueError, self.mf.get_page,
