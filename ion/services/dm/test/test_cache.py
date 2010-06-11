@@ -15,21 +15,30 @@ from twisted.internet import defer
 from twisted.trial import unittest
 from ion.test.iontest import IonTestCase
 
+import socket
+
 class CacheTester(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
         self.timeout = 60
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self._stop_container()
-
-    @defer.inlineCallbacks
-    def test_instantition_only(self):
         services = [
             {'name' : 'cache', 'module':'ion.services.dm.cache',
             'class' : 'CacheService'},
         ]
         sup = yield self._spawn_processes(services)
-        cc = CacheClient(proc=sup)
+        self.cc = CacheClient(proc=sup)
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
+
+    def test_instantition_only(self):
+        pass
+
+    @defer.inlineCallbacks
+    def test_cache_hit(self):
+        raise unittest.SkipTest('code not completed')
+
+        das = yield self.cc.get_url('http://amoeba.ucsd.edu:8001/coads.nc.das')
+        self.failUnlessSubstring('NC_GLOBAL', das)
