@@ -344,6 +344,30 @@ class BaseResource(object):
         """
         """
 
+    def __eq__(self,other):
+        
+        if not isinstance(other,self.__class__):
+            print 'Not the same class'
+            return False
+        
+        for name in self.attributes:
+            self_value = getattr(self,name)
+            
+            other_value = getattr(other,name)
+            if other_value != self_value:
+                print name, self_value, other_value
+                return False
+        return True
+
+    def __str__(self):
+        head = '='*10
+        strng  = """\n%s Resource Type: %s %s\n""" % (head, str(self.__class__.__name__), head)
+        for name in self.attributes:
+            value = getattr(self,name)
+            strng += """= '%s':'%s'\n""" % (name,value)
+        strng += head*2
+        return strng
+
     @property
     def attributes(self):
         names = []

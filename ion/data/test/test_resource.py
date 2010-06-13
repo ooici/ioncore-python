@@ -5,69 +5,37 @@ import logging
 logging = logging.getLogger(__name__)
 
 from ion.data import resource
+from twisted.python import reflect
 
-types=resource.types
 
-class TimestampTest(unittest.TestCase):
+class TestDeviceResource(unittest.TestCase):
     
     def setUp(self):
         
-        self.now = resource.TimeStampResource()
-        self.longago = resource.TimeStampResource(timestamp=10000.0)
+        res = resource.DeviceResource()
+        res.mfg = 'seabird'
+        res.serial = 10
+        res.voltage = 3.14159
+        self.res = res
+        self.res_type = reflect.fullyQualifiedName(resource.DeviceResource)
+        self.encoded=[('voltage', 'float\x003.14159'), ('serial', 'int\x0010'), ('mfg', 'str\x00seabird')]
+     
+    def testPrintResource(self):
+                
+        logging.info(self.res)
         
-    def test_print(self):
-        logging.info('Print Time Stamp:'+str(self.longago))
+    def testEncode(self):
+        """
+        """
+        enc = self.res.encode()
+        self.assertEqual(self.encoded,enc)
         
-    def test_equality(self):
-        self.assertNot(self.now == self.longago)
-        self.assert_(self.now == self.now)
-
-    def test_encode_eq_decode(self):
-        encoded= self.now.encode()
+    def testDecode(self):
         
-        decoded = resource.ResourceObject.decode(encoded,types)
+        dec = resource.BaseResource.decode(self.res_type,self.encoded)()
         
-        self.assert_(decoded == self.now)
+        print self.res
+        print dec
+        print 'SAME ++++++',dec == self.res
         
-        
-class UniqueTest(unittest.TestCase):
-    
-    def setUp(self):
-        
-        self.a = resource.UniqueResource()
-        self.b = resource.UniqueResource()
-        
-    def test_print(self):
-        logging.info('Print Unique Resource:'+str(self.a))
-        
-    def test_equality(self):
-        self.assertNot(self.a == self.b)
-        self.assert_(self.a == self.a)
-
-    def test_encode_eq_decode(self):
-        encoded= self.a.encode()
-        
-        decoded = resource.ResourceObject.decode(encoded,types)
-        
-        self.assert_(decoded == self.a)
-        
-        
-class IdentityTest(unittest.TestCase):
-    
-    def setUp(self):
-        
-        self.a = resource.IdentityResource(username='dstuebe', email='dstuebe@asascience.com', firstname='David', lastname='Stuebe')
-        self.b = resource.IdentityResource(username='draymer', email='deldotdr@gmail.com', firstname='Dorian', lastname='Raymer')
-        
-    def test_print(self):
-        logging.info('Print Identity Resource:'+str(self.a))
-        
-    def test_equality(self):
-        self.assertNot(self.a == self.b)
-        self.assert_(self.a == self.a)
-
-    def test_encode_eq_decode(self):
-        encoded= self.a.encode()
-        
-        decoded = resource.ResourceObject.decode(encoded,types)
-        self.assert_(decoded == self.a)
+        self.assertEqual(self.res,dec)
