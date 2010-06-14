@@ -52,9 +52,9 @@ class CAStoreError(Exception):
 class Entity(tuple):
     """
     Represents a child element of a tree object. Not an object itself, but
-    a convenience container for the format of an element of a tree.
-    A tuple is immutable, so this is a safe way to encode the elements of a
-    Tree.
+    a convenience container for the format of an element of a tree.  A
+    tuple is immutable, so this is a safe way to carry around the elements
+    of a Tree.
 
     @note Want flexibility on what obj is: Tree is encoded with the obj's
     sha1 hash (bin version).
@@ -408,6 +408,8 @@ class Commit(BaseObject):
         strng ="""\n%s Store Type: %s %s\n""" % (head, self.type, head,)
         strng+="""= Key: "%s"\n""" % sha1hex(self.value)
         strng+="""= Tree: "%s"\n""" % self.tree
+        if self.parents:
+            strng+="""= Parent: "%s"\n""" % self.parents[0]
         strng+="""= Log: "%s"\n""" % self.log
         strng+=head*2
         return strng

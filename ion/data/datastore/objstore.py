@@ -368,7 +368,6 @@ class ObjectStore(BaseObjectStore):
         d = self._object_exists(name)
 
         def _succeed(result):
-            print result
             if not result:
                 return self._create_object(name, baseClass)
             return defer.fail(ObjectStoreError('Error creating %s object %s' % (baseClass.__name__, name,)))
