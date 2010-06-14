@@ -34,12 +34,12 @@ def rewrite_url(dsUrl, newHostname=CACHE_HOSTNAME):
 
     ml = urlparse.urlsplit(dsUrl)
     # Replace the hostname with localhost
-    #chg_host = ml._replace(netloc=newHostname)
     # Remove all path components
-    #chg_path = chg_host._replace(path=os.path.basename(chg_host.path))
-    #return chg_path.geturl() 
-    chg_path = urlparse.urlunsplit((ml[0],newHostname,ml[2].split('/')[-1],ml[3], ml[4]))
+    chg_path = urlparse.urlunsplit((ml[0],newHostname,
+                                    ml[2].split('/')[-1],
+                                    ml[3], ml[4]))
     return chg_path
+
 def generate_filename(dataset_url, local_dir=LOCAL_DIR):
     """
     @brief Given a URL, generate a local filesystem name for same. Used by
