@@ -15,8 +15,6 @@ from twisted.internet import defer
 from twisted.trial import unittest
 from ion.test.iontest import IonTestCase
 
-import socket
-
 class RetrieverTester(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):

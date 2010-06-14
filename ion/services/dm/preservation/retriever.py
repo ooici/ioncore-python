@@ -2,6 +2,7 @@
 
 """
 @file ion/services/dm/preservation/retriever.py
+@package ion.services.dm.preservation.retriever Netcdf->DAP front end
 @author Paul Hubbard
 @date 6/11/10
 @brief Retriever - front end to local DAP server that sends DAP data out over OOI.
@@ -20,11 +21,12 @@ from ion.services.sa.fetcher import FetcherService
 
 class RetrieverService(FetcherService):
     """
-    Cache - subclass of ion.services.sa.fetcher
+    Preservation service retriever - subclass of ion.services.sa.fetcher
 
     OOI front end for a local DAP server. Uses DAP to talk to locally-running
-    instance of the cache server, which is responsible for netcdf->dap
-    transformation.
+    instance of the DAP server, which is responsible for netcdf->dap
+    transformation. Any dap server should work that can present netcdf files;
+    we often use pydap for testing.
 
     Because we rely on the DAP server to do that transformation, this can be
     a thin layer of code.
