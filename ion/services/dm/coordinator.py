@@ -15,7 +15,7 @@ from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.services.dm.fetcher import FetcherClient
+from ion.services.sa.fetcher import FetcherClient
 
 class CoordinatorService(BaseService):
     """
@@ -79,5 +79,11 @@ class CoordinatorClient(BaseServiceClient):
         logging.info('Reply from service: '+ str(content))
         defer.returnValue(str(content))
 
+    @defer.inlineCallbacks
+    def get_head(self, url):
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('get_head', url)
+        logging.info('Reply from service: '+ str(content))
+        defer.returnValue(str(content))
 
 factory = ProtocolFactory(CoordinatorService)

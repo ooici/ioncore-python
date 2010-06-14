@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 """
-@file ion/services/dm/test/test_fetcher.py
+@file ion/services/sa/test/test_fetcher.py
 @author Paul Hubbard
 @date 5/7/10
-@test ion.data.fetcher Test of refactored fetcher
+@test ion.services.sa.fetcher Test of rewritten fetcher
 """
 
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
+from socket import gaierror
 
-from ion.services.dm.fetcher import FetcherClient, FetcherService
+from ion.services.sa.fetcher import FetcherClient, FetcherService
 from ion.test.iontest import IonTestCase
 
 class FetcherServiceTester(IonTestCase):
@@ -32,8 +33,14 @@ class FetcherServiceTester(IonTestCase):
         self.failUnlessSubstring('is the time for all', page)
 
     def test_bad_host(self):
-        self.failUnlessRaises(ValueError, self.mf.get_page,
-                              'http://foo.bar.baz/')
+        try:
+            self.mf.get_page('http://foo.bar.baz/')
+        except gaierror, ge:
+            pass
+        except ValueError, ve:
+            pass
+        else:
+            self.fail('Should have raised an exception!')
 
     def test_404(self):
         self.failUnlessRaises(ValueError, self.mf.get_page,
@@ -43,7 +50,7 @@ class FetcherTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        services = [{'name':'fetcher', 'module':'ion.services.dm.fetcher',
+        services = [{'name':'fetcher', 'module':'ion.services.sa.fetcher',
                     'class': 'FetcherService'},]
         sup = yield self._spawn_processes(services)
         self.fc = FetcherClient(proc=sup)

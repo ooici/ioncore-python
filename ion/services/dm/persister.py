@@ -38,6 +38,8 @@ class PersisterService(BaseService):
     """
     @note Relies on a single message fitting in memory comfortably.
     @todo Depend on pub-sub
+    @todo Notifications of new fileset
+    @todo Update fileset directory/registry
     """
     @defer.inlineCallbacks
     def op_persist_dap_dataset(self, content, headers, msg):

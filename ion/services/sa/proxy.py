@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """
-@file ion/services/dm/proxy.py
+@file ion/services/sa/proxy.py
 @author Paul Hubbard
 @date 5/25/10
-@package ion.services.dm.proxy http->ooi proxy for user DAP access
+@package ion.services.sa.proxy http->ooi proxy for user DAP access
 Porting from LCO implementation to new LCA arch - complete rewrite.
 """
 
@@ -13,9 +13,7 @@ logging = logging.getLogger(__name__)
 from ion.core.base_process import ProtocolFactory
 
 from ion.services.base_service import BaseService
-from ion.services.dm.tinyproxy import ProxyHandler, ThreadingHTTPServer
-from multiprocessing import Process
-
+from ion.services.sa.tinyproxy import ProxyHandler, ThreadingHTTPServer
 
 class ProxyService(BaseService):
     """
@@ -45,8 +43,7 @@ class ProxyService(BaseService):
         server_address = ('', tcp_port)
         ProxyHandler.protocol_version = 'HTTP/1.0'
         httpd = ThreadingHTTPServer(server_address, ProxyHandler)
-        p = Process(target=httpd.serve_forever)
-#        p.start()
+#        httpd.serve_forever()
 #        logging.debug('Proxy listener running.')
 
 factory = ProtocolFactory(ProxyService)
