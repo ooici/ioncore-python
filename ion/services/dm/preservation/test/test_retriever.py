@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 """
-@test ion.services.dm.test.test_cache.py
+@test ion.services.dm.retriever.test.test_retriever.py
 @author Paul Hubbard
 @date 6/11/10
 """
 
-from ion.services.dm.cache import CacheClient
+from ion.services.dm.preservation.retriever import RetrieverClient
 
 import logging
 logging = logging.getLogger(__name__)
@@ -17,17 +17,18 @@ from ion.test.iontest import IonTestCase
 
 import socket
 
-class CacheTester(IonTestCase):
+class RetrieverTester(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
         self.timeout = 60
         services = [
-            {'name' : 'cache', 'module':'ion.services.dm.cache',
-            'class' : 'CacheService'},
+            {'name' : 'retriever',
+             'module':'ion.services.dm.preservation.retriever',
+            'class' : 'RetrieverService'},
         ]
         sup = yield self._spawn_processes(services)
-        self.cc = CacheClient(proc=sup)
+        self.rc = RetrieverClient(proc=sup)
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -40,5 +41,5 @@ class CacheTester(IonTestCase):
     def test_cache_hit(self):
         raise unittest.SkipTest('code not completed')
 
-        das = yield self.cc.get_url('http://amoeba.ucsd.edu:8001/coads.nc.das')
+        das = yield self.rc.get_url('http://amoeba.ucsd.edu:8001/coads.nc.das')
         self.failUnlessSubstring('NC_GLOBAL', das)
