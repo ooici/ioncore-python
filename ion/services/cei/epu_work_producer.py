@@ -18,6 +18,7 @@ class EPUWorkProducer(BaseService):
     def slc_init(self):
         self.queue_name_work = self.spawnArgs["queue_name_work"]
         self.work_produce_loop = LoopingCall(self.work_produce)
+        self.work_produce_loop.start(1) #XXX temporary for testing
 
     def op_start_producing(self, content, headers, msg):
         logging.info("op_start_producing")
