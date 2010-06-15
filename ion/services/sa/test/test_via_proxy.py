@@ -26,7 +26,7 @@ class IntegrationTest(IonTestCase):
                      'module':'ion.services.sa.fetcher',
                      'class': 'FetcherService'},
                     {'name': 'coordinator',
-                     'module': 'ion.services.dm.coordinator',
+                     'module': 'ion.services.dm.preservation.coordinator',
                      'class' : 'CoordinatorService'},
                     {'name':'proxy',
                      'module': 'ion.services.sa.proxy',
