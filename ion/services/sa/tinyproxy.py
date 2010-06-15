@@ -28,7 +28,7 @@ import BaseHTTPServer, socket, SocketServer, urlparse
 
 import logging
 logging = logging.getLogger(__name__)
-from ion.services.dm.coordinator import CoordinatorClient
+from ion.services.dm.preservation.coordinator import CoordinatorClient
 from twisted.internet import defer
 
 class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):
