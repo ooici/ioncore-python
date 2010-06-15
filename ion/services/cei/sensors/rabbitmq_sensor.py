@@ -29,7 +29,9 @@ class RabbitMQSensor(SensorProcess):
         if erlang_cookie is None:
             cookie = readCookie()
         else:
-            cookie = erlang_cookie
+            fh = open(erlang_cookie)
+            cookie = fh.read().strip()
+            fh.close()
         nodeName = buildNodeName(nodename)
         process = Process(nodeName, cookie)
         return RabbitMQControlService(process)
