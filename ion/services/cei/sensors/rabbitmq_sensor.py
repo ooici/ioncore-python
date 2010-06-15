@@ -22,11 +22,11 @@ class RabbitMQSensor(SensorProcess):
         if self.start_immediately:
             self.sensor_loop.start(self.sensor_interval)
 
-    def _create_sensor_client(self, erlang_cookie=None, nodename="txrabbitmq"):
+    def _create_sensor_client(self, erlang_cookie="/home/cc/.erlang.cookie", nodename="txrabbitmq"):
         #XXX Move the below into the 'txrabbitmq' library
         from txrabbitmq.service import RabbitMQControlService
         from twotp.node import Process, readCookie, buildNodeName
-        cookie = readCookie() #TODO: allow passing 'erlang_cookie'
+        cookie = readCookie(erlang_cookie)
         nodeName = buildNodeName(nodename)
         process = Process(nodeName, cookie)
         return RabbitMQControlService(process)
