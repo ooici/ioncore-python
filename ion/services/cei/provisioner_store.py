@@ -68,6 +68,23 @@ class ProvisionerStore(object):
         defer.returnValue(site_nodes)
 
     @defer.inlineCallbacks
+    def get_launches(self, state=None):
+        """Retrieves all launches in the given state, or the latest state
+        of all launches if state is unspecified.
+        """
+        records = yield self.get_all(node='')
+        groups = group_records(records, 'launch_id')
+        launches = []
+        for launch_id, records in groups.iteritems():
+            latest = records[0]
+            if state:
+                if latest['state'] == state:
+                    launches.append(latest)
+            else:
+                launches.append(latest)
+        defer.returnValue(launches)
+
+    @defer.inlineCallbacks
     def get_launch(self, launch):
         """Retrieves the latest launch record, from the launch_id.
         """

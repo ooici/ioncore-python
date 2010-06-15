@@ -151,8 +151,17 @@ class ProvisionerCore(object):
                 
             for node_rec, iaas_node in izip(launch_group, iaas_nodes):
                 node_rec['iaas_id'] = iaas_node.id
-                node_rec['public_ip'] = iaas_node.public_ip
-                node_rec['private_ip'] = iaas_node.private_ip
+                # for some reason, ec2 libcloud driver places IP in a list
+                #TODO if we support drivers that actually have multiple
+                #public and private IPs, we will need to revist this
+                public_ip = iaas_node.public_ip
+                if isinstance(public_ip, list):
+                    public_ip = public_ip[0]
+                private_ip = iaas_node.private_ip
+                if isinstance(private_ip, list):
+                    private_ip = private_ip[0]
+                node_rec['public_ip'] = public_ip
+                node_rec['private_ip'] = private_ip
                 node_rec['extra'] = iaas_node.extra.copy()
                 node_rec['state'] = states.Pending
             
@@ -176,6 +185,8 @@ class ProvisionerCore(object):
                     before_state=states.Terminated)
             if nodes:
                 yield self.query_one_site(site, nodes)
+
+        yield self.query_contexts()
 
     @defer.inlineCallbacks
     def query_one_site(self, site, nodes):
@@ -219,6 +230,48 @@ class ProvisionerCore(object):
         # Could do some analysis of these nodes
 
     @defer.inlineCallbacks
+    def query_contexts(self):
+        """Queries all open launch contexts and sends node updates.
+        """
+        #grab all the launches in the pending state
+        launches = yield self.store.get_launches(state=states.Pending)
+
+        for launch in launches:
+            context = launch.get('context')
+            launch_id = launch['launch_id']
+            if not context:
+                logging.warn('Launch %s is in %s state but it has no context!',
+                        launch['launch_id'], launch['state'])
+                continue
+            
+            ctx_uri = context['uri']
+            logging.debug('Querying context ' + ctx_uri)
+            context_status = yield threads.deferToThread(self._query_context,
+                    ctx_uri)
+            nodes = yield self.store.get_launch_nodes(launch_id)
+            by_ip = group_records(nodes, 'public_ip')
+            #TODO this matching could probably be more robust
+            updated_nodes = []
+            for ctx_node in context_status.nodes:
+                for id in ctx_node.identities:
+                    node = by_ip.get(id.ip)
+                    if node and _update_node_from_ctx(node, ctx_node, id):
+                        updated_nodes.append(node)
+                        break
+            if updated_nodes:
+                yield self.store_and_notify(updated_nodes)
+            
+            if context_status.complete:
+                logging.info('Launch %s context is complete!', launch_id)
+                # update the launch record so this context won't be re-queried
+                launch['state'] = states.Running
+                yield self.store.put_record(launch)
+            else:
+                logging.debug('Launch %s context is incomplete: %s of %s nodes',
+                        launch_id, len(context_status.nodes), 
+                        context_status.expected_count)
+    
+    @defer.inlineCallbacks
     def mark_launch_terminating(self, launch_id):
         """Mark a launch as Terminating in data store.
         """
@@ -254,10 +307,15 @@ class ProvisionerCore(object):
             yield self.terminate_launch(launch)
 
     def _create_context(self):
-        """Synchronous call to context broker.
+        """Synchronous call to context broker to create a new context.
         """
         return self.ctx_client.create_context()
 
+    def _query_context(self, resource):
+        """Synchronous call to context broker to query an existing context
+        """
+        return self.ctx_client.get_status(resource)
+    
     def _to_nimboss_node(self, node):
         """Nimboss drivers need a Node object for termination.
         """
@@ -288,3 +346,17 @@ def _one_node_record(node_id, group, group_name, launch,
             'allocation' : group['allocation'],
             'ctx_name' : group_name,
             }
+
+def _update_node_from_ctx(self, node, ctx_node, identity):
+    node_done = ctx_node.ok_occurred or ctx_node.error_occurred
+    if not node_done or node['state'] >= states.Running:
+        return False
+    if ctx_node.ok_occurred:
+        node['state'] = states.Running
+        node['pubkey'] = identity.pubkey
+    else:
+        node['state'] = states.Failed
+        node['error_code'] = ctx_node.error_code
+        node['error_message'] = ctx_node.error_message
+    return True
+
