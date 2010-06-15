@@ -389,8 +389,11 @@ class ObjectStore(BaseObjectStore):
         refs = cas.StoreContextWrapper(self.backend, name + '.refs.')
         meta = cas.StoreContextWrapper(self.backend, name + '.meta.')
         uuid_obj = UUID(name)
+        # These two lines are confusing - they are actually puting values in the
+        # same name space using different methods!
         id = yield self.put(uuid_obj)
         yield self.objs.put(name, id)
+
         obj = yield ObjectChassis.new(self, refs, meta, baseClass)
         defer.returnValue(obj)
 
