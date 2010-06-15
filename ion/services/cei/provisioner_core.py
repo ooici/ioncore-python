@@ -151,8 +151,17 @@ class ProvisionerCore(object):
                 
             for node_rec, iaas_node in izip(launch_group, iaas_nodes):
                 node_rec['iaas_id'] = iaas_node.id
-                node_rec['public_ip'] = iaas_node.public_ip
-                node_rec['private_ip'] = iaas_node.private_ip
+                # for some reason, ec2 libcloud driver places IP in a list
+                #TODO if we support drivers that actually have multiple
+                #public and private IPs, we will need to revist this
+                public_ip = iaas_node.public_ip
+                if isinstance(public_ip, list):
+                    public_ip = public_ip[0]
+                private_ip = iaas_node.private_ip
+                if isinstance(private_ip, list):
+                    private_ip = private_ip[0]
+                node_rec['public_ip'] = public_ip
+                node_rec['private_ip'] = private_ip
                 node_rec['extra'] = iaas_node.extra.copy()
                 node_rec['state'] = states.Pending
             
