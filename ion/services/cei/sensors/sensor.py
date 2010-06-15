@@ -40,6 +40,6 @@ class SensorProcess(BaseProcess):
 
     def plc_init(self):
         #TODO: pull LoopingCall into base class
-        self.sensor_interval = self.spawnArgs.get("sensor_interval", 2) # seconds per execution of 'sensor_loop'.
-        self.start_immediately = self.spawnArgs.get("start_immediately", True) #start sensor_loop right away.
+        self.sensor_interval = self.spawn_args.get("sensor_interval", 2) # seconds per execution of 'sensor_loop'.
+        self.start_immediately = self.spawn_args.get("start_immediately", True) #start sensor_loop right away.
 
