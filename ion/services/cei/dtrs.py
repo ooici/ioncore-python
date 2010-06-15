@@ -35,6 +35,8 @@ class DeployableTypeRegistryService(BaseService):
     def op_lookup(self, content, headers, msg):
         """Resolve a depoyable type
         """
+
+        logging.debug('Recieved DTRS lookup. content: ' + str(content))
         # just using a file for this right now, to keep it simple
         dtId = content['deployable_type']
         nodes = content.get('nodes')
@@ -55,7 +57,9 @@ class DeployableTypeRegistryService(BaseService):
             image = sites[node_site][node_name]['image']
             node['image'] = image
 
-        return self.reply(msg, 'result', result)
+        logging.debug('Sending DTRS response: ' + str(result))
+
+        return self.reply_ok(msg, result)
 
 class DeployableTypeRegistryClient(BaseServiceClient):
     """Client for accessing DTRS
