@@ -1,6 +1,6 @@
 {
   "capabilitycontainer":{
-    "broker":"amoeba.ucsd.edu",
+    "broker":"localhost",
     "bootscript":"res/scripts/newcc.py",
     "sysname":"cei",
     "lcaarch_branch":"cei-lcaarch",
@@ -12,7 +12,9 @@
     "provisioner":"{'name':'provisioner','module':'ion.services.cei.provisioner','class':'ProvisionerService'}",
     "epu_controller":"{'name':'epu_controller','module':'ion.services.cei.epu_controller','class':'EPUControllerService'}",
     "sensor_aggregator":"{'name':'sensor_aggregator','module':'ion.services.cei.sensor_aggregator','class':'SensorAggregatorService'}",
-    "dtrs":"{'name':'dtrs','module':'ion.services.cei.dtrs','class':'DeployableTypeRegistryService'}"
+    "dtrs":"{'name':'dtrs','module':'ion.services.cei.dtrs','class':'DeployableTypeRegistryService'}",
+    "epu_work_producer":"{'epu_work_producer':'dtrs','module':'ion.services.cei.epu_work_producer','class':'EPUWorkProducer'}",
+    "rabbitmq_sensor":"{'module':'ion.services.cei.sensors.rabbitmq_sensor', 'spawnargs':{'queue_name_work':'cei_work_queue', 'queue_name_events':'rabbitmq_sensor_events'}}"
   },
   "recipes":["setuptools", "twisted", "txamqp", "user", "provisioner", "sensor_aggregator", "capabilitycontainer"]
 }
