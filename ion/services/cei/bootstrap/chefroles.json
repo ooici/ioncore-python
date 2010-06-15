@@ -10,7 +10,7 @@
   "username":"cc",
   "services":{
     "provisioner":"{'name':'provisioner','module':'ion.services.cei.provisioner','class':'ProvisionerService'}",
-    "epu_controller":"{'name':'epu_controller','module':'ion.services.cei.epu_controller','class':'EPUControllerService'}",
+    "epu_controller":"{'name':'epu_controller','module':'ion.services.cei.epu_controller','class':'EPUControllerService', 'spawnargs':{'queue_name_work':'cei_work_queue'}}",
     "sensor_aggregator":"{'name':'sensor_aggregator','module':'ion.services.cei.sensor_aggregator','class':'SensorAggregatorService'}",
     "dtrs":"{'name':'dtrs','module':'ion.services.cei.dtrs','class':'DeployableTypeRegistryService'}",
     "epu_work_producer":"{'name':'epu_work_producer','module':'ion.services.cei.epu_work_producer','class':'EPUWorkProducer', 'spawnargs':{'queue_name_work':'cei_work_queue', 'queue_name_events':'rabbitmq_sensor_events'}}",
