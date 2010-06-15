@@ -7,7 +7,6 @@
 @brief The persister writes DAP datasets to disk as netcdf files.
 """
 
-
 from urlparse import urlsplit, urlunsplit
 import simplejson as json
 
@@ -32,15 +31,35 @@ from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.url_manipulation import generate_filename
 
 class PersisterService(BaseService):
+    """
+    The persister service is responsible for receiving a DAP dataset and
+    writing to disk in netcdf format.
+    Message protocol/encoding/format:
+    * Expect a dictionary with keys for das, dds and value ('value' = DODS)
+    * Since das and dds are multiline strings, they are encoded as json
+
+    The plan is that writing locally to disk will become writing to a HSM such
+    as iRODS that presents a filesystem interface (or file-like-object we can
+    hand off to the netcdf.save())
+    
+    @note Relies on a single message fitting in memory comfortably.
+    @todo Depend on pub-sub
+    @todo Notifications of new fileset
+    @todo Update fileset directory/registry
+    """
     declare = BaseService.service_declare(name='persister',
                                           version='0.1.0',
                                           dependencies=[])
-    """
-    @note Relies on a single message fitting in memory comfortably.
-    @todo Depend on pub-sub
-    """
+
     @defer.inlineCallbacks
     def op_persist_dap_dataset(self, content, headers, msg):
+        """
+        @brief top-level routine to persist a dataset.
+        @param content Message with das, dds and 'value' keys
+        @param headers Ignored
+        @param msg Used to route the reply, otherwise ignored
+        @retval RPC message via reply_ok/reply_err
+        """
         logging.info('called to persist a dap dataset!')
 
         assert(isinstance(content, dict))
@@ -56,6 +75,13 @@ class PersisterService(BaseService):
         yield self.reply_ok(msg)
 
     def _save_no_xmit(self, content, local_dir=None):
+        """
+        @brief Parse message into decodable objects: DAS, DDS, data.
+        Then calls _save_dataset to to the pydap->netcdf step.
+        @param content Dictionary with dds, das, dods keys
+        @param local_dir If set, destination directory (e.g. iRODS)
+        @retval Return value from _save_dataset
+        """
         try:
             dds = json.loads(content['dds'])
             das = json.loads(content['das'])
@@ -71,6 +97,17 @@ class PersisterService(BaseService):
         return(self._save_dataset(das, dds, dods, source_url, local_dir=local_dir))
 
     def _save_dataset(self, das, dds, dods, source_url, local_dir=None):
+        """
+        @brief Does the conversion from das+dds+dods into pydap objects and
+        thence to a netcdf file. Mostly pydap code, though we do brand/annotate
+        the dataset in the NC_GLOBAL attribute. (Experimental feature)
+        @param das DAS metadata, as returned from the server
+        @param dds DDS metadata, as returned from the server
+        @param dods DODS (actual data), XDR encoded, as returned from the server
+        @param source_url Original URL, used as key in dataset registry
+        @param local_dir If set, destination directory
+        """
+
         dataset = DDSParser(dds).parse()
         dataset = DASParser(das, dataset).parse()
 
@@ -126,6 +163,11 @@ class PersisterClient(BaseServiceClient):
 
     @defer.inlineCallbacks
     def persist_dap_dataset(self, dap_message):
+        """
+        @brief Invoke persister, assumes a single dataset per message
+        @param dap_message Message with das/dds/dods in das/dds/value keys
+        @retval ok or error via rpc mechanism
+        """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('persist_dap_dataset',

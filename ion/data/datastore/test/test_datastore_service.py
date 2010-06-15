@@ -26,15 +26,17 @@ class DataStoreServiceTest(IonTestCase):
         yield self._stop_container()
 
     @defer.inlineCallbacks
-    def test_hello(self):
+    def test_push_pull(self):
 
         services = [
-            {'name':'DataStoreService1','module':'ion.data.datastore.datastore_service','class':'DataStoreService'},
+            {'name':'DataStoreService1','module':'ion.data.datastore.datastore_service','class':'DataStoreService','spawnargs':{'MyFrontend':'afrontend'}},
         ]
 
         sup = yield self._spawn_processes(services)
 
-        rsc = DataStoreServiceClient(proc=sup)
-        yield rsc.push("Hi there, PushMe")
+        rsc = DataStoreServiceClient('localFrontend',proc=sup)
+        yield rsc.push("LongKeyForRepo")
         
-        yield rsc.pull("Hi there, PullMe")
+        yield rsc.pull("OtherLongKeyForRepo")
+
+        yield rsc.clone("OtherLongKeyForRepo")

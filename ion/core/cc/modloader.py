@@ -50,6 +50,7 @@ class ModuleLoader(object):
         try:
             modo = pu.get_module(mod)
         except StandardError, ie:
+            logging.exception(ie)
             logging.error("Error importing module: "+str(mod))
 
     def _load_package(self, pack, recurse=False):
@@ -65,4 +66,5 @@ class ModuleLoader(object):
                     elif os.path.isdir(os.path.join(path1,fname)) and recurse:
                         self._load_package(pack+'.'+fname)
         except StandardError, ie:
+            logging.exception(ie)
             logging.error("Error importing package: "+str(pack))

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/fetcher.py
-@package ion.services.dm.fetcher The fetcher grabs data via http (DAP)
+@file ion/services/sa/fetcher.py
+@package ion.services.sa.fetcher The fetcher grabs data via http (DAP)
 @author Paul Hubbard
 @date 5/7/10
 @brief External data gateway, minimal-state service that grabs single
@@ -63,6 +63,7 @@ class FetcherService(BaseService):
         @param src_url Source URL
         @retval send_ok or send_err as required
         @note This routine sends the reply back to the caller!
+        @note called by derived class ion.services.dm.cache.RetrieverService
         """
         assert(operation in ['GET', 'HEAD'])
 
@@ -90,7 +91,7 @@ class FetcherService(BaseService):
         Inner routine to grab a page, with or without http headers.
         May raise gaierror or ValueError
         @todo Merge this and _http_op
-        @note See ion.services.dm.test.test_fetcher.GetPageTester
+        @note See ion.services.sa.test.test_fetcher.GetPageTester
         """
         src = urlparse.urlsplit(url)
         try:
@@ -211,6 +212,18 @@ class FetcherClient(BaseServiceClient):
 
         logging.info('Sending request')
         (content, headers, msg) = yield self.rpc_send('get_url', requested_url)
+        if 'ERROR' in content:
+            raise ValueError('Error on URL: ' + content['failure'])
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_dap_dataset(self, requested_url):
+        """
+        Pull an entire dataset.
+        """
+        yield self._check_init()
+        logging.info('Starting fetch of DAP dataset %s' % requested_url)
+        (content, headers, msg) = yield self.rpc_send('get_dap_dataset', requested_url)
         if 'ERROR' in content:
             raise ValueError('Error on URL: ' + content['failure'])
         defer.returnValue(content)
