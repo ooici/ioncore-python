@@ -19,6 +19,7 @@ class EPUControllerService(BaseService):
     
     declare = BaseService.service_declare(name='epu_controller', version='0.1.0', dependencies=[])
     
+    @defer.inlineCallbacks
     def slc_init(self):
         #actually create work_queue:  (TODO: create events queue here)
         self.queue_name_work = self.get_scoped_name("system", self.spawn_args["queue_name_work"])
