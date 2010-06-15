@@ -23,7 +23,7 @@ sha1 = cas.sha1
 UUID = objstore.UUID
 Blob = objstore.Blob
 Tree = objstore.Tree
-Entit = objstore.Entity
+Entity = objstore.Entity
 Commit = objstore.Commit
 
 SUBJECT='subject'
