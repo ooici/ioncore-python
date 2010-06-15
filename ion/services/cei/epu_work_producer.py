@@ -17,7 +17,7 @@ class EPUWorkProducer(BaseService):
     declare = BaseService.service_declare(name='epu_work_producer', version='0.1.0', dependencies=[])
 
     def slc_init(self):
-        self.queue_name_work = self.spawn_args["queue_name_work"]
+        self.queue_name_work = self.get_scoped_name("system", self.spawn_args["queue_name_work"])
         self.work_produce_loop = LoopingCall(self.work_produce)
         self.work_produce_loop.start(1) #XXX temporary for testing
 

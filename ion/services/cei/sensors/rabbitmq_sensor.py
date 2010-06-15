@@ -15,8 +15,8 @@ class RabbitMQSensor(SensorProcess):
 
     def plc_init(self):
         SensorProcess.plc_init(self)
-        self.queue_name_work = self.spawn_args["queue_name_work"]
-        self.queue_name_events = self.spawn_args["queue_name_events"]
+        self.queue_name_work = self.get_scoped_name("system", self.spawn_args["queue_name_work"])
+        self.queue_name_events = self.get_scoped_name("system", self.spawn_args["queue_name_events"])
         self.sensor_client = self._create_sensor_client()
         self.sensor_loop = LoopingCall(self.messages_in_queue)
         if self.start_immediately:
