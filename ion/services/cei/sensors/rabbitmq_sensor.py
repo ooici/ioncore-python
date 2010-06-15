@@ -26,7 +26,10 @@ class RabbitMQSensor(SensorProcess):
         #XXX Move the below into the 'txrabbitmq' library
         from txrabbitmq.service import RabbitMQControlService
         from twotp.node import Process, readCookie, buildNodeName
-        cookie = readCookie(erlang_cookie)
+        if erlang_cookie is None:
+            cookie = readCookie()
+        else:
+            cookie = erlang_cookie
         nodeName = buildNodeName(nodename)
         process = Process(nodeName, cookie)
         return RabbitMQControlService(process)
