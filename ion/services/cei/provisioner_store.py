@@ -103,6 +103,21 @@ class ProvisionerStore(object):
                 nodes.append(records[0])
         defer.returnValue(nodes)
 
+    @defer.inlineCallbacks
+    def get_nodes_by_id(self, node_ids):
+        """Retrieves the latest node records, from a list of node_ids
+        """
+        records = yield self.get_all()
+        groups = group_records(records, 'node_id')
+        nodes = []
+        for node_id in node_ids:
+            records = groups.get(node_id)
+            if records:
+                nodes.append(records[0])
+            else:
+                nodes.append(None)
+        defer.returnValue(nodes)
+
     def get_all(self, launch=None, node=None):
         """Retrieves the states about an instance or launch.
 

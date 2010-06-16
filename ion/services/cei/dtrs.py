@@ -7,22 +7,22 @@
 @brief Deployable Type Registry Service. Used to look up Deployable type data/metadata.
 """
 
-import os
 import logging
 
 from twisted.internet import defer
 
 from magnet.spawnable import Receiver
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.util.config import Config
 from ion.core import ioninit
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
 
 #TODO ugggggggggghhhhhhhhh
+_REGISTRY = {}
 CONF = ioninit.config(__name__)
 execfile(CONF['deployable_types'])
+logging.debug('Loaded %s deployable types.', len(_REGISTRY))
 
 class DeployableTypeRegistryService(BaseService):
     """Deployable Type Registry service interface
@@ -74,6 +74,7 @@ class DeployableTypeRegistryClient(BaseServiceClient):
         """Lookup a deployable type
         """
         yield self._check_init()
+        logging.debug("Sending DTRS lookup request")
         (content, headers, msg) = yield self.rpc_send('lookup', {
             'deployable_type' : dt,
             'nodes' : nodes
