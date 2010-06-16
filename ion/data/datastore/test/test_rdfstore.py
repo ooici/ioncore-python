@@ -62,35 +62,35 @@ class AssociationBaseTest(unittest.TestCase):
 
 
         
-#class RdfStoreTest(unittest.TestCase):
-#    """
-#    """
-#    @defer.inlineCallbacks
-#    def setUp(self):
-#        s = yield store.Store.create_store()
-#        ss = yield set_store.SetStore.create_store()
-#        self.mystore = yield rdfstore.RdfStore.new(s, ss, 'test_partition')
-#        
-#    @defer.inlineCallbacks
-#    def test_create_object(self):
-#        rdfchassis = yield self.mystore.create('thing', resource.IdentityResource)
-#        self.assert_(isinstance(rdfchassis, rdfstore.RdfChassis))
-#
-#        id_res = yield rdfchassis.checkout()
-#        self.assert_(isinstance(id_res, resource.IdentityResource))
-#        id_res.name = 'Carlos S'
-#        id_res.email = 'carlos@ooici.biz'
-#        
-#        rdfchassis.commit()
-#        
-#    @defer.inlineCallbacks
-#    def test_checkout_object(self):
-#        rdfchassis = yield self.mystore.create('thing', resource.IdentityResource)
-#        id_res = yield rdfchassis.checkout()
-#        id_res.name = 'Carlos S'
-#        id_res.email = 'carlos@ooici.biz'
-#        rdfchassis.commit()
-#        id_res = yield rdfchassis.checkout()
+class RdfStoreTest(unittest.TestCase):
+    """
+    """
+    @defer.inlineCallbacks
+    def setUp(self):
+        s = yield store.Store.create_store()
+        ss = yield set_store.SetStore.create_store()
+        self.mystore = yield rdfstore.RdfStore.new(s, ss, 'test_partition')
+        
+    @defer.inlineCallbacks
+    def test_create_object(self):
+        rdfchassis = yield self.mystore.create('thing', resource.IdentityResource)
+        self.assert_(isinstance(rdfchassis, rdfstore.RdfChassis))
+
+        id_res = yield rdfchassis.checkout()
+        self.assert_(isinstance(id_res, resource.IdentityResource))
+        id_res.name = 'Carlos S'
+        id_res.email = 'carlos@ooici.biz'
+        
+        rdfchassis.commit()
+        
+    @defer.inlineCallbacks
+    def test_checkout_object(self):
+        rdfchassis = yield self.mystore.create('thing', resource.IdentityResource)
+        id_res = yield rdfchassis.checkout()
+        id_res.name = 'Carlos S'
+        id_res.email = 'carlos@ooici.biz'
+        rdfchassis.commit()
+        id_res = yield rdfchassis.checkout()
       
         
         
