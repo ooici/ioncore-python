@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """
-@file ion/services/dm/coordinator.py
+@file ion/services/dm/preservation/coordinator.py
 @author Paul Hubbard
 @date 5/25/10
-@package ion.services.dm.coordinator DX/DM coordinator/orchestrator. The brains.
+@package ion.services.dm.preservation.coordinator Preservation coordinator. The brains.
 
 Rewrite from LCO version; refactor/rewrite for new LCA arch.
 """
@@ -19,7 +19,7 @@ from ion.services.sa.fetcher import FetcherClient
 
 class CoordinatorService(BaseService):
     """
-    Brains behind DX, and also the primary interface.
+    Brains behind preservation, and also the primary interface.
     """
     # Define ourselves for the CC
     declare = BaseService.service_declare(name='coordinator',
@@ -35,7 +35,7 @@ class CoordinatorService(BaseService):
         Service life cycle state. Initialize service here. Can use yields.
         @todo Create instances of clients here for later - fetcher, attr store, etc
         """
-        logging.debug('CoordinatorService SLC init')
+        logging.debug('Preservation coordinator SLC init')
         self.fc = FetcherClient(proc=self)
 
     @defer.inlineCallbacks

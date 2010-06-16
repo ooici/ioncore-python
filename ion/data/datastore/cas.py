@@ -85,6 +85,19 @@ class Element(tuple):
             obj_id = obj
         return tuple.__new__(cls, [name, obj_id, mode])
 
+    def __str__(self):
+        head = "="*10
+        strng ="""\n%s Entity %s\n""" % (head, head)
+        strng+="""= tuple:: name:"%s" id:"%s" mode:"%s"\n""" % (self[0],sha1_to_hex(self[1]),self[2])
+        s=False
+        if self.obj:
+            s=True
+        strng+="""= tuple obj present=%s \n""" % s
+        strng+=head*2
+        return strng
+
+
+
 class ICAStoreObject(Interface):
     """
     Interface for objects stored in CAStore.

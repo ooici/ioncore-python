@@ -25,6 +25,13 @@ from ion.data.datastore import cas
 NULL_CHR = "\x00"
 
 
+class RdfReference(str):
+    """
+    @NOTE This is a temperoray addition to play with making a reference
+    """
+    def __init__(self,value):
+        str.__init__(value)
+
 class TypedAttribute(object):
 
     def __init__(self, type, default=None):

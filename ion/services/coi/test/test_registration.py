@@ -64,46 +64,104 @@ class UserRegistrationClientTest(IonTestCase):
     @defer.inlineCallbacks
     def test_authenticate(self):
         """
+        What we get from CILogon:
+        /DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A136
+        CN=Roger Unwin A136, O=ProtectNetwork, C=US, DC=cilogon, DC=org
+        What it means....
+        /C = country
+        /O = organization
+        /CN = Common Name?
+        /DC = Domain Component
         """
+        parms = {'Common_name': 'Roger Unwin A136',
+                 'Organization': 'ProtectNetwork',
+                 'Domain Component': 'cilogon org',
+                 'Country': 'US',
+                 'Certificate': 'dummy certificate',
+                 'RSA Private Key': 'dummy rsa private key'}
+        
         
         hc = IdentityRegistryServiceClient(proc=self.sup)
-        result = yield hc.authenticate("TESTING")
-        logging.debug('### Service reply: '+result['value'])
+        result = yield hc.authenticate(parms)
+        
+        logging.info('### User was authenticated: '+ str(result['authenticated']))
+        
+        self.failUnlessEqual(result['authenticated'], True)
         
     @defer.inlineCallbacks
     def test_generate_ooi_id(self):
         """
+        What we get from CILogon:
+        /DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A136
+        CN=Roger Unwin A136, O=ProtectNetwork, C=US, DC=cilogon, DC=org
+        What it means....
+        /C = country
+        /O = organization
+        /CN = Common Name?
+        /DC = Domain Component
         """
+        parms = {'Common_name': 'Roger Unwin A136',
+                 'Organization': 'ProtectNetwork',
+                 'Domain Component': 'cilogon org',
+                 'Country': 'US',
+                 'Certificate': 'dummy certificate',
+                 'RSA Private Key': 'dummy rsa private key'}
         
         hc = IdentityRegistryServiceClient(proc=self.sup)
-        result = yield hc.generate_ooi_id("TESTING")
-        logging.debug('### Service reply: '+result['value'])
+        result = yield hc.generate_ooi_id(parms)
+        logging.debug('### Generated ooi_id is : ' + str(result['ooi_id']) )
+        
+        if (result['ooi_id'] > 0) :
+            self.assertEqual(result['ooi_id'],result['ooi_id']) # hack since I cant find a pass(). this will get revisited in later iterations. Once its generating proper ooi_id's then this should be corrected.
+        else:
+            self.fail(self, msg='ooi should have come back as a number')
         
     @defer.inlineCallbacks
     def test_revoke_ooi_id(self):
         """
         """
+        logging.debug('### ENTERING test_revoke_ooi_id')
+
+        parms = {'ooi_id':'unwin45872043897'}
         
         hc = IdentityRegistryServiceClient(proc=self.sup)
-        result = yield hc.revoke_ooi_id("TESTING")
-        logging.debug('### Service reply: '+result['value'])
+        result = yield hc.revoke_ooi_id(parms)
+        
+        logging.debug('### Service reply: ' + str(result['revoked']))
+        
+        self.failUnlessEqual(result['revoked'], True)
          
     @defer.inlineCallbacks
     def test_store_registration(self):
         """
+        What we get from CILogon:
+        /DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A136
+        CN=Roger Unwin A136, O=ProtectNetwork, C=US, DC=cilogon, DC=org
+        What it means....
+        /C = country
+        /O = organization
+        /CN = Common Name?
+        /DC = Domain Component
         """
+        parms = {'common_name': 'Roger Unwin A136',
+                 'organization': 'ProtectNetwork',
+                 'Domain Component': 'cilogon org',
+                 'Country': 'US',
+                 'Certificate': 'dummy certificate',
+                 'RSA Private Key': 'dummy rsa private key'}
         
         hc = IdentityRegistryServiceClient(proc=self.sup)
-        result = yield hc.store_registration("TESTING")
-        logging.debug('### Service reply: '+result['value'])
+        result = yield hc.store_registration(parms)
+        logging.debug('###2 Service reply: '+result['value'])
                
     @defer.inlineCallbacks
     def test_store_registration_info(self):
         """
         """
+        parms = {'ooi_id':'unwin45872043897'}
         
         hc = IdentityRegistryServiceClient(proc=self.sup)
-        result = yield hc.store_registration_info("TESTING")
+        result = yield hc.store_registration_info(parms)
         logging.debug('### Service reply: '+result['value'])
 
     @defer.inlineCallbacks
