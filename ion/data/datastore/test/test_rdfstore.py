@@ -21,6 +21,11 @@ from ion.data import resource
 
 sha1 = cas.sha1
 
+
+class RdfResource(resource.BaseResource):
+    uuid_ref = resource.TypedAttribute(resource.RdfReference,default=resource.RdfReference('Default ID'))
+    name = resource.TypedAttribute(str,default='Junk')
+
 class AssociationBaseTest(unittest.TestCase):
 
     def setUp(self):
@@ -72,18 +77,6 @@ class RdfStoreTest(unittest.TestCase):
         self.mystore = yield rdfstore.RdfStore.new(s, ss, 'test_partition')
         
     @defer.inlineCallbacks
-    def test_create_object(self):
-        rdfchassis = yield self.mystore.create('thing', resource.IdentityResource)
-        self.assert_(isinstance(rdfchassis, rdfstore.RdfChassis))
-
-        id_res = yield rdfchassis.checkout()
-        self.assert_(isinstance(id_res, resource.IdentityResource))
-        id_res.name = 'Carlos S'
-        id_res.email = 'carlos@ooici.biz'
-        
-        rdfchassis.commit()
-        
-    @defer.inlineCallbacks
     def test_checkout_object(self):
         rdfchassis = yield self.mystore.create('thing', resource.IdentityResource)
         id_res = yield rdfchassis.checkout()
@@ -93,6 +86,28 @@ class RdfStoreTest(unittest.TestCase):
         new_res = yield rdfchassis.checkout()
         self.assertEqual(id_res,new_res)
       
+      
+    @defer.inlineCallbacks
+    def test_checkout_ref_object(self):
+        rdfchassis = yield self.mystore.create('thing', resource.IdentityResource)
+        id_res = yield rdfchassis.checkout()
+        id_res.name = 'Carlos S'
+        id_res.email = 'carlos@ooici.biz'
+        rdfchassis.commit()
+        
+        rdfchassis = yield self.mystore.create('ref_thing', RdfResource)
+        rdf_res = yield rdfchassis.checkout()
+        rdf_res.uuid_ref = resource.RdfReference('thing')
+        rdfchassis.commit()
+        rew_rdf_ref = yield rdfchassis.checkout()
+        
+        
+        
+        
+        
+        
+        
+        
         
         
         
