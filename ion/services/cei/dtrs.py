@@ -12,11 +12,9 @@ import logging
 from twisted.internet import defer
 
 from magnet.spawnable import Receiver
+from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.core import ioninit
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
 
 #TODO ugggggggggghhhhhhhhh
 _REGISTRY = {}
@@ -82,5 +80,4 @@ class DeployableTypeRegistryClient(BaseServiceClient):
         defer.returnValue(content)
 
 # Direct start of the service as a process with its default name
-receiver = Receiver(__name__)
-instance = DeployableTypeRegistryService(receiver)
+factory = ProtocolFactory(DeployableTypeRegistryService)
