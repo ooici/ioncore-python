@@ -263,10 +263,10 @@ class ObjectStoreObject(Tree):
     type = 'object' # or 'entity'?
 
 
-class BaseObjectChassis(object):
+class ObjectChassis(object):
     """
-    Creation functionality of ObjectChassis. 
-    This base cla
+    This establishes a context for accessing/modifying/committing an
+    "Object" or "Resource Entity" structure...thing.
     """
 
     def __init__(self, objstore, keyspace, objectClass=StoreClass):
@@ -283,38 +283,10 @@ class BaseObjectChassis(object):
         self.objstore = objstore
         self.keyspace = keyspace
         self.objectClass = objectClass
+        self.objectClassName = reflect.fullyQualifiedName(objectClass) #XXX hack
+        self.objectClassName = objectClass.__name__ #XXX hack
         self.index = None
         self.cur_commit = None
-
-    @classmethod
-    def new(cls, objstore, keyspace, objectClass):
-        """
-        @todo Design for recording 'objectClass' in system.
-        @todo How to organize creation of refs, meta, etc.
-        """
-        inst = cls(objstore, refs, meta, objectClass)
-        return inst
-
-
-    def _get_object_meta(self):
-        """
-        @brief Common meta info on this object.
-        It's like the misc mutable stuff in .git
-        """
-        d = self.meta.get('')
-
-        def _raise_if_none(res):
-            if not bool(res):
-                raise ObjectStoreError("Store meta not found")
-            return res
-        d.addCallback(_raise_if_none)
-        return d
-
-class ObjectChassis(BaseObjectChassis):
-    """
-    This establishes a context for accessing/modifying/committing an
-    "Object" or "Resource Entity" structure...thing.
-    """
 
     def update_head(self, commit_id, head='master'):
         """
@@ -350,7 +322,7 @@ class ObjectChassis(BaseObjectChassis):
             tree = yield self.objstore.get(commit.tree)
             yield tree.load(self.objstore)
             obj_parts = [(child[0], child.obj.content) for child in tree.children]
-            self.index = self.objectClass.decode(self.objectClass.__name__, obj_parts)()
+            self.index = self.objectClass.decode(self.objectClassName, obj_parts)()
         else:
             self.index = self.objectClass()
         self.cur_commit = ref
@@ -573,7 +545,8 @@ class ObjectStore(BaseObjectStore):
         """
         uuid_obj = UUID(name)
         id = yield self.put(uuid_obj)
-        obj_class = reflect.fullyQualifiedName(objectClass)
+        #obj_class = reflect.fullyQualifiedName(objectClass)
+        obj_class = objectClass.__name__
         obj_class_obj = Blob(obj_class)
         yield self.put(obj_class_obj)
         attrs = yield self._dump_object_class(objectClass)
