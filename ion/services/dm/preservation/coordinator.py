@@ -11,7 +11,6 @@ Rewrite from LCO version; refactor/rewrite for new LCA arch.
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
-#from magnet.spawnable import Receiver
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
