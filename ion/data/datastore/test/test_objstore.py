@@ -19,6 +19,10 @@ from ion.data import resource
 
 sha1 = cas.sha1
 
+class ObjectChassisTest(unittest.TestCase):
+    """
+    """
+
 class ObjectStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
@@ -27,8 +31,6 @@ class ObjectStoreTest(unittest.TestCase):
         self.test_namespace = 'test_namespace'
         self.object_store = yield objstore.ObjectStore.new(self.backend_store, self.test_namespace)
         
-        
-
     @defer.inlineCallbacks
     def test_new_fail(self):
         try:
@@ -40,26 +42,13 @@ class ObjectStoreTest(unittest.TestCase):
     @defer.inlineCallbacks
     def test_create_object(self):
         obj = yield self.object_store.create('thing',resource.IdentityResource)
-        self.assert_(isinstance(obj, objstore.ObjectChassis))
+        self.failUnless(isinstance(obj, objstore.ObjectChassis))
 
     @defer.inlineCallbacks
     def test_load_store(self):
         object_store2 = yield self.object_store.load(self.backend_store, self.test_namespace)
         
 
-
-class ObjectChassisTest(unittest.TestCase):
-    """
-    @TODO
-    Test:
-        Commit
-        Checkout
-        get_commit_history
-        new
-        
-    How can we make these more like unit tests and less like scripts?
-    """
-    pass
 
 
     

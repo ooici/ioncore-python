@@ -8,18 +8,189 @@
 
 import logging
 
+from zope import interface
+
 from twisted.internet import defer
 from twisted.python import reflect
 
-from ion.data import resource
 from ion.data.datastore import cas
+
+NULL_CHR = '\x00'
 
 class ObjectStoreError(Exception):
     """
     Base ObjectStore Exception
     """
 
-class Entity(cas.Entity):
+class IObjectChassis(interface.Interface):
+    """
+    A vehicle for carrying an application object in and out of
+    the Object Store.
+
+    The concept is very similar to a git repository.
+    """
+
+    def get_head(name):
+        """
+        """
+
+    def update_head(commit_id, name):
+        """
+        """
+
+    def checkout(ref):
+        """
+        """
+
+    def commit():
+        """
+        """
+
+    def write_tree():
+        """
+        """
+
+
+class IObjectStore(cas.ICAStore):
+    """
+    A CAStore for data objects.
+    """
+
+    def create(name, baseClass):
+        """
+        @brief Create a new data object entity with the structure of
+        baseClass.
+        @param name Unique identifier of data object.
+        @param baseClass Class that models structure of data object. This
+        class is a container of typed attributes.
+        """
+
+    def clone(name):
+        """
+        @brief Retrieve data object.
+        @param name Unique identifier of data object.
+        """
+
+class TypedAttribute(object):
+    """
+    @brief Descriptor class for Data Object Attributes. Objects are
+    containers of typed attributes.
+    """
+
+    def __init__(self, type, default=None):
+        self.name = None
+        self.type = type
+        self.default = default if default else type()
+        self.cache = None
+
+    def __get__(self, inst, cls):
+        value = getattr(inst, self.name, self.default)
+        return value
+
+    def __set__(self, inst, value):
+        if not isinstance(value, self.type):
+            raise TypeError("Must be a %s" % self.type)
+        setattr(inst, self.name, value)
+
+    @classmethod
+    def decode(cls, value):
+        stype, default = value.split(NULL_CHR)
+        
+        type = eval(str(stype))
+#        return cls(type, type(str(default)))
+
+        if type == list:
+            return cls(type, eval(str(default)))
+        else:
+           return cls(type, type(str(default)))
+
+class StoreType(type):
+    """
+    @brief Metaclass for all Data Objects.
+    """
+
+    def __new__(cls, name, bases, dict):
+        slots = []
+        for key, value in dict.items():
+            if isinstance(value, TypedAttribute):
+                value.name = '_' + key
+                slots.append(value.name)
+        dict['__slots__'] = slots
+        return type.__new__(cls, name, bases, dict)
+
+class StoreClass(object):
+    """
+    @brief [Abstract] Base class for all data objects.
+    """
+    __metaclass__ = StoreType
+
+    def __eq__(self,other):
+        
+        if not isinstance(other, BaseResource):
+            return False
+        
+        for name in self.attributes:
+            self_value = getattr(self,name)
+            
+            other_value = getattr(other,name)
+            if other_value != self_value:
+                return False
+        return True
+
+    def __str__(self):
+        head = '='*10
+        strng  = """\n%s Resource Type: %s %s\n""" % (head, str(self.__class__.__name__), head)
+        for name in self.attributes:
+            value = getattr(self,name)
+            strng += """= '%s':'%s'\n""" % (name,value)
+        strng += head*2
+        return strng
+
+    @property
+    def attributes(self):
+        names = []
+        for key in self.__slots__:
+            names.append(key[1:])
+        return names
+
+    def encode(self):
+        """
+        """
+        encoded = []
+        for name in self.attributes:
+            value = getattr(self, name)
+            
+            # Attempt to handle nested Resources
+            if not isinstance(value, StoreClass):
+                encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
+            else:
+                value = value.encode()
+                encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
+        return encoded
+
+    @classmethod
+    def decode(cls, className, attrs):
+        """
+        decode store object[s]
+        """
+        #d = dict([(str(name), TypedAttribute.decode(value)) for name, value in attrs])
+        d={}
+        for name, value in attrs:
+            #print 'name',name
+            #print 'value',value
+            d[str(name)] = TypedAttribute.decode(value)       
+        return type(str(className), (cls,), d)
+
+class EmptyObject(StoreClass):
+    """
+    @brief Trivial Store Object
+    """
+
+class ArbitraryObject(StoreClass):
+    key = TypedAttribute(str)
+
+
+class Element(cas.Element):
 
     def load(self, backend):
         """
@@ -35,14 +206,11 @@ class Entity(cas.Entity):
             return d
         return defer.succeed(None)
 
-class UUID(cas.Blob):
-    """
-    Names of objects are UUIDs and are stored as content objects.
-    """
-
-    type = 'uuid'
 
 class Blob(cas.Blob):
+
+    def __repr__(self):
+        return self.content
 
     def load(self, backend):
         """
@@ -52,7 +220,7 @@ class Blob(cas.Blob):
 
 class Tree(cas.Tree):
 
-    entityFactory = Entity
+    elementFactory = Element
 
     def load(self, backend):
         """
@@ -60,7 +228,7 @@ class Tree(cas.Tree):
         """
         return defer.DeferredList([child.load(backend) for child in self.children])
 
-    def __getitem__(self, name):
+    def x__getitem__(self, name):
         """
         lazy loading
         """
@@ -80,13 +248,29 @@ class Commit(cas.Commit):
             return d
         return defer.succeed(None)
 
+class UUID(Blob):
+    """
+    Names of objects are UUIDs and are stored as content objects.
+    """
+
+    type = 'uuid'
+
+class ObjectStoreObject(Tree):
+    """
+    @brief An ObjectStore Object is the main entity of the ObjectStore
+    environment.
+    """
+
+    type = 'object' # or 'entity'?
+
 
 class BaseObjectChassis(object):
     """
+    Creation functionality of ObjectChassis. 
+    This base cla
     """
-    baseClass = resource.BaseResource
 
-    def __init__(self, objstore, refs, meta, objectClass=None, commit=None):
+    def __init__(self, objstore, keyspace, objectClass=StoreClass):
         """
         @note
         objstore vs. objs
@@ -98,30 +282,20 @@ class BaseObjectChassis(object):
         refs & meta don't necessarily have types (yet).
         """
         self.objstore = objstore
-        self.refs = refs
-        self.meta = meta
-        if not objectClass:
-            objectClass = self.baseClass
+        self.keyspace = keyspace
         self.objectClass = objectClass
         self.index = None
         self.cur_commit = None
 
     @classmethod
-    def new(cls, objstore, refs, meta, objectClass):
+    def new(cls, objstore, keyspace, objectClass):
         """
+        @todo Design for recording 'objectClass' in system.
+        @todo How to organize creation of refs, meta, etc.
         """
         inst = cls(objstore, refs, meta, objectClass)
-        d = inst.meta.put('objectClass', reflect.fullyQualifiedName(objectClass))
-        d.addCallback(lambda _: inst)
-        return d
+        return inst
 
-    @defer.inlineCallbacks
-    def _init_metadata(self):
-        """
-        @brief write basic information about this store
-        @note self.objs.put(namespace, id) is used so that the uuid
-        representing an object is the key to the uuid object.
-        """
 
     def _get_object_meta(self):
         """
@@ -141,7 +315,6 @@ class ObjectChassis(BaseObjectChassis):
     """
     This establishes a context for accessing/modifying/committing an
     "Object" or "Resource Entity" structure...thing.
-
     """
 
     def update_head(self, commit_id, head='master'):
@@ -151,7 +324,7 @@ class ObjectChassis(BaseObjectChassis):
         In general, head is a ref, but other refs are not yet implemented.
         @retval Deferred
         """
-        return self.refs.put(head, commit_id)
+        return self.keyspace.put('refs.' + head, commit_id)
 
     def get_head(self, name='master'):
         """
@@ -163,7 +336,7 @@ class ObjectChassis(BaseObjectChassis):
         @todo get('heads.master') instead of just get('head')
         @note if head is not there, *IStore says return None*
         """
-        return self.refs.get(name)
+        return self.keyspace.get('refs.' + name)
 
     @defer.inlineCallbacks
     def checkout(self, head='master', commit_id=None):
@@ -194,7 +367,7 @@ class ObjectChassis(BaseObjectChassis):
         blobs = [(name, Blob(val)) for name, val in obs]
         for n, b in blobs:
             yield self.objstore.put(b)
-        childs = [Entity(name, blob) for name, blob in blobs]
+        childs = [Element(name, blob) for name, blob in blobs]
         tree = Tree(*childs)
         tree_id = yield self.objstore.put(tree)
         defer.returnValue(tree_id)
@@ -204,7 +377,7 @@ class ObjectChassis(BaseObjectChassis):
         
     def add(self, element):
         """
-        @param entity Instance of Entity or EntityProxy.
+        @param entity Instance of Element or ElementProxy.
         """
 
     def update(self, element):
@@ -245,9 +418,6 @@ class ObjectChassis(BaseObjectChassis):
             break
         defer.returnValue(commits)
 
-
-
-
 class BaseObjectStore(cas.CAStore):
     """
     @brief Interactive interface to an Object Store instance (who's raw
@@ -264,6 +434,7 @@ class BaseObjectStore(cas.CAStore):
             Blob.type:Blob,
             Tree.type:Tree,
             Commit.type:Commit,
+            ObjectStoreObject.type:ObjectStoreObject,
             }
 
     def __init__(self, backend, partition=''):
@@ -277,6 +448,7 @@ class BaseObjectStore(cas.CAStore):
         cas.CAStore.__init__(self, backend, partition)
         self.partition = partition
         self.storemeta = cas.StoreContextWrapper(backend, partition + '.meta.')
+        refs = cas.StoreContextWrapper(backend, partition + '.refs.')
         self.type = reflect.fullyQualifiedName(self.__class__)
 
     @classmethod
@@ -353,44 +525,67 @@ class BaseObjectStore(cas.CAStore):
         d.addErrback(lambda res: False)
         return d
 
-
 class ObjectStore(BaseObjectStore):
 
-    def create(self, name, baseClass):
+    @defer.inlineCallbacks
+    def create(self, name, objectClass):
         """
         @param name of object store object to create...
+        @param baseClass of object store object.
         @brief Create a new object named 'name'. This name should not exist
         yet in the object store.
-        @retval A Deferred that succeeds with a new instance.
-        @note Could just use an idempotent declare/get thing instead of
-        error-ing on create
+        @retval A Deferred that succeeds with a new instance of ObjectChassis.
         """
-        d = self._object_exists(name)
-
-        def _succeed(result):
-            if not result:
-                return self._create_object(name, baseClass)
-            return defer.fail(ObjectStoreError('Error creating %s object %s' % (baseClass.__name__, name,)))
-
-        def _fail(result):
-            return defer.fail(ObjectStoreError(result))
-
-        d.addCallback(_succeed)
-        d.addErrback(lambda r: _fail(r))
-        return d
+        if not (yield self._object_exists(name)):
+            yield self._create_object(name, objectClass)
+            obj = yield self._build_object(name)
+            defer.returnValue(obj)
+        else:
+            raise ObjectStoreError('Error creating %s object %s' % (objectClass.__name__, name,))
 
     @defer.inlineCallbacks
-    def _create_object(self, name, baseClass):
+    def _object_class(self, objectClass):
         """
-        @note Not Using Object Store Partition Namespace Yet.
-        Might not need to
+
         """
-        refs = cas.StoreContextWrapper(self.backend, name + '.refs.')
-        meta = cas.StoreContextWrapper(self.backend, name + '.meta.')
+        obs = objectClass().encode()
+        blobs = [(name, Blob(val)) for name, val in obs]
+        for n, b in blobs:
+            yield self.put(b)
+        childs = [Element(name, blob) for name, blob in blobs]
+        tree = Tree(*childs)
+        tree_id = yield self.put(tree)
+        defer.returnValue(tree)
+
+    @defer.inlineCallbacks
+    def _create_object(self, name, objectClass):
         uuid_obj = UUID(name)
         id = yield self.put(uuid_obj)
-        yield self.objs.put(name, id)
-        obj = yield ObjectChassis.new(self, refs, meta, baseClass)
+        obj_class = reflect.fullyQualifiedName(objectClass)
+        obj_class_obj = Blob(obj_class)
+        yield self.put(obj_class_obj)
+        attrs = yield self._object_class(objectClass)
+        obj_tree = ObjectStoreObject(('name', uuid_obj), 
+                                    ('class', obj_class_obj),
+                                    ('attrs', attrs))
+        obj_id = yield self.put(obj_tree)
+        yield self.objs.put(name, obj_id)
+        defer.returnValue(obj_id)
+
+
+    @defer.inlineCallbacks
+    def _build_object(self, name):
+        """
+        @brief General mechanical process for creating a local instance of
+        an object store object.
+        @note Not Using Object Store Partition Namespace Yet.
+        """
+        id = yield self.objs.get(name)
+        obj_obj = yield self.get(id)
+        yield obj_obj.load(self)
+        objectClass = obj_obj['class'].content
+        keyspace = cas.StoreContextWrapper(self.backend, self.partition + '.' + id + ':')
+        obj = ObjectChassis(self, keyspace, objectClass)
         defer.returnValue(obj)
 
     @defer.inlineCallbacks
@@ -407,25 +602,36 @@ class ObjectStore(BaseObjectStore):
             exists = False
         defer.returnValue(exists)
 
+    @defer.inlineCallbacks
     def clone(self, name):
         """
         @param name uuid of object store object.
-        @brief Clone an object from the object store. The semantic of clone
-        as opposed to get is very important. Objects in the object store
-        represent mutable models of immutable constituents. Getting is not
-        the appropriate verb because you are not getting something
-        canonical; this makes much sense when you consider the compliment 'put'
-        idea. There is no put, there is commit, and update ref,
+        @brief Clone an object from the object store. The semantic of
+        'clone' as opposed to 'get' is very important. Objects in the
+        object store represent [potentially mutable] models of immutable
+        constituents. 'Getting' is not the appropriate verb because you
+        are not necessarily retrieving some canonical state, you are
+        retrieving a distributed object with a known 'reference' name; this
+        makes much sense when you consider the compliment 'put' verb. There
+        is no 'put', there is 'commit', and update ref...
         """
-        uuid = self.get(name)
+        if (yield self._object_exists(name)):
+            obj = yield self._build_object(name)
+            defer.returnValue(obj)
 
+class Identity(StoreClass):
+    name = TypedAttribute(str)
+    age = TypedAttribute(int)
+    email = TypedAttribute(str)
 
 @defer.inlineCallbacks
 def _test(ns):
     from ion.data import store
     s = yield store.Store.create_store()
     obs = yield ObjectStore.new(s, 'test_partition')
-    obj = yield obs.create('thing', resource.IdentityResource)
+    obj = yield obs.create('thing', Identity)
+    ns.update(locals())
+    """
     ind = yield obj.checkout()
     ind.name = 'Carlos S'
     ind.email = 'carlos@ooici.biz'
@@ -439,32 +645,4 @@ def _test(ns):
     ind.email = 'carlos@ooici.com'
     yield obj.commit()
     ind = yield obj.checkout()
-    ns.update(locals())
-
-
-"""
-@note Two organizational strategies:
-    1 BaseObjectStore/ObjectStore class methods as factories for creating
-      and loading ObjectStore instances.
-    2 ObjectStore Factory for setting up an ObjsectStore instance.
-
-With 1, ObjectStore would have method names for creating/checking Stores
-and also the actual Objects in the ObjectStore.
-"""
-
-
-class ObjectStoreFactory(object):
     """
-    Sets up an object store
-    """
-
-    def __init__(self, backend):
-        """
-        """
-        self.backend = backend
-
-
-
-
-
-

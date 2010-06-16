@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-
-
 """
 @file ion/data/resource.py
 @author David Stuebe
@@ -22,9 +20,6 @@ from zope.interface import Attribute
 from twisted.internet import defer
 
 from ion.data.datastore import cas
-
-from twisted.python import reflect
-
 
 
 NULL_CHR = "\x00"
@@ -62,7 +57,7 @@ class TypedAttribute(object):
         else:
            return cls(type, type(str(default)))
 
-class TypedMeta(type):
+class DataObject(type):
 
     def __new__(cls, name, bases, dict):
         slots = []
@@ -76,7 +71,7 @@ class TypedMeta(type):
 class BaseResource(object):
     """
     """
-    __metaclass__ = TypedMeta
+    __metaclass__ = DataObject
 
     def __init__(self, **kwargs):
         """

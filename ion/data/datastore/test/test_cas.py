@@ -13,7 +13,6 @@ from twisted.trial import unittest
 
 from ion.data import store
 from ion.data.datastore import cas
-from ion.data.datastore import objstore
 
 sha1 = cas.sha1
 
@@ -113,6 +112,7 @@ class CommitObjectTest(unittest.TestCase):
         test = '\n========== Store Type: commit ==========\n'
         test += '= Key: "252f7b9b624170607c13e9370a560d75d0a9b9ea"\n'
         test += '= Tree: "80655da8d80aaaf92ce5357e7828dc09adb00993"\n'
+        test += '= Parent: "d8fd39d0bbdd2dcf322d8b11390a4c5825b11495"\n' 
         test += '= Log: "foo bar"\n'
         test += '='*20
         self.assertEqual(string,test)
@@ -143,7 +143,7 @@ class CAStoreTest(unittest.TestCase):
     def test_tree(self):
         b =  cas.Blob('test content')
         yield self.cas.put(b)
-        t1 = cas.Tree(cas.Entity('test', sha1(b)))
+        t1 = cas.Tree(cas.Element('test', sha1(b)))
         t1id = yield self.cas.put(t1)
         t1_out = yield self.cas.get(t1id)
         self.failUnlessEqual(t1_out.value, t1.value)
@@ -156,11 +156,11 @@ class CAStoreTest(unittest.TestCase):
         bid = yield self.cas.put(b)
         b2id = yield self.cas.put(b2)
         b3id = yield self.cas.put(b3)
-        t1 = cas.Tree(cas.Entity('test', sha1(b)),
-                            cas.Entity('hello', sha1(b2)))
+        t1 = cas.Tree(cas.Element('test', sha1(b)),
+                            cas.Element('hello', sha1(b2)))
         t1id = yield self.cas.put(t1)
-        t2 = cas.Tree(cas.Entity('thing', sha1(b3)),
-                            cas.Entity('tree', sha1(t1)))
+        t2 = cas.Tree(cas.Element('thing', sha1(b3)),
+                            cas.Element('tree', sha1(t1)))
         t2id = yield self.cas.put(t2)
         t1_out = yield self.cas.get(t1id)
         self.failUnlessEqual(t1_out.value, t1.value)
@@ -176,11 +176,11 @@ class CAStoreTest(unittest.TestCase):
         yield self.cas.put(b2)
         yield self.cas.put(b3)
 
-        t1 = cas.Tree(cas.Entity('test', sha1(b)),
-                            cas.Entity('hello', sha1(b2)))
+        t1 = cas.Tree(cas.Element('test', sha1(b)),
+                            cas.Element('hello', sha1(b2)))
         t1id = yield self.cas.put(t1)
-        t2 = cas.Tree(cas.Entity('thing', sha1(b3)),
-                            cas.Entity('tree', sha1(t1)))
+        t2 = cas.Tree(cas.Element('thing', sha1(b3)),
+                            cas.Element('tree', sha1(t1)))
         t2id = yield self.cas.put(t2)
         c = cas.Commit(t2id, log='first commit')
         cid = yield self.cas.put(c)
@@ -195,11 +195,11 @@ class CAStoreTest(unittest.TestCase):
         yield self.cas.put(b)
         yield self.cas.put(b2)
         yield self.cas.put(b3)
-        t1 = cas.Tree(cas.Entity('test', sha1(b)),
-                            cas.Entity('hello', sha1(b2)))
+        t1 = cas.Tree(cas.Element('test', sha1(b)),
+                            cas.Element('hello', sha1(b2)))
         t1id = yield self.cas.put(t1)
-        t2 = cas.Tree(cas.Entity('thing', sha1(b3)),
-                            cas.Entity('tree', sha1(t1)))
+        t2 = cas.Tree(cas.Element('thing', sha1(b3)),
+                            cas.Element('tree', sha1(t1)))
         t2id = yield self.cas.put(t2)
         c = cas.Commit(t2id, log='first commit')
         cid = yield self.cas.put(c)
@@ -207,8 +207,8 @@ class CAStoreTest(unittest.TestCase):
         b3new = cas.Blob('I remember, now!')
         b3newid = yield self.cas.put(b3new)
 
-        t2new = cas.Tree(cas.Entity('thing', sha1(b3new)),
-                            cas.Entity('tree', sha1(t1)))
+        t2new = cas.Tree(cas.Element('thing', sha1(b3new)),
+                            cas.Element('tree', sha1(t1)))
         t2newid = yield self.cas.put(t2new)
         cnew = cas.Commit(t2newid, parents=[cid], log='know what i knew but forgot')
         cnewid = yield self.cas.put(cnew)

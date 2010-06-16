@@ -49,7 +49,7 @@ class CAStoreError(Exception):
     Exception class for CAStore
     """
 
-class Entity(tuple):
+class Element(tuple):
     """
     Represents a child element of a tree object. Not an object itself, but
     a convenience container for the format of an element of a tree.  A
@@ -262,23 +262,23 @@ class Tree(BaseObject):
     """
     type = 'tree'
 
-    entityFactory = Entity
+    elementFactory = Element
 
     def __init__(self, *children):
         """
         @param children (name, obj_hash, mode)
 
         @note XXX For organizational convenience, child objects could be
-        represented by an Entity class...a container for the object, name,
-        and mode (state bit map). The entity would be completely abstract
+        represented by an Element class...a container for the object, name,
+        and mode (state bit map). The element would be completely abstract
         (arbitrary) in the context of the CAStore, but it might be part of
         the data model in a higher-level application.
         """
         entities = []
         names = {}
         for child in children:
-            if not isinstance(child, self.entityFactory):
-                child = self.entityFactory(*child)
+            if not isinstance(child, self.elementFactory):
+                child = self.elementFactory(*child)
             entities.append(child)
             names[child[0]] = child
         self.children = entities
@@ -303,8 +303,8 @@ class Tree(BaseObject):
         head = "="*10
         strng ="""\n%s Store Type: %s %s\n""" % (head, self.type, head,)
         strng+="""= Key: "%s"\n""" % sha1hex(self.value)
-        for entity in self.children:  
-            strng+="""= name: "%s", id: "%s"\n""" % (entity[0], sha1_to_hex(entity[1]),)
+        for element in self.children:  
+            strng+="""= name: "%s", id: "%s"\n""" % (element[0], sha1_to_hex(element[1]),)
         strng+=head*2
         return strng
 
@@ -378,7 +378,7 @@ class Tree(BaseObject):
         """
         @brief A factory for creating child entities for a Tree.
         """
-        return cls.entityFactory(name, obj, mode)
+        return cls.elementFactory(name, obj, mode)
 
 
 class Commit(BaseObject):
@@ -472,9 +472,27 @@ class Commit(BaseObject):
 
 class ICAStore(Interface):
     """
-    Interface for a content addressable value store
-    @todo determine appropriate interface methods.
+    Content addressable value store.
+
+    @brief Uses an instance of a backend key/value store class -- an object
+    providing ion.data.store.IStore
     """
+
+    TYPES = Attribute("""@param TYPES Dict providing map of ICAStoreObject
+        type names to ICAStoreObject implementation class.""")
+
+    def get(id):
+        """
+        @param id of content object
+        @retval A Deferred that fires with an object that provides
+        ICAStoreObject.
+        """
+
+    def put(obj):
+        """
+        @param obj instance of object providing ICAStoreObject
+        @retval A Deferred that fires with the obj id.
+        """
 
 class StoreContextWrapper(object):
     """
@@ -528,8 +546,7 @@ class CAStore(object):
         """
         self.backend = backend
         self.namespace = namespace
-        #self.objs = StoreContextWrapper(backend, namespace + '.objs.')
-        self.objs = StoreContextWrapper(backend, '') # Flat ns for content objs
+        self.objs = StoreContextWrapper(backend, namespace + '.objs.')
 
     def decode(self, encoded_obj):
         """
