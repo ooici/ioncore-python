@@ -39,11 +39,11 @@ BMEMBER = Blob('OOI:Member')
 BCLASS = Blob('OOI:Class')
 BTYPE = Blob('OOI:Type')
 
-class Association(cas.Tree):
+class Association(objstore.Tree):
     
     type='association'
     
-    entityFactory = cas.Entity
+    entityFactory = objstore.Entity
     
     spo = { # Subject, Predicate, Object
         SUBJECT:0,
@@ -53,7 +53,10 @@ class Association(cas.Tree):
     
     
     def __init__(self, subject, predicate, object):
-        
+        """
+        @PARAM subject, predicate, object are all inherit from class BASEOBJECT
+        @NOTE The arguments to Tree are entities, associations are different!
+        """
         triple = (subject, predicate, object)
         entities = []
         names = {}
@@ -61,14 +64,8 @@ class Association(cas.Tree):
         for position in self.spo:
             item = triple[self.spo[position]]
 
-            #if isinstance(item, self.entityFactory):
-             #  pass
-             
-            if isinstance(item, cas.BaseObject):
-                child = self.entityFactory(position, item)
-            else:
-                item = cas.Blob(item)
-                child = self.entityFactory(position, item)
+            assert(isinstance(item, cas.BaseObject))
+            child = self.entityFactory(position, item)
         
             entities.append(child)
             names[position] = child
@@ -143,33 +140,30 @@ class RdfChassis(objstore.ObjectChassis):
         associations=[]
         
         for name, val in obs:
-            tblobs = [  (SUBJECT,resource_blob),
-                        (PREDICATE,BPROPERTY),
-                        (OBJECT,Blob(name))]            
-            for n, b in tblobs:
+            tblobs = (resource_blob,
+                      BPROPERTY,
+                      Blob(name))            
+            for b in tblobs:
                 yield self.objstore.put(b)
-            childs = [Entity(name, blob) for name, blob in tblobs]
-            assctn = Associations(*childs)
+            assctn = Association(*tblobs)
             assctn_id = yield self.objstore.put(assctn)
             associations.append(assctn)
-            for n, b in blobs:
+            for b in tblobs:
                 yield self.objstore.associations.sadd(sha1(b), assctn_id)
             
             
-            tblobs = [  (SUBJECT,blob(name)),
-                        (PREDICATE,BVALUE),
-                        (OBJECT,Blob(val))]
-            for n, b in tblobs:
+            tblobs = (Blob(name),
+                      BVALUE,
+                      Blob(val))
+            for b in tblobs:
                 yield self.objstore.put(b)
-            childs = [Entity(name, blob) for name, blob in tblobs]
-            assctn = Associations(*childs)
+            assctn = Association(*tblobs)
             assctn_id = yield self.objstore.put(assctn)
             associations.append(assctn)
-            for n, b in blobs:
+            for b in tblobs:
                 yield self.objstore.associations.sadd(sha1(b), assctn_id)
-
         childs = [Entity('association', assctn) for assctn in associations]
-        tree = Tree(*childs)
+        tree = Tree(*childs)        
         tree_id = yield self.objstore.put(tree)
 
         defer.returnValue(tree_id)
@@ -192,6 +186,41 @@ class RdfChassis(objstore.ObjectChassis):
         yield self.update_head(commit_id)
         defer.returnValue(commit_id)
 
+    @defer.inlineCallbacks
+    def checkout(self, head='master', commit_id=None):
+        """
+        """
+        if commit_id:
+            ref = commit_id
+        else:
+            ref = yield self.get_head(head)
+        if ref:
+            commit = yield self.objstore.get(ref)
+            tree = yield self.objstore.get(commit.tree)
+            yield tree.load(self.objstore)
+            print tree
+            for child in tree.children:
+                print type(child)
+                print child
+                if child[0]=='association':
+                    print 'HERE'
+                    yield child.load(self.objstore)
+
+                    print child
+
+
+                    if child.obj.match(BVALUE,PREDICATE):
+                        print "FOUND PREDICATE!!!!!!!"
+                        print child.obj
+
+                
+                
+            obj_class_name = yield self.meta.get('objectClass')
+            self.index = self.objectClass.decode(obj_class_name, obj_parts)()
+        else:
+            self.index = self.objectClass()
+        self.cur_commit = ref
+        defer.returnValue(self.index)
     
 class RdfStore(objstore.ObjectStore):
     """
@@ -277,14 +306,14 @@ def _test(ns):
     ind = yield obj.checkout()
     ind.name = 'Carlos S'
     ind.email = 'carlos@ooici.biz'
-    yield obj.commit()
-    ind = yield obj.checkout()
-    ind.name = 'wwww S'
-    ind.email = 'carlos@ooici.biz'
-    yield obj.commit()
-    ind = yield obj.checkout()
-    ind.name = 'Carly S'
-    ind.email = 'carlos@ooici.com'
-    yield obj.commit()
-    ind = yield obj.checkout()
+#    yield obj.commit()
+#    ind = yield obj.checkout()
+#    ind.name = 'wwww S'
+#    ind.email = 'carlos@ooici.biz'
+#    yield obj.commit()
+#    ind = yield obj.checkout()
+#    ind.name = 'Carly S'
+#    ind.email = 'carlos@ooici.com'
+#    yield obj.commit()
+#    ind = yield obj.checkout()
     ns.update(locals())
