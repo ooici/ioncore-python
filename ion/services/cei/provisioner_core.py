@@ -25,9 +25,8 @@ from ion.services.cei.provisioner_store import group_records
 from ion.services.cei import states
 
 _NIMBOSS_STATE_MAP = {
-        #TODO when broker is polled, these states will end at Started
-        NimbossNodeState.RUNNING : states.Running, 
-        NimbossNodeState.REBOOTING : states.Running, #TODO hmm
+        NimbossNodeState.RUNNING : states.Started, 
+        NimbossNodeState.REBOOTING : states.Started, #TODO hmm
         NimbossNodeState.PENDING : states.Pending,
         NimbossNodeState.TERMINATED : states.Terminated,
         NimbossNodeState.UNKNOWN : states.ErrorRetrying}
@@ -292,19 +291,37 @@ class ProvisionerCore(object):
             if state < states.Pending or state >= states.Terminated:
                 continue
             #would be nice to do this as a batch operation
-            nimboss_node = self._to_nimboss_node(node)
-            driver = self.node_drivers[node['site']]
-            yield threads.deferToThread(driver.destroy_node, nimboss_node)
-        
-            yield self.store_and_notify([node], launch['subscribers'], 
-                    states.Terminated)
-
+            yield self._terminate_node(node, launch)
+            
     @defer.inlineCallbacks
     def terminate_launches(self, launch_ids):
         """Destroy all node in a set of launches.
         """
         for launch in launch_ids:
             yield self.terminate_launch(launch)
+
+    @defer.inlineCallbacks
+    def terminate_nodes(self, node_ids):
+        """Destroy all specified nodes.
+        """
+        nodes = yield self.store.get_nodes_by_id(node_ids)
+        for node_id, node in izip(node_ids, nodes):
+            if not node:
+                #maybe an error should make it's way to controller from here?
+                logging.warn('Node %s unknown but requested for termination',
+                        node_id)
+                continue
+            launch = yield self.store.get_launch(node['launch_id'])
+            yield self._terminate_node(node, launch)
+            
+    @defer.inlineCallbacks
+    def _terminate_node(self, node, launch):
+        nimboss_node = self._to_nimboss_node(node)
+        driver = self.node_drivers[node['site']]
+        yield threads.deferToThread(driver.destroy_node, nimboss_node)
+    
+        yield self.store_and_notify([node], launch['subscribers'], 
+                states.Terminated)
 
     def _create_context(self):
         """Synchronous call to context broker to create a new context.

@@ -197,7 +197,7 @@ class ControllerCoreControl(Control):
         @exception Exception illegal input/unknown ID(s)
         @exception Exception message not sent
         """
-        raise NotImplementedError
+        self.provisioner.terminate_nodes(instance_list)
     
     def destroy_launch(self, launch_id):
         """Terminate an entire launch.
@@ -209,5 +209,5 @@ class ControllerCoreControl(Control):
         @exception Exception illegal input/unknown ID
         @exception Exception message not sent
         """
-        raise NotImplementedError
+        self.provisioner.terminate_launches([launch_id])
     

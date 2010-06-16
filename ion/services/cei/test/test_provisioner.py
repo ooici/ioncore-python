@@ -9,14 +9,11 @@
 import logging
 import uuid
 from twisted.internet import defer
-from magnet.container import Container
-from magnet.spawnable import spawn
 
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
-from ion.services.cei.provisioner import ProvisionerService, ProvisionerClient
-from ion.services.cei.provisioner_store import group_records
+from ion.services.cei.provisioner import ProvisionerClient
 
 def _new_id():
     return str(uuid.uuid4())
@@ -54,8 +51,11 @@ class ProvisionerServiceTest(IonTestCase):
         yield pu.asleep(10) #async wait
         yield client.query()
         yield pu.asleep(5) #async wait
+        yield client.terminate_nodes(nodes['worker-node'].instance_ids)
+        yield pu.asleep(5) #async wait
         yield client.query()
         yield pu.asleep(5) #async wait
+
 
 class FakeLaunchItem(object):
     def __init__(self, count, site, allocation_id, data):

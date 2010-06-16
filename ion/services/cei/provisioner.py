@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 import logging
 logging = logging.getLogger(__name__)
-from twisted.internet import defer, reactor
+from twisted.internet import defer #, reactor
 
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.core import base_process
 from ion.core.base_process import ProtocolFactory
 from ion.services.cei.provisioner_store import ProvisionerStore
 from ion.services.cei.provisioner_core import ProvisionerCore
@@ -42,13 +41,28 @@ class ProvisionerService(BaseService):
         # set up a callLater to fulfill the request after the ack. Would be
         # cleaner to have explicit ack control.
         #reactor.callLater(0, self.core.fulfill_launch, launch, nodes)
-        self.core.fulfill_launch(launch, nodes)
+        yield self.core.fulfill_launch(launch, nodes)
     
     @defer.inlineCallbacks
-    def op_terminate(self, content, headers, msg):
+    def op_terminate_nodes(self, content, headers, msg):
+        """Service operation: Terminate one or more nodes
+        """
+        logging.debug('op_terminate_nodess content:'+str(content))
+
+        #expecting one or more node IDs
+        if not isinstance(content, list):
+            content = [content]
+
+        #TODO yield self.core.mark_nodes_terminating(content)
+
+        #reactor.callLater(0, self.core.terminate_nodes, content)
+        yield self.core.terminate_nodes(content)
+
+    @defer.inlineCallbacks
+    def op_terminate_launches(self, content, headers, msg):
         """Service operation: Terminate one or more launches
         """
-        logging.debug('op_terminate content:'+str(content))
+        logging.debug('op_terminate_launches content:'+str(content))
 
         #expecting one or more launch IDs
         if not isinstance(content, list):
@@ -58,13 +72,15 @@ class ProvisionerService(BaseService):
             yield self.core.mark_launch_terminating(launch)
 
         #reactor.callLater(0, self.core.terminate_launches, content)
-        self.core.terminate_launches(content)
+        yield self.core.terminate_launches(content)
 
+    @defer.inlineCallbacks
     def op_query(self, content, headers, msg):
         """Service operation: query IaaS  and send updates to subscribers.
         """
         # immediate ACK is desired
-        reactor.callLater(0, self.core.query_nodes, content)
+        #reactor.callLater(0, self.core.query_nodes, content)
+        yield self.core.query_nodes(content)
     
         
 class ProvisionerClient(BaseServiceClient):
@@ -106,6 +122,21 @@ class ProvisionerClient(BaseServiceClient):
         logging.debug('Sending query request to provisioner')
         yield self.send('query', None)
 
+    @defer.inlineCallbacks
+    def terminate_launches(self, launches):
+        """Terminates one or more launches
+        """
+        yield self._check_init()
+        logging.debug('Sending terminate_launches request to provisioner')
+        yield self.send('terminate_launches', launches)
+
+    @defer.inlineCallbacks
+    def terminate_nodes(self, nodes):
+        """Terminates one or more nodes
+        """
+        yield self._check_init()
+        logging.debug('Sending terminate_nodes request to provisioner')
+        yield self.send('terminate_nodes', nodes)
 
 class ProvisionerNotifier(object):
     """Abstraction for sending node updates to subscribers.
