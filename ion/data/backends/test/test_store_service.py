@@ -1,37 +1,35 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/test/test_hello.py
-@test ion.play.hello_service Example unit tests for sample code.
-@author Michael Meisinger
+@file ion/data/backends/test/test_store_service.py
+@test ion.data.backends.store_service test cases
+@author David Stuebe
 """
 
 from twisted.internet import defer
 
-from ion.play.hello_service import HelloServiceClient
+from ion.data.backends.store_service import StoreServiceClient
+from ion.data.test import test_store
 from ion.test.iontest import IonTestCase
 
-class HelloTest(IonTestCase):
+class StoreServiceTest(IonTestCase, test_store.IStoreTest):
     """
     Testing example hello service.
     """
 
     @defer.inlineCallbacks
-    def setUp(self):
+    def _setup_backend(self):
         yield self._start_container()
+        services = [
+            {'name':'store1','module':'ion.data.backends.store_service','class':'StoreService'},
+        ]
+
+        sup = yield self._spawn_processes(services)
+        ds = yield StoreServiceClient.create_store(proc=sup)
+        
+        defer.returnValue(ds)
+        
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self._stop_container()
-
-    @defer.inlineCallbacks
-    def test_hello(self):
-
-        services = [
-            {'name':'hello1','module':'ion.data.backends.store_service','class':'HelloService'},
-        ]
-
-        sup = yield self._spawn_processes(services)
-
-        hc = HelloServiceClient(proc=sup)
-        yield hc.hello("Hi there, hello1")
