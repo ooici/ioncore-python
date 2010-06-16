@@ -47,17 +47,18 @@ class AssociationBaseTest(unittest.TestCase):
     def test_put_get(self):
         s = yield store.Store.create_store()
         castore = cas.CAStore(s)
-        print self.association
+        logging.info(str(self.association))
+
         castore.TYPES[rdfstore.Association.type]=rdfstore.Association
         
         a_id = yield castore.put(self.association)
         
-        print "Returned ID:", a_id
-        
         assoc = yield castore.get(a_id)
         
-        print assoc
-
+        logging.info(str(assoc))
+        
+        self.assertEqual(self.association.value,assoc.value)
+        
 
 
         

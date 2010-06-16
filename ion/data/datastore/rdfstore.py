@@ -45,11 +45,11 @@ class Association(objstore.Tree):
     
     entityFactory = objstore.Entity
     
-    spo = { # Subject, Predicate, Object
-        SUBJECT:0,
-        PREDICATE:1,
-        OBJECT:2
-    }
+    spo = ( # Subject, Predicate, Object
+        SUBJECT,
+        PREDICATE,
+        OBJECT
+        )
     
     
     def __init__(self, subject, predicate, object):
@@ -62,8 +62,9 @@ class Association(objstore.Tree):
         entities = []
         names = {}
         
-        for position in self.spo:
-            item = triple[self.spo[position]]
+        for ind in range(3):
+            item = triple[ind]
+            position = self.spo[ind]
 
             if isinstance(item, cas.BaseObject):
                 child = self.entityFactory(position, item)
@@ -87,7 +88,7 @@ class Association(objstore.Tree):
         assert isinstance(other, cas.BaseObject)
         
         if not position:
-            position = self.spo.keys()
+            position = self.spo
         
         if not getattr(position, '__iter__', False):
             position = (position,)
