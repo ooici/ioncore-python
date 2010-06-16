@@ -209,21 +209,35 @@ class RdfChassis(objstore.ObjectChassis):
             commit = yield self.objstore.get(ref)
             tree = yield self.objstore.get(commit.tree)
             yield tree.load(self.objstore)
-            print tree
+            #print tree
+            obj_parts=[]
             for child in tree.children:
-                print child
+                #print child
                 # Later add other stuff to the root tree of the commit
                 if child[0]=='association':
-                    print child.obj
-                    print BVALUE
-                    print child.obj.children[0].obj
+                    #print child.obj
+                    #print BVALUE
+                    #print child.obj.children[0].obj
                     
-                    if child.obj.match(BVALUE,PREDICATE):
-                        print "FOUND PREDICATE!!!!!!!"
-                        print child.obj
+                    association = child.obj
+                    
+                    if association.match(BVALUE,PREDICATE):
+                        #print "FOUND PREDICATE!!!!!!!"
+                        subject = association._names[SUBJECT].obj
+                        object = association._names[OBJECT].obj
+                        
+                        #print subject
+                        #print object
+                        
+                        obj_parts.append((subject.content,object.content))
 
+
+                        #for ent in child.obj.children:
+                        #    blob = ent.obj
+                        #    
+                        #    print blob
                 
-                
+            #print obj_parts
             obj_class_name = yield self.meta.get('objectClass')
             self.index = self.objectClass.decode(obj_class_name, obj_parts)()
         else:

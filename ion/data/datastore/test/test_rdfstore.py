@@ -90,7 +90,8 @@ class RdfStoreTest(unittest.TestCase):
         id_res.name = 'Carlos S'
         id_res.email = 'carlos@ooici.biz'
         rdfchassis.commit()
-        id_res = yield rdfchassis.checkout()
+        new_res = yield rdfchassis.checkout()
+        self.assertEqual(id_res,new_res)
       
         
         
