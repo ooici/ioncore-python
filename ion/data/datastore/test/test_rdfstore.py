@@ -43,37 +43,53 @@ class AssociationBaseTest(unittest.TestCase):
         self.assertNot(self.association.match(self.subject,position=rdfstore.PREDICATE))      
         self.assertRaises(KeyError,self.association.match,self.subject,position='blahblahblah')
 
-
-        
-class RdfStoreTest(unittest.TestCase):
-    """
-    """
     @defer.inlineCallbacks
-    def setUp(self):
+    def test_put_get(self):
         s = yield store.Store.create_store()
-        ss = yield set_store.SetStore.create_store()
-        self.mystore = yield rdfstore.RdfStore.new(s, ss, 'test_partition')
+        castore = cas.CAStore(s)
+        print self.association
+        castore.TYPES[rdfstore.Association.type]=rdfstore.Association
         
-    @defer.inlineCallbacks
-    def test_create_object(self):
-        rdfchassis = yield self.mystore.create('thing', resource.IdentityResource)
-        self.assert_(isinstance(rdfchassis, rdfstore.RdfChassis))
+        a_id = yield castore.put(self.association)
+        
+        print "Returned ID:", a_id
+        
+        assoc = yield castore.get(a_id)
+        
+        print assoc
 
-        id_res = yield rdfchassis.checkout()
-        self.assert_(isinstance(id_res, resource.IdentityResource))
-        id_res.name = 'Carlos S'
-        id_res.email = 'carlos@ooici.biz'
+
+
         
-        rdfchassis.commit()
-        
-    @defer.inlineCallbacks
-    def test_checkout_object(self):
-        rdfchassis = yield self.mystore.create('thing', resource.IdentityResource)
-        id_res = yield rdfchassis.checkout()
-        id_res.name = 'Carlos S'
-        id_res.email = 'carlos@ooici.biz'
-        rdfchassis.commit()
-        id_res = yield rdfchassis.checkout()
+#class RdfStoreTest(unittest.TestCase):
+#    """
+#    """
+#    @defer.inlineCallbacks
+#    def setUp(self):
+#        s = yield store.Store.create_store()
+#        ss = yield set_store.SetStore.create_store()
+#        self.mystore = yield rdfstore.RdfStore.new(s, ss, 'test_partition')
+#        
+#    @defer.inlineCallbacks
+#    def test_create_object(self):
+#        rdfchassis = yield self.mystore.create('thing', resource.IdentityResource)
+#        self.assert_(isinstance(rdfchassis, rdfstore.RdfChassis))
+#
+#        id_res = yield rdfchassis.checkout()
+#        self.assert_(isinstance(id_res, resource.IdentityResource))
+#        id_res.name = 'Carlos S'
+#        id_res.email = 'carlos@ooici.biz'
+#        
+#        rdfchassis.commit()
+#        
+#    @defer.inlineCallbacks
+#    def test_checkout_object(self):
+#        rdfchassis = yield self.mystore.create('thing', resource.IdentityResource)
+#        id_res = yield rdfchassis.checkout()
+#        id_res.name = 'Carlos S'
+#        id_res.email = 'carlos@ooici.biz'
+#        rdfchassis.commit()
+#        id_res = yield rdfchassis.checkout()
       
         
         

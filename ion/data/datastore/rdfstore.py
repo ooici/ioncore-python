@@ -56,6 +56,7 @@ class Association(objstore.Tree):
         """
         @PARAM subject, predicate, object are all inherit from class BASEOBJECT
         @NOTE The arguments to Tree are entities, associations are different!
+        @NOTE - Damn - can't have only BASEOBJECTS withour rewiring all of CAS stuff
         """
         triple = (subject, predicate, object)
         entities = []
@@ -64,13 +65,22 @@ class Association(objstore.Tree):
         for position in self.spo:
             item = triple[self.spo[position]]
 
-            assert(isinstance(item, cas.BaseObject))
-            child = self.entityFactory(position, item)
-        
+            if isinstance(item, cas.BaseObject):
+                child = self.entityFactory(position, item)
+                
+            elif isinstance(item, self.entityFactory):
+                child = item
+                
+            else:
+                # WHAT?
+                print item
+                raise RuntimeError('Illegal argument in Association()')
+                        
             entities.append(child)
             names[position] = child
         self.children = entities
         self._names = names
+                
         
     def match(self, other, position=None):
         
@@ -200,15 +210,13 @@ class RdfChassis(objstore.ObjectChassis):
             yield tree.load(self.objstore)
             print tree
             for child in tree.children:
-                print type(child)
                 print child
+                # Later add other stuff to the root tree of the commit
                 if child[0]=='association':
-                    print 'HERE'
-                    yield child.load(self.objstore)
-
-                    print child
-
-
+                    print child.obj
+                    print BVALUE
+                    print child.obj.children[0].obj
+                    
                     if child.obj.match(BVALUE,PREDICATE):
                         print "FOUND PREDICATE!!!!!!!"
                         print child.obj
