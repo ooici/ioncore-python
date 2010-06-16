@@ -130,9 +130,11 @@ class IdentityRegistryService(BaseService):
     
     @defer.inlineCallbacks     
     def slc_init(self):
+        """
+        """
         # initialize data store
-        self.rdfs=RdfStore()
-        yield self.rdfs.init()
+        #self.rdfs=RdfStore()
+        #yield self.rdfs.init()
         
     def __init__(self, receiver, spawnArgs=None):
         # Service class initializer. Basic config, but no yields allowed.
