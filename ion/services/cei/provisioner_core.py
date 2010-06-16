@@ -35,9 +35,10 @@ class ProvisionerCore(object):
     """Provisioner functionality that is not specific to the service.
     """
 
-    def __init__(self, store, notifier):
+    def __init__(self, store, notifier, dtrs):
         self.store = store
         self.notifier = notifier
+        self.dtrs = dtrs
 
         #TODO how about a config file
         nimbus_key = os.environ['NIMBUS_KEY']
@@ -78,11 +79,7 @@ class ProvisionerCore(object):
             #TODO error handling, what?
             yield defer.fail()
 
-        #TODO how to do this lookup once for the service?
-        dtrs_id = yield base_process.procRegistry.get("dtrs")
-        dtrs = DeployableTypeRegistryClient(pid=dtrs_id)
-
-        dt = yield dtrs.lookup(deployable_type, nodes)
+        dt = yield self.dtrs.lookup(deployable_type, nodes)
 
         doc = dt['document']
         node_groups = dt['nodes']

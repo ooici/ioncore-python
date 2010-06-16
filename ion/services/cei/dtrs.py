@@ -74,6 +74,7 @@ class DeployableTypeRegistryClient(BaseServiceClient):
         """Lookup a deployable type
         """
         yield self._check_init()
+        logging.debug("Sending DTRS lookup request")
         (content, headers, msg) = yield self.rpc_send('lookup', {
             'deployable_type' : dt,
             'nodes' : nodes
