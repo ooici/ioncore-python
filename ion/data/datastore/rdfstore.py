@@ -16,6 +16,12 @@ from twisted.python import reflect
 from ion.data.datastore import cas
 from ion.data import dataobject 
 
+sha1 = cas.sha1
+
+SUBJECT='subject'
+OBJECT='object'
+PREDICATE='predicate'
+
 class Association(cas.Tree):
     
     type='association'
@@ -23,9 +29,9 @@ class Association(cas.Tree):
     entityFactory = cas.Entity
     
     spo = { # Subject, Predicate, Object
-        'subject':0,
-        'predicate':1,
-        'object':2
+        SUBJECT:0,
+        PREDICATE:1,
+        OBJECT:2
     }
     
     
@@ -35,19 +41,37 @@ class Association(cas.Tree):
         entities = []
         names = {}
         
-        for item in self.spo:
-            member = triple[self.spo[item]]
+        for position in self.spo:
+            item = triple[self.spo[position]]
 
-            #if isinstance(member, self.entityFactory):
+            #if isinstance(item, self.entityFactory):
              #  pass
              
-            if isinstance(member, cas.BaseObject):
-                child = self.entityFactory(item, member)
+            if isinstance(item, cas.BaseObject):
+                child = self.entityFactory(position, item)
             else:
-                member = cas.Blob(member)
-                child = self.entityFactory(item, member)
+                item = cas.Blob(item)
+                child = self.entityFactory(position, item)
         
             entities.append(child)
             names[child.name] = child
         self.children = entities
         self._names = names
+        
+    def match(self, other, position=None):
+        
+        assert isinstance(other, cas.BaseObject)
+        
+        if not position:
+            position = self.spo.keys()
+        
+        if not getattr(position, '__iter__', False):
+            position = (position,)
+            
+        for pos in position:
+            
+            if self._names[pos][1] == sha1(other.value):
+                return True
+            
+        return False
+                

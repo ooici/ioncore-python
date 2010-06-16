@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/data/datastore/test/test_techInterface.py
+@file ion/data/backends/test/test_setdatastore.py
 @author Paul Hubbard
 @author Matt Rodriguez
 @author David Stuebe
@@ -13,7 +13,7 @@ from twisted.trial import unittest
 import logging
 logging = logging.getLogger(__name__)
 from uuid import uuid4
-from ion.data.datastore.setdatastore import SetCassandraStore
+from ion.data.backends.setdatastore import SetCassandraStore
 
 
 class SetDataStoreInterfaceTest(unittest.TestCase):

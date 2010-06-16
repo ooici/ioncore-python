@@ -31,7 +31,7 @@ class Instrument(protocol.Protocol):
     prompt = 'S>'
     mode = 'auto'
     pumpInfo = 'SBE 49 FastCAT V 1.3a SERIAL NO. 0055'
-    sampleData = 'This is sample data: not sure what to put here yet.\n'
+    sampleData = '21.9028,  1.00012,    1.139,   1.0103\n'
     commands = {
         'ds' : pumpInfo + '\n' + 
           'number of scans to average = 1\n' +

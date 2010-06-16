@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/tinyproxy.py
-@package ion.services.dm.proxy Build proxy on raw sockets
+@file ion/services/sa/tinyproxy.py
+@package ion.services.sa.proxy Build proxy on raw sockets
 @author SUZUKI Hisao
 @date 5/28/10
 @see http://www.okisoft.co.jp/esc/python/proxy/
@@ -28,7 +28,7 @@ import BaseHTTPServer, socket, SocketServer, urlparse
 
 import logging
 logging = logging.getLogger(__name__)
-from ion.services.dm.coordinator import CoordinatorClient
+from ion.services.dm.preservation.coordinator import CoordinatorClient
 from twisted.internet import defer
 
 class ProxyHandler (BaseHTTPServer.BaseHTTPRequestHandler):

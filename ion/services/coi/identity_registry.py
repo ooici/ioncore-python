@@ -7,13 +7,16 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
+
+from ion.play.rdf_store.rdf_store import RdfStore
+from ion.play.rdf_store.rdf_base import RdfBlob, RdfAssociation, RdfEntity, RdfMixin, RdfState, WorkSpace, RdfDefs
+
 
 
 class IdentityRegistryServiceClient(BaseServiceClient):
@@ -54,31 +57,39 @@ class IdentityRegistryServiceClient(BaseServiceClient):
         logging.info('### Service reply: '+str(content))
         defer.returnValue(content)    
 
+
+
+
     @defer.inlineCallbacks   
-    def authenticate(self, text='Testing'):
+    def authenticate(self, parms):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('authenticate', text)
+        (content, headers, msg) = yield self.rpc_send('authenticate', parms)
         logging.info('### Service reply: '+str(content))
         defer.returnValue(content)   
+
+
+
+
 
     @defer.inlineCallbacks   
     def generate_ooi_id(self, text='Testing'):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('generate_ooi_id', text)
-        logging.info('### Service reply: '+str(content))
+        logging.info('### Service reply: ' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def revoke_ooi_id(self, text='Testing'):
+    def revoke_ooi_id(self, parms):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('revoke_ooi_id', text)
-        logging.info('### Service reply: '+str(content))
+
+        (content, headers, msg) = yield self.rpc_send('revoke_ooi_id', parms)
+        logging.info('### Service reply: ' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def store_registration(self, text='Testing'):
+    def store_registration(self, parms):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('store_registration', text)
+        (content, headers, msg) = yield self.rpc_send('store_registration', parms)
         logging.info('### Service reply: '+str(content))
         defer.returnValue(content)        
         
@@ -117,7 +128,12 @@ class IdentityRegistryService(BaseService):
     # Declaration of service
     declare = BaseService.service_declare(name='register_user', version='0.1.0', dependencies=[])
     
-    
+    @defer.inlineCallbacks     
+    def slc_init(self):
+        # initialize data store
+        self.rdfs=RdfStore()
+        yield self.rdfs.init()
+        
     def __init__(self, receiver, spawnArgs=None):
         # Service class initializer. Basic config, but no yields allowed.
         BaseService.__init__(self, receiver, spawnArgs)
@@ -128,7 +144,7 @@ class IdentityRegistryService(BaseService):
         """Service operation: .
         """
         # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_register_user ******RETURNING: '+str(content)}, {})
+        yield self.reply_ok(msg, {'value':'op_define_identity ******RETURNING: '+str(content)}, {})
         
     @defer.inlineCallbacks
     def op_register_user(self, content, headers, msg):
@@ -145,63 +161,96 @@ class IdentityRegistryService(BaseService):
         yield self.reply_ok(msg, {'value':'op_define_user_profile ******RETURNING: '+str(content)}, {})
         
     @defer.inlineCallbacks         
-    def op_authenticate(self, content, headers, msg):
-        """Service operation: .
+    def op_authenticate(self, parms, headers, msg):
+        """ Service operation: need to take values from parms and verify they exist in the data store.
         """
-        # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_register_user ******RETURNING: '+str(content)}, {})
+        
+        
+        yield self.reply_ok(msg, {'authenticated': True}, {})
+
 
     """
     Begin experimental methods RU
     """
     @defer.inlineCallbacks 
     def op_generate_ooi_id(self, content, headers, msg):
-        """RU Service operation: .
+        """ Service operation: this should generate a unique id when called.  Depending on if its user viewable or not
+            will determine if it needs to be based on their user name.  At this point i am not decided on how it should
+            be generated.
         """
+        
+        
+        
+        
         # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_register_user ******RETURNING: '+str(content)}, {})
+        yield self.reply_ok(msg, {'ooi_id': 1231231123}, {})
 
     @defer.inlineCallbacks 
-    def op_revoke_ooi_id(self, content, headers, msg):
-        """RU Service operation: .
+    def op_revoke_ooi_id(self, parms, headers, msg):
+        """RU Service operation: sormat for inputs.
+           parms = {'ooi_id':'username'}
+           
+           need to search the data store for the ooi_id and if present, flag it as revoked. then return true. return false on falure to find it?
+        
         """
+
+        
         # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_register_user ******RETURNING: '+str(content)}, {})
+        yield self.reply_ok(msg, {'revoked': True}, {})
+    
+    
+    
+    
     
     @defer.inlineCallbacks 
-    def op_store_registration(self, content, headers, msg):
-        """SRU ervice operation: .
+    def op_store_registration(self, parms, headers, msg):
+        """store retistration service operation:
+            parms = {'common_name': 'Roger Unwin A136',
+                 'organization': 'ProtectNetwork',
+                 'Domain Component': 'cilogon org',
+                 'Country': 'US',
+                 'Certificate': 'dummy certificate',
+                 'RSA Private Key': 'dummy rsa private key'}
+                 
+                 
+            the params should be stored, but it seems that mechanism is not completely done yet. so defer.
         """
-        # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_register_user ******RETURNING: '+str(content)}, {})
+    
+    
+
+
+
+
+
+
 
     @defer.inlineCallbacks 
     def op_store_registration_info(self, content, headers, msg):
         """RU Service operation: .
         """
         # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_register_user ******RETURNING: '+str(content)}, {})
+        yield self.reply_ok(msg, {'value':'op_store_registration_info ******RETURNING: '+str(content)}, {})
 
     @defer.inlineCallbacks 
     def op_get_registration_info(self, content, headers, msg):
         """RU Service operation: .
         """
         # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_register_user ******RETURNING: '+str(content)}, {})
+        yield self.reply_ok(msg, {'value':'op_get_registration_info ******RETURNING: '+str(content)}, {})
 
     @defer.inlineCallbacks 
     def op_update_registration_info(self, content, headers, msg):
         """RU Service operation: .
         """
         # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_register_user ******RETURNING: '+str(content)}, {})
+        yield self.reply_ok(msg, {'value':'op_update_registration_info ******RETURNING: '+str(content)}, {})
         
     @defer.inlineCallbacks 
     def op_revoke_registration(self, content, headers, msg):
         """RU Service operation: .
         """
         # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_register_user ******RETURNING: '+str(content)}, {})
+        yield self.reply_ok(msg, {'value':'op_revoke_registration ******RETURNING: '+str(content)}, {})
         
         
         

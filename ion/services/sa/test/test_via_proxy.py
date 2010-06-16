@@ -1,36 +1,35 @@
 #!/usr/bin/env python
 """
-@file ion/services/dm/test/test_via_proxy.py
+@file ion/services/sa/test/test_via_proxy.py
 @author Paul Hubbard
 @date 5/25/10
-@test ion.services.dm.proxy Test of refactored proxy+fetcher+controller
+@test ion.services.sa.proxy Test of refactored proxy+fetcher+controller
 @note Complete lack of DX code, just stock python calls!
 @see http://bytes.com/topic/python/answers/22918-proxy-authentication-using-urllib2
 @brief Designed to be an integration test, exercises DX via users' http proxy. Does
 not use OOI messaging.
 """
 
-import logging
-logging = logging.getLogger(__name__)
 import urllib2
 
 from twisted.internet import defer
-
 from ion.test.iontest import IonTestCase
-
 from twisted.trial import unittest
+
+import logging
+logging = logging.getLogger(__name__)
 
 class IntegrationTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         services = [{'name':'fetcher',
-                     'module':'ion.services.dm.fetcher',
+                     'module':'ion.services.sa.fetcher',
                      'class': 'FetcherService'},
                     {'name': 'coordinator',
-                     'module': 'ion.services.dm.coordinator',
+                     'module': 'ion.services.dm.preservation.coordinator',
                      'class' : 'CoordinatorService'},
                     {'name':'proxy',
-                     'module': 'ion.services.dm.proxy',
+                     'module': 'ion.services.sa.proxy',
                      'class': 'ProxyService'},]
         yield self._start_container()
         yield self._spawn_processes(services)
