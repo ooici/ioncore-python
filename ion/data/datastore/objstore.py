@@ -50,7 +50,6 @@ class IObjectChassis(interface.Interface):
         """
         """
 
-
 class IObjectStore(cas.ICAStore):
     """
     A CAStore for data objects.
@@ -351,8 +350,7 @@ class ObjectChassis(BaseObjectChassis):
             tree = yield self.objstore.get(commit.tree)
             yield tree.load(self.objstore)
             obj_parts = [(child[0], child.obj.content) for child in tree.children]
-            obj_class_name = yield self.meta.get('objectClass')
-            self.index = self.objectClass.decode(obj_class_name, obj_parts)()
+            self.index = self.objectClass.decode(self.objectClass.__name__, obj_parts)()
         else:
             self.index = self.objectClass()
         self.cur_commit = ref
@@ -495,6 +493,7 @@ class BaseObjectStore(cas.CAStore):
 
         d.addCallback(_succeed)
         d.addErrback(lambda r: _fail(r))
+        return d
 
     @defer.inlineCallbacks
     def _init_store_metadata(self):
@@ -544,7 +543,7 @@ class ObjectStore(BaseObjectStore):
             raise ObjectStoreError('Error creating %s object %s' % (objectClass.__name__, name,))
 
     @defer.inlineCallbacks
-    def _object_class(self, objectClass):
+    def _dump_object_class(self, objectClass):
         """
 
         """
@@ -557,14 +556,27 @@ class ObjectStore(BaseObjectStore):
         tree_id = yield self.put(tree)
         defer.returnValue(tree)
 
+    def _load_object_class(self, obj):
+        """
+        XXX Here StoreClass is assumed as the base class
+        """
+        objectClassName = obj['class'].content
+        obj_parts = [(child[0], child.obj.content) for child in obj['attrs'].children]
+        objectClass = StoreClass.decode(objectClassName, obj_parts)
+        return objectClass
+
     @defer.inlineCallbacks
     def _create_object(self, name, objectClass):
+        """
+        The structure of the data object needs to be stored as
+        castore/objstore objects some how...
+        """
         uuid_obj = UUID(name)
         id = yield self.put(uuid_obj)
         obj_class = reflect.fullyQualifiedName(objectClass)
         obj_class_obj = Blob(obj_class)
         yield self.put(obj_class_obj)
-        attrs = yield self._object_class(objectClass)
+        attrs = yield self._dump_object_class(objectClass)
         obj_tree = ObjectStoreObject(('name', uuid_obj), 
                                     ('class', obj_class_obj),
                                     ('attrs', attrs))
@@ -583,7 +595,7 @@ class ObjectStore(BaseObjectStore):
         id = yield self.objs.get(name)
         obj_obj = yield self.get(id)
         yield obj_obj.load(self)
-        objectClass = obj_obj['class'].content
+        objectClass = self._load_object_class(obj_obj)
         keyspace = cas.StoreContextWrapper(self.backend, self.partition + '.' + id + ':')
         obj = ObjectChassis(self, keyspace, objectClass)
         defer.returnValue(obj)
@@ -596,8 +608,8 @@ class ObjectStore(BaseObjectStore):
         @retval A Deferred
         """
         try:
-            obj = yield self.get(cas.sha1(name))
-            exists = True
+            obj = yield self.objs.get(name)
+            exists = bool(obj)
         except cas.CAStoreError:
             exists = False
         defer.returnValue(exists)
@@ -626,16 +638,22 @@ class Identity(StoreClass):
 
 @defer.inlineCallbacks
 def _test(ns):
+    """
+    Creating a namespace on the amoeba cassandra instillation can only
+    happen once. (And it worked, first try ;-)
+    """
     from ion.data import store
+    #from ion.data.backends import cassandra
     s = yield store.Store.create_store()
+    #s = yield cassandra.CassandraStore.create_store(cass_host_list=['amoeba.ucsd.edu:9160'])
+    ns.update(locals())
     obs = yield ObjectStore.new(s, 'test_partition')
     obj = yield obs.create('thing', Identity)
-    ns.update(locals())
-    """
     ind = yield obj.checkout()
     ind.name = 'Carlos S'
     ind.email = 'carlos@ooici.biz'
     yield obj.commit()
+    ns.update(locals())
     ind = yield obj.checkout()
     ind.name = 'wwww S'
     ind.email = 'carlos@ooici.biz'
@@ -645,4 +663,16 @@ def _test(ns):
     ind.email = 'carlos@ooici.com'
     yield obj.commit()
     ind = yield obj.checkout()
-    """
+    obj2 = yield obs.clone('thing')
+    ind2 = yield obj2.checkout()
+    ns.update(locals())
+
+@defer.inlineCallbacks
+def _test2(ns):
+    from ion.data.backends import cassandra
+    s = yield cassandra.CassandraStore.create_store(cass_host_list=['amoeba.ucsd.edu:9160'])
+    obs = yield ObjectStore.load(s, 'test_partition')
+    ns.update(locals())
+    obj = yield obs.clone('thing')
+    ns.update(locals())
+
