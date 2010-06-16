@@ -7,6 +7,7 @@ from magnet.spawnable import Receiver
 from ion.services.base_service import BaseService
 from ion.core.base_process import ProtocolFactory
 from ion.core import bootstrap
+import ion.util.procutils as pu
 from ion.services.cei.epucontroller import ControllerCore
 from ion.services.cei.provisioner import ProvisionerClient
 
@@ -31,6 +32,9 @@ class EPUControllerService(BaseService):
         self.provisioner_client = ProvisionerClient(self)
         self.core = ControllerCore(self.provisioner_client, engineclass)
         
+        #TODO trying to flush out a boot order issue
+        yield pu.asleep(10)
+
         self.core.begin_controlling()
 
         #TODO right now the controller regularly polls the provisioner for
