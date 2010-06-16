@@ -30,6 +30,15 @@ SUBJECT='subject'
 OBJECT='object'
 PREDICATE='predicate'
 
+
+    
+BPROPERTY = Blob('OOI:Property')
+BVALUE = Blob('OOI:Value')
+BINSTANCEOF = Blob('OOI:InstanceOf')
+BMEMBER = Blob('OOI:Member')
+BCLASS = Blob('OOI:Class')
+BTYPE = Blob('OOI:Type')
+
 class Association(cas.Tree):
     
     type='association'
@@ -127,18 +136,42 @@ class RdfChassis(objstore.ObjectChassis):
         Add refs to blobs in the association set
         """
         obs = self.index.encode()
-        blobs = [(name, Blob(val)) for name, val in obs]
-        for n, b in blobs:
-            yield self.objstore.put(b)
+        blobs=[]
+        resource_blob = Blob(self.index.__class__.__name__)
+        blobs.append(resource_blob)
+        
+        associations=[]
+        
+        for name, val in obs:
+            tblobs = [  (SUBJECT,resource_blob),
+                        (PREDICATE,BPROPERTY),
+                        (OBJECT,Blob(name))]            
+            for n, b in tblobs:
+                yield self.objstore.put(b)
+            childs = [Entity(name, blob) for name, blob in tblobs]
+            assctn = Associations(*childs)
+            assctn_id = yield self.objstore.put(assctn)
+            associations.append(assctn)
+            for n, b in blobs:
+                yield self.objstore.associations.sadd(sha1(b), assctn_id)
+            
+            
+            tblobs = [  (SUBJECT,blob(name)),
+                        (PREDICATE,BVALUE),
+                        (OBJECT,Blob(val))]
+            for n, b in tblobs:
+                yield self.objstore.put(b)
+            childs = [Entity(name, blob) for name, blob in tblobs]
+            assctn = Associations(*childs)
+            assctn_id = yield self.objstore.put(assctn)
+            associations.append(assctn)
+            for n, b in blobs:
+                yield self.objstore.associations.sadd(sha1(b), assctn_id)
 
-        childs = [Entity(name, blob) for name, blob in blobs]
+        childs = [Entity('association', assctn) for assctn in associations]
         tree = Tree(*childs)
         tree_id = yield self.objstore.put(tree)
-        
-        # Add references to the blobs in the association table
-        for n, b in blobs:
-            yield self.objstore.associations.sadd(sha1(b), tree_id)
-        
+
         defer.returnValue(tree_id)
 
     @defer.inlineCallbacks
@@ -244,14 +277,14 @@ def _test(ns):
     ind = yield obj.checkout()
     ind.name = 'Carlos S'
     ind.email = 'carlos@ooici.biz'
-#    yield obj.commit()
-#    ind = yield obj.checkout()
-#    ind.name = 'wwww S'
-#    ind.email = 'carlos@ooici.biz'
-#    yield obj.commit()
-#    ind = yield obj.checkout()
-#    ind.name = 'Carly S'
-#    ind.email = 'carlos@ooici.com'
-#    yield obj.commit()
-#    ind = yield obj.checkout()
+    yield obj.commit()
+    ind = yield obj.checkout()
+    ind.name = 'wwww S'
+    ind.email = 'carlos@ooici.biz'
+    yield obj.commit()
+    ind = yield obj.checkout()
+    ind.name = 'Carly S'
+    ind.email = 'carlos@ooici.com'
+    yield obj.commit()
+    ind = yield obj.checkout()
     ns.update(locals())
