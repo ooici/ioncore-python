@@ -128,13 +128,13 @@ class IdentityRegistryService(BaseService):
     # Declaration of service
     declare = BaseService.service_declare(name='register_user', version='0.1.0', dependencies=[])
     
-    @defer.inlineCallbacks     
-    def slc_init(self):
-        """
-        """
-        # initialize data store
-        #self.rdfs=RdfStore()
-        #yield self.rdfs.init()
+    #@defer.inlineCallbacks     
+    #def slc_init(self):
+    #    """
+    #    """
+    #    # initialize data store
+    #    #self.rdfs=RdfStore()
+    #    #yield self.rdfs.init()
         
     def __init__(self, receiver, spawnArgs=None):
         # Service class initializer. Basic config, but no yields allowed.
@@ -217,8 +217,7 @@ class IdentityRegistryService(BaseService):
                  
             the params should be stored, but it seems that mechanism is not completely done yet. so defer.
         """
-    
-    
+        yield self.reply_ok(msg, {'value':'op_get_registration_info ******RETURNING: '+str(parms)}, {})
 
 
 
