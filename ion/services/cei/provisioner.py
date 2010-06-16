@@ -7,6 +7,7 @@ from ion.services.base_service import BaseService, BaseServiceClient
 from ion.core.base_process import ProtocolFactory
 from ion.services.cei.provisioner_store import ProvisionerStore
 from ion.services.cei.provisioner_core import ProvisionerCore
+from ion.services.cei.dtrs import DeployableTypeRegistryClient
 from ion.services.cei import states
 
 class ProvisionerService(BaseService):
@@ -18,8 +19,10 @@ class ProvisionerService(BaseService):
 
     def slc_init(self):
         self.store = ProvisionerStore()
-        self.notifier = ProvisionerNotifier(self)
-        self.core = ProvisionerCore(self.store, self.notifier)
+        notifier = self.spawn_args.get('notifier')
+        self.notifier = notifier or ProvisionerNotifier(self)
+        self.dtrs = DeployableTypeRegistryClient(self)
+        self.core = ProvisionerCore(self.store, self.notifier, self.dtrs)
     
     @defer.inlineCallbacks
     def op_provision(self, content, headers, msg):
