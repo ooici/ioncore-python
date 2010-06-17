@@ -43,9 +43,11 @@ class StoreService(BaseService):
 
         # Provide rest of the spawnArgs to init the store
         self.store = yield self.backend.create_store(**backendargs)
-        logging.info("StoreService initialized")
-        logging.info("StoreService backend:"+str(backendcls))
-        logging.info("StoreService backend args:"+str(backendargs))
+        
+        name = self.__class__.__name__
+        logging.info(name + " initialized")
+        logging.info(name + " backend:"+str(backendcls))
+        logging.info(name + " backend args:"+str(backendargs))
 
     @defer.inlineCallbacks
     def op_put(self, content, headers, msg):
