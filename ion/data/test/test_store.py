@@ -18,6 +18,9 @@ from twisted.internet import defer
 from ion.data.backends import cassandra
 from ion.data.store import Store
 
+from ion.data.backends.store_service import StoreServiceClient
+from ion.test.iontest import IonTestCase
+
 
 class IStoreTest(unittest.TestCase):
 
@@ -85,4 +88,47 @@ class CassandraStoreTest(IStoreTest):
         clist = ['amoeba.ucsd.edu:9160']
         d = cassandra.CassandraStore.create_store(cass_host_list=clist)
         return d
+
+class CassandraStoreTest(IStoreTest):
+
+    def _setup_backend(self):
+        clist = ['amoeba.ucsd.edu:9160']
+        ds = cassandra.CassandraStore.create_store(
+            cass_host_list=clist,
+            namespace='n')
+        return ds
+        
+class CassandraSuperStoreTest(IStoreTest):
+
+    def _setup_backend(self):
+        clist = ['amoeba.ucsd.edu:9160']
+        ds = cassandra.CassandraStore.create_store(
+            cass_host_list=clist,
+            keyspace='DatastoreTest',
+            colfamily='DS1',
+            cf_super=True,
+            namespace='n')
+        return ds
+
+class StoreServiceTest(IonTestCase, IStoreTest):
+    """
+    Testing example hello service.
+    """
+
+    @defer.inlineCallbacks
+    def _setup_backend(self):
+        yield self._start_container()
+        services = [
+            {'name':'store1','module':'ion.data.backends.store_service','class':'StoreService'},
+        ]
+
+        sup = yield self._spawn_processes(services)
+        ds = yield StoreServiceClient.create_store(proc=sup)
+        
+        defer.returnValue(ds)
+        
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
 
