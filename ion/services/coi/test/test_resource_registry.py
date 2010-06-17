@@ -3,6 +3,7 @@
 """
 @file ion/services/coi/test/test_resource_registry.py
 @author Michael Meisinger
+@author David Stuebe
 @brief test service for registering resources and client classes
 """
 
@@ -11,8 +12,9 @@ logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.services.coi.resource_registry import ResourceDesc, ResourceLCState, \
- ResourceRegistryClient, ResourceTypes, ResourceTypeDesc
+from ion.data.datastore import registry
+
+from ion.services.coi import resource_registry
 from ion.test.iontest import IonTestCase
 
 

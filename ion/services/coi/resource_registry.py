@@ -10,13 +10,17 @@ import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
-from ion.data.store import Store
 
+from ion.data import dataobject
+from ion.data.datastore import registry
+
+from ion.core import ioninit
 from ion.core import base_process
 from ion.core.base_process import ProtocolFactory, BaseProcess
-from ion.data.dataobject import DataObject
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
+
+CONF = ioninit.config(__name__)
 
 class ResourceRegistryService(BaseService):
     """
@@ -28,19 +32,39 @@ class ResourceRegistryService(BaseService):
 
     # For now, keep registration in local memory store.
     def slc_init(self):
-        self.datastore = Store()
+        # use spawn args to determine backend class, second config file
+        backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', None))
+        backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', {}))
+        if backendcls:
+            self.backend = pu.get_class(backendcls)
+        else:
+            self.backend = Store
+        assert issubclass(self.backend, IStore)
 
+        # Provide rest of the spawnArgs to init the store
+        store = yield self.backend.create_store(**backendargs)
+        
+        self.reg = registry.ResourceRegistry(store)
+        
+        name = self.__class__.__name__
+        logging.info(name + " initialized")
+        logging.info(name + " backend:"+str(backendcls))
+        logging.info(name + " backend args:"+str(backendargs))
+        
+        
+        
     @defer.inlineCallbacks
     def op_register_resource(self, content, headers, msg):
         """
         Service operation: Register a resource instance with the registry.
         """
-        resdesc = content['res_desc'].copy()
-        logging.info('op_register_resource: '+str(resdesc))
-        resdesc['lifecycle_state'] = ResourceLCState.RESLCS_NEW
-        resid = pu.create_unique_id('R:')
-        yield self.datastore.put(resid, resdesc)
-        yield self.reply_ok(msg, {'res_id':str(resid)},)
+        res_id = str(content['res_id'])
+        res_enc = content['res_enc']
+        resource = dataobject.DataObject.encode(res_enc)
+        logging.info('op_register_resource: \n' + str(resource))
+
+        yield self.reg.register(res_id,resource)
+        yield self.reply_ok(msg, {'res_id':str(res_id)},)
 
     def op_define_resource_type(self, content, headers, msg):
         """
@@ -52,11 +76,13 @@ class ResourceRegistryService(BaseService):
         """
         Service operation: Get description for a resource instance.
         """
-        resid = content['res_id']
+        res_id = content['res_id']
         logging.info('op_get_resource_desc: '+str(resid))
 
-        res_desc = yield self.datastore.get(resid)
-        yield self.reply_ok(msg, {'res_desc':res_desc})
+        resource = yield self.reg.get_description(res_id)
+        logging.info('Got Resource \n: '+str(resource))
+
+        yield self.reply_ok(msg, {'res_enc':resource.ecocde()})
 
     def op_set_resource_lcstate(self, content, headers, msg):
         """
@@ -82,11 +108,11 @@ class ResourceRegistryClient(BaseServiceClient):
         pass
 
     @defer.inlineCallbacks
-    def register_resource(self, res_desc):
+    def register_resource(self, resource):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('register_resource',
-                                            {'res_desc':res_desc.encode()})
+                                            {'res_enc':resource.encode()})
         logging.info('Service reply: '+str(headers))
         defer.returnValue(str(content['res_id']))
 
@@ -97,93 +123,24 @@ class ResourceRegistryClient(BaseServiceClient):
         (content, headers, msg) = yield self.rpc_send('get_resource_desc',
                                                       {'res_id':res_id})
         logging.info('Service reply: '+str(content))
-        rd = ResourceDesc()
-        rdd = content['res_desc']
+        res_enc = content['res_enc']
         if rdd != None:
-            rd.decode(rdd)
+            resource = dataobject.DataObject.decode(res_enc)
             defer.returnValue(rd)
         else:
             defer.returnValue(None)
 
-class ResourceTypes(object):
-    """Static class with constant definitions for resource types.
-    Do not instantiate
-    """
-    RESTYPE_GENERIC = 'rt_generic'
-    RESTYPE_SERVICE = 'rt_service'
-    RESTYPE_UNASSIGNED = 'rt_unassigned'
-
-    def __init__(self):
-        raise RuntimeError('Do not instantiate '+self.__class__.__name__)
-
-class ResourceLCState(object):
-    """Static class with constant definitions for resource life cycle states.
-    Do not instantiate
-    """
-    RESLCS_NEW = 'rlcs_new'
-    RESLCS_ACTIVE = 'rlcs_active'
-    RESLCS_INACTIVE = 'rlcs_inactive'
-    RESLCS_DECOMM = 'rlcs_decomm'
-    RESLCS_RETIRED = 'rlcs_retired'
-    RESLCS_DEVELOPED = 'rlcs_developed'
-    RESLCS_COMMISSIONED = 'rlcs_commissioned'
-
-    def __init__(self):
-        raise RuntimeError('Do not instantiate '+self.__class__.__name__)
-
-class ResourceDesc(DataObject):
-    """Structured object for a resource description.
-
-    Attributes:
-    .name   name of the resource type
-    .res_type   identifier of the resource's type
-    """
-    def __init__(self, **kwargs):
-        DataObject.__init__(self)
-        if len(kwargs) != 0:
-            self.setResourceDesc(**kwargs)
-
-    def setResourceDesc(self, **kwargs):
-        if 'res_type' in kwargs:
-            self.set_attr('res_type',kwargs['res_type'])
-        else:
-            raise RuntimeError("Resource type missing")
-
-        if 'name' in kwargs:
-            self.set_attr('res_name',kwargs['name'])
-
-class ResourceTypeDesc(DataObject):
-    """Structured object for a resource type description.
-
-    Attributes:
-    .res_name   name of the resource type
-    .res_type   identifier of this resource type
-    .based_on   identifier of the base resource type
-    .desc   description
-    """
-    def __init__(self, **kwargs):
-        DataObject.__init__(self)
-        if len(kwargs) != 0:
-            self.setResourceTypeDesc(**kwargs)
-
-    def setResourceTypeDesc(self, **kwargs):
-        if 'name' in kwargs:
-            self.set_attr('name',kwargs['name'])
-        else:
-            raise RuntimeError("Resource type name missing")
-
-        if 'based_on' in kwargs:
-            self.set_attr('based_on',kwargs['based_on'])
-        else:
-            self.based_on = ResourceTypes.RESTYPE_GENERIC
-
-        if 'res_type' in kwargs:
-            self.set_attr('res_type',kwargs['res_type'])
-        else:
-            self.res_type = ResourceTypes.RESTYPE_UNASSIGNED
-
-        if 'desc' in kwargs:
-            self.set_attr('desc',kwargs['desc'])
+#class ResourceTypes(object):
+#    """Static class with constant definitions for resource types.
+#    Do not instantiate
+#    """
+#    RESTYPE_GENERIC = 'rt_generic'
+#    RESTYPE_SERVICE = 'rt_service'
+#    RESTYPE_UNASSIGNED = 'rt_unassigned'
+#
+#    def __init__(self):
+#        raise RuntimeError('Do not instantiate '+self.__class__.__name__)
+#
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(ResourceRegistryService)
