@@ -30,6 +30,9 @@ class IObjectChassis(interface.Interface):
     The concept is very similar to a git repository.
     """
 
+    objectClass = interface.Attribute("""@param objectClass structure of
+            actual data object a chassis moves instances of""")
+
     def get_head(name):
         """
         """
@@ -54,6 +57,8 @@ class IObjectStore(cas.ICAStore):
     """
     A CAStore for data objects.
     """
+    objectChassis = interface.Attribute("""@param objectChassis a class
+                    implementing IObjectChassis""")
 
     def create(name, baseClass):
         """
@@ -117,7 +122,7 @@ class StoreType(type):
         dict['__slots__'] = slots
         return type.__new__(cls, name, bases, dict)
 
-class StoreClass(object):
+class DataObject(object):
     """
     @brief [Abstract] Base class for all data objects.
     """
@@ -160,7 +165,7 @@ class StoreClass(object):
             value = getattr(self, name)
             
             # Attempt to handle nested Resources
-            if not isinstance(value, StoreClass):
+            if not isinstance(value, DataObject):
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
             else:
                 value = value.encode()
@@ -180,12 +185,12 @@ class StoreClass(object):
             d[str(name)] = TypedAttribute.decode(value)       
         return type(str(className), (cls,), d)
 
-class EmptyObject(StoreClass):
+class EmptyObject(DataObject):
     """
     @brief Trivial Store Object
     """
 
-class ArbitraryObject(StoreClass):
+class ArbitraryObject(DataObject):
     key = TypedAttribute(str)
 
 
@@ -269,7 +274,9 @@ class ObjectChassis(object):
     "Object" or "Resource Entity" structure...thing.
     """
 
-    def __init__(self, objstore, keyspace, objectClass=StoreClass):
+    interface.implements(IObjectChassis)
+
+    def __init__(self, objstore, keyspace, objectClass=DataObject):
         """
         @note
         objstore vs. objs
@@ -418,7 +425,6 @@ class BaseObjectStore(cas.CAStore):
         cas.CAStore.__init__(self, backend, partition)
         self.partition = partition
         self.storemeta = cas.StoreContextWrapper(backend, partition + '.meta.')
-        refs = cas.StoreContextWrapper(backend, partition + '.refs.')
         self.type = reflect.fullyQualifiedName(self.__class__)
 
     @classmethod
@@ -497,6 +503,14 @@ class BaseObjectStore(cas.CAStore):
         return d
 
 class ObjectStore(BaseObjectStore):
+    """
+    The class defined @param objectChassis must be a class that implements
+    ion.data.datastore.IObjectChassis
+    """
+
+    interface.implements(IObjectStore)
+
+    objectChassis = ObjectChassis
 
     @defer.inlineCallbacks
     def create(self, name, objectClass):
@@ -530,11 +544,11 @@ class ObjectStore(BaseObjectStore):
 
     def _load_object_class(self, obj):
         """
-        XXX Here StoreClass is assumed as the base class
+        XXX Here DataObject is assumed as the base class
         """
         objectClassName = obj['class'].content
         obj_parts = [(child[0], child.obj.content) for child in obj['attrs'].children]
-        objectClass = StoreClass.decode(objectClassName, obj_parts)
+        objectClass = DataObject.decode(objectClassName, obj_parts)
         return objectClass
 
     @defer.inlineCallbacks
@@ -570,7 +584,7 @@ class ObjectStore(BaseObjectStore):
         yield obj_obj.load(self)
         objectClass = self._load_object_class(obj_obj)
         keyspace = cas.StoreContextWrapper(self.backend, self.partition + '.' + id + ':')
-        obj = ObjectChassis(self, keyspace, objectClass)
+        obj = self.objectChassis(self, keyspace, objectClass)
         defer.returnValue(obj)
 
     @defer.inlineCallbacks
@@ -604,7 +618,7 @@ class ObjectStore(BaseObjectStore):
             obj = yield self._build_object(name)
             defer.returnValue(obj)
 
-class Identity(StoreClass):
+class Identity(DataObject):
     name = TypedAttribute(str)
     age = TypedAttribute(int)
     email = TypedAttribute(str)
