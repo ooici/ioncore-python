@@ -6,12 +6,8 @@ from zope import interface
 
 from twisted.internet import defer
 
+from ion.data import dataobject
 from ion.data.datastore import objstore
-
-class LCState(object):
-
-    def __repr__(self):
-        return "%s" % self.__class__.__name__
 
 LCStateNames = ['new',
                 'active',
@@ -22,29 +18,37 @@ LCStateNames = ['new',
                 'commissioned',
                 ]
 
-LCStates = dict([(name, type(name, (LCState,), {})()) for name in LCStateNames])
+class LCState(object):
 
-class StateAttribute(objstore.TypedAttribute):
-    """
-    """
-    states = LCStates
+    def __init__(self, state):
+        assert state in LCStateNames
+        self._state = state
+
+    def __repr__(self):
+        return self._state
+
+    def __eq__(self, other):
+        assert isinstance(other, LCState)
+        return str(self) == str(other)
+
+LCStates = dict([('LCState', LCState)] + [(name, LCState(name)) for name in LCStateNames])
 
 
-class ResourceDescription(objstore.DataObject):
+class ResourceDescription(dataobject.DataObject):
     """
     @brief Base for all OOI resource objects
     @note OOIResource or OOIRegistryObject or OOIObject???
     @note could build in explicit link back to ResourceRegistryClient so
     user can make changes through this object.
     """
-    name = TypedAttribute(str)
-    lifecycle = StateAttribute(LCState, default=LCStates['new'])
+    _types = LCStates
+
+    name = dataobject.TypedAttribute(str)
+    lifecycle = dataobject.TypedAttribute(LCState, default=LCStates['new'])
 
 class Generic(ResourceDescription):
     """
     """
-    name = TypedAttribute(str)
-    lifecycle = StateAttribute(LCState, default=LCStates['new'])
 
 
 class IResourceRegistry(interface.Interface):
@@ -96,12 +100,9 @@ class ResourceRegistry(objstore.ObjectStore):
             
         yield res_client.checkout()
         res_client.index = resource
-
         c_id = yield res_client.commit()
-
         defer.returnValue(c_id)
 
-        # now what?
 
     @defer.inlineCallbacks
     def get_description(self, uuid):
@@ -111,5 +112,18 @@ class ResourceRegistry(objstore.ObjectStore):
         resource_client = yield self.clone(uuid)
         resource_description = yield resource_client.checkout()
         defer.returnValue(resource_description)
+
+
+@defer.inlineCallbacks
+def test(ns):
+    from ion.data import store
+    s = yield store.Store.create_store()
+    ns.update(locals())
+    reg = ResourceRegistry(s)
+    res1 = ResourceDescription()
+    ns.update(locals())
+    res1.name = 'foo'
+    commit_id = yield reg.register('foo', res1)
+    ns.update(locals())
 
 

@@ -13,6 +13,7 @@ from zope import interface
 from twisted.internet import defer
 from twisted.python import reflect
 
+from ion.data import dataobject
 from ion.data.datastore import cas
 
 NULL_CHR = '\x00'
@@ -276,7 +277,9 @@ class ObjectChassis(object):
 
     interface.implements(IObjectChassis)
 
-    def __init__(self, objstore, keyspace, objectClass=DataObject):
+    objectClass = dataobject.DataObject
+
+    def __init__(self, objstore, keyspace, objectClass=None):
         """
         @note
         objstore vs. objs
@@ -289,9 +292,9 @@ class ObjectChassis(object):
         """
         self.objstore = objstore
         self.keyspace = keyspace
-        self.objectClass = objectClass
-        self.objectClassName = reflect.fullyQualifiedName(objectClass) #XXX hack
-        self.objectClassName = objectClass.__name__ #XXX hack
+        if objectClass:
+            #self.objectClass = objectClass
+            pass
         self.index = None
         self.cur_commit = None
 
@@ -329,7 +332,8 @@ class ObjectChassis(object):
             tree = yield self.objstore.get(commit.tree)
             yield tree.load(self.objstore)
             obj_parts = [(child[0], child.obj.content) for child in tree.children]
-            self.index = self.objectClass.decode(self.objectClassName, obj_parts)()
+            #self.index = self.objectClass.decode(self.objectClassName, obj_parts)()
+            self.index = self.objectClass.decode(obj_parts)()
         else:
             self.index = self.objectClass()
         self.cur_commit = ref
@@ -548,7 +552,7 @@ class ObjectStore(BaseObjectStore):
         """
         objectClassName = obj['class'].content
         obj_parts = [(child[0], child.obj.content) for child in obj['attrs'].children]
-        objectClass = DataObject.decode(objectClassName, obj_parts)
+        objectClass = self.objectChassis.objectClass.decode(obj_parts)
         return objectClass
 
     @defer.inlineCallbacks
