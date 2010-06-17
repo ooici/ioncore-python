@@ -5,6 +5,7 @@
 @author Michael Meisinger
 @author David Stuebe
 @brief service for storing and retrieving key/value pairs.
+@Note Test cases for the store service backend are now in ion.data.test.test_store
 """
 
 import logging
@@ -43,6 +44,8 @@ class StoreService(BaseService):
         # Provide rest of the spawnArgs to init the store
         self.store = yield self.backend.create_store(**backendargs)
         logging.info("StoreService initialized")
+        logging.info("StoreService backend:"+str(backendcls))
+        logging.info("StoreService backend args:"+str(backendargs))
 
     @defer.inlineCallbacks
     def op_put(self, content, headers, msg):
