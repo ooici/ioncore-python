@@ -88,7 +88,19 @@ class ResourceRegistry(objstore.ObjectStore):
         @note Is the way objectClass is referenced awkward?
         """
         assert isinstance(resource, self.objectChassis.objectClass)
-        res_client = yield self.create(uuid, self.objectChassis.objectClass)
+        
+        try:
+            res_client = yield self.create(uuid, self.objectChassis.objectClass)
+        except objstore.ObjectStoreError:
+            res_client = yield self.clone(uuid)
+            
+        yield res_client.checkout()
+        res_client.index = resource
+
+        c_id = yield res_client.commit()
+
+        defer.returnValue(c_id)
+
         # now what?
 
     @defer.inlineCallbacks
@@ -98,6 +110,6 @@ class ResourceRegistry(objstore.ObjectStore):
         """
         resource_client = yield self.clone(uuid)
         resource_description = yield resource_client.checkout()
-        defer.returnValue(resource_client)
+        defer.returnValue(resource_description)
 
 
