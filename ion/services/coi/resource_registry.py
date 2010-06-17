@@ -3,6 +3,7 @@
 """
 @file ion/services/coi/resource_registry.py
 @author Michael Meisinger
+@author David Stuebe
 @brief service for registering resources
 """
 
@@ -13,6 +14,8 @@ from magnet.spawnable import Receiver
 
 from ion.data import dataobject
 from ion.data.datastore import registry
+
+from ion.data import store
 
 from ion.core import ioninit
 from ion.core import base_process
@@ -31,6 +34,7 @@ class ResourceRegistryService(BaseService):
     declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
 
     # For now, keep registration in local memory store.
+    @defer.inlineCallbacks
     def slc_init(self):
         # use spawn args to determine backend class, second config file
         backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', None))
@@ -38,13 +42,13 @@ class ResourceRegistryService(BaseService):
         if backendcls:
             self.backend = pu.get_class(backendcls)
         else:
-            self.backend = Store
-        assert issubclass(self.backend, IStore)
+            self.backend = store.Store
+        assert issubclass(self.backend, store.IStore)
 
         # Provide rest of the spawnArgs to init the store
-        store = yield self.backend.create_store(**backendargs)
+        s = yield self.backend.create_store(**backendargs)
         
-        self.reg = registry.ResourceRegistry(store)
+        self.reg = registry.ResourceRegistry(s)
         
         name = self.__class__.__name__
         logging.info(name + " initialized")
@@ -60,7 +64,7 @@ class ResourceRegistryService(BaseService):
         """
         res_id = str(content['res_id'])
         res_enc = content['res_enc']
-        resource = dataobject.DataObject.encode(res_enc)
+        resource = registry.ResourceDescription.decode(res_enc)()
         logging.info('op_register_resource: \n' + str(resource))
 
         yield self.reg.register(res_id,resource)
@@ -72,17 +76,17 @@ class ResourceRegistryService(BaseService):
         """
 
     @defer.inlineCallbacks
-    def op_get_resource_desc(self, content, headers, msg):
+    def op_get_resource(self, content, headers, msg):
         """
-        Service operation: Get description for a resource instance.
+        Service operation: Get a resource instance.
         """
         res_id = content['res_id']
-        logging.info('op_get_resource_desc: '+str(resid))
+        logging.info('op_get_resource: '+str(res_id))
 
         resource = yield self.reg.get_description(res_id)
         logging.info('Got Resource \n: '+str(resource))
 
-        yield self.reply_ok(msg, {'res_enc':resource.ecocde()})
+        yield self.reply_ok(msg, {'res_enc':resource.encode()})
 
     def op_set_resource_lcstate(self, content, headers, msg):
         """
@@ -108,25 +112,25 @@ class ResourceRegistryClient(BaseServiceClient):
         pass
 
     @defer.inlineCallbacks
-    def register_resource(self, resource):
+    def register_resource(self, res_id, resource):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('register_resource',
-                                            {'res_enc':resource.encode()})
+                                            {'res_id':res_id,'res_enc':resource.encode()})
         logging.info('Service reply: '+str(headers))
         defer.returnValue(str(content['res_id']))
 
     @defer.inlineCallbacks
-    def get_resource_desc(self, res_id):
+    def get_resource(self, res_id):
         yield self._check_init()
 
-        (content, headers, msg) = yield self.rpc_send('get_resource_desc',
+        (content, headers, msg) = yield self.rpc_send('get_resource',
                                                       {'res_id':res_id})
         logging.info('Service reply: '+str(content))
         res_enc = content['res_enc']
-        if rdd != None:
-            resource = dataobject.DataObject.decode(res_enc)
-            defer.returnValue(rd)
+        if res_enc != None:
+            resource = registry.ResourceDescription.decode(res_enc)()
+            defer.returnValue(resource)
         else:
             defer.returnValue(None)
 

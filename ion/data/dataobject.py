@@ -9,6 +9,7 @@
 
 NULL_CHR = '\x00'
 
+
 class TypedAttribute(object):
     """
     @brief Descriptor class for Data Object Attributes. Objects are

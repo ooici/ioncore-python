@@ -19,7 +19,8 @@ from ion.data.store import Store
 from ion.core import ioninit, base_process
 from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core.cc.modloader import ModuleLoader
-from ion.services.coi.service_registry import ServiceRegistryClient, ServiceDesc
+from ion.services.coi.service_registry import ServiceRegistryClient
+from ion.data.datastore import registry
 from ion.util.config import Config
 import ion.util.procutils as pu
 
@@ -176,7 +177,7 @@ def bs_register_services():
     """
     src = ServiceRegistryClient()
     for proc in base_process.processes.values():
-        sd = ServiceDesc(name=proc['name'])
+        #sd = ServiceDesc(name=proc['name'])
         res = yield src.register_service(sd)
 
 def reset_container():

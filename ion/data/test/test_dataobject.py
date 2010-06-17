@@ -18,8 +18,7 @@ from magnet.spawnable import Receiver
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
-from ion.data.datastore.cas import sha1bin
-from ion.data.datastore.cas import sha1hex
+from ion.data.datastore import cas
 
 class SimpleObject(dataobject.DataObject):
     key = dataobject.TypedAttribute(str, 'xxx')
@@ -76,7 +75,7 @@ class TestBinaryObject(TestSimpleObject):
         # Need to come up with better binary data to test with!
         obj = BinaryObject()
         obj.name = 'Binary Junk'
-        obj.binary = sha1bin(obj.name)
+        obj.binary = cas.sha1bin(obj.name)
         self.obj = obj
         self.encoded=[('binary', "str\x00\xca\x98T\x17~\x0e41\x83\xcf'\xb6\xba&l\x1d\xd1\x9d\xd8["), ('name', 'str\x00Binary Junk')]
      
@@ -200,6 +199,7 @@ class TestSendTypesDataObject(TestSendDataObject):
         obj.integer = 42
         self.obj = obj
         yield self._start_container()
+
         
 #class Send_Binary_Resource_Object(Send_Resource_Object_Test):
 #    @defer.inlineCallbacks

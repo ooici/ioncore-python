@@ -17,7 +17,7 @@ from ion.data.dataobject import DataObject
 import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.services.coi.resource_registry import ResourceDesc, ResourceTypeDesc
+#from ion.services.coi.resource_registry import ResourceDesc, ResourceTypeDesc
 
 class ServiceRegistryService(BaseService):
     """
@@ -108,45 +108,45 @@ class ServiceRegistryClient(BaseServiceClient):
         sidesc = yield self.get_service_instance(service_name)
         defer.returnValue(sidesc['xname'])
 
-class ServiceInstanceDesc(ResourceDesc):
-    """Structured object for a service instance.
-
-    Attributes:
-    .name   name of the service
-    """
-    def __init__(self, **kwargs):
-        kw = kwargs.copy() if kwargs else {}
-        kw['res_type'] = 'rt_serviceinst'
-        ResourceDesc.__init__(self, **kw)
-        if len(kwargs) != 0:
-            self.setServiceInstanceDesc(**kwargs)
-
-    def setServiceInstanceDesc(self, **kwargs):
-        if 'xname' in kwargs:
-            self.set_attr('xname',kwargs['xname'])
-        else:
-            raise RuntimeError("Service exchange name missing")
-
-        if 'svc_name' in kwargs:
-            self.set_attr('svc_name',kwargs['svc_name'])
-        else:
-            raise RuntimeError("Service name missing")
-
-class ServiceDesc(ResourceTypeDesc):
-    """Structured object for a service description.
-
-    Attributes:
-    .name   name of the service
-    """
-    def __init__(self, **kwargs):
-        kw = kwargs.copy() if kwargs else {}
-        kw['res_type'] = 'rt_service'
-        ResourceTypeDesc.__init__(self, **kw)
-        if len(kwargs) != 0:
-            self.setServiceDesc(**kwargs)
-
-    def setServiceDesc(self, **kwargs):
-        if 'xname' in kwargs:
-            self.set_attr('xname',kwargs['xname'])
-        else:
-            self.set_attr('xname',kwargs['name'])
+#class ServiceInstanceDesc(ResourceDesc):
+#    """Structured object for a service instance.
+#
+#    Attributes:
+#    .name   name of the service
+#    """
+#    def __init__(self, **kwargs):
+#        kw = kwargs.copy() if kwargs else {}
+#        kw['res_type'] = 'rt_serviceinst'
+#        ResourceDesc.__init__(self, **kw)
+#        if len(kwargs) != 0:
+#            self.setServiceInstanceDesc(**kwargs)
+#
+#    def setServiceInstanceDesc(self, **kwargs):
+#        if 'xname' in kwargs:
+#            self.set_attr('xname',kwargs['xname'])
+#        else:
+#            raise RuntimeError("Service exchange name missing")
+#
+#        if 'svc_name' in kwargs:
+#            self.set_attr('svc_name',kwargs['svc_name'])
+#        else:
+#            raise RuntimeError("Service name missing")
+#
+#class ServiceDesc(ResourceTypeDesc):
+#    """Structured object for a service description.
+#
+#    Attributes:
+#    .name   name of the service
+#    """
+#    def __init__(self, **kwargs):
+#        kw = kwargs.copy() if kwargs else {}
+#        kw['res_type'] = 'rt_service'
+#        ResourceTypeDesc.__init__(self, **kw)
+#        if len(kwargs) != 0:
+#            self.setServiceDesc(**kwargs)
+#
+#    def setServiceDesc(self, **kwargs):
+#        if 'xname' in kwargs:
+#            self.set_attr('xname',kwargs['xname'])
+#        else:
+#            self.set_attr('xname',kwargs['name'])
