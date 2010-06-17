@@ -76,125 +76,6 @@ class IObjectStore(cas.ICAStore):
         @param name Unique identifier of data object.
         """
 
-class TypedAttribute(object):
-    """
-    @brief Descriptor class for Data Object Attributes. Objects are
-    containers of typed attributes.
-    """
-
-    def __init__(self, type, default=None):
-        self.name = None
-        self.type = type
-        self.default = default if default else type()
-        self.cache = None
-
-    def __get__(self, inst, cls):
-        value = getattr(inst, self.name, self.default)
-        return value
-
-    def __set__(self, inst, value):
-        if not isinstance(value, self.type):
-            raise TypeError("Must be a %s" % self.type)
-        setattr(inst, self.name, value)
-
-    @classmethod
-    def decode(cls, value):
-        stype, default = value.split(NULL_CHR)
-        
-        type = eval(str(stype))
-#        return cls(type, type(str(default)))
-
-        if type == list:
-            return cls(type, eval(str(default)))
-        else:
-           return cls(type, type(str(default)))
-
-class StoreType(type):
-    """
-    @brief Metaclass for all Data Objects.
-    """
-
-    def __new__(cls, name, bases, dict):
-        slots = []
-        for key, value in dict.items():
-            if isinstance(value, TypedAttribute):
-                value.name = '_' + key
-                slots.append(value.name)
-        dict['__slots__'] = slots
-        return type.__new__(cls, name, bases, dict)
-
-class DataObject(object):
-    """
-    @brief [Abstract] Base class for all data objects.
-    """
-    __metaclass__ = StoreType
-
-    def __eq__(self,other):
-        
-        if not isinstance(other, BaseResource):
-            return False
-        
-        for name in self.attributes:
-            self_value = getattr(self,name)
-            
-            other_value = getattr(other,name)
-            if other_value != self_value:
-                return False
-        return True
-
-    def __str__(self):
-        head = '='*10
-        strng  = """\n%s Resource Type: %s %s\n""" % (head, str(self.__class__.__name__), head)
-        for name in self.attributes:
-            value = getattr(self,name)
-            strng += """= '%s':'%s'\n""" % (name,value)
-        strng += head*2
-        return strng
-
-    @property
-    def attributes(self):
-        names = []
-        for key in self.__slots__:
-            names.append(key[1:])
-        return names
-
-    def encode(self):
-        """
-        """
-        encoded = []
-        for name in self.attributes:
-            value = getattr(self, name)
-            
-            # Attempt to handle nested Resources
-            if not isinstance(value, DataObject):
-                encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
-            else:
-                value = value.encode()
-                encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
-        return encoded
-
-    @classmethod
-    def decode(cls, className, attrs):
-        """
-        decode store object[s]
-        """
-        #d = dict([(str(name), TypedAttribute.decode(value)) for name, value in attrs])
-        d={}
-        for name, value in attrs:
-            #print 'name',name
-            #print 'value',value
-            d[str(name)] = TypedAttribute.decode(value)       
-        return type(str(className), (cls,), d)
-
-class EmptyObject(DataObject):
-    """
-    @brief Trivial Store Object
-    """
-
-class ArbitraryObject(DataObject):
-    key = TypedAttribute(str)
-
-
 class Element(cas.Element):
 
     def load(self, backend):
@@ -622,10 +503,10 @@ class ObjectStore(BaseObjectStore):
             obj = yield self._build_object(name)
             defer.returnValue(obj)
 
-class Identity(DataObject):
-    name = TypedAttribute(str)
-    age = TypedAttribute(int)
-    email = TypedAttribute(str)
+class Identity(dataobject.DataObject):
+    name = dataobject.TypedAttribute(str)
+    age = dataobject.TypedAttribute(int)
+    email = dataobject.TypedAttribute(str)
 
 @defer.inlineCallbacks
 def _test(ns):
@@ -638,6 +519,7 @@ def _test(ns):
     s = yield store.Store.create_store()
     #s = yield cassandra.CassandraStore.create_store(cass_host_list=['amoeba.ucsd.edu:9160'])
     ns.update(locals())
+    ObjectStore.objectChassis.objectClass = Identity
     obs = yield ObjectStore.new(s, 'test_partition')
     obj = yield obs.create('thing', Identity)
     ind = yield obj.checkout()
