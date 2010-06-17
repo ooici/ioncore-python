@@ -1,10 +1,14 @@
 #!/usr/bin/env python
 
 from twisted.trial import unittest
-from twisted.internet import defer
 import logging
 logging = logging.getLogger(__name__)
-from ion.data.dataobject import DataObject
+
+from twisted.python import reflect
+
+
+from twisted.internet import defer
+from ion.data import dataobject
 
 # To Test messages using DataObjects
 from ion.test.iontest import IonTestCase
@@ -14,159 +18,103 @@ from magnet.spawnable import Receiver
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
+from ion.data.datastore.cas import sha1bin
+from ion.data.datastore.cas import sha1hex
 
-class DataObjectTest(unittest.TestCase):
-    """Testing service classes of resource registry
-    """
-#    def setUp(self):
-#        pass
+class SimpleObject(dataobject.DataObject):
+    key = dataobject.TypedAttribute(str, 'xxx')
+    name = dataobject.TypedAttribute(str, 'blank')
+
+
+class TestSimpleObject(unittest.TestCase):
     
-    def test_dataobject(self):
+    def setUp(self):
         
-        dobj = DataObject()
+        obj = SimpleObject()
+        obj.key = 'seabird'
+        obj.name = 'David'
+        self.obj = obj
+        self.encoded=[('key', 'str\x00seabird'),('name', 'str\x00David')]
+     
+    def testPrintObject(self):
+                
+        logging.info(self.obj)
+        
+    def testEncode(self):
+        """
+        """
+        enc = self.obj.encode()
+        self.assertEqual(self.encoded,enc)
+        
+    def testDecode(self):
+        dec = dataobject.DataObject.decode(self.encoded)()
+        #print 'dec',dec
+        self.assert_(self.obj==dec)
 
-        dobj.set_attr('thing1','thing2')
-        self.assertIsInstance(dobj.__dict__, dict)
-        
-        self.assertIsInstance(dobj.encode(),dict)
-        
-        self.assertEqual(dobj.get_attr('thing1'),'thing2')
-        
-        # test a simple dictionary
-        d = dict()
-        d['a']=1
-        d['b']='b'
-        d['c']=3.14159
-        
-        dobj.decode(d)
-        
-        self.assertEqual(dobj.get_attr('a'),1)
-        self.assertEqual(dobj.get_attr('b'),'b')
-        self.assertEqual(dobj.get_attr('c'),3.14159)
-        
-        dobj2=DataObject.from_encoding(d)
-        
-        self.assertEqual(dobj2.get_attr('a'),1)
-        self.assertEqual(dobj2.get_attr('b'),'b')
-        self.assertEqual(dobj2.get_attr('c'),3.14159)
-        
-        self.assertIdentical(dobj,dobj)
+class PrimaryTypesObject(SimpleObject):
+#    key = dataobject.TypedAttribute(str, 'xxx')
+#    name = dataobject.TypedAttribute(str, 'blank')
+    integer = dataobject.TypedAttribute(int,5)
+    floating = dataobject.TypedAttribute(float,5.0)
 
-        # The Uniquie ID makes these two not equal
-        self.assertNotEqual(dobj,dobj2)
+class TestPrimaryTypesObject(TestSimpleObject):
+    def setUp(self):
+        obj = PrimaryTypesObject()
+        obj.key = 'seabird'
+        obj.name = 'David'
+        obj.floating = 3.14159
+        obj.integer = 42
+        self.obj = obj
+        self.encoded=[('key', 'str\x00seabird'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'), ('name', 'str\x00David')]
         
-        self.assertEqual(dobj2,DataObject.from_encoding(dobj2.encode()))
-       
-        self.assertRaises(AssertionError,dobj.set_attr, 6, 6) 
-        
-        # Put a list, tuple, dict, DataObject and set in a dictionary
+class BinaryObject(dataobject.DataObject):
+    name = dataobject.TypedAttribute(str)
+    binary = dataobject.TypedAttribute(str)
 
-        # List
-        d = dict()
-        l=[1,'f',3.4]
-        d['a']=l
-        
-        dobj3=DataObject.from_encoding(d)
-        
-        self.assertIsInstance(dobj3.get_attr('a'),list)
-        self.assertEqual(dobj3.get_attr('a'),l)
-        
-        # For now, Assuming Lists are protected Blobs!
-        ## Can't put complex things in a list
-        #lx = list(l)
-        #lx.append({6:5})
-        #dlx={'a':lx}
-        #self.assertRaises(AssertionError,DataObject.from_encoding,dlx)
-      
-        
-        # Tuple
-        t=('t','u','p','l','e')
-        dt={'b':t}
-        
-        self.assertRaises(AssertionError,DataObject.from_encoding,dt)
-        #dobj3=DataObject.from_encoding(dt)
-        ## Made Tuple an error!
-        #self.assertIsInstance(dobj3.get_attr('b'),tuple)
-        #self.assertEqual(dobj3.get_attr('b'),t)
+class TestBinaryObject(TestSimpleObject):
+    def setUp(self):
+        # Need to come up with better binary data to test with!
+        obj = BinaryObject()
+        obj.name = 'Binary Junk'
+        obj.binary = sha1bin(obj.name)
+        self.obj = obj
+        self.encoded=[('binary', "str\x00\xca\x98T\x17~\x0e41\x83\xcf'\xb6\xba&l\x1d\xd1\x9d\xd8["), ('name', 'str\x00Binary Junk')]
+     
+class ListObject(dataobject.DataObject):
+    name = dataobject.TypedAttribute(str)
+    rlist = dataobject.TypedAttribute(list)
+     
+#class TestListObject(TestSimpleObject):
+#    def setUp(self):
+#        obj = ListObject()
+#        obj.name = 'a big list'
+#        obj.rlist = ['a',3,4.0,{'a':3}]
+#        self.obj = obj
+#        self.encoded=[('rlist', "list\x00['a', 3, 4.0, {'a': 3}]"), ('name', 'str\x00a big list')]
+     
+#class NestedResource(dataobject.DataObject):
+#    name = dataobject.TypedAttribute(str)
+#   device = dataobject.TypedAttribute(dataobject.DeviceResource)
 
-        # Can't use tuple as Dict Key in DataObject
-        dt={'b':t,(9,8):5}
-        self.assertRaises(AssertionError,DataObject.from_encoding,dt)
+#class TestNestedResource(TestDeviceResource):
+#    def setUp(self):
+#        
+#        dev = dataobject.DeviceResource()
+#        dev.mfg = 'seabird'
+#        dev.serial = 10
+#        dev.voltage = 3.14159
+#        
+#        res = NestedResource()
+#        res.name = 'a dev resource'
+#        res.device = dev
+#        self.res = res
+#        self.res_type = reflect.fullyQualifiedName(NestedResource)
+#        self.encoded=[('rlist', "list\x00['a', 3, 4.0, {'a': 3}]"), ('name', 'str\x00a big list')]
 
         
-        # Set
-        s=set()
-        for i in t:
-            s.add(i)
-        ds={'s':s}
-        self.assertRaises(AssertionError,DataObject.from_encoding,ds)
-        
-        #self.assertIsInstance(dobj3.get_attr('c'),set)
-        #self.assertEqual(dobj3.get_attr('c'),s)
-        
-        # Dictionary in a dictionary
-        e=dict()
-        f=dict()
-        e['d']=d
-        f['e']=e
-        dobj3=DataObject.from_encoding(f)
-        
-        self.assertIsInstance(dobj3.get_attr('e'),DataObject)
-        de=dobj3.get_attr('e')
-        self.assertIsInstance(de.get_attr('d'),DataObject)
-        dd=de.get_attr('d')
-        self.assertEqual(dd.get_attr('a'),l)
-
-        # Data Object
-        a=DataObject.from_encoding(d)
-        b=DataObject.from_encoding(d)
-        c=DataObject.from_encoding(d)
-        
-        do=DataObject()
-        do.set_attr('a',a)
-        do.set_attr('b',b)
-        do.set_attr('c',c)
-
-        self.assertIsInstance(do.get_attr('a'),DataObject)
-        self.assertEqual(do.get_attr('a'),a)
-        print 'obja',a
-        print 'objref',do.get_attr('a')
-
-        blob = do.encode()   
-
-        d0 = DataObject.from_encoding(blob)
-        
-        #print '===a',d0.get_attr('a').__dict__
-        #print '===b',d0.get_attr('b').__dict__
-        #print '===c',d0.get_attr('c').__dict__
-        
-        self.assertEqual(d0.get_attr('a'),a)
-
-        # Recover the tuple
-#        dt=d0.get_attr('a')
-#        ti=dt.get_attr('b')
-#        self.assertEqual(ti,t)
-        
-        # Recover the set
-#        ds=d0.get_attr('a')
-#        si=dt.get_attr('c')
-#        self.assertEqual(si,s)
-        
-        self.assertEqual(do,d0)
-        
-        # Test Memory leak issue:
-        # http://code.activestate.com/recipes/52308-the-simple-but-handy-collector-of-a-bunch-of-named/
-        
-        for i in range(10**2): # try 10**9 
-            a = DataObject()
-            
-            
-            
-
 class ResponseService(BaseService):
     """Example service implementation
     """
-    
     # Declaration of service
     declare = BaseService.service_declare(name='responder', version='0.1.0', dependencies=[])
     
@@ -177,13 +125,12 @@ class ResponseService(BaseService):
     def op_respond(self, content, headers, msg):
         logging.info('op_respond: '+str(content))
         
-        print 'Type is: ', type(content)
-        assert type(content) is dict
-        
-        dobj = DataObject.from_encoding(content)
+        obj = dataobject.DataObject.decode(content)()
+        logging.info(obj)
+        response = obj.encode()
 
         # The following line shows how to reply to a message
-        yield self.reply(msg, 'reply', dobj.encode(), {})
+        yield self.reply(msg, 'reply', response, {})
 
 class ResponseServiceClient(BaseServiceClient):
     """
@@ -196,23 +143,30 @@ class ResponseServiceClient(BaseServiceClient):
         BaseServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
-    def send_data_object(self, dobj):
+    def send_data_object(self, obj):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('respond', dobj.encode(), {})
+        print obj
+        msg=obj.encode()
+        
+        (content, headers, msg) = yield self.rpc_send('respond', msg, {})
         logging.info('Responder replied: '+str(content))
-        do = DataObject.from_encoding(content)    
-        defer.returnValue(do)
+        response = dataobject.DataObject.decode(content)()
+        defer.returnValue(response)
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(ResponseService)
 
 
 
-class Send_Data_Object_Test(IonTestCase):
+class TestSendDataObject(IonTestCase):
     """Testing service classes of resource registry
     """
     @defer.inlineCallbacks
     def setUp(self):
+        obj = SimpleObject()
+        obj.key = 'seabird'
+        obj.name = 'David'
+        self.obj = obj
         yield self._start_container()
 
     @defer.inlineCallbacks
@@ -228,37 +182,42 @@ class Send_Data_Object_Test(IonTestCase):
 
         sup = yield self._spawn_processes(services)
 
-        rs = ResponseServiceClient(sup)
+        rsc = ResponseServiceClient(sup)
         
         # Simple Send and Check value:
-        do = yield rs.send_data_object(DataObject.from_encoding({'test':'value'}))
-        self.assertEqual(do.get_attr('test'),'value')
-        
-        
-        t=(unicode('t'),unicode('u'),unicode('p'),unicode('l'),unicode('e'),3)
-        l=[4,'a',15,'opq']
-        d={'a':5,'b':3.14159}
-        s=set()
-        s.add(5)
-        s.add('Cat')
-        dct={
-#            'test1':t,
-            'test2':d,
-            'test3':l}
-#            'test4':s}
+        response = yield rsc.send_data_object(self.obj)
+        self.assertEqual(self.obj, response)
 
-        dsend = DataObject.from_encoding(dct)
-                         
-                         
-        dreceive = yield rs.send_data_object(dsend)
+class TestSendTypesDataObject(TestSendDataObject):
+    """Testing service classes of resource registry
+    """
+    @defer.inlineCallbacks
+    def setUp(self):
+        obj = PrimaryTypesObject()
+        obj.key = 'seabird'
+        obj.name = 'David'
+        obj.floating = 3.14159
+        obj.integer = 42
+        self.obj = obj
+        yield self._start_container()
         
-        # Can't allow tuples because it breaks DataObject comparison        
-        ## Allow passing tuples, but they come out as lists!
-        #self.assertIsInstance(dreceive.get_attr('test1'),list)
-        #self.assertEqual(dreceive.get_attr('test1'),list(t))        
-        self.assertEqual(dreceive,dsend)
-        self.assertEqual(dreceive.get_attr('test2'),dsend.get_attr('test2'))
-        self.assertEqual(dreceive.get_attr('test3'),l)
-#        self.assertEqual(dreceive.get_attr('test4'),s)
+#class Send_Binary_Resource_Object(Send_Resource_Object_Test):
+#    @defer.inlineCallbacks
+#    def setUp(self):
+#        res = BinaryResource()
+#        res.name = 'Binary Junk'
+#        res.binary = sha1bin(res.name)
+#        self.res = res
+#        yield self._start_container()
 
-                         
+#class Send_List_Resource_Object(Send_Resource_Object_Test):
+#    @defer.inlineCallbacks
+#    def setUp(self):
+#        res = ListResource()
+#        res.name = 'a big list'
+#        res.rlist = ['a',3,4.0,{'a':3}]
+#        self.res = res
+#        yield self._start_container()
+ 
+ 
+ 
