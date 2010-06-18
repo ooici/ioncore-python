@@ -534,7 +534,7 @@ class StoreContextWrapper(object):
         return self.backend.remove(self._key(id))
 
     def query(self, regex):
-        pattern = "%s(%s)" % (self.prefix, regex,)
+        pattern = "%s%s" % (self.prefix, regex,)
         return self.backend.query(pattern)
 
 class CAStore(object):

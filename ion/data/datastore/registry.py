@@ -103,7 +103,6 @@ class ResourceRegistry(objstore.ObjectStore):
         c_id = yield res_client.commit()
         defer.returnValue(c_id)
 
-
     @defer.inlineCallbacks
     def get_description(self, uuid):
         """
@@ -113,17 +112,32 @@ class ResourceRegistry(objstore.ObjectStore):
         resource_description = yield resource_client.checkout()
         defer.returnValue(resource_description)
 
+    def list(self):
+        """
+        @brief list of resource description uuids(names)
+        """
+        return self.refs.query('(\w*$)')
+
+    @defer.inlineCallbacks
+    def list_descriptions(self):
+        ids = yield self.list()
+        defer.returnValue([(yield self.get_description(id)) for id in ids])
+            
+
 
 @defer.inlineCallbacks
 def test(ns):
     from ion.data import store
     s = yield store.Store.create_store()
     ns.update(locals())
-    reg = ResourceRegistry(s)
+    reg = yield ResourceRegistry.new(s, 'registry')
     res1 = ResourceDescription()
     ns.update(locals())
     res1.name = 'foo'
     commit_id = yield reg.register('foo', res1)
+    res2 = ResourceDescription()
+    res2.name = 'doo'
+    commit_id = yield reg.register('daa', res2)
     ns.update(locals())
 
 

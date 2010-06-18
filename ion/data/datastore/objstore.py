@@ -310,6 +310,7 @@ class BaseObjectStore(cas.CAStore):
         cas.CAStore.__init__(self, backend, partition)
         self.partition = partition
         self.storemeta = cas.StoreContextWrapper(backend, partition + '.meta.')
+        self.refs = cas.StoreContextWrapper(backend, partition + '.refs:')
         self.type = reflect.fullyQualifiedName(self.__class__)
 
     @classmethod
@@ -453,7 +454,8 @@ class ObjectStore(BaseObjectStore):
                                     ('class', obj_class_obj),
                                     ('attrs', attrs))
         obj_id = yield self.put(obj_tree)
-        yield self.objs.put(name, obj_id)
+        #yield self.objs.put(name, obj_id)
+        yield self.refs.put(name, obj_id)
         defer.returnValue(obj_id)
 
 
@@ -464,11 +466,13 @@ class ObjectStore(BaseObjectStore):
         an object store object.
         @note Not Using Object Store Partition Namespace Yet.
         """
-        id = yield self.objs.get(name)
+        #id = yield self.objs.get(name)
+        id = yield self.refs.get(name)
         obj_obj = yield self.get(id)
         yield obj_obj.load(self)
         objectClass = self._load_object_class(obj_obj)
-        keyspace = cas.StoreContextWrapper(self.backend, self.partition + '.' + id + ':')
+        #keyspace = cas.StoreContextWrapper(self.backend, self.partition + '.' + id + ':')
+        keyspace = cas.StoreContextWrapper(self.refs, name + '.')
         obj = self.objectChassis(self, keyspace, objectClass)
         defer.returnValue(obj)
 
@@ -480,7 +484,8 @@ class ObjectStore(BaseObjectStore):
         @retval A Deferred
         """
         try:
-            obj = yield self.objs.get(name)
+            #obj = yield self.objs.get(name)
+            obj = yield self.refs.get(name)
             exists = bool(obj)
         except cas.CAStoreError:
             exists = False

@@ -50,6 +50,10 @@ class DataObjectType(type):
     """
 
     def __new__(cls, name, bases, dict):
+        """
+        @brief this makes it so DataObjects can inherit TypedAttributes
+        from their super class.
+        """
         d = {}
         for key, value in [b.__dict__.items() for b in bases][0]:
             if isinstance(value, TypedAttribute):

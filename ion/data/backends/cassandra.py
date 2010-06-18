@@ -119,8 +119,10 @@ class CassandraStore(IStore):
         if self.cf_super:
             klist = self.kvs.get_range(super_column=self.namespace)
             for x in klist:
-                if re.search(regex, x[0]):
-                    matched_list.append(x)
+                #m = re.search(regex, x[0])
+                m = re.findall(regex, x[0])
+                if m:
+                    matched_list.extend(m)
         else:
             klist = self.kvs.get_range()
             if self.namespace:
@@ -128,13 +130,18 @@ class CassandraStore(IStore):
                 pl = len(prefix)
                 for x in klist:
                     key = x[0]
-                    if key.startswith(prefix) and re.search(regex, key[pl:]):
-                        y = (key[pl:], x[1])
-                        matched_list.append(y)
+                    #m = re.search(regex, key[pl:])
+                    m = re.findall(regex, key[pl:])
+                    #if key.startswith(prefix) and m:
+                    if m:
+                        #y = (key[pl:], x[1])
+                        matched_list.extend(m)
             else:
                 for x in klist:
-                    if re.search(regex, x[0]):
-                        matched_list.append(x)
+                    #m = re.search(regex, x[0])
+                    m = re.findall(regex, x[0])
+                    if m:
+                        matched_list.extend(m)
 
         return defer.succeed(matched_list)
 
