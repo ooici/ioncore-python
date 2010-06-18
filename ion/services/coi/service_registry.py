@@ -17,6 +17,7 @@ import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
+
 from ion.data.datastore import registry
 from ion.data import dataobject
 from ion.data import store
@@ -170,7 +171,6 @@ class ServiceRegistryClient(BaseServiceClient):
         defer.returnValue(sidesc.xname)
 
 
-
 class ServiceDesc(registry.ResourceDescription):
     """Structured object for a service instance.
 
@@ -192,6 +192,7 @@ class ServiceInstanceDesc(registry.ResourceDescription):
     xname = dataobject.TypedAttribute(str)
     svc_name = dataobject.TypedAttribute(str)
     res_type = dataobject.TypedAttribute(str,'rt_service')
+
 
 
 #class ServiceInstanceDesc(ResourceDesc):
@@ -217,7 +218,7 @@ class ServiceInstanceDesc(registry.ResourceDescription):
 #            self.set_attr('svc_name',kwargs['svc_name'])
 #        else:
 #            raise RuntimeError("Service name missing")
-#
+
 #class ServiceDesc(ResourceTypeDesc):
 #    """Structured object for a service description.
 #

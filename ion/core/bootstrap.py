@@ -19,8 +19,10 @@ from ion.data.store import Store
 from ion.core import ioninit, base_process
 from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core.cc.modloader import ModuleLoader
+
 from ion.services.coi import service_registry
 from ion.data.datastore import registry
+
 from ion.util.config import Config
 import ion.util.procutils as pu
 

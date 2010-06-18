@@ -78,7 +78,7 @@ class IStoreTest(unittest.TestCase):
 #        print 'type rl',type(rl)
 #        print 'type rl[0]', type(rl[0])
 #        print 'type rl[0][0]', type(rl[0][0])
-        self.failUnlessEqual(rl[0][0], self.key)
+        self.failUnlessEqual(rl[0], self.key)
 
 
 
