@@ -84,9 +84,11 @@ class ResourceRegistryService(BaseService):
         logging.info('op_get_resource: '+str(res_id))
 
         resource = yield self.reg.get_description(res_id)
-        logging.info('Got Resource \n: '+str(resource))
-
-        yield self.reply_ok(msg, {'res_enc':resource.encode()})
+        logging.info('Got Resource:\n'+str(resource))
+        if resource:
+            yield self.reply_ok(msg, {'res_enc':resource.encode()})
+        else:
+            yield self.reply_err(msg, {'res_enc':None})
 
     def op_set_resource_lcstate(self, content, headers, msg):
         """

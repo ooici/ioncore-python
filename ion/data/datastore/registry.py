@@ -112,9 +112,12 @@ class ResourceRegistry(objstore.ObjectStore):
         @brief Get resource description object
         """
         resource_client = yield self.clone(uuid)
-        resource_description = yield resource_client.checkout()
+        if resource_client:
+            resource_description = yield resource_client.checkout()
+        else:
+            resource_description=None
         defer.returnValue(resource_description)
-
+    
 
 @defer.inlineCallbacks
 def test(ns):

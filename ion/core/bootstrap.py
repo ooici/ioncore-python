@@ -19,7 +19,7 @@ from ion.data.store import Store
 from ion.core import ioninit, base_process
 from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core.cc.modloader import ModuleLoader
-from ion.services.coi.service_registry import ServiceRegistryClient
+from ion.services.coi import service_registry
 from ion.data.datastore import registry
 from ion.util.config import Config
 import ion.util.procutils as pu
@@ -76,7 +76,7 @@ def init_container():
         Container.interceptor_system = cls()
     # Collect all service declarations in local code modules
     ModuleLoader().load_modules()
-    #yield bs_register_services()
+    yield bs_register_services()
 
 def _set_container_args(contargs=None):
     ioninit.cont_args['_args'] = contargs
@@ -175,9 +175,10 @@ def bs_register_services():
     """
     Register all the declared processes.
     """
-    src = ServiceRegistryClient()
+    src = service_registry.ServiceRegistryClient()
     for proc in base_process.processes.values():
-        #sd = ServiceDesc(name=proc['name'])
+        sd = service_registry.ServiceDesc()
+        sd.name = proc['name']
         res = yield src.register_service(sd)
 
 def reset_container():

@@ -54,6 +54,16 @@ class ResourceRegistryTest(IonTestCase):
 
 
 class ResourceRegistryCoreServiceTest(IonTestCase):
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+        self.sup = yield self._start_core_services()
+        print 'self.sup',self.sup
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
+
 
     @defer.inlineCallbacks
     def test_resource_reg(self):
@@ -70,4 +80,5 @@ class ResourceRegistryCoreServiceTest(IonTestCase):
         self.assertEqual(rd3,rd2)
 
         rd4 = yield reg.get_resource('NONE')
+        print 'rd4',rd4
         self.assertFalse(rd4,'resource desc not None')
