@@ -7,8 +7,9 @@
 @brief storing immutable values (blobs, trees, commit) and storing structured
         mutable objects mapped to graphs of immutable values
 
-@todo Decide if Objects(BaseObject) pass around object instances, or their
-hashes.
+@note This file is almost Twisted independent; the only exception is in
+CAStore -- ion.data.store.IStore specifies methods that return
+twisted.internet.defer.Deferred objects.
 """
 
 import re
@@ -20,7 +21,6 @@ from zope.interface import Interface
 from zope.interface import implements
 from zope.interface import Attribute 
 
-from twisted.internet import defer
 
 NULL_CHR = "\x00"
 
@@ -44,13 +44,17 @@ def sha1_to_hex(bytes):
     almosthex = map(hex, hex_bytes)
     return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
 
+class CAStoreError(Exception):
+    """
+    Exception class for CAStore
+    """
 
-class Entity(tuple):
+class Element(tuple):
     """
     Represents a child element of a tree object. Not an object itself, but
-    a convenience container for the format of an element of a tree.
-    A tuple is immutable, so this is a safe way to encode the elements of a
-    Tree.
+    a convenience container for the format of an element of a tree.  A
+    tuple is immutable, so this is a safe way to carry around the elements
+    of a Tree.
 
     @note Want flexibility on what obj is: Tree is encoded with the obj's
     sha1 hash (bin version).
@@ -58,13 +62,16 @@ class Entity(tuple):
 
     def __init__(self, name, obj, mode=None):
         """
-        @todo XXX rethink this
+        @param name something to associate with obj
+        @param obj a storable object or it's id.
+        @brief Only store obj if it is really an instance of BaseObject.
+        @note Tree uses this to represent it's child elements. Tree treats
+        this like a tuple. This extension of tuple enforces the order of
+        name, obj, mode.
         """
         if not isinstance(obj, BaseObject):
             obj = None
-        self.name = name
         self.obj = obj
-        self.obj_id = self[1]
 
     def __new__(cls, name, obj, mode='100644'):
         """
@@ -78,19 +85,18 @@ class Entity(tuple):
             obj_id = obj
         return tuple.__new__(cls, [name, obj_id, mode])
 
-    def load(self, backend):
-        """
-        @brief experimental way to dynamically load objects from id's.
-        """
-        if not self.obj:
-            def cb(obj):
-                self.obj = obj
-                return obj.load(backend)
+    def __str__(self):
+        head = "="*10
+        strng ="""\n%s Entity %s\n""" % (head, head)
+        strng+="""= tuple:: name:"%s" id:"%s" mode:"%s"\n""" % (self[0],sha1_to_hex(self[1]),self[2])
+        s=False
+        if self.obj:
+            s=True
+        strng+="""= tuple obj present=%s \n""" % s
+        strng+=head*2
+        return strng
 
-            d = backend.get(self.obj_id)
-            d.addCallback(cb)
-            return d
-        return defer.succeed(None)
+
 
 class ICAStoreObject(Interface):
     """
@@ -105,14 +111,6 @@ class ICAStoreObject(Interface):
         @brief Bytes to write into store.
         """
 
-    def hash():
-        """
-        @brief Hash (sha1) of storable value
-        @todo Decide if this should really be part of the interface
-        @note This method is depricated in favor of calling sha1(obj)
-        so that the form, binary or hex can be specified.
-        """
-
     def encode():
         """
         @brief Full encoding (header + body) of storable content. This
@@ -124,11 +122,6 @@ class ICAStoreObject(Interface):
         """
         @brief Decode value into an instance of a StoreObject class
         """
-        
-    def __str__():
-        """
-        @brief Pretty print object as string for inspection
-        """
 
 class BaseObject(object):
     """Base object of content addressable value store
@@ -138,6 +131,7 @@ class BaseObject(object):
     implements(ICAStoreObject)
 
     type = None
+    _value_cache = None
 
     @classmethod
     def get_type(cls):
@@ -151,13 +145,10 @@ class BaseObject(object):
         """
         @brief Bytes that actually go into the store (i.e. content
         addressable key/value store).
-        @todo cache encoding() result to avoid re-computing the same thing.
         """
-        return self.encode()
-
-    @property
-    def hash(self):
-        return sha1(self.value, bin=False)
+        if not self._value_cache:
+            self._value_cache = self.encode()
+        return self._value_cache
 
     def encode(self):
         """
@@ -258,8 +249,8 @@ class Blob(BaseObject):
 
     def __str__(self):
         head = '='*10
-        strng  = """\n%s Store Type: %s %s\n""" % (head, str(self.get_type()), head)
-        strng += """= Key: "%s"\n""" % str( self.hash )
+        strng  = """\n%s Store Type: %s %s\n""" % (head, self.type, head,)
+        strng += """= Key: "%s"\n""" % sha1hex(self.value)
         strng += """= Content: "%s"\n""" % str(self.content)
         strng += head*2
         return strng
@@ -276,12 +267,6 @@ class Blob(BaseObject):
         """
         return cls(encoded_body)
 
-    def load(self, backend):
-        """
-        @brief leaf of load recursion. Do nothing.
-        """
-        return defer.succeed(self.content)
-
 class Tree(BaseObject):
     """
     Tree Object
@@ -290,25 +275,25 @@ class Tree(BaseObject):
     """
     type = 'tree'
 
-    entityFactory = Entity
+    elementFactory = Element
 
     def __init__(self, *children):
         """
         @param children (name, obj_hash, mode)
 
         @note XXX For organizational convenience, child objects could be
-        represented by an Entity class...a container for the object, name,
-        and mode (state bit map). The entity would be completely abstract
+        represented by an Element class...a container for the object, name,
+        and mode (state bit map). The element would be completely abstract
         (arbitrary) in the context of the CAStore, but it might be part of
         the data model in a higher-level application.
         """
         entities = []
         names = {}
         for child in children:
-            if not isinstance(child, self.entityFactory):
-                child = self.entityFactory(*child)
+            if not isinstance(child, self.elementFactory):
+                child = self.elementFactory(*child)
             entities.append(child)
-            names[child.name] = child
+            names[child[0]] = child
         self.children = entities
         self._names = names
 
@@ -329,10 +314,10 @@ class Tree(BaseObject):
 
     def __str__(self):
         head = "="*10
-        strng ="""\n%s Store Type: %s %s\n""" % (head,str(self.get_type()),head)
-        strng+="""= Key: "%s"\n""" % str( self.hash )
-        for entity in self.children:  
-            strng+="""= name: "%s", id: "%s"\n""" % (entity[0],sha1_to_hex(entity[1]))
+        strng ="""\n%s Store Type: %s %s\n""" % (head, self.type, head,)
+        strng+="""= Key: "%s"\n""" % sha1hex(self.value)
+        for element in self.children:  
+            strng+="""= name: "%s", id: "%s"\n""" % (element[0], sha1_to_hex(element[1]),)
         strng+=head*2
         return strng
 
@@ -406,13 +391,8 @@ class Tree(BaseObject):
         """
         @brief A factory for creating child entities for a Tree.
         """
-        return cls.entityFactory(name, obj, mode)
+        return cls.elementFactory(name, obj, mode)
 
-    def load(self, backend):
-        """
-        @brief Call load on all entities.
-        """
-        return defer.DeferredList([child.load(backend) for child in self.children])
 
 class Commit(BaseObject):
     """
@@ -438,9 +418,11 @@ class Commit(BaseObject):
 
     def __str__(self):
         head = "="*10
-        strng ="""\n%s Store Type: %s %s\n""" % (head,str(self.get_type()),head)
-        strng+="""= Key: "%s"\n""" % str( self.hash )
+        strng ="""\n%s Store Type: %s %s\n""" % (head, self.type, head,)
+        strng+="""= Key: "%s"\n""" % sha1hex(self.value)
         strng+="""= Tree: "%s"\n""" % self.tree
+        if self.parents:
+            strng+="""= Parent: "%s"\n""" % self.parents[0]
         strng+="""= Log: "%s"\n""" % self.log
         strng+=head*2
         return strng
@@ -503,9 +485,27 @@ class Commit(BaseObject):
 
 class ICAStore(Interface):
     """
-    Interface for a content addressable value store
-    @todo determine appropriate interface methods.
+    Content addressable value store.
+
+    @brief Uses an instance of a backend key/value store class -- an object
+    providing ion.data.store.IStore
     """
+
+    TYPES = Attribute("""@param TYPES Dict providing map of ICAStoreObject
+        type names to ICAStoreObject implementation class.""")
+
+    def get(id):
+        """
+        @param id of content object
+        @retval A Deferred that fires with an object that provides
+        ICAStoreObject.
+        """
+
+    def put(obj):
+        """
+        @param obj instance of object providing ICAStoreObject
+        @retval A Deferred that fires with the obj id.
+        """
 
 class StoreContextWrapper(object):
     """
@@ -513,6 +513,11 @@ class StoreContextWrapper(object):
     """
 
     def __init__(self, backend, prefix):
+        """
+        @param backend instance that provides ion.data.store.IStore
+        interface.
+        @param prefix segment of namespace (the context).
+        """
         self.backend = backend
         self.prefix = prefix
 
@@ -529,15 +534,16 @@ class StoreContextWrapper(object):
         return self.backend.remove(self._key(id))
 
     def query(self, regex):
-        pattern = "%s(%s)" % (self.prefix, regex,)
+        pattern = "%s%s" % (self.prefix, regex,)
         return self.backend.query(pattern)
 
 class CAStore(object):
     """
     Content Addressable Store
-    Manages and provides organizational utilities for a set of objects
-    (blobs, trees, commits, etc.)
     """
+
+    BaseStorableType = BaseObject
+
     TYPES = {
             Blob.type:Blob,
             Tree.type:Tree,
@@ -546,22 +552,21 @@ class CAStore(object):
 
     def __init__(self, backend, namespace='', compression=None):
         """
+        @param backend instance that provides the ion.data.store.IStore
+        interface.
         @param namespace root prefix qualifying context for this CAS with in the
         general space of the backend store.
-        @param backend storage interface
         """
-        self._backend = backend
-        self.root_namespace = namespace
-        self.objstore = StoreContextWrapper(backend, namespace + '.objects.')
-        self.refstore = StoreContextWrapper(backend, namespace + '.refs.')
-        self.infostore = StoreContextWrapper(backend, namespace + '.info.')
+        self.backend = backend
+        self.namespace = namespace
+        self.objs = StoreContextWrapper(backend, namespace + '.objs.')
 
     def decode(self, encoded_obj):
         """
         @brief decode raw object read from backend store
         @param encoded_obj encoded object of one of the type in self.TYPES
         """
-        obj = BaseObject.decode(encoded_obj, self.TYPES)
+        obj = self.BaseStorableType.decode(encoded_obj, self.TYPES)
         return obj
 
     def hash_object(self, obj):
@@ -586,7 +591,7 @@ class CAStore(object):
         value = obj.value #compress arg
         hash = sha1(value)
         id = sha1_to_hex(hash)
-        d = self.objstore.put(id, value)
+        d = self.objs.put(id, value)
         d.addCallback(lambda _: id)
         return d
 
@@ -598,8 +603,10 @@ class CAStore(object):
         """
         if len(id) == 20:
             id = sha1_to_hex(id)
-        d = self.objstore.get(id)
+        d = self.objs.get(id)
         def _decode_cb(raw):
+            if not raw:
+                raise CAStoreError("Object with id: %s not found" % id)
             return self.decode(raw)
         d.addCallback(_decode_cb)
         # d.addErrback

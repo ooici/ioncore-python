@@ -11,7 +11,7 @@ from twisted.internet import defer
 
 from ion.core.base_process import BaseProcess
 from ion.core.base_process import BaseProcessClient
-from ion.services.coi.resource_registry import ResourceLCState
+from ion.data.datastore.registry import LCState
 
 class ResourceAgent(BaseProcess):
     """
@@ -34,7 +34,7 @@ class ResourceAgent(BaseProcess):
     def op_setLifecycleState(self, content, headers, msg):
         """
         """
-        self.lifecycleState = ResourceLCState.RESLCS_NEW
+        self.lifecycleState = LCState('new')
 
     def op_execute(self, content, headers, msg):
         """
@@ -59,13 +59,6 @@ class ResourceAgentClient(BaseProcessClient):
         Set the lifecycle state of the instrument agent
         @param value A ion.services.coi.resource_registry.ResourceLCState value
         """
-        assert((value == ResourceLCState.RESLCS_NEW) or
-               (value == ResourceLCState.RESLCS_ACTIVE) or
-               (value == ResourceLCState.RESLCS_INACTIVE) or
-               (value == ResourceLCState.RESLCS_DECOM) or
-               (value == ResourceLCState.RESLCS_RETIRED) or
-               (value == ResourceLCState.RESLCS_DEVELOPED) or
-               (value == ResourceLCState.RESLCS_COMMISSIONED))
         
         (content, headers, msg) = yield self.rpc_send('setLifecycleState',
                                                       value)

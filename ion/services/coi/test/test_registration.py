@@ -152,7 +152,7 @@ class UserRegistrationClientTest(IonTestCase):
         
         hc = IdentityRegistryServiceClient(proc=self.sup)
         result = yield hc.store_registration(parms)
-        logging.debug('###2 Service reply: '+result['value'])
+        logging.debug('###2 Service reply: '+str(result['value']))
                
     @defer.inlineCallbacks
     def test_store_registration_info(self):

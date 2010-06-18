@@ -89,9 +89,9 @@ class IdentityRegistryServiceClient(BaseServiceClient):
     @defer.inlineCallbacks
     def store_registration(self, parms):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('store_registration', parms)
-        logging.info('### Service reply: '+str(content))
-        defer.returnValue(content)        
+        #(content, headers, msg) = yield self.rpc_send('store_registration', parms)
+        #logging.info('### Service reply: '+str(content))
+        defer.returnValue({'value':None})        
         
     @defer.inlineCallbacks
     def store_registration_info(self, text='Testing'):
@@ -135,6 +135,7 @@ class IdentityRegistryService(BaseService):
     #    # initialize data store
     #    #self.rdfs=RdfStore()
     #    #yield self.rdfs.init()
+
         
     def __init__(self, receiver, spawnArgs=None):
         # Service class initializer. Basic config, but no yields allowed.
