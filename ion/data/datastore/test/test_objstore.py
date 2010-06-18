@@ -15,7 +15,6 @@ from ion.data import store
 from ion.data.datastore import cas
 from ion.data.datastore import objstore
 
-from ion.data import resource
 
 sha1 = cas.sha1
 
@@ -41,7 +40,7 @@ class ObjectStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_create_object(self):
-        obj = yield self.object_store.create('thing',resource.IdentityResource)
+        obj = yield self.object_store.create('thing',objstore.Identity)
         self.failUnless(isinstance(obj, objstore.ObjectChassis))
 
     @defer.inlineCallbacks
