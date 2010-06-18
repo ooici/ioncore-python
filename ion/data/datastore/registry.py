@@ -35,6 +35,14 @@ class LCState(object):
 
 LCStates = dict([('LCState', LCState)] + [(name, LCState(name)) for name in LCStateNames])
 
+class states(dict):
+
+    def __init__(self, d):
+        dict.__init__(self, d)
+        for k, v in d.items():
+            setattr(self, k, v)
+
+LCStates = states(LCStates)
 
 class ResourceDescription(dataobject.DataObject):
     """
@@ -46,7 +54,10 @@ class ResourceDescription(dataobject.DataObject):
     _types = LCStates
 
     name = dataobject.TypedAttribute(str)
-    lifecycle = dataobject.TypedAttribute(LCState, default=LCStates['new'])
+    lifecycle = dataobject.TypedAttribute(LCState, default=LCStates.new)
+
+    def set_lifecyclestate(self, state):
+        self.lifecycle = state
 
 class Generic(ResourceDescription):
     """
