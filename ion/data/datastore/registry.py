@@ -2,6 +2,9 @@
 @file ion/data/datastore/registry.py
 """
 
+import logging
+logging = logging.getLogger(__name__)
+
 from zope import interface
 
 from twisted.internet import defer
@@ -138,6 +141,8 @@ class ResourceRegistry(objstore.ObjectStore):
     @defer.inlineCallbacks
     def list_descriptions(self):
         ids = yield self.list()
+        # Should this return a dictionary with UUID:Resource?
+        # Should the UUID be stored as part of the resource?
         defer.returnValue([(yield self.get_description(id)) for id in ids])
             
 

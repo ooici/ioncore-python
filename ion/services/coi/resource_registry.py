@@ -28,7 +28,12 @@ CONF = ioninit.config(__name__)
 class ResourceRegistryService(BaseService):
     """
     Resource registry service interface
-    """
+    The Resource Registry Service uses an IStore interface to a back end Key
+    Value Store to store and track version controlled objects. The store will
+    share a name space and share objects unless a new store or store name space
+    is created. The resource are retrieved as complete objects from the store.
+    The built-in encode method is used to store and transmit them using the COI
+    messaging."""
 
     # Declaration of service
     declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
@@ -66,7 +71,7 @@ class ResourceRegistryService(BaseService):
         res_enc = content['res_enc']
         resource = registry.ResourceDescription.decode(res_enc)()
         logging.info('op_register_resource: \n' + str(resource))
-
+  
         yield self.reg.register(res_id,resource)
         yield self.reply_ok(msg, {'res_id':str(res_id)},)
 
