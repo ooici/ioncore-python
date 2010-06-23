@@ -13,7 +13,6 @@ logging = logging.getLogger(__name__)
 from twisted.internet import defer, reactor
 from twisted.web import server, resource
 
-import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
