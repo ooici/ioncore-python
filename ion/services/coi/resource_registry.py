@@ -28,12 +28,13 @@ CONF = ioninit.config(__name__)
 class ResourceRegistryService(BaseService):
     """
     Resource registry service interface
-    The Resource Registry Service uses an IStore interface to a back end Key
-    Value Store to store and track version controlled objects. The store will
-    share a name space and share objects unless a new store or store name space
-    is created. The resource are retrieved as complete objects from the store.
-    The built-in encode method is used to store and transmit them using the COI
-    messaging."""
+    The Resource Registry Service uses an IStore interface to a backend Key
+    Value Store to store to track version controlled objects. The store will
+    share a name space and share objects depending on configuration when it is
+    created. The resource are retrieved as complete objects from the store. The
+    built-in encode method is used to store and transmit them using the COI
+    messaging.
+    """
 
     # Declaration of service
     declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
@@ -120,6 +121,11 @@ class ResourceRegistryClient(BaseServiceClient):
 
     @defer.inlineCallbacks
     def register_resource(self, res_id, resource):
+        """
+        @brief Store a resource in the registry by its ID. It can be new or
+        modified.
+        @param res_id is a resource identifier unique to this resource.
+        """
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('register_resource',
@@ -129,6 +135,11 @@ class ResourceRegistryClient(BaseServiceClient):
 
     @defer.inlineCallbacks
     def get_resource(self, res_id):
+        """
+        @brief Retrieve a resource from the registry by its ID
+        @param res_id is a resource identifier unique to this resource
+        """
+        
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('get_resource',
