@@ -40,6 +40,7 @@ class WebService(BaseService):
         self.root = DMUI()
         self.site = server.Site(self.root)
         self.port = reactor.listenTCP(2100, self.site)
+        self.root.print_string = None
         logging.info('Website started')
 
     @defer.inlineCallbacks

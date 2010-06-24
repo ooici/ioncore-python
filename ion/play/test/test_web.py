@@ -10,6 +10,7 @@ from twisted.internet import defer
 
 from ion.play.web_service import WebServiceClient
 from ion.test.iontest import IonTestCase
+from twisted.web import client
 
 class HelloTest(IonTestCase):
     """
@@ -35,8 +36,17 @@ class HelloTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
 
+        # Pull page to make sure its serving
+        page = yield client.getPage('http://127.0.0.1:2100/')
+
+        self.failIfSubstring('hello http world', page)
+
         wc = WebServiceClient(proc=sup)
         yield wc.set_string('hello http world!')
 
-        # @todo http client to pull same...
-        
+        # Pull page to make sure it got there
+        page = yield client.getPage('http://127.0.0.1:2100/')
+
+        self.failUnlessSubstring('hello http world', page)
+
+
