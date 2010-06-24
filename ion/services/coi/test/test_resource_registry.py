@@ -51,7 +51,32 @@ class ResourceRegistryTest(IonTestCase):
         logging.info('Resource desc:\n '+str(rd3))
         self.assertEqual(rd3,rd2)
 
+    @defer.inlineCallbacks
+    def test_resource_reg(self):
 
+        rd2 = registry.Generic()
+        rd2.name = 'David'
+        
+        rid = yield self.rrc.register_resource(str(uuid.uuid4()),rd2) 
+        logging.info('Resource registered with id '+str(rid))
+
+        rd3 = yield self.rrc.get_resource(rid)
+        logging.info('Resource desc:\n '+str(rd3))
+        self.assertEqual(rd3,rd2)
+        
+        yield self.rrc.set_lcstate(rid,registry.LCStates.active)
+        rd4 = yield self.rrc.get_resource(rid)
+        logging.info('Resource desc:\n '+str(rd4))
+        self.assertNotEqual(rd3,rd4)
+
+        success = yield self.rrc.set_lcstate_new(rid)
+        self.assertEqual(success,True)
+        
+        success = yield self.rrc.set_lcstate_new('dklhshkaviohe23290')
+        self.assertEqual(success,False)
+        
+        
+        
 
 class ResourceRegistryCoreServiceTest(IonTestCase):
     @defer.inlineCallbacks

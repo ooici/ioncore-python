@@ -29,6 +29,20 @@ class RegistryTest(unittest.TestCase):
         res2 = yield self.reg.get_description(res_id)
         self.failUnless(res == res2)
 
+    def test_lcstate(self):
+        
+        logging.info(registry.LCStates)
+        
+        res = registry.Generic()
+        logging.info(res.get_lifecyclestate())
+        
+        res.set_lifecyclestate(registry.LCStates.active)
+        logging.info(res.get_lifecyclestate())
+        res.set_lifecyclestate(registry.LCStates['retired'])
+        logging.info(res.get_lifecyclestate())
+
+
+
     @defer.inlineCallbacks
     def test_register_overwrite(self):
         res_id = uuid.uuid4().hex

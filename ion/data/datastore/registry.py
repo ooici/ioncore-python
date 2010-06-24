@@ -23,6 +23,8 @@ LCStateNames = ['new',
                 'commissioned',
                 ]
 
+
+
 class LCState(object):
 
     def __init__(self, state):
@@ -60,7 +62,11 @@ class ResourceDescription(dataobject.DataObject):
     lifecycle = dataobject.TypedAttribute(LCState, default=LCStates.new)
 
     def set_lifecyclestate(self, state):
+        assert(isinstance(state, LCState))
         self.lifecycle = state
+
+    def get_lifecyclestate(self):
+        return self.lifecycle
 
 class Generic(ResourceDescription):
     """

@@ -95,15 +95,36 @@ class ResourceRegistryService(BaseService):
             yield self.reply_ok(msg, {'res_enc':resource.encode()})
         else:
             yield self.reply_err(msg, {'res_enc':None})
-
+    
+    @defer.inlineCallbacks
     def op_set_resource_lcstate(self, content, headers, msg):
         """
         Service operation: set the life cycle state of resource
         """
+        res_id = str(content['res_id'])
+        lifecycle = str(content['lifecycle'])
+        logging.info('op_set_resource_lcstate: '+str(res_id) + ', LCState:' + str(lifecycle))
+
+        resource = yield self.reg.get_description(res_id)
+        
+        if resource:
+            resource.set_lifecyclestate(registry.LCStates[lifecycle])
+            yield self.reg.register(res_id,resource)
+            yield self.reply_ok(msg, {'res_id':str(res_id)},)
+
+        else:
+            yield self.reply_err(msg, {'res_id':None})
+
+
 
     def op_find_resources(self, content, headers, msg):
         """
         Service operation: find resources by criteria
+        """
+
+    def op_list_resources(self,content, headers, msg):
+        """
+        Service operation: List resources of a particular type
         """
 
 
@@ -151,6 +172,47 @@ class ResourceRegistryClient(BaseServiceClient):
             defer.returnValue(resource)
         else:
             defer.returnValue(None)
+
+
+    @defer.inlineCallbacks
+    def set_lcstate(self, res_id, lcstate):
+        """
+        @brief Retrieve a resource from the registry by its ID
+        @param res_id is a resource identifier unique to this resource
+        @param lcstate is a resource life cycle stae
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('set_resource_lcstate',
+                                                      {'res_id':res_id,'lifecycle':str(lcstate)})
+        logging.info('Service reply: '+str(content))
+        
+        if content['status'] == 'OK':
+            defer.returnValue(True)
+        else:
+            defer.returnValue(False)
+
+    def set_lcstate_new(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.new)
+
+    def set_lcstate_active(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.active)
+        
+    def set_lcstate_inactive(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.inactive)
+
+    def set_lcstate_decomm(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.decomm)
+
+    def set_lcstate_retired(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.retired)
+
+    def set_lcstate_developed(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.developed)
+
+    def set_lcstate_commissioned(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.commissioned)
+
 
 #class ResourceTypes(object):
 #    """Static class with constant definitions for resource types.
