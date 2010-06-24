@@ -142,7 +142,7 @@ class ResourceRegistry(objstore.ObjectStore):
         """
         @brief list of resource description uuids(names)
         """
-        return self.refs.query('(\w*$)')
+        return self.refs.query('([-\w]*$)')
 
     @defer.inlineCallbacks
     def list_descriptions(self):
