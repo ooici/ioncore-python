@@ -83,7 +83,7 @@ class ServiceDesc(registry.ResourceDescription):
     .name   name of the service
     """    
     svc_name = dataobject.TypedAttribute(str)
-    res_type = dataobject.TypedAttribute(str,'rt_serviceinst')
+    res_type = dataobject.TypedAttribute(str,'rt_service')
 
         
 
@@ -96,7 +96,7 @@ class ServiceInstanceDesc(registry.ResourceDescription):
     """    
     xname = dataobject.TypedAttribute(str)
     svc_name = dataobject.TypedAttribute(str)
-    res_type = dataobject.TypedAttribute(str,'rt_service')
+    res_type = dataobject.TypedAttribute(str,'rt_serviceinst')
 
 
 

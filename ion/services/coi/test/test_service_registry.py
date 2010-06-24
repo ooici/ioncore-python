@@ -49,6 +49,7 @@ class ServiceRegistryTest(IonTestCase):
         
         ri1 = yield self.src.register_service_instance(si1)
 
+        # Return string with xname
         ri2 = yield self.src.get_service_instance_name('svcinst1')
         self.assertEqual(ri2, 'self.sup.id.full')
 
