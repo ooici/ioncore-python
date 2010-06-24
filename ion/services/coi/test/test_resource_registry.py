@@ -52,7 +52,7 @@ class ResourceRegistryTest(IonTestCase):
         self.assertEqual(rd3,rd2)
 
     @defer.inlineCallbacks
-    def test_resource_reg(self):
+    def test_resource_state(self):
 
         rd2 = registry.Generic()
         rd2.name = 'David'
@@ -64,14 +64,17 @@ class ResourceRegistryTest(IonTestCase):
         logging.info('Resource desc:\n '+str(rd3))
         self.assertEqual(rd3,rd2)
         
+        # Change the state and make sure the result is correct
         yield self.rrc.set_lcstate(rid,registry.LCStates.active)
         rd4 = yield self.rrc.get_resource(rid)
         logging.info('Resource desc:\n '+str(rd4))
         self.assertNotEqual(rd3,rd4)
 
+        # Make sure set_lcstate returns true for a valid id
         success = yield self.rrc.set_lcstate_new(rid)
         self.assertEqual(success,True)
         
+        # Try to set the state of a resource which does not exist
         success = yield self.rrc.set_lcstate_new('dklhshkaviohe23290')
         self.assertEqual(success,False)
         
@@ -83,7 +86,8 @@ class ResourceRegistryCoreServiceTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
         self.sup = yield self._start_core_services()
-        print 'self.sup',self.sup
+        #logging.info('self.sup.proc_state'+str(self.sup.proc_state))
+        
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -105,5 +109,5 @@ class ResourceRegistryCoreServiceTest(IonTestCase):
         self.assertEqual(rd3,rd2)
 
         rd4 = yield reg.get_resource('NONE')
-        print 'rd4',rd4
+        logging.info('rd4'+str(rd4))
         self.assertFalse(rd4,'resource desc not None')
