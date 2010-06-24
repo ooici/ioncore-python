@@ -147,6 +147,7 @@ class ResourceRegistry(objstore.ObjectStore):
     @defer.inlineCallbacks
     def list_descriptions(self):
         ids = yield self.list()
+        logging.info('ID List:'+str(ids))
         # Should this return a dictionary with UUID:Resource?
         # Should the UUID be stored as part of the resource?
         defer.returnValue([(yield self.get_description(id)) for id in ids])

@@ -77,6 +77,7 @@ class RegistryTest(unittest.TestCase):
         for res in res_s:
             logging.info( str(res))
             
+        self.assertIn(res, res_s)
         self.assertNotEqual(res_s[1],res_s[0])
         
 

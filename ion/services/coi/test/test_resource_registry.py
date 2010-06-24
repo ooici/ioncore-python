@@ -78,6 +78,41 @@ class ResourceRegistryTest(IonTestCase):
         success = yield self.rrc.set_lcstate_new('dklhshkaviohe23290')
         self.assertEqual(success,False)
         
+    @defer.inlineCallbacks
+    def test_resource_state(self):
+
+        rd1 = registry.Generic()
+        rd1.name = 'David'
+        
+        rd2 = registry.Generic()
+        rd2.name = 'Dorian'
+        
+        rd3 = registry.Generic()
+        rd3.name = 'John'
+        
+#        rid1 = yield self.rrc.register_resource(str(uuid.uuid4()),rd1)
+#        rid2 = yield self.rrc.register_resource(str(uuid.uuid4()),rd2)
+#       rid3 = yield self.rrc.register_resource(str(uuid.uuid4()),rd3)
+        
+        rid1 = yield self.rrc.register_resource('foo',rd1)
+        rid2 = yield self.rrc.register_resource('poo',rd2)
+        rid3 = yield self.rrc.register_resource(str(uuid.uuid4()),rd3)
+        
+        # Just to see what happens modify John
+        rd3.name = 'John Graybeal'
+        rid3 = yield self.rrc.register_resource(rid3,rd3)
+        
+        test = yield self.rrc.get_resource(rid3)
+        self.assertEqual(test,rd3)
+        
+        logging.info('**Get the list**')
+        # Get the list of resources:
+        resources = yield self.rrc.list_resources()
+        for res in resources:
+            logging.info(str(res))
+        
+        
+        
         
         
 

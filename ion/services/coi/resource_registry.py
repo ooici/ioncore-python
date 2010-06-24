@@ -122,11 +122,18 @@ class ResourceRegistryService(BaseService):
         Service operation: find resources by criteria
         """
 
+    @defer.inlineCallbacks
     def op_list_resources(self,content, headers, msg):
         """
         Service operation: List resources of a particular type
         """
-
+        logging.info('op_get_resources')
+        resources = yield self.reg.list_descriptions()
+        logging.info('Found Resources:'+str(resources))
+        
+        yield self.reply_ok(msg, {'res_enc':list([res.encode() for res in resources])} )
+        
+        
 
 class ResourceRegistryClient(BaseServiceClient):
     """
@@ -212,6 +219,23 @@ class ResourceRegistryClient(BaseServiceClient):
 
     def set_lcstate_commissioned(self, res_id):
         return self.set_lcstate(res_id, registry.LCStates.commissioned)
+
+    @defer.inlineCallbacks
+    def list_resources(self):
+        """
+        @brief Retrieve all the resources in the registry
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('list_resources',{})
+        logging.info('Service reply: '+str(content))
+        
+        res_enc = content['res_enc']
+        resources=[]
+        if res_enc != None:
+            for res in res_enc:
+                resources.append(registry.ResourceDescription.decode(res)())
+        defer.returnValue(resources)
 
 
 #class ResourceTypes(object):
