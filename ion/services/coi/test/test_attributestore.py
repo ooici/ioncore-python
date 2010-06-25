@@ -78,7 +78,7 @@ class AttrStoreServiceTest(IonTestCase):
                                         'keyspace':'Datastore',
                                         'colfamily':'DS1',
                                         'cf_super':True,
-                                        'namespace':None,
+                                        'namespace':'his',
                                         }}},
             {'name':'attstore2',
             'module':'ion.services.coi.attributestore',
@@ -89,7 +89,7 @@ class AttrStoreServiceTest(IonTestCase):
                                         'keyspace':'Datastore',
                                         'colfamily':'DS1',
                                         'cf_super':True,
-                                        'namespace':None,
+                                        'namespace':'hers',
                                         }}}
                     ]
 
@@ -116,4 +116,5 @@ class AttrStoreServiceTest(IonTestCase):
 
         # With common backends the value should be found.
         resx1 = yield asc2.get('key1')
-        self.assertEqual(resx1, 'value2')
+        self.assertEqual(resx1, 'value2',msg='Failed to pull value from second service instance')
+        

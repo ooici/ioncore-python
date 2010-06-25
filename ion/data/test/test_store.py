@@ -37,11 +37,22 @@ class IStoreTest(unittest.TestCase):
         d = Store.create_store()
         return d
 
-    #@defer.inlineCallbacks
+    @defer.inlineCallbacks
     def tearDown(self):
-        #yield self.ds.remove(self.key)
-        #del self.ds #shouldn't need
-        pass
+        yield self.ds.remove(self.key)
+        yield self.ds.clear_store()
+        
+
+    @defer.inlineCallbacks
+    def test_clear_store(self):
+        # Make sure we can't read the cleared store
+        yield self.ds.put(self.key, self.value)
+        rc = yield self.ds.clear_store()
+        if rc == None:
+            logging.info("Success clearing store!")
+        rc = yield self.ds.get(self.key)
+        self.failUnlessEqual(rc, None)
+
 
     @defer.inlineCallbacks
     def test_get_404(self):
@@ -82,23 +93,43 @@ class IStoreTest(unittest.TestCase):
 
 
 
-class CassandraStoreTest(IStoreTest):
+class CassandraStoreTestSuperCols(IStoreTest):
 
     def _setup_backend(self):
         clist = ['amoeba.ucsd.edu:9160']
         d = cassandra.CassandraStore.create_store(cass_host_list=clist)
         return d
 
-class CassandraStoreTest(IStoreTest):
+
+class CassandraStoreTestNoSuperCols(IStoreTest):
 
     def _setup_backend(self):
         clist = ['amoeba.ucsd.edu:9160']
         ds = cassandra.CassandraStore.create_store(
             cass_host_list=clist,
+            cf_super=False,
+            keyspace='Datasets',
+            colfamily='Catalog'
+            )
+        return ds
+
+    def test_clear_store(self):
+        raise unittest.SkipTest('Can not clear the persistent store if the name space is not unique')
+
+"""
+class CassandraStoreTestSup(IStoreTest):
+
+    def _setup_backend(self):
+        clist = ['amoeba.ucsd.edu:9160']
+        ds = cassandra.CassandraStore.create_store(
+            cass_host_list=clist,
+            keyspace='Datastore',
+            colfamily='DS1',
+            cf_super=True,
             namespace='n')
         return ds
-        
-class CassandraSuperStoreTest(IStoreTest):
+
+class CassandraSuperStoreRandomNameSpaceTest(IStoreTest):
 
     def _setup_backend(self):
         clist = ['amoeba.ucsd.edu:9160']
@@ -106,9 +137,10 @@ class CassandraSuperStoreTest(IStoreTest):
             cass_host_list=clist,
             keyspace='DatastoreTest',
             colfamily='DS1',
-            cf_super=True,
-            namespace='n')
+            cf_super=True)
         return ds
+
+"""
 
 class StoreServiceTest(IonTestCase, IStoreTest):
     """
@@ -118,6 +150,7 @@ class StoreServiceTest(IonTestCase, IStoreTest):
     @defer.inlineCallbacks
     def _setup_backend(self):
         yield self._start_container()
+        # By default, the store service will use Store in the backend.
         services = [
             {'name':'store1','module':'ion.data.backends.store_service','class':'StoreService'},
         ]

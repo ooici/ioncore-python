@@ -44,6 +44,12 @@ class IStore(object):
         instance.kwargs = kwargs
         return defer.succeed(instance)
 
+    def clear_store(self):
+        """
+        """
+        raise NotImplementedError, "Abstract Interface Not Implemented"
+        
+
     def get(self, key):
         """
         @param key  an immutable key associated with a value
@@ -81,6 +87,10 @@ class Store(IStore):
     """
     def __init__(self, **kwargs):
         self.kvs = {}
+
+    def clear_store(self):
+        self.kvs = {}
+        return defer.succeed(None)
 
     def get(self, key):
         """
