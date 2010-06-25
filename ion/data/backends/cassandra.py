@@ -149,7 +149,6 @@ class CassandraStore(IStore):
             klist = self.kvs.get(self.key)
 
         for x in klist.keys():
-            print x
             #m = re.search(regex, x[0])
             m = re.findall(regex, x)
             if m:
