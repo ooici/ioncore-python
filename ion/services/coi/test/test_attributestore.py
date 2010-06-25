@@ -59,6 +59,7 @@ class AttrStoreServiceTest(IonTestCase):
 
         asc2 = AttributeStoreClient(proc=sup, targetname='as2')
 
+        # With separate backends this should return none
         resx1 = yield asc2.get('key1')
         self.assertEqual(resx1, None)
         
@@ -113,5 +114,6 @@ class AttrStoreServiceTest(IonTestCase):
 
         asc2 = AttributeStoreClient(proc=sup, targetname='as2')
 
+        # With common backends the value should be found.
         resx1 = yield asc2.get('key1')
         self.assertEqual(resx1, 'value2')
