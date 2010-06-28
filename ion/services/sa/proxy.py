@@ -11,9 +11,80 @@ import logging
 logging = logging.getLogger(__name__)
 
 from ion.core.base_process import ProtocolFactory
+from ion.services.dm.preservation.coordinator import CoordinatorClient
 
 from ion.services.base_service import BaseService
-from ion.services.sa.tinyproxy import ProxyHandler, ThreadingHTTPServer
+from twisted.internet import defer, protocol, reactor
+from twisted.protocols.basic import LineReceiver
+
+
+# Read configuration file to find TCP server port
+from ion.core import ioninit
+config = ioninit.config(__name__)
+PROXY_PORT = int(config.getValue('proxy_port', '8100'))
+
+class DAPProxyProtocol(LineReceiver):
+    """
+    Super, super simple HTTP proxy. Goal: Take requests from DAP clients such
+    as matlab and netcdf, convert them into OOI messages to the preservation
+    service coordinator, and return whatever it gets from same as http.
+
+    Initially written using the twisted proxy classes, but in the end what we
+    need here is quite different from what the provide, so its much simpler
+    to just implement it as a most-basic protocol.
+
+    @see http://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol
+    @see The DAP protocol spec at http://www.opendap.org/pdf/ESE-RFC-004v1.1.pdf
+    """
+    def connectionMade(self):
+        logging.debug('connected!')
+        self.buf = []
+
+    def lineReceived(self, line):
+        logging.debug('got a line: %s' % line)
+        self.buf.append(line)
+        if len(line) == 0:
+            logging.info('Ready to send request off!')
+            self.send_receive()
+
+    @defer.inlineCallbacks
+    def send_receive(self):
+        """
+        Ready to send an http command off to the coordinator for dispatch.
+        """
+        logging.debug('starting send to coordinator...')
+        cc = CoordinatorClient()
+        # First entry in buffer should be 'GET url http/1.0' or similar
+        cmd, url, method = self.buf[0].split(' ')
+
+        if 'Connection: close' in self.buf:
+            logging.debug('disconnect request found')
+            do_disconnect = True
+        else:
+            do_disconnect = False
+
+        if cmd == 'HEAD':
+            page = yield cc.get_head(url)
+            logging.debug('got head back, writing to proxy client')
+            self.transport.write(page)
+        elif cmd == 'GET':
+            page = yield cc.get_url(url)
+            logging.debug('got page back, writing to proxy client')
+            self.transport.write(page)
+            logging.debug('done with trans.write')
+        else:
+            logging.error('Unknown command "%s"' % self.buf[0])
+            self.transport.write('HTTP/1.0 500 Server error, no comprende.\r\n')
+
+        if do_disconnect:
+            yield self.transport.loseConnection()
+
+        logging.debug('done with send/receive')
+        self.buf = []
+
+
+class DAPProxyFactory(protocol.ServerFactory):
+    protocol = DAPProxyProtocol
 
 class ProxyService(BaseService):
     """
@@ -24,26 +95,18 @@ class ProxyService(BaseService):
                                           version='0.1.0',
                                           dependencies=['controller'])
 
-    def __init__(self, receiver, spawnArgs=None):
-        # Service class initializer. Basic config, but no yields allowed.
-        BaseService.__init__(self, receiver, spawnArgs)
-        logging.info('ProxyService.__init__()')
-
+    @defer.inlineCallbacks
     def slc_init(self):
         """
-        Use this hook to bind to listener TCP port and setup modified
-        proxy stack.
-        @todo Move tcp port to DX configuration file
+        Use this hook to bind to listener TCP port.
         """
-        tcp_port = 8000
-        logging.debug('Setting up proxy on port %d...' % tcp_port)
-        """
-        based on BaseHTTPServer.test and tweaked a bit.
-        """
-        server_address = ('', tcp_port)
-        ProxyHandler.protocol_version = 'HTTP/1.0'
-        httpd = ThreadingHTTPServer(server_address, ProxyHandler)
-#        httpd.serve_forever()
-#        logging.debug('Proxy listener running.')
+        logging.info('starting proxy on port %d' % PROXY_PORT)
+        self.proxy_port = yield reactor.listenTCP(PROXY_PORT, DAPProxyFactory())
+        logging.info('Proxy listener running.')
+
+    @defer.inlineCallbacks
+    def slc_shutdown(self):
+        logging.info('Shutting down proxy')
+        yield self.proxy_port.stopListening()
 
 factory = ProtocolFactory(ProxyService)

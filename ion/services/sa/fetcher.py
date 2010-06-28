@@ -252,6 +252,7 @@ class FetcherClient(BaseServiceClient):
         that the fetcher can reply directly to the proxy and bypass the
         coordinator.
         """
+        yield self._check_init()
         logging.debug('Fetcher forwarding URL')
         yield self.send('get_url', content, self._rewrite_headers(headers))
 
@@ -260,6 +261,7 @@ class FetcherClient(BaseServiceClient):
         """
         Same as forward_get_url, different verb.
         """
+        yield self._check_init()
         yield self.send('get_dap_dataset', content, self._rewrite_headers(headers))
 
 # If loaded as a module, spawn the process
