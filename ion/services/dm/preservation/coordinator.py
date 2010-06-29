@@ -23,11 +23,7 @@ class CoordinatorService(BaseService):
     # Define ourselves for the CC
     declare = BaseService.service_declare(name='coordinator',
                                           version='0.1.0',
-                                          dependencies=[])
-
-    def __init__(self, receiver, spawnArgs=None):
-        BaseService.__init__(self, receiver, spawnArgs)
-        logging.debug('CoordinatorService.__init__()')
+                                          dependencies=['fetcher'])
 
     def slc_init(self):
         """
@@ -64,7 +60,7 @@ class CoordinatorService(BaseService):
 class CoordinatorClient(BaseServiceClient):
     """
     Caller interface to coordinator.
-    @see ion.services.dm.proxy for an example
+    @see ion.services.sa.proxy for an example
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
@@ -75,14 +71,14 @@ class CoordinatorClient(BaseServiceClient):
     def get_url(self, url):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('get_url', url)
-        logging.info('Reply from service: '+ str(content))
-        defer.returnValue(str(content))
+        # @bug get_url returns unicode, must cast to string or transport.write barfs
+        defer.returnValue(str(content['value']))
 
     @defer.inlineCallbacks
     def get_head(self, url):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('get_head', url)
-        logging.info('Reply from service: '+ str(content))
-        defer.returnValue(str(content))
+        #logging.info('Reply from service: '+ content['value'])
+        defer.returnValue(str(content['value']))
 
 factory = ProtocolFactory(CoordinatorService)
