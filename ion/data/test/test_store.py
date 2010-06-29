@@ -39,7 +39,6 @@ class IStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self.ds.remove(self.key)
         yield self.ds.clear_store()
         
 
@@ -164,4 +163,8 @@ class StoreServiceTest(IonTestCase, IStoreTest):
     @defer.inlineCallbacks
     def tearDown(self):
         yield self._stop_container()
+    
+#    def test_clear_store(self):
+#        raise unittest.SkipTest('Not implemented yet')
+
 

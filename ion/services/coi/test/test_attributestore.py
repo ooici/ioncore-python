@@ -69,7 +69,7 @@ class AttrStoreServiceTest(IonTestCase):
     def test_put_common_backend(self):
         # Test with cassandra store backend where both services can access common values!
         services = [
-            {'name':'attstore1',
+            {'name':'Junk1',
              'module':'ion.services.coi.attributestore',
              'class':'AttributeStoreService',
              'spawnargs':{'servicename':'as1',
@@ -78,9 +78,10 @@ class AttrStoreServiceTest(IonTestCase):
                                         'keyspace':'Datastore',
                                         'colfamily':'DS1',
                                         'cf_super':True,
-                                        'namespace':'his',
+                                        'namespace':'ours',
+                                        'key':'Junk'
                                         }}},
-            {'name':'attstore2',
+            {'name':'Junk2',
             'module':'ion.services.coi.attributestore',
             'class':'AttributeStoreService',
             'spawnargs':{'servicename':'as2',
@@ -89,7 +90,8 @@ class AttrStoreServiceTest(IonTestCase):
                                         'keyspace':'Datastore',
                                         'colfamily':'DS1',
                                         'cf_super':True,
-                                        'namespace':'hers',
+                                        'namespace':'ours',
+                                        'key':'Junk'
                                         }}}
                     ]
 
@@ -113,6 +115,13 @@ class AttrStoreServiceTest(IonTestCase):
         self.assertEqual(res5, None)
 
         asc2 = AttributeStoreClient(proc=sup, targetname='as2')
+
+        tres1 = yield asc2.put('tkey1','tvalue1')
+        logging.info('tResult1 put: '+str(tres1))
+
+        tres2 = yield asc2.get('tkey1')
+        logging.info('tResult2 get: '+str(tres2))
+        self.assertEqual(tres2, 'tvalue1')
 
         # With common backends the value should be found.
         resx1 = yield asc2.get('key1')

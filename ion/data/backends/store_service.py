@@ -33,8 +33,8 @@ class StoreService(BaseService):
     @defer.inlineCallbacks
     def slc_init(self):
         # use spawn args to determine backend class, second config file
-        backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', None))
-        backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', {}))
+        backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.data.store.Store'))
+        backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', default={}))
         if backendcls:
             self.backend = pu.get_class(backendcls)
         else:
@@ -89,6 +89,15 @@ class StoreService(BaseService):
         res = yield self.store.remove(key)
         yield self.reply_ok(msg, {'result':res})
 
+    @defer.inlineCallbacks
+    def op_clear_store(self, content, headers, msg):
+        """
+        Service operation: Delete a value.
+        """
+        res = yield self.store.clear_store()
+        yield self.reply_ok(msg, {'result':res})
+
+
 class StoreServiceClient(BaseServiceClient, IStore):
     """
     Class for the client accessing the attribute store via Exchange
@@ -124,6 +133,11 @@ class StoreServiceClient(BaseServiceClient, IStore):
         logging.info('Service remove reply: '+str(content))
         defer.returnValue(content['result'])
 
+    @defer.inlineCallbacks
+    def clear_store(self):
+        (content, headers, msg) = yield self.rpc_send('clear_store', {})
+        logging.info('Service clear_store reply: '+str(content))
+        defer.returnValue(content['result'])
 
 
 

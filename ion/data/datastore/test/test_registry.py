@@ -9,6 +9,8 @@ from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.data import store
+from ion.data.backends import store_service
+from ion.data.backends import cassandra
 from ion.data.datastore import registry
 
 class RegistryTest(unittest.TestCase):
@@ -17,8 +19,20 @@ class RegistryTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        s = yield store.Store.create_store()
+        s = yield self._set_up_backend()
+#        s = yield cassandra.CassandraStore.create_store()
         self.reg = registry.ResourceRegistry(s)
+        self.mystore = s
+
+    
+    def _set_up_backend(self):
+        s = store.Store.create_store()
+        return (s)
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.mystore.clear_store()
+
 
     @defer.inlineCallbacks
     def test_register(self):
@@ -82,3 +96,16 @@ class RegistryTest(unittest.TestCase):
         
 
 
+class RegistryCassandraTest(RegistryTest):
+    """
+    """
+
+    def _setup_backend(self):
+        clist = ['amoeba.ucsd.edu:9160']
+        ds = cassandra.CassandraStore.create_store(
+            cass_host_list=clist,
+            cf_super=False,
+            keyspace='Datasets',
+            colfamily='Catalog'
+            )
+        return ds

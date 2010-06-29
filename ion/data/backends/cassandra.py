@@ -69,6 +69,10 @@ class CassandraStore(IStore):
             if inst.namespace == None:
                 # Must change behavior to set a random namespace so that test don't interfere!
                 inst.namespace = ':'
+        else:
+            if inst.namespace:
+                logging.info('Ignoring namespace argument in non super column cassandra store')
+            inst.namespace=None
 
         if not inst.cass_host_list:
             logging.info('Connecting to Cassandra on localhost...')
