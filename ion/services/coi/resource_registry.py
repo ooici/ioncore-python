@@ -25,20 +25,13 @@ import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
 
-class ResourceRegistryService(BaseService):
+class BaseResourceRegistryService(BaseService):
     """
-    Resource registry service interface
-    The Resource Registry Service uses an IStore interface to a backend Key
-    Value Store to store to track version controlled objects. The store will
-    share a name space and share objects depending on configuration when it is
-    created. The resource are retrieved as complete objects from the store. The
-    built-in encode method is used to store and transmit them using the COI
-    messaging.
+    Base class for resource registries
+    @TODO make sure this is a pure virtual class
     """
 
-    # Declaration of service
-    declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
-
+    
     # For now, keep registration in local memory store.
     @defer.inlineCallbacks
     def slc_init(self):
@@ -61,41 +54,6 @@ class ResourceRegistryService(BaseService):
         logging.info(name + " backend:"+str(backendcls))
         logging.info(name + " backend args:"+str(backendargs))
         
-        
-        
-    @defer.inlineCallbacks
-    def op_register_resource(self, content, headers, msg):
-        """
-        Service operation: Register a resource instance with the registry.
-        """
-        res_id = str(content['res_id'])
-        res_enc = content['res_enc']
-        resource = registry.ResourceDescription.decode(res_enc)()
-        logging.info('op_register_resource: \n' + str(resource))
-  
-        yield self.reg.register(res_id,resource)
-        yield self.reply_ok(msg, {'res_id':str(res_id)},)
-
-    def op_define_resource_type(self, content, headers, msg):
-        """
-        Service operation: Create or update a resource type with the registry.
-        """
-
-    @defer.inlineCallbacks
-    def op_get_resource(self, content, headers, msg):
-        """
-        Service operation: Get a resource instance.
-        """
-        res_id = content['res_id']
-        logging.info('op_get_resource: '+str(res_id))
-
-        resource = yield self.reg.get_description(res_id)
-        logging.info('Got Resource:\n'+str(resource))
-        if resource:
-            yield self.reply_ok(msg, {'res_enc':resource.encode()})
-        else:
-            yield self.reply_err(msg, {'res_enc':None})
-    
     @defer.inlineCallbacks
     def op_set_resource_lcstate(self, content, headers, msg):
         """
@@ -133,6 +91,80 @@ class ResourceRegistryService(BaseService):
         
         yield self.reply_ok(msg, {'res_enc':list([res.encode() for res in resources])} )
         
+
+
+class ResourceRegistryService(BaseResourceRegistryService):
+    """
+    Resource registry service interface
+    The Resource Registry Service uses an IStore interface to a backend Key
+    Value Store to store to track version controlled objects. The store will
+    share a name space and share objects depending on configuration when it is
+    created. The resource are retrieved as complete objects from the store. The
+    built-in encode method is used to store and transmit them using the COI
+    messaging.
+    """
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
+    """
+    # For now, keep registration in local memory store.
+    @defer.inlineCallbacks
+    def slc_init(self):
+        # use spawn args to determine backend class, second config file
+        backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', None))
+        backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', {}))
+        if backendcls:
+            self.backend = pu.get_class(backendcls)
+        else:
+            self.backend = store.Store
+        assert issubclass(self.backend, store.IStore)
+
+        # Provide rest of the spawnArgs to init the store
+        s = yield self.backend.create_store(**backendargs)
+        
+        self.reg = registry.ResourceRegistry(s)
+        
+        name = self.__class__.__name__
+        logging.info(name + " initialized")
+        logging.info(name + " backend:"+str(backendcls))
+        logging.info(name + " backend args:"+str(backendargs))
+    """
+        
+        
+    @defer.inlineCallbacks
+    def op_register_resource(self, content, headers, msg):
+        """
+        Service operation: Register a resource instance with the registry.
+        """
+        res_id = str(content['res_id'])
+        res_enc = content['res_enc']
+        resource = registry.ResourceDescription.decode(res_enc)()
+        logging.info('op_register_resource: \n' + str(resource))
+  
+        yield self.reg.register(res_id,resource)
+        yield self.reply_ok(msg, {'res_id':str(res_id)},)
+
+    def op_define_resource_type(self, content, headers, msg):
+        """
+        Service operation: Create or update a resource type with the registry.
+        """
+
+    @defer.inlineCallbacks
+    def op_get_resource(self, content, headers, msg):
+        """
+        Service operation: Get a resource instance.
+        """
+        res_id = content['res_id']
+        logging.info('op_get_resource: '+str(res_id))
+
+        resource = yield self.reg.get_description(res_id)
+        logging.info('Got Resource:\n'+str(resource))
+        if resource:
+            yield self.reply_ok(msg, {'res_enc':resource.encode()})
+        else:
+            yield self.reply_err(msg, {'res_enc':None})
+    
+
         
 
 class ResourceRegistryClient(BaseServiceClient):
