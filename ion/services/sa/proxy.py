@@ -39,6 +39,8 @@ class DAPProxyProtocol(LineReceiver):
     def connectionMade(self):
         logging.debug('connected!')
         self.buf = []
+        self.http_connected = False
+        self.hostname = None
 
     def lineReceived(self, line):
         logging.debug('got a line: %s' % line)
@@ -47,12 +49,24 @@ class DAPProxyProtocol(LineReceiver):
             logging.info('Ready to send request off!')
             self.send_receive()
 
+    def _reassemble_url(self, url):
+        """
+        If in fake-connected mode, rewrite request. Client issues:
+        connect hostname
+        get /url
+
+        which we have to convert into
+        get hostname/url
+        """
+        assert(self.http_connected)
+
+        return('http://%s%s' % (self.hostname, url))
+
     @defer.inlineCallbacks
     def send_receive(self):
         """
         Ready to send an http command off to the coordinator for dispatch.
         """
-        logging.debug('starting send to coordinator...')
         cc = CoordinatorClient()
         # First entry in buffer should be 'GET url http/1.0' or similar
         cmd, url, method = self.buf[0].split(' ')
@@ -63,15 +77,29 @@ class DAPProxyProtocol(LineReceiver):
         else:
             do_disconnect = False
 
-        if cmd == 'HEAD':
+        if self.http_connected:
+            logging.debug('rewriting url...')
+            url = self._reassemble_url(url)
+            logging.debug('nw ' + url)
+
+        if cmd == 'CONNECT':
+            self.http_connected = True
+            self.hostname = url
+            logging.debug('hostname is ' + self.hostname)
+
+            logging.debug('Ackowledging connect with fake response')
+            self.transport.write('HTTP/1.1 200 Did get connection\r\n')
+            self.transport.write('Content-Type: text/plain; charset=UTF-8\r\n')
+            self.transport.write('\r\n')
+            self.buf = []
+        elif cmd == 'HEAD':
             page = yield cc.get_head(url)
-            logging.debug('got head back, writing to proxy client')
             self.transport.write(page)
         elif cmd == 'GET':
+            logging.debug('pulling url...')
             page = yield cc.get_url(url)
-            logging.debug('got page back, writing to proxy client')
             self.transport.write(page)
-            logging.debug('done with trans.write')
+            yield self.transport.loseConnection()
         else:
             logging.error('Unknown command "%s"' % self.buf[0])
             self.transport.write('HTTP/1.0 500 Server error, no comprende.\r\n')
@@ -79,7 +107,6 @@ class DAPProxyProtocol(LineReceiver):
         if do_disconnect:
             yield self.transport.loseConnection()
 
-        logging.debug('done with send/receive')
         self.buf = []
 
 
@@ -106,6 +133,9 @@ class ProxyService(BaseService):
 
     @defer.inlineCallbacks
     def slc_shutdown(self):
+        """
+        Close TCP listener
+        """
         logging.info('Shutting down proxy')
         yield self.proxy_port.stopListening()
 

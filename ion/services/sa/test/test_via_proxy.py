@@ -81,7 +81,7 @@ class IntegrationTest(IonTestCase):
         GET http://amoeba.ucsd.edu/tmp/test1.txt http/1.0
 
         """
-        yield pu.asleep(0)
+        yield pu.asleep(30)
 
     @defer.inlineCallbacks
     def test_single_get(self):

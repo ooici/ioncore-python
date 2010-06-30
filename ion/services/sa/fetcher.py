@@ -49,7 +49,7 @@ class FetcherService(BaseService):
         @todo check for library routine to do this.
         @note output has an blank line at the end (\r\n)
         """
-        hstr = ''
+        hstr = 'HTTP/1.0 200 OK\r\n'
         for x in result.getheaders():
             hstr = hstr + '%s: %s\r\n' % (x[0], x[1])
 
@@ -67,6 +67,8 @@ class FetcherService(BaseService):
         """
         assert(operation in ['GET', 'HEAD'])
 
+        logging.debug('Fetcher: %s %s' % (operation, src_url))
+
         src = urlparse.urlsplit(src_url)
         try:
             conn = http.HTTPConnection(src.netloc)
@@ -82,10 +84,16 @@ class FetcherService(BaseService):
             hstr = self._reassemble_headers(res)
             # @note read on HEAD returns no data
             hstr = hstr + '\n' + res.read()
+            # Uncomment this to see the completed result
+            # logging.debug(hstr)
             yield self.reply_ok(msg, content=hstr)
+        else:
+            logging.info('fetch error %s %s %s %s' %
+                         (operation, src_url, res.status, res.reason))
 
-        yield self.reply_err(msg, content='%s: %s' % (res.status, res.reason))
+            yield self.reply_err(msg, content='%s: %s' % (res.status, res.reason))
 
+        logging.debug('fetch completed %s' % res.status)
     def get_page(self, url, get_headers=False):
         """
         Inner routine to grab a page, with or without http headers.

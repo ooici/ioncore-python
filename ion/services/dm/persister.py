@@ -5,6 +5,7 @@
 @author Paul Hubbard
 @date 6/7/10
 @brief The persister writes DAP datasets to disk as netcdf files.
+@see DAP protocol spec: http://www.opendap.org/pdf/ESE-RFC-004v1.1.pdf
 """
 
 from urlparse import urlsplit, urlunsplit
@@ -41,7 +42,7 @@ class PersisterService(BaseService):
     The plan is that writing locally to disk will become writing to a HSM such
     as iRODS that presents a filesystem interface (or file-like-object we can
     hand off to the netcdf.save())
-    
+
     @note Relies on a single message fitting in memory comfortably.
     @todo Depend on pub-sub
     @todo Notifications of new fileset
