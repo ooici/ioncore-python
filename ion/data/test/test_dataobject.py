@@ -144,7 +144,7 @@ class ResponseServiceClient(BaseServiceClient):
     @defer.inlineCallbacks
     def send_data_object(self, obj):
         yield self._check_init()
-        print obj
+        #print obj
         msg=obj.encode()
         
         (content, headers, msg) = yield self.rpc_send('respond', msg, {})
