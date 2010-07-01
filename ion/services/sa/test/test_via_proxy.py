@@ -25,7 +25,57 @@ config = ioninit.config('ion.services.sa.proxy')
 PROXY_PORT = int(config.getValue('proxy_port', '8100'))
 import ion.util.procutils as pu
 
+
+from pydap.client import open_url
+from pydap.util import socks
+import pydap.lib
+
+import httplib2
 import urllib2
+
+class PydapIntegrationTest(IonTestCase):
+    """
+    High-fidelity integration test - use pydap's full DAP client to exercise
+    the proxy + stack. Pydap is blocking, so it runs in a deferred thread.
+    @see http://pydap.org/client.html?highlight=proxy
+    """
+    @defer.inlineCallbacks
+    def setUp(self):
+        services = [{'name':'fetcher',
+                     'module':'ion.services.sa.fetcher',
+                     'class': 'FetcherService'},
+                    {'name': 'coordinator',
+                     'module': 'ion.services.dm.preservation.coordinator',
+                     'class' : 'CoordinatorService'},
+                    {'name':'proxy',
+                     'module': 'ion.services.sa.proxy',
+                     'class': 'ProxyService'},]
+        yield self._start_container()
+        yield self._spawn_processes(services)
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        # @note Required to trigger the slc_shutdown hook
+        yield self._shutdown_processes()
+        yield self._stop_container()
+
+    def _dap_open(self, url):
+        pydap.lib.PROXY = httplib2.ProxyInfo(socks.PROXY_TYPE_HTTP,
+                                        'localhost', PROXY_PORT)
+        dataset = open_url(url)
+        return dataset
+
+    @defer.inlineCallbacks
+    def test_metadata(self):
+        url = 'http://amoeba.ucsd.edu:8001/coads.nc'
+        dset = yield threads.deferToThread(self._dap_open, url)
+        text = str(dset)
+        self.failUnlessSubstring('COADSX', text)
+        self.failUnlessSubstring('COADSY', text)
+        self.failUnlessSubstring('AIRT', text)
+        self.failUnlessSubstring('VWND', text)
+        self.failUnlessSubstring('WSPD', text)
+
 
 class IntegrationTest(IonTestCase):
     @defer.inlineCallbacks

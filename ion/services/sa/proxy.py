@@ -49,19 +49,6 @@ class DAPProxyProtocol(LineReceiver):
             logging.info('Ready to send request off!')
             self.send_receive()
 
-    def _reassemble_url(self, url):
-        """
-        If in fake-connected mode, rewrite request. Client issues:
-        connect hostname
-        get /url
-
-        which we have to convert into
-        get hostname/url
-        """
-        assert(self.http_connected)
-
-        return('http://%s%s' % (self.hostname, url))
-
     @defer.inlineCallbacks
     def send_receive(self):
         """
@@ -79,8 +66,8 @@ class DAPProxyProtocol(LineReceiver):
 
         if self.http_connected:
             logging.debug('rewriting url...')
-            url = self._reassemble_url(url)
-            logging.debug('nw ' + url)
+            url = 'http://%s%s' % (self.hostname, url)
+            logging.debug('new ' + url)
 
         if cmd == 'CONNECT':
             self.http_connected = True

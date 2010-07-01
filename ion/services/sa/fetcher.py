@@ -8,6 +8,7 @@
 @brief External data gateway, minimal-state service that grabs single
 pages or DAP datasets via HTTP. Also supports the not-in-the-spec HEAD
 method for badly written DAP clients.
+@see http://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol
 """
 
 import logging
