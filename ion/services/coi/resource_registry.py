@@ -99,7 +99,6 @@ class BaseResourceRegistryService(BaseService):
                 if isinstance(att, registry.LCState):
                     att = str(att)
                 
-                print k, v
                 if isinstance(v, (str, unicode) ):
                     # Use regex
                     if not re.search(v, att):
