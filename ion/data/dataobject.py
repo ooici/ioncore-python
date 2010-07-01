@@ -76,9 +76,13 @@ class DataObject(object):
     _types = {}
 
     def __eq__(self, other):
-        assert isinstance(other, DataObject) 
-        m = [getattr(self, a) == getattr(other, a) for a in self.attributes]
-        return reduce(lambda a, b: a and b, m)
+        assert isinstance(other, DataObject)
+        # comparison of data objects which have different atts must not error out
+        try:
+            m = [getattr(self, a) == getattr(other, a) for a in self.attributes]
+            return reduce(lambda a, b: a and b, m)
+        except:
+            return False
             
 
     def __str__(self):
