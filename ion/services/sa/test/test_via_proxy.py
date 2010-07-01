@@ -65,17 +65,34 @@ class PydapIntegrationTest(IonTestCase):
         dataset = open_url(url)
         return dataset
 
+    def _dap_pull_sst_chunk(self, url):
+        dataset = self._dap_open(url)
+        var = dataset['SST']
+        # var[range] actually causes an XDR transfer of data
+        return var[0,10:14,10:14]
+
     @defer.inlineCallbacks
     def test_metadata(self):
         url = 'http://amoeba.ucsd.edu:8001/coads.nc'
         dset = yield threads.deferToThread(self._dap_open, url)
         text = str(dset)
+        # @todo Verify dataset contains pydap/numpy objects, not just strings
         self.failUnlessSubstring('COADSX', text)
         self.failUnlessSubstring('COADSY', text)
         self.failUnlessSubstring('AIRT', text)
         self.failUnlessSubstring('VWND', text)
         self.failUnlessSubstring('WSPD', text)
 
+        var = dset['SST']
+        self.failUnlessEqual(var.shape, (12, 90, 180))
+        self.failUnlessIsInstance(var, pydap.model.GridType)
+
+    @defer.inlineCallbacks
+    def test_binary_data(self):
+        raise unittest.SkipTest('Binary transfer still broken')
+        url = 'http://amoeba.ucsd.edu:8001/coads.nc'
+        var = yield threads.deferToThread(self._dap_pull_sst_chunk, url)
+        logging.info('got data ok!')
 
 class IntegrationTest(IonTestCase):
     @defer.inlineCallbacks
