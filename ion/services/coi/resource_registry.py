@@ -15,6 +15,7 @@ from magnet.spawnable import Receiver
 from ion.data import dataobject
 from ion.data.datastore import registry
 
+import re
 from ion.data import store
 
 from ion.core import ioninit
@@ -74,24 +75,48 @@ class BaseResourceRegistryService(BaseService):
             yield self.reply_err(msg, {'res_id':None})
 
 
-
+    @defer.inlineCallbacks
     def op_find_resources(self, content, headers, msg):
         """
         Service operation: find resources by criteria
         Content is a dictionary of attributes which must match a resource:
         """
-        
-        reslist = yield self.reg.list_descriptions()
-        
-        find_list=[]
-        for res in reslist:
-            for k,v in content:
-                print res
-                att = res.__getattribute__(k)
-            
-                print 'att', att
-            
 
+        reslist = yield self.reg.list_descriptions()
+        find_list=[]
+        for res in reslist:                        
+            # Test for failure and break
+            test=True
+            for k,v in content.items():                
+                # if this resource does not contain this attribute move on
+                if not k in res.attributes:
+                    test = False
+                    break
+                
+                att = getattr(res, k, None)
+                
+                # Bogus - can't send lcstate objects in a dict must convert to sting to test
+                if isinstance(att, registry.LCState):
+                    att = str(att)
+                
+                print k, v
+                if isinstance(v, (str, unicode) ):
+                    # Use regex
+                    if not re.search(v, att):
+                        test=False
+                        break
+                else:
+                    # test equality
+                    #@TODO add tests for range and in list...
+                    
+                    
+                    if att != v and v != None:
+                       test=False
+                       break                    
+            if test:
+                find_list.append(res)
+
+        yield self.reply_ok(msg, {'res_enc':list([res.encode() for res in find_list])} )
 
 class ResourceRegistryService(BaseResourceRegistryService):
     """
@@ -188,6 +213,25 @@ class BaseRegistryClient(BaseServiceClient):
         return self.set_lcstate(res_id, registry.LCStates.commissioned)
     
 
+
+    @defer.inlineCallbacks
+    def find_resources(self,attributes):
+        """
+        @brief Retrieve all the resources in the registry
+        @param attributes is a dictionary of attributes which will be used to select a resource
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('find_resources',attributes)
+        logging.info('Service reply: '+str(content))
+        
+        res_enc = content['res_enc']
+        resources=[]
+        if res_enc != None:
+            for res in res_enc:
+                resources.append(registry.ResourceDescription.decode(res)())
+        defer.returnValue(resources)
+
         
 
 class ResourceRegistryClient(BaseRegistryClient):
@@ -236,25 +280,6 @@ class ResourceRegistryClient(BaseRegistryClient):
             defer.returnValue(None)
 
 
-
-
-    @defer.inlineCallbacks
-    def find_resources(self,attributes):
-        """
-        @brief Retrieve all the resources in the registry
-        @param attributes is a dictionary of attributes which will be used to select a resource
-        """
-        yield self._check_init()
-
-        (content, headers, msg) = yield self.rpc_send('list_resources',attributes)
-        logging.info('Service reply: '+str(content))
-        
-        res_enc = content['res_enc']
-        resources=[]
-        if res_enc != None:
-            for res in res_enc:
-                resources.append(registry.ResourceDescription.decode(res)())
-        defer.returnValue(resources)
 
 
 #class ResourceTypes(object):

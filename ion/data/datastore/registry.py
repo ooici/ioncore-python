@@ -152,6 +152,9 @@ class ResourceRegistry(objstore.ObjectStore):
         # Should the UUID be stored as part of the resource?
         defer.returnValue([(yield self.get_description(id)) for id in ids])
             
+#    @defer.inlineCallbacks
+#    def get_history(self,parent=None):
+        
 
 
 @defer.inlineCallbacks
