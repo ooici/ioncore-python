@@ -78,19 +78,19 @@ class BaseResourceRegistryService(BaseService):
     def op_find_resources(self, content, headers, msg):
         """
         Service operation: find resources by criteria
+        Content is a dictionary of attributes which must match a resource:
         """
-
-    @defer.inlineCallbacks
-    def op_list_resources(self,content, headers, msg):
-        """
-        Service operation: List resources of a particular type
-        """
-        logging.info('op_get_resources')
-        resources = yield self.reg.list_descriptions()
-        logging.info('Found Resources:'+str(resources))
         
-        yield self.reply_ok(msg, {'res_enc':list([res.encode() for res in resources])} )
+        reslist = yield self.reg.list_descriptions()
         
+        find_list=[]
+        for res in reslist:
+            for k,v in content:
+                print res
+                att = res.__getattribute__(k)
+            
+                print 'att', att
+            
 
 
 class ResourceRegistryService(BaseResourceRegistryService):
@@ -106,29 +106,7 @@ class ResourceRegistryService(BaseResourceRegistryService):
 
     # Declaration of service
     declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
-    """
-    # For now, keep registration in local memory store.
-    @defer.inlineCallbacks
-    def slc_init(self):
-        # use spawn args to determine backend class, second config file
-        backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', None))
-        backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', {}))
-        if backendcls:
-            self.backend = pu.get_class(backendcls)
-        else:
-            self.backend = store.Store
-        assert issubclass(self.backend, store.IStore)
 
-        # Provide rest of the spawnArgs to init the store
-        s = yield self.backend.create_store(**backendargs)
-        
-        self.reg = registry.ResourceRegistry(s)
-        
-        name = self.__class__.__name__
-        logging.info(name + " initialized")
-        logging.info(name + " backend:"+str(backendcls))
-        logging.info(name + " backend args:"+str(backendargs))
-    """
         
         
     @defer.inlineCallbacks
@@ -165,9 +143,54 @@ class ResourceRegistryService(BaseResourceRegistryService):
             yield self.reply_err(msg, {'res_enc':None})
     
 
+class BaseRegistryClient(BaseServiceClient):
+    """
+    Do not instantiate this class!
+    """
+
+    @defer.inlineCallbacks
+    def set_lcstate(self, res_id, lcstate):
+        """
+        @brief Retrieve a resource from the registry by its ID
+        @param res_id is a resource identifier unique to this resource
+        @param lcstate is a resource life cycle stae
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('set_resource_lcstate',
+                                                      {'res_id':res_id,'lifecycle':str(lcstate)})
+        logging.info('Service reply: '+str(content))
+        
+        if content['status'] == 'OK':
+            defer.returnValue(True)
+        else:
+            defer.returnValue(False)
+
+    def set_lcstate_new(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.new)
+
+    def set_lcstate_active(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.active)
+        
+    def set_lcstate_inactive(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.inactive)
+
+    def set_lcstate_decomm(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.decomm)
+
+    def set_lcstate_retired(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.retired)
+
+    def set_lcstate_developed(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.developed)
+
+    def set_lcstate_commissioned(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.commissioned)
+    
+
         
 
-class ResourceRegistryClient(BaseServiceClient):
+class ResourceRegistryClient(BaseRegistryClient):
     """
     Class for the client accessing the resource registry.
     """
@@ -213,53 +236,17 @@ class ResourceRegistryClient(BaseServiceClient):
             defer.returnValue(None)
 
 
-    @defer.inlineCallbacks
-    def set_lcstate(self, res_id, lcstate):
-        """
-        @brief Retrieve a resource from the registry by its ID
-        @param res_id is a resource identifier unique to this resource
-        @param lcstate is a resource life cycle stae
-        """
-        yield self._check_init()
 
-        (content, headers, msg) = yield self.rpc_send('set_resource_lcstate',
-                                                      {'res_id':res_id,'lifecycle':str(lcstate)})
-        logging.info('Service reply: '+str(content))
-        
-        if content['status'] == 'OK':
-            defer.returnValue(True)
-        else:
-            defer.returnValue(False)
-
-    def set_lcstate_new(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.new)
-
-    def set_lcstate_active(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.active)
-        
-    def set_lcstate_inactive(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.inactive)
-
-    def set_lcstate_decomm(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.decomm)
-
-    def set_lcstate_retired(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.retired)
-
-    def set_lcstate_developed(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.developed)
-
-    def set_lcstate_commissioned(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.commissioned)
 
     @defer.inlineCallbacks
-    def list_resources(self):
+    def find_resources(self,attributes):
         """
         @brief Retrieve all the resources in the registry
+        @param attributes is a dictionary of attributes which will be used to select a resource
         """
         yield self._check_init()
 
-        (content, headers, msg) = yield self.rpc_send('list_resources',{})
+        (content, headers, msg) = yield self.rpc_send('list_resources',attributes)
         logging.info('Service reply: '+str(content))
         
         res_enc = content['res_enc']

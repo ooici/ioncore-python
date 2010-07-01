@@ -79,7 +79,7 @@ class ResourceRegistryTest(IonTestCase):
         self.assertEqual(success,False)
         
     @defer.inlineCallbacks
-    def test_resource_state(self):
+    def test_find_resource(self):
 
         rd1 = registry.Generic()
         rd1.name = 'David'
@@ -105,9 +105,9 @@ class ResourceRegistryTest(IonTestCase):
         test = yield self.rrc.get_resource(rid3)
         self.assertEqual(test,rd3)
         
-        logging.info('**Get the list**')
+        logging.info('**find a resource**')
         # Get the list of resources:
-        resources = yield self.rrc.list_resources()
+        resources = yield self.rrc.find_resources({'name':'David'})
         for res in resources:
             logging.info(str(res))
         
