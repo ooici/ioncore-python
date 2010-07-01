@@ -53,6 +53,7 @@ class CCAgent(ResourceAgent):
         logging.info("Listening to CC anouncements: "+str(annid))
 
         # Start with an identify request. Will lead to an announce by myself
+        #@TODO - Can not send a message to a base process which is not initialized!
         yield self.send(self.ann_name, 'identify', 'started', {'quiet':True})
 
         # Convenience HACK: Add a few functions to container shell
