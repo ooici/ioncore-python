@@ -21,19 +21,192 @@ class UserRegistrationClientTest(IonTestCase):
     
     @defer.inlineCallbacks
     def setUp(self):
+        
         yield self._start_container()
-        
-        services = [{'name':'register_user',
-                     'module':'ion.services.coi.identity_registry',
-                     'class': 'IdentityRegistryService'},]
-        self.sup = yield self._spawn_processes(services)
+        # !!!!!
+        # later on may need to find a way to get this to go into a seperate resource registry from everything else.
+        # !!!!!
+        self.sup = yield self._start_core_services()
 
-        
 
+        self.identity_registry_service_client = IdentityRegistryServiceClient(proc=self.sup)
+        
+    @defer.inlineCallbacks
+    def test_register_user(self):
+        """
+        """
+        parms = {
+            # these are the fields from the trust provider
+            'common_name' : "Roger Unwin A13",
+            'country' : "US",
+            'trust_provider' : "ProtectNetwork",
+            'domain_component' : "cilogon",
+            'certificate' : "MIIEMjCCAxqgAwIBAgIBZDANBgkqhkiG9w0BAQUFADBqMRMwEQYKCZImiZPyLGQB\n" +
+                            "GRYDb3JnMRcwFQYKCZImiZPyLGQBGRYHY2lsb2dvbjELMAkGA1UEBhMCVVMxEDAO\n" + 
+                            "BgNVBAoTB0NJTG9nb24xGzAZBgNVBAMTEkNJTG9nb24gQmFzaWMgQ0EgMTAeFw0x\n" +
+                            "MDA2MjkxODIxNTlaFw0xMDA2MzAwNjI2NTlaMG8xEzARBgoJkiaJk/IsZAEZEwNv\n" +
+                            "cmcxFzAVBgoJkiaJk/IsZAEZEwdjaWxvZ29uMQswCQYDVQQGEwJVUzEXMBUGA1UE\n" +
+                            "ChMOUHJvdGVjdE5ldHdvcmsxGTAXBgNVBAMTEFJvZ2VyIFVud2luIEExMzYwggEi\n" +
+                            "MA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQD0Ci/5ZK1Cta7OaVWGCJb3js/p\n" +
+                            "l+0B4AHXjqOTcSDX/f7U+kful3cKhcPryIV2/bnfh9dYpC4RNHVI32uACH/BCkFG\n" +
+                            "kqsNrLfh7b8g41xBxnREwANI/NEqzwcgNL9mfi8SiY8lEOxGqMYdsNo20QsehRgo\n" +
+                            "SPswGAA0uApdBGkxJGolaPscG7z10WQEd0/HUiAnda8RP0QEPmqPvX/2xJT9sgOg\n" +
+                            "KEU/to+ue/eBuwrlTjy4qn3IsGlwKyckXe9wXnkmck/S9MWvEax17cC4qjTZKYpy\n" +
+                            "/k0NMBVcO+dsqdGuwus4q4IxBHy9P8kq3QAQoJies11RspTCQ61GuVwCu1V7AgMB\n" +
+                            "AAGjgd0wgdowDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCBLAwEwYDVR0lBAww\n" +
+                            "CgYIKwYBBQUHAwIwGAYDVR0gBBEwDzANBgsrBgEEAYKRNgECATBqBgNVHR8EYzBh\n" +
+                            "MC6gLKAqhihodHRwOi8vY3JsLmNpbG9nb24ub3JnL2NpbG9nb24tYmFzaWMuY3Js\n" +
+                            "MC+gLaArhilodHRwOi8vY3JsLmRvZWdyaWRzLm9yZy9jaWxvZ29uLWJhc2ljLmNy\n" +
+                            "bDAfBgNVHREEGDAWgRRpdHNhZ3JlZW4xQHlhaG9vLmNvbTANBgkqhkiG9w0BAQUF\n" +
+                            "AAOCAQEAT0uKY2BEYPhozSBzRrOgY9gw5yXczbq3kEx+kxF1jXAeMMD3u2i1apZ3\n" +
+                            "dIS0FzCj1b3y8tfBr5FNde//axLZfxSo3kO9djlUrfqJnycaGevc2zMD8+GIst0J\n" +
+                            "OB+3GClYYpagLkRbkkLX3hU/qfb4c4DnHVmZOaXKsOKETB7xcxWimIlL47O2XGNt\n" +
+                            "PEUP0RzlJTkgD7LeSS0I+9SlFe0Wdb6knkMJ4afT5xLr2FXkcU9VRqGu8Gr2A4ha\n" +
+                            "CKLqTUDKFOUp5i16pLY4p6Ahn0IcFWOyWJLQ70mUJz+WVqCVXjkfMpKbrMgcKZNC\n" +
+                            "9kgKHA8cRnz97xbQIcDdeGU9tCAuGQ==",
+            'rsa_private_key' : "MIIEowIBAAKCAQEA9Aov+WStQrWuzmlVhgiW947P6ZftAeAB146jk3Eg1/3+1PpH\n" +
+                            "7pd3CoXD68iFdv2534fXWKQuETR1SN9rgAh/wQpBRpKrDay34e2/IONcQcZ0RMAD\n" +
+                            "SPzRKs8HIDS/Zn4vEomPJRDsRqjGHbDaNtELHoUYKEj7MBgANLgKXQRpMSRqJWj7\n" +
+                            "HBu89dFkBHdPx1IgJ3WvET9EBD5qj71/9sSU/bIDoChFP7aPrnv3gbsK5U48uKp9\n" +
+                            "yLBpcCsnJF3vcF55JnJP0vTFrxGsde3AuKo02SmKcv5NDTAVXDvnbKnRrsLrOKuC\n" +
+                            "MQR8vT/JKt0AEKCYnrNdUbKUwkOtRrlcArtVewIDAQABAoIBACkHFW2uOVq/xLW7\n" +
+                            "C7/O7eKMxfOVsSjhii29M070c/scHp2bvkAkgsToHDolqhqJKZik89VZNM17rkQk\n" +
+                            "G6SYyTGhEbxVqCBSa0+2cq2Ky9XbEW0FgwfgSSITUDVf6NXIXQ2WxtQKdk6izTvs\n" +
+                            "oaMZne7xnVAYhPJe9pnmXweoWC8Ehiu2MrSYQHsgc7A4zSHvKscvdGkGYif6bCVx\n" +
+                            "bi1qWvEJyIlQqRW1PmtI65tmf7Y3yOnDJYBs5hQ7nSVgSFIwox8L9h1QhU72E9kN\n" +
+                            "aqMakS5qS/PnTilB17xfbrT6Gx9yTBlm4Zyc2JgqIRjICRYetYRzQYRVv8v262D8\n" +
+                            "nHIv8CECgYEA/3RDBV9mgXwrN9ol+ICfG4SeJHzTfVJjGB+GsPIZ0yUQ3rpKBVvA\n" +
+                            "/eXBfEPL+ruDMSt5y/KnqXQu3JhiRP+uOgfwUK6GMRAJS8XkVr98nM/cW646dnvQ\n" +
+                            "k1S9LOmqPkiTq6VnOJIzwmTtUCtwpqwU8ZbuZHKagGhMCVGzrCJgC0MCgYEA9I+u\n" +
+                            "hhlkZaMrzLOTtti+5dGVtBy+avSqkp2f4oQG/Z62NGSnxzNqELnriErZkYR3d4Kv\n" +
+                            "zj0j+CO5V9xLpYzHusgYk7jLRcZQSyVjnkkrorOT2qeBqgl/FYSoD64+Eydq+NsV\n" +
+                            "7xwWFCWbcmDAFxPJU2eqES85cQSiAzi6d1ndfWkCgYAXcBZaHter17WraTOEqmBu\n" +
+                            "yOstk9pfrDh1VScpgv0Fl2gF13fFKBb79KGdAidr+Npfn4qMQNZLQOKv0Ldrdz4I\n" +
+                            "CwRskqazR7JipmR95RHM3XFtY/3vMwr/CY5V2ZaKImSSIhnnYdqn4lS3v1SVpkJB\n" +
+                            "rERxKOauE2OukzV1/K1tOwKBgQCAZRrETnp2Hdd17eWkPmDiuUj2OY0DDBatSNHT\n" +
+                            "E2u0JWoVUa8AFw8dXu64LEvTaQ9rkBIKnfDParn41bBlZubJOholHASkSjyHZ0bI\n" +
+                            "qDOfhNYgGocppTiyLGYrbVgrqCsyIZt/YGh7BU96Gi9fLkUpY6hWw0tN+ZexR0wm\n" +
+                            "Mujk2QKBgAugycaF1zFmK7UOg9/thfY07uNgnYRFLDCYB4G5f0xeagzYp+SEt3oO\n" +
+                            "q23C/NhdxAQH1rfUptZXM1rnVyM+ycI3IulnAiJ96AD5FQX0PRWmo2DtHgpZ21Sh\n" +
+                            "cZGidYECf6XdGxhSsf2C81LcDdk99KlPd7fkqLWOs5cAwlR4r3CY",
+            'expiration_date' : "Tue Jun 29 23:32:16 PDT 2010",
+            # These are the fields we prompt the user for during registration
+            'first_name' : "Roger", 
+            'last_name' : "Unwin", 
+            'phone' : "8588675309", 
+            'fax' : "6198675309", 
+            'email' : "unwin@sdsc.edu",
+            'organization' : "University of California San Diego", 
+            'department' : "San Diego Supercomputing Center", 
+            'title' : "Research Programmer"} 
+    
+        result = yield self.identity_registry_service_client.register_user(parms)
+        logging.debug('###1 Service reply: #####################################' + result)
+        logging.debug('###Trying to get lookup for key ' + result )
+        result = yield self.identity_registry_service_client.get_registration_info(result)
+        logging.debug('###2 Service reply: #####################################'+ str(result))
+        
+        
+    #@defer.inlineCallbacks
+    #def test_get_registration_info(self):
+    #    """
+    #    """
+    #    
+    #    result = yield self.identity_registry_service_client.register_user("TESTING")
+    #    logging.debug('### Service reply: #####################################' + result)
+    #    result = yield self.identity_registry_service_client.get_registration_info("TESTING")
+    #    logging.debug('### Service reply: #####################################'+ str(result))
+   
+    @defer.inlineCallbacks
+    def test_update_user(self):
+        """
+        """
+        parms = {
+            # these are the fields from the trust provider
+            'common_name' : "Roger Unwin A13",
+            'country' : "US",
+            'trust_provider' : "ProtectNetwork",
+            'domain_component' : "cilogon",
+            'certificate' : "MIIEMjCCAxqgAwIBAgIBZDANBgkqhkiG9w0BAQUFADBqMRMwEQYKCZImiZPyLGQB\n" +
+                            "GRYDb3JnMRcwFQYKCZImiZPyLGQBGRYHY2lsb2dvbjELMAkGA1UEBhMCVVMxEDAO\n" + 
+                            "BgNVBAoTB0NJTG9nb24xGzAZBgNVBAMTEkNJTG9nb24gQmFzaWMgQ0EgMTAeFw0x\n" +
+                            "MDA2MjkxODIxNTlaFw0xMDA2MzAwNjI2NTlaMG8xEzARBgoJkiaJk/IsZAEZEwNv\n" +
+                            "cmcxFzAVBgoJkiaJk/IsZAEZEwdjaWxvZ29uMQswCQYDVQQGEwJVUzEXMBUGA1UE\n" +
+                            "ChMOUHJvdGVjdE5ldHdvcmsxGTAXBgNVBAMTEFJvZ2VyIFVud2luIEExMzYwggEi\n" +
+                            "MA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQD0Ci/5ZK1Cta7OaVWGCJb3js/p\n" +
+                            "l+0B4AHXjqOTcSDX/f7U+kful3cKhcPryIV2/bnfh9dYpC4RNHVI32uACH/BCkFG\n" +
+                            "kqsNrLfh7b8g41xBxnREwANI/NEqzwcgNL9mfi8SiY8lEOxGqMYdsNo20QsehRgo\n" +
+                            "SPswGAA0uApdBGkxJGolaPscG7z10WQEd0/HUiAnda8RP0QEPmqPvX/2xJT9sgOg\n" +
+                            "KEU/to+ue/eBuwrlTjy4qn3IsGlwKyckXe9wXnkmck/S9MWvEax17cC4qjTZKYpy\n" +
+                            "/k0NMBVcO+dsqdGuwus4q4IxBHy9P8kq3QAQoJies11RspTCQ61GuVwCu1V7AgMB\n" +
+                            "AAGjgd0wgdowDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCBLAwEwYDVR0lBAww\n" +
+                            "CgYIKwYBBQUHAwIwGAYDVR0gBBEwDzANBgsrBgEEAYKRNgECATBqBgNVHR8EYzBh\n" +
+                            "MC6gLKAqhihodHRwOi8vY3JsLmNpbG9nb24ub3JnL2NpbG9nb24tYmFzaWMuY3Js\n" +
+                            "MC+gLaArhilodHRwOi8vY3JsLmRvZWdyaWRzLm9yZy9jaWxvZ29uLWJhc2ljLmNy\n" +
+                            "bDAfBgNVHREEGDAWgRRpdHNhZ3JlZW4xQHlhaG9vLmNvbTANBgkqhkiG9w0BAQUF\n" +
+                            "AAOCAQEAT0uKY2BEYPhozSBzRrOgY9gw5yXczbq3kEx+kxF1jXAeMMD3u2i1apZ3\n" +
+                            "dIS0FzCj1b3y8tfBr5FNde//axLZfxSo3kO9djlUrfqJnycaGevc2zMD8+GIst0J\n" +
+                            "OB+3GClYYpagLkRbkkLX3hU/qfb4c4DnHVmZOaXKsOKETB7xcxWimIlL47O2XGNt\n" +
+                            "PEUP0RzlJTkgD7LeSS0I+9SlFe0Wdb6knkMJ4afT5xLr2FXkcU9VRqGu8Gr2A4ha\n" +
+                            "CKLqTUDKFOUp5i16pLY4p6Ahn0IcFWOyWJLQ70mUJz+WVqCVXjkfMpKbrMgcKZNC\n" +
+                            "9kgKHA8cRnz97xbQIcDdeGU9tCAuGQ==",
+            'rsa_private_key' : "MIIEowIBAAKCAQEA9Aov+WStQrWuzmlVhgiW947P6ZftAeAB146jk3Eg1/3+1PpH\n" +
+                            "7pd3CoXD68iFdv2534fXWKQuETR1SN9rgAh/wQpBRpKrDay34e2/IONcQcZ0RMAD\n" +
+                            "SPzRKs8HIDS/Zn4vEomPJRDsRqjGHbDaNtELHoUYKEj7MBgANLgKXQRpMSRqJWj7\n" +
+                            "HBu89dFkBHdPx1IgJ3WvET9EBD5qj71/9sSU/bIDoChFP7aPrnv3gbsK5U48uKp9\n" +
+                            "yLBpcCsnJF3vcF55JnJP0vTFrxGsde3AuKo02SmKcv5NDTAVXDvnbKnRrsLrOKuC\n" +
+                            "MQR8vT/JKt0AEKCYnrNdUbKUwkOtRrlcArtVewIDAQABAoIBACkHFW2uOVq/xLW7\n" +
+                            "C7/O7eKMxfOVsSjhii29M070c/scHp2bvkAkgsToHDolqhqJKZik89VZNM17rkQk\n" +
+                            "G6SYyTGhEbxVqCBSa0+2cq2Ky9XbEW0FgwfgSSITUDVf6NXIXQ2WxtQKdk6izTvs\n" +
+                            "oaMZne7xnVAYhPJe9pnmXweoWC8Ehiu2MrSYQHsgc7A4zSHvKscvdGkGYif6bCVx\n" +
+                            "bi1qWvEJyIlQqRW1PmtI65tmf7Y3yOnDJYBs5hQ7nSVgSFIwox8L9h1QhU72E9kN\n" +
+                            "aqMakS5qS/PnTilB17xfbrT6Gx9yTBlm4Zyc2JgqIRjICRYetYRzQYRVv8v262D8\n" +
+                            "nHIv8CECgYEA/3RDBV9mgXwrN9ol+ICfG4SeJHzTfVJjGB+GsPIZ0yUQ3rpKBVvA\n" +
+                            "/eXBfEPL+ruDMSt5y/KnqXQu3JhiRP+uOgfwUK6GMRAJS8XkVr98nM/cW646dnvQ\n" +
+                            "k1S9LOmqPkiTq6VnOJIzwmTtUCtwpqwU8ZbuZHKagGhMCVGzrCJgC0MCgYEA9I+u\n" +
+                            "hhlkZaMrzLOTtti+5dGVtBy+avSqkp2f4oQG/Z62NGSnxzNqELnriErZkYR3d4Kv\n" +
+                            "zj0j+CO5V9xLpYzHusgYk7jLRcZQSyVjnkkrorOT2qeBqgl/FYSoD64+Eydq+NsV\n" +
+                            "7xwWFCWbcmDAFxPJU2eqES85cQSiAzi6d1ndfWkCgYAXcBZaHter17WraTOEqmBu\n" +
+                            "yOstk9pfrDh1VScpgv0Fl2gF13fFKBb79KGdAidr+Npfn4qMQNZLQOKv0Ldrdz4I\n" +
+                            "CwRskqazR7JipmR95RHM3XFtY/3vMwr/CY5V2ZaKImSSIhnnYdqn4lS3v1SVpkJB\n" +
+                            "rERxKOauE2OukzV1/K1tOwKBgQCAZRrETnp2Hdd17eWkPmDiuUj2OY0DDBatSNHT\n" +
+                            "E2u0JWoVUa8AFw8dXu64LEvTaQ9rkBIKnfDParn41bBlZubJOholHASkSjyHZ0bI\n" +
+                            "qDOfhNYgGocppTiyLGYrbVgrqCsyIZt/YGh7BU96Gi9fLkUpY6hWw0tN+ZexR0wm\n" +
+                            "Mujk2QKBgAugycaF1zFmK7UOg9/thfY07uNgnYRFLDCYB4G5f0xeagzYp+SEt3oO\n" +
+                            "q23C/NhdxAQH1rfUptZXM1rnVyM+ycI3IulnAiJ96AD5FQX0PRWmo2DtHgpZ21Sh\n" +
+                            "cZGidYECf6XdGxhSsf2C81LcDdk99KlPd7fkqLWOs5cAwlR4r3CY",
+            'expiration_date' : "Tue Jun 29 23:32:16 PDT 2010",
+            # These are the fields we prompt the user for during registration
+            'first_name' : "Roger", 
+            'last_name' : "Unwin", 
+            'phone' : "8588675309", 
+            'fax' : "6198675309", 
+            'email' : "unwin@sdsc.edu",
+            'organization' : "University of California San Diego", 
+            'department' : "San Diego Supercomputing Center", 
+            'title' : "Research Programmer"}
+        result = yield self.identity_registry_service_client.register_user(parms)
+        logging.debug('###1 register_user service reply: #####################################' + result)
+        
+        
+        parms = {
+            # these are the fields from the trust provider
+            'common_name' : "Roger Unwin CHANGED",
+            'phone' : "8588675309 CHANGED",
+            'country' : "UK CHANGED"}
+        parms["ooi_id"] = result
+        result = yield self.identity_registry_service_client.update_user(parms)
+        logging.debug('###2 update_user service reply: #####################################' + result)
+        
+        
+        logging.debug('###Trying to get lookup for key ' + result )
+        result = yield self.identity_registry_service_client.get_registration_info(result)
+        logging.debug('###3 Service reply: #####################################'+ str(result))
+        
     @defer.inlineCallbacks
     def tearDown(self):
         yield self._stop_container()
-        
+'''        
     @defer.inlineCallbacks
     def test_define_identity(self):
         """
@@ -43,15 +216,7 @@ class UserRegistrationClientTest(IonTestCase):
         result = yield hc.define_identity("TESTING")
         logging.debug('### Service reply: ' + result['value'])
                 
-    @defer.inlineCallbacks
-    def test_register_user(self):
-        """
-        """
-        
-        hc = IdentityRegistryServiceClient(proc=self.sup)
-        result = yield hc.register_user("TESTING")
-        logging.debug('### Service reply: ' + result['value'])
-        
+ 
     @defer.inlineCallbacks
     def test_define_user_profile(self):
         """
@@ -164,14 +329,6 @@ class UserRegistrationClientTest(IonTestCase):
         result = yield hc.store_registration_info(parms)
         logging.debug('### Service reply: '+result['value'])
 
-    @defer.inlineCallbacks
-    def test_get_registration_info(self):
-        """
-        """
-        
-        hc = IdentityRegistryServiceClient(proc=self.sup)
-        result = yield hc.get_registration_info("TESTING")
-        logging.debug('### Service reply: '+result['value'])
 
     @defer.inlineCallbacks
     def test_update_registration_info(self):
@@ -190,3 +347,4 @@ class UserRegistrationClientTest(IonTestCase):
         hc = IdentityRegistryServiceClient(proc=self.sup)
         result = yield hc.revoke_registration("TESTING")
         logging.debug('### Service reply: '+result['value'])
+'''
