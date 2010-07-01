@@ -95,6 +95,7 @@ class DAPProxyProtocol(LineReceiver):
             yield self.transport.loseConnection()
 
         self.buf = []
+        logging.debug('send_receive completed')
 
 
 class DAPProxyFactory(protocol.ServerFactory):
