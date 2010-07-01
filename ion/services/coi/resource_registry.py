@@ -15,6 +15,7 @@ from magnet.spawnable import Receiver
 from ion.data import dataobject
 from ion.data.datastore import registry
 
+import re
 from ion.data import store
 
 from ion.core import ioninit
@@ -25,20 +26,13 @@ import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
 
-class ResourceRegistryService(BaseService):
+class BaseResourceRegistryService(BaseService):
     """
-    Resource registry service interface
-    The Resource Registry Service uses an IStore interface to a backend Key
-    Value Store to store to track version controlled objects. The store will
-    share a name space and share objects depending on configuration when it is
-    created. The resource are retrieved as complete objects from the store. The
-    built-in encode method is used to store and transmit them using the COI
-    messaging.
+    Base class for resource registries
+    @TODO make sure this is a pure virtual class
     """
 
-    # Declaration of service
-    declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
-
+    
     # For now, keep registration in local memory store.
     @defer.inlineCallbacks
     def slc_init(self):
@@ -61,6 +55,82 @@ class ResourceRegistryService(BaseService):
         logging.info(name + " backend:"+str(backendcls))
         logging.info(name + " backend args:"+str(backendargs))
         
+    @defer.inlineCallbacks
+    def op_set_resource_lcstate(self, content, headers, msg):
+        """
+        Service operation: set the life cycle state of resource
+        """
+        res_id = str(content['res_id'])
+        lifecycle = str(content['lifecycle'])
+        logging.info('op_set_resource_lcstate: '+str(res_id) + ', LCState:' + str(lifecycle))
+
+        resource = yield self.reg.get_description(res_id)
+        
+        if resource:
+            resource.set_lifecyclestate(registry.LCStates[lifecycle])
+            yield self.reg.register(res_id,resource)
+            yield self.reply_ok(msg, {'res_id':str(res_id)},)
+
+        else:
+            yield self.reply_err(msg, {'res_id':None})
+
+
+    @defer.inlineCallbacks
+    def op_find_resources(self, content, headers, msg):
+        """
+        Service operation: find resources by criteria
+        Content is a dictionary of attributes which must match a resource:
+        """
+
+        reslist = yield self.reg.list_descriptions()
+        find_list=[]
+        for res in reslist:                        
+            # Test for failure and break
+            test=True
+            for k,v in content.items():                
+                # if this resource does not contain this attribute move on
+                if not k in res.attributes:
+                    test = False
+                    break
+                
+                att = getattr(res, k, None)
+                
+                # Bogus - can't send lcstate objects in a dict must convert to sting to test
+                if isinstance(att, registry.LCState):
+                    att = str(att)
+                
+                if isinstance(v, (str, unicode) ):
+                    # Use regex
+                    if not re.search(v, att):
+                        test=False
+                        break
+                else:
+                    # test equality
+                    #@TODO add tests for range and in list...
+                    
+                    
+                    if att != v and v != None:
+                       test=False
+                       break                    
+            if test:
+                find_list.append(res)
+
+        yield self.reply_ok(msg, {'res_enc':list([res.encode() for res in find_list])} )
+
+class ResourceRegistryService(BaseResourceRegistryService):
+    """
+    Resource registry service interface
+    The Resource Registry Service uses an IStore interface to a backend Key
+    Value Store to store to track version controlled objects. The store will
+    share a name space and share objects depending on configuration when it is
+    created. The resource are retrieved as complete objects from the store. The
+    built-in encode method is used to store and transmit them using the COI
+    messaging.
+    """
+
+    # Declaration of service
+    declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
+
         
         
     @defer.inlineCallbacks
@@ -96,46 +166,74 @@ class ResourceRegistryService(BaseService):
         else:
             yield self.reply_err(msg, {'res_enc':None})
     
+
+class BaseRegistryClient(BaseServiceClient):
+    """
+    Do not instantiate this class!
+    """
+
     @defer.inlineCallbacks
-    def op_set_resource_lcstate(self, content, headers, msg):
+    def set_lcstate(self, res_id, lcstate):
         """
-        Service operation: set the life cycle state of resource
+        @brief Retrieve a resource from the registry by its ID
+        @param res_id is a resource identifier unique to this resource
+        @param lcstate is a resource life cycle stae
         """
-        res_id = str(content['res_id'])
-        lifecycle = str(content['lifecycle'])
-        logging.info('op_set_resource_lcstate: '+str(res_id) + ', LCState:' + str(lifecycle))
+        yield self._check_init()
 
-        resource = yield self.reg.get_description(res_id)
+        (content, headers, msg) = yield self.rpc_send('set_resource_lcstate',
+                                                      {'res_id':res_id,'lifecycle':str(lcstate)})
+        logging.info('Service reply: '+str(content))
         
-        if resource:
-            resource.set_lifecyclestate(registry.LCStates[lifecycle])
-            yield self.reg.register(res_id,resource)
-            yield self.reply_ok(msg, {'res_id':str(res_id)},)
-
+        if content['status'] == 'OK':
+            defer.returnValue(True)
         else:
-            yield self.reply_err(msg, {'res_id':None})
+            defer.returnValue(False)
 
+    def set_lcstate_new(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.new)
 
+    def set_lcstate_active(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.active)
+        
+    def set_lcstate_inactive(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.inactive)
 
-    def op_find_resources(self, content, headers, msg):
-        """
-        Service operation: find resources by criteria
-        """
+    def set_lcstate_decomm(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.decomm)
+
+    def set_lcstate_retired(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.retired)
+
+    def set_lcstate_developed(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.developed)
+
+    def set_lcstate_commissioned(self, res_id):
+        return self.set_lcstate(res_id, registry.LCStates.commissioned)
+    
+
 
     @defer.inlineCallbacks
-    def op_list_resources(self,content, headers, msg):
+    def find_resources(self,attributes):
         """
-        Service operation: List resources of a particular type
+        @brief Retrieve all the resources in the registry
+        @param attributes is a dictionary of attributes which will be used to select a resource
         """
-        logging.info('op_get_resources')
-        resources = yield self.reg.list_descriptions()
-        logging.info('Found Resources:'+str(resources))
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('find_resources',attributes)
+        logging.info('Service reply: '+str(content))
         
-        yield self.reply_ok(msg, {'res_enc':list([res.encode() for res in resources])} )
-        
+        res_enc = content['res_enc']
+        resources=[]
+        if res_enc != None:
+            for res in res_enc:
+                resources.append(registry.ResourceDescription.decode(res)())
+        defer.returnValue(resources)
+
         
 
-class ResourceRegistryClient(BaseServiceClient):
+class ResourceRegistryClient(BaseRegistryClient):
     """
     Class for the client accessing the resource registry.
     """
@@ -181,61 +279,6 @@ class ResourceRegistryClient(BaseServiceClient):
             defer.returnValue(None)
 
 
-    @defer.inlineCallbacks
-    def set_lcstate(self, res_id, lcstate):
-        """
-        @brief Retrieve a resource from the registry by its ID
-        @param res_id is a resource identifier unique to this resource
-        @param lcstate is a resource life cycle stae
-        """
-        yield self._check_init()
-
-        (content, headers, msg) = yield self.rpc_send('set_resource_lcstate',
-                                                      {'res_id':res_id,'lifecycle':str(lcstate)})
-        logging.info('Service reply: '+str(content))
-        
-        if content['status'] == 'OK':
-            defer.returnValue(True)
-        else:
-            defer.returnValue(False)
-
-    def set_lcstate_new(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.new)
-
-    def set_lcstate_active(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.active)
-        
-    def set_lcstate_inactive(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.inactive)
-
-    def set_lcstate_decomm(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.decomm)
-
-    def set_lcstate_retired(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.retired)
-
-    def set_lcstate_developed(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.developed)
-
-    def set_lcstate_commissioned(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.commissioned)
-
-    @defer.inlineCallbacks
-    def list_resources(self):
-        """
-        @brief Retrieve all the resources in the registry
-        """
-        yield self._check_init()
-
-        (content, headers, msg) = yield self.rpc_send('list_resources',{})
-        logging.info('Service reply: '+str(content))
-        
-        res_enc = content['res_enc']
-        resources=[]
-        if res_enc != None:
-            for res in res_enc:
-                resources.append(registry.ResourceDescription.decode(res)())
-        defer.returnValue(resources)
 
 
 #class ResourceTypes(object):

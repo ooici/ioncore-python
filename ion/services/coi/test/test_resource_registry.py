@@ -16,6 +16,7 @@ from ion.data.datastore import registry
 
 from ion.services.coi.resource_registry import ResourceRegistryClient
 from ion.test.iontest import IonTestCase
+from ion.data import dataobject
 
 import uuid
 
@@ -70,6 +71,7 @@ class ResourceRegistryTest(IonTestCase):
         logging.info('Resource desc:\n '+str(rd4))
         self.assertNotEqual(rd3,rd4)
 
+
         # Make sure set_lcstate returns true for a valid id
         success = yield self.rrc.set_lcstate_new(rid)
         self.assertEqual(success,True)
@@ -78,13 +80,22 @@ class ResourceRegistryTest(IonTestCase):
         success = yield self.rrc.set_lcstate_new('dklhshkaviohe23290')
         self.assertEqual(success,False)
         
-    @defer.inlineCallbacks
-    def test_resource_state(self):
-
-        rd1 = registry.Generic()
-        rd1.name = 'David'
         
-        rd2 = registry.Generic()
+        
+        
+    @defer.inlineCallbacks
+    def test_find_resource(self):
+        
+        class test_resource(registry.ResourceDescription):
+            ival = dataobject.TypedAttribute(int)
+
+        rd1 = test_resource()
+        rd1.name = 'David'
+        rd1.ival = 1000
+                
+        rd1.set_lifecyclestate(registry.LCStates.active)
+                
+        rd2 = test_resource()
         rd2.name = 'Dorian'
         
         rd3 = registry.Generic()
@@ -105,16 +116,50 @@ class ResourceRegistryTest(IonTestCase):
         test = yield self.rrc.get_resource(rid3)
         self.assertEqual(test,rd3)
         
-        logging.info('**Get the list**')
-        # Get the list of resources:
-        resources = yield self.rrc.list_resources()
-        for res in resources:
-            logging.info(str(res))
+        logging.info('**find a resource**')
+        # Test for a valid attribute
+        resources = yield self.rrc.find_resources({'name':'David','ival':1000})
+        #print resources[0]
+        self.assertIn(rd1,resources)
+        self.assertNotIn(rd2, resources)
+        self.assertNotIn(rd3, resources)
+
+        
+        resources = yield self.rrc.find_resources({'name':'David','ival':2000})
+        #print resources[0]
+        self.assertEqual(resources,[])
+        
+        
+        # test for an invalid attribute
+        resources = yield self.rrc.find_resources({'names':'David'})
+        self.assertEqual(resources,[])
         
         
         
+        resources = yield self.rrc.find_resources({'name':'D'})
+        self.assertIn(rd1, resources)
+        self.assertIn(rd2, resources)
+        self.assertNotIn(rd3, resources)
+
+        resources = yield self.rrc.find_resources({'name':None})
+        self.assertIn(rd1, resources)
+        self.assertIn(rd2, resources)
+        self.assertIn(rd3, resources)
+
+
+        resources = yield self.rrc.find_resources({'lifecycle':None})
+        self.assertIn(rd1, resources)
+        self.assertIn(rd2, resources)
+        self.assertIn(rd3, resources)
+                
+        # Finding lifecycle is bogus for now!
+        # you can not transmitt a LCState object in a dict - must use the string
+        resources = yield self.rrc.find_resources({'lifecycle':'active'})
+        self.assertIn(rd1, resources)
+        self.assertNotIn(rd2, resources)
+        self.assertNotIn(rd3, resources)
         
-        
+
 
 class ResourceRegistryCoreServiceTest(IonTestCase):
     @defer.inlineCallbacks
