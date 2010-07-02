@@ -68,6 +68,16 @@ class ResourceDescription(dataobject.DataObject):
     def get_lifecyclestate(self):
         return self.lifecycle
 
+    @property
+    def identity(self):
+        return self._identity
+    
+    @property
+    def parent_commit(self):
+        return self._parent_commit
+
+
+
 class Generic(ResourceDescription):
     """
     """
