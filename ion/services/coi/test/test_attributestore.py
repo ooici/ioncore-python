@@ -63,6 +63,8 @@ class AttrStoreServiceTest(IonTestCase):
         resx1 = yield asc2.get('key1')
         self.assertEqual(resx1, None)
         
+        yield asc1.clear_store()
+        yield asc2.clear_store()
         
         
     @defer.inlineCallbacks
@@ -72,7 +74,7 @@ class AttrStoreServiceTest(IonTestCase):
             {'name':'Junk1',
              'module':'ion.services.coi.attributestore',
              'class':'AttributeStoreService',
-             'spawnargs':{'servicename':'as1',
+             'spawnargs':{'servicename':'as1', # this is the name of the instance!
                             'backend_class':'ion.data.backends.cassandra.CassandraStore',
                             'backend_args':{'cass_host_list':['amoeba.ucsd.edu:9160'],
                                         'keyspace':'Datastore',
@@ -84,7 +86,7 @@ class AttrStoreServiceTest(IonTestCase):
             {'name':'Junk2',
             'module':'ion.services.coi.attributestore',
             'class':'AttributeStoreService',
-            'spawnargs':{'servicename':'as2',
+            'spawnargs':{'servicename':'as2', # this is the name of the instance!
                         'backend_class':'ion.data.backends.cassandra.CassandraStore',
                         'backend_args':{'cass_host_list':['amoeba.ucsd.edu:9160'],
                                         'keyspace':'Datastore',
@@ -126,4 +128,7 @@ class AttrStoreServiceTest(IonTestCase):
         # With common backends the value should be found.
         resx1 = yield asc2.get('key1')
         self.assertEqual(resx1, 'value2',msg='Failed to pull value from second service instance')
+        
+        yield asc1.clear_store()
+        yield asc2.clear_store()
         
