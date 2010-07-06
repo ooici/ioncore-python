@@ -17,7 +17,6 @@ from ion.services.base_service import BaseService
 from twisted.internet import defer, protocol, reactor
 from twisted.protocols.basic import LineReceiver
 
-
 # Read configuration file to find TCP server port
 from ion.core import ioninit
 config = ioninit.config(__name__)

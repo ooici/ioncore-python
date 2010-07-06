@@ -23,6 +23,7 @@ from ion.services.sa.fetcher import FetcherService, FetcherClient
 from ion.services.dm.url_manipulation import generate_filename
 
 from ion.test.iontest import IonTestCase
+import base64
 
 class TransportTester(IonTestCase):
     """
@@ -39,7 +40,7 @@ class TransportTester(IonTestCase):
 
     @defer.inlineCallbacks
     def test_one(self):
-        raise unittest.SkipTest('Waiting for CISWCORE-14')
+        #raise unittest.SkipTest('Waiting for CISWCORE-14')
 
         services = [
              {'name': 'fetcher', 'module': 'ion.services.sa.fetcher',
@@ -50,7 +51,8 @@ class TransportTester(IonTestCase):
 
         fc = FetcherClient(proc=sup)
         dset = yield fc.get_dap_dataset('http://ooici.net:8001/coads.nc')
-        logging.warn(dset)
+        dset = base64.b64decode(dset)
+        #logging.warn(dset)
         logging.warn(type(dset))
         self.failUnlessSubstring(dset, 'NC_GLOBAL')
         self.failUnlessSubstring(dset, 'ooi-download-timestamp')
@@ -133,7 +135,7 @@ class PersisterTester(IonTestCase):
 
     @defer.inlineCallbacks
     def test_fetcher_and_persister_services(self):
-        raise unittest.SkipTest('Waiting for CISWCORE-14')
+        #raise unittest.SkipTest('Waiting for CISWCORE-14')
 
         services = [
             {'name': 'persister', 'module': 'ion.services.dm.persister',
@@ -144,11 +146,11 @@ class PersisterTester(IonTestCase):
         sup = yield self._spawn_processes(services)
 
         dset_url = 'http://ooici.net:8001/coads.nc'
-#        local_dir = '/tmp/'
-#        fname = generate_filename(dset_url, local_dir=local_dir)
+        local_dir = '/tmp/'
+        fname = generate_filename(dset_url, local_dir=local_dir)
 
         pc = PersisterClient(proc=sup)
-#        fc = FetcherClient(proc=sup)
+        fc = FetcherClient(proc=sup)
         fs = FetcherService()
 
         logging.debug('Grabbing dataset ' + dset_url)

@@ -6,6 +6,7 @@
 @test ion.services.sa.fetcher Test of rewritten fetcher
 """
 
+import base64
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
@@ -63,18 +64,18 @@ class FetcherTest(IonTestCase):
     def _get_page(self, src_url):
         logging.debug('sending GET request for "%s"...' % src_url)
         res = yield self.fc.get_url(src_url)
-        msg = res['value']
         if res['status'] == 'ERROR':
-            raise ValueError('Error on fetch: ' + msg)
+            raise ValueError('Error on fetch')
+        msg = base64.b64decode(res['value'])
         defer.returnValue(msg)
 
     @defer.inlineCallbacks
     def _get_phead(self, src_url):
         logging.debug('sending HEAD request for "%s"...' % src_url)
         res = yield self.fc.get_head(src_url)
-        msg = res['value']
         if res['status'] == 'ERROR':
-            raise ValueError('Error on fetch: ' + msg)
+            raise ValueError('Error on fetch')
+        msg = base64.b64decode(res['value'])
         defer.returnValue(msg)
 
     ###############################################

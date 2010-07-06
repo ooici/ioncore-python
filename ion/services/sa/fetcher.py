@@ -14,6 +14,8 @@ method for badly written DAP clients.
 import logging
 logging = logging.getLogger(__name__)
 
+import base64
+
 from twisted.internet import defer
 import httplib as http
 from socket import gaierror
@@ -87,7 +89,7 @@ class FetcherService(BaseService):
             hstr = hstr + '\n' + res.read()
             # Uncomment this to see the completed result
             # logging.debug(hstr)
-            yield self.reply_ok(msg, content=hstr)
+            yield self.reply_ok(msg, content=base64.b64encode(hstr))
         else:
             logging.info('fetch error %s %s %s %s' %
                          (operation, src_url, res.status, res.reason))
