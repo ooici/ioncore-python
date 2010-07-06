@@ -103,6 +103,7 @@ class FetcherService(BaseService):
         May raise gaierror or ValueError
         @todo Merge this and _http_op
         @note See ion.services.sa.test.test_fetcher.GetPageTester
+        @note Does not transmit, and therefore does not call base64
         """
         src = urlparse.urlsplit(url)
         try:
