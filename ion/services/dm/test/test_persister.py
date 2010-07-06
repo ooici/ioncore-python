@@ -113,6 +113,8 @@ class PersisterServiceTester(unittest.TestCase):
 
         logging.debug('Grabbing dataset ' + dset_url)
         dset = self.fs._get_dataset_no_xmit(dset_url)
+        logging.debug('decoding b64-dods')
+        dset['dods'] = base64.b64decode(dset['dods'])
         logging.debug('Persisting dataset')
         self.ps._save_no_xmit(dset, local_dir=local_dir)
         if open(fname):

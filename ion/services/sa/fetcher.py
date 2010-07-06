@@ -146,6 +146,7 @@ class FetcherService(BaseService):
         """
         The core of the fetcher: function to grab an entire DAP dataset and
         return it as a dictionary.
+        @note dods is base64-encoded!
         """
         base_url = base_dap_url(source_url)
         das_url = base_url + '.das'
@@ -170,7 +171,7 @@ class FetcherService(BaseService):
         dset_msg['source_url'] = base_url
         dset_msg['das'] = json.dumps(das)
         dset_msg['dds'] = json.dumps(dds)
-        dset_msg['value'] = dods
+        dset_msg['dods'] = base64.b64encode(dods)
         return(dset_msg)
 
     @defer.inlineCallbacks

@@ -10,6 +10,7 @@
 
 from urlparse import urlsplit, urlunsplit
 import simplejson as json
+import base64
 
 from pydap.model import BaseType, SequenceType
 from pydap.proxy import ArrayProxy, SequenceProxy, VariableProxy
@@ -36,8 +37,9 @@ class PersisterService(BaseService):
     The persister service is responsible for receiving a DAP dataset and
     writing to disk in netcdf format.
     Message protocol/encoding/format:
-    * Expect a dictionary with keys for das, dds and value ('value' = DODS)
+    * Expect a dictionary with keys for das, dds and dods
     * Since das and dds are multiline strings, they are encoded as json
+    * Dods is base64-encoded
 
     The plan is that writing locally to disk will become writing to a HSM such
     as iRODS that presents a filesystem interface (or file-like-object we can
@@ -56,7 +58,7 @@ class PersisterService(BaseService):
     def op_persist_dap_dataset(self, content, headers, msg):
         """
         @brief top-level routine to persist a dataset.
-        @param content Message with das, dds and 'value' keys
+        @param content Message with das, dds and dods keys
         @param headers Ignored
         @param msg Used to route the reply, otherwise ignored
         @retval RPC message via reply_ok/reply_err
@@ -86,7 +88,7 @@ class PersisterService(BaseService):
         try:
             dds = json.loads(content['dds'])
             das = json.loads(content['das'])
-            dods = content['value']
+            dods = content['dods']
             source_url = content['source_url']
         except KeyError, ke:
             logging.error('Unable to find required fields in dataset!')
@@ -166,7 +168,7 @@ class PersisterClient(BaseServiceClient):
     def persist_dap_dataset(self, dap_message):
         """
         @brief Invoke persister, assumes a single dataset per message
-        @param dap_message Message with das/dds/dods in das/dds/value keys
+        @param dap_message Message with das/dds/dods in das/dds/dods keys
         @retval ok or error via rpc mechanism
         """
         yield self._check_init()
