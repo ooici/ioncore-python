@@ -40,7 +40,7 @@ class TypedAttribute(object):
         type = eval(str(stype), types)
 #        return cls(type, type(str(default)))
         if default:
-            print 'type, default:',type, default
+            #print 'type, default:',type, default
             #return cls(type, eval(str(default), types))
             return cls(type, type(str(default)))
         return cls(type)
