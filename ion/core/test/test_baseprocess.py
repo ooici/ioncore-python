@@ -7,6 +7,7 @@
 """
 
 import os
+import sha
 import logging
 logging = logging.getLogger(__name__)
 
@@ -90,6 +91,36 @@ class BaseProcessTest(IonTestCase):
         self.assertEquals(msg.payload['content']['value'], 'content123')
 
         yield sup.shutdown()
+
+    @defer.inlineCallbacks
+    def test_send_byte_string(self):
+        """
+        @brief Test that any arbitrary byte string can be sent through the
+        ion + magnet stack. Use a 20 byte sha1 digest as test string.
+        """
+        p1 = ReceiverProcess()
+        pid1 = yield p1.spawn()
+        yield p1.init()
+
+        processes = [
+            {'name':'echo','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
+        ]
+        sup = yield self._spawn_processes(processes, sup=p1)
+
+        pid2 = p1.get_child_id('echo')
+
+        byte_string = sha.sha('test').digest()
+
+        yield p1.send(pid2, 'echo', byte_string)
+        logging.info('Sent byte-string')
+
+        msg = yield p1.await_message()
+        logging.info('Received byte-string')
+        self.assertEquals(msg.payload['content']['value'], byte_string)
+
+        yield sup.shutdown()
+
+
 
     @defer.inlineCallbacks
     def test_shutdown(self):
