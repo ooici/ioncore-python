@@ -113,9 +113,9 @@ class PersisterServiceTester(unittest.TestCase):
 
         logging.debug('Grabbing dataset ' + dset_url)
         dset = self.fs._get_dataset_no_xmit(dset_url)
-        logging.debug('decoding b64-dods')
+        logging.debug('decoding b64-dods, %d bytes' % len(dset['dods']))
         dset['dods'] = base64.b64decode(dset['dods'])
-        logging.debug('Persisting dataset')
+        logging.debug('Persisting dataset, %d bytes' % len(dset['dods']))
         self.ps._save_no_xmit(dset, local_dir=local_dir)
         if open(fname):
            pass
@@ -147,16 +147,13 @@ class PersisterTester(IonTestCase):
         ]
         boss = yield self._spawn_processes(services)
 
-        dset_url = 'http://ooici.net:8001/coads.nc'
-        local_dir = '/tmp/'
-        fname = generate_filename(dset_url, local_dir=local_dir)
-
         pc = PersisterClient(proc=boss)
         fc = FetcherClient(proc=boss)
         fs = FetcherService()
 
+        dset_url = 'http://ooici.net:8001/coads.nc'
+
         logging.debug('Grabbing dataset ' + dset_url)
         dset = fs._get_dataset_no_xmit(dset_url)
-
         rc = yield pc.persist_dap_dataset(dset)
         self.failUnlessSubstring('SUCCESS', rc)
