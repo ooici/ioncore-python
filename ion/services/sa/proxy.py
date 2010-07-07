@@ -17,6 +17,8 @@ from ion.services.base_service import BaseService
 from twisted.internet import defer, protocol, reactor
 from twisted.protocols.basic import LineReceiver
 
+import base64
+
 # Read configuration file to find TCP server port
 from ion.core import ioninit
 config = ioninit.config(__name__)
@@ -35,11 +37,14 @@ class DAPProxyProtocol(LineReceiver):
     @see http://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol
     @see The DAP protocol spec at http://www.opendap.org/pdf/ESE-RFC-004v1.1.pdf
     """
-    def connectionMade(self):
-        logging.debug('connected!')
+    def reset(self):
         self.buf = []
         self.http_connected = False
         self.hostname = None
+
+    def connectionMade(self):
+        logging.debug('connected!')
+        self.reset()
 
     def lineReceived(self, line):
         logging.debug('got a line: %s' % line)
@@ -68,6 +73,8 @@ class DAPProxyProtocol(LineReceiver):
             url = 'http://%s%s' % (self.hostname, url)
             logging.debug('new ' + url)
 
+        generic_err = '500 Server error, no comprende.\r\n'
+
         if cmd == 'CONNECT':
             self.http_connected = True
             self.hostname = url
@@ -78,22 +85,38 @@ class DAPProxyProtocol(LineReceiver):
             self.transport.write('Content-Type: text/plain; charset=UTF-8\r\n')
             self.transport.write('\r\n')
             self.buf = []
-        elif cmd == 'HEAD':
-            page = yield cc.get_head(url)
-            self.transport.write(page)
+            defer.returnValue(None)
+
+        if cmd not in ['GET', 'HEAD']:
+            logging.error('Unknown command "%s"' % self.buf[0])
+            yield self.transport.write(generic_err)
+            yield self.transport.loseConnection()
+            self.reset()
+            return
+
+        # Either get or head commands
+        if cmd == 'HEAD':
+            resp = yield cc.get_head(url)
         elif cmd == 'GET':
             logging.debug('pulling url...')
-            page = yield cc.get_url(url)
-            self.transport.write(page)
-            yield self.transport.loseConnection()
-        else:
-            logging.error('Unknown command "%s"' % self.buf[0])
-            self.transport.write('HTTP/1.0 500 Server error, no comprende.\r\n')
+            resp = yield cc.get_url(url)
 
-        if do_disconnect:
+        # Did the command succeed?
+        if resp['status'] != 'OK':
+            logging.warn('Bad result on %s %s' % (cmd, url))
+            rs = resp['value']
+            logging.warn(rs)
+            yield self.transport.write(rs)
             yield self.transport.loseConnection()
+            self.reset()
+            logging.debug('done with error handler')
+            return
 
-        self.buf = []
+        # OK, response OK, decode page and return it
+        self.transport.write(base64.b64decode(resp['value']))
+
+        yield self.transport.loseConnection()
+        self.reset()
         logging.debug('send_receive completed')
 
 

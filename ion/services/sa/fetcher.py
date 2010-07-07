@@ -52,7 +52,7 @@ class FetcherService(BaseService):
         @todo check for library routine to do this.
         @note output has an blank line at the end (\r\n)
         """
-        hstr = 'HTTP/1.0 200 OK\r\n'
+        hstr = 'HTTP/1.0 %d %s\r\n' % (result.status, result.reason)
         for x in result.getheaders():
             hstr = hstr + '%s: %s\r\n' % (x[0], x[1])
 
@@ -67,6 +67,7 @@ class FetcherService(BaseService):
         @retval send_ok or send_err as required
         @note This routine sends the reply back to the caller!
         @note called by derived class ion.services.dm.cache.RetrieverService
+        @todo Better propagation of HTTP result codes back to callers (eg 404)
         """
         assert(operation in ['GET', 'HEAD'])
 
@@ -82,19 +83,20 @@ class FetcherService(BaseService):
             logging.exception()
             yield self.reply_err(msg, content=str(ge))
 
+        hstr = self._reassemble_headers(res)
+
         # Did it succeed?
         if res.status == 200:
-            hstr = self._reassemble_headers(res)
             # @note read on HEAD returns no data
             hstr = hstr + '\n' + res.read()
             # Uncomment this to see the completed result
             # logging.debug(hstr)
+            # @note base64-encoded page returned!
             yield self.reply_ok(msg, content=base64.b64encode(hstr))
         else:
             logging.info('fetch error %s %s %s %s' %
                          (operation, src_url, res.status, res.reason))
-
-            yield self.reply_err(msg, content='%s: %s' % (res.status, res.reason))
+            yield self.reply_err(msg, content=hstr)
 
         logging.debug('fetch completed %s' % res.status)
     def get_page(self, url, get_headers=False):
@@ -102,6 +104,7 @@ class FetcherService(BaseService):
         Inner routine to grab a page, with or without http headers.
         May raise gaierror or ValueError
         @todo Merge this and _http_op
+        @todo Better propagation of HTTP result codes back to callers (eg 404)
         @note See ion.services.sa.test.test_fetcher.GetPageTester
         @note Does not transmit, and therefore does not call base64
         """
@@ -172,11 +175,6 @@ class FetcherService(BaseService):
         dset_msg['das'] = json.dumps(das)
         dset_msg['dds'] = json.dumps(dds)
         dset_msg['dods'] = base64.b64encode(dods)
-
-        import md5
-        fh = md5.new(dset_msg['dods'])
-        logging.debug('source dods md5: %s, size %d' % (fh.hexdigest(),
-                                                        len(str(dset_msg))))
 
         return(dset_msg)
 
