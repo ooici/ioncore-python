@@ -69,6 +69,10 @@ class PydapIntegrationTest(IonTestCase):
     def _dap_pull_sst_chunk(self, url):
         dataset = self._dap_open(url)
         var = dataset['SST']
+        #from IPython.Shell import IPShellEmbed
+        #ipshell = IPShellEmbed('')
+        #ipshell()
+
         # var[range] actually causes an XDR transfer of data
         return var[0,10:14,10:14]
 
@@ -89,7 +93,7 @@ class PydapIntegrationTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_binary_data(self):
-        raise unittest.SkipTest('Binary transfer still broken')
+        raise unittest.SkipTest('Proxy transfer still broken')
         var = yield threads.deferToThread(self._dap_pull_sst_chunk, TEST_URL)
         logging.info('got data ok!')
 

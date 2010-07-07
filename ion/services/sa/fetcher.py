@@ -160,7 +160,7 @@ class FetcherService(BaseService):
         try:
             das = self.get_page(das_url)
             dds = self.get_page(dds_url)
-            dods = self.get_page(dods_url, get_headers=True)
+            dods = self.get_page(dods_url)
         except ValueError, ve:
             logging.exception('Error on fetch of ' + base_url)
             raise ve
@@ -175,6 +175,9 @@ class FetcherService(BaseService):
         dset_msg['das'] = json.dumps(das)
         dset_msg['dds'] = json.dumps(dds)
         dset_msg['dods'] = base64.b64encode(dods)
+#        from IPython.Shell import IPShellEmbed
+#        ipshell = IPShellEmbed('')
+#        ipshell()
 
         return(dset_msg)
 
