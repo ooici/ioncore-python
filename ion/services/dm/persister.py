@@ -88,7 +88,7 @@ class PersisterService(BaseService):
         try:
             dds = json.loads(content['dds'])
             das = json.loads(content['das'])
-            dods = content['dods']
+            dods = base64.b64decode(content['dods'])
             source_url = content['source_url']
         except KeyError, ke:
             logging.error('Unable to find required fields in dataset!')
@@ -122,10 +122,8 @@ class PersisterService(BaseService):
         dataset.attributes['NC_GLOBAL']['ooi-download-timestamp'] = time.time()
         dataset.attributes['NC_GLOBAL']['ooi-source-url'] = source_url
 
-        """
-        Back to pydap code - this block is from open_url in client.py
-        Remove any projections from the url, leaving selections.
-        """
+        # Back to pydap code - this block is from open_url in client.py
+        # Remove any projections from the url, leaving selections.
         scheme, netloc, path, query, fragment = urlsplit(source_url)
         projection, selection = parse_qs(query)
         url = urlunsplit(
