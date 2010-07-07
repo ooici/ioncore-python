@@ -9,6 +9,7 @@
 
 NULL_CHR = '\x00'
 
+import json
 
 class TypedAttribute(object):
     """
@@ -42,6 +43,13 @@ class TypedAttribute(object):
         if default:
             #print 'type, default:',type, default
             #return cls(type, eval(str(default), types))
+            if issubclass(type, DataObject):
+                #print 'Holy SHIT ==========='
+                #print default
+                #print type.decode(json.loads(default))()
+                data_object = type.decode(json.loads(default))()
+                return cls(type, data_object)
+            
             return cls(type, type(str(default)))
         return cls(type)
 
@@ -110,12 +118,27 @@ class DataObject(object):
             value = getattr(self, name)
             
             # Attempt to handle nested Resources
-            if not isinstance(value, DataObject):
-                encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
+            if isinstance(value, DataObject):
+                value_enc = value.encode()
+                encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(value_enc),)))
+            elif isinstance(value,(list,tuple,set)):
+                print 'HERHEHRHEHRHERHEHRHREH'
+                value_enc = []
+                for val in value:
+                    value_enc.append("")
+                
+                encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(value_enc),)))
+
             else:
-                value = value.encode()
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
+
+                
         return encoded
+
+    def _encode(self, name, value):
+        """
+        """
+
 
     @classmethod
     def decode(cls, attrs):

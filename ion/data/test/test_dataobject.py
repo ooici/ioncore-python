@@ -201,14 +201,14 @@ class TestSendTypesDataObject(TestSendDataObject):
         yield self._start_container()
 
         
-class Send_Binary_Resource_Object(TestSendDataObject):
-    @defer.inlineCallbacks
-    def setUp(self):
-        res = BinaryObject()
-        res.name = 'Binary Junk'
-        res.binary = cas.sha1bin(res.name)
-        self.obj = res
-        yield self._start_container()
+#class Send_Binary_Resource_Object(TestSendDataObject):
+#    @defer.inlineCallbacks
+#    def setUp(self):
+#        res = BinaryObject()
+#        res.name = 'Binary Junk'
+#        res.binary = cas.sha1bin(res.name)
+#        self.obj = res
+#        yield self._start_container()
 
 class Send_List_Resource_Object(TestSendDataObject):
     @defer.inlineCallbacks

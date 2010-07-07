@@ -110,6 +110,7 @@ class ResourceDescription(ResourceReference):
     user can make changes through this object.
     """
     _types = LCStates
+    _types['ResourceReference']=ResourceReference
 
     name = dataobject.TypedAttribute(str)
     lifecycle = dataobject.TypedAttribute(LCState, default=LCStates.new)
