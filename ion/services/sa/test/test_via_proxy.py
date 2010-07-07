@@ -33,6 +33,7 @@ import pydap.lib
 import httplib2
 import urllib2
 
+TEST_URL = 'http://amoeba.ucsd.edu:8001/coads.nc'
 class PydapIntegrationTest(IonTestCase):
     """
     High-fidelity integration test - use pydap's full DAP client to exercise
@@ -73,8 +74,7 @@ class PydapIntegrationTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_metadata(self):
-        url = 'http://amoeba.ucsd.edu:8001/coads.nc'
-        dset = yield threads.deferToThread(self._dap_open, url)
+        dset = yield threads.deferToThread(self._dap_open, TEST_URL)
         text = str(dset)
         # @todo Verify dataset contains pydap/numpy objects, not just strings
         self.failUnlessSubstring('COADSX', text)
@@ -90,8 +90,7 @@ class PydapIntegrationTest(IonTestCase):
     @defer.inlineCallbacks
     def test_binary_data(self):
         raise unittest.SkipTest('Binary transfer still broken')
-        url = 'http://amoeba.ucsd.edu:8001/coads.nc'
-        var = yield threads.deferToThread(self._dap_pull_sst_chunk, url)
+        var = yield threads.deferToThread(self._dap_pull_sst_chunk, TEST_URL)
         logging.info('got data ok!')
 
 class IntegrationTest(IonTestCase):

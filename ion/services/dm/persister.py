@@ -93,10 +93,6 @@ class PersisterService(BaseService):
             das = json.loads(str(content['das']))
             dods = base64.b64decode(content['dods'])
             source_url = content['source_url']
-            from IPython.Shell import IPShellEmbed
-            ipshell = IPShellEmbed('')
-#            ipshell()
-
             logging.debug('Decoded dataset OK')
         except KeyError, ke:
             logging.error('Unable to find required fields in dataset!')
@@ -165,12 +161,8 @@ class PersisterService(BaseService):
         logging.info('Saving DAP dataset "%s" to "%s"' % (source_url, fname))
 
         try:
-            from IPython.Shell import IPShellEmbed
-            ipshell = IPShellEmbed('')
             netcdf.save(dataset, fname)
-
         except UnicodeDecodeError, ude:
-            ipshell()
             logging.exception('save error: %s ' % ude)
             return 1
 
