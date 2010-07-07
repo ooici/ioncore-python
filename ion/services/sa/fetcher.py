@@ -165,28 +165,40 @@ class FetcherService(BaseService):
             logging.exception('Error on fetch of ' + base_url)
             raise ge
 
-        logging.debug('Fetch completed OK.')
+        logging.debug('Fetches completed OK, composing and returning message')
 
         dset_msg = {}
         dset_msg['source_url'] = base_url
         dset_msg['das'] = json.dumps(das)
         dset_msg['dds'] = json.dumps(dds)
         dset_msg['dods'] = base64.b64encode(dods)
+
+        import md5
+        fh = md5.new(dset_msg['dods'])
+        logging.debug('source dods md5: %s, size %d' % (fh.hexdigest(),
+                                                        len(str(dset_msg))))
+
         return(dset_msg)
 
     @defer.inlineCallbacks
     def op_get_dap_dataset(self, content, headers, msg):
-
+        """
+        Pull a DAP dataset, encode into reply, send reply. Integrates
+        everything else.
+        """
         try:
+            # Do the fetches, carefully
             dmesg = self._get_dataset_no_xmit(content)
         except ValueError, ve:
-            yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
-            return
+            yield self.reply_err(msg, 'reply',
+                                 {'value':'Error on fetch: %s' % str(ve)}, {})
+            defer.returnValue(None)
         except gaierror, ge:
-            yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
-            return
+            yield self.reply_err(msg, 'reply',
+                                 {'value':'Error on fetch: %s' % str(ge)}, {})
+            defer.returnValue(None)
 
-        logging.info('Sending dataset')
+        logging.info('Returning dataset via reply_ok...')
         yield self.reply_ok(msg, dmesg)
         logging.debug('Send complete')
 
@@ -235,7 +247,6 @@ class FetcherClient(BaseServiceClient):
         Pull an entire dataset.
         """
         yield self._check_init()
-        logging.info('Starting fetch of DAP dataset %s' % requested_url)
         (content, headers, msg) = yield self.rpc_send('get_dap_dataset', requested_url)
         if 'ERROR' in content:
             raise ValueError('Error on URL: ' + content['failure'])

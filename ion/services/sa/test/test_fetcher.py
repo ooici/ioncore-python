@@ -24,7 +24,8 @@ class FetcherServiceTester(IonTestCase):
         self.mf = FetcherService()
 
     def test_single_page_with_headers(self):
-        page = self.mf.get_page('http://amoeba.ucsd.edu/tmp/test1.txt', get_headers=True)
+        page = self.mf.get_page('http://amoeba.ucsd.edu/tmp/test1.txt',
+                                get_headers=True)
         self.failUnlessSubstring('content-length', page)
         self.failUnlessSubstring('is the time for all', page)
 
@@ -37,8 +38,10 @@ class FetcherServiceTester(IonTestCase):
         try:
             self.mf.get_page('http://foo.bar.baz/')
         except gaierror, ge:
+            logging.debug('got err as expected! %s' % str(ge))
             pass
         except ValueError, ve:
+            logging.debug('got err as expected: %s' % str(ve))
             pass
         else:
             self.fail('Should have raised an exception!')
