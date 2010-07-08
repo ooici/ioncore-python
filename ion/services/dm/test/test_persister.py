@@ -85,7 +85,8 @@ class ServiceTester(unittest.TestCase):
         to get and persist a full dataset from amoeba (5.2MB)
         """
         # generate filename so we can look for it after saving
-        fname = generate_filename(TEST_DSET)
+        local_dir = '/tmp/'
+        fname = generate_filename(TEST_DSET, local_dir=local_dir)
 
         dset = self.fs._get_dataset_no_xmit(TEST_DSET)
         self.ps._save_no_xmit(dset, local_dir=local_dir)
@@ -102,7 +103,7 @@ class PersisterTester(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
-        self.timeout = 120
+        self.timeout = 300
         yield self._start_container()
 
     @defer.inlineCallbacks
