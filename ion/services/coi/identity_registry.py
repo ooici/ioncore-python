@@ -68,15 +68,13 @@ class IdentityRegistryClient(BaseRegistryClient):
         """
         Needs documentation here
         """
-
+        
         user.ooi_id = str(uuid.uuid4())
-
+        
         yield self._check_init()
-
+        
         (content, headers, msg) = yield self.rpc_send('register_user', {'user_enc': user.encode()})
-
-        logging.info('Reister User Service reply: '+str(headers))
-
+        
         defer.returnValue(str(content['user_id']))
 
     @defer.inlineCallbacks
@@ -88,32 +86,13 @@ class IdentityRegistryClient(BaseRegistryClient):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('find_users', attributes)
-        logging.info('Service reply: '+str(content))
-
+        
         users_enc = content['users_enc']
         users=[]
         if users_enc != None:
             for user in users_enc:
                 users.append(registry.ResourceDescription.decode(user)())
         defer.returnValue(users)
-
-    #@defer.inlineCallbacks
-    #def get_registration_info(self, user_id):
-    #    """
-    #    @brief Retrieve a person from the registry by its ID
-    #    @param user_id is a Person identifier unique to this Person
-    #
-    #    This routine should be nerfed. use get_user instead.
-    #    """
-    #
-    #    yield self._check_init()
-    #
-    #    foo = yield self.get_user(user_id)
-    #
-    #    if not foo:
-    #        defer.returnValue(foo)
-    #    else :
-    #        defer.returnValue(foo.phone)
 
 
     @defer.inlineCallbacks
@@ -125,8 +104,7 @@ class IdentityRegistryClient(BaseRegistryClient):
 
         yield self._check_init()
 
-        (content, headers, msg) = yield self.rpc_send('get_user',
-                                                      {'user_id':user_id})
+        (content, headers, msg) = yield self.rpc_send('get_user', {'user_id': user_id})
         logging.info('Service reply: '+str(content))
         user_enc = content['user_enc']
 
@@ -141,12 +119,11 @@ class IdentityRegistryClient(BaseRegistryClient):
         """
         This one needs a comment
         """
+        
         yield self._check_init()
-
+        
         (content, headers, msg) = yield self.rpc_send('register_user', {'user_id': Person.ooi_id, 'user_enc': Person.encode()})
-
-        logging.info('Reister User Service reply: '+str(headers))
-
+        
         defer.returnValue(str(content['user_id']))
 
 
@@ -214,12 +191,10 @@ class IdentityRegistryService(BaseResourceRegistryService):  # (was BaseService)
         @brief : Register a user instance with the user registry.
         @param : User object (encoded)
         """
-
-        #user_id = str(content['user_id'])
+        
         user_enc = content['user_enc']
         user = registry.ResourceDescription.decode(user_enc)()
-        logging.info('op_register_resource: \n' + str(user))
-
+        
         yield self.reg.register(user.ooi_id, user)
         yield self.reply_ok(msg, {'user_id':user.ooi_id},)
 
@@ -230,8 +205,7 @@ class IdentityRegistryService(BaseResourceRegistryService):  # (was BaseService)
         @param : user_id: the ooi_id for the user (uuid4())
         """
         user_id = content['user_id']
-        logging.info('op_get_user: '+str(user_id))
-
+        
         user = yield self.reg.get_description(user_id)
         if user:
             yield self.reply_ok(msg, {'user_enc': user.encode()})
