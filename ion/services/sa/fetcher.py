@@ -171,6 +171,7 @@ class FetcherService(BaseService):
         logging.debug('Fetches completed OK, composing and returning message')
 
         dset_msg = {}
+        dset_msg['quiet'] = True # Keep procutils from clogging the log
         dset_msg['source_url'] = base_url
         dset_msg['das'] = json.dumps(das)
         dset_msg['dds'] = json.dumps(dds)
