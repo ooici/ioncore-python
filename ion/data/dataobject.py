@@ -39,18 +39,30 @@ class TypedAttribute(object):
         
         #the use of str is temporary unti lcaarch msging is fixed
         type = eval(str(stype), types)
-#        return cls(type, type(str(default)))
+
         if default:
             #print 'type, default:',type, default
             #return cls(type, eval(str(default), types))
             if issubclass(type, DataObject):
-                #print 'Holy SHIT ==========='
-                #print default
-                #print type.decode(json.loads(default))()
                 data_object = type.decode(json.loads(default))()
                 return cls(type, data_object)
-            
-            return cls(type, type(str(default)))
+                
+            elif issubclass(type, (list, set, tuple)):
+                list_enc = json.loads(default)
+                    
+                objs=[]
+                for item in list_enc:
+                    itype, ival = item.split(NULL_CHR)
+                    itype = eval(str(itype), types)
+                    
+                    if issubclass(itype, DataObject):
+                        objs.append(itype.decode(json.loads(ival))() )
+                    else:
+                        objs.append(itype(str(ival)))
+                    
+                return cls(type, type(objs))
+            else:
+                return cls(type, type(str(default)))
         return cls(type)
 
 
@@ -122,22 +134,21 @@ class DataObject(object):
                 value_enc = value.encode()
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(value_enc),)))
             elif isinstance(value,(list,tuple,set)):
-                print 'HERHEHRHEHRHERHEHRHREH'
-                value_enc = []
+                list_enc = []
                 for val in value:
-                    value_enc.append("")
+                    if isinstance(val, DataObject):
+                        val_enc = val.encode()
+                        list_enc.append("%s%s%s" % (type(val).__name__, NULL_CHR, json.dumps(val_enc),))
+                    else:
+                        list_enc.append("%s%s%s" % (type(val).__name__, NULL_CHR, str(val)))
                 
-                encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(value_enc),)))
+                encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(list_enc),)))
 
             else:
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
 
                 
         return encoded
-
-    def _encode(self, name, value):
-        """
-        """
 
 
     @classmethod

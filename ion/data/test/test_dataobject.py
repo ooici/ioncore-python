@@ -89,7 +89,7 @@ class TestListObject(TestSimpleObject):
         obj.name = 'a big list'
         obj.rlist = ['a',3,4.0]
         self.obj = obj
-        self.encoded=[('rlist', "list\x00['a', 3, 4.0]"), ('name', 'str\x00a big list')]
+        self.encoded=[('rlist', 'list\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big list')]
      
 #class NestedResource(dataobject.DataObject):
 #    name = dataobject.TypedAttribute(str)
@@ -123,6 +123,10 @@ class ResponseService(BaseService):
     @defer.inlineCallbacks
     def op_respond(self, content, headers, msg):
         logging.info('op_respond: '+str(content))
+        
+        #Bogus!
+        # How do we add types?
+        dataobject.DataObject._types['PrimaryTypesObject']=PrimaryTypesObject
         
         obj = dataobject.DataObject.decode(content)()
         logging.info(obj)
@@ -215,7 +219,7 @@ class Send_List_Resource_Object(TestSendDataObject):
     def setUp(self):
         res = ListObject()
         res.name = 'a big list'
-        res.rlist = ['a',3,4.0,{'a':3}]
+        res.rlist = ['a',3,4.0,PrimaryTypesObject()]
         self.obj = res
         yield self._start_container()
  

@@ -213,8 +213,6 @@ class TestSendResourceReference(TestSendResource):
         obj.ref = registry.ResourceReference(branch='david',id='mine', parent='yours', type='a class')
         return obj
     
-    
-
 
 
 
