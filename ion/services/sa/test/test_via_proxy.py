@@ -17,9 +17,6 @@ from twisted.trial import unittest
 import logging
 logging = logging.getLogger(__name__)
 
-from twisted.internet import reactor
-from twisted.web import client
-
 from ion.core import ioninit
 config = ioninit.config('ion.services.sa.proxy')
 PROXY_PORT = int(config.getValue('proxy_port', '8100'))
@@ -95,6 +92,7 @@ class PydapIntegrationTest(IonTestCase):
     def test_binary_data(self):
         raise unittest.SkipTest('Proxy transfer still broken')
         var = yield threads.deferToThread(self._dap_pull_sst_chunk, TEST_URL)
+        self.failUnless(len(var) > 0)
         logging.info('got data ok!')
 
 class IntegrationTest(IonTestCase):

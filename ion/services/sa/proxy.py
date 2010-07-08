@@ -58,22 +58,27 @@ class DAPProxyProtocol(LineReceiver):
         """
         Ready to send an http command off to the coordinator for dispatch.
         """
+        generic_err = '500 Server error, no comprende.\r\n'
         cc = CoordinatorClient()
         # First entry in buffer should be 'GET url http/1.0' or similar
-        cmd, url, method = self.buf[0].split(' ')
+        try:
+            cmd, url, method = self.buf[0].split(' ')
+        except ValueError:
+            logging.warn('Unable to parse command "%s"' % self.buf[0])
+            self.transport.write('400 Command not understood\r\n')
+            self.transport.loseConnection()
+            self.reset()
+            return
 
         if 'Connection: close' in self.buf:
+            # @todo Handle 1.1 persisten connections correctly
             logging.debug('disconnect request found')
-            do_disconnect = True
-        else:
-            do_disconnect = False
 
         if self.http_connected:
             logging.debug('rewriting url...')
             url = 'http://%s%s' % (self.hostname, url)
             logging.debug('new ' + url)
 
-        generic_err = '500 Server error, no comprende.\r\n'
 
         if cmd == 'CONNECT':
             self.http_connected = True
@@ -111,6 +116,8 @@ class DAPProxyProtocol(LineReceiver):
             self.reset()
             logging.debug('done with error handler')
             return
+
+        logging.debug('cmd %s returned OK' % cmd)
 
         # OK, response OK, decode page and return it
         self.transport.write(base64.b64decode(resp['value']))
