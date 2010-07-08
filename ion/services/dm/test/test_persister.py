@@ -29,7 +29,7 @@ class TransportTester(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        self.timeout = 60
+        self.timeout = 120
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -73,6 +73,7 @@ class ServiceTester(unittest.TestCase):
         """
         self.ps = PersisterService()
         self.fs = FetcherService()
+        self.timeout = 120
 
     def test_instantiation_only(self):
         # Create and destroy the instances - any errors?
@@ -84,8 +85,7 @@ class ServiceTester(unittest.TestCase):
         to get and persist a full dataset from amoeba (5.2MB)
         """
         # generate filename so we can look for it after saving
-        local_dir = '/tmp/'
-        fname = generate_filename(TEST_DSET, local_dir=local_dir)
+        fname = generate_filename(TEST_DSET)
 
         dset = self.fs._get_dataset_no_xmit(TEST_DSET)
         self.ps._save_no_xmit(dset, local_dir=local_dir)
@@ -102,7 +102,7 @@ class PersisterTester(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
-        self.timeout = 30
+        self.timeout = 120
         yield self._start_container()
 
     @defer.inlineCallbacks
