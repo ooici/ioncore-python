@@ -97,7 +97,7 @@ class ResourceRegistry(objstore.ObjectStore):
         @brief list of resource description uuids(names)
         """
         idlist = yield self.refs.query('([-\w]*$)')
-        defer.returnValue([ResourceReference(id=id) for id in idlist])
+        defer.returnValue([dataobject.ResourceReference(id=id) for id in idlist])
 
 
     @defer.inlineCallbacks

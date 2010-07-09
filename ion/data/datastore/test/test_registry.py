@@ -45,7 +45,7 @@ class RegistryTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_register(self):
-        res = registry.ResourceDescription.create_new_resource()
+        res = dataobject.ResourceDescription.create_new_resource()
         res.name = 'foo'
         res = yield self.reg.register(res)
         
@@ -59,19 +59,19 @@ class RegistryTest(unittest.TestCase):
         
         #logging.info(registry.LCStates)
         
-        res = registry.Generic.create_new_resource()
+        res = dataobject.ResourceDescription.create_new_resource()
         logging.info(res.get_lifecyclestate())
         
-        res.set_lifecyclestate(registry.LCStates.active)
+        res.set_lifecyclestate(dataobject.LCStates.active)
         logging.info(res.get_lifecyclestate())
-        res.set_lifecyclestate(registry.LCStates['retired'])
+        res.set_lifecyclestate(dataobject.LCStates['retired'])
         logging.info(res.get_lifecyclestate())
 
 
 
     @defer.inlineCallbacks
     def test_register_overwrite(self):
-        res = registry.ResourceDescription.create_new_resource()
+        res = dataobject.ResourceDescription.create_new_resource()
         res.name = 'foo'
         ref = yield self.reg.register(res)
         #logging.info(str(res))
@@ -84,11 +84,11 @@ class RegistryTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_register_get_list(self):
-        res1 = registry.ResourceDescription.create_new_resource()
+        res1 = dataobject.ResourceDescription.create_new_resource()
         res1.name = 'foo'
         res1 = yield self.reg.register(res1)
 
-        res2 = registry.ResourceDescription.create_new_resource()
+        res2 = dataobject.ResourceDescription.create_new_resource()
         res2.name = 'moo'
         res2 = yield self.reg.register(res2)
 
