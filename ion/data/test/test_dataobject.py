@@ -20,10 +20,18 @@ from ion.services.base_service import BaseService, BaseServiceClient
 
 from ion.data.datastore import cas
 
+"""
+Define some data objects for testing
+"""
+
 class SimpleObject(dataobject.DataObject):
+    """
+    @Brief A simple data object to use as a base class
+    """
     key = dataobject.TypedAttribute(str, 'xxx')
     name = dataobject.TypedAttribute(str, 'blank')
 
+dataobject.DataObject._types['SimpleObject']=SimpleObject
 
 class TestSimpleObject(unittest.TestCase):
     
@@ -47,14 +55,17 @@ class TestSimpleObject(unittest.TestCase):
         
     def testDecode(self):
         dec = dataobject.DataObject.decode(self.encoded)()
-        print 'dec',dec
+        #print 'dec',dec
         self.assert_(self.obj==dec)
 
 class PrimaryTypesObject(SimpleObject):
-#    key = dataobject.TypedAttribute(str, 'xxx')
-#    name = dataobject.TypedAttribute(str, 'blank')
+    """
+    @Brief PrimaryTypesObject inherits attributes from Simple Object
+    """
     integer = dataobject.TypedAttribute(int,5)
     floating = dataobject.TypedAttribute(float,5.0)
+
+dataobject.DataObject._types['PrimaryTypesObject']=PrimaryTypesObject
 
 class TestPrimaryTypesObject(TestSimpleObject):
     def setUp(self):
@@ -70,6 +81,8 @@ class BinaryObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
     binary = dataobject.TypedAttribute(str)
 
+dataobject.DataObject._types['BinaryObject']=BinaryObject
+
 class TestBinaryObject(TestSimpleObject):
     def setUp(self):
         # Need to come up with better binary data to test with!
@@ -83,6 +96,8 @@ class ListObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
     rlist = dataobject.TypedAttribute(list)
      
+dataobject.DataObject._types['ListObject']=ListObject
+     
 class TestListObject(TestSimpleObject):
     def setUp(self):
         obj = ListObject()
@@ -91,25 +106,69 @@ class TestListObject(TestSimpleObject):
         self.obj = obj
         self.encoded=[('rlist', 'list\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big list')]
      
-#class NestedResource(dataobject.DataObject):
-#    name = dataobject.TypedAttribute(str)
-#   device = dataobject.TypedAttribute(dataobject.DeviceResource)
+class TestListOfObjects(TestSimpleObject):
+    def setUp(self):
+        obj = ListObject()
+        obj.name = 'a big list of objects'
+        obj.rlist = [PrimaryTypesObject(),PrimaryTypesObject(),SimpleObject()]
+        self.obj = obj
+        self.encoded=[('rlist','list\x00["PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+ 
+                       '"PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+
+                       '"SimpleObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]"]'),
+                        ('name', 'str\x00a big list of objects')]
+     
+class SetObject(dataobject.DataObject):
+    name = dataobject.TypedAttribute(str)
+    rset = dataobject.TypedAttribute(set)
+     
+dataobject.DataObject._types['SetObject']=SetObject
 
-#class TestNestedResource(TestDeviceResource):
-#    def setUp(self):
-#        
-#        dev = dataobject.DeviceResource()
-#        dev.mfg = 'seabird'
-#        dev.serial = 10
-#        dev.voltage = 3.14159
-#        
-#        res = NestedResource()
-#        res.name = 'a dev resource'
-#        res.device = dev
-#        self.res = res
-#        self.res_type = reflect.fullyQualifiedName(NestedResource)
-#        self.encoded=[('rlist', "list\x00['a', 3, 4.0, {'a': 3}]"), ('name', 'str\x00a big list')]
+class TestSetObject(TestSimpleObject):
+    def setUp(self):
+        obj = SetObject()
+        obj.name = 'a big set'
+        obj.rset = set(['a',3,4.0])
+        self.obj = obj
+        self.encoded=[('rset', 'set\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big set')]
 
+class TupleObject(dataobject.DataObject):
+    name = dataobject.TypedAttribute(str)
+    rtuple = dataobject.TypedAttribute(tuple)
+     
+dataobject.DataObject._types['TupleObject']=TupleObject
+
+     
+class TestTupleObject(TestSimpleObject):
+    def setUp(self):
+        obj = TupleObject()
+        obj.name = 'a big tuple'
+        obj.rtuple = ('a',3,4.0)
+        self.obj = obj
+        self.encoded=[('rtuple', 'tuple\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big tuple')]
+     
+class NestedObject(dataobject.DataObject):
+    name = dataobject.TypedAttribute(str,'stuff')
+    rset = dataobject.TypedAttribute(SetObject)
+    primary = dataobject.TypedAttribute(PrimaryTypesObject)
+    
+    dataobject.DataObject._types['PrimaryTypesObject']=PrimaryTypesObject
+    dataobject.DataObject._types['SetObject']=SetObject
+
+dataobject.DataObject._types['NestedObject']=NestedObject
+
+class TestNestedObject(TestSimpleObject):
+    def setUp(self):
+        sobj = SetObject()
+        sobj.name = 'a big set'
+        sobj.rset = set(['a',3,4.0])
+        
+        obj=NestedObject()
+        obj.rset = sobj
+        
+        self.obj = obj
+        self.encoded=[  ('primary','PrimaryTypesObject\x00[["key", "str\\u0000xxx"], ["floating", "float\\u00005.0"], ["integer", "int\\u00005"], ["name", "str\\u0000blank"]]'),
+                        ('rset','SetObject\x00[["rset", "set\\u0000[\\"str\\\\u0000a\\", \\"int\\\\u00003\\", \\"float\\\\u00004.0\\"]"], ["name", "str\\u0000a big set"]]'),
+                        ('name', 'str\x00stuff')]
         
 class ResponseService(BaseService):
     """Example service implementation
@@ -124,9 +183,6 @@ class ResponseService(BaseService):
     def op_respond(self, content, headers, msg):
         logging.info('op_respond: '+str(content))
         
-        #Bogus!
-        # How do we add types?
-        dataobject.DataObject._types['PrimaryTypesObject']=PrimaryTypesObject
         
         obj = dataobject.DataObject.decode(content)()
         logging.info(obj)
@@ -214,7 +270,7 @@ class TestSendTypesDataObject(TestSendDataObject):
 #        self.obj = res
 #        yield self._start_container()
 
-class Send_List_Resource_Object(TestSendDataObject):
+class Send_List_Data_Object(TestSendDataObject):
     @defer.inlineCallbacks
     def setUp(self):
         res = ListObject()
@@ -223,5 +279,24 @@ class Send_List_Resource_Object(TestSendDataObject):
         self.obj = res
         yield self._start_container()
  
+class Send_Set_Data_Object(TestSendDataObject):
+    @defer.inlineCallbacks
+    def setUp(self):
+        res = SetObject()
+        res.name = 'a big set'
+        res.rlist = set(['a',3,4.0,PrimaryTypesObject()])
+        self.obj = res
+        yield self._start_container()
  
+class TestSendResourceReference(TestSendDataObject):
+    """
+    """
+    def _create_object(self):
+        obj = DataObject.ResourceDescription.create_new_resource()
+        obj.name = 'complex'
+        obj.ref = registry.ResourceReference(branch='david',id='mine', parent='yours', type='a class')
+        return obj
+    
+
+
  
