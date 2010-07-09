@@ -187,6 +187,7 @@ class ResourceReference(DataObject):
     @Brief The ResourceReference class is the base class for all resources.
     It contains the context of the resource from the repository where it is stored.
     """
+    
     _identity = TypedAttribute(str,None)
     #@TODO Make the commit ref a list so that an object can be a merge
     _parent_commit = TypedAttribute(str,None)
@@ -230,6 +231,8 @@ class ResourceReference(DataObject):
         inst._branch = self._branch
         return inst
 
+DataObject._types['ResourceReference']=ResourceReference
+
 """
 Define properties of Life Cycle State for Resource Descriptions
 """
@@ -272,7 +275,7 @@ class states(dict):
 
 LCStates = states(LCStates)
 
-
+DataObject._types.update(LCStates)
 
 class ResourceDescription(ResourceReference):
     """
@@ -280,8 +283,6 @@ class ResourceDescription(ResourceReference):
     @note could build in explicit link back to ResourceRegistryClient so
     user can make changes through this object.
     """
-    #_types['ResourceReference']=ResourceReference
-    #_types.update(LCStates)
     
 
     name = TypedAttribute(str)
@@ -294,6 +295,7 @@ class ResourceDescription(ResourceReference):
     def get_lifecyclestate(self):
         return self.lifecycle
 
+DataObject._types['ResourceDescription']=ResourceDescription
 
 
 

@@ -42,7 +42,7 @@ class ServiceRegistryService(resource_registry.BaseResourceRegistryService):
         """
         svc_name = str(content['svc_name'])
         svc_enc = content['svc_enc']
-        svc = registry.ResourceDescription.decode(svc_enc)()
+        svc = dataobject.ResourceDescription.decode(svc_enc)()
         logging.info('op_register_service: \n' + str(svc))
   
         yield self.reg.register(svc_name,svc)
@@ -72,7 +72,7 @@ class ServiceRegistryService(resource_registry.BaseResourceRegistryService):
         """
         svc_name = str(content['svc_name'])
         svc_enc = content['svc_enc']
-        svc = registry.ResourceDescription.decode(svc_enc)()
+        svc = dataobject.ResourceDescription.decode(svc_enc)()
         logging.info('op_register_service: \n' + str(svc))
   
         yield self.reg.register(svc_name,svc)
@@ -128,7 +128,7 @@ class ServiceRegistryClient(resource_registry.BaseRegistryClient):
         logging.info('Service reply: '+str(content))
         svc_enc = content['svc_enc']
         if res_enc != None:
-            svc = registry.ResourceDescription.decode(svc_enc)()
+            svc = dataobject.ResourceDescription.decode(svc_enc)()
             defer.returnValue(svc)
         else:
             defer.returnValue(None)
@@ -151,7 +151,7 @@ class ServiceRegistryClient(resource_registry.BaseRegistryClient):
         logging.info('Service reply: '+str(content))
         svc_enc = content['svc_enc']
         if res_enc != None:
-            svc = registry.ResourceDescription.decode(svc_enc)()
+            svc = dataobject.ResourceDescription.decode(svc_enc)()
             defer.returnValue(svc)
         else:
             defer.returnValue(None)
@@ -162,7 +162,7 @@ class ServiceRegistryClient(resource_registry.BaseRegistryClient):
         defer.returnValue(sidesc.xname)
 
 
-class ServiceDesc(registry.ResourceDescription):
+class ServiceDesc(dataobject.ResourceDescription):
     """Structured object for a service instance.
 
     Attributes:
@@ -175,7 +175,7 @@ class ServiceDesc(registry.ResourceDescription):
     res_type = dataobject.TypedAttribute(str,'rt_service')
     
     
-class ServiceInterfaceDesc(registry.ResourceDescription):
+class ServiceInterfaceDesc(dataobject.ResourceDescription):
     """
     op_service_method = dataobject.TypedAttribute(dict)
     Where the dict is a content is a description for the message
@@ -184,7 +184,7 @@ class ServiceInterfaceDesc(registry.ResourceDescription):
         
 
 
-class ServiceInstanceDesc(registry.ResourceDescription):
+class ServiceInstanceDesc(dataobject.ResourceDescription):
     """Structured object for a service instance.
 
     Attributes:

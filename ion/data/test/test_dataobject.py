@@ -291,11 +291,13 @@ class Send_Set_Data_Object(TestSendDataObject):
 class TestSendResourceReference(TestSendDataObject):
     """
     """
-    def _create_object(self):
-        obj = DataObject.ResourceDescription.create_new_resource()
+    @defer.inlineCallbacks
+    def setUp(self):
+        obj = dataobject.ResourceDescription.create_new_resource()
         obj.name = 'complex'
-        obj.ref = registry.ResourceReference(branch='david',id='mine', parent='yours', type='a class')
-        return obj
+        obj.ref = dataobject.ResourceReference(branch='david',id='mine', parent='yours', type='a class')
+        self.obj = obj
+        yield self._start_container()
     
 
 
