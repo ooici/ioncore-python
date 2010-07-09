@@ -72,13 +72,13 @@ class CoordinatorClient(BaseServiceClient):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('get_url', url)
         # @bug get_url returns unicode, must cast to string or transport.write barfs
-        defer.returnValue(str(content['value']))
+        defer.returnValue(content)
 
     @defer.inlineCallbacks
     def get_head(self, url):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('get_head', url)
         #logging.info('Reply from service: '+ content['value'])
-        defer.returnValue(str(content['value']))
+        defer.returnValue(content)
 
 factory = ProtocolFactory(CoordinatorService)

@@ -49,6 +49,10 @@ def generate_filename(dataset_url, local_dir=LOCAL_DIR):
     @retval Local filename
     @todo Complete refactor - directories, etc
     """
+    if local_dir == None:
+        local_dir = LOCAL_DIR
+
+    assert(local_dir != None)
     assert(len(local_dir) > 0)
 
     if local_dir[-1:] != '/':

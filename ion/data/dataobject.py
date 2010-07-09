@@ -10,10 +10,11 @@
 NULL_CHR = '\x00'
 
 import json
+import uuid
 
 class TypedAttribute(object):
     """
-    @brief Descriptor class for Data Object Attributes. Objects are
+    @brief Descriptor class for Data Object Attributes. Data Objects are
     containers of typed attributes.
     """
 
@@ -34,12 +35,19 @@ class TypedAttribute(object):
 
     @classmethod
     def decode(cls, value, _types={}):
+        """
+        @brief This class method decodes a typed attribute
+        @param value is the string which is to be decoded
+        @param _types is a dictionary of types which can be decoded
+        """
+        
         types = _types.copy()
         stype, default = value.split(NULL_CHR)
         
         #the use of str is temporary unti lcaarch msging is fixed
         type = eval(str(stype), types)
 
+        # If a value is given for the typed attribute decode it.
         if default:
             #print 'type, default:',type, default
             #return cls(type, eval(str(default), types))
@@ -164,14 +172,130 @@ class DataObject(object):
             d[str(name)] = TypedAttribute.decode(value, cls._types)       
         return type(cls.__name__, (cls,), d)
 
-class ArbitraryObject(DataObject):
-    key = TypedAttribute(str, 'xxx')
-    name = TypedAttribute(str, 'blank')
+"""
+Add some important proprieties for OOICI Resource Descriptions
+"""
 
-class Test(ArbitraryObject):
-    name = TypedAttribute(str, 'door')
-    age = TypedAttribute(int)
+def create_unique_identity():
+    """
+    @Brief Method to create global unique identity for any new resource 
+    """
+    return str(uuid.uuid4())
 
+class ResourceReference(DataObject):
+    """
+    @Brief The ResourceReference class is the base class for all resources.
+    It contains the context of the resource from the repository where it is stored.
+    """
+    
+    _identity = TypedAttribute(str,None)
+    #@TODO Make the commit ref a list so that an object can be a merge
+    _parent_commit = TypedAttribute(str,None)
+    _resource_type = TypedAttribute(str,None)
+    _branch = TypedAttribute(str,'master')
+
+    def __init__(self,branch=None,id=None,parent=None,type=None):
+        if id:
+            self._identity = id
+        if parent:
+            self._parent_commit = parent
+        if type:
+            self._resource_type = type
+        if branch:
+            self._branch = branch
+
+
+    @classmethod
+    def create_new_resource(cls):
+        """
+        @Brief Use this method to instantiate any new resource!
+        """
+        inst = cls()
+        inst._identity = create_unique_identity()
+        inst._resource_type = cls.__class__.__name__
+        inst._branch = 'master'
+        return inst
+    
+    
+    
+    def reference(self):
+        """
+        @Brief Use this method to make a reference to any resource
+        """
+        inst = ResourceReference()
+        if self._identity:
+            inst._identity = self._identity
+        if self._parent_commit:
+            inst._parent_commit = self._parent_commit
+        inst._resource_type = self._resource_type
+        inst._branch = self._branch
+        return inst
+
+DataObject._types['ResourceReference']=ResourceReference
+
+"""
+Define properties of Life Cycle State for Resource Descriptions
+"""
+LCStateNames = ['new',
+                'active',
+                'inactive',
+                'decomm',
+                'retired',
+                'developed',
+                'commissioned',
+                ]
+
+class LCState(object):
+    """
+    @Brief Class to control the possible states based on the LCStateNames list
+    """
+
+    def __init__(self, state):
+        assert state in LCStateNames
+        self._state = state
+
+    def __repr__(self):
+        return self._state
+
+    def __eq__(self, other):
+        assert isinstance(other, LCState)
+        return str(self) == str(other)
+
+LCStates = dict([('LCState', LCState)] + [(name, LCState(name)) for name in LCStateNames])
+
+class states(dict):
+    """
+    Class used to set the the possible states
+    """
+
+    def __init__(self, d):
+        dict.__init__(self, d)
+        for k, v in d.items():
+            setattr(self, k, v)
+
+LCStates = states(LCStates)
+
+DataObject._types.update(LCStates)
+
+class ResourceDescription(ResourceReference):
+    """
+    @brief Base for all OOI resource description objects
+    @note could build in explicit link back to ResourceRegistryClient so
+    user can make changes through this object.
+    """
+    
+
+    name = TypedAttribute(str)
+    lifecycle = TypedAttribute(LCState, default=LCStates.new)
+
+    def set_lifecyclestate(self, state):
+        assert(isinstance(state, LCState))
+        self.lifecycle = state
+
+    def get_lifecyclestate(self):
+        return self.lifecycle
+
+DataObject._types['ResourceDescription']=ResourceDescription
 
 
 

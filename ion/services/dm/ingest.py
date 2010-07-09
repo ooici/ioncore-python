@@ -40,8 +40,8 @@ class IngestService(BaseService):
         Does the work but not the messaging.
         """
         try:
-            dds = json.loads(content['dds'])
-            das = json.loads(content['das'])
+            dds = json.loads(str(content['dds']))
+            das = json.loads(str(content['das']))
         except KeyError, ke:
             logging.exception(ke)
             logging.error('Unable to find headers in DAP message!')
