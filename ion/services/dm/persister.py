@@ -10,6 +10,7 @@
 
 from urlparse import urlsplit, urlunsplit
 import simplejson as json
+import base64
 
 from pydap.model import BaseType, SequenceType
 from pydap.proxy import ArrayProxy, SequenceProxy, VariableProxy
@@ -36,8 +37,9 @@ class PersisterService(BaseService):
     The persister service is responsible for receiving a DAP dataset and
     writing to disk in netcdf format.
     Message protocol/encoding/format:
-    * Expect a dictionary with keys for das, dds and value ('value' = DODS)
+    * Expect a dictionary with keys for das, dds and dods
     * Since das and dds are multiline strings, they are encoded as json
+    * Dods is base64-encoded
 
     The plan is that writing locally to disk will become writing to a HSM such
     as iRODS that presents a filesystem interface (or file-like-object we can
@@ -56,7 +58,7 @@ class PersisterService(BaseService):
     def op_persist_dap_dataset(self, content, headers, msg):
         """
         @brief top-level routine to persist a dataset.
-        @param content Message with das, dds and 'value' keys
+        @param content Message with das, dds and dods keys
         @param headers Ignored
         @param msg Used to route the reply, otherwise ignored
         @retval RPC message via reply_ok/reply_err
@@ -69,9 +71,10 @@ class PersisterService(BaseService):
             rc = self._save_no_xmit(content)
         except KeyError:
             yield self.reply_err(msg, {'value':'Missing headers'}, {})
-            return
+            defer.returnValue(None)
         if rc:
             yield self.reply_err(msg, {'value': 'Error saving!'}, {})
+            defer.returnValue(None)
 
         yield self.reply_ok(msg)
 
@@ -82,12 +85,15 @@ class PersisterService(BaseService):
         @param content Dictionary with dds, das, dods keys
         @param local_dir If set, destination directory (e.g. iRODS)
         @retval Return value from _save_dataset
+        @note if no local_dir, set from config file via generate_filename
         """
         try:
-            dds = json.loads(content['dds'])
-            das = json.loads(content['das'])
-            dods = content['value']
+            logging.debug('Decoding %d byte dataset...' % len(str(content)))
+            dds = json.loads(str(content['dds']))
+            das = json.loads(str(content['das']))
+            dods = base64.b64decode(content['dods'])
             source_url = content['source_url']
+            logging.debug('Decoded dataset OK')
         except KeyError, ke:
             logging.error('Unable to find required fields in dataset!')
             raise ke
@@ -108,7 +114,8 @@ class PersisterService(BaseService):
         @param source_url Original URL, used as key in dataset registry
         @param local_dir If set, destination directory
         """
-
+        das = str(das)
+        logging.debug('Starting creation of pydap objects')
         dataset = DDSParser(dds).parse()
         dataset = DASParser(das, dataset).parse()
 
@@ -117,13 +124,11 @@ class PersisterService(BaseService):
         @todo Design decision - what goes into per-file metadata?
         @note This is purely OOI code - not pydap at all.
         """
-        dataset.attributes['NC_GLOBAL']['ooi-download-timestamp'] = time.time()
+        dataset.attributes['NC_GLOBAL']['ooi-download-timestamp'] = time.asctime()
         dataset.attributes['NC_GLOBAL']['ooi-source-url'] = source_url
 
-        """
-        Back to pydap code - this block is from open_url in client.py
-        Remove any projections from the url, leaving selections.
-        """
+        # Back to pydap code - this block is from open_url in client.py
+        # Remove any projections from the url, leaving selections.
         scheme, netloc, path, query, fragment = urlsplit(source_url)
         projection, selection = parse_qs(query)
         url = urlunsplit(
@@ -151,10 +156,15 @@ class PersisterService(BaseService):
         dds, xdrdata = dods.split('\nData:\n', 1)
         dataset.data = DapUnpacker(xdrdata, dataset).getvalue()
 
+        logging.debug('pydap object creation complete')
         fname = generate_filename(source_url, local_dir=local_dir)
         logging.info('Saving DAP dataset "%s" to "%s"' % (source_url, fname))
 
-        netcdf.save(dataset, fname)
+        try:
+            netcdf.save(dataset, fname)
+        except UnicodeDecodeError, ude:
+            logging.exception('save error: %s ' % ude)
+            return 1
 
 class PersisterClient(BaseServiceClient):
     def __init__(self, proc=None, **kwargs):
@@ -166,7 +176,7 @@ class PersisterClient(BaseServiceClient):
     def persist_dap_dataset(self, dap_message):
         """
         @brief Invoke persister, assumes a single dataset per message
-        @param dap_message Message with das/dds/dods in das/dds/value keys
+        @param dap_message Message with das/dds/dods in das/dds/dods keys
         @retval ok or error via rpc mechanism
         """
         yield self._check_init()

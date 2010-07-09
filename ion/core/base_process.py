@@ -181,7 +181,7 @@ class BaseProcess(object):
         """
         Handling of RPC replies.
         """
-        logging.info('BaseProcess: Received RPC reply. content=' +str(payload['content']))
+        logging.info('BaseProcess: Received RPC reply.')
         d = self.rpc_conv.pop(payload['conv-id'])
         content = payload.get('content', None)
         res = (content, payload, msg)
