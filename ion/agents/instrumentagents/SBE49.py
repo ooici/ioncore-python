@@ -9,21 +9,20 @@ import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
+from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
 from ion.core.base_process import ProtocolFactory
 from ion.data.datastore.registry import LCStates as LCS
 
 
-instrumentCommands = (
+instrument_commands = (
     "setdefaults",
     "start",
     "stop",
     "pumpon",
     "pumpoff",
     "getsample",
-    "start_direct_access",
-    "stop_direct_access",
     "test_temperature_converted",
     "test_conductivity_converted",
     "test_pressure_converted",
@@ -32,11 +31,16 @@ instrumentCommands = (
     "test_pressure_raw"
 )
 
+ci_commands = (
+    "start_direct_access",
+    "stop_direct_access",
+)
+
 """
 Maybe some day these values are looked up from a registry of common
 controlled vocabulary
 """
-instrumentParameters = (
+instrument_parameters = (
     "baudrate",
     "outputformat",
     "outputsal",
@@ -79,9 +83,10 @@ instrumentParameters = (
     "ptcb2"
 )
 
-"""
-Someday the driver may inherit from a common (RS-232?) object if there is a need...
-"""
+ci_parameters = (
+    
+)
+
 
 class SBE49InstrumentDriver(InstrumentDriver):
     """
@@ -151,7 +156,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         Execute the given command
         """
-        if command in instrumentCommands:
+        if command in instrument_commands:
             return (1, command)
         else:
             return (0, command)
@@ -173,7 +178,6 @@ class SBE49InstrumentAgent(InstrumentAgent):
     Inherits basic get, set, getStatus, getCapabilities, etc. from parent
     """
     driver = SBE49InstrumentDriver()
-    lifecycleState = LCS['new']
 
     @staticmethod
     def __translator(input):
@@ -184,7 +188,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
         return input
 
     @defer.inlineCallbacks
-    def op_getTranslator(self, content, headers, msg):
+    def op_get_translator(self, content, headers, msg):
         """
         Return the translator function that will convert the very raw format
         of the instrument into a common OOI repository-ready format
@@ -193,14 +197,16 @@ class SBE49InstrumentAgent(InstrumentAgent):
 #        yield self.reply_ok(msg, self.__translator)
 
     @defer.inlineCallbacks
-    def op_getCapabilities(self, content, headers, msg):
+    def op_get_capabilities(self, content, headers, msg):
         """
         Obtain a list of capabilities that this instrument has. This is
         simply a command and parameter list at this point
         """
-        yield self.reply(msg, 'getCapabilties',
-                         {'commands': instrumentCommands,
-                          'parameters': instrumentParameters}, {})
+        yield self.reply(msg, 'get_capabilities',
+                         {IA.instrument_commands: instrument_commands,
+                          IA.instrument_parameters: instrument_parameters,
+                          IA.ci_commands: ci_commands,
+                          IA.ci_parameters: ci_parameters}, {})
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(SBE49InstrumentAgent)
