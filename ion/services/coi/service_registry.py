@@ -26,7 +26,7 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
 
-class ServiceRegistryService(resource_registry.ResourceRegistryService):
+class ServiceRegistryService(resource_registry.BaseResourceRegistryService):
     """
     Service registry service interface
     @todo a service is a resource and should also be living in the resource registry
@@ -35,11 +35,70 @@ class ServiceRegistryService(resource_registry.ResourceRegistryService):
     declare = BaseService.service_declare(name='service_registry', version='0.1.0', dependencies=[])
 
 
+    @defer.inlineCallbacks
+    def op_register_service_description(self, content, headers, msg):
+        """
+        Service operation: Register a resource instance with the registry.
+        """
+        svc_name = str(content['svc_name'])
+        svc_enc = content['svc_enc']
+        svc = registry.ResourceDescription.decode(svc_enc)()
+        logging.info('op_register_service: \n' + str(svc))
+  
+        yield self.reg.register(svc_name,svc)
+        yield self.reply_ok(msg, {'svc_name':str(svc_name)},)
+
+
+    @defer.inlineCallbacks
+    def op_get_service_description(self, content, headers, msg):
+        """
+        Service operation: Get a resource instance.
+        """
+        svc_name = content['svc_name']
+        logging.info('op_get_service: '+str(svc_name))
+
+        svc = yield self.reg.get_description(svc_name)
+        logging.info('Got Resource:\n'+str(resource))
+        if svc:
+            yield self.reply_ok(msg, {'svc_enc':svc.encode()})
+        else:
+            yield self.reply_err(msg, {'svc_enc':None})
+
+
+    @defer.inlineCallbacks
+    def op_register_service_instance(self, content, headers, msg):
+        """
+        Service operation: Register a resource instance with the registry.
+        """
+        svc_name = str(content['svc_name'])
+        svc_enc = content['svc_enc']
+        svc = registry.ResourceDescription.decode(svc_enc)()
+        logging.info('op_register_service: \n' + str(svc))
+  
+        yield self.reg.register(svc_name,svc)
+        yield self.reply_ok(msg, {'svc_name':str(svc_name)},)
+
+    @defer.inlineCallbacks
+    def op_get_service_instance(self, content, headers, msg):
+        """
+        Service operation: Get a resource instance.
+        """
+        svc_name = content['svc_name']
+        logging.info('op_get_service: '+str(svc_name))
+
+        svc = yield self.reg.get_description(svc_name)
+        logging.info('Got Resource:\n'+str(resource))
+        if svc:
+            yield self.reply_ok(msg, {'svc_enc':svc.encode()})
+        else:
+            yield self.reply_err(msg, {'svc_enc':None})
+
+
 # Spawn of the process using the module name
 factory = ProtocolFactory(ServiceRegistryService)
 
 
-class ServiceRegistryClient():
+class ServiceRegistryClient(resource_registry.BaseRegistryClient):
     """
     Client class for accessing the service registry. This is most important for
     finding and accessing any other services. This client knows how to find the
@@ -51,24 +110,51 @@ class ServiceRegistryClient():
         self.rrc = resource_registry.ResourceRegistryClient(proc, **kwargs)
 
     @defer.inlineCallbacks
-    def register_service(self, svc):
-        svc_name = yield self.rrc.register_resource(svc.svc_name,svc)
-        defer.returnValue(svc_name)
+    def register_service(self, svc_desc):        
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('register_service',
+                                            {'svc_name':svc_desc.svc_name,'svc_enc':svc_desc.encode()})
+        logging.info('Register Service reply: '+str(headers))
+        defer.returnValue(str(content['svc_name']))
+        
 
     @defer.inlineCallbacks
     def get_service(self, service_name):
-        svc_desc = yield self.rrc.get_resource(service_name)
-        defer.returnValue(svc_desc)
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('get_service',
+                                                      {'svc_name':service_name})
+        logging.info('Service reply: '+str(content))
+        svc_enc = content['svc_enc']
+        if res_enc != None:
+            svc = registry.ResourceDescription.decode(svc_enc)()
+            defer.returnValue(svc)
+        else:
+            defer.returnValue(None)
 
     @defer.inlineCallbacks
     def register_service_instance(self, svc_inst):
-        svcinst_name = yield self.rrc.register_resource(svc_inst.svc_name,svc_inst)
-        defer.returnValue(svcinst_name)
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('register_service',
+                                            {'svc_inst_name':svc_inst.svc_name,'svc_enc':svc_desc.encode()})
+        logging.info('Register Service reply: '+str(headers))
+        defer.returnValue(str(content['svc_name']))
 
     @defer.inlineCallbacks
-    def get_service_instance(self, service_name):
-        svcinst_desc = yield self.rrc.get_resource(service_name)
-        defer.returnValue(svcinst_desc)
+    def get_service_instance(self, service_instance_name):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('get_service_instance',
+                                                      {'svc_name':service_instance_name})
+        logging.info('Service reply: '+str(content))
+        svc_enc = content['svc_enc']
+        if res_enc != None:
+            svc = registry.ResourceDescription.decode(svc_enc)()
+            defer.returnValue(svc)
+        else:
+            defer.returnValue(None)
 
     @defer.inlineCallbacks
     def get_service_instance_name(self, service_name):
@@ -83,8 +169,18 @@ class ServiceDesc(registry.ResourceDescription):
     .name   name of the service
     """    
     svc_name = dataobject.TypedAttribute(str)
+    svc_module = dataobject.TypedAttribute(str)
+    svc_class = dataobject.TypedAttribute(str)
+    svc_spawnargs = dataobject.TypedAttribute(dict,{})
     res_type = dataobject.TypedAttribute(str,'rt_service')
-
+    
+    
+class ServiceInterfaceDesc(registry.ResourceDescription):
+    """
+    op_service_method = dataobject.TypedAttribute(dict)
+    Where the dict is a content is a description for the message
+    """
+    
         
 
 
@@ -95,9 +191,17 @@ class ServiceInstanceDesc(registry.ResourceDescription):
     .name   name of the service
     """    
     xname = dataobject.TypedAttribute(str)
-    svc_name = dataobject.TypedAttribute(str)
+    inst_name = dataobject.TypedAttribute(str)
+    inst_type = dataobject.TypedAttribute(str)
     res_type = dataobject.TypedAttribute(str,'rt_serviceinst')
 
+
+# Service interface description for the resource registry service
+class ServiceRegistryInterfaceDesc(ServiceInterfaceDesc):
+    op_register_service_description = dataobject.TypedAttribute(dict,{'svc_name':'str','svc_enc':'ResourceDescription'})
+    op_get_service_description = dataobject.TypedAttribute(dict)
+    op_register_service_instance = dataobject.TypedAttribute(dict)
+    op_get_service_instance = dataobject.TypedAttribute(dict)
 
 
 #class ServiceInstanceDesc(ResourceDesc):

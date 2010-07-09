@@ -20,24 +20,30 @@ import pycassa
 from ion.core import ioninit
 from ion.data.store import IStore
 
+import uuid
+
 CONF = ioninit.config(__name__)
 CF_default_keyspace = CONF['default_keyspace']
 CF_default_colfamily = CONF['default_colfamily']
 CF_default_cf_super = CONF['default_cf_super']
 CF_default_namespace = CONF['default_namespace']
+CF_default_key = CONF['default_key']
+
 
 class CassandraStore(IStore):
     """
     Store interface for interacting with the Cassandra key/value store
     @see http://github.com/vomjom/pycassa
+    @Note Default behavior is to use a random super column name space!
     """
     def __init__(self, **kwargs):
         self.kvs = None
         self.cass_host_list = None
         self.keyspace = None
         self.colfamily = None
-        self.cf_super = False
+        self.cf_super = True
         self.namespace = None
+        self.key=None
 
     @classmethod
     def create_store(cls, **kwargs):
@@ -53,9 +59,20 @@ class CassandraStore(IStore):
         inst.keyspace = kwargs.get('keyspace', CF_default_keyspace)
         inst.colfamily = kwargs.get('colfamily', CF_default_colfamily)
         inst.cf_super = kwargs.get('cf_super', CF_default_cf_super)
-        inst.namespace = kwargs.get('namespace', CF_default_namespace)
-        if inst.cf_super and inst.namespace == None:
-            inst.namespace = ":"
+        inst.key = kwargs.get('key', CF_default_key)
+        
+        if not inst.key:
+            inst.key = str(uuid.uuid4())
+        
+        if inst.cf_super:
+            inst.namespace = kwargs.get('namespace', CF_default_namespace)
+            if inst.namespace == None:
+                # Must change behavior to set a random namespace so that test don't interfere!
+                inst.namespace = ':'
+        else:
+            if inst.namespace:
+                logging.info('Ignoring namespace argument in non super column cassandra store')
+            inst.namespace=None
 
         if not inst.cass_host_list:
             logging.info('Connecting to Cassandra on localhost...')
@@ -66,31 +83,47 @@ class CassandraStore(IStore):
         inst.kvs = pycassa.ColumnFamily(inst.client, inst.keyspace,
                                         inst.colfamily, super=inst.cf_super)
         logging.info('connected to Cassandra... OK.')
+        logging.info('cass_host_list: '+str(inst.cass_host_list))
+        logging.info('keyspace: '+str(inst.keyspace))
+        logging.info('colfamily: '+str(inst.colfamily))
+        logging.info('cf_super: '+str(inst.cf_super))
+        logging.info('namespace: '+str(inst.namespace))
         return defer.succeed(inst)
 
-    def get(self, key):
+
+    def clear_store(self):
+        """
+        @brief Delete the super column namespace. Do not touch default namespace!
+        @note This is complicated by the persistence across many 
+        """
+        if self.cf_super:
+            self.kvs.remove(self.key,super_column=self.namespace)
+        else:
+            logging.info('Can not clear root of persistent store!')
+        return defer.succeed(None)
+        
+
+    def get(self, col):
         """
         @brief Return a value corresponding to a given key
-        @param key Cassandra key
+        @param col Cassandra column
         @retval Deferred, for value from the ion dictionary, or None
         """
         value = None
         try:
             if self.cf_super:
-                val = self.kvs.get(key, super_column=self.namespace)
+                value = self.kvs.get(self.key, columns=[col], super_column=self.namespace)
             else:
-                if self.namespace:
-                    key = self.namespace + ":" + key
-                val = self.kvs.get(key)
+                value = self.kvs.get(self.key, columns=[col])
             #logging.debug('Key "%s":"%s"' % (key, val))
             #this could fail if insert did it wrong
-            value = val['value']
+            value=value.get(col)
         except pycassa.NotFoundException:
             #logging.debug('Key "%s" not found' % key)
             pass
         return defer.succeed(value)
 
-    def put(self, key, value):
+    def put(self, col, value):
         """
         @brief Write a key/value pair into cassandra
         @param key Lookup key
@@ -100,11 +133,9 @@ class CassandraStore(IStore):
         """
         #logging.debug('writing key %s value %s' % (key, value))
         if self.cf_super:
-            self.kvs.insert(key, {self.namespace:{'value':value}})
+            self.kvs.insert(self.key, {self.namespace:{col:value}})
         else:
-            if self.namespace:
-                key = self.namespace + ":" + key
-            self.kvs.insert(key, {'value':value})
+            self.kvs.insert(self.key, {col:value})
         return defer.succeed(None)
 
     def query(self, regex):
@@ -117,35 +148,19 @@ class CassandraStore(IStore):
         #@todo This implementation is very inefficient. Do smarter, but how?
         matched_list = []
         if self.cf_super:
-            klist = self.kvs.get_range(super_column=self.namespace)
-            for x in klist:
-                #m = re.search(regex, x[0])
-                m = re.findall(regex, x[0])
-                if m:
-                    matched_list.extend(m)
+            klist = self.kvs.get(self.key, super_column=self.namespace)
         else:
-            klist = self.kvs.get_range()
-            if self.namespace:
-                prefix = self.namespace+":" if self.namespace else ''
-                pl = len(prefix)
-                for x in klist:
-                    key = x[0]
-                    #m = re.search(regex, key[pl:])
-                    m = re.findall(regex, key[pl:])
-                    #if key.startswith(prefix) and m:
-                    if m:
-                        #y = (key[pl:], x[1])
-                        matched_list.extend(m)
-            else:
-                for x in klist:
-                    #m = re.search(regex, x[0])
-                    m = re.findall(regex, x[0])
-                    if m:
-                        matched_list.extend(m)
+            klist = self.kvs.get(self.key)
+
+        for x in klist.keys():
+            #m = re.search(regex, x[0])
+            m = re.findall(regex, x)
+            if m:
+                matched_list.extend(m)
 
         return defer.succeed(matched_list)
 
-    def remove(self, key):
+    def remove(self, col):
         """
         @brief delete a key/value pair
         @param key Key to delete
@@ -153,9 +168,7 @@ class CassandraStore(IStore):
         @note Deletes are lazy, so key may still be visible for some time.
         """
         if self.cf_super:
-            self.kvs.remove(key, super_column=self.namespace)
+            self.kvs.remove(self.key, columns=[col], super_column=self.namespace)
         else:
-            if self.namespace:
-                key = self.namespace + ":" + key
-            self.kvs.remove(key)
+            self.kvs.remove(self.key, columns=[col])
         return defer.succeed(None)

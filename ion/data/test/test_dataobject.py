@@ -47,7 +47,7 @@ class TestSimpleObject(unittest.TestCase):
         
     def testDecode(self):
         dec = dataobject.DataObject.decode(self.encoded)()
-        #print 'dec',dec
+        print 'dec',dec
         self.assert_(self.obj==dec)
 
 class PrimaryTypesObject(SimpleObject):
@@ -83,13 +83,13 @@ class ListObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
     rlist = dataobject.TypedAttribute(list)
      
-#class TestListObject(TestSimpleObject):
-#    def setUp(self):
-#        obj = ListObject()
-#        obj.name = 'a big list'
-#        obj.rlist = ['a',3,4.0,{'a':3}]
-#        self.obj = obj
-#        self.encoded=[('rlist', "list\x00['a', 3, 4.0, {'a': 3}]"), ('name', 'str\x00a big list')]
+class TestListObject(TestSimpleObject):
+    def setUp(self):
+        obj = ListObject()
+        obj.name = 'a big list'
+        obj.rlist = ['a',3,4.0]
+        self.obj = obj
+        self.encoded=[('rlist', 'list\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big list')]
      
 #class NestedResource(dataobject.DataObject):
 #    name = dataobject.TypedAttribute(str)
@@ -124,6 +124,10 @@ class ResponseService(BaseService):
     def op_respond(self, content, headers, msg):
         logging.info('op_respond: '+str(content))
         
+        #Bogus!
+        # How do we add types?
+        dataobject.DataObject._types['PrimaryTypesObject']=PrimaryTypesObject
+        
         obj = dataobject.DataObject.decode(content)()
         logging.info(obj)
         response = obj.encode()
@@ -144,9 +148,9 @@ class ResponseServiceClient(BaseServiceClient):
     @defer.inlineCallbacks
     def send_data_object(self, obj):
         yield self._check_init()
-        print obj
+        #print obj
         msg=obj.encode()
-        
+        logging.info('Sending Encoded resource:'+str(msg))
         (content, headers, msg) = yield self.rpc_send('respond', msg, {})
         logging.info('Responder replied: '+str(content))
         response = dataobject.DataObject.decode(content)()
@@ -201,23 +205,23 @@ class TestSendTypesDataObject(TestSendDataObject):
         yield self._start_container()
 
         
-#class Send_Binary_Resource_Object(Send_Resource_Object_Test):
+#class Send_Binary_Resource_Object(TestSendDataObject):
 #    @defer.inlineCallbacks
 #    def setUp(self):
-#        res = BinaryResource()
+#        res = BinaryObject()
 #        res.name = 'Binary Junk'
-#        res.binary = sha1bin(res.name)
-#        self.res = res
+#        res.binary = cas.sha1bin(res.name)
+#        self.obj = res
 #        yield self._start_container()
 
-#class Send_List_Resource_Object(Send_Resource_Object_Test):
-#    @defer.inlineCallbacks
-#    def setUp(self):
-#        res = ListResource()
-#        res.name = 'a big list'
-#        res.rlist = ['a',3,4.0,{'a':3}]
-#        self.res = res
-#        yield self._start_container()
+class Send_List_Resource_Object(TestSendDataObject):
+    @defer.inlineCallbacks
+    def setUp(self):
+        res = ListObject()
+        res.name = 'a big list'
+        res.rlist = ['a',3,4.0,PrimaryTypesObject()]
+        self.obj = res
+        yield self._start_container()
  
  
  

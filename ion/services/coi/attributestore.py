@@ -29,6 +29,16 @@ class AttributeStoreService(store_service.StoreService):
                                           version='0.1.0',
                                           dependencies=[])
 
+    def __init__(self, receiver, spawnArgs=None):
+        # Service class initializer. Basic config, but no yields allowed.
+        BaseService.__init__(self, receiver, spawnArgs)
+        
+        self.spawn_args['backend_class'] = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.data.store.Store'))
+        self.spawn_args['backend_args'] = self.spawn_args.get('backend_args', CONF.getValue('backend_args', default={}))
+
+        logging.info('AttributeStoreService.__init__()')
+
+
 
 class AttributeStoreClient(store_service.StoreServiceClient):
     """
