@@ -76,8 +76,9 @@ class ResourceRegistry(objstore.ObjectStore):
         """
         @brief Get resource description object
         """
-        branch = resource_reference._branch
         assert isinstance(resource_reference, dataobject.ResourceReference)
+        
+        branch = resource_reference._branch
         resource_client = yield self.clone(resource_reference._identity)
         if resource_client:
             if not resource_reference._parent_commit:

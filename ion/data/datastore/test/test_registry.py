@@ -73,14 +73,29 @@ class RegistryTest(unittest.TestCase):
     def test_register_overwrite(self):
         res = dataobject.ResourceDescription.create_new_resource()
         res.name = 'foo'
-        ref = yield self.reg.register(res)
-        #logging.info(str(res))
-        #logging.info(str(ref))
+        res = yield self.reg.register(res)
+        ref1 = res.reference()
+        # get this version back again
+        res1 = yield self.reg.get_description(ref1)
+        self.failUnless(res == res1)
+        self.assertEqual(res1.name, 'foo')
+        
+        #update with new data
         res.name = 'moo'
-        ref = yield self.reg.register(res)
+        res = yield self.reg.register(res)
 
-        res2 = yield self.reg.get_description(ref)
+        # get the new version back again
+        ref2 = res.reference()
+        res2 = yield self.reg.get_description(ref2)
         self.failUnless(res == res2)
+        self.assertEqual(res1.name, 'foo')
+
+        # Get the original
+        res1 = yield self.reg.get_description(ref1)
+        self.assertEqual(res1.name, 'foo')
+        
+    def test_register_select_ancestor(self):
+        raise unittest.SkipTest('Not implimented yet!')
 
     @defer.inlineCallbacks
     def test_register_get_list(self):
