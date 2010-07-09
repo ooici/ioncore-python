@@ -2,23 +2,25 @@
 
 """
 @file ion/services/coi/identity_registry.py
-@author Michael Meisinger
+@author Roger Unwin
 @brief service for registering and authenticating identities
 """
 
 import logging
-from twisted.internet import defer
-from magnet.spawnable import Receiver
+logging = logging.getLogger(__name__)
 
-import ion.util.procutils as pu
+from twisted.internet import defer
+
 from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+#from ion.services.base_service import BaseService
 from ion.data import dataobject
 from ion.data.datastore import registry
-from ion.services.coi import resource_registry
-
-import uuid # experimental. remember to remove after done playing with uuid
+from ion.services.coi.resource_registry import  BaseRegistryClient,  BaseResourceRegistryService
+import uuid
 from ion.core import ioninit
+import re
+from ion.services.base_service import BaseService, BaseServiceClient
+
 
 CONF = ioninit.config(__name__)
 
@@ -26,8 +28,9 @@ class Person(registry.ResourceDescription):
     """
     Need to pull this out to its own file.  but not yet....
     """
-   
+
     # These are the fields that we get from the Trust Provider
+    ooi_id = dataobject.TypedAttribute(str)
     common_name = dataobject.TypedAttribute(str)
     country = dataobject.TypedAttribute(str)
     trust_provider = dataobject.TypedAttribute(str) # this is the trust provider /O (Organization field)
@@ -44,377 +47,171 @@ class Person(registry.ResourceDescription):
     organization = dataobject.TypedAttribute(str)
     department = dataobject.TypedAttribute(str)
     title = dataobject.TypedAttribute(str)
-    
+
     # address?
 
 
 
 
-
-
-class IdentityRegistryServiceClient(BaseServiceClient): # inherit from BaseRegistry Client # gives me lc stuff and find
-    
-    # test_resource_registry is my friend.
+class IdentityRegistryClient(BaseRegistryClient):
     """
-    This is an exemplar service client that calls the hello service. It
-    makes service calls RPC style.
+    This service is responsible for registering new users, and retrieving user information.
     """
+
     def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "identity_registry"
+        BaseServiceClient.__init__(self, proc, **kwargs)
+
+    @defer.inlineCallbacks
+    def register_user(self, user):
         """
+        Needs documentation here
         """
-        self.ResourceRegistryClient = resource_registry.ResourceRegistryClient(proc, **kwargs)
+        
+        user.ooi_id = str(uuid.uuid4())
+        
+        yield self._check_init()
+        
+        (content, headers, msg) = yield self.rpc_send('register_user', {'user_enc': user.encode()})
+        
+        defer.returnValue(str(content['user_id']))
 
     @defer.inlineCallbacks
-    def register_user(self, parms):
-        
-        # @bug Possible bug. May need to test if the user is already registered, or collides with another user.
-        
-        # copy data to object
-        # save object
-        # find object
-        # pull field from object
-        
-        res_id = str(uuid.uuid3(uuid.uuid4(), parms['trust_provider'])) #"user_registration_store" # this is actually supposed to be a unique id for the person
-        
-        # create a new user
-        user = Person()
-        
-        # initialize the user
-        user.common_name = parms['common_name']
-        user.country = parms['country'] 
-        user.trust_provider = parms['trust_provider']
-        user.domain_component = parms['domain_component']
-        user.certificate = parms['certificate']
-        user.rsa_private_key = parms['rsa_private_key']
-        user.expiration_date = parms['expiration_date']
-        # These are the fields we prompt the user for during registration
-        user.first_name = parms['first_name']
-        user.last_name = parms['last_name']
-        user.phone = parms['phone']
-        user.fax = parms['fax']
-        user.email = parms['email']
-        user.organization = parms['organization']
-        user.department = parms['department']
-        user.title = parms['title']
-
-        # store user
-        yield self.ResourceRegistryClient.register_resource(res_id, user)
-        
-        # do I need to call the service? can i migrate this to the service?
-       
-        defer.returnValue(res_id)
-        
-    @defer.inlineCallbacks
-    def update_user(self, parms):
+    def find_users(self, attributes):
         """
-        Takes dict of values.  ooi_id is defined in the dict of values.
-        
-        This should load the user, then set any values in the dict...
+        @brief Retrieve all the Person(s) in the registry
+        @param attributes is a dictionary of attributes which will be used to select a resource
         """
-        res_id = parms['ooi_id']
-        # create a new user
-        user = Person()
-        
-        old_user = yield self.ResourceRegistryClient.get_resource(res_id)
-        
-        old_user_dict = old_user.__dict__
-        for key in list(old_user_dict):
-            if key in list(user.__dict__):
-                if isinstance(old_user_dict[key], basestring):
-                    setattr(user, key[1:], old_user_dict[key])
-                    logging.info("###--> update_user setting old value for " + key[1:] + " = " + old_user_dict[key] + " for user.")
-                
-        
-        for key in list(parms):
-            setattr(user, key, parms[key])
-            logging.info("###--> update_user setting new value for " + key + " = " + parms[key] + " for user.")
-        
-    
-        # store user
-        
-        yield self.ResourceRegistryClient.register_resource(res_id, user)
-        
-        # do I need to call the service? can i migrate this to the service?
-       
-        defer.returnValue(res_id)
-        
- 
-        
-    @defer.inlineCallbacks   
-    def define_user_profile(self, text='Testing'):
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('define_user_profile', text)
-        logging.info('### Service reply: '+str(content))
-        defer.returnValue(content)  
-        
-    @defer.inlineCallbacks   
-    def define_identity(self, text='Testing'):
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('define_identity', text)
-        logging.info('### Service reply: '+str(content))
-        defer.returnValue(content)      
-
-    @defer.inlineCallbacks   
-    def define_user_profile(self, text='Testing'):
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('define_user_profile', text)
-        logging.info('### Service reply: '+str(content))
-        defer.returnValue(content)    
-
-
-
-
-    @defer.inlineCallbacks   
-    def authenticate(self, parms):
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('authenticate', parms)
-        logging.info('### Service reply: '+str(content))
-        defer.returnValue(content)   
-
-
-
-
-
-    @defer.inlineCallbacks   
-    def generate_ooi_id(self, text='Testing'):
-        
-        # in is email
-        
-        # find all matches for email
-        
-        
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('generate_ooi_id', text)
-        logging.info('### Service reply: ' + str(content))
-        defer.returnValue(content)
-        
-    @defer.inlineCallbacks
-    def revoke_ooi_id(self, parms):
         yield self._check_init()
 
-        (content, headers, msg) = yield self.rpc_send('revoke_ooi_id', parms)
-        logging.info('### Service reply: ' + str(content))
-        defer.returnValue(content)
+        (content, headers, msg) = yield self.rpc_send('find_users', attributes)
         
-    @defer.inlineCallbacks
-    def store_registration(self, parms):
-        yield self._check_init()
-        #(content, headers, msg) = yield self.rpc_send('store_registration', parms)
-        #logging.info('### Service reply: '+str(content))
-        defer.returnValue({'value':None})        
-        
-    @defer.inlineCallbacks
-    def store_registration_info(self, text='Testing'):
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('store_registration_info', text)
-        logging.info('### Service reply: '+str(content))
-        defer.returnValue(content)
-        
-    @defer.inlineCallbacks
-    def get_registration_info(self, ooi_id):
-        
-        
-        res_id = ooi_id #"user_registration_store" # this is actually supposed to be a unique id for the person
-     
-        foo = yield self.ResourceRegistryClient.get_resource(res_id)
-        
-        # @bug will fail bad if resid does not exist
-        if not foo:
-            defer.returnValue(foo)
-        else :
-            defer.returnValue(foo.phone)
-        
-        
-    @defer.inlineCallbacks
-    def update_registration_info(self, text='Testing'):
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('update_registration_info', text)
-        logging.info('### Service reply: '+str(content))
-        defer.returnValue(content)            
+        users_enc = content['users_enc']
+        users=[]
+        if users_enc != None:
+            for user in users_enc:
+                users.append(registry.ResourceDescription.decode(user)())
+        defer.returnValue(users)
+
 
     @defer.inlineCallbacks
-    def revoke_registration(self, text='Testing'):
+    def get_user(self, user_id):
+        """
+        @brief Retrieve a resource from the registry by its ID
+        @param res_id is a resource identifier unique to this resource
+        """
+
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('revoke_registration', text)
-        logging.info('### Service reply: '+str(content))
-        defer.returnValue(content)
+
+        (content, headers, msg) = yield self.rpc_send('get_user', {'user_id': user_id})
+        logging.info('Service reply: '+str(content))
+        user_enc = content['user_enc']
+
+        if user_enc != None:
+            user = registry.ResourceDescription.decode(user_enc)()
+            defer.returnValue(user)
+        else:
+            defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def update_user(self, Person):
+        """
+        This one needs a comment
+        """
         
+        yield self._check_init()
         
+        (content, headers, msg) = yield self.rpc_send('register_user', {'user_id': Person.ooi_id, 'user_enc': Person.encode()})
         
-    '''    
-        find_resource / op_find_resource pass in attribute and value
-        need op_register_resource op_register_identity # similar to his
-        op_get_resource op_get_identity # similar to his
-    '''
-    
-class IdentityRegistryService(BaseService):  # should inherit from BaseResourceService in coi resource registry
-    """(User and resource) identity registry service interface
+        defer.returnValue(str(content['user_id']))
+
+
+
+class IdentityRegistryService(BaseResourceRegistryService):  # (was BaseService) should inherit from BaseResourceService in coi resource registry
     """
-    
+    Identity registry service interface
+    """
+
     # Declaration of service
-    declare = BaseService.service_declare(name='register_user', version='0.1.0', dependencies=[])
-    
-    #@defer.inlineCallbacks     
-    #def slc_init(self):
-    #    """
-    #    """
-    #    # initialize data store
-    #    #self.rdfs=RdfStore()
-    #    #yield self.rdfs.init()
-    '''
-        
+    declare = BaseResourceRegistryService.service_declare(name='identity_registry', version='0.1.0', dependencies=[])
+
     def __init__(self, receiver, spawnArgs=None):
         # Service class initializer. Basic config, but no yields allowed.
         BaseService.__init__(self, receiver, spawnArgs)
-        logging.info('### IdentityRegistryService.__init__()')
-        
-        
-        
-        
-    @defer.inlineCallbacks    
-    def op_define_identity(self, content, headers, msg):
-        """Service operation: .
+
+
+    @defer.inlineCallbacks
+    def op_find_users(self, content, headers, msg):
         """
-        # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_define_identity ******RETURNING: '+str(content)}, {})
-        
+        @brief : Service operation: Find users by criteria.
+        @param : content: a dictionary of attributes which must match a resource
+
+        This will change in the future once the class we inherit from makes this a generic
+        """
+
+        users_list = yield self.reg.list_descriptions()
+        find_list=[]
+        for user in users_list:
+            # Test for failure and break
+            test=True
+            for k, v in content.items():
+                # if this resource does not contain this attribute move on
+                if not k in user.attributes:
+                    test = False
+                    break
+
+                att = getattr(user, k, None)
+
+                # Bogus - can't send lcstate objects in a dict must convert to sting to test
+                if isinstance(att, registry.LCState):
+                    att = str(att)
+
+                if isinstance(v, (str, unicode) ):
+                    # Use regex
+                    if not re.search(v, att):
+                        test=False
+                        break
+                else:
+                    # test equality
+                    #@TODO add tests for range and in list...
+
+
+                    if att != v and v != None:
+                       test=False
+                       break
+            if test:
+                find_list.append(user)
+
+        yield self.reply_ok(msg, {'users_enc':list([user.encode() for user in find_list])} )
+
     @defer.inlineCallbacks
     def op_register_user(self, content, headers, msg):
-        """Service operation: .
+        """
+        @brief : Register a user instance with the user registry.
+        @param : User object (encoded)
         """
         
-        (content, headers, msg) = yield self.rpc_send('register_resource',
-                                            {'res_id':res_id,'res_enc':resource.encode()})
+        user_enc = content['user_enc']
+        user = registry.ResourceDescription.decode(user_enc)()
         
-        
+        yield self.reg.register(user.ooi_id, user)
+        yield self.reply_ok(msg, {'user_id':user.ooi_id},)
+
+    @defer.inlineCallbacks
+    def op_get_user(self, content, headers, msg):
         """
-        self.rrc = ResourceRegistryClient(proc=sup)
-        
-        user_id = "ooi3127"
-        person_object = Person()
-        person_object.first_name = 'Roger'
-        
-        rid = yield self.rrc.register_resource(str(user_id), person_object) 
-        logging.info('Resource registered with id '+str(rid))
-    
-        rd3 = yield self.rrc.get_resource(rid)
+        @brief : Service operation: Get a user info record.
+        @param : user_id: the ooi_id for the user (uuid4())
         """
+        user_id = content['user_id']
         
-        
-        # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_register_user ******RETURNING: '+str(content)}, {})
-
-    @defer.inlineCallbacks 
-    def op_define_user_profile(self, content, headers, msg):
-        """Service operation: .
-        """
-        # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_define_user_profile ******RETURNING: '+str(content)}, {})
-        
-    @defer.inlineCallbacks         
-    def op_authenticate(self, parms, headers, msg):
-        """ Service operation: need to take values from parms and verify they exist in the data store.
-        """
-        
-        
-        yield self.reply_ok(msg, {'authenticated': True}, {})
+        user = yield self.reg.get_description(user_id)
+        if user:
+            yield self.reply_ok(msg, {'user_enc': user.encode()})
+        else:
+            yield self.reply_err(msg, {'user_enc': None})
 
 
-    """
-    Begin experimental methods RU
-    """
-    @defer.inlineCallbacks 
-    def op_generate_ooi_id(self, content, headers, msg):
-        """ Service operation: this should generate a unique id when called.  Depending on if its user viewable or not
-            will determine if it needs to be based on their user name.  At this point i am not decided on how it should
-            be generated.
-        """
-        
-        
-        
-        
-        # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'ooi_id': 1231231123}, {})
-
-    @defer.inlineCallbacks 
-    def op_revoke_ooi_id(self, parms, headers, msg):
-        """RU Service operation: sormat for inputs.
-           parms = {'ooi_id':'username'}
-           
-           need to search the data store for the ooi_id and if present, flag it as revoked. then return true. return false on falure to find it?
-        
-        """
-
-        
-        # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'revoked': True}, {})
-    
-    
-    
-    
-    
-    @defer.inlineCallbacks 
-    def op_store_registration(self, parms, headers, msg):
-        """store retistration service operation:
-            parms = {'common_name': 'Roger Unwin A136',
-                 'organization': 'ProtectNetwork',
-                 'Domain Component': 'cilogon org',
-                 'Country': 'US',
-                 'Certificate': 'dummy certificate',
-                 'RSA Private Key': 'dummy rsa private key'}
-                 
-                 
-            the params should be stored, but it seems that mechanism is not completely done yet. so defer.
-        """
-        yield self.reply_ok(msg, {'value':'op_get_registration_info ******RETURNING: '+str(parms)}, {})
-
-
-
-
-
-
-
-    @defer.inlineCallbacks 
-    def op_store_registration_info(self, content, headers, msg):
-        """RU Service operation: .
-        """
-        # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_store_registration_info ******RETURNING: '+str(content)}, {})
-
-    @defer.inlineCallbacks 
-    def op_get_registration_info(self, content, headers, msg):
-        """RU Service operation: .
-        """
-        # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_get_registration_info ******RETURNING: '+str(content)}, {})
-
-    @defer.inlineCallbacks 
-    def op_update_registration_info(self, content, headers, msg):
-        """RU Service operation: .
-        """
-        # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_update_registration_info ******RETURNING: '+str(content)}, {})
-        
-    @defer.inlineCallbacks 
-    def op_revoke_registration(self, content, headers, msg):
-        """RU Service operation: .
-        """
-        # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'op_revoke_registration ******RETURNING: '+str(content)}, {})
-        
-        
-        
-        
-        
-        
-        
-        
-        
-
-
-    '''
 # Spawn of the process using the module name
 factory = ProtocolFactory(IdentityRegistryService)
-
-
-

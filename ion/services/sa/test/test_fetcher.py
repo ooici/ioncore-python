@@ -6,6 +6,7 @@
 @test ion.services.sa.fetcher Test of rewritten fetcher
 """
 
+import base64
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
@@ -23,7 +24,8 @@ class FetcherServiceTester(IonTestCase):
         self.mf = FetcherService()
 
     def test_single_page_with_headers(self):
-        page = self.mf.get_page('http://amoeba.ucsd.edu/tmp/test1.txt', get_headers=True)
+        page = self.mf.get_page('http://amoeba.ucsd.edu/tmp/test1.txt',
+                                get_headers=True)
         self.failUnlessSubstring('content-length', page)
         self.failUnlessSubstring('is the time for all', page)
 
@@ -36,8 +38,10 @@ class FetcherServiceTester(IonTestCase):
         try:
             self.mf.get_page('http://foo.bar.baz/')
         except gaierror, ge:
+            logging.debug('got err as expected! %s' % str(ge))
             pass
         except ValueError, ve:
+            logging.debug('got err as expected: %s' % str(ve))
             pass
         else:
             self.fail('Should have raised an exception!')
@@ -63,18 +67,18 @@ class FetcherTest(IonTestCase):
     def _get_page(self, src_url):
         logging.debug('sending GET request for "%s"...' % src_url)
         res = yield self.fc.get_url(src_url)
-        msg = res['value']
         if res['status'] == 'ERROR':
-            raise ValueError('Error on fetch: ' + msg)
+            raise ValueError('Error on fetch')
+        msg = base64.b64decode(res['value'])
         defer.returnValue(msg)
 
     @defer.inlineCallbacks
     def _get_phead(self, src_url):
         logging.debug('sending HEAD request for "%s"...' % src_url)
         res = yield self.fc.get_head(src_url)
-        msg = res['value']
         if res['status'] == 'ERROR':
-            raise ValueError('Error on fetch: ' + msg)
+            raise ValueError('Error on fetch')
+        msg = base64.b64decode(res['value'])
         defer.returnValue(msg)
 
     ###############################################

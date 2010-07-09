@@ -10,37 +10,39 @@
 import logging
 logging = logging.getLogger(__name__)
 
-import httplib as http
-import urlparse
-
 from twisted.internet import defer
 from twisted.trial import unittest
-
-from ion.play.hello_service import HelloServiceClient
 
 from ion.services.dm.persister import PersisterClient, PersisterService
 from ion.services.sa.fetcher import FetcherService, FetcherClient
 from ion.services.dm.url_manipulation import generate_filename
 
 from ion.test.iontest import IonTestCase
+import base64
+import simplejson as json
 
+TEST_DSET = 'http://ooici.net:8001/coads.nc'
 class TransportTester(IonTestCase):
     """
-    Verify that carrot and ion can transport binary (XDR) data.
+    Verify that we can transport binary (XDR) data.
     """
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        self.timeout = 60
+        self.timeout = 120
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self._stop_container()
 
     @defer.inlineCallbacks
-    def test_one(self):
-        raise unittest.SkipTest('Waiting for CISWCORE-14')
+    def test_fetcher_service_only(self):
+        raise unittest.SkipTest('Timing out on EC2')
 
+        """
+        Use fetcher service to get a complete dataset, try to decode the message
+        fields once we get it.
+        """
         services = [
              {'name': 'fetcher', 'module': 'ion.services.sa.fetcher',
              'class': 'FetcherService'},
@@ -49,43 +51,21 @@ class TransportTester(IonTestCase):
         sup = yield self._spawn_processes(services)
 
         fc = FetcherClient(proc=sup)
-        dset = yield fc.get_dap_dataset('http://ooici.net:8001/coads.nc')
-        logging.warn(dset)
-        logging.warn(type(dset))
-        self.failUnlessSubstring(dset, 'NC_GLOBAL')
-        self.failUnlessSubstring(dset, 'ooi-download-timestamp')
-        self.failUnlessSubstring(dset, 'ooi-source-url')
-        self.failUnlessSubstring(dset, 'http://ooici.net:8001/coads.nc')
+        dset = yield fc.get_dap_dataset(TEST_DSET)
 
-    @defer.inlineCallbacks
-    def test_two(self):
-        raise unittest.SkipTest('Waiting for CISWCORE-14')
+        # decode fields as an integrity test
+        dset['das'] = json.loads(dset['das'])
+        dset['dds'] = json.loads(dset['dds'])
+        dset['dods'] = base64.b64decode(dset['dods'])
+        self.failUnlessEqual(dset['source_url'], TEST_DSET)
+        self.failUnlessSubstring('COADSX', dset['das'])
+        self.failUnlessSubstring('COADSY', dset['das'])
 
-        """
-        Try a manual pull of XDR and send to known-good service.
-        """
 
-        services = [
-            {'name':'hello1','module':'ion.play.hello_service','class':'HelloService'},
-        ]
-
-        sup = yield self._spawn_processes(services)
-
-        hc = HelloServiceClient(proc=sup)
-
-        src = urlparse.urlsplit('http://amoeba.ucsd.edu:8001/glacier.nc?var232%5B0:1:0%5D%5B0:1:0%5D%5B0:1:601%5D%5B0:1:401%5D&')
-        conn = http.HTTPConnection(src.netloc)
-        conn.request('GET', src.path)
-        res = conn.getresponse()
-        payload = res.read()
-
-        yield hc.hello(payload)
-
-class PersisterServiceTester(unittest.TestCase):
+class ServiceTester(unittest.TestCase):
     """
-    Create an instance of the persister service class and test same w/out capability
-    container & messaging. Also instantiates the fetcher the same way to pull
-    a dataset.
+    Create an instance of the fetcher and persister services
+    and test w/out capability container & messaging.
 
     Way too clever.
     """
@@ -95,6 +75,7 @@ class PersisterServiceTester(unittest.TestCase):
         """
         self.ps = PersisterService()
         self.fs = FetcherService()
+        self.timeout = 120
 
     def test_instantiation_only(self):
         # Create and destroy the instances - any errors?
@@ -105,16 +86,16 @@ class PersisterServiceTester(unittest.TestCase):
         More complex than it might appear - reach in and use the methods
         to get and persist a full dataset from amoeba (5.2MB)
         """
-        dset_url = 'http://ooici.net:8001/coads.nc'
+        # generate filename so we can look for it after saving
         local_dir = '/tmp/'
-        fname = generate_filename(dset_url, local_dir=local_dir)
+        fname = generate_filename(TEST_DSET, local_dir=local_dir)
 
-        logging.debug('Grabbing dataset ' + dset_url)
-        dset = self.fs._get_dataset_no_xmit(dset_url)
-        logging.debug('Persisting dataset')
+        dset = self.fs._get_dataset_no_xmit(TEST_DSET)
         self.ps._save_no_xmit(dset, local_dir=local_dir)
-        if open(fname):
-           pass
+
+        f = open(fname, 'r')
+        if f:
+           f.close()
         else:
             self.fail('Datafile not found!')
 
@@ -124,7 +105,7 @@ class PersisterTester(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
-        self.timeout = 30
+        self.timeout = 300
         yield self._start_container()
 
     @defer.inlineCallbacks
@@ -132,27 +113,41 @@ class PersisterTester(IonTestCase):
         yield self._stop_container()
 
     @defer.inlineCallbacks
-    def test_fetcher_and_persister_services(self):
-        raise unittest.SkipTest('Waiting for CISWCORE-14')
+    def test_fetcher_svc_persister_client(self):
+        raise unittest.SkipTest('Timing out on EC2')
+        """
+        Trying to track down a failure - use fetcher service and
+        persister client.
+        """
+        services = [
+            {'name': 'persister', 'module': 'ion.services.dm.persister',
+             'class': 'PersisterService'},
+            ]
+        boss = yield self._spawn_processes(services)
+        fs = FetcherService()
+        dset = fs._get_dataset_no_xmit(TEST_DSET)
+        pc = PersisterClient(proc=boss)
+        rc = yield pc.persist_dap_dataset(dset)
+        self.failUnlessSubstring('OK', rc)
 
+    @defer.inlineCallbacks
+    def test_svcs_and_messaging(self):
+        raise unittest.SkipTest('Timing out on EC2')
         services = [
             {'name': 'persister', 'module': 'ion.services.dm.persister',
              'class': 'PersisterService'},
             {'name': 'fetcher', 'module': 'ion.services.sa.fetcher',
              'class': 'FetcherService'},
         ]
-        sup = yield self._spawn_processes(services)
+        boss = yield self._spawn_processes(services)
 
-        dset_url = 'http://ooici.net:8001/coads.nc'
-#        local_dir = '/tmp/'
-#        fname = generate_filename(dset_url, local_dir=local_dir)
+        fc = FetcherClient(proc=boss)
+        logging.debug('Grabbing dataset ' + TEST_DSET)
+        dset = yield fc.get_dap_dataset(TEST_DSET)
 
-        pc = PersisterClient(proc=sup)
-#        fc = FetcherClient(proc=sup)
-        fs = FetcherService()
-
-        logging.debug('Grabbing dataset ' + dset_url)
-        dset = fs._get_dataset_no_xmit(dset_url)
-
+        pc = PersisterClient(proc=boss)
+        #ps = PersisterService()
+        logging.debug('Saving dataset...')
         rc = yield pc.persist_dap_dataset(dset)
-        self.failUnlessSubstring('SUCCESS', rc)
+        #ps._save_no_xmit(dset)
+        self.failUnlessSubstring('OK', rc)

@@ -14,6 +14,8 @@ method for badly written DAP clients.
 import logging
 logging = logging.getLogger(__name__)
 
+import base64
+
 from twisted.internet import defer
 import httplib as http
 from socket import gaierror
@@ -50,7 +52,7 @@ class FetcherService(BaseService):
         @todo check for library routine to do this.
         @note output has an blank line at the end (\r\n)
         """
-        hstr = 'HTTP/1.0 200 OK\r\n'
+        hstr = 'HTTP/1.0 %d %s\r\n' % (result.status, result.reason)
         for x in result.getheaders():
             hstr = hstr + '%s: %s\r\n' % (x[0], x[1])
 
@@ -65,6 +67,7 @@ class FetcherService(BaseService):
         @retval send_ok or send_err as required
         @note This routine sends the reply back to the caller!
         @note called by derived class ion.services.dm.cache.RetrieverService
+        @todo Better propagation of HTTP result codes back to callers (eg 404)
         """
         assert(operation in ['GET', 'HEAD'])
 
@@ -80,19 +83,20 @@ class FetcherService(BaseService):
             logging.exception()
             yield self.reply_err(msg, content=str(ge))
 
+        hstr = self._reassemble_headers(res)
+
         # Did it succeed?
         if res.status == 200:
-            hstr = self._reassemble_headers(res)
             # @note read on HEAD returns no data
             hstr = hstr + '\n' + res.read()
             # Uncomment this to see the completed result
             # logging.debug(hstr)
-            yield self.reply_ok(msg, content=hstr)
+            # @note base64-encoded page returned!
+            yield self.reply_ok(msg, content=base64.b64encode(hstr))
         else:
             logging.info('fetch error %s %s %s %s' %
                          (operation, src_url, res.status, res.reason))
-
-            yield self.reply_err(msg, content='%s: %s' % (res.status, res.reason))
+            yield self.reply_err(msg, content=hstr)
 
         logging.debug('fetch completed %s' % res.status)
     def get_page(self, url, get_headers=False):
@@ -100,7 +104,9 @@ class FetcherService(BaseService):
         Inner routine to grab a page, with or without http headers.
         May raise gaierror or ValueError
         @todo Merge this and _http_op
+        @todo Better propagation of HTTP result codes back to callers (eg 404)
         @note See ion.services.sa.test.test_fetcher.GetPageTester
+        @note Does not transmit, and therefore does not call base64
         """
         src = urlparse.urlsplit(url)
         try:
@@ -143,6 +149,7 @@ class FetcherService(BaseService):
         """
         The core of the fetcher: function to grab an entire DAP dataset and
         return it as a dictionary.
+        @note dods is base64-encoded!
         """
         base_url = base_dap_url(source_url)
         das_url = base_url + '.das'
@@ -153,7 +160,7 @@ class FetcherService(BaseService):
         try:
             das = self.get_page(das_url)
             dds = self.get_page(dds_url)
-            dods = self.get_page(dods_url, get_headers=True)
+            dods = self.get_page(dods_url)
         except ValueError, ve:
             logging.exception('Error on fetch of ' + base_url)
             raise ve
@@ -161,28 +168,39 @@ class FetcherService(BaseService):
             logging.exception('Error on fetch of ' + base_url)
             raise ge
 
-        logging.debug('Fetch completed OK.')
+        logging.debug('Fetches completed OK, composing and returning message')
 
         dset_msg = {}
+        dset_msg['quiet'] = True # Keep procutils from clogging the log
         dset_msg['source_url'] = base_url
         dset_msg['das'] = json.dumps(das)
         dset_msg['dds'] = json.dumps(dds)
-        dset_msg['value'] = dods
+        dset_msg['dods'] = base64.b64encode(dods)
+#        from IPython.Shell import IPShellEmbed
+#        ipshell = IPShellEmbed('')
+#        ipshell()
+
         return(dset_msg)
 
     @defer.inlineCallbacks
     def op_get_dap_dataset(self, content, headers, msg):
-
+        """
+        Pull a DAP dataset, encode into reply, send reply. Integrates
+        everything else.
+        """
         try:
+            # Do the fetches, carefully
             dmesg = self._get_dataset_no_xmit(content)
         except ValueError, ve:
-            yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
-            return
+            yield self.reply_err(msg, 'reply',
+                                 {'value':'Error on fetch: %s' % str(ve)}, {})
+            defer.returnValue(None)
         except gaierror, ge:
-            yield self.reply_err(msg, 'reply', {'value':'Error on fetch'}, {})
-            return
+            yield self.reply_err(msg, 'reply',
+                                 {'value':'Error on fetch: %s' % str(ge)}, {})
+            defer.returnValue(None)
 
-        logging.info('Sending dataset')
+        logging.info('Returning dataset via reply_ok...')
         yield self.reply_ok(msg, dmesg)
         logging.debug('Send complete')
 
@@ -231,7 +249,6 @@ class FetcherClient(BaseServiceClient):
         Pull an entire dataset.
         """
         yield self._check_init()
-        logging.info('Starting fetch of DAP dataset %s' % requested_url)
         (content, headers, msg) = yield self.rpc_send('get_dap_dataset', requested_url)
         if 'ERROR' in content:
             raise ValueError('Error on URL: ' + content['failure'])
