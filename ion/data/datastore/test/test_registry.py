@@ -100,7 +100,7 @@ class RegistryCassandraTest(RegistryTest):
     """
     """
 
-    def _setup_backend(self):
+    def _set_up_backend(self):
         clist = ['amoeba.ucsd.edu:9160']
         ds = cassandra.CassandraStore.create_store(
             cass_host_list=clist,
