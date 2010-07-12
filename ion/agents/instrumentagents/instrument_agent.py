@@ -9,11 +9,9 @@ import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.data.datastore.registry import ResourceDescription
+from ion.data.dataobject import ResourceDescription
 from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
-from ion.services.coi.resource_registry import ResourceRegistryClient
-
 
 """
 Constants/Enumerations for tags in capabiltiies dict structures
@@ -52,12 +50,6 @@ class InstrumentDriver():
         @param command The command to execute
         @retval Result code of some sort
         """
-        
-class InstrumentAgentResourceDescription(ResourceDescription):
-    """
-    The derived class that specifies what information the instrument agents
-    are going to keep in the resource registry
-    """
     
 class InstrumentAgent(ResourceAgent):
     """

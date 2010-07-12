@@ -9,12 +9,12 @@ import uuid
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
-from ion.data.datastore.registry import LCState
+from ion.data.dataobject import LCState
 
 from ion.test.iontest import IonTestCase
 from ion.agents.resource_agent import ResourceAgentClient
 from ion.services.coi.resource_registry import ResourceRegistryClient
-from ion.agents.instrumentagents.instrument_agent \
+from ion.resources.ipaa_resource_descriptions \
     import InstrumentAgentResourceDescription
 class TestResourceAgent(IonTestCase):
     

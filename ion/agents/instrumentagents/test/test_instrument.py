@@ -13,7 +13,7 @@ logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.data.datastore.registry import LCStates as LCS
+from ion.data.dataobject import LCStates as LCS
 from ion.test.iontest import IonTestCase
 from ion.services.coi.resource_registry import ResourceRegistryClient
 from ion.agents.instrumentagents import instrument_agent as IA

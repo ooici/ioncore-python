@@ -12,10 +12,10 @@ import uuid
 from twisted.internet import defer
 
 from ion.services.coi.resource_registry import ResourceRegistryClient
-from ion.data.datastore.registry import ResourceDescription
+from ion.data.dataobject import ResourceDescription
 from ion.core.base_process import BaseProcess
 from ion.core.base_process import BaseProcessClient
-from ion.data.datastore.registry import LCState, LCStateNames
+from ion.data.dataobject import LCState, LCStateNames
 
 class ResourceAgent(BaseProcess):
     """
@@ -102,15 +102,13 @@ class ResourceAgent(BaseProcess):
             register.
         @todo Turn initial parameter asserts into a decode check
         """
-        logging.debug("*** in op_register_resource in ResourceAgent with content %s", content)
         assert(isinstance(content, list))
         assert("lifecycle" == content[0][0])
         assert("name" == content[1][0])
         if (self.res_reg_client == None):
             yield self.reply_err(msg,
                                  "No resource registry client has been set!")
-        res_desc = ResourceDescription.decode(content)
-        logging.debug("*** res_desc: %s", res_desc)
+        res_desc = ResourceDescription.decode(content)()
         assert(isinstance(res_desc, ResourceDescription))
         if (self.resource_id == None):
             self.resource_id = \
@@ -118,6 +116,7 @@ class ResourceAgent(BaseProcess):
                                                             res_desc)
         else:
             result = yield self.res_reg_client.register_resource(id, res_desc)
+        logging.debug("*** id: %s", self.resource_id)
         if (result == None):
             yield self.reply_err(msg, "Could not re-register object id %s" %id)
         else:

@@ -13,7 +13,7 @@ from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
 from ion.core.base_process import ProtocolFactory
-from ion.data.datastore.registry import LCStates as LCS
+from ion.data.dataobject import LCStates as LCS
 
 
 instrument_commands = (
