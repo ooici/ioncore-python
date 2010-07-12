@@ -13,44 +13,99 @@ class HostStatus:
     
     def __init__(self, host, port, agentName, communityName):
         self.reader = SnmpReader(host, port, agentName, communityName)
-        self.refresh()
         
-    def refresh(self):
-        pass
 
-    
+    """
+    Produces a dictionary from the getNetworkInterfaces, getStorage,
+    and getProcesses methods.
+    """
+    def getAll(self):
+        ret = {}
+        ret['NetworkInterfaces'] = self.getNetworkInterfaces()
+        ret['Storage']           = self.getStorage()
+        ret['Processes']         = self.getProcesses()
+        return ret
+
+        
+    """
+    Gets information about the host's network interfaces.
+    """
     def getNetworkInterfaces(self):
         return self.reader.getTable(
                 Rfc1213Mib.interfaces_ifTable,
                 [
-                    ('Descr'     , Rfc1213Mib.interfaces_ifTable_ifDescr),
-                    ('Speed'     , Rfc1213Mib.interfaces_ifTable_ifSpeed),
-                    ('InOctets'  , Rfc1213Mib.interfaces_ifTable_ifInOctets),
-                    ('InErrors'  , Rfc1213Mib.interfaces_ifTable_ifInErrors),
-                    ('OutOctets' , Rfc1213Mib.interfaces_ifTable_ifOutOctets), 
-                    ('OutErrors' , Rfc1213Mib.interfaces_ifTable_ifOutErrors)                 
-                ]
-           )
-    
-    def getStorage(self):
-        return self.reader.getTable(
-                Rfc2790.hrStorageTable,
-                [
-                    ('Descr'               , Rfc2790.hrStorageDescr),
-                    ('AllocationUnits'     , Rfc2790.hrStorageAllocationUnits),
-                    ('StorageSize'         , Rfc2790.hrStorageSize),
-                    ('StorageUse'          , Rfc2790.hrStorageUsed),
-                    ('AllocationFailuers'  , Rfc2790.hrStorageAllocationFailures)
+                    ('Descr'     , Rfc1213Mib.interfaces_ifTable_ifDescr)
+                    ,('Speed'     , Rfc1213Mib.interfaces_ifTable_ifSpeed)
+                    ,('InOctets'  , Rfc1213Mib.interfaces_ifTable_ifInOctets)
+                    ,('InErrors'  , Rfc1213Mib.interfaces_ifTable_ifInErrors)
+                    ,('OutOctets' , Rfc1213Mib.interfaces_ifTable_ifOutOctets) 
+                    ,('OutErrors' , Rfc1213Mib.interfaces_ifTable_ifOutErrors)                 
                 ]
            )
 
+    
+    def getStorage(self):
+        """
+        Gets information about the host's storage, including disk drives and memory.
+        """
+        return self.reader.getTable(
+                Rfc2790Mib.hrStorageTable,
+                [
+                    ('Descr'               , Rfc2790Mib.hrStorageDescr)
+                    ,('AllocationUnits'     , Rfc2790Mib.hrStorageAllocationUnits)
+                    ,('StorageSize'         , Rfc2790Mib.hrStorageSize)
+                    ,('StorageUse'          , Rfc2790Mib.hrStorageUsed)
+                    ,('AllocationFailuers'  , Rfc2790Mib.hrStorageAllocationFailures)
+                ]
+           )
+
+
+    def getProcesses(self):
+        """
+        Gets information about processes currently running on the host.
+        """
+        runtable = self.reader.getTable(
+                Rfc2790Mib.hrSWRunTable,
+                [
+                    ('RunIndex'      , Rfc2790Mib.hrSWRunIndex)
+                    ,('RunName'       , Rfc2790Mib.hwSWRunName)
+                    ,('RunID'         , Rfc2790Mib.hrSWRunID)
+                    ,('RunPath'       , Rfc2790Mib.hrSWRunPath)
+                    ,('RunParameters' , Rfc2790Mib.hrSWRunParameters)
+                    ,('RunType'       , Rfc2790Mib.hrSWRunType)
+                    ,('RunStatus'     , Rfc2790Mib.hrSWRunStatus)
+                ],
+                True
+           )
+        
+        perftable = self.reader.getTable(
+                Rfc2790Mib.hrSWRunPerfTable,
+                [
+                    ('CPU' , Rfc2790Mib.hrSWRunPerfCPU)
+                    ,('Mem' , Rfc2790Mib.hrSWRunPerfMem)                ],
+                True
+            )
+
+        # not sure why SWRunPerf and SWRun tables are separate in 
+        # the MIB.  They make more sense as one happy table.  So we'll
+        # stitch them together.
+        ret = [];
+        for rkey in runtable:
+            row = runtable[rkey]
+            if perftable.has_key(rkey):
+                for pkey in perftable[rkey]:
+                    row[pkey] = perftable[rkey][pkey]
+            ret.append(row)
+            
+        return ret
+        
 
 class SnmpReader:
     """
-    Reads common SNMP data from the specified host.  RFC1213 and RFC2790 
+    Reads common SNMP data from the specified host.  RFC1213 and Rfc2790
     MIBs are specifically targeted, more information available here 
     http://www.ietf.org/rfc/rfc1213.txt and also here
-    http://portal.acm.org/citation.cfm?id=RFC2790  
+    http://portal.acm.org/citation.cfm?id=Rfc2790Mib  
     """            
 
     def __init__(self, host, port, agentName, communityName):
@@ -58,7 +113,7 @@ class SnmpReader:
         self.communityName = communityName
         self.host = host
         self.port = port
-        self.supportsHR = self.get(('Rfc2790Test',Rfc2790.hrSystemNumUsers)) != None
+        self.supportsHR = self.get(('Rfc2790Test',Rfc2790Mib.hrSystemNumUsers)) != None
         self.supportsRfc1213 = self.get(('Rfc1213Test',Rfc1213Mib.system_sysDescr)) != None
         self.supportsPysnmp = PysnmpImported
  
@@ -92,11 +147,11 @@ class SnmpReader:
 
 
 
-    def getTable(self, tableOid, fields):
+    def getTable(self, tableOid, fields, includeId = False):
         """
         Gets an SNMP table value and converts it into a more mainstream
         value (i.e. gets rid of ASN1 and converts key-value pairs into
-        a list of dictionaries.  Result should be JSON ready.
+        a list of dictionaries.  Result should be JSON ready.)
         """
         
         table = self._getNext(tableOid)
@@ -110,7 +165,10 @@ class SnmpReader:
                 ids.append(row[-1])
 
         # Actually put all the loose values into a real table.  
-        ret = []
+        if includeId == True:
+            ret = {}
+        else:
+            ret = []
         for i in ids:
             row = {}
             for f in fields:
@@ -118,7 +176,10 @@ class SnmpReader:
                 oid.append(i)
                 if (table.has_key(tuple(oid))):
                     row[f[0]] = table[tuple(oid)]._value
-            ret.append(row)
+            if includeId:
+                ret[i] = row
+            else:
+                ret.append(row)
         return ret
 
 
@@ -142,7 +203,7 @@ class SnmpReader:
 
 
 
-class Rfc2790:
+class Rfc2790Mib:
     """
     RFC 2790 MIB OIDs which of are interest to the OOICI project.
     """
@@ -158,8 +219,21 @@ class Rfc2790:
     hrStorageUsed               = (1,3,6,1,2,1,25,2,3,1,6)
     hrStorageAllocationFailures = (1,3,6,1,2,1,25,2,3,1,7)
 
+    hrSWRunPerfTable = (1,3,6,1,2,1,25,5,1)
+    hrSWRunPerfCPU   = (1,3,6,1,2,1,25,5,1,1,2)
+    hrSWRunPerfMem   = (1,3,6,1,2,1,25,5,1,1,1)
+                        
+    hrSWRunTable =      (1,3,6,1,2,1,25,4,2,1)
+    hrSWRunIndex =      (1,3,6,1,2,1,25,4,2,1,1)
+    hwSWRunName =       (1,3,6,1,2,1,25,4,2,1,2)
+    hrSWRunID =         (1,3,6,1,2,1,25,4,2,1,3)
+    hrSWRunPath =       (1,3,6,1,2,1,25,4,2,1,4)
+    hrSWRunParameters = (1,3,6,1,2,1,25,4,2,1,5)
+    hrSWRunType =       (1,3,6,1,2,1,25,4,2,1,6)
+    hrSWRunStatus =     (1,3,6,1,2,1,25,4,2,1,7)
 
 
+    
 class Rfc1213Mib:
     """
     RFC 1213 MIB OIDs which of are interest to the OOICI project.
@@ -184,12 +258,5 @@ class Rfc1213Mib:
 
 r = HostStatus('bfoxooi.ucsd.edu', 161, 'ccagent', 'ooicinet')
 
-print r.reader.supportsPysnmp
-print r.reader.supportsRfc1213
-print r.reader.supportsHR
-
-netif = json.dumps(r.getNetworkInterfaces(), indent=4)
-print netif
-
-storage = json.dumps(r.getStorage(), indent=4)
-print storage
+all = json.dumps(r.getAll(), indent=4)
+print all
