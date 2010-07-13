@@ -9,6 +9,7 @@ from zope import interface
 
 from twisted.internet import defer
 
+from ion.data import store
 from ion.data import dataobject
 from ion.data.datastore import objstore
 
@@ -16,6 +17,7 @@ from ion.core import ioninit
 from ion.core import base_process
 from ion.core.base_process import ProtocolFactory, BaseProcess
 from ion.services.base_service import BaseService, BaseServiceClient
+from ion.resources import coi_resource_descriptions
 import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
@@ -26,8 +28,10 @@ class IRegistry(object):
     @brief General API of any registry
     @TOD change to use zope interface!
     """
+    def clear_registry(self):
+        raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def register_resource_description(resource_description):
+    def register_resource_description(self,resource_description):
         """
         @brief Register resource description.
         @param uuid unique name of resource instance.
@@ -36,18 +40,39 @@ class IRegistry(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
     
-    def get_resource_description(resource_reference):
+    def get_resource_description(self,resource_reference):
         """
         @param uuid name of resource.
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
     
-    def set_resource_lcstate(resource_reference, lcstate):
+    def set_resource_lcstate(self,resource_reference,lcstate):
         """
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
     
-    def find_resource_description(properties):
+    def set_resource_lcstate_new(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.new)
+
+    def set_resource_lcstate_active(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.active)
+        
+    def set_resource_lcstate_inactive(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.inactive)
+
+    def set_resource_lcstate_decomm(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.decomm)
+
+    def set_resource_lcstate_retired(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.retired)
+
+    def set_resource_lcstate_developed(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.developed)
+
+    def set_resource_lcstate_commissioned(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.commissioned)
+    
+    def find_resource_description(self,properties):
         """
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
@@ -62,6 +87,11 @@ class Registry(objstore.ObjectStore, IRegistry):
     """
 
     objectChassis = RegistryBackend
+
+    def clear_registry(self):
+        return self.backend.clear_store()
+
+
 
     @defer.inlineCallbacks
     def register_resource_description(self, resource_description):
@@ -169,7 +199,7 @@ class Registry(objstore.ObjectStore, IRegistry):
                         test = compare_regex_defaults(description,res)
                 else:
                     if ignore_defaults:
-                        test = compare_no_defaults(description,res)
+                        test = compare_ignore_defaults(description,res)
                     else:
                         test = compare_defaults(description,res)
                 if test:
@@ -218,14 +248,15 @@ def compare_defaults(r1,r2):
     except:
         return False
         
-def compare_no_defaults(r1,r2):
+def compare_ignore_defaults(r1,r2):
     """
     """
-    #try:
-    #    m = [getattr(r1, a) == getattr(r2, a) or getattr(r1, a) ==  b for a in r1.attributes]
-    #    return reduce(lambda a, b: a and b, m)
-    #except:
-    #    return False
+    try:
+        default = r1.__class__()
+        m = [getattr(r1, a) == getattr(r2, a) or getattr(r1, a) ==  getattr(default,a) for a in r1.attributes]
+        return reduce(lambda a, b: a and b, m)
+    except:
+        return False
             
 
 
@@ -250,6 +281,11 @@ class BaseRegistryService(BaseService):
     """
     @Brief Base Registry Service Clase
     """
+    
+    # Declaration of service
+    declare = BaseService.service_declare(name='registry_service', version='0.1.0', dependencies=[])
+
+    
     # For now, keep registration in local memory store. override with spawn args to use cassandra
     @defer.inlineCallbacks
     def slc_init(self):
@@ -265,15 +301,21 @@ class BaseRegistryService(BaseService):
         # Provide rest of the spawnArgs to init the store
         s = yield self.backend.create_store(**backendargs)
         
-        self.reg = registry.Registry(s)
+        self.reg = Registry(s)
         
         name = self.__class__.__name__
         logging.info(name + " initialized")
         logging.info(name + " backend:"+str(backendcls))
         logging.info(name + " backend args:"+str(backendargs))
 
-        
-        
+
+    @defer.inlineCallbacks
+    def op_clear_registry(self, content, headers, msg):
+        logging.info('op_clear_registry!')
+        yield self.reg.clear_registry()
+        yield self.reply_ok(msg)
+
+
     @defer.inlineCallbacks
     def op_register_resource_description(self, content, headers, msg):
         """
@@ -283,7 +325,10 @@ class BaseRegistryService(BaseService):
         logging.info('op_register_resource_description: \n' + str(resource))
   
         resource = yield self.reg.register_resource_description(resource)
-        yield self.reply_ok(msg, resource.encode())
+        if resource:
+            yield self.reply_ok(msg, resource.encode())
+        else:
+            yield self.reply_err(msg, None)
 
 
     @defer.inlineCallbacks
@@ -294,7 +339,7 @@ class BaseRegistryService(BaseService):
         resource_reference = dataobject.ResourceDescription.decode(content)()
         logging.info('op_get_resource_description: '+str(resource_reference))
 
-        resource = yield self.reg.get_resouce_description(resource_reference)
+        resource = yield self.reg.get_resource_description(resource_reference)
         logging.info('Got Resource:\n'+str(resource))
         if resource:
             yield self.reply_ok(msg, resource.encode())
@@ -307,18 +352,16 @@ class BaseRegistryService(BaseService):
         """
         Service operation: set the life cycle state of resource
         """
-        reference_lcstate = dataobject.ResourceDescription.decode(content)()
+        container = dataobject.ResourceDescription.decode(content)()
 
-        if isinstance(reference_lcstate, dataobject.ResourceReferenceLCStateObject):
-            logging.info('op_set_resource_lcstate: '+str(reference_lcstate))
-            resource_reference = reference_lcstate.reference
-            lcstate = reference_lcstate.lifecycle
+        if isinstance(reference_lcstate,  coi_resource_descriptions.SetResourceLCStateContainer):
+            logging.info('op_set_resource_lcstate: '+str(container))
+            resource_reference = container.reference
+            lcstate = container.lcstate
 
             resource = yield self.reg.set_resource_lcstate(resource_reference, lcstate)
         
             if resource:
-                resource.set_lifecyclestate(registry.LCStates[lifecycle])
-                resource = yield self.reg.register_resource_description(resource)
                 yield self.reply_ok(msg, resource.reference().encode())
 
         else:
@@ -337,7 +380,7 @@ class BaseRegistryService(BaseService):
         container = dataobject.ResourceDescription.decode(content)()
         
         result_list = []
-        if isinstance(container, dataobject.FindResourceDescriptionContainer):
+        if isinstance(container,  coi_resource_descriptions.FindResourceDescriptionContainer):
             description = container.description
             regex = contianer.regex
             ignore_defaults = container.ignore_defaults
@@ -345,10 +388,117 @@ class BaseRegistryService(BaseService):
             result_list = yield self.reg.find_resource_description(description,regex,ignore_results)
         
         
-        results=dataobject.ResourceDescriptionListContainer()
+        results=coi_resource_descriptions.ResourceDescriptionListContainer()
         results.resources = result_list
         
         yield self.reply_ok(msg, results.encode())
+
+# Spawn of the process using the module name
+factory = ProtocolFactory(BaseRegistryService)
+
+
+class BaseRegistryClient(BaseServiceClient,IRegistry):
+    """
+    Do not instantiate this class!
+    """
+            
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "registry_service"
+        BaseServiceClient.__init__(self, proc, **kwargs)
+
+    @defer.inlineCallbacks
+    def clear_registry(self):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('clear_registry',None)
+        if content['status']=='OK':
+            defer.returnValue(None)
+
+
+    @defer.inlineCallbacks
+    def register_resource_description(self,resource_description):
+        """
+        @brief Store a resource in the registry by its ID. It can be new or
+        modified.
+        @param res_id is a resource identifier unique to this resource.
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('register_resource_description',
+                                            resource_description.encode())
+        logging.info('Service reply: '+str(headers))
+        if content['status']=='OK':
+            resource_description = dataobject.ResourceDescription.decode(content['value'])()
+            defer.returnValue(resource_description)
+        else:
+            defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def get_resource_description(self,resource_reference):
+        """
+        @brief Retrieve a resource from the registry by Reference
+        """
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('get_resource_description',
+                                                      resource_reference.encode())
+        logging.info('Service reply: '+str(headers))
+
+        if content['status']=='OK':
+            resource_description = dataobject.ResourceDescription.decode(content['value'])()
+            defer.returnValue(resource_description)
+        else:
+            defer.returnValue(None)
+
+
+    @defer.inlineCallbacks
+    def set_resource_lcstate(self, resource_reference, lcstate):
+        """
+        @brief Retrieve a resource from the registry by its ID
+        """
+        yield self._check_init()
+
+        container = coi_resource_descriptions.SetResourceLCStateContainer()
+        container.lcstate = lcstate
+        container.reference = resource_reference
+
+        (content, headers, msg) = yield self.rpc_send('set_resource_lcstate',
+                                                      container.encode())
+        logging.info('Service reply: '+str(headers))
+        
+        if content['status'] == 'OK':
+            resource_reference = dataobject.ResourceReference.decode(content['value'])()
+            defer.returnValue(resource_reference)
+        else:
+            defer.returnValue(None)
+
+
+    @defer.inlineCallbacks
+    def find_resource_description(self,description,regex=True,ignore_defaults=True):
+        """
+        @brief Retrieve all the resources in the registry
+        @param attributes is a dictionary of attributes which will be used to select a resource
+        """
+        yield self._check_init()
+
+        container = coi_resource_descriptions.FindResourceDescriptionContainer()
+        container.description = description
+        container.ignore_defaults = ignore_defaults
+        container.regex = regex
+        
+        (content, headers, msg) = yield self.rpc_send('find_resource_description',
+                                                      container.encode())
+        logging.info('Service reply: '+str(headers))
+        
+        # Return a list of resources
+        if content['status'] == 'OK':
+            results = dataobject.DataObject.decode(content['value'])()
+            defer.returnValue(results.resources)
+        else:
+            defer.returnValue([])
+
+
+
 
 
 

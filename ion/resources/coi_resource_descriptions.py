@@ -8,7 +8,7 @@ class SetResourceLCStateContainer(DataObject):
     @ Brief a message object used to set state and 
     """
     # Beware of using a class object as a typed attribute!
-    lifecycle = TypedAttribute(LCState, default=None)
+    lcstate = TypedAttribute(LCState, default=None)
     reference = TypedAttribute(ResourceReference)
 
 

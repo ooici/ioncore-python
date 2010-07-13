@@ -28,19 +28,16 @@ class RegistryTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        s = yield self._set_up_backend()
-#        s = yield cassandra.CassandraStore.create_store()
+        yield self._setup_backend()
+        
+    @defer.inlineCallbacks
+    def _setup_backend(self):
+        s = yield store.Store.create_store()
         self.reg = registry.Registry(s)
-        self.mystore = s
-
-    
-    def _set_up_backend(self):
-        s = store.Store.create_store()
-        return (s)
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self.mystore.clear_store()
+        yield self.reg.clear_registry()
 
 
     @defer.inlineCallbacks
@@ -50,6 +47,8 @@ class RegistryTest(unittest.TestCase):
         #@Note - always over-write the old argument value!
         res = yield self.reg.register_resource_description(res)
         
+        print res
+        print type(res)
         ref = res.reference()
         res2 = yield self.reg.get_resource_description(ref)
         #print res
@@ -123,29 +122,51 @@ class RegistryTest(unittest.TestCase):
         res2 = yield self.reg.register_resource_description(res2)
 
 
-        blank = dataobject.ResourceDescription.create_new_resource()
+        blank = dataobject.ResourceDescription()
         results = yield self.reg.find_resource_description(blank,regex=False,ignore_defaults=False)
         self.assertEqual(results,[])
         
         results = yield self.reg.find_resource_description(res1,regex=False,ignore_defaults=False)
         self.assertIn(res1, results)
         self.assertNotIn(res2, results)
+        
+        results = yield self.reg.find_resource_description(blank,regex=False,ignore_defaults=True)
+        self.assertIn(res1, results)
+        self.assertIn(res2, results)
+        
 
 class RegistryCassandraTest(RegistryTest):
     """
     """
 
-    def _set_up_backend(self):
+    @defer.inlineCallbacks
+    def _setup_backend(self):
         clist = ['amoeba.ucsd.edu:9160']
-        ds = cassandra.CassandraStore.create_store(
+        s = yield cassandra.CassandraStore.create_store(
             cass_host_list=clist,
             cf_super=True,            
             keyspace='Datastore',
             colfamily='DS1'
             )
-        return ds
+        self.reg = registry.Registry(s)
 
 
+class RegistryServiceTest(IonTestCase, RegistryTest):
+    """
+    """
+    @defer.inlineCallbacks
+    def _setup_backend(self):
+        yield self._start_container()
+        # By default, the store service will use Store in the backend.
+        services = [
+            {'name':'registry1','module':'ion.data.datastore.registry','class':'BaseRegistryService'},
+        ]
 
+        sup = yield self._spawn_processes(services)        
+        self.reg = registry.BaseRegistryClient(proc=sup)
 
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.reg.clear_registry()
+        yield self._stop_container()
 
