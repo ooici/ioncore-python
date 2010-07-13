@@ -300,5 +300,37 @@ class TestSendResourceReference(TestSendDataObject):
         yield self._start_container()
     
 
+class TestResourceDescription(unittest.TestCase):
+    
+    def test_create(self):
+        raise unittest.SkipTest('Not implimented yet!')
+    
+    def test_reference(self):
+        raise unittest.SkipTest('Not implimented yet!')
+    
+    def test_create(self):
+        raise unittest.SkipTest('Not implimented yet!')
+        
+    def test_set_lcstate(self):
+        
+        #logging.info(registry.LCStates)
+        res = dataobject.ResourceDescription.create_new_resource()
+        #logging.info(res.get_lifecyclestate())
+        self.assertEqual(res.lifecycle, dataobject.LCStates.new)
 
+        res.set_lifecyclestate(dataobject.LCStates.active)
+        self.assertEqual(res.lifecycle, dataobject.LCStates.active)
+        #logging.info(res.get_lifecyclestate())
+        
+        res.set_lifecyclestate(dataobject.LCStates['retired'])
+        self.assertEqual(res.lifecycle, dataobject.LCStates.retired)
+        #logging.info(res.get_lifecyclestate())
+
+        self.failUnlessRaises(TypeError,res.set_lifecyclestate,'new')
+
+    def test_get_lcstate(self):
+ 
+        res = dataobject.ResourceDescription.create_new_resource()
+        
+        self.assertEqual(res.get_lifecyclestate(),dataobject.LCState('new'))
  

@@ -30,8 +30,9 @@ class TypedAttribute(object):
 
     def __set__(self, inst, value):
         if not isinstance(value, self.type):
-            raise TypeError("Must be a %s" % self.type)
+            raise TypeError("Error setting typed attribute %s \n Attribute must be of class %s \n Recieved Value of Class: %s" % (self.name, self.type, value.__class__))
         setattr(inst, self.name, value)
+
 
     @classmethod
     def decode(cls, value, _types={}):
@@ -250,7 +251,7 @@ class LCState(object):
     @Brief Class to control the possible states based on the LCStateNames list
     """
 
-    def __init__(self, state):
+    def __init__(self, state='new'):
         assert state in LCStateNames
         self._state = state
 
@@ -289,13 +290,13 @@ class ResourceDescription(ResourceReference):
     lifecycle = TypedAttribute(LCState, default=LCStates.new)
 
     def set_lifecyclestate(self, state):
-        assert(isinstance(state, LCState))
         self.lifecycle = state
 
     def get_lifecyclestate(self):
         return self.lifecycle
 
 DataObject._types['ResourceDescription']=ResourceDescription
+
 
 
 

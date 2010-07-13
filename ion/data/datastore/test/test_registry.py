@@ -30,7 +30,7 @@ class RegistryTest(unittest.TestCase):
     def setUp(self):
         s = yield self._set_up_backend()
 #        s = yield cassandra.CassandraStore.create_store()
-        self.reg = registry.ResourceRegistry(s)
+        self.reg = registry.Registry(s)
         self.mystore = s
 
     
@@ -47,25 +47,14 @@ class RegistryTest(unittest.TestCase):
     def test_register(self):
         res = dataobject.ResourceDescription.create_new_resource()
         res.name = 'foo'
-        res = yield self.reg.register(res)
+        #@Note - always over-write the old argument value!
+        res = yield self.reg.register_resource_description(res)
         
         ref = res.reference()
-        res2 = yield self.reg.get_description(ref)
+        res2 = yield self.reg.get_resource_description(ref)
         #print res
         #print res2
         self.failUnless(res == res2)
-
-    def test_lcstate(self):
-        
-        #logging.info(registry.LCStates)
-        
-        res = dataobject.ResourceDescription.create_new_resource()
-        logging.info(res.get_lifecyclestate())
-        
-        res.set_lifecyclestate(dataobject.LCStates.active)
-        logging.info(res.get_lifecyclestate())
-        res.set_lifecyclestate(dataobject.LCStates['retired'])
-        logging.info(res.get_lifecyclestate())
 
 
 
@@ -73,53 +62,74 @@ class RegistryTest(unittest.TestCase):
     def test_register_overwrite(self):
         res = dataobject.ResourceDescription.create_new_resource()
         res.name = 'foo'
-        res = yield self.reg.register(res)
+        res = yield self.reg.register_resource_description(res)
         ref1 = res.reference()
         # get this version back again
-        res1 = yield self.reg.get_description(ref1)
+        res1 = yield self.reg.get_resource_description(ref1)
         self.failUnless(res == res1)
         self.assertEqual(res1.name, 'foo')
         
         #update with new data
         res.name = 'moo'
-        res = yield self.reg.register(res)
+        res = yield self.reg.register_resource_description(res)
 
         # get the new version back again
         ref2 = res.reference()
-        res2 = yield self.reg.get_description(ref2)
+        res2 = yield self.reg.get_resource_description(ref2)
         self.failUnless(res == res2)
         self.assertEqual(res1.name, 'foo')
 
         # Get the original
-        res1 = yield self.reg.get_description(ref1)
+        res1 = yield self.reg.get_resource_description(ref1)
         self.assertEqual(res1.name, 'foo')
         
     def test_register_select_ancestor(self):
         raise unittest.SkipTest('Not implimented yet!')
 
+
+    def test_set_lcastate(self):
+        res = dataobject.ResourceDescription.create_new_resource()
+        res.name = 'foo'
+        res = yield self.reg.register_resource_description(res)
+        ref1 = res.reference()
+        
+        #set by resource (Includes reference):
+        ref2 = yield self.reg.set_resource_lcstate(res, dataobject.LCStates.active)
+        
+        # Used returend reference to set again:
+        ref3 = yield self.reg.set_resource_lcstate(ref2, dataobject.LCStates.retired)
+        
+        res = yield self.reg.get_resource_description(ref3)
+        self.assertEqual(res,dataobject.LCStates.retired)
+        
+        res = yield self.reg.get_resource_description(ref2)
+        self.assertEqual(res,dataobject.LCStates.active)
+        
+        res = yield self.reg.get_resource_description(ref1)
+        self.assertEqual(res,dataobject.LCStates.new)
+        
+        
+
+
     @defer.inlineCallbacks
-    def test_register_get_list(self):
+    def test_registry_find(self):
+
         res1 = dataobject.ResourceDescription.create_new_resource()
         res1.name = 'foo'
-        res1 = yield self.reg.register(res1)
-
+        res1 = yield self.reg.register_resource_description(res1)
+        
         res2 = dataobject.ResourceDescription.create_new_resource()
         res2.name = 'moo'
-        res2 = yield self.reg.register(res2)
+        res2 = yield self.reg.register_resource_description(res2)
 
-        ref_list = yield self.reg.list()
-        #print res_list
-        
-        # Can't compare the resource description to the reference list
-        #self.assertIn(res1.reference(), ref_list)
-        
-        res_s = yield self.reg.list_descriptions()
-        self.assertEqual(len(res_s), 2)
-            
-            
-        self.assertIn(res1, res_s)        
-        self.assertIn(res2, res_s)        
 
+        blank = dataobject.ResourceDescription.create_new_resource()
+        results = yield self.reg.find_resource_description(blank,regex=False,ignore_defaults=False)
+        self.assertEqual(results,[])
+        
+        results = yield self.reg.find_resource_description(res1,regex=False,ignore_defaults=False)
+        self.assertIn(res1, results)
+        self.assertNotIn(res2, results)
 
 class RegistryCassandraTest(RegistryTest):
     """
