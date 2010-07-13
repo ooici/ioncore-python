@@ -164,13 +164,28 @@ class RegistryServiceTest(IonTestCase, RegistryTest):
         services = [
             {'name':'registry1','module':'ion.data.datastore.registry','class':'BaseRegistryService'},
         ]
-
-        sup = yield self._spawn_processes(services)
+        
         print 'Dataobject._types',dataobject.DataObject._types
+        
+        sup = yield self._spawn_processes(services)
+        #print 'Dataobject._types',dataobject.DataObject._types
         self.reg = registry.BaseRegistryClient(proc=sup)
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.reg.clear_registry()
         yield self._stop_container()
+
+
+
+class TestLoadTypes(IonTestCase):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+        print 'Dataobject._types',dataobject.DataObject._types
+        
+    def test(self):
+        print 'testing'
+
 

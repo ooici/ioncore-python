@@ -377,16 +377,18 @@ class BaseRegistryService(BaseService):
         regex = None
         ignore_defaults = None
         
+        dataobject.DataObject._types['FindResourceDescriptionContainer']=coi_resource_descriptions.FindResourceDescriptionContainer
+        
         container = dataobject.ResourceDescription.decode(content)()
         
         result_list = []
         if isinstance(container,  coi_resource_descriptions.FindResourceDescriptionContainer):
+            print container
             description = container.description
-            regex = contianer.regex
+            regex = container.regex
             ignore_defaults = container.ignore_defaults
-        
-            result_list = yield self.reg.find_resource_description(description,regex,ignore_results)
-        
+            
+            result_list = yield self.reg.find_resource_description(description,regex,ignore_defaults)
         
         results=coi_resource_descriptions.ResourceDescriptionListContainer()
         results.resources = result_list
@@ -492,6 +494,9 @@ class BaseRegistryClient(BaseServiceClient,IRegistry):
         
         # Return a list of resources
         if content['status'] == 'OK':
+            
+            dataobject.DataObject._types['ResourceDescriptionListContainer']=coi_resource_descriptions.ResourceDescriptionListContainer
+            
             results = dataobject.DataObject.decode(content['value'])()
             defer.returnValue(results.resources)
         else:

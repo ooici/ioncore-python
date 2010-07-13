@@ -41,22 +41,22 @@ class TypedAttribute(object):
         @param value is the string which is to be decoded
         @param _types is a dictionary of types which can be decoded
         """
-        
+                
         types = _types.copy()
         stype, default = value.split(NULL_CHR)
         
         #the use of str is temporary unti lcaarch msging is fixed
-        type = eval(str(stype), types)
+        mytype = eval(str(stype), types)
 
         # If a value is given for the typed attribute decode it.
         if default:
             #print 'type, default:',type, default
             #return cls(type, eval(str(default), types))
-            if issubclass(type, DataObject):
-                data_object = type.decode(json.loads(default),header=False)()
-                return cls(type, data_object)
+            if issubclass(mytype, DataObject):
+                data_object = mytype.decode(json.loads(default),header=False)()
+                return cls(mytype, data_object)
                 
-            elif issubclass(type, (list, set, tuple)):
+            elif issubclass(mytype, (list, set, tuple)):
                 list_enc = json.loads(default)
                     
                 objs=[]
@@ -69,10 +69,14 @@ class TypedAttribute(object):
                     else:
                         objs.append(itype(str(ival)))
                     
-                return cls(type, type(objs))
+                return cls(mytype, mytype(objs))
+
+            elif issubclass(mytype, bool):
+                return cls(mytype, eval(str(default)))
+            
             else:
-                return cls(type, type(str(default)))
-        return cls(type)
+                return cls(mytype, mytype(str(default)))
+        return cls(mytype)
 
 
 class DataObjectType(type):
@@ -118,9 +122,10 @@ class DataObject(object):
     def __str__(self):
         head = '='*10
         strng  = """\n%s Resource Type: %s %s\n""" % (head, str(self.__class__.__name__), head)
+        strng += """= 'name':'value':<type> \n"""
         for name in self.attributes:
             value = getattr(self,name)
-            strng += """= '%s':'%s'\n""" % (name,value)
+            strng += """= '%s':'%s':%s\n""" % (name,value,type(value))
         strng += head*2
         return strng
 

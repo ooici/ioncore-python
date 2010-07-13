@@ -28,8 +28,8 @@ class SimpleObject(dataobject.DataObject):
     """
     @Brief A simple data object to use as a base class
     """
-    key = dataobject.TypedAttribute(str, 'xxx')
     name = dataobject.TypedAttribute(str, 'blank')
+    key = dataobject.TypedAttribute(str, 'xxx')
 
 dataobject.DataObject._types['SimpleObject']=SimpleObject
 
@@ -38,8 +38,8 @@ class TestSimpleObject(unittest.TestCase):
     def setUp(self):
         
         obj = SimpleObject()
-        obj.key = 'seabird'
         obj.name = 'David'
+        obj.key = 'seabird'
         self.obj = obj
         self.encoded=[('Object_Type', 'SimpleObject'),('key', 'str\x00seabird'),('name', 'str\x00David')]
      
@@ -56,6 +56,7 @@ class TestSimpleObject(unittest.TestCase):
     def testDecode(self):
         dec = dataobject.DataObject.decode(self.encoded)()
         #print 'dec',dec
+        #print 'self.obj',self.obj
         self.assertEqual(self.obj,dec)
         self.assertEqual(type(self.obj).__name__,type(dec).__name__)
 
@@ -66,7 +67,8 @@ class PrimaryTypesObject(SimpleObject):
     """
     integer = dataobject.TypedAttribute(int,5)
     floating = dataobject.TypedAttribute(float,5.0)
-
+    boolen = dataobject.TypedAttribute(bool,True)
+    
 dataobject.DataObject._types['PrimaryTypesObject']=PrimaryTypesObject
 
 class TestPrimaryTypesObject(TestSimpleObject):
@@ -75,10 +77,12 @@ class TestPrimaryTypesObject(TestSimpleObject):
         obj.key = 'seabird'
         obj.name = 'David'
         obj.floating = 3.14159
+        obj.boolen = False
         obj.integer = 42
         self.obj = obj
-        self.encoded=[('Object_Type', 'PrimaryTypesObject'),('key', 'str\x00seabird'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'), ('name', 'str\x00David')]
-        
+        self.encoded=[('Object_Type', 'PrimaryTypesObject'),('key', 'str\x00seabird'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'),('boolen', 'bool\x00False'), ('name', 'str\x00David')]        
+        #self.encoded=[('Object_Type', 'PrimaryTypesObject'),('boolen', 'bool\x00False'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'), ('key', 'str\x00seabird'), ('name', 'str\x00David')]
+
 class BinaryObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
     binary = dataobject.TypedAttribute(str)
@@ -114,8 +118,8 @@ class TestListOfObjects(TestSimpleObject):
         obj.name = 'a big list of objects'
         obj.rlist = [PrimaryTypesObject(),PrimaryTypesObject(),SimpleObject()]
         self.obj = obj
-        self.encoded=[('Object_Type', 'ListObject'),('rlist','list\x00["PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+ 
-                       '"PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+
+        self.encoded=[('Object_Type', 'ListObject'),('rlist','list\x00["PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"boolen\\", \\"bool\\\\u0000True\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+ 
+                       '"PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"boolen\\", \\"bool\\\\u0000True\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+
                        '"SimpleObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]"]'),
                         ('name', 'str\x00a big list of objects')]
      
@@ -169,7 +173,7 @@ class TestNestedObject(TestSimpleObject):
         
         self.obj = obj
         self.encoded=[  ('Object_Type', 'NestedObject'),
-                        ('primary','PrimaryTypesObject\x00[["key", "str\\u0000xxx"], ["floating", "float\\u00005.0"], ["integer", "int\\u00005"], ["name", "str\\u0000blank"]]'),
+                        ('primary','PrimaryTypesObject\x00[["key", "str\\u0000xxx"], ["floating", "float\\u00005.0"], ["integer", "int\\u00005"], ["boolen", "bool\\u0000True"], ["name", "str\\u0000blank"]]'),
                         ('rset','SetObject\x00[["rset", "set\\u0000[\\"str\\\\u0000a\\", \\"int\\\\u00003\\", \\"float\\\\u00004.0\\"]"], ["name", "str\\u0000a big set"]]'),
                         ('name', 'str\x00stuff')]
         
