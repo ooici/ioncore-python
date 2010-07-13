@@ -1,5 +1,5 @@
-import json
-
+from SimpleXMLRPCServer import SimpleXMLRPCServer
+import xmlrpclib    
 try:
     from pysnmp.entity.rfc3413.oneliner import cmdgen
     PysnmpImported = True
@@ -7,10 +7,59 @@ except ImportError:
     PysnmpImported = False
 
 
+class HostStatusRPCServer:
+    """
+    RPC server for returning host status on request. 
+    """
 
-      
+    def __init__(
+                 self, 
+                 snmpHost          = 'localhost', 
+                 snmpPort          = 161,
+                 snmpAgentName     = 'ooici',
+                 snmpCommunityName = 'ooicinet',
+                 rpcHost           = 'localhost',
+                 rpcPort           = 9010  ):
+        """
+        Test
+        """
+        self.server = SimpleXMLRPCServer((rpcHost, rpcPort))
+        self.status = HostStatus(
+                                 snmpHost, 
+                                 snmpPort, 
+                                 snmpAgentName, 
+                                 snmpCommunityName
+                                 )
+        self.server.register_function(self.getStatus)
+        self.server.register_introspection_functions()
+        self.server.serve_forever()
+        
+    def getStatus(self):
+        return self.status.getAll()
+        
+        
+class HostStatusRPCClient:
+    """
+    RPC client for testing only. 
+    """
+
+    def __init__(
+                 self, 
+                 rpcHost           = 'localhost',
+                 rpcPort           = 9010  ):
+        """
+        Test
+        """
+        self.client = xmlrpclib.ServerProxy('http://%s:%d'%(rpcHost, rpcPort))
+        
+    def getStatus(self):
+        return self.status.getAll()
+
 class HostStatus:
-    
+    """
+    Represents the status of the local host as retrieved using
+    SNMP and RFC1213 and RFC2790 SNMP MIB definitions.
+    """
     def __init__(self, host, port, agentName, communityName):
         self.reader = SnmpReader(host, port, agentName, communityName)
         
@@ -255,8 +304,9 @@ class Rfc1213Mib:
 
 
 
-
-r = HostStatus('bfoxooi.ucsd.edu', 161, 'ccagent', 'ooicinet')
-
-all = json.dumps(r.getAll(), indent=4)
-print all
+client = HostStatusRPCClient()
+server = HostStatusRPCServer()
+# all = rpc.status.getAll()
+#r = HostStatus('bfoxooi.ucsd.edu', 161, 'ccagent', 'ooicinet')
+#all = json.dumps(r.getAll(), indent=4)
+# print all
