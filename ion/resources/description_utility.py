@@ -10,12 +10,13 @@ from ion.data import dataobject
 
 def load_descriptions():
 
+    logging.warning('*********RUNNIG LOAD DESCRIPTIONS')
     modules=CONF.getObject()
     if not modules:
         logging.warning('Found no Resource Description modules to load!')
 
     for module in modules:
-        print module
+        print 'X+X+X+XX+X+X+X+X+X+X+X+X+',module
         mod = __import__(module)
 
         for name in dir(mod):

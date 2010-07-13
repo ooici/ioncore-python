@@ -27,3 +27,9 @@ class FindResourceDescriptionContainer(DataObject):
     description = TypedAttribute(ResourceDescription, default=None)
     regex = TypedAttribute(bool, default=True)
     ignore_defaults = TypedAttribute(bool, default=True)
+    
+    
+class ComplexResource(ResourceDescription):
+    reference = TypedAttribute(ResourceDescription, default=None)
+    title = TypedAttribute(str, default='True')
+    aint = TypedAttribute(int, default=True)

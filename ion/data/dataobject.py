@@ -136,7 +136,7 @@ class DataObject(object):
         """
         encoded = []
         if header:
-            encoded.append(('Object Type', "%s" % (type(self).__name__)))
+            encoded.append(('Object_Type', "%s" % (type(self).__name__)))
             
         for name in self.attributes:
             value = getattr(self, name)

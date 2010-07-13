@@ -41,7 +41,7 @@ class TestSimpleObject(unittest.TestCase):
         obj.key = 'seabird'
         obj.name = 'David'
         self.obj = obj
-        self.encoded=[('Object Type', 'SimpleObject'),('key', 'str\x00seabird'),('name', 'str\x00David')]
+        self.encoded=[('Object_Type', 'SimpleObject'),('key', 'str\x00seabird'),('name', 'str\x00David')]
      
     def testPrintObject(self):
                 
@@ -77,7 +77,7 @@ class TestPrimaryTypesObject(TestSimpleObject):
         obj.floating = 3.14159
         obj.integer = 42
         self.obj = obj
-        self.encoded=[('Object Type', 'PrimaryTypesObject'),('key', 'str\x00seabird'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'), ('name', 'str\x00David')]
+        self.encoded=[('Object_Type', 'PrimaryTypesObject'),('key', 'str\x00seabird'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'), ('name', 'str\x00David')]
         
 class BinaryObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
@@ -92,7 +92,7 @@ class TestBinaryObject(TestSimpleObject):
         obj.name = 'Binary Junk'
         obj.binary = cas.sha1bin(obj.name)
         self.obj = obj
-        self.encoded=[('Object Type', 'BinaryObject'),('binary', "str\x00\xca\x98T\x17~\x0e41\x83\xcf'\xb6\xba&l\x1d\xd1\x9d\xd8["), ('name', 'str\x00Binary Junk')]
+        self.encoded=[('Object_Type', 'BinaryObject'),('binary', "str\x00\xca\x98T\x17~\x0e41\x83\xcf'\xb6\xba&l\x1d\xd1\x9d\xd8["), ('name', 'str\x00Binary Junk')]
      
 class ListObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
@@ -106,7 +106,7 @@ class TestListObject(TestSimpleObject):
         obj.name = 'a big list'
         obj.rlist = ['a',3,4.0]
         self.obj = obj
-        self.encoded=[('Object Type', 'ListObject'),('rlist', 'list\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big list')]
+        self.encoded=[('Object_Type', 'ListObject'),('rlist', 'list\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big list')]
      
 class TestListOfObjects(TestSimpleObject):
     def setUp(self):
@@ -114,7 +114,7 @@ class TestListOfObjects(TestSimpleObject):
         obj.name = 'a big list of objects'
         obj.rlist = [PrimaryTypesObject(),PrimaryTypesObject(),SimpleObject()]
         self.obj = obj
-        self.encoded=[('Object Type', 'ListObject'),('rlist','list\x00["PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+ 
+        self.encoded=[('Object_Type', 'ListObject'),('rlist','list\x00["PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+ 
                        '"PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+
                        '"SimpleObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]"]'),
                         ('name', 'str\x00a big list of objects')]
@@ -131,7 +131,7 @@ class TestSetObject(TestSimpleObject):
         obj.name = 'a big set'
         obj.rset = set(['a',3,4.0])
         self.obj = obj
-        self.encoded=[('Object Type', 'SetObject'),('rset', 'set\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big set')]
+        self.encoded=[('Object_Type', 'SetObject'),('rset', 'set\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big set')]
 
 class TupleObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
@@ -146,7 +146,7 @@ class TestTupleObject(TestSimpleObject):
         obj.name = 'a big tuple'
         obj.rtuple = ('a',3,4.0)
         self.obj = obj
-        self.encoded=[('Object Type', 'TupleObject'),('rtuple', 'tuple\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big tuple')]
+        self.encoded=[('Object_Type', 'TupleObject'),('rtuple', 'tuple\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big tuple')]
      
 class NestedObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str,'stuff')
@@ -168,7 +168,7 @@ class TestNestedObject(TestSimpleObject):
         obj.rset = sobj
         
         self.obj = obj
-        self.encoded=[  ('Object Type', 'NestedObject'),
+        self.encoded=[  ('Object_Type', 'NestedObject'),
                         ('primary','PrimaryTypesObject\x00[["key", "str\\u0000xxx"], ["floating", "float\\u00005.0"], ["integer", "int\\u00005"], ["name", "str\\u0000blank"]]'),
                         ('rset','SetObject\x00[["rset", "set\\u0000[\\"str\\\\u0000a\\", \\"int\\\\u00003\\", \\"float\\\\u00004.0\\"]"], ["name", "str\\u0000a big set"]]'),
                         ('name', 'str\x00stuff')]

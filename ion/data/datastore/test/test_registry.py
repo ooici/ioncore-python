@@ -22,6 +22,8 @@ from magnet.spawnable import Receiver
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
+from ion.resources.coi_resource_descriptions import ComplexResource
+
 class RegistryTest(unittest.TestCase):
     """
     """
@@ -43,12 +45,13 @@ class RegistryTest(unittest.TestCase):
     @defer.inlineCallbacks
     def test_register(self):
         res = dataobject.ResourceDescription.create_new_resource()
+        #res = ComplexResource.create_new_resource()
         res.name = 'foo'
         #@Note - always over-write the old argument value!
         res = yield self.reg.register_resource_description(res)
         
-        print res
-        print type(res)
+        print 'Saved Resource:',res
+        print 'Resource Type:',type(res)
         ref = res.reference()
         res2 = yield self.reg.get_resource_description(ref)
         #print res
@@ -162,7 +165,8 @@ class RegistryServiceTest(IonTestCase, RegistryTest):
             {'name':'registry1','module':'ion.data.datastore.registry','class':'BaseRegistryService'},
         ]
 
-        sup = yield self._spawn_processes(services)        
+        sup = yield self._spawn_processes(services)
+        print 'Dataobject._types',dataobject.DataObject._types
         self.reg = registry.BaseRegistryClient(proc=sup)
 
     @defer.inlineCallbacks
