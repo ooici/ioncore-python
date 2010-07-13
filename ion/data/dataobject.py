@@ -9,7 +9,7 @@
 
 NULL_CHR = '\x00'
 
-import json
+import simplejson as json
 import uuid
 
 class TypedAttribute(object):
