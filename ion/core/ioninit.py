@@ -54,6 +54,14 @@ def check_magnet_version():
 
 check_magnet_version()
 
+def install_msgpacker():
+    from carrot.serialization import registry
+    import msgpack
+    registry.register('msgpack', msgpack.packb, msgpack.unpackb, content_type='application/msgpack', content_encoding='binary')
+    registry._set_default_serializer('msgpack')
+
+install_msgpacker()
+
 def set_log_levels(levelfilekey=None):
     """
     Sets logging levels of per module loggers to given values. Loggers of
