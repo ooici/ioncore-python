@@ -65,7 +65,7 @@ class TypedAttribute(object):
                     itype = eval(str(itype), types)
                     
                     if issubclass(itype, DataObject):
-                        objs.append(itype.decode(json.loads(ival))() )
+                        objs.append(itype.decode(json.loads(ival),header=False)() )
                     else:
                         objs.append(itype(str(ival)))
                     
@@ -134,11 +134,10 @@ class DataObject(object):
     def encode(self,header=True):
         """
         """
-        print 'Encoding! header=',header
         encoded = []
         if header:
-            print 'adding header!'
             encoded.append(('Object Type', "%s" % (type(self).__name__)))
+            
         for name in self.attributes:
             value = getattr(self, name)
             
@@ -150,7 +149,7 @@ class DataObject(object):
                 list_enc = []
                 for val in value:
                     if isinstance(val, DataObject):
-                        val_enc = val.encode()
+                        val_enc = val.encode(header = False)
                         list_enc.append("%s%s%s" % (type(val).__name__, NULL_CHR, json.dumps(val_enc),))
                     else:
                         list_enc.append("%s%s%s" % (type(val).__name__, NULL_CHR, str(val)))
@@ -171,11 +170,13 @@ class DataObject(object):
         """
         #d = dict([(str(name), TypedAttribute.decode(value)) for name, value in attrs])
         d={}
+        clsobj = cls
         if header:
             header,clsname = attrs.pop(0)
             #print 'header',header
             #print 'clsname',clsname
-        clsobj = eval(str(clsname), cls._types)
+            clsobj = eval(str(clsname), cls._types)
+            
         for name, value in attrs:
             #print 'name',name
             #print 'value',value
@@ -228,14 +229,14 @@ class ResourceReference(DataObject):
     
     
     
-    def reference(self):
+    def reference(self,head=False):
         """
         @Brief Use this method to make a reference to any resource
         """
         inst = ResourceReference()
         if self._identity:
             inst._identity = self._identity
-        if self._parent_commit:
+        if self._parent_commit and not head:
             inst._parent_commit = self._parent_commit
         inst._resource_type = self._resource_type
         inst._branch = self._branch

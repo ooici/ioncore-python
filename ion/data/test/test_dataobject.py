@@ -131,7 +131,7 @@ class TestSetObject(TestSimpleObject):
         obj.name = 'a big set'
         obj.rset = set(['a',3,4.0])
         self.obj = obj
-        self.encoded=[('rset', 'set\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big set')]
+        self.encoded=[('Object Type', 'SetObject'),('rset', 'set\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big set')]
 
 class TupleObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
@@ -146,7 +146,7 @@ class TestTupleObject(TestSimpleObject):
         obj.name = 'a big tuple'
         obj.rtuple = ('a',3,4.0)
         self.obj = obj
-        self.encoded=[('rtuple', 'tuple\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big tuple')]
+        self.encoded=[('Object Type', 'TupleObject'),('rtuple', 'tuple\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big tuple')]
      
 class NestedObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str,'stuff')
@@ -168,7 +168,8 @@ class TestNestedObject(TestSimpleObject):
         obj.rset = sobj
         
         self.obj = obj
-        self.encoded=[  ('primary','PrimaryTypesObject\x00[["key", "str\\u0000xxx"], ["floating", "float\\u00005.0"], ["integer", "int\\u00005"], ["name", "str\\u0000blank"]]'),
+        self.encoded=[  ('Object Type', 'NestedObject'),
+                        ('primary','PrimaryTypesObject\x00[["key", "str\\u0000xxx"], ["floating", "float\\u00005.0"], ["integer", "int\\u00005"], ["name", "str\\u0000blank"]]'),
                         ('rset','SetObject\x00[["rset", "set\\u0000[\\"str\\\\u0000a\\", \\"int\\\\u00003\\", \\"float\\\\u00004.0\\"]"], ["name", "str\\u0000a big set"]]'),
                         ('name', 'str\x00stuff')]
         
@@ -305,14 +306,29 @@ class TestSendResourceReference(TestSendDataObject):
 class TestResourceDescription(unittest.TestCase):
     
     def test_create(self):
-        raise unittest.SkipTest('Not implimented yet!')
-    
+        res = dataobject.ResourceDescription.create_new_resource()
+        self.assertEqual(res._branch,'master')
+        self.assertEqual(res._resource_type,dataobject.ResourceDescription.__class__.__name__)
+        self.assert_(res._identity)
+        self.assertNot(res._parent_commit)
+
     def test_reference(self):
-        raise unittest.SkipTest('Not implimented yet!')
-    
-    def test_create(self):
-        raise unittest.SkipTest('Not implimented yet!')
+        res = dataobject.ResourceDescription.create_new_resource()
+        res._parent_commit = 'LotsOfJunk'
         
+        ref = res.reference()
+        self.assertEqual(res._identity,ref._identity)
+        self.assertEqual(res._parent_commit,ref._parent_commit)
+        self.assertEqual(res._branch,ref._branch)
+        self.assertEqual(res._resource_type,ref._resource_type)
+
+        ref = res.reference(head=True)
+        self.assertEqual(res._identity,ref._identity)
+        self.assertEqual('',ref._parent_commit)
+        self.assertEqual(res._branch,ref._branch)
+        self.assertEqual(res._resource_type,ref._resource_type)
+
+    
     def test_set_lcstate(self):
         
         #logging.info(registry.LCStates)
