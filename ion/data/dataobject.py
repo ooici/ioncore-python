@@ -53,7 +53,7 @@ class TypedAttribute(object):
             #print 'type, default:',type, default
             #return cls(type, eval(str(default), types))
             if issubclass(type, DataObject):
-                data_object = type.decode(json.loads(default))()
+                data_object = type.decode(json.loads(default),header=False)()
                 return cls(type, data_object)
                 
             elif issubclass(type, (list, set, tuple)):
@@ -131,16 +131,20 @@ class DataObject(object):
             names.append(key[1:])
         return names
 
-    def encode(self):
+    def encode(self,header=True):
         """
         """
+        print 'Encoding! header=',header
         encoded = []
+        if header:
+            print 'adding header!'
+            encoded.append(('Object Type', "%s" % (type(self).__name__)))
         for name in self.attributes:
             value = getattr(self, name)
             
             # Attempt to handle nested Resources
             if isinstance(value, DataObject):
-                value_enc = value.encode()
+                value_enc = value.encode(header = False)
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(value_enc),)))
             elif isinstance(value,(list,tuple,set)):
                 list_enc = []
@@ -161,17 +165,22 @@ class DataObject(object):
 
 
     @classmethod
-    def decode(cls, attrs):
+    def decode(cls, attrs,header=True):
         """
         decode store object[s]
         """
         #d = dict([(str(name), TypedAttribute.decode(value)) for name, value in attrs])
         d={}
+        if header:
+            header,clsname = attrs.pop(0)
+            #print 'header',header
+            #print 'clsname',clsname
+        clsobj = eval(str(clsname), cls._types)
         for name, value in attrs:
             #print 'name',name
             #print 'value',value
             d[str(name)] = TypedAttribute.decode(value, cls._types)       
-        return type(cls.__name__, (cls,), d)
+        return type(clsobj.__name__, (clsobj,), d)
 
 """
 Add some important proprieties for OOICI Resource Descriptions

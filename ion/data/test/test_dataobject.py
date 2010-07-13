@@ -41,7 +41,7 @@ class TestSimpleObject(unittest.TestCase):
         obj.key = 'seabird'
         obj.name = 'David'
         self.obj = obj
-        self.encoded=[('key', 'str\x00seabird'),('name', 'str\x00David')]
+        self.encoded=[('Object Type', 'SimpleObject'),('key', 'str\x00seabird'),('name', 'str\x00David')]
      
     def testPrintObject(self):
                 
@@ -56,8 +56,10 @@ class TestSimpleObject(unittest.TestCase):
     def testDecode(self):
         dec = dataobject.DataObject.decode(self.encoded)()
         #print 'dec',dec
-        self.assert_(self.obj==dec)
+        self.assertEqual(self.obj,dec)
+        self.assertEqual(type(self.obj).__name__,type(dec).__name__)
 
+        
 class PrimaryTypesObject(SimpleObject):
     """
     @Brief PrimaryTypesObject inherits attributes from Simple Object
@@ -75,7 +77,7 @@ class TestPrimaryTypesObject(TestSimpleObject):
         obj.floating = 3.14159
         obj.integer = 42
         self.obj = obj
-        self.encoded=[('key', 'str\x00seabird'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'), ('name', 'str\x00David')]
+        self.encoded=[('Object Type', 'PrimaryTypesObject'),('key', 'str\x00seabird'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'), ('name', 'str\x00David')]
         
 class BinaryObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
@@ -90,7 +92,7 @@ class TestBinaryObject(TestSimpleObject):
         obj.name = 'Binary Junk'
         obj.binary = cas.sha1bin(obj.name)
         self.obj = obj
-        self.encoded=[('binary', "str\x00\xca\x98T\x17~\x0e41\x83\xcf'\xb6\xba&l\x1d\xd1\x9d\xd8["), ('name', 'str\x00Binary Junk')]
+        self.encoded=[('Object Type', 'BinaryObject'),('binary', "str\x00\xca\x98T\x17~\x0e41\x83\xcf'\xb6\xba&l\x1d\xd1\x9d\xd8["), ('name', 'str\x00Binary Junk')]
      
 class ListObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
@@ -104,7 +106,7 @@ class TestListObject(TestSimpleObject):
         obj.name = 'a big list'
         obj.rlist = ['a',3,4.0]
         self.obj = obj
-        self.encoded=[('rlist', 'list\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big list')]
+        self.encoded=[('Object Type', 'ListObject'),('rlist', 'list\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big list')]
      
 class TestListOfObjects(TestSimpleObject):
     def setUp(self):
@@ -112,7 +114,7 @@ class TestListOfObjects(TestSimpleObject):
         obj.name = 'a big list of objects'
         obj.rlist = [PrimaryTypesObject(),PrimaryTypesObject(),SimpleObject()]
         self.obj = obj
-        self.encoded=[('rlist','list\x00["PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+ 
+        self.encoded=[('Object Type', 'ListObject'),('rlist','list\x00["PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+ 
                        '"PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+
                        '"SimpleObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]"]'),
                         ('name', 'str\x00a big list of objects')]
