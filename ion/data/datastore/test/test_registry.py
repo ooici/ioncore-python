@@ -44,7 +44,9 @@ class RegistryTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_register(self):
+        
         res = dataobject.ResourceDescription.create_new_resource()
+        #dataobject.DataObject._types['ComplexResource']=ComplexResource
         #res = ComplexResource.create_new_resource()
         res.name = 'foo'
         #@Note - always over-write the old argument value!

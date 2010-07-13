@@ -176,6 +176,9 @@ class DataObject(object):
         #d = dict([(str(name), TypedAttribute.decode(value)) for name, value in attrs])
         d={}
         clsobj = cls
+        if isinstance(attrs, tuple):
+            attrs = list(attrs)
+        
         if header:
             header,clsname = attrs.pop(0)
             #print 'header',header
