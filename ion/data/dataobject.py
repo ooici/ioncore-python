@@ -12,6 +12,8 @@ NULL_CHR = '\x00'
 import simplejson as json
 import uuid
 
+from twisted.python import reflect
+
 class TypedAttribute(object):
     """
     @brief Descriptor class for Data Object Attributes. Data Objects are
@@ -90,10 +92,19 @@ class DataObjectType(type):
         from their super class.
         """
         d = {}
-        for key, value in [b.__dict__.items() for b in bases][0]:
+        base_dicts = []
+
+        for base in bases:
+            ayb = reflect.allYourBase(base)
+            base_dicts.extend(base.__dict__.items())
+            for ay in ayb:
+                base_dicts.extend(ay.__dict__.items())
+        for key, value in base_dicts:
             if isinstance(value, TypedAttribute):
                 value.name = '_' + key
                 d[value.name] = value.default
+
+
         for key, value in dict.items():
             if isinstance(value, TypedAttribute):
                 value.name = '_' + key

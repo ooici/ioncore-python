@@ -36,6 +36,10 @@ class Inherit2(Inherit1):
 class Inherit3(Inherit2):
     inherit3 = dataobject.TypedAttribute(str, '3')
 
+class Inherit210(Inherit2, Inherit1, Inherit0):
+    """
+    """
+
 class TestInheritObject(unittest.TestCase):
     
     def test_inherit(self):
