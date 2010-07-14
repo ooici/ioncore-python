@@ -35,8 +35,7 @@ class TestInstrumentAgent(IonTestCase):
             {'name':'testSBE49IA',
              'module':'ion.agents.instrumentagents.SBE49'},
             {'name':'resource_registry',
-             'module':'ion.services.coi.resource_registry',
-             'class':'ResourceRegistryService'}
+             'module':'ion.services.coi.resource_registry'}
         ]
         self.sup = yield self._spawn_processes(processes)
         self.svc_id = yield self.sup.get_child_id('testSBE49IA')

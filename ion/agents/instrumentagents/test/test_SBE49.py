@@ -6,7 +6,6 @@ including the driver
 @file ion/agents/test/test_SBE49.py
 """
 
-import logging
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
@@ -21,15 +20,10 @@ class TestSBE49(IonTestCase):
     def setUp(self):
         yield self._start_container()
         
-#        processes = [{'name':'testSBE49driver',
-#              'module':'ion.agents.instrumentagents.SBE49',
-#              'class':'SBE49InstrumentDriver'}]
-#        self.sup = yield self._spawn_processes(processes)
         self.sup = yield bootstrap.create_supervisor()
         self.driver = SBE49InstrumentDriver()
         self.driver_pid = yield self.driver.spawn()
         yield self.driver.init()
-        logging.debug("*** sup: %s, driver pid: %s", self.sup, self.driver_pid)
         self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
                                                          target=self.driver_pid)
         
