@@ -15,7 +15,7 @@ import json
 from ion.test.iontest import IonTestCase
 from ion.services.coi.host_status import SnmpReader,HostStatus
 
-class HostStatusRPCTest(IonTestCase):
+class HostStatusTest(IonTestCase):
     """
     """
     def setUp(self):
@@ -24,13 +24,17 @@ class HostStatusRPCTest(IonTestCase):
     def tearDown(self):
         pass
     
+    def test_DeliberatelyBadSnmpReader(self):
+        hs = HostStatus('localhost', 180, 'ccagent', 'ooicinet',timeout=0.5, retries=0)
+        all = json.dumps(hs.getAll(), indent=4)
+        print all
+        
     def test_SnmpReader(self):
         hs = HostStatus('localhost', 161, 'ccagent', 'ooicinet')
         all = json.dumps(hs.getAll(), indent=4)
-
-    def test_DeliberatelyBadSnmpReader(self):
-        hs = HostStatus('localhost', 180, 'ccagent', 'ooicinet')
-        all = json.dumps(hs.getAll(), indent=4)
+        print all
+                
+        
 
 
 
