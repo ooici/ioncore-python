@@ -7,6 +7,7 @@ except ImportError:
     PysnmpImported = False
 
 
+
 class HostStatusRPCServer:
     """
     RPC server for returning host status on request. 
@@ -36,6 +37,7 @@ class HostStatusRPCServer:
         
     def getStatus(self):
         return self.status.getAll()
+
         
         
 class HostStatusRPCClient:
@@ -54,6 +56,8 @@ class HostStatusRPCClient:
         
     def getStatus(self):
         return self.status.getAll()
+
+
 
 class HostStatus:
     """
@@ -174,10 +178,10 @@ class SnmpReader:
         value (i.e. gets rid of ANS1).
         """
         shot = self._get(field[1])
-        if shot[1] != 0:
+        try:
+            return {field[0]:shot[3][0][1]._value}
+        except:
             return None
-        return {field[0]:shot[3][0][1]._value}
-    
     
         
     def _get(self, object):
@@ -304,8 +308,8 @@ class Rfc1213Mib:
 
 
 
-client = HostStatusRPCClient()
-server = HostStatusRPCServer()
+# client = HostStatusRPCClient()
+# server = HostStatusRPCServer()
 # all = rpc.status.getAll()
 #r = HostStatus('bfoxooi.ucsd.edu', 161, 'ccagent', 'ooicinet')
 #all = json.dumps(r.getAll(), indent=4)
