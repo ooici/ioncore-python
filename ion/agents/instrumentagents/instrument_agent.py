@@ -9,9 +9,9 @@ import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.data.dataobject import ResourceDescription
 from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
+from ion.core.base_process import BaseProcess, BaseProcessClient
 
 """
 Constants/Enumerations for tags in capabiltiies dict structures
@@ -22,34 +22,106 @@ instrument_commands = 'instrument_commands'
 instrument_parameters = 'instrument_parameters'
 
 
-class InstrumentDriver():
+class InstrumentDriver(BaseProcess):
     """
     A base driver class. This is intended to provide the common parts of
     the interface that instrument drivers should follow in order to use
     common InstrumentAgent methods. This should never really be instantiated.
     """
-    def fetch_param(self, param):
+    def op_fetch_params(self, content, headers, msg):
         """
         Using the instrument protocol, fetch a parameter from the instrument
-        @param param The parameter to fetch
-        @retval The value of the fetched parameter
+        @param content A list of parameters to fetch
+        @retval A dictionary with the parameter and value of the requested
+            parameter
         """
         
-    def set_param(self, param, value):
+    def op_set_params(self, content, headers, msg):
         """
         Using the instrument protocol, set a parameter on the instrument
-        @param param The parameter to set
-        @param value The value to set
+        @param content A dictionary with the parameters and values to set
         @retval A small dict of parameter and value on success, empty dict on
             failure
         """
         
+    def op_execute(self, content, headers, msg):
+        """
+        Using the instrument protocol, execute the requested command
+        @param content The list of commands to execute
+        @retval Result code of some sort
+        """
+    
+    def op_configure_driver(self, content, headers, msg):
+        """
+        This method takes a dict of settings that the driver understands as
+        configuration of the driver itself (ie 'target_ip', 'port', etc.). This
+        is the bootstrap information for the driver and includes enough
+        information for the driver to start communicating with the instrument.
+        @param content A dict with parameters for the driver 
+        """
+        
+        
+class InstrumentDriverClient(BaseProcessClient):
+    """
+    The base class for the instrument driver client interface. This interface
+    is designed to be used by the instrument agent to work with the driver.
+    """
+    @defer.inlineCallbacks
+    def fetch_params(self, param_list):
+        """
+        Using the instrument protocol, fetch a parameter from the instrument
+        @param param_list A list of parameters to fetch
+        @retval A dictionary with the parameter and value of the requested
+            parameter
+        """
+        assert(isinstance(param_list, list))
+        (content, headers, message) = yield self.rpc_send('fetch_params',
+                                                          param_list)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def set_params(self, param_dict):
+        """
+        Using the instrument protocol, set a parameter on the instrument
+        @param param_dict A dictionary with the parameters and values to set
+        @retval A small dict of parameter and value on success, empty dict on
+            failure
+        """
+        assert(isinstance(param_dict, dict))
+        (content, headers, message) = yield self.rpc_send('set_params',
+                                                          param_dict)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
     def execute(self, command):
         """
         Using the instrument protocol, execute the requested command
-        @param command The command to execute
+        @param command The command to execute. A list with the first element as
+            the command, the rest as arguments
         @retval Result code of some sort
         """
+        result = {}
+        assert(isinstance(command, list))
+        (content, headers, message) = yield self.rpc_send('execute',
+                                                          command)
+        defer.returnValue(content)
+    
+    @defer.inlineCallbacks    
+    def configure_driver(self, config_vals):
+        """
+        This method takes a dict of settings that the driver understands as
+        configuration of the driver itself (ie 'target_ip', 'port', etc.). This
+        is the bootstrap information for the driver and includes enough
+        information for the driver to start communicating with the instrument.
+        @param config_vals A dict with parameters for the driver 
+        """
+        assert(isinstance(config_vals, dict))
+        (content, headers, message) = yield self.rpc_send('configure_driver',
+                                                          config_vals)
+        defer.returnValue(content)
+        
     
 class InstrumentAgent(ResourceAgent):
     """
@@ -61,6 +133,7 @@ class InstrumentAgent(ResourceAgent):
     """
     
     driver = None
+    driver_client = None
         
     @defer.inlineCallbacks
     def op_get_translator(self, content, headers, msg):
@@ -187,7 +260,7 @@ class InstrumentAgent(ResourceAgent):
     @defer.inlineCallbacks
     def op_execute(self, content, headers, msg):
         """
-        Execute a specific command on the instrument, reply with a confirmation
+        Execute a command on the instrument, reply with a confirmation
         message including output of command, or simple ACK that command
         was executed. For InstrumentAgent calls, execute maps to an execution
         to the CI set of commands.

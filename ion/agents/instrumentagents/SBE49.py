@@ -12,9 +12,9 @@ from twisted.internet import defer
 from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
-from ion.core.base_process import ProtocolFactory
-from ion.data.dataobject import LCStates as LCS
+from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient
 
+from ion.core.base_process import ProtocolFactory
 
 instrument_commands = (
     "setdefaults",
@@ -93,7 +93,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
     Maybe some day these values are looked up from a registry of common
         controlled vocabulary
     """
-    __instrumentParameters = {
+    __instrument_parameters = {
         "baudrate": 9600,
         "outputformat": 0,
         "outputsal": "Y",
@@ -136,32 +136,49 @@ class SBE49InstrumentDriver(InstrumentDriver):
         "ptcb2": 0.0
     }
 
-    def fetch_param(self, param):
+    @defer.inlineCallbacks
+    def op_fetch_params(self, content, headers, msg):
         """
-        operate in instrument protocol to get parameter
+        Operate in instrument protocol to get parameter
+        @todo Write the code to interface this with something
         """
-        return self.__instrumentParameters[param]
+        assert(isinstance(content, list))
+        result = {}
+        for param in content:
+            result[param] = self.__instrument_parameters[param]
+        yield self.reply_ok(msg, result)
 
-    def set_param(self, param, value):
+    @defer.inlineCallbacks
+    def op_set_params(self, content, headers, msg):
         """
         operate in instrument protocol to set a parameter
         """
-        if (param in self.__instrumentParameters):
-            self.__instrumentParameters[param] = value
-            return {param: value}
+        assert(isinstance(content, dict))
+        updated = False
+        for param in content:
+            if (param in self.__instrument_parameters):
+                self.__instrument_parameters[param] = content[param]
+                updated = True
+        if (updated == True):
+            yield self.reply_ok(msg, content)
         else:
-            return {}
-
-    def execute(self, command):
+            yield self.reply_err(msg, "No values updated")
+            
+    @defer.inlineCallbacks
+    def op_execute(self, content, headers, msg):
         """
-        Execute the given command
+        Execute the given command structure (first element command, rest
+        of the elements are arguments)
         """
+        assert(isinstance(content, list))
+        command = content[0]
         if command in instrument_commands:
-            return (1, command)
+            yield self.reply_ok(msg, command)
         else:
-            return (0, command)
+            yield self.reply_err(msg, "Invalid Command")
 
-    def get_status(self, args):
+    @defer.inlineCallbacks
+    def op_get_status(self, content, headers, msg):
         """
         Return the non-parameter and non-lifecycle status of the instrument.
         This may include a snippit of config or important summary of what the
@@ -169,15 +186,44 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @param args a list of arguments that may be given for the status
             retreival.
         @return Return a tuple of (status_code, dict)
+        @todo Remove this? Is it even used?
         """
-        return (1, {'result': 'a-ok'})
-
+        yield self.reply_ok(msg, "a-ok")
+        
+    @defer.inlineCallbacks
+    def op_configure_driver(self, content, headers, msg):
+        """
+        This method takes a dict of settings that the driver understands as
+        configuration of the driver itself (ie 'target_ip', 'port', etc.). This
+        is the bootstrap information for the driver and includes enough
+        information for the driver to start communicating with the instrument.
+        @param content A dict with parameters for the driver
+        @todo Actually make this stub do something
+        """
+        logging.debug("*** configuring driver in driver, Content: %s", content)
+        assert(isinstance(content, dict))
+        # Do something here, then adjust test case
+        yield self.reply_ok(msg, content)
+        
+        
+class SBE49InstrumentDriverClient(InstrumentDriverClient):
+    """
+    The client class for the instrument driver. This is the client that the
+    instrument agent can use for communicating with the driver.
+    """
+    
+    
 class SBE49InstrumentAgent(InstrumentAgent):
     """
     Sea-Bird 49 specific instrument driver
     Inherits basic get, set, getStatus, getCapabilities, etc. from parent
     """
-    driver = SBE49InstrumentDriver()
+    
+    def __init__(self):
+        self.driver = SBE49InstrumentDriver()
+        self.driver_id = yield self.driver.spawn()
+        self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
+                                                         target=self.driver_id)
 
     @staticmethod
     def __translator(input):
