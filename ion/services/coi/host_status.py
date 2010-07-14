@@ -64,8 +64,10 @@ class HostStatus:
     Represents the status of the local host as retrieved using
     SNMP and RFC1213 and RFC2790 SNMP MIB definitions.
     """
-    def __init__(self, host, port, agentName, communityName):
-        self.reader = SnmpReader(host, port, agentName, communityName)
+    def __init__(self, host, port, agentName, communityName, timeout=1.5, retries=3):
+        self.timeout = timeout
+        self.retries = retries
+        self.reader = SnmpReader(host, port, agentName, communityName, timeout, retries)
         
 
     """
@@ -139,6 +141,7 @@ class HostStatus:
                 True
             )
 
+        
         # not sure why SWRunPerf and SWRun tables are separate in 
         # the MIB.  They make more sense as one happy table.  So we'll
         # stitch them together.
@@ -161,13 +164,17 @@ class SnmpReader:
     http://portal.acm.org/citation.cfm?id=Rfc2790Mib  
     """            
 
-    def __init__(self, host, port, agentName, communityName):
+    def __init__(self, host, port, agentName, communityName, timeout=1.5, retries=3):
         self.agentName = agentName
         self.communityName = communityName
         self.host = host
         self.port = port
-        self.supportsHR = self.get(('Rfc2790Test',Rfc2790Mib.hrSystemNumUsers)) != None
+        self.timeout = timeout
+        self.retries = 3
+        self.supportsSNMP = True
+        self.supportsRfc2790 = self.get(('Rfc2790Test',Rfc2790Mib.hrSystemNumUsers)) != None
         self.supportsRfc1213 = self.get(('Rfc1213Test',Rfc1213Mib.system_sysDescr)) != None
+        self.supportsSNMP = self.supportsRfc1213 or self.supportsRfc2790
         self.supportsPysnmp = PysnmpImported
  
 
@@ -177,6 +184,9 @@ class SnmpReader:
         Gets an SNMP single value and converts it into a more mainstream
         value (i.e. gets rid of ANS1).
         """
+        if not self.supportsSNMP:
+            return None
+        
         shot = self._get(field[1])
         try:
             return {field[0]:shot[3][0][1]._value}
@@ -188,12 +198,16 @@ class SnmpReader:
         """ 
         Implements SNMP's get function.
         """
+        
         errorIndication,    \
         errorStatus,        \
         errorIndex,         \
         varBinds = cmdgen.CommandGenerator().getCmd(
             cmdgen.CommunityData(self.agentName, self.communityName, 1),
-            cmdgen.UdpTransportTarget((self.host, self.port)),
+            cmdgen.UdpTransportTarget(
+                                      (self.host, self.port), 
+                                      timeout=self.timeout, 
+                                      retries=self.retries ),
             object
         )
         return errorIndication, errorStatus, errorIndex, varBinds
@@ -205,8 +219,10 @@ class SnmpReader:
         Gets an SNMP table value and converts it into a more mainstream
         value (i.e. gets rid of ASN1 and converts key-value pairs into
         a list of dictionaries.  Result should be JSON ready.)
-        """
-        
+        """        
+        if not self.supportsSNMP:
+            return []
+
         table = self._getNext(tableOid)
         
         # SNMP can return non-sequential row numbers.  So we check which
@@ -241,12 +257,13 @@ class SnmpReader:
         """
         Implements the SNMP getNext function.
         """
+        
         errorIndication,    \
         errorStatus,        \
         errorIndex,         \
         varBinds = cmdgen.CommandGenerator().nextCmd(
             cmdgen.CommunityData(self.agentName, self.communityName, 1),
-            cmdgen.UdpTransportTarget((self.host, self.port)),
+            cmdgen.UdpTransportTarget((self.host, self.port), timeout=self.timeout, retries=self.retries),
             object
         )
         ret = {}
