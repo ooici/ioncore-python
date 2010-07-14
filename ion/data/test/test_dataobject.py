@@ -48,7 +48,29 @@ class TestInheritObject(unittest.TestCase):
         logging.info(i2)
         logging.info(i3)
         self.assertIsInstance(i3,Inherit0)
+        self.assertIsInstance(i2,Inherit0)
+        self.assertIsInstance(i1,Inherit0)
+        self.assertIsInstance(i3,Inherit3)
+
+        self.failUnlessIn('inherit0',i0.attributes)
+        self.assertEqual(len(i0.attributes),1)
+
+        self.failUnlessIn('inherit0',i1.attributes)
+        self.failUnlessIn('inherit1',i1.attributes)
+        self.assertEqual(len(i1.attributes),2)
+        
+        self.failUnlessIn('inherit2',i2.attributes)
+        self.failUnlessIn('inherit1',i2.attributes)
+        self.failUnlessIn('inherit0',i2.attributes)
+        self.assertEqual(len(i2.attributes),3)
+        
+        self.failUnlessIn('inherit3',i3.attributes)
+        self.failUnlessIn('inherit2',i3.attributes)
         self.failUnlessIn('inherit1',i3.attributes)
+        self.failUnlessIn('inherit0',i3.attributes)
+        self.assertEqual(len(i3.attributes),4)
+
+
 
 
 

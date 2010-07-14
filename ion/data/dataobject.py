@@ -122,7 +122,7 @@ class DataObject(object):
     def __str__(self):
         head = '='*10
         strng  = """\n%s Resource Type: %s %s\n""" % (head, str(self.__class__.__name__), head)
-        strng += """= 'name':'value':<type> \n"""
+        strng += """= 'ATT NAME':'VALUE':<TYPE> \n"""
         for name in self.attributes:
             value = getattr(self,name)
             strng += """= '%s':'%s':%s\n""" % (name,value,type(value))
