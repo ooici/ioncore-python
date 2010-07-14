@@ -100,21 +100,32 @@ class Registry(objstore.ObjectStore, IRegistry):
         by creating a new (unique) resource object to the store.
         @note Is the way objectClass is referenced awkward?
         """
+        #print 'Dataobject Register Start',dataobject.DataObject._types.has_key('__builtins__')
+        #del dataobject.DataObject._types['__builtins__']
+        #print 'Dataobject Register Removed',dataobject.DataObject._types.has_key('__builtins__')
+
         if isinstance(resource_description, self.objectChassis.objectClass):
         
-            id = resource_description._identity
+            id = resource_description.RegistryIdentity
             if not id:
                 raise RuntimeError('Can not register a resource which does not have an identity.')
+
+            #print 'Dataobject Register Is Instance',dataobject.DataObject._types.has_key('__builtins__')
         
+            
             try:
                 res_client = yield self.create(id, self.objectChassis.objectClass)
             except objstore.ObjectStoreError:
                 res_client = yield self.clone(id)
+ 
+            #print 'Dataobject Chasis',dataobject.DataObject._types.has_key('__builtins__')
             
             yield res_client.checkout()
+            
+            #print 'Dataobject checkout',dataobject.DataObject._types.has_key('__builtins__')
+            
             res_client.index = resource_description
-            resource_description._parent_commit = yield res_client.commit()
-            #print 'pcommit',resource_description._parent_commit
+            resource_description.RegistryCommit = yield res_client.commit()
         else:
             resource_description = None
         defer.returnValue(resource_description)
@@ -127,16 +138,16 @@ class Registry(objstore.ObjectStore, IRegistry):
         resource_description=None
         if isinstance(resource_reference, dataobject.ResourceReference):
         
-            branch = resource_reference._branch
-            resource_client = yield self.clone(resource_reference._identity)
+            branch = resource_reference.RegistryBranch
+            resource_client = yield self.clone(resource_reference.RegistryIdentity)
             if resource_client:
-                if not resource_reference._parent_commit:
-                    resource_reference._parent_commit = yield resource_client.get_head(branch)
+                if not resource_reference.RegistryCommit:
+                    resource_reference.RegistryCommit = yield resource_client.get_head(branch)
 
-                pc = resource_reference._parent_commit
+                pc = resource_reference.RegistryCommit
                 resource_description = yield resource_client.checkout(commit_id=pc)
-                resource_description._branch = branch
-                resource_description._parent_commit = pc
+                resource_description.RegistryBranch = branch
+                resource_description.RegistryCommit = pc
             
         defer.returnValue(resource_description)
 
@@ -164,7 +175,7 @@ class Registry(objstore.ObjectStore, IRegistry):
         @note this is a temporary solution to implement search
         """
         idlist = yield self.refs.query('([-\w]*$)')
-        defer.returnValue([dataobject.ResourceReference(id=id) for id in idlist])
+        defer.returnValue([dataobject.ResourceReference(RegistryIdentity=id) for id in idlist])
 
 
     @defer.inlineCallbacks
@@ -376,14 +387,11 @@ class BaseRegistryService(BaseService):
         description = None
         regex = None
         ignore_defaults = None
-        
-        dataobject.DataObject._types['FindResourceDescriptionContainer']=coi_resource_descriptions.FindResourceDescriptionContainer
-        
+                
         container = dataobject.ResourceDescription.decode(content)()
         
         result_list = []
         if isinstance(container,  coi_resource_descriptions.FindResourceDescriptionContainer):
-            print container
             description = container.description
             regex = container.regex
             ignore_defaults = container.ignore_defaults
@@ -493,10 +501,7 @@ class BaseRegistryClient(BaseServiceClient,IRegistry):
         logging.info('Service reply: '+str(headers))
         
         # Return a list of resources
-        if content['status'] == 'OK':
-            
-            dataobject.DataObject._types['ResourceDescriptionListContainer']=coi_resource_descriptions.ResourceDescriptionListContainer
-            
+        if content['status'] == 'OK':            
             results = dataobject.DataObject.decode(content['value'])()
             defer.returnValue(results.resources)
         else:

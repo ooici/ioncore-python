@@ -207,21 +207,18 @@ class ResourceReference(DataObject):
     It contains the context of the resource from the repository where it is stored.
     """
     
-    _identity = TypedAttribute(str,None)
+    RegistryIdentity = TypedAttribute(str,None)
     #@TODO Make the commit ref a list so that an object can be a merge
-    _parent_commit = TypedAttribute(str,None)
-    _resource_type = TypedAttribute(str,None)
-    _branch = TypedAttribute(str,'master')
+    RegistryCommit = TypedAttribute(str,None)
+    RegistryBranch = TypedAttribute(str,'master')
 
-    def __init__(self,branch=None,id=None,parent=None,type=None):
-        if id:
-            self._identity = id
-        if parent:
-            self._parent_commit = parent
-        if type:
-            self._resource_type = type
-        if branch:
-            self._branch = branch
+    def __init__(self,RegistryIdentity='',RegistryCommit='',RegistryBranch=''):
+        if RegistryIdentity:
+            self.RegistryIdentity = RegistryIdentity
+        if RegistryCommit:
+            self.RegistryCommit = RegistryCommit
+        if RegistryBranch:
+            self.RegistryBranch = RegistryBranch
 
 
     @classmethod
@@ -230,9 +227,8 @@ class ResourceReference(DataObject):
         @Brief Use this method to instantiate any new resource!
         """
         inst = cls()
-        inst._identity = create_unique_identity()
-        inst._resource_type = cls.__class__.__name__
-        inst._branch = 'master'
+        inst.RegistryIdentity = create_unique_identity()
+        inst.RegistryBranch = 'master'
         return inst
     
     
@@ -242,12 +238,11 @@ class ResourceReference(DataObject):
         @Brief Use this method to make a reference to any resource
         """
         inst = ResourceReference()
-        if self._identity:
-            inst._identity = self._identity
-        if self._parent_commit and not head:
-            inst._parent_commit = self._parent_commit
-        inst._resource_type = self._resource_type
-        inst._branch = self._branch
+        if self.RegistryIdentity:
+            inst.RegistryIdentity = self.RegistryIdentity
+        if self.RegistryCommit and not head:
+            inst.RegistryCommit = self.RegistryCommit
+        inst.RegistryBranch = self.RegistryBranch
         return inst
 
 DataObject._types['ResourceReference']=ResourceReference

@@ -1,6 +1,4 @@
-
-import uuid
-
+#!/usr/bin/env python
 
 import logging
 logging = logging.getLogger(__name__)
@@ -21,8 +19,6 @@ from twisted.internet import defer
 from magnet.spawnable import Receiver
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
-
-from ion.resources.coi_resource_descriptions import ComplexResource
 
 class RegistryTest(unittest.TestCase):
     """
@@ -46,22 +42,17 @@ class RegistryTest(unittest.TestCase):
     def test_register(self):
         
         res = dataobject.ResourceDescription.create_new_resource()
-        #dataobject.DataObject._types['ComplexResource']=ComplexResource
-        #res = ComplexResource.create_new_resource()
-        print 'myid',res._identity
         res.name = 'foo'
         
-        print 'RESOURCE STATE',res
+        #print 'Dataobject Created',dataobject.DataObject._types.has_key('__builtins__')
+        
         #@Note - always over-write the old argument value!
         res = yield self.reg.register_resource_description(res)
         
-        print 'Saved Resource:',res
-        print 'Resource Type:',type(res)
+        #print 'Dataobject Registerd!',dataobject.DataObject._types.has_key('__builtins__')
+        
         ref = res.reference()
         res2 = yield self.reg.get_resource_description(ref)
-        #print res
-        print res2
-        print type(res2)
         self.failUnless(res == res2)
 
 
@@ -166,15 +157,13 @@ class RegistryServiceTest(IonTestCase, RegistryTest):
     @defer.inlineCallbacks
     def _setup_backend(self):
         yield self._start_container()
-        # By default, the store service will use Store in the backend.
+        
         services = [
             {'name':'registry1','module':'ion.data.datastore.registry','class':'BaseRegistryService'},
         ]
         
-        print 'Dataobject._types',dataobject.DataObject._types
-        
+        #description_utility.load_descriptions()
         sup = yield self._spawn_processes(services)
-        #print 'Dataobject._types',dataobject.DataObject._types
         self.reg = registry.BaseRegistryClient(proc=sup)
 
     @defer.inlineCallbacks
@@ -184,14 +173,6 @@ class RegistryServiceTest(IonTestCase, RegistryTest):
 
 
 
-class TestLoadTypes(IonTestCase):
 
-    @defer.inlineCallbacks
-    def setUp(self):
-        yield self._start_container()
-        print 'Dataobject._types',dataobject.DataObject._types
-        
-    def test(self):
-        print 'testing'
 
 

@@ -30,6 +30,14 @@ class FindResourceDescriptionContainer(DataObject):
     
     
 class ComplexResource(ResourceDescription):
-    resource_reference = TypedAttribute(ResourceDescription, default=None)
+    Resource_reference = TypedAttribute(str, default=None)
     title = TypedAttribute(str, default='True')
-    aint = TypedAttribute(int, default=True)
+    aint1 = TypedAttribute(int, default=True)
+    
+    
+    
+class ComplexResource2(ComplexResource):
+    aint2 = TypedAttribute(int, default=True)
+    
+class ComplexResource3(ComplexResource2):
+    aint3 = TypedAttribute(int, default=True)

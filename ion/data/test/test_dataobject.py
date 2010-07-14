@@ -24,6 +24,34 @@ from ion.data.datastore import cas
 Define some data objects for testing
 """
 
+class Inherit0(dataobject.DataObject):
+    inherit0 = dataobject.TypedAttribute(str, '0')
+
+class Inherit1(Inherit0):
+    inherit1 = dataobject.TypedAttribute(str, '1')
+
+class Inherit2(Inherit1):
+    inherit2 = dataobject.TypedAttribute(str, '2')
+
+class Inherit3(Inherit2):
+    inherit3 = dataobject.TypedAttribute(str, '3')
+
+class TestInheritObject(unittest.TestCase):
+    
+    def test_inherit(self):
+        i0 = Inherit0()
+        i1 = Inherit1()
+        i2 = Inherit2()
+        i3 = Inherit3()
+        logging.info(i0)
+        logging.info(i1)
+        logging.info(i2)
+        logging.info(i3)
+        self.assertIsInstance(i3,Inherit0)
+        self.failUnlessIn('inherit1',i3.attributes)
+
+
+
 class SimpleObject(dataobject.DataObject):
     """
     @Brief A simple data object to use as a base class
@@ -302,7 +330,7 @@ class TestSendResourceReference(TestSendDataObject):
     def setUp(self):
         obj = dataobject.ResourceDescription.create_new_resource()
         obj.name = 'complex'
-        obj.ref = dataobject.ResourceReference(branch='david',id='mine', parent='yours', type='a class')
+        obj.ref = dataobject.ResourceReference(RegistryBranch='david',RegistryIdentity='mine', RegistryCommit='yours')
         self.obj = obj
         yield self._start_container()
     
@@ -311,26 +339,23 @@ class TestResourceDescription(unittest.TestCase):
     
     def test_create(self):
         res = dataobject.ResourceDescription.create_new_resource()
-        self.assertEqual(res._branch,'master')
-        self.assertEqual(res._resource_type,dataobject.ResourceDescription.__class__.__name__)
-        self.assert_(res._identity)
-        self.assertNot(res._parent_commit)
+        self.assertEqual(res.RegistryBranch,'master')
+        self.assert_(res.RegistryIdentity)
+        self.assertNot(res.RegistryCommit)
 
     def test_reference(self):
         res = dataobject.ResourceDescription.create_new_resource()
-        res._parent_commit = 'LotsOfJunk'
+        res.RegistryCommit = 'LotsOfJunk'
         
         ref = res.reference()
-        self.assertEqual(res._identity,ref._identity)
-        self.assertEqual(res._parent_commit,ref._parent_commit)
-        self.assertEqual(res._branch,ref._branch)
-        self.assertEqual(res._resource_type,ref._resource_type)
+        self.assertEqual(res.RegistryIdentity,ref.RegistryIdentity)
+        self.assertEqual(res.RegistryCommit,ref.RegistryCommit)
+        self.assertEqual(res.RegistryBranch,ref.RegistryBranch)
 
         ref = res.reference(head=True)
-        self.assertEqual(res._identity,ref._identity)
-        self.assertEqual('',ref._parent_commit)
-        self.assertEqual(res._branch,ref._branch)
-        self.assertEqual(res._resource_type,ref._resource_type)
+        self.assertEqual(res.RegistryIdentity,ref.RegistryIdentity)
+        self.assertEqual('',ref.RegistryCommit)
+        self.assertEqual(res.RegistryBranch,ref.RegistryBranch)
 
     
     def test_set_lcstate(self):
