@@ -435,11 +435,7 @@ class ObjectStore(BaseObjectStore):
         XXX Here DataObject is assumed as the base class
         """
         objectClassName = obj['class'].content
-        print 'objectClassName',objectClassName
-        print 'objectClass',self.objectChassis.objectClass
         obj_parts = [(child[0], child.obj.content) for child in obj['attrs'].children]
-        print 'obj_parts',obj_parts
-        print 'self.objectChassis.objectClass',self.objectChassis.objectClass
         objectClass = self.objectChassis.objectClass.decode(obj_parts,header=False)
         return objectClass
 

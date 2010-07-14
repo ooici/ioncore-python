@@ -7,7 +7,7 @@ CONF = ioninit.config(__name__)
 import inspect
 from ion.data import dataobject
 
-
+"""
 def load_descriptions():
 
     logging.warning('*********RUNNIG LOAD DESCRIPTIONS')
@@ -25,4 +25,4 @@ def load_descriptions():
                 if issubclass(obj, dataobject.DataObject):
                     dataobject.DataObject._types[name]=obj
 
-
+"""

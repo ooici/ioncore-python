@@ -23,7 +23,7 @@ from ion.core.cc.modloader import ModuleLoader
 from ion.services.coi import service_registry
 from ion.data.datastore import registry
 
-from ion.resources.description_utility import load_descriptions
+#from ion.resources.description_utility import load_descriptions
 
 from ion.util.config import Config
 import ion.util.procutils as pu
@@ -81,7 +81,7 @@ def init_container():
     # Collect all service declarations in local code modules
     ModuleLoader().load_modules()
     #Load All Resource Descriptions for future decoding
-    load_descriptions()
+    #load_descriptions()
     yield bs_register_services()
 
 def _set_container_args(contargs=None):

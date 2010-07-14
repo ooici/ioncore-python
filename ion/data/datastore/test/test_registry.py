@@ -48,7 +48,10 @@ class RegistryTest(unittest.TestCase):
         res = dataobject.ResourceDescription.create_new_resource()
         #dataobject.DataObject._types['ComplexResource']=ComplexResource
         #res = ComplexResource.create_new_resource()
+        print 'myid',res._identity
         res.name = 'foo'
+        
+        print 'RESOURCE STATE',res
         #@Note - always over-write the old argument value!
         res = yield self.reg.register_resource_description(res)
         
@@ -57,7 +60,8 @@ class RegistryTest(unittest.TestCase):
         ref = res.reference()
         res2 = yield self.reg.get_resource_description(ref)
         #print res
-        #print res2
+        print res2
+        print type(res2)
         self.failUnless(res == res2)
 
 
