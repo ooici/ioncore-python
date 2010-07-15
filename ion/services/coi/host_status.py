@@ -1,5 +1,5 @@
-import json
-
+from SimpleXMLRPCServer import SimpleXMLRPCServer
+import xmlrpclib    
 try:
     from pysnmp.entity.rfc3413.oneliner import cmdgen
     PysnmpImported = True
@@ -8,11 +8,66 @@ except ImportError:
 
 
 
-      
+class HostStatusRPCServer:
+    """
+    RPC server for returning host status on request. 
+    """
+
+    def __init__(
+                 self, 
+                 snmpHost          = 'localhost', 
+                 snmpPort          = 161,
+                 snmpAgentName     = 'ooici',
+                 snmpCommunityName = 'ooicinet',
+                 rpcHost           = 'localhost',
+                 rpcPort           = 9010  ):
+        """
+        Test
+        """
+        self.server = SimpleXMLRPCServer((rpcHost, rpcPort))
+        self.status = HostStatus(
+                                 snmpHost, 
+                                 snmpPort, 
+                                 snmpAgentName, 
+                                 snmpCommunityName
+                                 )
+        self.server.register_function(self.getStatus)
+        self.server.register_introspection_functions()
+        self.server.serve_forever()
+        
+    def getStatus(self):
+        return self.status.getAll()
+
+        
+        
+class HostStatusRPCClient:
+    """
+    RPC client for testing only. 
+    """
+
+    def __init__(
+                 self, 
+                 rpcHost           = 'localhost',
+                 rpcPort           = 9010  ):
+        """
+        Test
+        """
+        self.client = xmlrpclib.ServerProxy('http://%s:%d'%(rpcHost, rpcPort))
+        
+    def getStatus(self):
+        return self.status.getAll()
+
+
+
 class HostStatus:
-    
-    def __init__(self, host, port, agentName, communityName):
-        self.reader = SnmpReader(host, port, agentName, communityName)
+    """
+    Represents the status of the local host as retrieved using
+    SNMP and RFC1213 and RFC2790 SNMP MIB definitions.
+    """
+    def __init__(self, host, port, agentName, communityName, timeout=1.5, retries=3):
+        self.timeout = timeout
+        self.retries = retries
+        self.reader = SnmpReader(host, port, agentName, communityName, timeout, retries)
         
 
     """
@@ -86,6 +141,7 @@ class HostStatus:
                 True
             )
 
+        
         # not sure why SWRunPerf and SWRun tables are separate in 
         # the MIB.  They make more sense as one happy table.  So we'll
         # stitch them together.
@@ -108,13 +164,17 @@ class SnmpReader:
     http://portal.acm.org/citation.cfm?id=Rfc2790Mib  
     """            
 
-    def __init__(self, host, port, agentName, communityName):
+    def __init__(self, host, port, agentName, communityName, timeout=1.5, retries=3):
         self.agentName = agentName
         self.communityName = communityName
         self.host = host
         self.port = port
-        self.supportsHR = self.get(('Rfc2790Test',Rfc2790Mib.hrSystemNumUsers)) != None
+        self.timeout = timeout
+        self.retries = 3
+        self.supportsSNMP = True
+        self.supportsRfc2790 = self.get(('Rfc2790Test',Rfc2790Mib.hrSystemNumUsers)) != None
         self.supportsRfc1213 = self.get(('Rfc1213Test',Rfc1213Mib.system_sysDescr)) != None
+        self.supportsSNMP = self.supportsRfc1213 or self.supportsRfc2790
         self.supportsPysnmp = PysnmpImported
  
 
@@ -124,23 +184,30 @@ class SnmpReader:
         Gets an SNMP single value and converts it into a more mainstream
         value (i.e. gets rid of ANS1).
         """
-        shot = self._get(field[1])
-        if shot[1] != 0:
+        if not self.supportsSNMP:
             return None
-        return {field[0]:shot[3][0][1]._value}
-    
+        
+        shot = self._get(field[1])
+        try:
+            return {field[0]:shot[3][0][1]._value}
+        except:
+            return None
     
         
     def _get(self, object):
         """ 
         Implements SNMP's get function.
         """
+        
         errorIndication,    \
         errorStatus,        \
         errorIndex,         \
         varBinds = cmdgen.CommandGenerator().getCmd(
             cmdgen.CommunityData(self.agentName, self.communityName, 1),
-            cmdgen.UdpTransportTarget((self.host, self.port)),
+            cmdgen.UdpTransportTarget(
+                                      (self.host, self.port), 
+                                      timeout=self.timeout, 
+                                      retries=self.retries ),
             object
         )
         return errorIndication, errorStatus, errorIndex, varBinds
@@ -152,8 +219,10 @@ class SnmpReader:
         Gets an SNMP table value and converts it into a more mainstream
         value (i.e. gets rid of ASN1 and converts key-value pairs into
         a list of dictionaries.  Result should be JSON ready.)
-        """
-        
+        """        
+        if not self.supportsSNMP:
+            return []
+
         table = self._getNext(tableOid)
         
         # SNMP can return non-sequential row numbers.  So we check which
@@ -188,12 +257,13 @@ class SnmpReader:
         """
         Implements the SNMP getNext function.
         """
+        
         errorIndication,    \
         errorStatus,        \
         errorIndex,         \
         varBinds = cmdgen.CommandGenerator().nextCmd(
             cmdgen.CommunityData(self.agentName, self.communityName, 1),
-            cmdgen.UdpTransportTarget((self.host, self.port)),
+            cmdgen.UdpTransportTarget((self.host, self.port), timeout=self.timeout, retries=self.retries),
             object
         )
         ret = {}
@@ -255,8 +325,9 @@ class Rfc1213Mib:
 
 
 
-
-r = HostStatus('bfoxooi.ucsd.edu', 161, 'ccagent', 'ooicinet')
-
-all = json.dumps(r.getAll(), indent=4)
-print all
+# client = HostStatusRPCClient()
+# server = HostStatusRPCServer()
+# all = rpc.status.getAll()
+#r = HostStatus('bfoxooi.ucsd.edu', 161, 'ccagent', 'ooicinet')
+#all = json.dumps(r.getAll(), indent=4)
+# print all
