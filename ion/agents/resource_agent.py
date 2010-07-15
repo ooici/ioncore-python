@@ -11,7 +11,7 @@ from twisted.internet import defer
 
 from ion.core.base_process import BaseProcess
 from ion.core.base_process import BaseProcessClient
-from ion.data.datastore.registry import LCState
+from ion.data.dataobject import LCState
 
 class ResourceAgent(BaseProcess):
     """

@@ -37,127 +37,22 @@ class ResourceRegistryTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        yield self.rrc.clear_registry
         yield self._stop_container()
 
     @defer.inlineCallbacks
     def test_resource_reg(self):
-
-        rd2 = registry.Generic()
-        rd2.name = 'David'
+        # put in a bogus resource for now...
+        res = dataobject.InformationResource.create_new_resource()
+        res = yield self.rrc.register_resource_type(res)
         
-        rid = yield self.rrc.register_resource(str(uuid.uuid4()),rd2) 
-        logging.info('Resource registered with id '+str(rid))
-
-        rd3 = yield self.rrc.get_resource(rid)
-        logging.info('Resource desc:\n '+str(rd3))
-        self.assertEqual(rd3,rd2)
-
-    @defer.inlineCallbacks
-    def test_resource_state(self):
-
-        rd2 = registry.Generic()
-        rd2.name = 'David'
+        res = yield self.rrc.set_resource_lcstate_commissioned(res)
         
-        rid = yield self.rrc.register_resource(str(uuid.uuid4()),rd2) 
-        logging.info('Resource registered with id '+str(rid))
-
-        rd3 = yield self.rrc.get_resource(rid)
-        logging.info('Resource desc:\n '+str(rd3))
-        self.assertEqual(rd3,rd2)
+        ref = res.reference()
         
-        # Change the state and make sure the result is correct
-        yield self.rrc.set_lcstate(rid,registry.LCStates.active)
-        rd4 = yield self.rrc.get_resource(rid)
-        logging.info('Resource desc:\n '+str(rd4))
-        self.assertNotEqual(rd3,rd4)
-
-
-        # Make sure set_lcstate returns true for a valid id
-        success = yield self.rrc.set_lcstate_new(rid)
-        self.assertEqual(success,True)
+        res2 = yield self.rrc.get_resource_type(ref)
         
-        # Try to set the state of a resource which does not exist
-        success = yield self.rrc.set_lcstate_new('dklhshkaviohe23290')
-        self.assertEqual(success,False)
-        
-        
-        
-        
-    @defer.inlineCallbacks
-    def test_find_resource(self):
-        
-        class test_resource(registry.ResourceDescription):
-            ival = dataobject.TypedAttribute(int)
-
-        rd1 = test_resource()
-        rd1.name = 'David'
-        rd1.ival = 1000
-                
-        rd1.set_lifecyclestate(registry.LCStates.active)
-                
-        rd2 = test_resource()
-        rd2.name = 'Dorian'
-        
-        rd3 = registry.Generic()
-        rd3.name = 'John'
-        
-#        rid1 = yield self.rrc.register_resource(str(uuid.uuid4()),rd1)
-#        rid2 = yield self.rrc.register_resource(str(uuid.uuid4()),rd2)
-#       rid3 = yield self.rrc.register_resource(str(uuid.uuid4()),rd3)
-        
-        rid1 = yield self.rrc.register_resource('foo',rd1)
-        rid2 = yield self.rrc.register_resource('poo',rd2)
-        rid3 = yield self.rrc.register_resource(str(uuid.uuid4()),rd3)
-        
-        # Just to see what happens modify John
-        rd3.name = 'John Graybeal'
-        rid3 = yield self.rrc.register_resource(rid3,rd3)
-        
-        test = yield self.rrc.get_resource(rid3)
-        self.assertEqual(test,rd3)
-        
-        logging.info('**find a resource**')
-        # Test for a valid attribute
-        resources = yield self.rrc.find_resources({'name':'David','ival':1000})
-        #print resources[0]
-        self.assertIn(rd1,resources)
-        self.assertNotIn(rd2, resources)
-        self.assertNotIn(rd3, resources)
-
-        
-        resources = yield self.rrc.find_resources({'name':'David','ival':2000})
-        #print resources[0]
-        self.assertEqual(resources,[])
-        
-        
-        # test for an invalid attribute
-        resources = yield self.rrc.find_resources({'names':'David'})
-        self.assertEqual(resources,[])
-        
-        
-        
-        resources = yield self.rrc.find_resources({'name':'D'})
-        self.assertIn(rd1, resources)
-        self.assertIn(rd2, resources)
-        self.assertNotIn(rd3, resources)
-
-        resources = yield self.rrc.find_resources({'name':None})
-        self.assertIn(rd1, resources)
-        self.assertIn(rd2, resources)
-        self.assertIn(rd3, resources)
-
-
-        resources = yield self.rrc.find_resources({'lifecycle':None})
-        self.assertIn(rd1, resources)
-        self.assertIn(rd2, resources)
-        self.assertIn(rd3, resources)
-                
-        # Finding lifecycle is bogus for now!
-        # you can not transmitt a LCState object in a dict - must use the string
-        resources = yield self.rrc.find_resources({'lifecycle':'active'})
-        self.assertIn(rd1, resources)
-        self.assertNotIn(rd2, resources)
-        self.assertNotIn(rd3, resources)
+        self.assertEqual(res,res2)
         
 
 
@@ -174,20 +69,3 @@ class ResourceRegistryCoreServiceTest(IonTestCase):
         yield self._stop_container()
 
 
-    @defer.inlineCallbacks
-    def test_resource_reg(self):
-
-        rd2 = registry.Generic()
-        rd2.name = 'David'
-        
-        reg = ResourceRegistryClient(proc=self.sup)
-        rid = yield reg.register_resource(str(uuid.uuid4()),rd2) 
-        logging.info('Resource registered with id '+str(rid))
-
-        rd3 = yield reg.get_resource(rid)
-        logging.info('Resource desc:\n '+str(rd3))
-        self.assertEqual(rd3,rd2)
-
-        rd4 = yield reg.get_resource('NONE')
-        logging.info('rd4'+str(rd4))
-        self.assertFalse(rd4,'resource desc not None')

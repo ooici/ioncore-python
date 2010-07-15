@@ -22,6 +22,27 @@ import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
 
+class LCStateMixin(object):
+    def set_resource_lcstate_new(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.new)
+
+    def set_resource_lcstate_active(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.active)
+        
+    def set_resource_lcstate_inactive(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.inactive)
+
+    def set_resource_lcstate_decomm(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.decomm)
+
+    def set_resource_lcstate_retired(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.retired)
+
+    def set_resource_lcstate_developed(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.developed)
+
+    def set_resource_lcstate_commissioned(self, resource_reference):
+        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.commissioned)
 
 class IRegistry(object):
     """
@@ -51,27 +72,6 @@ class IRegistry(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
     
-    def set_resource_lcstate_new(self, resource_reference):
-        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.new)
-
-    def set_resource_lcstate_active(self, resource_reference):
-        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.active)
-        
-    def set_resource_lcstate_inactive(self, resource_reference):
-        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.inactive)
-
-    def set_resource_lcstate_decomm(self, resource_reference):
-        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.decomm)
-
-    def set_resource_lcstate_retired(self, resource_reference):
-        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.retired)
-
-    def set_resource_lcstate_developed(self, resource_reference):
-        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.developed)
-
-    def set_resource_lcstate_commissioned(self, resource_reference):
-        return self.set_resource_lcstate(resource_reference, dataobject.LCStates.commissioned)
-    
     def find_resource(self,description):
         """
         """
@@ -82,7 +82,7 @@ class RegistryBackend(objstore.ObjectChassis):
     """
     objectClass = dataobject.Resource
 
-class Registry(objstore.ObjectStore, IRegistry):
+class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
     """
     """
 
@@ -362,7 +362,7 @@ class BaseRegistryService(BaseService):
         """
         container = dataobject.Resource.decode(content)()
 
-        if isinstance(reference_lcstate,  coi_resources.SetResourceLCStateContainer):
+        if isinstance(container,  coi_resource_descriptions.SetResourceLCStateContainer):
             logging.info('op_set_resource_lcstate: '+str(container))
             resource_reference = container.reference
             lcstate = container.lcstate
@@ -417,11 +417,7 @@ class RegistryService(BaseRegistryService):
 factory = ProtocolFactory(RegistryService)
 
 
-
-
-
-
-class BaseRegistryClient(BaseServiceClient,IRegistry):
+class BaseRegistryClient(BaseServiceClient):
     """
     Do not instantiate this class!
     """
@@ -471,17 +467,17 @@ class BaseRegistryClient(BaseServiceClient,IRegistry):
 
 
     @defer.inlineCallbacks
-    def set_resource_lcstate(self, resource_reference, lcstate):
+    def base_set_resource_lcstate(self, resource_reference, lcstate,op_name):
         """
         @brief Retrieve a resource from the registry by its ID
         """
         yield self._check_init()
 
-        container = coi_resources.SetResourceLCStateContainer()
+        container = coi_resource_descriptions.SetResourceLCStateContainer()
         container.lcstate = lcstate
         container.reference = resource_reference
 
-        (content, headers, msg) = yield self.rpc_send('set_resource_lcstate',
+        (content, headers, msg) = yield self.rpc_send(op_name,
                                                       container.encode())
         logging.info('Service reply: '+str(headers))
         
@@ -493,7 +489,7 @@ class BaseRegistryClient(BaseServiceClient,IRegistry):
 
 
     @defer.inlineCallbacks
-    def find_resource(self,description,regex=True,ignore_defaults=True):
+    def base_find_resource(self,description,op_name, regex=True,ignore_defaults=True):
         """
         @brief Retrieve all the resources in the registry
         @param attributes is a dictionary of attributes which will be used to select a resource
@@ -505,8 +501,7 @@ class BaseRegistryClient(BaseServiceClient,IRegistry):
         container.ignore_defaults = ignore_defaults
         container.regex = regex
         
-        (content, headers, msg) = yield self.rpc_send('find_resource',
-                                                      container.encode())
+        (content, headers, msg) = yield self.rpc_send(op_name,container.encode())
         logging.info('Service reply: '+str(headers))
         
         # Return a list of resources
@@ -517,7 +512,7 @@ class BaseRegistryClient(BaseServiceClient,IRegistry):
             defer.returnValue([])
 
 
-class RegistryClient(BaseRegistryClient,IRegistry):
+class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
     """
     """
     
@@ -528,17 +523,18 @@ class RegistryClient(BaseRegistryClient,IRegistry):
 
 
     def clear_registry(self):
-        return self.base_clear_registry(self,'clear_registry')
-
+        return self.base_clear_registry('clear_registry')
 
     def register_resource(self,resource):
-        return self.base_register_resource(self,resource, 'register_resource')
+        return self.base_register_resource(resource, 'register_resource')
 
     def get_resource(self,resource_reference):
-        return self.base_get_resource(self,resource_reference,'get_resource'):
+        return self.base_get_resource(resource_reference,'get_resource')
+        
+    def set_resource_lcstate(self, resource_reference, lcstate):
+        return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_resource_lcstate')
 
-
-
-
+    def find_resource(self, description,regex=True,ignore_defaults=True):
+        return self.base_find_resource(description,'find_resource',regex,ignore_defaults)
 
 

@@ -27,7 +27,7 @@ import ion.util.procutils as pu
 CONF = ioninit.config(__name__)
 
 
-class ResourceRegistryService(BaseService):
+class ResourceRegistryService(registry.BaseRegistryService):
     """
     Resource registry service interface
     The Resource Registry Service uses an IStore interface to a backend Key
@@ -41,36 +41,35 @@ class ResourceRegistryService(BaseService):
     # Declaration of service
     declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
 
-    slc_init = registry.BaseRegistryService.slc_init
-
-    op_clear_registry = registry.BaseRegistryService.op_clear_registry
-
-    op_register_resource_instance = registry.BaseRegistryService.op_register_resource
+    
+    op_clear_registry = registry.BaseRegistryService.base_clear_registry
+    
+    op_register_resource_instance = registry.BaseRegistryService.base_register_resource
     """
     Service operation: Register a resource instance with the registry.
     """
-    
-    op_define_resource_type = registry.BaseRegistryService.op_register_resource
+    op_register_resource_type = registry.BaseRegistryService.base_register_resource
     """
     Service operation: Create or update a resource type with the registry.
     """
-    
-    op_get_resource_instance = registry.BaseRegistryService.op_get_resource
+    op_get_resource_instance = registry.BaseRegistryService.base_get_resource
     """
     Service operation: Get a resource instance.
     """
- 
-    op_get_resource_type = registry.BaseRegistryService.op_get_resource
+    op_get_resource_type = registry.BaseRegistryService.base_get_resource
     """
     Service operation: Get a resource type.
     """
+    op_set_resource_lcstate = registry.BaseRegistryService.base_set_resource_lcstate
+    """
+    Service operation: Set a resource life cycle state
+    """
+    op_find_resource = registry.BaseRegistryService.base_find_resource
+    """
+    Service operation: Set a resource life cycle state
+    """
 
-    op_find_resource = registry.BaseRegistryService.op_find_resource
-
-
-        
-
-class ResourceRegistryClient(BaseServiceClient):
+class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin):
     """
     Class for the client accessing the resource registry.
     """
@@ -79,25 +78,40 @@ class ResourceRegistryClient(BaseServiceClient):
             kwargs['targetname'] = "resource_registry"
         BaseServiceClient.__init__(self, proc, **kwargs)
 
-    register_resource_instance = registry.BaseRegistryClient.register_resource
-    """
-    Client method to Register a Resource instance
-    """
     
-    define_resource_type = registry.BaseRegistryClient.register_resource
-    """
-    Client method to register the Definition of a Resource Type
-    """
+    def clear_registry(self):
+        return self.base_clear_registry('clear_registry')
+
+    def register_resource_instance(self,resource):
+        """
+        Client method to Register a Resource instance
+        """
+        return self.base_register_resource(resource, 'register_resource_instance')
     
-    get_resource_instance = registry.BaseRegistryClient.get_resource
-    """
-    Get a resource instance
-    """
-    
-    get_resource_type = registry.BaseRegistryClient.get_resource
-    """
-    Get a resource type
-    """
+    def register_resource_type(self,resource):
+        """
+        Client method to register the Definition of a Resource Type
+        """
+        return self.base_register_resource(resource, 'register_resource_type')
+
+    def get_resource_type(self,resource_reference):
+        """
+        Get a resource type
+        """
+        return self.base_get_resource(resource_reference,'get_resource_type')
+
+    def get_resource(self,resource_reference):
+        """
+        Get a resource instance
+        """
+        return self.base_get_resource(resource_reference,'get_resource_instance')
+        
+    def set_resource_lcstate(self, resource_reference, lcstate):
+        return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_resource_lcstate')
+
+    def find_resource(self, description,regex=True,ignore_defaults=True):
+        return self.base_find_resource(description,'find_resource',regex,ignore_defaults)
+
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(ResourceRegistryService)
