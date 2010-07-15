@@ -98,14 +98,19 @@ class RegistryTest(unittest.TestCase):
         # Used returend reference to set again:
         ref3 = yield self.reg.set_resource_lcstate(ref2, dataobject.LCStates.retired)
         
+        ref4 = yield self.reg.set_resource_lcstate_commissioned(ref3)
+        
+        res = yield self.reg.get_resource(ref4)
+        self.assertEqual(res.lifecycle,dataobject.LCStates.retired)
+        
         res = yield self.reg.get_resource(ref3)
-        self.assertEqual(res,dataobject.LCStates.retired)
+        self.assertEqual(res.lifecycle,dataobject.LCStates.retired)
         
         res = yield self.reg.get_resource(ref2)
-        self.assertEqual(res,dataobject.LCStates.active)
+        self.assertEqual(res.lifecycle,dataobject.LCStates.active)
         
         res = yield self.reg.get_resource(ref1)
-        self.assertEqual(res,dataobject.LCStates.new)
+        self.assertEqual(res.lifecycle,dataobject.LCStates.new)
         
         
 

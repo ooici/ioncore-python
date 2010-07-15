@@ -76,17 +76,25 @@ class TypesContainer(dict):
 
 OOIResourceTypes = TypesContainer(OOIResourceTypes)
 
+# Classes that do not inherit from DataObject must be explicitly added to the data
+# Object Dictionary to be decoded!
 DataObject._types.update(OOIResourceTypes)
 
-class AttributeDescription(Resource):
+class AttributeDescription(DataObject):
     name = TypedAttribute(str)
     type = TypedAttribute(str)
     default = TypedAttribute(str)
+    resource_description = \
+    'This is a resource used in the resource registry.\n\
+    It provides for the description of resource attributes'
 
-class ResourceDescription(Resource):
+
+class ResourceDescription(InformationResource):
     type = TypedAttribute(ResourceType)
-    attributes = TypedAttribute(list)
+    atts = TypedAttribute(list)
     inherits_from = TypedAttribute(ResourceReference)
     description = TypedAttribute(str)
-    
+    resource_description = \
+    'This is a resource used in the resource registry.\n\
+    It describes resource types'
     

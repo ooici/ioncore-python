@@ -13,12 +13,12 @@ from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.data.datastore import registry
+from ion.resources import coi_resource_descriptions
 
 from ion.services.coi.resource_registry import ResourceRegistryClient
 from ion.test.iontest import IonTestCase
 from ion.data import dataobject
 
-import uuid
 
 class ResourceRegistryTest(IonTestCase):
     """
@@ -54,6 +54,16 @@ class ResourceRegistryTest(IonTestCase):
         
         self.assertEqual(res,res2)
         
+    def test_describe_resource(self):
+        # put in a bogus resource for now...
+        res = coi_resource_descriptions.ResourceDescription.create_new_resource()
+        
+        res_desc = self.rrc._describe_resource(res)
+        
+        print 'res:',res
+        print 'res_desc',res_desc
+
+
 
 
 class ResourceRegistryCoreServiceTest(IonTestCase):
