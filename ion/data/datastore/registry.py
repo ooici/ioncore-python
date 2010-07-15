@@ -31,7 +31,7 @@ class IRegistry(object):
     def clear_registry(self):
         raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def register_resource_description(self,resource_description):
+    def register_resource(self,resource):
         """
         @brief Register resource description.
         @param uuid unique name of resource instance.
@@ -40,7 +40,7 @@ class IRegistry(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
     
-    def get_resource_description(self,resource_reference):
+    def get_resource(self,resource_reference):
         """
         @param uuid name of resource.
         """
@@ -72,7 +72,7 @@ class IRegistry(object):
     def set_resource_lcstate_commissioned(self, resource_reference):
         return self.set_resource_lcstate(resource_reference, dataobject.LCStates.commissioned)
     
-    def find_resource_description(self,properties):
+    def find_resource(self,description):
         """
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
@@ -80,7 +80,7 @@ class IRegistry(object):
 class RegistryBackend(objstore.ObjectChassis):
     """
     """
-    objectClass = dataobject.ResourceDescription
+    objectClass = dataobject.Resource
 
 class Registry(objstore.ObjectStore, IRegistry):
     """
@@ -94,7 +94,7 @@ class Registry(objstore.ObjectStore, IRegistry):
 
 
     @defer.inlineCallbacks
-    def register_resource_description(self, resource_description):
+    def register_resource(self, resource):
         """
         @brief Add a new resource description to the registry. Implemented
         by creating a new (unique) resource object to the store.
@@ -104,9 +104,9 @@ class Registry(objstore.ObjectStore, IRegistry):
         #del dataobject.DataObject._types['__builtins__']
         #print 'Dataobject Register Removed',dataobject.DataObject._types.has_key('__builtins__')
 
-        if isinstance(resource_description, self.objectChassis.objectClass):
+        if isinstance(resource, self.objectChassis.objectClass):
         
-            id = resource_description.RegistryIdentity
+            id = resource.RegistryIdentity
             if not id:
                 raise RuntimeError('Can not register a resource which does not have an identity.')
 
@@ -124,18 +124,18 @@ class Registry(objstore.ObjectStore, IRegistry):
             
             #print 'Dataobject checkout',dataobject.DataObject._types.has_key('__builtins__')
             
-            res_client.index = resource_description
-            resource_description.RegistryCommit = yield res_client.commit()
+            res_client.index = resource
+            resource.RegistryCommit = yield res_client.commit()
         else:
-            resource_description = None
-        defer.returnValue(resource_description)
+            resource = None
+        defer.returnValue(resource)
 
     @defer.inlineCallbacks
-    def get_resource_description(self, resource_reference):
+    def get_resource(self, resource_reference):
         """
         @brief Get resource description object
         """
-        resource_description=None
+        resource=None
         if isinstance(resource_reference, dataobject.ResourceReference):
         
             branch = resource_reference.RegistryBranch
@@ -145,11 +145,11 @@ class Registry(objstore.ObjectStore, IRegistry):
                     resource_reference.RegistryCommit = yield resource_client.get_head(branch)
 
                 pc = resource_reference.RegistryCommit
-                resource_description = yield resource_client.checkout(commit_id=pc)
-                resource_description.RegistryBranch = branch
-                resource_description.RegistryCommit = pc
+                resource = yield resource_client.checkout(commit_id=pc)
+                resource.RegistryBranch = branch
+                resource.RegistryCommit = pc
             
-        defer.returnValue(resource_description)
+        defer.returnValue(resource)
 
     @defer.inlineCallbacks
     def set_resource_lcstate(self, resource_reference, lcstate):
@@ -157,13 +157,13 @@ class Registry(objstore.ObjectStore, IRegistry):
         Service operation: set the life cycle state of resource
         """
 
-        resource_description = yield self.get_resource_description(resource_reference)
+        resource = yield self.get_resource(resource_reference)
         
-        if resource_description:
-            resource_description.set_lifecyclestate(lcstate)
-            resource_description = yield self.register_resource_description(resource_description)
+        if resource:
+            resource.set_lifecyclestate(lcstate)
+            resource = yield self.register_resource(resource)
            
-            defer.returnValue(resource_description.reference())
+            defer.returnValue(resource.reference())
         else:
             defer.returnValue(None)
 
@@ -185,18 +185,18 @@ class Registry(objstore.ObjectStore, IRegistry):
         @note this is a temporary solution to implement search
         """
         refs = yield self._list()
-        defer.returnValue([(yield self.get_resource_description(ref)) for ref in refs])
+        defer.returnValue([(yield self.get_resource(ref)) for ref in refs])
         
         
     @defer.inlineCallbacks
-    def find_resource_description(self,description,regex=True,ignore_defaults=True):
+    def find_resource(self,description,regex=True,ignore_defaults=True):
         """
         @brief Find resource descriptions in the registry meeting the criteria
-        in the FindResourceDescriptionContainer 
+        in the FindResourceContainer 
         """
         # container for the return arguments
         results=[]
-        if isinstance(description,dataobject.ResourceDescription):
+        if isinstance(description,dataobject.Resource):
             # Get the list of descriptions in this registry
             reslist = yield self._list_descriptions()
 
@@ -277,13 +277,13 @@ def test(ns):
     s = yield store.Store.create_store()
     ns.update(locals())
     reg = yield ResourceRegistry.new(s, 'registry')
-    res1 = dataobject.ResourceDescription.create_new_resource()
+    res1 = dataobject.Resource.create_new_resource()
     ns.update(locals())
     res1.name = 'foo'
-    commit_id = yield reg.register_resource_description(res1)
-    res2 = dataobject.ResourceDescription.create_new_resource()
+    commit_id = yield reg.register_resource(res1)
+    res2 = dataobject.Resource.create_new_resource()
     res2.name = 'doo'
-    commit_id = yield reg.register_resource_description(res2)
+    commit_id = yield reg.register_resource(res2)
     ns.update(locals())
 
 
@@ -292,9 +292,6 @@ class BaseRegistryService(BaseService):
     """
     @Brief Base Registry Service Clase
     """
-    
-    # Declaration of service
-    declare = BaseService.service_declare(name='registry_service', version='0.1.0', dependencies=[])
 
     
     # For now, keep registration in local memory store. override with spawn args to use cassandra
@@ -321,21 +318,21 @@ class BaseRegistryService(BaseService):
 
 
     @defer.inlineCallbacks
-    def op_clear_registry(self, content, headers, msg):
+    def base_clear_registry(self, content, headers, msg):
         logging.info('op_clear_registry!')
         yield self.reg.clear_registry()
         yield self.reply_ok(msg)
 
 
     @defer.inlineCallbacks
-    def op_register_resource_description(self, content, headers, msg):
+    def base_register_resource(self, content, headers, msg):
         """
         Service operation: Register a resource instance with the registry.
         """
-        resource = dataobject.ResourceDescription.decode(content)()
-        logging.info('op_register_resource_description: \n' + str(resource))
+        resource = dataobject.Resource.decode(content)()
+        logging.info('op_register_resource: \n' + str(resource))
   
-        resource = yield self.reg.register_resource_description(resource)
+        resource = yield self.reg.register_resource(resource)
         if resource:
             yield self.reply_ok(msg, resource.encode())
         else:
@@ -343,14 +340,14 @@ class BaseRegistryService(BaseService):
 
 
     @defer.inlineCallbacks
-    def op_get_resource_description(self, content, headers, msg):
+    def base_get_resource(self, content, headers, msg):
         """
         Service operation: Get a resource instance.
         """
-        resource_reference = dataobject.ResourceDescription.decode(content)()
-        logging.info('op_get_resource_description: '+str(resource_reference))
+        resource_reference = dataobject.Resource.decode(content)()
+        logging.info('op_get_resource: '+str(resource_reference))
 
-        resource = yield self.reg.get_resource_description(resource_reference)
+        resource = yield self.reg.get_resource(resource_reference)
         logging.info('Got Resource:\n'+str(resource))
         if resource:
             yield self.reply_ok(msg, resource.encode())
@@ -359,13 +356,13 @@ class BaseRegistryService(BaseService):
 
         
     @defer.inlineCallbacks
-    def op_set_resource_lcstate(self, content, headers, msg):
+    def base_set_resource_lcstate(self, content, headers, msg):
         """
         Service operation: set the life cycle state of resource
         """
-        container = dataobject.ResourceDescription.decode(content)()
+        container = dataobject.Resource.decode(content)()
 
-        if isinstance(reference_lcstate,  coi_resource_descriptions.SetResourceLCStateContainer):
+        if isinstance(reference_lcstate,  coi_resources.SetResourceLCStateContainer):
             logging.info('op_set_resource_lcstate: '+str(container))
             resource_reference = container.reference
             lcstate = container.lcstate
@@ -379,7 +376,7 @@ class BaseRegistryService(BaseService):
             yield self.reply_err(msg, None)
 
     @defer.inlineCallbacks
-    def op_find_resource_description(self, content, headers, msg):
+    def base_find_resource(self, content, headers, msg):
         """
         @brief Find resource descriptions in the registry meeting the criteria
         listed in the properties dictionary 
@@ -388,23 +385,40 @@ class BaseRegistryService(BaseService):
         regex = None
         ignore_defaults = None
                 
-        container = dataobject.ResourceDescription.decode(content)()
+        container = dataobject.Resource.decode(content)()
         
         result_list = []
-        if isinstance(container,  coi_resource_descriptions.FindResourceDescriptionContainer):
+        if isinstance(container,  coi_resource_descriptions.FindResourceContainer):
             description = container.description
             regex = container.regex
             ignore_defaults = container.ignore_defaults
             
-            result_list = yield self.reg.find_resource_description(description,regex,ignore_defaults)
+            result_list = yield self.reg.find_resource(description,regex,ignore_defaults)
         
-        results=coi_resource_descriptions.ResourceDescriptionListContainer()
+        results=coi_resource_descriptions.ResourceListContainer()
         results.resources = result_list
         
         yield self.reply_ok(msg, results.encode())
 
+
+class RegistryService(BaseRegistryService):
+
+     # Declaration of service
+    declare = BaseService.service_declare(name='registry_service', version='0.1.0', dependencies=[])
+
+    op_clear_registry = BaseRegistryService.base_clear_registry
+    op_register_resource = BaseRegistryService.base_register_resource
+    op_get_resource = BaseRegistryService.base_get_resource
+    op_set_resource_lcstate = BaseRegistryService.base_set_resource_lcstate
+    op_find_resource = BaseRegistryService.base_find_resource
+
+
 # Spawn of the process using the module name
-factory = ProtocolFactory(BaseRegistryService)
+factory = ProtocolFactory(RegistryService)
+
+
+
+
 
 
 class BaseRegistryClient(BaseServiceClient,IRegistry):
@@ -412,22 +426,17 @@ class BaseRegistryClient(BaseServiceClient,IRegistry):
     Do not instantiate this class!
     """
             
-    def __init__(self, proc=None, **kwargs):
-        if not 'targetname' in kwargs:
-            kwargs['targetname'] = "registry_service"
-        BaseServiceClient.__init__(self, proc, **kwargs)
-
     @defer.inlineCallbacks
-    def clear_registry(self):
+    def base_clear_registry(self,op_name):
         yield self._check_init()
 
-        (content, headers, msg) = yield self.rpc_send('clear_registry',None)
+        (content, headers, msg) = yield self.rpc_send(op_name,None)
         if content['status']=='OK':
             defer.returnValue(None)
 
 
     @defer.inlineCallbacks
-    def register_resource_description(self,resource_description):
+    def base_register_resource(self,resource,op_name):
         """
         @brief Store a resource in the registry by its ID. It can be new or
         modified.
@@ -435,28 +444,28 @@ class BaseRegistryClient(BaseServiceClient,IRegistry):
         """
         yield self._check_init()
 
-        (content, headers, msg) = yield self.rpc_send('register_resource_description',
-                                            resource_description.encode())
+        (content, headers, msg) = yield self.rpc_send(op_name,
+                                            resource.encode())
         logging.info('Service reply: '+str(headers))
         if content['status']=='OK':
-            resource_description = dataobject.ResourceDescription.decode(content['value'])()
-            defer.returnValue(resource_description)
+            resource = dataobject.Resource.decode(content['value'])()
+            defer.returnValue(resource)
         else:
             defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def get_resource_description(self,resource_reference):
+    def base_get_resource(self,resource_reference,op_name):
         """
         @brief Retrieve a resource from the registry by Reference
         """
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('get_resource_description',
+        (content, headers, msg) = yield self.rpc_send(op_name,
                                                       resource_reference.encode())
         logging.info('Service reply: '+str(headers))
 
         if content['status']=='OK':
-            resource_description = dataobject.ResourceDescription.decode(content['value'])()
-            defer.returnValue(resource_description)
+            resource = dataobject.Resource.decode(content['value'])()
+            defer.returnValue(resource)
         else:
             defer.returnValue(None)
 
@@ -468,7 +477,7 @@ class BaseRegistryClient(BaseServiceClient,IRegistry):
         """
         yield self._check_init()
 
-        container = coi_resource_descriptions.SetResourceLCStateContainer()
+        container = coi_resources.SetResourceLCStateContainer()
         container.lcstate = lcstate
         container.reference = resource_reference
 
@@ -484,19 +493,19 @@ class BaseRegistryClient(BaseServiceClient,IRegistry):
 
 
     @defer.inlineCallbacks
-    def find_resource_description(self,description,regex=True,ignore_defaults=True):
+    def find_resource(self,description,regex=True,ignore_defaults=True):
         """
         @brief Retrieve all the resources in the registry
         @param attributes is a dictionary of attributes which will be used to select a resource
         """
         yield self._check_init()
 
-        container = coi_resource_descriptions.FindResourceDescriptionContainer()
+        container = coi_resource_descriptions.FindResourceContainer()
         container.description = description
         container.ignore_defaults = ignore_defaults
         container.regex = regex
         
-        (content, headers, msg) = yield self.rpc_send('find_resource_description',
+        (content, headers, msg) = yield self.rpc_send('find_resource',
                                                       container.encode())
         logging.info('Service reply: '+str(headers))
         
@@ -506,6 +515,27 @@ class BaseRegistryClient(BaseServiceClient,IRegistry):
             defer.returnValue(results.resources)
         else:
             defer.returnValue([])
+
+
+class RegistryClient(BaseRegistryClient,IRegistry):
+    """
+    """
+    
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "registry_service"
+        BaseServiceClient.__init__(self, proc, **kwargs)
+
+
+    def clear_registry(self):
+        return self.base_clear_registry(self,'clear_registry')
+
+
+    def register_resource(self,resource):
+        return self.base_register_resource(self,resource, 'register_resource')
+
+    def get_resource(self,resource_reference):
+        return self.base_get_resource(self,resource_reference,'get_resource'):
 
 
 

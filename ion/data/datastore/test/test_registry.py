@@ -41,45 +41,45 @@ class RegistryTest(unittest.TestCase):
     @defer.inlineCallbacks
     def test_register(self):
         
-        res = dataobject.ResourceDescription.create_new_resource()
+        res = dataobject.Resource.create_new_resource()
         res.name = 'foo'
         
         #print 'Dataobject Created',dataobject.DataObject._types.has_key('__builtins__')
         
         #@Note - always over-write the old argument value!
-        res = yield self.reg.register_resource_description(res)
+        res = yield self.reg.register_resource(res)
         
         #print 'Dataobject Registerd!',dataobject.DataObject._types.has_key('__builtins__')
         
         ref = res.reference()
-        res2 = yield self.reg.get_resource_description(ref)
+        res2 = yield self.reg.get_resource(ref)
         self.failUnless(res == res2)
 
 
 
     @defer.inlineCallbacks
     def test_register_overwrite(self):
-        res = dataobject.ResourceDescription.create_new_resource()
+        res = dataobject.Resource.create_new_resource()
         res.name = 'foo'
-        res = yield self.reg.register_resource_description(res)
+        res = yield self.reg.register_resource(res)
         ref1 = res.reference()
         # get this version back again
-        res1 = yield self.reg.get_resource_description(ref1)
+        res1 = yield self.reg.get_resource(ref1)
         self.failUnless(res == res1)
         self.assertEqual(res1.name, 'foo')
         
         #update with new data
         res.name = 'moo'
-        res = yield self.reg.register_resource_description(res)
+        res = yield self.reg.register_resource(res)
 
         # get the new version back again
         ref2 = res.reference()
-        res2 = yield self.reg.get_resource_description(ref2)
+        res2 = yield self.reg.get_resource(ref2)
         self.failUnless(res == res2)
         self.assertEqual(res1.name, 'foo')
 
         # Get the original
-        res1 = yield self.reg.get_resource_description(ref1)
+        res1 = yield self.reg.get_resource(ref1)
         self.assertEqual(res1.name, 'foo')
         
     def test_register_select_ancestor(self):
@@ -87,9 +87,9 @@ class RegistryTest(unittest.TestCase):
 
 
     def test_set_lcastate(self):
-        res = dataobject.ResourceDescription.create_new_resource()
+        res = dataobject.Resource.create_new_resource()
         res.name = 'foo'
-        res = yield self.reg.register_resource_description(res)
+        res = yield self.reg.register_resource(res)
         ref1 = res.reference()
         
         #set by resource (Includes reference):
@@ -98,13 +98,13 @@ class RegistryTest(unittest.TestCase):
         # Used returend reference to set again:
         ref3 = yield self.reg.set_resource_lcstate(ref2, dataobject.LCStates.retired)
         
-        res = yield self.reg.get_resource_description(ref3)
+        res = yield self.reg.get_resource(ref3)
         self.assertEqual(res,dataobject.LCStates.retired)
         
-        res = yield self.reg.get_resource_description(ref2)
+        res = yield self.reg.get_resource(ref2)
         self.assertEqual(res,dataobject.LCStates.active)
         
-        res = yield self.reg.get_resource_description(ref1)
+        res = yield self.reg.get_resource(ref1)
         self.assertEqual(res,dataobject.LCStates.new)
         
         
@@ -113,24 +113,24 @@ class RegistryTest(unittest.TestCase):
     @defer.inlineCallbacks
     def test_registry_find(self):
 
-        res1 = dataobject.ResourceDescription.create_new_resource()
+        res1 = dataobject.Resource.create_new_resource()
         res1.name = 'foo'
-        res1 = yield self.reg.register_resource_description(res1)
+        res1 = yield self.reg.register_resource(res1)
         
-        res2 = dataobject.ResourceDescription.create_new_resource()
+        res2 = dataobject.Resource.create_new_resource()
         res2.name = 'moo'
-        res2 = yield self.reg.register_resource_description(res2)
+        res2 = yield self.reg.register_resource(res2)
 
 
-        blank = dataobject.ResourceDescription()
-        results = yield self.reg.find_resource_description(blank,regex=False,ignore_defaults=False)
+        blank = dataobject.Resource()
+        results = yield self.reg.find_resource(blank,regex=False,ignore_defaults=False)
         self.assertEqual(results,[])
         
-        results = yield self.reg.find_resource_description(res1,regex=False,ignore_defaults=False)
+        results = yield self.reg.find_resource(res1,regex=False,ignore_defaults=False)
         self.assertIn(res1, results)
         self.assertNotIn(res2, results)
         
-        results = yield self.reg.find_resource_description(blank,regex=False,ignore_defaults=True)
+        results = yield self.reg.find_resource(blank,regex=False,ignore_defaults=True)
         self.assertIn(res1, results)
         self.assertIn(res2, results)
         

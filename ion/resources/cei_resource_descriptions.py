@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-from ion.data.dataobject import DataObject, ResourceDescription, TypedAttribute, LCState, LCStates, ResourceReference
+from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource
 
 """
 class EXAMPLE_RESOURCE(ResourceDescription):

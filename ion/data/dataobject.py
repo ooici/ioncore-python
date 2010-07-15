@@ -302,7 +302,7 @@ LCStates = states(LCStates)
 
 DataObject._types.update(LCStates)
 
-class ResourceDescription(ResourceReference):
+class Resource(ResourceReference):
     """
     @brief Base for all OOI resource description objects
     @note could build in explicit link back to ResourceRegistryClient so
@@ -319,8 +319,18 @@ class ResourceDescription(ResourceReference):
     def get_lifecyclestate(self):
         return self.lifecycle
 
-DataObject._types['ResourceDescription']=ResourceDescription
+DataObject._types['Resource']=Resource
 
+
+class InformationResource(Resource):
+    """
+    """
+DataObject._types['InformationResource']=InformationResource
+
+class StatefulResource(Resource):
+    """
+    """
+DataObject._types['StatefulResource']=StatefulResource
 
 
 

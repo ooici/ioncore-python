@@ -354,23 +354,23 @@ class TestSendResourceReference(TestSendDataObject):
     """
     @defer.inlineCallbacks
     def setUp(self):
-        obj = dataobject.ResourceDescription.create_new_resource()
+        obj = dataobject.Resource.create_new_resource()
         obj.name = 'complex'
         obj.ref = dataobject.ResourceReference(RegistryBranch='david',RegistryIdentity='mine', RegistryCommit='yours')
         self.obj = obj
         yield self._start_container()
     
 
-class TestResourceDescription(unittest.TestCase):
+class TestResource(unittest.TestCase):
     
     def test_create(self):
-        res = dataobject.ResourceDescription.create_new_resource()
+        res = dataobject.Resource.create_new_resource()
         self.assertEqual(res.RegistryBranch,'master')
         self.assert_(res.RegistryIdentity)
         self.assertNot(res.RegistryCommit)
 
     def test_reference(self):
-        res = dataobject.ResourceDescription.create_new_resource()
+        res = dataobject.Resource.create_new_resource()
         res.RegistryCommit = 'LotsOfJunk'
         
         ref = res.reference()
@@ -387,7 +387,7 @@ class TestResourceDescription(unittest.TestCase):
     def test_set_lcstate(self):
         
         #logging.info(registry.LCStates)
-        res = dataobject.ResourceDescription.create_new_resource()
+        res = dataobject.Resource.create_new_resource()
         #logging.info(res.get_lifecyclestate())
         self.assertEqual(res.lifecycle, dataobject.LCStates.new)
 
@@ -403,7 +403,7 @@ class TestResourceDescription(unittest.TestCase):
 
     def test_get_lcstate(self):
  
-        res = dataobject.ResourceDescription.create_new_resource()
+        res = dataobject.Resource.create_new_resource()
         
         self.assertEqual(res.get_lifecyclestate(),dataobject.LCState('new'))
  
