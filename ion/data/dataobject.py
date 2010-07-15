@@ -299,7 +299,8 @@ class states(dict):
             setattr(self, k, v)
 
 LCStates = states(LCStates)
-
+# Classes that do not inherit from DataObject must be explicitly added to the data
+# Object Dictionary to be decoded!
 DataObject._types.update(LCStates)
 
 class Resource(ResourceReference):

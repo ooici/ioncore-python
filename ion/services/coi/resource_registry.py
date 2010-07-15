@@ -24,6 +24,8 @@ from ion.core.base_process import ProtocolFactory, BaseProcess
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
 
+from ion.resources import coi_resource_descriptions
+
 CONF = ioninit.config(__name__)
 
 
@@ -82,6 +84,11 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
     def clear_registry(self):
         return self.base_clear_registry('clear_registry')
 
+    def register_local_resource_types(self):
+        """
+        """
+
+
     def register_resource_instance(self,resource):
         """
         Client method to Register a Resource instance
@@ -92,7 +99,20 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         """
         Client method to register the Definition of a Resource Type
         """
-        return self.base_register_resource(resource, 'register_resource_type')
+        resource_type = self._describe_resource(resource)
+        
+        return self.base_register_resource(resource_type, 'register_resource_type')
+
+    def _describe_resource(self,resource):
+        resource_type = coi_resource_descriptions.ResourceDescription.create_new_resource()
+        resource_type.name = resource.__class__.__name__
+        resource_type.type = coi_resource_descriptions.OOIResourceTypes.information
+        #resource_type.inherits_from = resource.__class__.
+        if hasattr(resource, 'resource_description'):
+            resource_type.description = resource.resource_description
+            
+        return resource_type
+        
 
     def get_resource_type(self,resource_reference):
         """
