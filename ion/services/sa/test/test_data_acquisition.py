@@ -9,7 +9,10 @@
 from twisted.internet import defer
 
 from ion.services.sa.data_acquisition import DataAcquisitionServiceClient
+from ion.services.sa.data_acquisition import DataAcquisitionDataStore
 from ion.test.iontest import IonTestCase
+
+from twisted.trial import unittest
 
 class DataAcquisitionTest(IonTestCase):
     """
@@ -40,3 +43,20 @@ class DataAcquisitionTest(IonTestCase):
     def test_acquire_block(self):
 
          yield self.da.acquire_block("accessing acquire block")
+
+ 
+    @defer.inlineCallbacks
+    def test_push_pull(self):
+        raise unittest.SkipTest('code not completed')
+        
+        services = [
+            {'name':'DataStoreService1','module':'ion.data.datastore.datastore_service','class':'DataStoreService','spawnargs':{'MyFrontend':'afrontend'}},
+        ]
+
+        sup = yield self._spawn_processes(services)
+
+        rsc = DataAcquisitionDataStore('localFrontend',proc=sup)
+        
+        yield self.rsc.test_data_store()
+        
+        

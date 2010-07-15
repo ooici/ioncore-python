@@ -14,6 +14,7 @@ from magnet.spawnable import Receiver
 import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
+from ion.data.datastore.datastore_service import DataStoreServiceClient
 
 class DataAcquisitionService(BaseService):
     """Data acquisition service interface
@@ -78,3 +79,13 @@ class DataAcquisitionServiceClient(BaseServiceClient):
         (content, headers, msg) = yield self.rpc_send('acquire_message', text)
         logging.info('Acquire message Service reply: '+str(content))
         defer.returnValue(str(content))
+
+class DataAcquisitionDataStore(DataStoreServiceClient):
+
+	
+    @defer.inlineCallbacks
+    def test_data_store(self):
+        yield self.push("LongKeyForRepo")        
+        yield self.pull("OtherLongKeyForRepo")
+        yield self.clone("OtherLongKeyForRepo") 
+    
