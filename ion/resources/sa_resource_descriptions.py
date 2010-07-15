@@ -20,6 +20,6 @@ class ExampleResource(StatefulResource):
     att2 = TypedAttribute(str)
 
 class TestResource(unittest.TestCase):
-    def printtest(self):
+    def test_print(self):
         res = ExampleResource()
         print res
