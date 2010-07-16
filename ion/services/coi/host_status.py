@@ -11,6 +11,9 @@ except ImportError:
 class HostStatusRPCServer:
     """
     RPC server for returning host status on request. 
+
+    @todo Include interface ipv4 and ipv6 addresses 
+    @todo Move memory from storage to another location
     """
 
     def __init__(
