@@ -130,14 +130,27 @@ class DataObject(object):
             return False
             
 
-    def __str__(self):
+    def __str__(self, indent=''):
         head = '='*10
-        strng  = """\n%s Resource Type: %s %s\n""" % (head, str(self.__class__.__name__), head)
-        strng += """= 'ATT NAME':'VALUE':<TYPE> \n"""
+        strng  = """\n%s%s Resource Type: %s %s\n""" % (indent,head, str(self.__class__.__name__), head)
+        strng += """%s= 'ATT NAME':'VALUE':<TYPE> \n""" % indent
         for name in self.attributes:
             value = getattr(self,name)
-            strng += """= '%s':'%s':%s\n""" % (name,value,type(value))
-        strng += head*2
+            if isinstance(value, (list, tuple, set)):
+                strng += indent + head*3 + '\n'
+                strng += """%s= '%s': %s: List of Values Follows!\n""" % (indent, name,type(value))
+                for item in value:
+                    if isinstance(item, DataObject):
+                        strng += """%s= '%s':%s\n""" % (indent,type(item),item.__str__(indent + '>'))
+                    else:
+                        strng += """%s= '%s':%s\n""" % (indent,item,type(item))
+                strng += indent + head + 'End Of List!' + head + '\n'
+            elif isinstance(value, DataObject):
+                strng += """%s= '%s':'%s':%s\n""" % (indent, name,value.__str__(indent + '>'),type(value))
+            else:
+                
+                strng += """%s= '%s':'%s':%s\n""" % (indent, name,value,type(value))
+        strng += indent + head*4
         return strng
 
     @property
@@ -146,6 +159,13 @@ class DataObject(object):
         for key in self.__dict__:
             names.append(key[1:])
         return names
+
+    def get_attributes(self):
+        atts={}
+        for key,value in self.__dict__.items():
+            atts[key[1:]]=value
+        return atts
+        
 
     def encode(self,header=True):
         """
@@ -313,6 +333,8 @@ class Resource(ResourceReference):
 
     name = TypedAttribute(str)
     lifecycle = TypedAttribute(LCState, default=LCStates.new)
+    resource_description = \
+    'This is the base class for all resources.'
 
     def set_lifecyclestate(self, state):
         self.lifecycle = state
@@ -326,11 +348,17 @@ DataObject._types['Resource']=Resource
 class InformationResource(Resource):
     """
     """
+    resource_description = \
+    'This is the base class for all Information resources.'
+    
 DataObject._types['InformationResource']=InformationResource
 
 class StatefulResource(Resource):
     """
     """
+    resource_description = \
+    'This is the base class for all Stateful resources.'
+    
 DataObject._types['StatefulResource']=StatefulResource
 
 

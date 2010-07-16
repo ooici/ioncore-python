@@ -10,6 +10,7 @@
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
+from twisted.python import reflect
 from magnet.spawnable import Receiver
 
 from ion.data import dataobject
@@ -50,27 +51,31 @@ class ResourceRegistryService(registry.BaseRegistryService):
     """
     Service operation: Register a resource instance with the registry.
     """
-    op_register_resource_type = registry.BaseRegistryService.base_register_resource
+    op_register_resource_definition = registry.BaseRegistryService.base_register_resource
     """
-    Service operation: Create or update a resource type with the registry.
+    Service operation: Create or update a resource definition with the registry.
     """
     op_get_resource_instance = registry.BaseRegistryService.base_get_resource
     """
     Service operation: Get a resource instance.
     """
-    op_get_resource_type = registry.BaseRegistryService.base_get_resource
+    op_get_resource_definition = registry.BaseRegistryService.base_get_resource
     """
-    Service operation: Get a resource type.
+    Service operation: Get a resource definition.
     """
     op_set_resource_lcstate = registry.BaseRegistryService.base_set_resource_lcstate
     """
     Service operation: Set a resource life cycle state
     """
-    op_find_resource = registry.BaseRegistryService.base_find_resource
+    op_find_resource_definition = registry.BaseRegistryService.base_find_resource
     """
-    Service operation: Set a resource life cycle state
+    Service operation: Find the definition of a resource
     """
-
+    op_find_described_resource = registry.BaseRegistryService.base_find_resource
+    """
+    Service operation: Find resource definitions which meet the description
+    """
+    
 class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin):
     """
     Class for the client accessing the resource registry.
@@ -95,32 +100,60 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         """
         return self.base_register_resource(resource, 'register_resource_instance')
     
-    def register_resource_type(self,resource):
+    @defer.inlineCallbacks
+    def register_resource_definition(self,resource):
         """
         Client method to register the Definition of a Resource Type
         """
-        resource_type = self._describe_resource(resource)
         
-        return self.base_register_resource(resource_type, 'register_resource_type')
-
-    def _describe_resource(self,resource):
-        resource_type = coi_resource_descriptions.ResourceDescription.create_new_resource()
-        resource_type.name = resource.__class__.__name__
-        resource_type.type = coi_resource_descriptions.OOIResourceTypes.information
-        #resource_type.inherits_from = resource.__class__.
-        if hasattr(resource, 'resource_description'):
-            resource_type.description = resource.resource_description
+        found = yield self.find_resource_definition(resource)
+        if found:
+            defer.returnValue(found)
             
-        return resource_type
+        resource_type = coi_resource_descriptions.ResourceDescription.create_new_resource()
+        resource_type.describe_resource(resource)
+        
+        print resource_type
+        
+        print 'LOOK FOR PARENT'
+        
+        if resource_type.name != 'Resource':
+            # If it is the base Resource skip it!
+            resource_type.inherits_from = yield self.get_parent_resource_reference(resource)
+        
+        resource_type.set_lifecyclestate(dataobject.LCStates.developed)
+        resource_type = yield self.base_register_resource(resource_type, 'register_resource_definition')
+        defer.returnValue(resource_type)
         
 
-    def get_resource_type(self,resource_reference):
-        """
-        Get a resource type
-        """
-        return self.base_get_resource(resource_reference,'get_resource_type')
+    @defer.inlineCallbacks
+    def get_parent_resource_reference(self,resource):
+        
+        parent_class = self.get_resource_parent_class(resource)
+        parent_resource_def = yield self.find_resource_definition(parent_class())
+        if not parent_resource_def:
+            parent_resource_def = yield self.register_resource_definition(parent_class())
 
-    def get_resource(self,resource_reference):
+        defer.returnValue(parent_resource_def.reference())
+        
+
+    def get_resource_parent_class(self,resource):
+        assert isinstance(resource, dataobject.ResourceReference)
+        # Ignore multiple inheritence for now!
+        if issubclass(resource.__class__.__bases__[0], dataobject.Resource):
+            return resource.__class__.__bases__[0]
+        else:
+            # 'Resource' should refer to itself!
+            return dataobject.Resource
+        
+
+    def get_resource_definition(self,resource_reference):
+        """
+        Get a resource definition
+        """
+        return self.base_get_resource(resource_reference,'get_resource_definition')
+
+    def get_resource_instance(self,resource_reference):
         """
         Get a resource instance
         """
@@ -129,8 +162,21 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
     def set_resource_lcstate(self, resource_reference, lcstate):
         return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_resource_lcstate')
 
-    def find_resource(self, description,regex=True,ignore_defaults=True):
-        return self.base_find_resource(description,'find_resource',regex,ignore_defaults)
+    @defer.inlineCallbacks
+    def find_resource_definition(self, resource):
+        resource_type = coi_resource_descriptions.ResourceDescription()
+        resource_type.describe_resource(resource)
+        alist = yield self.base_find_resource(resource_type,'find_resource_definition',regex=False,ignore_defaults=True)
+        # Find returns a list but only one resource should match!
+        if alist:
+            assert len(alist) == 1
+            defer.returnValue(alist[0])
+        else:
+            defer.returnValue(None)
+            
+    def find_described_resources(self, description,regex=True,ignore_defaults=True):
+        return self.base_find_resource(description,'find_described_resource',regex,ignore_defaults)
+        
 
 
 # Spawn of the process using the module name

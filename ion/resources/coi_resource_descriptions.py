@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-
+import logging
+logging = logging.getLogger(__name__)
 from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource
 
 """
@@ -83,10 +84,7 @@ DataObject._types.update(OOIResourceTypes)
 class AttributeDescription(DataObject):
     name = TypedAttribute(str)
     type = TypedAttribute(str)
-    default = TypedAttribute(str)
-    resource_description = \
-    'This is a resource used in the resource registry.\n\
-    It provides for the description of resource attributes'
+    #default = TypedAttribute(str) Ignore defaults for now - can't get at it!
 
 
 class ResourceDescription(InformationResource):
@@ -97,4 +95,26 @@ class ResourceDescription(InformationResource):
     resource_description = \
     'This is a resource used in the resource registry.\n\
     It describes resource types'
+    
+    def describe_resource(self,resource):
+        assert isinstance(resource, Resource)
+        
+        self.name = resource.__class__.__name__
+        
+        if isinstance(resource, InformationResource):
+            self.type = OOIResourceTypes.information
+        elif isinstance(resource, StatefulResource):
+            self.type = OOIResourceTypes.stateful
+        else:
+            self.type = OOIResourceTypes.unassigned
+        
+        if hasattr(resource, 'resource_description'):
+            self.description = resource.resource_description
+            
+        for att in resource.attributes:
+            attdesc = AttributeDescription()
+            attdesc.name = att
+            attdesc.type = str(type(getattr(resource, att)))
+            self.atts.append(attdesc)    
+            
     

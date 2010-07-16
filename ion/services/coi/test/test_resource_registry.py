@@ -44,25 +44,23 @@ class ResourceRegistryTest(IonTestCase):
     def test_resource_reg(self):
         # put in a bogus resource for now...
         res = dataobject.InformationResource.create_new_resource()
-        res = yield self.rrc.register_resource_type(res)
+        res = yield self.rrc.register_resource_definition(res)
         
         res = yield self.rrc.set_resource_lcstate_commissioned(res)
         
         ref = res.reference()
         
-        res2 = yield self.rrc.get_resource_type(ref)
+        res2 = yield self.rrc.get_resource_definition(ref)
         
-        self.assertEqual(res,res2)
+        self.assertEqual(res2,res)
+        print res
         
     def test_describe_resource(self):
         # put in a bogus resource for now...
         res = coi_resource_descriptions.ResourceDescription.create_new_resource()
         
-        res_desc = self.rrc._describe_resource(res)
-        
+        res.describe_resource(res)
         print 'res:',res
-        print 'res_desc',res_desc
-
 
 
 
