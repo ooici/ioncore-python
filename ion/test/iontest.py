@@ -46,6 +46,7 @@ class IonTestCase(unittest.TestCase):
         mopt['broker_host'] = CONF['broker_host']
         mopt['broker_port'] = CONF['broker_port']
         mopt['broker_vhost'] = CONF['broker_vhost']
+        mopt['broker_heartbeat'] = CONF['broker_heartbeat']
         mopt['boot_script'] = None
         mopt['script'] = None
 
