@@ -135,10 +135,34 @@ class RegistryTest(unittest.TestCase):
         self.assertIn(res1, results)
         self.assertNotIn(res2, results)
         
+        results = yield self.reg.find_resource(blank,regex=False,ignore_defaults=True)
+        self.assertIn(res1, results)
+        self.assertIn(res2, results)
+        
+        results = yield self.reg.find_resource(blank,regex=True,ignore_defaults=True)
+        self.assertIn(res1, results)
+        self.assertIn(res2, results)
+        
         blank.name='oo'
         results = yield self.reg.find_resource(blank,regex=True,ignore_defaults=True)
         self.assertIn(res1, results)
         self.assertIn(res2, results)
+        
+        blank.name='mo'
+        results = yield self.reg.find_resource(blank,regex=True,ignore_defaults=True)
+        self.assertNotIn(res1, results)
+        self.assertIn(res2, results)
+        
+        blank.name='mo'
+        results = yield self.reg.find_resource(blank,regex=True,attnames=['name',])
+        self.assertNotIn(res1, results)
+        self.assertIn(res2, results)
+        
+        blank.name='moo'
+        results = yield self.reg.find_resource(blank,attnames=['name',])
+        self.assertNotIn(res1, results)
+        self.assertIn(res2, results)
+        
         
 
 class RegistryCassandraTest(RegistryTest):
