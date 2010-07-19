@@ -110,6 +110,16 @@ class InstrumentDriverClient(BaseProcessClient):
                                                           command)
         defer.returnValue(content)
     
+    @defer.inlineCallbacks
+    def get_status(self, arg):
+        """
+        Using the instrument protocol, gather status from the instrument
+        @param arg The argument needed for gathering status
+        @retval Result message of some sort
+        """
+        (content, headers, message) = yield self.rpc_send('get_status', arg)
+        defer.returnValue(content)
+        
     @defer.inlineCallbacks    
     def configure_driver(self, config_vals):
         """
@@ -218,7 +228,7 @@ class InstrumentAgent(ResourceAgent):
         response = {}
         for key in content:
             result = {}
-            result = yield self.driver_client.set_param(key, content[key])
+            result = yield self.driver_client.set_params(key, content[key])
             if result == {}:
                 yield self.reply_err(msg, "Could not set %s" % key)
             else:
@@ -294,12 +304,12 @@ class InstrumentAgent(ResourceAgent):
         @retval ACK message with response on success, ERR message on failure
         """
         assert(isinstance(content, list))
-        response = self.driver_client.get_status(content)
-        if ((isinstance(response, tuple)) and (response[0] == 1)):
-            yield self.reply_ok(msg, response[1])
+        response = yield self.driver_client.get_status(content)
+        if (response['status'] == 'OK'):
+            yield self.reply_ok(msg, response['value'])
         else:
-            yield self.reply_err(msg, 'No values found')
-            
+            yield self.reply_err(msg, response['value'])
+                    
 class InstrumentAgentClient(ResourceAgentClient):
     """
     The base class for an Instrument Agent Client. It is a service
@@ -406,11 +416,11 @@ class InstrumentAgentClient(ResourceAgentClient):
     def get_status(self, argList):
         """
         Obtain the non-parameter and non-lifecycle status of the instrument
+        @param argList A list of arguments to pass for status
         """
         assert(isinstance(argList, list))
         (content, headers, message) = yield self.rpc_send('get_status',
                                                               argList)
-        assert(isinstance(content, dict))
         defer.returnValue(content)
         
     @defer.inlineCallbacks    

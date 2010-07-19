@@ -110,8 +110,6 @@ class TestInstrumentAgent(IonTestCase):
         #rd3 = yield self.rrc.get_resource(rid)
         raise unittest.SkipTest('Needs a working registration plan')
 
-        yield
-
         
         
     @defer.inlineCallbacks
@@ -119,7 +117,7 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test the resource lifecycle management
         """
-        
+        raise unittest.SkipTest('Still needs resource registry integration')
         response = yield self.IAClient.set_lifecycle_state(LCS.inactive)
         self.assertEqual(response, LCS.inactive)
 
@@ -168,12 +166,13 @@ class TestInstrumentAgent(IonTestCase):
     def test_status(self):
         """
         Test to see if the status response is correct
+        @todo Do we even need this function?
         """
         response = yield self.IAClient.get_status(['some_arg'])
-        logging.debug("testStatus response: %s", response)
+        logging.debug("*** testStatus response: %s", response)
         self.assert_(isinstance(response, dict))
         self.assertEqual(response['status'], "OK")
-        self.assertEqual(response['result'], 'a-ok')
+        self.assertEqual(response['value'], 'a-ok')
         
     @defer.inlineCallbacks
     def test_translator(self):
