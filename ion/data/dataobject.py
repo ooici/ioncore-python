@@ -215,7 +215,10 @@ class DataObject(object):
         
     def non_default_atts(self,attnames):
         atts=[]
-        default = self.__class__()
+        print 'CLASS NAME',self.__class__.__name__
+        data_object_class = self._types[self.__class__.__name__]
+        default = data_object_class()
+        #default = self.__class__()
         if not attnames:
             attnames=self.attributes
             

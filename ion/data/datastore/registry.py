@@ -491,7 +491,7 @@ class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
     def set_resource_lcstate(self, resource_reference, lcstate):
         return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_resource_lcstate')
 
-    def find_resource(self, description,regex=True,ignore_defaults=True):
-        return self.base_find_resource(description,'find_resource',regex,ignore_defaults)
+    def find_resource(self, description,regex=True,ignore_defaults=True, attnames=[]):
+        return self.base_find_resource(description,'find_resource',regex,ignore_defaults,attnames)
 
 
