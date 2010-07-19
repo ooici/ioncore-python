@@ -116,7 +116,6 @@ class ResourceAgent(BaseProcess):
                                                             res_desc)
         else:
             result = yield self.res_reg_client.register_resource(id, res_desc)
-        logging.debug("*** id: %s", self.resource_id)
         if (result == None):
             yield self.reply_err(msg, "Could not re-register object id %s" %id)
         else:
@@ -222,7 +221,6 @@ class ResourceAgentClient(BaseProcessClient):
         (content, headers, msg) = yield self.rpc_send('get_lifecycle_state',
                                                       '')
         if content['status'] == 'OK':
-            logging.debug("*** get_lifecycle_state content: %s", content)
             defer.returnValue(content['result'])
         else:
             defer.returnValue(False)        

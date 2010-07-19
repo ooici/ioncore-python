@@ -33,9 +33,11 @@ class TestInstrumentAgent(IonTestCase):
         # Start an instrument agent
         processes = [
             {'name':'testSBE49IA',
-             'module':'ion.agents.instrumentagents.SBE49'},
+             'module':'ion.agents.instrumentagents.SBE49',
+             'class':'SBE49InstrumentAgent'},
             {'name':'resource_registry',
-             'module':'ion.services.coi.resource_registry'}
+             'module':'ion.services.coi.resource_registry',
+             'class':'ResourceRegistryService'}
         ]
         self.sup = yield self._spawn_processes(processes)
         self.svc_id = yield self.sup.get_child_id('testSBE49IA')
@@ -141,17 +143,26 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability of the SBE49 driver to execute commands through the
         InstrumentAgentClient class
         """
-        response = yield self.IAClient.execute_instrument(['start', 'badcommand', 'stop'])
+        response = yield self.IAClient.execute_instrument({'start':['now', 1],
+                                                           'stop':[]})
         self.assert_(isinstance(response, dict))
-        self.assert_('badcommand' in response)
-        self.assert_('start' in response)
-        self.assert_('stop' in response)
-        self.assert_(isinstance(response['start'], dict))
-        self.assert_(isinstance(response['stop'], dict))
-        self.assert_(isinstance(response['badcommand'], dict))
-        self.assert_(response['start']['status'] == 'OK')
-        self.assert_(response['stop']['status'] == 'OK')
-        self.assert_(response['badcommand']['status'] == 'ERROR')
+        self.assert_('status' in response.keys())
+        self.assertEqual(response['status'], 'OK')
+        self.assert_('start' in response['value'])
+        self.assert_('stop' in response['value'])
+        self.assert_(response['status'] == 'OK')
+
+        response = yield self.IAClient.execute_instrument({'badcommand':['now', '1']})
+    
+        self.assert_(isinstance(response, dict))
+        self.assertEqual(response['status'], 'ERROR') 
+                
+        response = yield self.IAClient.execute_instrument({})
+        self.assert_(isinstance(response, dict))
+        self.assertEqual(response['status'], 'ERROR')
+        
+        
+
         
     @defer.inlineCallbacks
     def test_status(self):
