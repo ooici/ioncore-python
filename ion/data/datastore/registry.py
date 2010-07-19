@@ -189,85 +189,39 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         
         
     @defer.inlineCallbacks
-    def find_resource(self,description,regex=True,ignore_defaults=True):
+    def find_resource(self,description,regex=True,ignore_defaults=True,attnames=[]):
         """
         @brief Find resource descriptions in the registry meeting the criteria
         in the FindResourceContainer 
         """
+        
+        print 'Description==========================:',description
+        print 'REGEX', regex
+        print 'ATTNAMES',attnames
+        print 'IGNORE_DEFAULTS', ignore_defaults
+        
         # container for the return arguments
         results=[]
-        if isinstance(description,dataobject.Resource):
+        if isinstance(description,dataobject.DataObject):
+            refs = yield self._list()
+
             # Get the list of descriptions in this registry
+            
             reslist = yield self._list_descriptions()
 
-            for res in reslist:                        
-                # Test for failure and break
-                test = False
-                if regex:
-                    if ignore_defaults:
-                        test = compare_regex_no_defaults(description,res)
-                    else:
-                        test = compare_regex_defaults(description,res)
-                else:
-                    if ignore_defaults:
-                        test = compare_ignore_defaults(description,res)
-                    else:
-                        test = compare_defaults(description,res)
-                if test:
+            for ref in refs:
+                res = yield self.get_resource(ref)
+                
+                print "CHECKING RESOURCE:", res
+                if description.compared_to(res,
+                                        regex=regex,
+                                        ignore_defaults=ignore_defaults,
+                                        attnames=attnames):
                     results.append(res)
+                    
+        print 'RESULTS LIST', results
 
         defer.returnValue(results)
-
-def compare_regex_defaults(r1,r2):
-    """
-    test=True
-    for k,v in properties.items():                
-        # if this resource does not contain this attribute move on
-        if not k in res.attributes:
-            test = False
-            break
-            
-        att = getattr(res, k, None)
-            
-        # Bogus - can't send lcstate objects in a dict must convert to sting to test
-        if isinstance(att, dataobject.LCState):
-            att = str(att)
-            
-        if isinstance(v, (str, unicode) ):
-            # Use regex
-            if not re.search(v, att):
-                test=False
-                break
-        else:
-            # test equality
-            #@TODO add tests for range and in list...
-            
-            
-            if att != v and v != None:
-                test=False
-                break                    
-    """
-        
-def compare_regex_no_defaults(r1,r2):
-    """
-    """
-        
-def compare_defaults(r1,r2):
-    try:
-        m = [getattr(r1, a) == getattr(r2, a) for a in r1.attributes]
-        return reduce(lambda a, b: a and b, m)
-    except:
-        return False
-        
-def compare_ignore_defaults(r1,r2):
-    """
-    """
-    try:
-        default = r1.__class__()
-        m = [getattr(r1, a) == getattr(r2, a) or getattr(r1, a) ==  getattr(default,a) for a in r1.attributes]
-        return reduce(lambda a, b: a and b, m)
-    except:
-        return False
             
 
 
@@ -384,6 +338,7 @@ class BaseRegistryService(BaseService):
         description = None
         regex = None
         ignore_defaults = None
+        attnames=[]
                 
         container = dataobject.Resource.decode(content)()
         
@@ -392,8 +347,9 @@ class BaseRegistryService(BaseService):
             description = container.description
             regex = container.regex
             ignore_defaults = container.ignore_defaults
+            attnames = container.attnames
             
-            result_list = yield self.reg.find_resource(description,regex,ignore_defaults)
+            result_list = yield self.reg.find_resource(description,regex,ignore_defaults, attnames)
         
         results=coi_resource_descriptions.ResourceListContainer()
         results.resources = result_list
@@ -489,7 +445,7 @@ class BaseRegistryClient(BaseServiceClient):
 
 
     @defer.inlineCallbacks
-    def base_find_resource(self,description,op_name, regex=True,ignore_defaults=True):
+    def base_find_resource(self,description,op_name, regex=True,ignore_defaults=True,attnames=[]):
         """
         @brief Retrieve all the resources in the registry
         @param attributes is a dictionary of attributes which will be used to select a resource
@@ -500,6 +456,7 @@ class BaseRegistryClient(BaseServiceClient):
         container.description = description
         container.ignore_defaults = ignore_defaults
         container.regex = regex
+        container.attnames = attnames
         
         (content, headers, msg) = yield self.rpc_send(op_name,container.encode())
         logging.info('Service reply: '+str(headers))

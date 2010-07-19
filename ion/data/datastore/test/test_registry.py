@@ -135,7 +135,8 @@ class RegistryTest(unittest.TestCase):
         self.assertIn(res1, results)
         self.assertNotIn(res2, results)
         
-        results = yield self.reg.find_resource(blank,regex=False,ignore_defaults=True)
+        blank.name='oo'
+        results = yield self.reg.find_resource(blank,regex=True,ignore_defaults=True)
         self.assertIn(res1, results)
         self.assertIn(res2, results)
         

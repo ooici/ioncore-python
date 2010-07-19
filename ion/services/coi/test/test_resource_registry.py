@@ -46,9 +46,8 @@ class ResourceRegistryTest(IonTestCase):
         res = dataobject.InformationResource.create_new_resource()
         res = yield self.rrc.register_resource_definition(res)
         
-        res = yield self.rrc.set_resource_lcstate_commissioned(res)
-        
-        ref = res.reference()
+        ref = yield self.rrc.set_resource_lcstate_commissioned(res)
+
         
         res2 = yield self.rrc.get_resource_definition(ref)
         

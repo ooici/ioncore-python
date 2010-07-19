@@ -31,6 +31,7 @@ class FindResourceContainer(DataObject):
     description = TypedAttribute(Resource, default=None)
     regex = TypedAttribute(bool, default=True)
     ignore_defaults = TypedAttribute(bool, default=True)
+    attnames = TypedAttribute(list)
     
     
 """

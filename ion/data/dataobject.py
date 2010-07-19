@@ -11,6 +11,7 @@ NULL_CHR = '\x00'
 
 import simplejson as json
 import uuid
+import re
 
 from twisted.python import reflect
 
@@ -121,14 +122,104 @@ class DataObject(object):
     _types = {}
 
     def __eq__(self, other):
+        """
+        Compare dataobjects of the same class. All attributes must be equal.
+        """
         assert isinstance(other, DataObject)
         # comparison of data objects which have different atts must not error out
+        atts1 = set(self.attributes)
+        atts2 = set(other.attributes)
+        atts = atts1.union(atts2)
         try:
-            m = [getattr(self, a) == getattr(other, a) for a in self.attributes]
+            m = [getattr(self, a) == getattr(other, a) for a in atts]
             return reduce(lambda a, b: a and b, m)
         except:
             return False
+
+    
+    def __ge__(self,other):
+        """
+        Compare data object which inherit from eachother - common attributes must be equal!
+        See test case for intended applications
+        
+        """
+        assert isinstance(other, DataObject)
+        # comparison of data objects which have different atts must not error out
+        atts = set(other.attributes)
+        #print 'SELF',self.get_attributes()
+        #print 'OTHER',other.get_attributes()
+        try:
+            m = [getattr(self, a) == getattr(other, a) for a in atts]
+            return reduce(lambda a, b: a and b, m)
+        except:
+            return False
+        
+    def compared_to(self,other,regex=False,ignore_defaults=False,attnames=None):
+        """
+        Compares only attributes of self by default
+        """
+        assert isinstance(other, DataObject)
+
+        atts=None
+        if not attnames:
+            atts = self.attributes
+        else:
+            atts=attnames
+
+        if ignore_defaults:
+            atts = self.non_default_atts(atts)
             
+        if not regex:
+            try:
+                m=[]
+                for a in atts:
+                    if isinstance(getattr(self, a),DataObject):
+                        m.append(getattr(self, a).compared_to(
+                                                getattr(other, a),
+                                                ignore_defaults=ignore_defaults))
+                    else:                        
+                        m.append(getattr(self, a) == getattr(other, a))
+                    
+                return reduce(lambda a, b: a and b, m)
+            except:
+                return False
+        else:
+            try:
+                m=[]
+                for a in atts:
+                    if getattr(self, a) == getattr(other, a):
+                        m.append(True)
+                    elif isinstance(getattr(other, a),(str, unicode)):
+                        m.append(re.findall(getattr(self, a),getattr(other, a)))
+                    elif isinstance(getattr(other, a),DataObject):
+                        m.append(getattr(self, a).compared_to(
+                                                    getattr(other, a),
+                                                    regex=regex,
+                                                    ignore_defaults=ignore_defaults))
+                    else:
+                        m.append(False)
+                    
+                return reduce(lambda a, b: a and b, m)
+            except:
+                return False
+            
+
+        
+        
+    def non_default_atts(self,attnames):
+        atts=[]
+        default = self.__class__()
+        if not attnames:
+            attnames=self.attributes
+        for a in attnames:
+            if getattr(self, a) !=  getattr(default,a):
+                atts.append(a)
+        return atts
+        
+        
+    #    def __le__(self,other):
+    #        """
+    #        """
 
     def __str__(self, indent=''):
         head = '='*10
@@ -221,6 +312,9 @@ class DataObject(object):
             #print 'value',value
             d[str(name)] = TypedAttribute.decode(value, cls._types)       
         return type(clsobj.__name__, (clsobj,), d)
+
+
+
 
 """
 Add some important proprieties for OOICI Resource Descriptions

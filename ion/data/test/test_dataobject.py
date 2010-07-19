@@ -40,7 +40,7 @@ class Inherit210(Inherit2, Inherit1, Inherit0):
     """
     """
 
-class TestInheritObject(unittest.TestCase):
+class TestInheritedObject(unittest.TestCase):
     
     def test_inherit(self):
         i0 = Inherit0()
@@ -74,7 +74,140 @@ class TestInheritObject(unittest.TestCase):
         self.failUnlessIn('inherit0',i3.attributes)
         self.assertEqual(len(i3.attributes),4)
 
+class TestDataObjectComparison(unittest.TestCase):
 
+    def test_eq_inherit(self):
+        i0=Inherit0()
+        i1=Inherit1()
+        a1=Inherit1()
+        
+        self.assertEqual(i0,i0)
+        self.assertEqual(i1,i1)
+        self.assertEqual(i1,a1)
+
+
+        self.assertNotEqual(i0,i1)
+        self.assertNotEqual(i1,i0)
+
+    def test_eq_primarytypes(self):
+        p1=PrimaryTypesObject()
+        p2=PrimaryTypesObject()
+
+        p1.key = 'equal?'
+        self.assertNotEqual(p1,p2)
+        p2.key = 'equal?'    
+        self.assertEqual(p1,p2)
+        
+        p1.boolen = False
+        self.assertNotEqual(p1,p2)
+        p2.boolen = False    
+        self.assertEqual(p1,p2)
+        
+        p1.int = 42
+        self.assertNotEqual(p1,p2)
+        p2.int = 42   
+        self.assertEqual(p1,p2)
+
+        p1.float = 3.14159 
+        self.assertNotEqual(p1,p2)
+        p2.float = 3.14159    
+        self.assertEqual(p1,p2)
+
+
+    def test_ge_inherit(self):
+        i0=Inherit0()
+        i1=Inherit1()
+        a1=Inherit1()
+        
+        self.assert_(i0<=i1)
+        self.assert_(i1>=i0)
+        self.assertNot(i0>=i1)
+        self.assertNot(i1<=i0)
+        self.assert_(i0<=i0)
+        self.assert_(i1<=i1)
+        self.assert_(i1>=i1)
+
+    def test_ge_primarytypes(self):
+        p1=PrimaryTypesObject()
+        p2=PrimaryTypesObject()
+
+        p1.key = 'equal?'
+        self.assertNot(p1>=p2)
+        p2.key = 'equal?'    
+        self.assert_(p1>=p2)
+        
+        p1.boolen = False
+        self.assertNot(p1<=p2)
+        p2.boolen = False    
+        self.assert_(p1<=p2)
+        
+        p1.integer = 42
+        self.assertNot(p1<=p2)
+        p2.integer = 42   
+        self.assert_(p1>=p2)
+
+        p1.floating = 3.14159 
+        self.assertNot(p1>=p2)
+        p2.floating = 3.14159    
+        self.assert_(p1>=p2)
+
+    def test_comare_to_inherits(self):
+        
+        p1=PrimaryTypesObject()
+        s1=SimpleObject()
+        
+        # The attributes of S1 are still equal to the same attributes of P1
+        p1.integer=42
+        self.assert_(s1.compared_to(p1))
+        
+        p1.name = 'NotEqual'
+        self.assertNot(s1.compared_to(p1,regex=True))
+
+        s1.name = 'Not'
+        self.assert_(s1.compared_to(p1,regex=True))
+
+
+    def test_compare_to_certain_atts(self):
+        
+        p1=PrimaryTypesObject()
+        p2=PrimaryTypesObject()
+        
+        atts=['name','integer']
+
+        
+        # The attributes of S1 are still equal to the same attributes of P1
+        p1.integer=42
+        self.assertNot(p1.compared_to(p2,attnames=atts))
+        
+        p2.integer=42
+        self.assert_(p1.compared_to(p2,attnames=atts))
+        
+        p2.floating = 3.14159
+        self.assert_(p1.compared_to(p2,attnames=atts))
+        
+        p2.name = 'NotEqual'
+        self.assertNot(p1.compared_to(p2,regex=True,attnames=atts))
+
+        p1.name = 'Not'
+        self.assert_(p1.compared_to(p2,regex=True,attnames=atts))
+
+    def test_ignoring_defaults(self):
+        
+        p1=PrimaryTypesObject()
+        p2=PrimaryTypesObject()
+        
+        p1.name='test'
+        p1.integer=90
+        p1.floating=472.0
+        
+        p2.name='test'
+        
+        self.assert_(p2.compared_to(p1,ignore_defaults=True))
+        self.assertNot(p1.compared_to(p2,ignore_defaults=True))
+
+        p2.name='tes'        
+        self.assert_(p2.compared_to(p1,ignore_defaults=True,regex=True))
+        self.assertNot(p1.compared_to(p2,ignore_defaults=True,regex=True))
 
 
 
