@@ -165,13 +165,10 @@ class DataObject(object):
             atts = self.attributes
         else:
             atts=attnames
-        print 'Searching for ATTS:', atts
-
+            
         if ignore_defaults:
             atts = self.non_default_atts(atts)
-            
-        print 'Searching for ATTS:', atts
-            
+                        
         if not atts:
             # A degenerate case
             return True
@@ -215,19 +212,13 @@ class DataObject(object):
         
     def non_default_atts(self,attnames):
         atts=[]
-        print 'CLASS NAME',self.__class__.__name__
         data_object_class = self._types[self.__class__.__name__]
         default = data_object_class()
         #default = self.__class__()
         if not attnames:
             attnames=self.attributes
-            
-        print 'ATTNAMES:',attnames
-        print 'SELF',self
-        print 'DEFAULT',default
         for a in attnames:
             if getattr(self, a) !=  getattr(default,a):
-                print 'NON DEFAULT', a
                 atts.append(a)
         return atts
         

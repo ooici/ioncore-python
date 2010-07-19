@@ -195,11 +195,6 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         in the FindResourceContainer 
         """
         
-        print 'Description==========================:',description
-        print 'REGEX', regex
-        print 'ATTNAMES',attnames
-        print 'IGNORE_DEFAULTS', ignore_defaults
-        
         # container for the return arguments
         results=[]
         if isinstance(description,dataobject.DataObject):
@@ -212,15 +207,12 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
             for ref in refs:
                 res = yield self.get_resource(ref)
                 
-                print "CHECKING RESOURCE:", res
                 if description.compared_to(res,
                                         regex=regex,
                                         ignore_defaults=ignore_defaults,
                                         attnames=attnames):
                     results.append(res)
                     
-        print 'RESULTS LIST', results
-
         defer.returnValue(results)
             
 
