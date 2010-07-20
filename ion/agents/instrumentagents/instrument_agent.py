@@ -11,36 +11,130 @@ from twisted.internet import defer
 
 from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
+from ion.core.base_process import BaseProcess, BaseProcessClient
 
-class InstrumentDriver():
+"""
+Constants/Enumerations for tags in capabiltiies dict structures
+"""
+ci_commands = 'ci_commands'
+ci_parameters = 'ci_parameters'
+instrument_commands = 'instrument_commands'
+instrument_parameters = 'instrument_parameters'
+
+
+class InstrumentDriver(BaseProcess):
     """
     A base driver class. This is intended to provide the common parts of
     the interface that instrument drivers should follow in order to use
     common InstrumentAgent methods. This should never really be instantiated.
     """
-    def fetch_param(self, param):
+    def op_fetch_params(self, content, headers, msg):
         """
         Using the instrument protocol, fetch a parameter from the instrument
-        @param param The parameter to fetch
-        @return The value of the fetched parameter
+        @param content A list of parameters to fetch
+        @retval A dictionary with the parameter and value of the requested
+            parameter
         """
         
-    def set_param(self, param, value):
+    def op_set_params(self, content, headers, msg):
         """
         Using the instrument protocol, set a parameter on the instrument
-        @param param The parameter to set
-        @param value The value to set
-        @return A small dict of parameter and value on success, empty dict on
+        @param content A dictionary with the parameters and values to set
+        @retval A small dict of parameter and value on success, empty dict on
             failure
         """
         
+    def op_execute(self, content, headers, msg):
+        """
+        Using the instrument protocol, execute the requested command
+        @param command A dictionary where the command name is the key and the
+            arguments are the value as a (possibly empty) list. For example:
+            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @retval Result code of some sort
+        """
+    
+    def op_configure_driver(self, content, headers, msg):
+        """
+        This method takes a dict of settings that the driver understands as
+        configuration of the driver itself (ie 'target_ip', 'port', etc.). This
+        is the bootstrap information for the driver and includes enough
+        information for the driver to start communicating with the instrument.
+        @param content A dict with parameters for the driver 
+        """
+        
+        
+class InstrumentDriverClient(BaseProcessClient):
+    """
+    The base class for the instrument driver client interface. This interface
+    is designed to be used by the instrument agent to work with the driver.
+    """
+    @defer.inlineCallbacks
+    def fetch_params(self, param_list):
+        """
+        Using the instrument protocol, fetch a parameter from the instrument
+        @param param_list A list of parameters to fetch
+        @retval A dictionary with the parameter and value of the requested
+            parameter
+        """
+        assert(isinstance(param_list, list))
+        (content, headers, message) = yield self.rpc_send('fetch_params',
+                                                          param_list)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def set_params(self, param_dict):
+        """
+        Using the instrument protocol, set a parameter on the instrument
+        @param param_dict A dictionary with the parameters and values to set
+        @retval A small dict of parameter and value on success, empty dict on
+            failure
+        """
+        assert(isinstance(param_dict, dict))
+        (content, headers, message) = yield self.rpc_send('set_params',
+                                                          param_dict)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
     def execute(self, command):
         """
         Using the instrument protocol, execute the requested command
-        @param command The command to execute
-        @return Result code of some sort
+        @param command A dictionary where the command name is the key and the
+            arguments are the value as a (possibly empty) list. For example:
+            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @retval Result code of some sort
         """
+        assert(isinstance(command, dict))
+        (content, headers, message) = yield self.rpc_send('execute',
+                                                          command)
+        defer.returnValue(content)
+    
+    @defer.inlineCallbacks
+    def get_status(self, arg):
+        """
+        Using the instrument protocol, gather status from the instrument
+        @param arg The argument needed for gathering status
+        @retval Result message of some sort
+        """
+        (content, headers, message) = yield self.rpc_send('get_status', arg)
+        defer.returnValue(content)
         
+    @defer.inlineCallbacks    
+    def configure_driver(self, config_vals):
+        """
+        This method takes a dict of settings that the driver understands as
+        configuration of the driver itself (ie 'target_ip', 'port', etc.). This
+        is the bootstrap information for the driver and includes enough
+        information for the driver to start communicating with the instrument.
+        @param config_vals A dict with parameters for the driver 
+        """
+        assert(isinstance(config_vals, dict))
+        (content, headers, message) = yield self.rpc_send('configure_driver',
+                                                          config_vals)
+        defer.returnValue(content)
+        
+    
 class InstrumentAgent(ResourceAgent):
     """
     The base class for developing Instrument Agents. This defines
@@ -50,10 +144,10 @@ class InstrumentAgent(ResourceAgent):
     and getCapabilities routines.
     """
     
-    driver = None
-    
+    driver_client = None
+        
     @defer.inlineCallbacks
-    def op_getTranslator(self, content, headers, msg):
+    def op_get_translator(self, content, headers, msg):
         """
         Obtain a function that translates the raw data format of the actual
         device into a generic data format that can be sent to the repository.
@@ -65,99 +159,156 @@ class InstrumentAgent(ResourceAgent):
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
         """
-        React to a request for parameter values,
-        @return A reply message containing a dictionary of name/value pairs
+        React to a request for parameter values. In the InstrumentAgent,
+        this defaults to parameters relating to the CI side of operations
+        For instrument parameters, use the op_getFromInstrument() methods
+        @see op_getFromInstrument()
+        @see op_getFromCI()
+        @retval A reply message containing a dictionary of name/value pairs
+        """
+        yield self.op_get_from_CI(content, headers, msg)
+    
+    @defer.inlineCallbacks
+    def op_get_from_instrument(self, content, headers, msg):
+        """
+        Get configuration parameters from the instrument side of the agent.
+        This is stuff that would generally be handled by the instrument driver.
+        @retval A reply message containing a dictionary of name/value pairs
         """
         assert(isinstance(content, list))
-        assert(self.driver != None)
+        assert(self.driver_client != None)
         response = {}
         for key in content:
-            response[key] = self.driver.fetch_param(key)
+            response = yield self.driver_client.fetch_params(content)
         if response != {}:
             yield self.reply_ok(msg, response)
         else:
             yield self.reply_err(msg, 'No values found')
     
+    @defer.inlineCallbacks
+    def op_get_from_CI(self, content, headers, msg):
+        """
+        Get data from the cyberinfrastructure side of the agent (registry info,
+        topic locations, messaging parameters, process parameters, etc.)
+        @retval A reply message containing a dictionary of name/value pairs
+        @todo Write this or push to subclass
+        """
+        assert(isinstance(content, list))
+        assert(self.driver_client != None)
+        response = {}
+        #get data somewhere, or just punt this lower in the class hierarchy
+        if response != {}:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg, 'No values found')
+            
     @defer.inlineCallbacks    
     def op_set(self, content, headers, msg):
         """
-        Set parameters to the requested values.
-        @return Message with a list of settings
+        Set parameters to the infrastructure side of the agent. For
+        instrument-specific values, use op_setToInstrument().
+        @see op_setToInstrument
+        @see op_setToCI
+        @retval Message with a list of settings
+            that were changed and what their new values are upon success.
+            On failure, return the bad key, but previous keys were already set
+        """
+        yield self.op_set_to_CI(content, headers, msg)
+    
+    @defer.inlineCallbacks
+    def op_set_to_instrument(self, content, headers, msg):
+        """
+        Set parameters to the instrument side of of the agent. These are
+        generally values that will be handled by the instrument driver.
+        @param content A dict that contains the key:value pair to set
+        @retval Message with a list of settings
             that were changed and what their new values are upon success.
             On failure, return the bad key, but previous keys were already set
         """
         assert(isinstance(content, dict))
-        assert(self.driver != None)
         response = {}
-        for key in content:
-            result = {}
-            result = self.driver.set_param(key, content[key])
-            if result == {}:
-                yield self.reply_err(msg, "Could not set %s" % key)
-            else:
-                response.update(result)
+        result = yield self.driver_client.set_params(content)
+        if result == {}:
+            yield self.reply_err(msg, "Could not set %s" % content)
+        else:
+            response.update(result)
         assert(response != {})
         yield self.reply_ok(msg, response)
-            
+    
     @defer.inlineCallbacks
-    def op_getLifecycleState(self, content, headers, msg):
+    def op_set_to_CI(self, content, headers, msg):
         """
-        Query the lifecycle state of the object
-        @return Message with the lifecycle state
-        @todo Should actually work with registry for lifecycle state
+        Set parameters related to the infrastructure side of the agent
+        (registration information, location, network addresses, etc.)
+        @retval Message with a list of settings that were changed and what
+           their new values are upon success. On failure, return the bad key,
+           but previous keys were already set
+        @todo Write this or pass through to a subclass
         """
-        yield self.reply(msg, 'getLifecycleState', self.lifecycleState, {})
-        
-    @defer.inlineCallbacks
-    def op_setLifecycleState(self, content, headers, msg):
-        """
-        Set the lifecycle state
-        @return Message with the lifecycle state that was set
-        @todo Should actually work with registry for lifecycle state
-        """
-        self.lifecycleState = content
-        yield self.reply(msg, 'setLifecycleState', content, {})
+        pass
     
     @defer.inlineCallbacks
     def op_execute(self, content, headers, msg):
         """
-        Execute a specific command on the instrument, reply with a confirmation
+        Execute a command on the instrument, reply with a confirmation
         message including output of command, or simple ACK that command
-        was executed.
-        @param content Should be a list where first element is the command,
-            the rest are the arguments
-        @return ACK message with response on success, ERR message with string
+        was executed. For InstrumentAgent calls, execute maps to an execution
+        to the CI set of commands.
+        @param command A dictionary where the command name is the key and the
+            arguments are the value as a (possibly empty) list. For example:
+            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @retval ACK message with response on success, ERR message with string
             indicating code and response message on fail
         """
-        assert(isinstance(content, unicode))
-        assert(self.driver != None)
-        execResult = self.driver.execute(content)
-        assert(len(execResult) == 2)
-        (errorCode, response) = execResult
-        assert(isinstance(errorCode, int))
-        if errorCode == 1:
-            yield self.reply_ok(msg, response)
-        else:
-            yield self.reply_err(msg,
-                                 "Error code %s, response: %s" % (errorCode,
-                                                                  response))
+        yield self.op_execute_CI(content, headers, msg)
+        
+    @defer.inlineCallbacks
+    def op_execute_CI(self, content, headers, msg):
+        """
+        Execute infrastructure commands related to the Instrument Agent
+        instance. This includes commands for messaging, resource management
+        processes, etc.
+        @param content Should be a list where first element is the command,
+            the rest are the arguments
+        @retval ACK message with response on success, ERR message with string
+            indicating code and response message on fail
+        """
     
     @defer.inlineCallbacks
-    def op_getStatus(self, content, headers, msg):
+    def op_execute_instrument(self, content, headers, msg):
+        """
+        Execute instrument commands relate to the instrument fronted by this
+        Instrument Agent. These commands will likely be handled by the
+        underlying driver.
+        @param command A dictionary where the command name is the key and the
+            arguments are the value as a (possibly empty) list. For example:
+            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @retval ACK message with response on success, ERR message with string
+            indicating code and response message on fail
+        """
+        assert(isinstance(content, dict))
+        execResult = yield self.driver_client.execute(content)
+        assert(isinstance(execResult, dict))
+        if (execResult['status'] == 'OK'):
+            yield self.reply_ok(msg, execResult['value'])
+        else:
+            yield self.reply_err(msg, "Failure, response is: %s"
+                                 % execResult['value'])
+    @defer.inlineCallbacks
+    def op_get_status(self, content, headers, msg):
         """
         Obtain the status of an instrument. This includes non-parameter
         and non-lifecycle state of the instrument.
         @param content A list of arguments to make up the status request
-        @return ACK message with response on success, ERR message on failure
+        @retval ACK message with response on success, ERR message on failure
         """
         assert(isinstance(content, list))
-        assert(self.driver != None)
-        response = self.driver.get_status(content)
-        if ((isinstance(response, tuple)) and (response[0] == 1)):
-            yield self.reply_ok(msg, response[1])
+        response = yield self.driver_client.get_status(content)
+        if (response['status'] == 'OK'):
+            yield self.reply_ok(msg, response['value'])
         else:
-            yield self.reply_err(msg, 'No values found')
-            
+            yield self.reply_err(msg, response['value'])
+                    
 class InstrumentAgentClient(ResourceAgentClient):
     """
     The base class for an Instrument Agent Client. It is a service
@@ -165,85 +316,142 @@ class InstrumentAgentClient(ResourceAgentClient):
     """
 
     @defer.inlineCallbacks    
-    def get(self, paramList):
+    def get_from_instrument(self, paramList):
         """
         Obtain a list of parameter names from the instrument
         @param paramList A list of the values to fetch
-        @return A dict of the names and values requested
+        @retval A dict of the names and values requested
         """
         assert(isinstance(paramList, list))
-        (content, headers, message) = yield self.rpc_send('get', paramList)
+        (content, headers, message) = yield self.rpc_send('get_from_instrument',
+                                                          paramList)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+    
+    @defer.inlineCallbacks    
+    def get_from_CI(self, paramList):
+        """
+        Obtain a list of parameter names from the instrument
+        @param paramList A list of the values to fetch
+        @retval A dict of the names and values requested
+        """
+        assert(isinstance(paramList, list))
+        (content, headers, message) = yield self.rpc_send('get_from_CI',
+                                                          paramList)
         assert(isinstance(content, dict))
         defer.returnValue(content)
     
     @defer.inlineCallbacks
-    def set(self, paramDict):
+    def set_to_instrument(self, paramDict):
         """
         Set a collection of values on an instrument
         @param paramDict A dict of parameter names and the values they are
             being set to
-        @return A dict of the successful set operations that were performed
+        @retval A dict of the successful set operations that were performed
         @todo Add exceptions for error conditions
         """
         assert(isinstance(paramDict, dict))
-        (content, headers, message) = yield self.rpc_send('set', paramDict)
+        (content, headers, message) = yield self.rpc_send('set_to_instrument',
+                                                          paramDict)
         assert(isinstance(content, dict))
         defer.returnValue(content)
-    
-    @defer.inlineCallbacks
-    def execute(self, commandList):
-        """
-        Execute the commands in the order of the list. Processing will cease
-        when a command fails, but will not roll back.
-        @param command_list An ordered list of commands to execute
-        @return Dictionary of responses to each execute command
-        @todo Alter semantics of this call as needed...maybe arguments?
-        @todo Add exceptions as needed
-        """
-        result = {}
-        assert(isinstance(commandList, list))
-        for command in commandList:
-            (content, headers, message) = yield self.rpc_send('execute',
-                                                              command)
-            result[command] = content
-        assert(isinstance(result, dict))
-        defer.returnValue(result)
 
     @defer.inlineCallbacks
-    def getStatus(self, argList):
+    def set_to_CI(self, paramDict):
+        """
+        Set a collection of values on an instrument
+        @param paramDict A dict of parameter names and the values they are
+            being set to
+        @retval A dict of the successful set operations that were performed
+        @todo Add exceptions for error conditions
+        """
+        assert(isinstance(paramDict, dict))
+        (content, headers, message) = yield self.rpc_send('set_to_CI',
+                                                          paramDict)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def execute_instrument(self, command):
+        """
+        Execute the instrument commands in the order of the list.
+        Processing will cease when a command fails, but will not roll back.
+        For instrument calls, use executeInstrument()
+        @see executeInstrument()
+        @param command A dictionary where the command name is the key and the
+            arguments are the value as a (possibly empty) list. For example:
+            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @retval Dictionary of responses to each execute command
+        @todo Alter semantics of this call as needed...maybe a list?
+        @todo Add exceptions as needed
+        """
+        assert(isinstance(command, dict))
+        (content, headers, message) = yield self.rpc_send('execute_instrument',
+                                                          command)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def execute_CI(self, command):
+        """
+        Execute the instrument commands in the order of the list.
+        Processing will cease when a command fails, but will not roll back.
+        For instrument calls, use executeCI()
+        @see executeInstrument()
+        @param command A dictionary where the command name is the key and the
+            arguments are the value as a (possibly empty) list. For example:
+            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @retval Dictionary of responses to each execute command
+        @todo Alter semantics of this call as needed...maybe a command list?
+        @todo Add exceptions as needed
+        """
+        assert(isinstance(command, list))
+        (content, headers, message) = yield self.rpc_send('execute_CI',
+                                                          command)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def get_status(self, argList):
         """
         Obtain the non-parameter and non-lifecycle status of the instrument
+        @param argList A list of arguments to pass for status
         """
         assert(isinstance(argList, list))
-        (content, headers, message) = yield self.rpc_send('getStatus',
+        (content, headers, message) = yield self.rpc_send('get_status',
                                                               argList)
-        assert(isinstance(content, dict))
         defer.returnValue(content)
         
     @defer.inlineCallbacks    
-    def getCapabilities(self):
+    def get_capabilities(self):
         """
         Obtain a list of capabilities from the instrument
-        @return A dict with commands and parameter lists that are supported
-            such as {'commands':[], 'parameters':[]}
+        @retval A dict with commands and
+        parameter lists that are supported
+            such as {'commands':(), 'parameters':()}
         """
-        (content, headers, message) = yield self.rpc_send('getCapabilities',
+        (content, headers, message) = yield self.rpc_send('get_capabilities',
                                                           ())
         assert(isinstance(content, dict))
-        assert('commands' in content)
-        assert('parameters' in content)
-        assert(isinstance(content['commands'], list))
-        assert(isinstance(content['parameters'], list))
+        assert('ci_commands' in content)
+        assert('ci_parameters' in content)
+        assert(isinstance(content['ci_commands'], list))
+        assert(isinstance(content['ci_parameters'], list))
+        assert('instrument_commands' in content)
+        assert('instrument_parameters' in content)
+        assert(isinstance(content['instrument_commands'], list))
+        assert(isinstance(content['instrument_parameters'], list))
+
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def getTranslator(self):
+    def get_translator(self):
         """
         Get the translator routine that will convert the raw format of the
         device into a common, repository-ready one
-        @return Function code that takes in data in the streamed format and
+        @retval Function code that takes in data in the streamed format and
             and puts it into the repository ready format
         """
-        (content, headers, message) = yield self.rpc_send('getTranslator', ())
+        (content, headers, message) = yield self.rpc_send('get_translator', ())
         #assert(inspect.isroutine(content))
         defer.returnValue(content)  
