@@ -79,18 +79,20 @@ class SBE49InstrumentDriver(InstrumentDriver):
     @defer.inlineCallbacks
     def op_set_params(self, content, headers, msg):
         """
-        operate in instrument protocol to set a parameter
+        Operate in instrument protocol to set a parameter. Current semantics
+        are that, if there is a problem, fail as soon as possible. This may
+        leave partial settings made in the device.
+        @param content A dict of all the parameters and values to set
+        @todo Make this an all-or-nothing and/or rollback-able transaction
+            list?
         """
         assert(isinstance(content, dict))
-        updated = False
-        for param in content:
-            if (param in self.__instrument_parameters):
+        for param in content.keys():
+            if (param not in self.__instrument_parameters):
+                yield self.reply_err(msg, "Could not set %s" % param)
+            else:
                 self.__instrument_parameters[param] = content[param]
-                updated = True
-        if (updated == True):
             yield self.reply_ok(msg, content)
-        else:
-            yield self.reply_err(msg, "No values updated")
             
     @defer.inlineCallbacks
     def op_execute(self, content, headers, msg):

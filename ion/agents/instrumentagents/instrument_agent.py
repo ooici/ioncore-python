@@ -220,19 +220,18 @@ class InstrumentAgent(ResourceAgent):
         """
         Set parameters to the instrument side of of the agent. These are
         generally values that will be handled by the instrument driver.
+        @param content A dict that contains the key:value pair to set
         @retval Message with a list of settings
             that were changed and what their new values are upon success.
             On failure, return the bad key, but previous keys were already set
         """
         assert(isinstance(content, dict))
         response = {}
-        for key in content:
-            result = {}
-            result = yield self.driver_client.set_params(key, content[key])
-            if result == {}:
-                yield self.reply_err(msg, "Could not set %s" % key)
-            else:
-                response.update(result)
+        result = yield self.driver_client.set_params(content)
+        if result == {}:
+            yield self.reply_err(msg, "Could not set %s" % content)
+        else:
+            response.update(result)
         assert(response != {})
         yield self.reply_ok(msg, response)
     

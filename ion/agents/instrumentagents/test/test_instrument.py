@@ -95,6 +95,7 @@ class TestInstrumentAgent(IonTestCase):
         # Try setting something bad
         response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
                                             'badvalue': 1})
+        logging.debug("*** response: %s", response)
         self.assert_(response['status'] == 'ERROR')
         self.assert_('baudrate' not in response)
 
