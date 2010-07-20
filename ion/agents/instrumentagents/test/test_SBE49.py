@@ -9,8 +9,8 @@ including the driver
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
-from ion.agents.instrumentagents.SBE49 import SBE49InstrumentDriverClient
-from ion.agents.instrumentagents.SBE49 import SBE49InstrumentDriver
+from ion.agents.instrumentagents.SBE49_instrument_driver import SBE49InstrumentDriverClient
+from ion.agents.instrumentagents.SBE49_instrument_driver import SBE49InstrumentDriver
 from ion.core import bootstrap
 
 class TestSBE49(IonTestCase):

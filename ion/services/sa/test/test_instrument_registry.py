@@ -13,12 +13,12 @@ from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.data.datastore import registry
-from ion.resources import coi_resource_descriptions
 
-from ion.services.coi.resource_registry import ResourceRegistryClient
+from ion.services.sa.instrument_registry import InstrumentRegistryClient
 from ion.test.iontest import IonTestCase
 from ion.data import dataobject
 
+import uuid
 
 class ResourceRegistryTest(IonTestCase):
     """
@@ -30,10 +30,10 @@ class ResourceRegistryTest(IonTestCase):
         yield self._start_container()
         #self.sup = yield self._start_core_services()
         services = [
-            {'name':'resourceregistry1','module':'ion.services.coi.resource_registry','class':'ResourceRegistryService'}]
+            {'name':'resourceregistry1','module':'ion.services.sa.instrument_registry','class':'InstrumentRegistryService'}]
         sup = yield self._spawn_processes(services)
 
-        self.rrc = ResourceRegistryClient(proc=sup)
+        self.rrc = InstrumentRegistryClient(proc=sup)
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -44,23 +44,16 @@ class ResourceRegistryTest(IonTestCase):
     def test_resource_reg(self):
         # put in a bogus resource for now...
         res = dataobject.InformationResource.create_new_resource()
-        res = yield self.rrc.register_resource_definition(res)
+        res = yield self.rrc.register_instrument_type(res)
         
-        ref = yield self.rrc.set_resource_lcstate_commissioned(res)
-
+        res = yield self.rrc.set_resource_lcstate_commissioned(res)
         
-        res2 = yield self.rrc.get_resource_definition(ref)
+        ref = res.reference()
         
-        self.assertEqual(res2,res)
-        print res
+        res2 = yield self.rrc.get_instrument_type(ref)
         
-    def test_describe_resource(self):
-        # put in a bogus resource for now...
-        res = coi_resource_descriptions.ResourceDescription.create_new_resource()
+        self.assertEqual(res,res2)
         
-        res.describe_resource(res)
-        print 'res:',res
-
 
 
 class ResourceRegistryCoreServiceTest(IonTestCase):

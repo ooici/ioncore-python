@@ -15,7 +15,6 @@ from ion.core import base_process
 import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.services.coi import resource_registry
 
 
 from ion.data.datastore import registry
@@ -26,7 +25,7 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
 
-class ServiceRegistryService(resource_registry.BaseResourceRegistryService):
+class ServiceRegistryService(registry.BaseRegistryService):
     """
     Service registry service interface
     @todo a service is a resource and should also be living in the resource registry
@@ -42,7 +41,7 @@ class ServiceRegistryService(resource_registry.BaseResourceRegistryService):
         """
         svc_name = str(content['svc_name'])
         svc_enc = content['svc_enc']
-        svc = dataobject.ResourceDescription.decode(svc_enc)()
+        svc = dataobject.Resource.decode(svc_enc)()
         logging.info('op_register_service: \n' + str(svc))
   
         yield self.reg.register(svc_name,svc)
@@ -72,7 +71,7 @@ class ServiceRegistryService(resource_registry.BaseResourceRegistryService):
         """
         svc_name = str(content['svc_name'])
         svc_enc = content['svc_enc']
-        svc = dataobject.ResourceDescription.decode(svc_enc)()
+        svc = dataobject.Resource.decode(svc_enc)()
         logging.info('op_register_service: \n' + str(svc))
   
         yield self.reg.register(svc_name,svc)
@@ -98,7 +97,7 @@ class ServiceRegistryService(resource_registry.BaseResourceRegistryService):
 factory = ProtocolFactory(ServiceRegistryService)
 
 
-class ServiceRegistryClient(resource_registry.BaseRegistryClient):
+class ServiceRegistryClient(registry.BaseRegistryClient):
     """
     Client class for accessing the service registry. This is most important for
     finding and accessing any other services. This client knows how to find the
@@ -128,7 +127,7 @@ class ServiceRegistryClient(resource_registry.BaseRegistryClient):
         logging.info('Service reply: '+str(content))
         svc_enc = content['svc_enc']
         if res_enc != None:
-            svc = dataobject.ResourceDescription.decode(svc_enc)()
+            svc = dataobject.Resource.decode(svc_enc)()
             defer.returnValue(svc)
         else:
             defer.returnValue(None)
@@ -151,7 +150,7 @@ class ServiceRegistryClient(resource_registry.BaseRegistryClient):
         logging.info('Service reply: '+str(content))
         svc_enc = content['svc_enc']
         if res_enc != None:
-            svc = dataobject.ResourceDescription.decode(svc_enc)()
+            svc = dataobject.Resource.decode(svc_enc)()
             defer.returnValue(svc)
         else:
             defer.returnValue(None)
@@ -162,7 +161,7 @@ class ServiceRegistryClient(resource_registry.BaseRegistryClient):
         defer.returnValue(sidesc.xname)
 
 
-class ServiceDesc(dataobject.ResourceDescription):
+class ServiceDesc(dataobject.Resource):
     """Structured object for a service instance.
 
     Attributes:
@@ -175,7 +174,7 @@ class ServiceDesc(dataobject.ResourceDescription):
     res_type = dataobject.TypedAttribute(str,'rt_service')
     
     
-class ServiceInterfaceDesc(dataobject.ResourceDescription):
+class ServiceInterfaceDesc(dataobject.Resource):
     """
     op_service_method = dataobject.TypedAttribute(dict)
     Where the dict is a content is a description for the message
@@ -184,7 +183,7 @@ class ServiceInterfaceDesc(dataobject.ResourceDescription):
         
 
 
-class ServiceInstanceDesc(dataobject.ResourceDescription):
+class ServiceInstanceDesc(dataobject.Resource):
     """Structured object for a service instance.
 
     Attributes:
@@ -198,7 +197,7 @@ class ServiceInstanceDesc(dataobject.ResourceDescription):
 
 # Service interface description for the resource registry service
 class ServiceRegistryInterfaceDesc(ServiceInterfaceDesc):
-    op_register_service_description = dataobject.TypedAttribute(dict,{'svc_name':'str','svc_enc':'ResourceDescription'})
+    op_register_service_description = dataobject.TypedAttribute(dict,{'svc_name':'str','svc_enc':'Resource'})
     op_get_service_description = dataobject.TypedAttribute(dict)
     op_register_service_instance = dataobject.TypedAttribute(dict)
     op_get_service_instance = dataobject.TypedAttribute(dict)

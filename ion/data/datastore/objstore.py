@@ -421,7 +421,7 @@ class ObjectStore(BaseObjectStore):
         """
 
         """
-        obs = objectClass().encode()
+        obs = objectClass().encode(header=False)
         blobs = [(name, Blob(val)) for name, val in obs]
         for n, b in blobs:
             yield self.put(b)
@@ -436,7 +436,7 @@ class ObjectStore(BaseObjectStore):
         """
         objectClassName = obj['class'].content
         obj_parts = [(child[0], child.obj.content) for child in obj['attrs'].children]
-        objectClass = self.objectChassis.objectClass.decode(obj_parts)
+        objectClass = self.objectChassis.objectClass.decode(obj_parts,header=False)
         return objectClass
 
     @defer.inlineCallbacks

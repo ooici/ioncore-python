@@ -426,8 +426,9 @@ class InstrumentAgentClient(ResourceAgentClient):
     def get_capabilities(self):
         """
         Obtain a list of capabilities from the instrument
-        @retval A dict with commands and parameter lists that are supported
-            such as {'commands':[], 'parameters':[]}
+        @retval A dict with commands and
+        parameter lists that are supported
+            such as {'commands':(), 'parameters':()}
         """
         (content, headers, message) = yield self.rpc_send('get_capabilities',
                                                           ())

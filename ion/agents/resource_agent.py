@@ -12,7 +12,7 @@ import uuid
 from twisted.internet import defer
 
 from ion.services.coi.resource_registry import ResourceRegistryClient
-from ion.data.dataobject import ResourceDescription
+from ion.resources.coi_resource_descriptions import ResourceDescription
 from ion.core.base_process import BaseProcess
 from ion.core.base_process import BaseProcessClient
 from ion.data.dataobject import LCState, LCStateNames
