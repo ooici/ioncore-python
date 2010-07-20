@@ -73,8 +73,6 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability of the SBE49 driver to send and receive get, set,
         and other messages. Best called as RPC message pairs.
         """
-#        raise unittest.SkipTest('Needs Refactor of LifeCycle State and Resource Descriptions')
-
         response = yield self.IAClient.get_from_instrument(['baudrate','outputformat'])
         self.assert_(response['status'] == 'OK')
         self.assertEqual(response['baudrate'], 9600)
