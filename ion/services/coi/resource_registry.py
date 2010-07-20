@@ -95,13 +95,25 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         resources.
         """
 
-
-    def register_resource_instance(self,resource):
+    @defer.inlineCallbacks
+    def register_resource_instance(self,resource,owner):
         """
         Client method to Register a Resource instance
+        An instance is a reference to an owner, a description and the resource
+        @Note this need architectural clarification
         """
-        return self.base_register_resource(resource, 'register_resource_instance')
+        resource_description = yield self.register_resource_definition(resource)
+
+        resource_instance = coi_resource_descriptions.ResourceInstance.create_new_resource()
+        resource_instance.name = resource.name # ?
+        resource_instance.description = resource_description.reference(head=True)
+        resource_instance.owner = owner.reference(head=True)
+        resource_instance.resource = resource.reference(head=True)
+            
+        resource_instance = self.base_register_resource(resource_instance, 'register_resource_instance')
     
+        defer.returnValue(resource_instance)
+        
     @defer.inlineCallbacks
     def register_resource_definition(self,resource):
         """
@@ -162,6 +174,9 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
 
     @defer.inlineCallbacks
     def find_resource_definition(self, resource):
+        """
+        @Brief find the definition of a resoruce in the resource registry
+        """
         resource_type = coi_resource_descriptions.ResourceDescription()
         resource_type.describe_resource(resource)
         alist = yield self.base_find_resource(resource_type,'find_resource_definition',regex=False,ignore_defaults=True)
@@ -173,9 +188,16 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
             defer.returnValue(None)
             
     def find_described_resources(self, description,regex=True,ignore_defaults=True):
+        """
+        @Brief find all registered resources which match the attributes of description
+        """
         return self.base_find_resource(description,'find_described_resource',regex,ignore_defaults)
         
-
+    def find_resource_instance(self, description,regex=True,ignore_defaults=True):
+        """
+        @Brief Find all registered instances that match the the attributes of description
+        """
+        return self.base_find_resource(description,'find_resource_instance',regex,ignore_defaults)
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(ResourceRegistryService)
