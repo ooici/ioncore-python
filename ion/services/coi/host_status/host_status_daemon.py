@@ -1,6 +1,6 @@
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 from host_status import HostStatus
-import os,sys
+import os,sys,encoders
 from daemon import Daemon
  
 
@@ -49,7 +49,7 @@ class HostStatusRPCServer:
         """
         Gets the status of this host (RPC registered function)
         """
-        return self.status.getAll()
+        return encoders.encodeJSONToXMLRPC(self.status.getAll())
 
 
         
