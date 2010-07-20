@@ -41,12 +41,14 @@ Resource Description object are used in the OOICI Registries
 
 """
 Define properties of resource types
+@Note What is the intent with Resource Types? 
 """
 ResourceTypes = ['generic',
                 'unassigned',
                 'information',
                 'service',
-                'stateful'
+                'stateful',
+                'taskable'
                 ]
 
 class ResourceType(object):

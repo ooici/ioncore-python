@@ -73,7 +73,10 @@ class TypedAttribute(object):
                         objs.append(itype(str(ival)))
                     
                 return cls(mytype, mytype(objs))
-
+            elif issubclass(mytype, dict):
+                # since dicts are 'just' json encoded load and return!
+                return json.loads(default)
+            
             elif issubclass(mytype, bool):
                 return cls(mytype, eval(str(default)))
             
@@ -279,6 +282,7 @@ class DataObject(object):
                 value_enc = value.encode(header = False)
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(value_enc),)))
             elif isinstance(value,(list,tuple,set)):
+                # List can contain other data object or decodable types
                 list_enc = []
                 for val in value:
                     if isinstance(val, DataObject):
@@ -288,7 +292,10 @@ class DataObject(object):
                         list_enc.append("%s%s%s" % (type(val).__name__, NULL_CHR, str(val)))
                 
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(list_enc),)))
-
+            elif isinstance(value,dict):
+                # dict can only contain JSONable types!
+                encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(value),)))
+                
             else:
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
 

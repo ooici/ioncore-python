@@ -339,6 +339,25 @@ class TestTupleObject(TestSimpleObject):
         self.obj = obj
         self.encoded=[('Object_Type', 'TupleObject'),('rtuple', 'tuple\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big tuple')]
      
+     
+class DictObject(dataobject.DataObject):
+    name = dataobject.TypedAttribute(str)
+    rdict = dataobject.TypedAttribute(dict)
+     
+dataobject.DataObject._types['DictObject']=DictObject
+
+class TestDictObject(TestSimpleObject):
+    def setUp(self):
+        obj = DictObject()
+        obj.name = 'David'
+        obj.rdict = {'a':'a','b':5,'data':3.14159}
+        self.obj = obj
+        self.encoded=[('Object_Type', 'DictObject'),
+                    ('rdict', 'dict\x00{"a": "a", "b": 5, "data": 3.1415899999999999}'),
+                    ('name', 'str\x00David')]
+    
+     
+     
 class NestedObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str,'stuff')
     rset = dataobject.TypedAttribute(SetObject)
