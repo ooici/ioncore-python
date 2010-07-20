@@ -44,24 +44,5 @@ class HostStatusTest(IonTestCase):
         print all
     
     
-    # Testing RPC wrapper
-                
-    def test_RPCServer(self):
-        """
-        RPC Server is started as a process, testing that it starts and shutsdown
-        gracefully.
-        """
-        try:
-            p = subprocess.Popen(
-                (sys.executable,"ion/services/coi/host_status/host_status_server.py"),
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE
-                )
-        except socket.error:
-            print "Socket already in use"
-            p.kill()
-            
-        status = p.stdout.readline()
-        p.kill()
 
 
