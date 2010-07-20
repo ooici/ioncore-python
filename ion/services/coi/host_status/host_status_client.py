@@ -1,7 +1,7 @@
-import xmlrpclib
+import xmlrpclib, json
 
 s = xmlrpclib.ServerProxy('http://localhost:9010')
-print s.getStatus()
+print json.dumps(s.getStatus(), indent=4)
 
 # Print list of available methods
 print s.system.listMethods()
