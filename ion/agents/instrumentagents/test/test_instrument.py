@@ -15,7 +15,6 @@ from twisted.trial import unittest
 
 from ion.data.dataobject import LCStates as LCS
 from ion.test.iontest import IonTestCase
-from ion.services.coi.resource_registry import ResourceRegistryClient
 from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 from ion.agents.instrumentagents.SBE49 import ci_commands as IACICommands
@@ -95,7 +94,6 @@ class TestInstrumentAgent(IonTestCase):
         # Try setting something bad
         response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
                                             'badvalue': 1})
-        logging.debug("*** response: %s", response)
         self.assert_(response['status'] == 'ERROR')
         self.assert_('baudrate' not in response)
 
@@ -119,6 +117,7 @@ class TestInstrumentAgent(IonTestCase):
         Test the resource lifecycle management
         """
         raise unittest.SkipTest('Still needs resource registry integration')
+        """
         response = yield self.IAClient.set_lifecycle_state(LCS.inactive)
         self.assertEqual(response, LCS.inactive)
 
@@ -134,7 +133,7 @@ class TestInstrumentAgent(IonTestCase):
 
         response = yield self.IAClient.set_lifecycle_state(LCS('foobar'))
         self.assertEqual(response, active)
-
+        """
 
     @defer.inlineCallbacks
     def test_execute(self):

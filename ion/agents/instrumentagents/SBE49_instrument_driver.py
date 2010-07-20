@@ -101,7 +101,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
         of the elements are arguments)
         @todo actually do something
         """
-        ok = True
         assert(isinstance(content, dict))
         if (content == {}):
             yield self.reply_err(msg, "Empty command")
