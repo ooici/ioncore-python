@@ -21,6 +21,9 @@ from ion.data.datastore import registry
 from ion.data import dataobject
 from ion.data import store
 
+from ion.resources import coi_resource_descriptions
+
+
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
@@ -33,215 +36,142 @@ class ServiceRegistryService(registry.BaseRegistryService):
     # Declaration of service
     declare = BaseService.service_declare(name='service_registry', version='0.1.0', dependencies=[])
 
+    op_clear_registry = registry.BaseRegistryService.base_clear_registry
 
-    @defer.inlineCallbacks
-    def op_register_service_description(self, content, headers, msg):
-        """
-        Service operation: Register a resource instance with the registry.
-        """
-        svc_name = str(content['svc_name'])
-        svc_enc = content['svc_enc']
-        svc = dataobject.Resource.decode(svc_enc)()
-        logging.info('op_register_service: \n' + str(svc))
-  
-        yield self.reg.register(svc_name,svc)
-        yield self.reply_ok(msg, {'svc_name':str(svc_name)},)
+    op_register_service_defintion = registry.BaseRegistryService.base_register_resource
+    """
+    Service operation: Register a service description with the registry.
+    """
 
+    op_get_service_definition = registry.BaseRegistryService.base_get_resource
+    """
+    Service operation: Get a service description.
+    """
 
-    @defer.inlineCallbacks
-    def op_get_service_description(self, content, headers, msg):
-        """
-        Service operation: Get a resource instance.
-        """
-        svc_name = content['svc_name']
-        logging.info('op_get_service: '+str(svc_name))
+    op_register_service_instance = registry.BaseRegistryService.base_register_resource
+    """
+    Service operation: Register a service instance with the registry.
+    """
 
-        svc = yield self.reg.get_description(svc_name)
-        logging.info('Got Resource:\n'+str(resource))
-        if svc:
-            yield self.reply_ok(msg, {'svc_enc':svc.encode()})
-        else:
-            yield self.reply_err(msg, {'svc_enc':None})
-
-
-    @defer.inlineCallbacks
-    def op_register_service_instance(self, content, headers, msg):
-        """
-        Service operation: Register a resource instance with the registry.
-        """
-        svc_name = str(content['svc_name'])
-        svc_enc = content['svc_enc']
-        svc = dataobject.Resource.decode(svc_enc)()
-        logging.info('op_register_service: \n' + str(svc))
-  
-        yield self.reg.register(svc_name,svc)
-        yield self.reply_ok(msg, {'svc_name':str(svc_name)},)
-
-    @defer.inlineCallbacks
-    def op_get_service_instance(self, content, headers, msg):
-        """
-        Service operation: Get a resource instance.
-        """
-        svc_name = content['svc_name']
-        logging.info('op_get_service: '+str(svc_name))
-
-        svc = yield self.reg.get_description(svc_name)
-        logging.info('Got Resource:\n'+str(resource))
-        if svc:
-            yield self.reply_ok(msg, {'svc_enc':svc.encode()})
-        else:
-            yield self.reply_err(msg, {'svc_enc':None})
-
+    op_get_service_instance = registry.BaseRegistryService.base_get_resource
+    """
+    Service operation: Get a service instance.
+    """
+    op_set_service_lcstate = registry.BaseRegistryService.base_set_resource_lcstate
+    """
+    Service operation: Set a service life cycle state
+    """
+    op_find_service_definition = registry.BaseRegistryService.base_find_resource
+    """
+    Service operation: Find the definition of a service
+    """
+    op_find_described_resource = registry.BaseRegistryService.base_find_resource
+    """
+    Service operation: Find service definitions which meet a description
+    """
+    
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(ServiceRegistryService)
 
 
-class ServiceRegistryClient(registry.BaseRegistryClient):
+class ServiceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin):
     """
     Client class for accessing the service registry. This is most important for
     finding and accessing any other services. This client knows how to find the
-    service registry
+    service registry - what does that mean, don't all clients have targetname
+    assigned?
     """
     def __init__(self, proc=None, **kwargs):
-        kwargs['targetname'] = "service_registry"
-        # rrc = Resource Registry Client
-        self.rrc = resource_registry.ResourceRegistryClient(proc, **kwargs)
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "service_registry"
+        BaseServiceClient.__init__(self, proc, **kwargs)
+
+    def clear_registry(self):
+        return self.base_clear_registry('clear_registry')
+
+    def register_container_services(self):
+        """
+        This method is called when the container is started to inspect the
+        services of lca arch and register descriptions for each service.
+        """
 
     @defer.inlineCallbacks
-    def register_service(self, svc_desc):        
-        yield self._check_init()
-
-        (content, headers, msg) = yield self.rpc_send('register_service',
-                                            {'svc_name':svc_desc.svc_name,'svc_enc':svc_desc.encode()})
-        logging.info('Register Service reply: '+str(headers))
-        defer.returnValue(str(content['svc_name']))
+    def register_service_defintion(self,service_class):
+        """
+        Client method to register the Definition of a Service Class
+        """
+        found = yield self.find_service_definition(service_class)
+        if found:
+            defer.returnValue(found)
+            
+        service_description = coi_resource_descriptions.ServiceDescription.create_new_resource()
+        service_description.describe_service(service_class)
+                        
+        
+        service_description.set_lifecyclestate(dataobject.LCStates.developed)
+        service_description = yield self.base_register_resource(service_description, 'register_service_definition')
+        defer.returnValue(resource_type)
         
 
-    @defer.inlineCallbacks
-    def get_service(self, service_name):
-        yield self._check_init()
+    def get_service_description(self, resource_reference):
+        """
+        Get a service description
+        """
+        return self.base_get_resource(resource_reference,'get_service_description')
 
-        (content, headers, msg) = yield self.rpc_send('get_service',
-                                                      {'svc_name':service_name})
-        logging.info('Service reply: '+str(content))
-        svc_enc = content['svc_enc']
-        if res_enc != None:
-            svc = dataobject.Resource.decode(svc_enc)()
-            defer.returnValue(svc)
+    @defer.inlineCallbacks
+    def register_service_instance(self,service_instance):
+        """
+        Client method to register a Service Instance
+        """
+        found = yield self.find_service_instnace(service_instance)
+        if found:
+            defer.returnValue(found)
+            
+        service_reference = coi_resource_descriptions.ServiceInstance.create_new_resource()
+        service_reference.describe_instance(service_class)
+                        
+        
+        service_description.set_lifecyclestate(dataobject.LCStates.developed)
+        service_description = yield self.base_register_resource(service_description, 'register_service_definition')
+        defer.returnValue(resource_type)
+
+    def get_service_instance(self, resource_reference):
+        """
+        Get a service instance
+        """
+        return self.base_get_resource(resource_reference,'get_service_instance')
+
+
+    def set_resource_lcstate(self, resource_reference, lcstate):
+        return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_service_lcstate')
+
+
+    @defer.inlineCallbacks
+    def find_service_definition(self, resource):
+        svc_desc = coi_resource_descriptions.ResourceDescription()
+        svc_desc.describe_service(resource)
+        alist = yield self.base_find_resource(resource_type,'find_resource_definition',regex=False,ignore_defaults=True)
+        # Find returns a list but only one resource should match!
+        if alist:
+            assert len(alist) == 1
+            defer.returnValue(alist[0])
         else:
             defer.returnValue(None)
-
-    @defer.inlineCallbacks
-    def register_service_instance(self, svc_inst):
-        yield self._check_init()
-
-        (content, headers, msg) = yield self.rpc_send('register_service',
-                                            {'svc_inst_name':svc_inst.svc_name,'svc_enc':svc_desc.encode()})
-        logging.info('Register Service reply: '+str(headers))
-        defer.returnValue(str(content['svc_name']))
-
-    @defer.inlineCallbacks
-    def get_service_instance(self, service_instance_name):
-        yield self._check_init()
-
-        (content, headers, msg) = yield self.rpc_send('get_service_instance',
-                                                      {'svc_name':service_instance_name})
-        logging.info('Service reply: '+str(content))
-        svc_enc = content['svc_enc']
-        if res_enc != None:
-            svc = dataobject.Resource.decode(svc_enc)()
-            defer.returnValue(svc)
-        else:
-            defer.returnValue(None)
-
-    @defer.inlineCallbacks
-    def get_service_instance_name(self, service_name):
-        sidesc = yield self.get_service_instance(service_name)
-        defer.returnValue(sidesc.xname)
-
-
-class ServiceDesc(dataobject.Resource):
-    """Structured object for a service instance.
-
-    Attributes:
-    .name   name of the service
-    """    
-    svc_name = dataobject.TypedAttribute(str)
-    svc_module = dataobject.TypedAttribute(str)
-    svc_class = dataobject.TypedAttribute(str)
-    svc_spawnargs = dataobject.TypedAttribute(dict,{})
-    res_type = dataobject.TypedAttribute(str,'rt_service')
-    
-    
-class ServiceInterfaceDesc(dataobject.Resource):
-    """
-    op_service_method = dataobject.TypedAttribute(dict)
-    Where the dict is a content is a description for the message
-    """
-    
+            
+    def find_described_resources(self, description,regex=True,ignore_defaults=True):
+        return self.base_find_resource(description,'find_described_resource',regex,ignore_defaults)
         
 
 
-class ServiceInstanceDesc(dataobject.Resource):
-    """Structured object for a service instance.
-
-    Attributes:
-    .name   name of the service
-    """    
-    xname = dataobject.TypedAttribute(str)
-    inst_name = dataobject.TypedAttribute(str)
-    inst_type = dataobject.TypedAttribute(str)
-    res_type = dataobject.TypedAttribute(str,'rt_serviceinst')
 
 
-# Service interface description for the resource registry service
-class ServiceRegistryInterfaceDesc(ServiceInterfaceDesc):
-    op_register_service_description = dataobject.TypedAttribute(dict,{'svc_name':'str','svc_enc':'Resource'})
-    op_get_service_description = dataobject.TypedAttribute(dict)
-    op_register_service_instance = dataobject.TypedAttribute(dict)
-    op_get_service_instance = dataobject.TypedAttribute(dict)
 
 
-#class ServiceInstanceDesc(ResourceDesc):
-#    """Structured object for a service instance.
-#
-#    Attributes:
-#    .name   name of the service
-#    """
-#    def __init__(self, **kwargs):
-#        kw = kwargs.copy() if kwargs else {}
-#        kw['res_type'] = 'rt_serviceinst'
-#        ResourceDesc.__init__(self, **kw)
-#        if len(kwargs) != 0:
-#            self.setServiceInstanceDesc(**kwargs)
-#
-#    def setServiceInstanceDesc(self, **kwargs):
-#        if 'xname' in kwargs:
-#            self.set_attr('xname',kwargs['xname'])
-#        else:
-#            raise RuntimeError("Service exchange name missing")
-#
-#        if 'svc_name' in kwargs:
-#            self.set_attr('svc_name',kwargs['svc_name'])
-#        else:
-#            raise RuntimeError("Service name missing")
 
-#class ServiceDesc(ResourceTypeDesc):
-#    """Structured object for a service description.
-#
-#    Attributes:
-#    .name   name of the service
-#    """
-#    def __init__(self, **kwargs):
-#        kw = kwargs.copy() if kwargs else {}
-#        kw['res_type'] = 'rt_service'
-#        ResourceTypeDesc.__init__(self, **kw)
-#        if len(kwargs) != 0:
-#            self.setServiceDesc(**kwargs)
-#
-#    def setServiceDesc(self, **kwargs):
-#        if 'xname' in kwargs:
-#            self.set_attr('xname',kwargs['xname'])
-#        else:
-#            self.set_attr('xname',kwargs['name'])
+
+
+
+
+

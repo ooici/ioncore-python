@@ -433,8 +433,6 @@ class Resource(ResourceReference):
 
     name = TypedAttribute(str)
     lifecycle = TypedAttribute(LCState, default=LCStates.new)
-    resource_description = \
-    'This is the base class for all resources.'
 
     def set_lifecyclestate(self, state):
         self.lifecycle = state
@@ -447,17 +445,15 @@ DataObject._types['Resource']=Resource
 
 class InformationResource(Resource):
     """
+    @brief Base for all OOI information resource objects
     """
-    resource_description = \
-    'This is the base class for all Information resources.'
     
 DataObject._types['InformationResource']=InformationResource
 
 class StatefulResource(Resource):
     """
+    @brief Base for all OOI Stateful resource objects
     """
-    resource_description = \
-    'This is the base class for all Stateful resources.'
     
 DataObject._types['StatefulResource']=StatefulResource
 

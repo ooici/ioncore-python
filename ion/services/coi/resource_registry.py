@@ -16,7 +16,6 @@ from magnet.spawnable import Receiver
 from ion.data import dataobject
 from ion.data.datastore import registry
 
-import re
 from ion.data import store
 
 from ion.core import ioninit
@@ -89,8 +88,11 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
     def clear_registry(self):
         return self.base_clear_registry('clear_registry')
 
-    def register_local_resource_types(self):
+    def register_container_resources(self):
         """
+        This method is called when the container is started to inspect the
+        resources directory of lca arch and register descriptions for all
+        resources.
         """
 
 
@@ -112,11 +114,7 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
             
         resource_type = coi_resource_descriptions.ResourceDescription.create_new_resource()
         resource_type.describe_resource(resource)
-        
-        print resource_type
-        
-        print 'LOOK FOR PARENT'
-        
+                        
         if resource_type.name != 'Resource':
             # If it is the base Resource skip it!
             resource_type.inherits_from = yield self.get_parent_resource_reference(resource)
