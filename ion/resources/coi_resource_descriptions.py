@@ -41,12 +41,14 @@ Resource Description object are used in the OOICI Registries
 
 """
 Define properties of resource types
+@Note What is the intent with Resource Types? 
 """
 ResourceTypes = ['generic',
                 'unassigned',
                 'information',
                 'service',
-                'stateful'
+                'stateful',
+                'taskable'
                 ]
 
 class ResourceType(object):
@@ -86,8 +88,7 @@ DataObject._types.update(OOIResourceTypes)
 class AttributeDescription(DataObject):
     name = TypedAttribute(str)
     type = TypedAttribute(str)
-    #default = TypedAttribute(str) Ignore defaults for now - can't get at it!
-
+    default = TypedAttribute(str) 
 
 class ResourceDescription(InformationResource):
     """
@@ -96,44 +97,18 @@ class ResourceDescription(InformationResource):
     """
     type = TypedAttribute(ResourceType)
     atts = TypedAttribute(list)
-    inherits_from = TypedAttribute(ResourceReference)
+    inherits_from = TypedAttribute(list)
     description = TypedAttribute(str)
 
-    
-    def describe_resource(self,resource):
-        """
-        @Brief Extract metadata from a resource object to store in the resource
-        registry
-        @Param resource is an instance of a class which inherits from Resource
-        """
-        assert isinstance(resource, Resource)
-        
-        self.name = resource.__class__.__name__
-        
-        if isinstance(resource, InformationResource):
-            self.type = OOIResourceTypes.information
-        elif isinstance(resource, StatefulResource):
-            self.type = OOIResourceTypes.stateful
-        else:
-            self.type = OOIResourceTypes.unassigned
-        
-        self.description = inspect.getdoc(resource)
-            
-        for att in resource.attributes:
-            attdesc = AttributeDescription()
-            attdesc.name = att
-            attdesc.type = str(type(getattr(resource, att)))
-            self.atts.append(attdesc)    
-            
     
 class ResourceInstance(InformationResource):
     """
     Resource Instances are stored in the resource registry.
     They describe instances of a resource type
     """
-    instance_description = TypedAttribute(ResourceReference)
-    instance_owner = TypedAttribute(ResourceReference)
-    instance = TypedAttribute(ResourceReference)
+    description = TypedAttribute(ResourceReference)
+    owner = TypedAttribute(ResourceReference)
+    resource = TypedAttribute(ResourceReference)
     
 class IdentityResource(InformationResource):
     """
@@ -175,30 +150,7 @@ class ServiceDescription(InformationResource):
     #spawnargs = TypedAttribute(dict,{})
     description = TypedAttribute(str)
 
-    
-    def describe_service(self,svc):
-        
-        assert issubclass(svc, BaseService)
-        
-        self.name = svc.declare['name']
-        self.version = svc.declare['version']
-        
-        self.class_name = svc.__name__
-        self.module = svc.__module__
-                
-        self.description = inspect.getdoc(svc)      
-            
-        for attr in inspect.classify_class_attrs(svc):
-            if attr.kind == 'method':
-            
-                opdesc = ServiceMethodInterface()
-                opdesc.name = attr.name
-                opdesc.description = inspect.getdoc(attr.object)
-                #Can't seem to get the arguments in any meaningful way...
-                #opdesc.arguments = inspect.getargspec(attr.object)
-                
-                self.interface.append(attdesc)    
-            
+   
     
 class ServiceInstance(InformationResource):
     """

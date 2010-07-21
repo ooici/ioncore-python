@@ -43,13 +43,13 @@ class ResourceRegistryTest(IonTestCase):
     @defer.inlineCallbacks
     def test_resource_reg(self):
         # put in a bogus resource for now...
-        res_to_describe = dataobject.InformationResource.create_new_resource()
+        res_to_describe = coi_resource_descriptions.IdentityResource
         res_description = yield self.rrc.register_resource_definition(res_to_describe)
         
         ref = yield self.rrc.set_resource_lcstate_commissioned(res_description)
 
         
-        commissioned_description = yield self.rrc.get_resource_definition(ref)
+        #commissioned_description = yield self.rrc.get_resource_definition(ref)
         
         #self.assertEqual(res2,res)
         logging.info( str(commissioned_description))
@@ -57,10 +57,9 @@ class ResourceRegistryTest(IonTestCase):
         
     def test_describe_resource(self):
         # put in a bogus resource for now...
-        res = coi_resource_descriptions.ResourceDescription.create_new_resource()
         
-        res.describe_resource(res)
-        logging.info(res)
+        rd = yield self.rrc.describe_resource(coi_resource_descriptions.IdentityResource)
+        logging.info(rd)
         
         
 
