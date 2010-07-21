@@ -12,8 +12,8 @@ def main():
     services = [
             {
                 'name':'registry', 
-                'module':'ion.services.coi.resource_registry',
-                'class':'ResourceRegistryService',
+                'module':'ion.data.datastore.registry',
+                'class':'RegistryService',
                 'spawnargs':{
                     'sys-name':'mysys',
                     'servicename':'registry',
