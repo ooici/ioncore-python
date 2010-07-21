@@ -68,15 +68,16 @@ class InstrumentDriverClient(BaseProcessClient):
     The base class for the instrument driver client interface. This interface
     is designed to be used by the instrument agent to work with the driver.
     """
+        
     @defer.inlineCallbacks
     def fetch_params(self, param_list):
         """
         Using the instrument protocol, fetch a parameter from the instrument
-        @param param_list A list of parameters to fetch
+        @param param_list A list or tuple of parameters to fetch
         @retval A dictionary with the parameter and value of the requested
             parameter
         """
-        assert(isinstance(param_list, list))
+        assert(isinstance(param_list, (list, tuple)))
         (content, headers, message) = yield self.rpc_send('fetch_params',
                                                           param_list)
         assert(isinstance(content, dict))
@@ -175,7 +176,7 @@ class InstrumentAgent(ResourceAgent):
         This is stuff that would generally be handled by the instrument driver.
         @retval A reply message containing a dictionary of name/value pairs
         """
-        assert(isinstance(content, list))
+        assert(isinstance(content, (list, tuple)))
         assert(self.driver_client != None)
         response = {}
         for key in content:
@@ -193,7 +194,7 @@ class InstrumentAgent(ResourceAgent):
         @retval A reply message containing a dictionary of name/value pairs
         @todo Write this or push to subclass
         """
-        assert(isinstance(content, list))
+        assert(isinstance(content, (list, tuple)))
         assert(self.driver_client != None)
         response = {}
         #get data somewhere, or just punt this lower in the class hierarchy
@@ -302,7 +303,7 @@ class InstrumentAgent(ResourceAgent):
         @param content A list of arguments to make up the status request
         @retval ACK message with response on success, ERR message on failure
         """
-        assert(isinstance(content, list))
+        assert(isinstance(content, (list, tuple)))
         response = yield self.driver_client.get_status(content)
         if (response['status'] == 'OK'):
             yield self.reply_ok(msg, response['value'])
@@ -435,12 +436,12 @@ class InstrumentAgentClient(ResourceAgentClient):
         assert(isinstance(content, dict))
         assert('ci_commands' in content)
         assert('ci_parameters' in content)
-        assert(isinstance(content['ci_commands'], list))
-        assert(isinstance(content['ci_parameters'], list))
+        assert(isinstance(content['ci_commands'], (tuple, list)))
+        assert(isinstance(content['ci_parameters'], (tuple, list)))
         assert('instrument_commands' in content)
         assert('instrument_parameters' in content)
-        assert(isinstance(content['instrument_commands'], list))
-        assert(isinstance(content['instrument_parameters'], list))
+        assert(isinstance(content['instrument_commands'], (tuple, list)))
+        assert(isinstance(content['instrument_parameters'], (tuple, list)))
 
         defer.returnValue(content)
         
