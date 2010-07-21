@@ -1,7 +1,7 @@
 from SimpleXMLRPCServer import SimpleXMLRPCServer
-from host_status import HostStatus
+from readers import HostReader
 import os,sys,encoders
-from daemon import Daemon
+from base_daemon import Daemon
  
 
 class HostStatusRPCServer:
@@ -11,7 +11,6 @@ class HostStatusRPCServer:
     @todo Include interface ipv4 and ipv6 addresses 
     @todo Move memory from 'storage' to another location
     @todo Add daemon logging
-    @todo parameterize ports, community name, etc
     """
 
     def __init__(
@@ -26,7 +25,7 @@ class HostStatusRPCServer:
         Creates the RPC server
         """
         self.server = SimpleXMLRPCServer((rpcHost, rpcPort))
-        self.status = HostStatus(
+        self.status = HostReader(
                                  snmpHost, 
                                  snmpPort, 
                                  snmpAgentName, 
@@ -77,24 +76,9 @@ class HostStatusNoDaemon():
 
 
 
-daemon = HostStatusNoDaemon()
- 
 if __name__ == "__main__":
     # runAlways = HostStatusNoDaemon()
     daemon = HostStatusDaemon('/tmp/host_status_daemon.pid')
-    if len(sys.argv) == 2:
-        if 'start' == sys.argv[1]:
-            daemon.start()
-        elif 'stop' == sys.argv[1]:
-            daemon.stop()
-        elif 'restart' == sys.argv[1]:
-            daemon.restart()
-        else:
-            print "Unknown command"
-            sys.exit(2)
-        sys.exit(0)
-    else:
-        print "usage: %s start|stop|restart" % sys.argv[0]
-        sys.exit(2)
+    daemon.processCommandLine()
  
         
