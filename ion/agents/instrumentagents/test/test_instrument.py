@@ -17,10 +17,10 @@ from ion.data.dataobject import LCStates as LCS
 from ion.test.iontest import IonTestCase
 from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
-from ion.agents.instrumentagents.SBE49 import ci_commands as IACICommands
-from ion.agents.instrumentagents.SBE49 import ci_parameters as IACIParameters
-from ion.agents.instrumentagents.SBE49 import instrument_commands as IAInstCommands
-from ion.agents.instrumentagents.SBE49 import instrument_parameters as IAInstParameters
+from ion.agents.instrumentagents.SBE49_constants import ci_commands as IACICommands
+from ion.agents.instrumentagents.SBE49_constants import ci_parameters as IACIParameters
+from ion.agents.instrumentagents.SBE49_constants import instrument_commands as IAInstCommands
+from ion.agents.instrumentagents.SBE49_constants import instrument_parameters as IAInstParameters
 
 
 class TestInstrumentAgent(IonTestCase):
@@ -32,7 +32,7 @@ class TestInstrumentAgent(IonTestCase):
         # Start an instrument agent
         processes = [
             {'name':'testSBE49IA',
-             'module':'ion.agents.instrumentagents.SBE49',
+             'module':'ion.agents.instrumentagents.SBE49_IA',
              'class':'SBE49InstrumentAgent'},
             {'name':'resource_registry',
              'module':'ion.services.coi.resource_registry',
@@ -53,6 +53,7 @@ class TestInstrumentAgent(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        yield self._shutdown_processes()
         yield self._stop_container()
 
     @defer.inlineCallbacks
@@ -62,10 +63,14 @@ class TestInstrumentAgent(IonTestCase):
         capabilities
         """
         result = yield self.IAClient.get_capabilities()
-        self.assert_(list(IACICommands) == result[IA.ci_commands])
-        self.assert_(list(IACIParameters) == result[IA.ci_parameters])
-        self.assert_(list(IAInstCommands) == result[IA.instrument_commands])
-        self.assert_(list(IAInstParameters) == result[IA.instrument_parameters])
+        self.assert_(list(IACICommands)
+                     == list(result[IA.ci_commands]))
+        self.assert_(list(IACIParameters)
+                     == list(result[IA.ci_parameters]))
+        self.assert_(list(IAInstCommands)
+                     == list(result[IA.instrument_commands]))
+        self.assert_(list(IAInstParameters)
+                     == list(result[IA.instrument_parameters]))
 
     @defer.inlineCallbacks
     def test_get_set_SBE49_params(self):
@@ -167,7 +172,6 @@ class TestInstrumentAgent(IonTestCase):
         @todo Do we even need this function?
         """
         response = yield self.IAClient.get_status(['some_arg'])
-        logging.debug("*** testStatus response: %s", response)
         self.assert_(isinstance(response, dict))
         self.assertEqual(response['status'], "OK")
         self.assertEqual(response['value'], 'a-ok')

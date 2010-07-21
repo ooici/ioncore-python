@@ -5,12 +5,12 @@ including the driver
 @author Steve Foley
 @file ion/agents/test/test_SBE49.py
 """
-
+import logging
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
-from ion.agents.instrumentagents.SBE49_instrument_driver import SBE49InstrumentDriverClient
-from ion.agents.instrumentagents.SBE49_instrument_driver import SBE49InstrumentDriver
+from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriverClient
+from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriver
 from ion.core import bootstrap
 
 class TestSBE49(IonTestCase):
@@ -46,7 +46,8 @@ class TestSBE49(IonTestCase):
         result = yield self.driver_client.fetch_params(params.keys())
         self.assertNotEqual(params, result)
         result = yield self.driver_client.set_params({})
-        self.assertEqual(result['status'], 'ERROR')
+        self.assertEqual(len(result.keys()), 1)
+        self.assertEqual(result['status'], 'OK')
         set_result = yield self.driver_client.set_params(params)
         self.assertEqual(set_result['status'], 'OK')
         self.assertEqual(set_result['baudrate'], params['baudrate'])
@@ -58,11 +59,13 @@ class TestSBE49(IonTestCase):
         
     @defer.inlineCallbacks
     def test_execute(self):
-        cmd1 = ['start', 'now']
-        cmd2 = ['pumpoff', '3600', '1']
+        """
+        Lame test since this doesnt do much
+        """
+        cmd1 = {'start': ['now']}
+        cmd2 = {'pumpoff':['3600', '1']}
         result = yield self.driver_client.execute(cmd1)
         self.assertEqual(result['status'], 'OK')
-        self.assertEqual(result['value'], cmd1[0])
         result = yield self.driver_client.execute(cmd2)
         self.assertEqual(result['status'], 'OK')
-        self.assertEqual(result['value'], cmd2[0])
+        

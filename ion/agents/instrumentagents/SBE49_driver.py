@@ -11,7 +11,7 @@ from twisted.internet import defer
 
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient
-from ion.agents.instrumentagents.SBE49 import instrument_commands
+from ion.agents.instrumentagents.SBE49_constants import instrument_commands
 
 
 from ion.core.base_process import ProtocolFactory
@@ -70,7 +70,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         Operate in instrument protocol to get parameter
         @todo Write the code to interface this with something
         """
-        assert(isinstance(content, list))
+        assert(isinstance(content, (list, tuple)))
         result = {}
         for param in content:
             result[param] = self.__instrument_parameters[param]
@@ -92,7 +92,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 yield self.reply_err(msg, "Could not set %s" % param)
             else:
                 self.__instrument_parameters[param] = content[param]
-            yield self.reply_ok(msg, content)
+        yield self.reply_ok(msg, content)
             
     @defer.inlineCallbacks
     def op_execute(self, content, headers, msg):

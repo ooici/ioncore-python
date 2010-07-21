@@ -25,7 +25,7 @@ class TestResourceAgent(IonTestCase):
         # us some sort of agent...doesnt really matter what kind, does it
         processes = [
             {'name':'testAgent',
-             'module':'ion.agents.instrumentagents.SBE49',
+             'module':'ion.agents.instrumentagents.SBE49_IA',
              'class':'SBE49InstrumentAgent'},
             {'name':'resource_registry',
              'module':'ion.services.coi.resource_registry',
