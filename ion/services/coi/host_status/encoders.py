@@ -12,23 +12,34 @@ def encodeJSONToXMLRPC(object):
     
     """
     if hasattr(object, '__iter__'):
+        
+        # recurse through iterables
+        
         copy = type(object)()
+
         if isinstance(object,dict):
             for key in object:
                 copy[key] = encodeJSONToXMLRPC(object[key])
             return copy
+
         elif isinstance(object,list):
             for next in object:
                 copy.append(encodeJSONToXMLRPC(next))
             return copy
+
         elif isinstance(object,tuple):
             l = list(object)
             copy = []
             for next in l:
                 copy.append(encodeJSONToXMLRPC(next))
             return tuple(copy)
+        
         else:
-            raise Exception('Cannot encode object: unsupported iterable %s = %s'%(type(object), str(object)))
+            raise Exception(
+                            'Cannot encode object:'
+                            ' unsupported iterable %s = %s'
+                            %(type(object), str(object))
+                            )
     else:
         if not isinstance(object,unicode)       \
             and not isinstance(object, str)     \
@@ -38,27 +49,54 @@ def encodeJSONToXMLRPC(object):
             and object != True                  \
             and object != False                 \
             and object != None:
-            raise Exception('Cannot encode object: unsupported type %s = %s'%(type(object), str(object)))
+            raise Exception(
+                            'Cannot encode object:'
+                            ' unsupported type %s = %s'
+                            %(type(object), str(object))
+                            )
+            
+        # secret sauce - we want to turn large ints to strings    
         if isinstance(object,long) or isinstance(object,int):
             if object > 2**31 - 1:
                 return 'long:' + hex(object)
+        
         return object
 
 
     
 def decodeXMLRPCToJSON(object):
+    """
+    Inverse of encodeJSONToXMLRPC
+    """
     if hasattr(object, '__iter__'):
+        
+        # recurse through iterables
+        
         copy = type(object)()
+
         if isinstance(object,dict):
             for key in object:
                 copy[key] = decodeXMLRPCToJSON(object[key])
             return copy
+
         elif isinstance(object,list):
             for next in object:
                 copy.append(decodeXMLRPCToJSON(next))
             return copy
+
+        elif isinstance(object,tuple):
+            l = list(object)
+            copy = []
+            for next in l:
+                copy.append(decodeXMLRPCToJSON(next))
+            return tuple(copy)
+        
         else:
-            raise Exception('Cannot encode object: unsupported iterable %s'%type(object))
+            raise Exception(
+                            'Cannot decode object:'
+                            ' unsupported iterable %s = %s'
+                            %(type(object), str(object))
+                            )
     else:
         if not isinstance(object,unicode)       \
             and not isinstance(object, str)     \
@@ -68,7 +106,13 @@ def decodeXMLRPCToJSON(object):
             and object != True                  \
             and object != False                 \
             and object != None:
-            raise Exception('Cannot encode object: unsupported type %s'%type(object))
+            raise Exception(
+                            'Cannot encode object:'
+                            ' unsupported type %s = %s'
+                            %(type(object), str(object))
+                            )
+            
+        # secret sauce - we want to turn large ints to strings    
         if isinstance(object, str) or isinstance(object, unicode):
             if re.match("^long\:0x[0-9A-Fa-f]+", object):
                 return int(object[5:], 16)
