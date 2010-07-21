@@ -40,9 +40,23 @@ class Inherit210(Inherit2, Inherit1, Inherit0):
     """
     """
 
+class InheritOver(Inherit210,Inherit3):
+    inheritover = dataobject.TypedAttribute(str, 'a new one')
+    inherit2 = dataobject.TypedAttribute(str, 'over')
+    inherit0 = dataobject.TypedAttribute(str, 'over')
+    
+#class InheritOverOver(Inherit210,InheritOver):
+    """
+    This will fail - it is an illegal inheritance pattern
+    """
+class InheritOverUnder(InheritOver,Inherit210):
+    """
+    Legal but does nothing?
+    """
+
 class TestInheritedObject(unittest.TestCase):
     
-    def test_inherit(self):
+    def test_inheritance(self):
         i0 = Inherit0()
         i1 = Inherit1()
         i2 = Inherit2()
@@ -74,6 +88,62 @@ class TestInheritedObject(unittest.TestCase):
         self.failUnlessIn('inherit0',i3.attributes)
         self.assertEqual(len(i3.attributes),4)
 
+
+    def test_Inherit210(self):
+        i210 = Inherit210()
+        logging.info(i210)
+        self.assertEqual(i210.inherit2, '2')
+        self.assertEqual(i210.inherit1, '1')
+        self.assertEqual(i210.inherit0, '0')
+
+    def test_InheritOver(self):
+        io = InheritOver()
+        logging.info(io)
+        self.assertEqual(io.inherit2, 'over')
+        self.assertEqual(io.inherit1, '1')
+        self.assertEqual(io.inherit0, 'over')
+        self.assertEqual(io.inheritover, 'a new one')
+
+    def test_InheritOverOver(self):
+        raise unittest.SkipTest('This is not a legal inheritance pattern!')
+        #ioo = InheritOverOver()
+        #logging.info(io)
+        #self.assertEqual(ioo.inherit2, 'over')
+        #self.assertEqual(ioo.inherit1, '1')
+        #self.assertEqual(ioo.inherit0, 'over')
+        #self.assertEqual(ioo.inheritover, 'a new one')
+
+    def test_InheritOverUnder(self):
+        iou = InheritOverUnder()
+        logging.info(iou)
+        self.assertEqual(iou.inherit2, 'over')
+        self.assertEqual(iou.inherit1, '1')
+        self.assertEqual(iou.inherit0, 'over')
+        self.assertEqual(iou.inheritover, 'a new one')
+
+    def test_get_typedattributes(self):
+        io = InheritOver()
+    
+        atts = io.get_typedattributes()
+        
+        cls_atts = InheritOver.get_typedattributes()
+        
+        # Make sure the method works for both class and instance
+        self.assertEqual(atts, cls_atts)
+
+        # check that the dict of atts is correct
+        self.assertEqual(atts['inherit2'].default,io.inherit2)
+        self.assertEqual(atts['inherit2'].type,type(io.inherit2))
+
+        self.assertEqual(atts['inherit1'].default,io.inherit1)  
+        self.assertEqual(atts['inherit1'].type,type(io.inherit1))
+
+        self.assertEqual(atts['inherit0'].default,io.inherit0)  
+        self.assertEqual(atts['inherit0'].type,type(io.inherit0))
+        
+        self.assertEqual(atts['inheritover'].default,io.inheritover)  
+        self.assertEqual(atts['inheritover'].type,type(io.inheritover))
+        
 class TestDataObjectComparison(unittest.TestCase):
 
     def test_eq_inherit(self):

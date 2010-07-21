@@ -98,10 +98,10 @@ class DataObjectType(type):
         d = {}
         base_dicts = []
 
-        for base in bases:
+        for base in reversed(bases):
             ayb = reflect.allYourBase(base)
             base_dicts.extend(base.__dict__.items())
-            for ay in ayb:
+            for ay in reversed(ayb):
                 base_dicts.extend(ay.__dict__.items())
         for key, value in base_dicts:
             if isinstance(value, TypedAttribute):
@@ -215,13 +215,14 @@ class DataObject(object):
         
     def non_default_atts(self,attnames):
         atts=[]
-        data_object_class = self._types[self.__class__.__name__]
-        default = data_object_class()
-        #default = self.__class__()
+        
+        typedatts = self.get_typedattributes()        
+        
         if not attnames:
             attnames=self.attributes
+                    
         for a in attnames:
-            if getattr(self, a) !=  getattr(default,a):
+            if getattr(self, a) !=  typedatts[a].default:
                 atts.append(a)
         return atts
         
@@ -252,6 +253,29 @@ class DataObject(object):
                 strng += """%s= '%s':'%s':%s\n""" % (indent, name,value,type(value))
         strng += indent + head*4
         return strng
+
+    @classmethod
+    def get_typedattributes(cls):
+        """
+        @Brief Get the typed attributes of the class
+        @Note What about typed attributes that are over ridden?
+        """
+        
+        d={}
+        ayb = reflect.allYourBase(cls)
+        for yb in reversed(ayb):
+            if issubclass(yb, DataObject):
+                d.update(yb.__dict__)
+        
+        d.update(cls.__dict__)
+        
+        atts = {}
+        for key,value in d.items():
+            if isinstance(value, TypedAttribute):
+                atts[key]=value
+        return  atts
+        
+
 
     @property
     def attributes(self):
@@ -362,14 +386,21 @@ class ResourceReference(DataObject):
     @classmethod
     def create_new_resource(cls):
         """
-        @Brief Use this method to instantiate any new resource!
+        @Brief Use this method to instantiate any new resource with a unique id!
         """
         inst = cls()
         inst.RegistryIdentity = create_unique_identity()
         inst.RegistryBranch = 'master'
         return inst
     
-    
+    def create_new_reference(self):
+        """
+        @Brief Create or overwrite the reference identity for this resource
+        """
+        self.RegistryIdentity = create_unique_identity()
+        self.RegistryBranch = 'master'
+        self.RegistryCommit = ''
+        return self
     
     def reference(self,head=False):
         """
