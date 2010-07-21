@@ -110,7 +110,7 @@ class ResourceInstance(InformationResource):
     owner = TypedAttribute(ResourceReference)
     resource = TypedAttribute(ResourceReference)
     
-class IdentityResource(InformationResource):
+class IdentityResource(StatefulResource):
     """
     Identity Resources are stored in the identity registry
     Identity Resources describe the identity of human in the OOICI...
@@ -152,7 +152,7 @@ class ServiceDescription(InformationResource):
 
    
     
-class ServiceInstance(InformationResource):
+class ServiceInstance(StatefulResource):
     """
     Resource Instances are stored in the resource registry.
     They describe instances of a resource type
@@ -162,12 +162,35 @@ class ServiceInstance(InformationResource):
     spawnargs = TypedAttribute(str)
     type = TypedAttribute(str)
     exchange_name = TypedAttribute(str)
+    process_id = TypedAttribute(str)
+
+
+class AgentMethodInterface(StatefulResource):
+    description = TypedAttribute(str)
+    arguments = TypedAttribute(str)
+
+class AgentDescription(InformationResource):
+    """
+    Agent Descriptions are stored in the agent registry.
+    They describe an agent, its interface and attributes
+    """
+    interface = TypedAttribute(list)
+    module = TypedAttribute(str)
+    version = TypedAttribute(str)
+    #spawnargs = TypedAttribute(dict,{})
+    description = TypedAttribute(str)
     
-    def describe_instance(self,svc_inst):
-        """
-        """
-        self.name=svc_inst.svc_name
-        self.description = inspect.getdoc(svc_inst)
-        self.exchange_name = svc_inst.svc_reciever
+class AgentInstance(StatefulResource):
+    """
+    Agent Instances are stored in the agent registry.
+    They describe instances of an agent and reference its description and
+    the subject of the agent.
+    """
+    description = TypedAttribute(ResourceReference)
+    #owner = TypedAttribute(ResourceReference)
+    spawnargs = TypedAttribute(str)
+    type = TypedAttribute(str)
+    process_id = TypedAttribute(str)
+    subject = TypedAttribute(ResourceReference)
 
 

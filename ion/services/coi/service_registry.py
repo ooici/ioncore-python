@@ -166,6 +166,15 @@ class ServiceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin):
         service_description = yield self.base_register_resource(service_description, 'register_service_instance')
         defer.returnValue(resource_type)
 
+        
+    def describe_instance(self,svc_inst):
+        """
+        """
+        self.name=svc_inst.svc_name
+        self.description = inspect.getdoc(svc_inst)
+        self.exchange_name = svc_inst.svc_reciever
+
+
     def get_service_instance(self, resource_reference):
         """
         Get a service instance

@@ -169,7 +169,8 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
 
         found_rd = yield self.find_resource_definitions_from_description(resource_description,regex=False,ignore_defaults=True)
         if found_rd:
-            defer.returnValue(found_rd)
+            assert len(found_rd) == 1
+            defer.returnValue(found_rd[0])
         else:
             resource_description.create_new_reference()
             resource_description = yield self.base_register_resource(resource_description, 'register_resource_definition')
