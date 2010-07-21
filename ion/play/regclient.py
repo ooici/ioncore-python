@@ -4,8 +4,6 @@ from twisted.python import log
 
 from magnet.container import Container
 
-
-
 @defer.inlineCallbacks
 def main(ns={}):
     from ion.data.datastore import registry
