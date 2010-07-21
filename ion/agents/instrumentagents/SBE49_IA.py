@@ -40,12 +40,6 @@ class SBE49InstrumentAgent(InstrumentAgent):
         driver_id = yield self.sup.spawn_child(pd)
         self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
                                                          target=driver_id)
-
-    def plc_shutdown(self):
-        """
-        Shut down our driver setup
-        """
-        self.driver_client = None
         
     @staticmethod
     def __translator(input):
