@@ -45,8 +45,10 @@ class TypedAttribute(object):
         @param _types is a dictionary of types which can be decoded
         """
                 
+        #print '=================================================='
         types = _types.copy()
         stype, default = value.split(NULL_CHR)
+        #print '---------- ', stype, default
         
         #the use of str is temporary unti lcaarch msging is fixed
         mytype = eval(str(stype), types)
@@ -171,6 +173,13 @@ class DataObject(object):
             
         if ignore_defaults:
             atts = self.non_default_atts(atts)
+                
+        #print 'ATTTTS',atts
+        
+        #print 'REGEX',regex
+        #print 'ignore_defaults',ignore_defaults
+        #print 'other',other.get_typedattributes()['name'].default
+        #print 'self',self.get_typedattributes()['name'].default
                         
         if not atts:
             # A degenerate case
@@ -215,13 +224,17 @@ class DataObject(object):
         
     def non_default_atts(self,attnames):
         atts=[]
-        
-        typedatts = self.get_typedattributes()        
+        # There is something wrong with the way the dataobject is decoded
+        # unless you pull the class definition from _types, the defaults
+        # are incorrect when using the results of a message?
+        r_class = self._types[self.__class__.__name__]
+        typedatts = r_class.get_typedattributes()        
         
         if not attnames:
             attnames=self.attributes
                     
         for a in attnames:
+            #print a, getattr(self, a), typedatts[a].default
             if getattr(self, a) !=  typedatts[a].default:
                 atts.append(a)
         return atts
@@ -347,7 +360,10 @@ class DataObject(object):
         for name, value in attrs:
             #print 'name',name
             #print 'value',value
-            d[str(name)] = TypedAttribute.decode(value, cls._types)       
+            d[str(name)] = TypedAttribute.decode(value, cls._types)
+            #print name, d[str(name)].default
+        #print 'clsobj', clsobj
+            
         return type(clsobj.__name__, (clsobj,), d)
 
 
@@ -470,13 +486,6 @@ class Resource(ResourceReference):
     
 
     name = TypedAttribute(str)
-    lifecycle = TypedAttribute(LCState, default=LCStates.new)
-
-    def set_lifecyclestate(self, state):
-        self.lifecycle = state
-
-    def get_lifecyclestate(self):
-        return self.lifecycle
 
 DataObject._types['Resource']=Resource
 
@@ -492,6 +501,14 @@ class StatefulResource(Resource):
     """
     @brief Base for all OOI Stateful resource objects
     """
+    lifecycle = TypedAttribute(LCState, default=LCStates.new)
+
+    def set_lifecyclestate(self, state):
+        self.lifecycle = state
+
+    def get_lifecyclestate(self):
+        return self.lifecycle
+
     
 DataObject._types['StatefulResource']=StatefulResource
 

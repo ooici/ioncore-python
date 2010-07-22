@@ -609,7 +609,7 @@ class TestResource(unittest.TestCase):
     def test_set_lcstate(self):
         
         #logging.info(registry.LCStates)
-        res = dataobject.Resource.create_new_resource()
+        res = dataobject.StatefulResource.create_new_resource()
         #logging.info(res.get_lifecyclestate())
         self.assertEqual(res.lifecycle, dataobject.LCStates.new)
 
@@ -625,7 +625,7 @@ class TestResource(unittest.TestCase):
 
     def test_get_lcstate(self):
  
-        res = dataobject.Resource.create_new_resource()
+        res = dataobject.StatefulResource.create_new_resource()
         
         self.assertEqual(res.get_lifecyclestate(),dataobject.LCState('new'))
  

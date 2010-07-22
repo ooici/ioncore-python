@@ -77,10 +77,10 @@ class InstrumentRegistryService(registry.BaseRegistryService):
     """
     Service operation: Get a resource type.
     """
-    op_set_instrument_lcstate = registry.BaseRegistryService.base_set_resource_lcstate #changed
-    """
-    Service operation: Set a resource life cycle state
-    """
+    #op_set_instrument_lcstate = registry.BaseRegistryService.base_set_resource_lcstate #changed
+    #"""
+    #Service operation: Set a resource life cycle state
+    #"""
     op_find_instrument = registry.BaseRegistryService.base_find_resource #changed
     """
     Service operation: Set a resource life cycle state
@@ -123,8 +123,8 @@ class InstrumentRegistryClient(registry.BaseRegistryClient, registry.LCStateMixi
         """
         return self.base_get_resource(resource_reference,'get_instrument_instance')
         
-    def set_resource_lcstate(self, resource_reference, lcstate):
-        return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_instrument_lcstate')
+    #def set_resource_lcstate(self, resource_reference, lcstate):
+    #    return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_instrument_lcstate')
 
     def find_instrument(self, description,regex=True,ignore_defaults=True):
         return self.base_find_resource(description,'find_instrument',regex,ignore_defaults)

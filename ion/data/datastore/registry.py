@@ -72,7 +72,7 @@ class IRegistry(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
     
-    def find_resource(self,description):
+    def find_resource(self,description,regex=True,ignore_defaults=True,attnames=[]):
         """
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
@@ -156,7 +156,6 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         """
         Service operation: set the life cycle state of resource
         """
-
         resource = yield self.get_resource(resource_reference)
         
         if resource:
@@ -380,7 +379,7 @@ class BaseRegistryClient(BaseServiceClient):
 
 
     @defer.inlineCallbacks
-    def base_register_resource(self,resource,op_name):
+    def base_register_resource(self,op_name ,resource):
         """
         @brief Store a resource in the registry by its ID. It can be new or
         modified.
@@ -398,7 +397,7 @@ class BaseRegistryClient(BaseServiceClient):
             defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def base_get_resource(self,resource_reference,op_name):
+    def base_get_resource(self,op_name ,resource_reference):
         """
         @brief Retrieve a resource from the registry by Reference
         """
@@ -415,7 +414,7 @@ class BaseRegistryClient(BaseServiceClient):
 
 
     @defer.inlineCallbacks
-    def base_set_resource_lcstate(self, resource_reference, lcstate,op_name):
+    def base_set_resource_lcstate(self, op_name, resource_reference, lcstate):
         """
         @brief Retrieve a resource from the registry by its ID
         """
@@ -437,7 +436,7 @@ class BaseRegistryClient(BaseServiceClient):
 
 
     @defer.inlineCallbacks
-    def base_find_resource(self,description,op_name, regex=True,ignore_defaults=True,attnames=[]):
+    def base_find_resource(self, op_name, description, regex=True,ignore_defaults=True,attnames=[]):
         """
         @brief Retrieve all the resources in the registry
         @param attributes is a dictionary of attributes which will be used to select a resource
@@ -475,15 +474,15 @@ class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
         return self.base_clear_registry('clear_registry')
 
     def register_resource(self,resource):
-        return self.base_register_resource(resource, 'register_resource')
+        return self.base_register_resource('register_resource', resource)
 
     def get_resource(self,resource_reference):
-        return self.base_get_resource(resource_reference,'get_resource')
+        return self.base_get_resource('get_resource', resource_reference)
         
     def set_resource_lcstate(self, resource_reference, lcstate):
-        return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_resource_lcstate')
+        return self.base_set_resource_lcstate('set_resource_lcstate',resource_reference, lcstate)
 
     def find_resource(self, description,regex=True,ignore_defaults=True, attnames=[]):
-        return self.base_find_resource(description,'find_resource',regex,ignore_defaults,attnames)
+        return self.base_find_resource('find_resource',description,regex,ignore_defaults,attnames)
 
 
