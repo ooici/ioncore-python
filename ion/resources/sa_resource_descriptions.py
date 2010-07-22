@@ -23,3 +23,13 @@ class TestResource(unittest.TestCase):
     def test_print(self):
         res = ExampleResource()
         print res
+        
+class InstrumentResource(StatefulResource):
+    '''
+    @Note <class> must be a type which python can instantiate with eval!
+    '''
+    baudrate = TypedAttribute(int, default=9600)
+    outputformat =TypedAttribute(int, default=0)
+    outputsal = TypedAttribute(bool, default=True)
+    
+    tadvance = TypedAttribute(float, default=0.0625)

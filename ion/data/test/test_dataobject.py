@@ -311,7 +311,7 @@ class TestSimpleObject(unittest.TestCase):
         self.assertEqual(self.encoded,enc)
         
     def testDecode(self):
-        dec = dataobject.DataObject.decode(self.encoded)()
+        dec = dataobject.DataObject.decode(self.encoded)
         #print 'dec',dec
         #print 'self.obj',self.obj
         self.assertEqual(self.obj,dec)
@@ -407,6 +407,7 @@ class TestListObjectBehavior(unittest.TestCase):
            
         obj2 = ListObject()
         self.assertEqual(obj2.rlist, [])
+        self.assertEqual(obj1.rlist, [1,2])
      
      
 class SetObject(dataobject.DataObject):

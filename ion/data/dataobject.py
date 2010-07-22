@@ -134,7 +134,6 @@ class DataObject(object):
                 setattr(self,name,{})
             if att.type == set:
                 setattr(self,name,set([]))
-        
 
 
     def __eq__(self, other):
@@ -367,14 +366,24 @@ class DataObject(object):
             #print 'clsname',clsname
             clsobj = eval(str(clsname), cls._types)
             
+        obj = clsobj()
+            
+            
         for name, value in attrs:
             #print 'name',name
             #print 'value',value
-            d[str(name)] = TypedAttribute.decode(value, cls._types)
+            ta = TypedAttribute.decode(value, cls._types)
+            #print 'ta',ta.default
+            
+            setattr(obj,name, ta.default)
             #print name, d[str(name)].default
         #print 'clsobj', clsobj
             
-        return type(clsobj.__name__, (clsobj,), d)
+        
+            
+        #
+        #return type(clsobj.__name__, (clsobj,), d)
+        return obj
 
 
 
@@ -401,13 +410,13 @@ class ResourceReference(DataObject):
     RegistryBranch = TypedAttribute(str,'master')
 
     def __init__(self,RegistryIdentity='',RegistryCommit='',RegistryBranch=''):
+        DataObject.__init__(self)
         if RegistryIdentity:
             self.RegistryIdentity = RegistryIdentity
         if RegistryCommit:
             self.RegistryCommit = RegistryCommit
         if RegistryBranch:
             self.RegistryBranch = RegistryBranch
-
 
     @classmethod
     def create_new_resource(cls):

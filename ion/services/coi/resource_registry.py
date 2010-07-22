@@ -190,6 +190,8 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         resource_description.description = inspect.getdoc(resource_class)
         
         
+        resource_description.atts=[]
+        
         print '========================== zero', len(resource_description.atts)
         # Get all the typed attributes of the resource
         print '===============',resource_description.name,'========================'
