@@ -154,7 +154,8 @@ class FilenameTester(unittest.TestCase):
     Test filename generation, no communications necessary.
     """
     def setUp(self):
-        self.prefix = '../../dap_server/data/'
+        cfg =  ioninit.config('ion.services.dm.url_manipulation')
+        self.prefix = cfg.getValue('local_dir', None)
 
     def test_most_basic(self):
         b = generate_filename('http://amoeba.ucsd.edu/coads.nc')

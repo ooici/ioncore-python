@@ -44,6 +44,12 @@ class IStore(object):
         instance.kwargs = kwargs
         return defer.succeed(instance)
 
+    def clear_store(self):
+        """
+        """
+        raise NotImplementedError, "Abstract Interface Not Implemented"
+        
+
     def get(self, key):
         """
         @param key  an immutable key associated with a value
@@ -82,6 +88,10 @@ class Store(IStore):
     def __init__(self, **kwargs):
         self.kvs = {}
 
+    def clear_store(self):
+        self.kvs = {}
+        return defer.succeed(None)
+
     def get(self, key):
         """
         @see IStore.get
@@ -101,10 +111,13 @@ class Store(IStore):
         return defer.maybeDeferred(self._query, regex)
 
     def _query(self, regex):
-        keys = [re.search(regex,m).group() for m in self.kvs.keys() if re.search(regex,m)]
+        #keys = [re.search(regex,m).group() for m in self.kvs.keys() if re.search(regex,m)]
         match_list=[]
-        for key in keys:
-            match_list.append((key, self.kvs.get(key)))
+        for s in self.kvs.keys():
+            #m = re.search(regex, s)
+            m = re.findall(regex, s)
+            if m:
+                match_list.extend(m)
         return match_list
 
     def remove(self, key):

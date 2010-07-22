@@ -12,7 +12,7 @@ from twisted.internet import defer
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
 from ion.core.base_process import ProtocolFactory
-from ion.services.coi.resource_registry import ResourceLCState as LCS
+from ion.data.datastore.registry import LCStates as LCS
 
 
 instrumentCommands = (
@@ -173,7 +173,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
     Inherits basic get, set, getStatus, getCapabilities, etc. from parent
     """
     driver = SBE49InstrumentDriver()
-    lifecycleState = LCS.RESLCS_NEW
+    lifecycleState = LCS['new']
 
     @staticmethod
     def __translator(input):

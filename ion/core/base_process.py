@@ -181,7 +181,7 @@ class BaseProcess(object):
         """
         Handling of RPC replies.
         """
-        logging.info('BaseProcess: Received RPC reply. content=' +str(payload['content']))
+        logging.info('BaseProcess: Received RPC reply.')
         d = self.rpc_conv.pop(payload['conv-id'])
         content = payload.get('content', None)
         res = (content, payload, msg)
@@ -219,7 +219,9 @@ class BaseProcess(object):
         'op' message attribute.
         @retval deferred
         """
-        assert payload['op'] == 'init' or self.proc_state == "INITIALIZED"
+        #@BUG Added hack to handle messages from plc_init in cc_agent!
+        #assert payload['op'] == 'init' or self.proc_state == "INITIALIZED"
+        assert payload['op'] == 'init' or self.proc_state == "INITIALIZED" or (payload['op'] == 'identify' and payload['content']=='started')
         d = pu.dispatch_message(payload, msg, target, conv)
         return d
 

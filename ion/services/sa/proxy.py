@@ -11,9 +11,124 @@ import logging
 logging = logging.getLogger(__name__)
 
 from ion.core.base_process import ProtocolFactory
+from ion.services.dm.preservation.coordinator import CoordinatorClient
 
 from ion.services.base_service import BaseService
-from ion.services.sa.tinyproxy import ProxyHandler, ThreadingHTTPServer
+from twisted.internet import defer, protocol, reactor
+from twisted.protocols.basic import LineReceiver
+
+import base64
+
+# Read configuration file to find TCP server port
+from ion.core import ioninit
+config = ioninit.config(__name__)
+PROXY_PORT = int(config.getValue('proxy_port', '8100'))
+
+class DAPProxyProtocol(LineReceiver):
+    """
+    Super, super simple HTTP proxy. Goal: Take requests from DAP clients such
+    as matlab and netcdf, convert them into OOI messages to the preservation
+    service coordinator, and return whatever it gets from same as http.
+
+    Initially written using the twisted proxy classes, but in the end what we
+    need here is quite different from what the provide, so its much simpler
+    to just implement it as a most-basic protocol.
+
+    @see http://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol
+    @see The DAP protocol spec at http://www.opendap.org/pdf/ESE-RFC-004v1.1.pdf
+    """
+    def reset(self):
+        self.buf = []
+        self.http_connected = False
+        self.hostname = None
+
+    def connectionMade(self):
+        logging.debug('connected!')
+        self.reset()
+
+    def lineReceived(self, line):
+        logging.debug('got a line: %s' % line)
+        self.buf.append(line)
+        if len(line) == 0:
+            logging.info('Ready to send request off!')
+            self.send_receive()
+
+    @defer.inlineCallbacks
+    def send_receive(self):
+        """
+        Ready to send an http command off to the coordinator for dispatch.
+        """
+        generic_err = '500 Server error, no comprende.\r\n'
+        cc = CoordinatorClient()
+        # First entry in buffer should be 'GET url http/1.0' or similar
+        try:
+            cmd, url, method = self.buf[0].split(' ')
+        except ValueError:
+            logging.warn('Unable to parse command "%s"' % self.buf[0])
+            self.transport.write('400 Command not understood\r\n')
+            self.transport.loseConnection()
+            self.reset()
+            return
+
+        if 'Connection: close' in self.buf:
+            # @todo Handle 1.1 persisten connections correctly
+            logging.debug('disconnect request found')
+
+        if self.http_connected:
+            logging.debug('rewriting url...')
+            url = 'http://%s%s' % (self.hostname, url)
+            logging.debug('new ' + url)
+
+
+        if cmd == 'CONNECT':
+            self.http_connected = True
+            self.hostname = url
+            logging.debug('hostname is ' + self.hostname)
+
+            logging.debug('Ackowledging connect with fake response')
+            self.transport.write('HTTP/1.1 200 Did get connection\r\n')
+            self.transport.write('Content-Type: text/plain; charset=UTF-8\r\n')
+            self.transport.write('\r\n')
+            self.buf = []
+            defer.returnValue(None)
+
+        if cmd not in ['GET', 'HEAD']:
+            logging.error('Unknown command "%s"' % self.buf[0])
+            yield self.transport.write(generic_err)
+            yield self.transport.loseConnection()
+            self.reset()
+            return
+
+        # Either get or head commands
+        if cmd == 'HEAD':
+            resp = yield cc.get_head(url)
+        elif cmd == 'GET':
+            logging.debug('pulling url...')
+            resp = yield cc.get_url(url)
+
+        # Did the command succeed?
+        if resp['status'] != 'OK':
+            logging.warn('Bad result on %s %s' % (cmd, url))
+            rs = resp['value']
+            logging.warn(rs)
+            yield self.transport.write(rs)
+            yield self.transport.loseConnection()
+            self.reset()
+            logging.debug('done with error handler')
+            return
+
+        logging.debug('cmd %s returned OK' % cmd)
+
+        # OK, response OK, decode page and return it
+        self.transport.write(base64.b64decode(resp['value']))
+
+        yield self.transport.loseConnection()
+        self.reset()
+        logging.debug('send_receive completed')
+
+
+class DAPProxyFactory(protocol.ServerFactory):
+    protocol = DAPProxyProtocol
 
 class ProxyService(BaseService):
     """
@@ -24,26 +139,21 @@ class ProxyService(BaseService):
                                           version='0.1.0',
                                           dependencies=['controller'])
 
-    def __init__(self, receiver, spawnArgs=None):
-        # Service class initializer. Basic config, but no yields allowed.
-        BaseService.__init__(self, receiver, spawnArgs)
-        logging.info('ProxyService.__init__()')
-
+    @defer.inlineCallbacks
     def slc_init(self):
         """
-        Use this hook to bind to listener TCP port and setup modified
-        proxy stack.
-        @todo Move tcp port to DX configuration file
+        Use this hook to bind to listener TCP port.
         """
-        tcp_port = 8000
-        logging.debug('Setting up proxy on port %d...' % tcp_port)
+        logging.info('starting proxy on port %d' % PROXY_PORT)
+        self.proxy_port = yield reactor.listenTCP(PROXY_PORT, DAPProxyFactory())
+        logging.info('Proxy listener running.')
+
+    @defer.inlineCallbacks
+    def slc_shutdown(self):
         """
-        based on BaseHTTPServer.test and tweaked a bit.
+        Close TCP listener
         """
-        server_address = ('', tcp_port)
-        ProxyHandler.protocol_version = 'HTTP/1.0'
-        httpd = ThreadingHTTPServer(server_address, ProxyHandler)
-#        httpd.serve_forever()
-#        logging.debug('Proxy listener running.')
+        logging.info('Shutting down proxy')
+        yield self.proxy_port.stopListening()
 
 factory = ProtocolFactory(ProxyService)
