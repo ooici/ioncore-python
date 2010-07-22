@@ -112,8 +112,7 @@ class ResourceAgent(BaseProcess):
         assert(isinstance(res_desc, ResourceDescription))
         if (self.resource_id == None):
             self.resource_id = \
-                yield self.res_reg_client.register_resource(str(uuid.uuid4()),
-                                                            res_desc)
+                yield self.res_reg_client.register_agent_instance(self)
         else:
             result = yield self.res_reg_client.register_resource(id, res_desc)
         if (result == None):
