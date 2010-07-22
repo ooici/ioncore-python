@@ -46,19 +46,39 @@ class ResourceRegistryTest(IonTestCase):
         res_to_describe = coi_resource_descriptions.IdentityResource
         res_description = yield self.rrc.register_resource_definition(res_to_describe)
                 
-        #self.assertEqual(res2,res)
-        #logging.info( str(res_description))
-        print 'List Length',len(res_description.atts)
+                
+        stateful_description = yield self.rrc.find_resource_definition_from_resource(dataobject.StatefulResource)
+             
+        self.assertEqual(len(stateful_description.inherits_from),1)
+        ref_to_resource = stateful_description.inherits_from[0]
         
-        #res_base = yield self.rrc.get_resource_definition(res_description.inherits_from[0])
-        #print 'Base List Length',len(res_base.atts)
+        resource_description = yield self.rrc.get_resource_definition(ref_to_resource)
+        
+
+    @defer.inlineCallbacks
+    def test_resource_instance_reg(self):
+        res_inst = coi_resource_descriptions.IdentityResource.create_new_resource()
+        
+        # this should be in an identity registry before being used... 
+        me = coi_resource_descriptions.IdentityResource.create_new_resource()
+        me.name = 'david'
+        me.ooi_id = 'just a programmer...'
         
         
-    def test_describe_resource(self):
-        # put in a bogus resource for now...
+        instance = yield self.rrc.register_resource_instance(res_inst,me)
         
-        rd = yield self.rrc.describe_resource(coi_resource_descriptions.IdentityResource)
-        logging.info(rd)
+        resource_description = yield self.rrc.get_resource_definition(instance.description)
+        
+        print instance
+        print resource_description
+        
+        
+        
+    @defer.inlineCallbacks
+    def test_describe_resource(self):        
+        # Test a simple, non-recursive resource description
+        rd = yield self.rrc.describe_resource(dataobject.Resource)
+        self.assertEqual(rd.name, 'Resource')
         
         
 

@@ -264,7 +264,7 @@ class BaseRegistryService(BaseService):
 
     @defer.inlineCallbacks
     def base_clear_registry(self, content, headers, msg):
-        logging.info('op_clear_registry!')
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'])
         yield self.reg.clear_registry()
         yield self.reply_ok(msg)
 
@@ -274,8 +274,9 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Register a resource instance with the registry.
         """
+        logging.info('msg headers:'+ str(headers))
         resource = dataobject.Resource.decode(content)
-        logging.info('op_register_resource: \n' + str(resource))
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Resource: \n' + str(resource))
   
         resource = yield self.reg.register_resource(resource)
         if resource:
@@ -290,7 +291,7 @@ class BaseRegistryService(BaseService):
         Service operation: Get a resource instance.
         """
         resource_reference = dataobject.Resource.decode(content)
-        logging.info('op_get_resource: '+str(resource_reference))
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
 
         resource = yield self.reg.get_resource(resource_reference)
         logging.info('Got Resource:\n'+str(resource))
@@ -306,9 +307,9 @@ class BaseRegistryService(BaseService):
         Service operation: set the life cycle state of resource
         """
         container = dataobject.Resource.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
 
         if isinstance(container,  coi_resource_descriptions.SetResourceLCStateContainer):
-            logging.info('op_set_resource_lcstate: '+str(container))
             resource_reference = container.reference
             lcstate = container.lcstate
 
@@ -332,7 +333,8 @@ class BaseRegistryService(BaseService):
         attnames=[]
                 
         container = dataobject.Resource.decode(content)
-        
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
+
         result_list = []
         if isinstance(container,  coi_resource_descriptions.FindResourceContainer):
             description = container.description

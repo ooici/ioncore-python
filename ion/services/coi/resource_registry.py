@@ -125,7 +125,7 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         else:
             # Give it a new Unique ID and put it in the registry
             resource_instance_description.create_new_reference()
-            resource_instance_description = self.base_register_resource('register_resource_instance', resource_instance_description)    
+            resource_instance_description = yield self.base_register_resource('register_resource_instance', resource_instance_description)    
             defer.returnValue(resource_instance_description)
         
     @defer.inlineCallbacks
@@ -139,7 +139,7 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         assert isinstance(owner, coi_resource_descriptions.IdentityResource)
 
         resource_instance_description = coi_resource_descriptions.ResourceInstance()
-        resource_instance_description.name = resource_instance.name # ?
+        resource_instance_description.name = resource_instance.__class__.__name__ # ?
 
         #Get the registry description for this resource
         resource_description = yield self.register_resource_definition(resource_instance.__class__)
@@ -188,30 +188,20 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         resource_description = coi_resource_descriptions.ResourceDescription()        
         resource_description.name = resource_class.__name__
         resource_description.description = inspect.getdoc(resource_class)
-        
-        
-        resource_description.atts=[]
-        
-        print '========================== zero', len(resource_description.atts)
+                
         # Get all the typed attributes of the resource
-        print '===============',resource_description.name,'========================'
-        print resource_class.get_typedattributes().keys()
         for name, att in resource_class.get_typedattributes().items():
-            print 'NAME AND ATT', name, att
             attdesc = coi_resource_descriptions.AttributeDescription()
             attdesc.name = name
             attdesc.type = str(att.type)
             attdesc.default = str(att.default)
             resource_description.atts.append(attdesc)    
         
-        print '========================== first', len(resource_description.atts)
         
         # Get the reference to the resource it inherits from
         
         base_ref = yield self.get_resource_bases_by_reference(resource_class)
-        
-        print '========================== second', len(resource_description.atts)
-        
+                
         resource_description.inherits_from = base_ref
         
         # Set the type based on inheritance?
