@@ -4,7 +4,7 @@
     "bootscript":"res/scripts/newcc.py",
     "sysname":"cei",
     "broker_heartbeat":"0",
-    "lcaarch_branch":"cei-lcaarch",
+    "lcaarch_branch":"cei",
     "lcaarch_commit_hash":"HEAD",
     "log_level":"DEBUG"
   },
