@@ -132,6 +132,7 @@ class BaseObject(object):
 
     type = None
     _value_cache = None
+    _encoded_cache = None
 
     @classmethod
     def get_type(cls):
@@ -153,11 +154,14 @@ class BaseObject(object):
     def encode(self):
         """
         @brief Encode this instance.
+        @note This is where a cache should be. BaseObject.value is DEPRECATED.
+        @todo Use cStringIO buffer instead of python str.
         """
-        body = self._encode_body()
-        header = self._encode_header(body)
-        encoded = "%s%s" % (header, body,)
-        return encoded
+        if not self._encoded_cache:
+            body = self._encode_body()
+            header = self._encode_header(body)
+            self._encoded_cache = "%s%s" % (header, body,)
+        return self._encoded_cache
 
     @staticmethod
     def decode(value, types):
@@ -497,14 +501,14 @@ class ICAStore(Interface):
     def get(id):
         """
         @param id of content object
-        @retval A Deferred that fires with an object that provides
+        @retval defer.Deferred that fires with an object that provides
         ICAStoreObject.
         """
 
     def put(obj):
         """
         @param obj instance of object providing ICAStoreObject
-        @retval A Deferred that fires with the obj id.
+        @retval defer.Deferred that fires with the obj id.
         """
 
 class StoreContextWrapper(object):
@@ -588,10 +592,10 @@ class CAStore(object):
         can always be assumed that a hash corresponds to an object in the
         store.
         """
-        value = obj.value #compress arg
-        hash = sha1(value)
+        data = obj.encode() #compress arg
+        hash = sha1(data)
         id = sha1_to_hex(hash)
-        d = self.objs.put(id, value)
+        d = self.objs.put(id, data)
         d.addCallback(lambda _: id)
         return d
 
@@ -604,10 +608,14 @@ class CAStore(object):
         if len(id) == 20:
             id = sha1_to_hex(id)
         d = self.objs.get(id)
-        def _decode_cb(raw):
-            if not raw:
+        def _decode_cb(data):
+            if not data:
                 raise CAStoreError("Object with id: %s not found" % id)
-            return self.decode(raw)
+            obj = self.decode(data)
+            # assure integrity 
+            if not id == sha1(obj, bin=False):
+                raise CAStoreError("Object Integrity Error!")
+            return obj
         d.addCallback(_decode_cb)
         # d.addErrback
         return d

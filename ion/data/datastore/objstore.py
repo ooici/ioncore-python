@@ -70,12 +70,16 @@ class IObjectStore(cas.ICAStore):
         @param name Unique identifier of data object.
         @param baseClass Class that models structure of data object. This
         class is a container of typed attributes.
+        @retval defer.Deferred that succeeds with an instance of
+        objectChassis.
         """
 
     def clone(name):
         """
         @brief Retrieve data object.
         @param name Unique identifier of data object.
+        @retval defer.Deferred that succeeds with an instance of
+        objectChassis.
         """
 
 class Element(cas.Element):
@@ -497,6 +501,8 @@ class ObjectStore(BaseObjectStore):
     def clone(self, name):
         """
         @param name uuid of object store object.
+        @retval defer.Deferred that succeeds with an instance of
+        objectChassis.
         @brief Clone an object from the object store. The semantic of
         'clone' as opposed to 'get' is very important. Objects in the
         object store represent [potentially mutable] models of immutable
