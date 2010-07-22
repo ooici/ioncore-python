@@ -51,7 +51,11 @@ class ObjectStoreServiceTest(iontest.IonTestCase):
         self.failUnlessEqual(b.encode(), b_out.encode())
         
 
-class ObjectStoreServiceCASTest(iontest.IonTestCase, test_cas.CAStoreTest):
+class ObjectStoreICASTest(iontest.IonTestCase, test_cas.CAStoreTest):
+    """
+    Test the cas.ICAStore implementation of ObjectStoreService and 
+    ObjectStoreClient using the cas module test suite.
+    """
 
     @defer.inlineCallbacks
     def setUp(self):
