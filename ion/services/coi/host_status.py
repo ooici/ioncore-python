@@ -29,7 +29,14 @@ class HostStatusService(BaseService):
 
 
     def slc_init(self):
+        self.lc = task.LoopingCall(self.announce)
+        #self.lc.start(10)
         logging.info("HostStatusService initialized")
+
+
+    
+    def announce(self):
+        print 'Hoorah!'
 
 
     def op_config(self, content, headers, msg):
