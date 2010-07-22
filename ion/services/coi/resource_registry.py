@@ -71,18 +71,18 @@ class ResourceRegistryService(registry.BaseRegistryService):
     Service operation: Set a resource life cycle state
     """
     
-    op_find_resource_definition_from_resource = registry.BaseRegistryService.base_find_resource
+    op_find_registered_resource_definition_from_resource = registry.BaseRegistryService.base_find_resource
     """
     Service operation: Find the registered definition of a resource
     """
-    op_find_resource_definitions_from_description = registry.BaseRegistryService.base_find_resource
+    op_find_registered_resource_definitions_from_description = registry.BaseRegistryService.base_find_resource
     """
     Service operation: find all registered resources which match the attributes of description
     """
     
     op_find_registered_resource_instance_from_instance = registry.BaseRegistryService.base_find_resource
     """
-    Service operation: Find all registered instances that match the the attributes of description
+    Service operation: Find the registered instances that matches the service class
     """
     op_find_registered_resource_instance_from_description = registry.BaseRegistryService.base_find_resource
     """
@@ -120,8 +120,8 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         
         found_rid = yield self.find_registered_resource_instance_from_description(resource_instance,regex=False,ignore_defaults=True)
         if found_rid:
-            # if it is already there, return it.
-            defer.returnValue(found_rid)
+            assert len(found_rid) == 1
+            defer.returnValue(found_rid[0])
         else:
             # Give it a new Unique ID and put it in the registry
             resource_instance_description.create_new_reference()
@@ -138,8 +138,10 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         assert isinstance(resource_instance, dataobject.Resource)
         assert isinstance(owner, coi_resource_descriptions.IdentityResource)
 
+        # Do not make a new resource idenity - this is a generic method which
+        # is also used to look for an existing description
         resource_instance_description = coi_resource_descriptions.ResourceInstance()
-        resource_instance_description.name = resource_instance.__class__.__name__ # ?
+        resource_instance_description.name = resource_instance.__class__.__name__ 
 
         #Get the registry description for this resource
         resource_description = yield self.register_resource_definition(resource_instance.__class__)
@@ -167,7 +169,7 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         """
         resource_description = yield self.describe_resource(resource_class)
 
-        found_rd = yield self.find_resource_definitions_from_description(resource_description,regex=False,ignore_defaults=True)
+        found_rd = yield self.find_registered_resource_definitions_from_description(resource_description,regex=False,ignore_defaults=True)
         if found_rd:
             assert len(found_rd) == 1
             defer.returnValue(found_rd[0])
@@ -185,6 +187,8 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         """
         assert issubclass(resource_class, dataobject.Resource)
         
+        # Do not make a new resource idenity - this is a generic method which
+        # is also used to look for an existing description
         resource_description = coi_resource_descriptions.ResourceDescription()        
         resource_description.name = resource_class.__name__
         resource_description.description = inspect.getdoc(resource_class)
@@ -226,7 +230,7 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         
         bases_refs=[]
         for base in bases:
-            parent_resource_description = yield self.find_resource_definition_from_resource(base)
+            parent_resource_description = yield self.find_registered_resource_definition_from_resource(base)
             if not parent_resource_description:
                 parent_resource_description = yield self.register_resource_definition(base)
             
@@ -256,12 +260,12 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         return self.base_set_resource_lcstate('set_resource_lcstate',resource_reference, lcstate)
 
     @defer.inlineCallbacks
-    def find_resource_definition_from_resource(self, resource_class):
+    def find_registered_resource_definition_from_resource(self, resource_class):
         """
         @Brief find the registered definition of a resoruce
         """
         resource_description = yield self.describe_resource(resource_class)
-        description_list = yield self.base_find_resource('find_resource_definition_from_resource',resource_description,regex=False,ignore_defaults=True)
+        description_list = yield self.base_find_resource('find_registered_resource_definition_from_resource',resource_description,regex=False,ignore_defaults=True)
         # Find returns a list but only one resource should match!
         if description_list:
             assert len(description_list) == 1
@@ -269,11 +273,11 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         else:
             defer.returnValue(None)
             
-    def find_resource_definitions_from_description(self, description,regex=True,ignore_defaults=True,attnames=[]):
+    def find_registered_resource_definitions_from_description(self, description,regex=True,ignore_defaults=True,attnames=[]):
         """
         @Brief find all registered resources which match the attributes of description
         """
-        return self.base_find_resource('find_resource_definitions_from_description',description,regex,ignore_defaults,attnames)
+        return self.base_find_resource('find_registered_resource_definitions_from_description',description,regex,ignore_defaults,attnames)
         
     @defer.inlineCallbacks
     def find_registered_resource_instance_from_instance(self, resource_instance, owner):

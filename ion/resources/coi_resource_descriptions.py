@@ -145,8 +145,11 @@ class ServiceDescription(InformationResource):
     version = TypedAttribute(str)
     #spawnargs = TypedAttribute(dict,{})
     description = TypedAttribute(str)
+    class_name = TypedAttribute(str)
+    
 
 class ServiceMethodInterface(DataObject):
+    name = TypedAttribute(str)
     description = TypedAttribute(str)
     arguments = TypedAttribute(str)
 
@@ -159,11 +162,11 @@ class ServiceInstance(StatefulResource):
     """
     description = TypedAttribute(ResourceReference)
     #owner = TypedAttribute(ResourceReference)
-    spawnargs = TypedAttribute(str)
+    spawnargs = TypedAttribute(dict)
     type = TypedAttribute(str)
     exchange_name = TypedAttribute(str)
     process_id = TypedAttribute(str)
-
+    target = TypedAttribute(str)
 
 class AgentDescription(InformationResource):
     """

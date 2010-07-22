@@ -47,7 +47,7 @@ class ResourceRegistryTest(IonTestCase):
         res_description = yield self.rrc.register_resource_definition(res_to_describe)
                 
                 
-        stateful_description = yield self.rrc.find_resource_definition_from_resource(dataobject.StatefulResource)
+        stateful_description = yield self.rrc.find_registered_resource_definition_from_resource(dataobject.StatefulResource)
              
         self.assertEqual(len(stateful_description.inherits_from),1)
         ref_to_resource = stateful_description.inherits_from[0]
@@ -99,3 +99,9 @@ class ResourceRegistryCoreServiceTest(IonTestCase):
     @defer.inlineCallbacks
     def test_reg_startup(self):
         self.rrc = ResourceRegistryClient(proc=self.sup)
+        
+        res_to_describe = coi_resource_descriptions.IdentityResource
+        res_description = yield self.rrc.register_resource_definition(res_to_describe)
+        
+        print res_description
+        
