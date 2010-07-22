@@ -264,7 +264,7 @@ class BaseRegistryService(BaseService):
 
     @defer.inlineCallbacks
     def base_clear_registry(self, content, headers, msg):
-        logging.info('op_clear_registry!')
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'])
         yield self.reg.clear_registry()
         yield self.reply_ok(msg)
 
@@ -274,8 +274,9 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Register a resource instance with the registry.
         """
-        resource = dataobject.Resource.decode(content)()
-        logging.info('op_register_resource: \n' + str(resource))
+        logging.info('msg headers:'+ str(headers))
+        resource = dataobject.Resource.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Resource: \n' + str(resource))
   
         resource = yield self.reg.register_resource(resource)
         if resource:
@@ -289,8 +290,8 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Get a resource instance.
         """
-        resource_reference = dataobject.Resource.decode(content)()
-        logging.info('op_get_resource: '+str(resource_reference))
+        resource_reference = dataobject.Resource.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
 
         resource = yield self.reg.get_resource(resource_reference)
         logging.info('Got Resource:\n'+str(resource))
@@ -305,10 +306,10 @@ class BaseRegistryService(BaseService):
         """
         Service operation: set the life cycle state of resource
         """
-        container = dataobject.Resource.decode(content)()
+        container = dataobject.Resource.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
 
         if isinstance(container,  coi_resource_descriptions.SetResourceLCStateContainer):
-            logging.info('op_set_resource_lcstate: '+str(container))
             resource_reference = container.reference
             lcstate = container.lcstate
 
@@ -331,8 +332,9 @@ class BaseRegistryService(BaseService):
         ignore_defaults = None
         attnames=[]
                 
-        container = dataobject.Resource.decode(content)()
-        
+        container = dataobject.Resource.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
+
         result_list = []
         if isinstance(container,  coi_resource_descriptions.FindResourceContainer):
             description = container.description
@@ -391,7 +393,7 @@ class BaseRegistryClient(BaseServiceClient):
                                             resource.encode())
         logging.info('Service reply: '+str(headers))
         if content['status']=='OK':
-            resource = dataobject.Resource.decode(content['value'])()
+            resource = dataobject.Resource.decode(content['value'])
             defer.returnValue(resource)
         else:
             defer.returnValue(None)
@@ -407,7 +409,7 @@ class BaseRegistryClient(BaseServiceClient):
         logging.info('Service reply: '+str(headers))
 
         if content['status']=='OK':
-            resource = dataobject.Resource.decode(content['value'])()
+            resource = dataobject.Resource.decode(content['value'])
             defer.returnValue(resource)
         else:
             defer.returnValue(None)
@@ -429,7 +431,7 @@ class BaseRegistryClient(BaseServiceClient):
         logging.info('Service reply: '+str(headers))
         
         if content['status'] == 'OK':
-            resource_reference = dataobject.ResourceReference.decode(content['value'])()
+            resource_reference = dataobject.ResourceReference.decode(content['value'])
             defer.returnValue(resource_reference)
         else:
             defer.returnValue(None)
@@ -454,7 +456,7 @@ class BaseRegistryClient(BaseServiceClient):
         
         # Return a list of resources
         if content['status'] == 'OK':            
-            results = dataobject.DataObject.decode(content['value'])()
+            results = dataobject.DataObject.decode(content['value'])
             defer.returnValue(results.resources)
         else:
             defer.returnValue([])

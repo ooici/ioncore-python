@@ -58,7 +58,7 @@ class TypedAttribute(object):
             #print 'type, default:',type, default
             #return cls(type, eval(str(default), types))
             if issubclass(mytype, DataObject):
-                data_object = mytype.decode(json.loads(default),header=False)()
+                data_object = mytype.decode(json.loads(default),header=False)
                 return cls(mytype, data_object)
                 
             elif issubclass(mytype, (list, set, tuple)):
@@ -70,14 +70,15 @@ class TypedAttribute(object):
                     itype = eval(str(itype), types)
                     
                     if issubclass(itype, DataObject):
-                        objs.append(itype.decode(json.loads(ival),header=False)() )
+                        objs.append(itype.decode(json.loads(ival),header=False) )
                     else:
                         objs.append(itype(str(ival)))
                     
                 return cls(mytype, mytype(objs))
             elif issubclass(mytype, dict):
                 # since dicts are 'just' json encoded load and return!
-                return json.loads(default)
+                
+                return cls(mytype, json.loads(default))
             
             elif issubclass(mytype, bool):
                 return cls(mytype, eval(str(default)))
