@@ -497,7 +497,7 @@ class ResponseService(BaseService):
         logging.info('op_respond: '+str(content))
         
         
-        obj = dataobject.DataObject.decode(content)()
+        obj = dataobject.DataObject.decode(content)
         logging.info(obj)
         response = obj.encode()
 
@@ -522,7 +522,7 @@ class ResponseServiceClient(BaseServiceClient):
         logging.info('Sending Encoded resource:'+str(msg))
         (content, headers, msg) = yield self.rpc_send('respond', msg, {})
         logging.info('Responder replied: '+str(content))
-        response = dataobject.DataObject.decode(content)()
+        response = dataobject.DataObject.decode(content)
         defer.returnValue(response)
 
 # Spawn of the process using the module name
