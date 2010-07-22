@@ -216,7 +216,7 @@ class ObjectChassis(object):
             yield tree.load(self.objstore)
             obj_parts = [(child[0], child.obj.content) for child in tree.children]
             #self.index = self.objectClass.decode(self.objectClassName, obj_parts)()
-            self.index = self.objectClass.decode(obj_parts)()
+            self.index = self.objectClass.decode(obj_parts)
         else:
             self.index = self.objectClass()
         self.cur_commit = ref

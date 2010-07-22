@@ -274,7 +274,7 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Register a resource instance with the registry.
         """
-        resource = dataobject.Resource.decode(content)()
+        resource = dataobject.Resource.decode(content)
         logging.info('op_register_resource: \n' + str(resource))
   
         resource = yield self.reg.register_resource(resource)
@@ -289,7 +289,7 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Get a resource instance.
         """
-        resource_reference = dataobject.Resource.decode(content)()
+        resource_reference = dataobject.Resource.decode(content)
         logging.info('op_get_resource: '+str(resource_reference))
 
         resource = yield self.reg.get_resource(resource_reference)
@@ -305,7 +305,7 @@ class BaseRegistryService(BaseService):
         """
         Service operation: set the life cycle state of resource
         """
-        container = dataobject.Resource.decode(content)()
+        container = dataobject.Resource.decode(content)
 
         if isinstance(container,  coi_resource_descriptions.SetResourceLCStateContainer):
             logging.info('op_set_resource_lcstate: '+str(container))
@@ -331,7 +331,7 @@ class BaseRegistryService(BaseService):
         ignore_defaults = None
         attnames=[]
                 
-        container = dataobject.Resource.decode(content)()
+        container = dataobject.Resource.decode(content)
         
         result_list = []
         if isinstance(container,  coi_resource_descriptions.FindResourceContainer):
@@ -391,7 +391,7 @@ class BaseRegistryClient(BaseServiceClient):
                                             resource.encode())
         logging.info('Service reply: '+str(headers))
         if content['status']=='OK':
-            resource = dataobject.Resource.decode(content['value'])()
+            resource = dataobject.Resource.decode(content['value'])
             defer.returnValue(resource)
         else:
             defer.returnValue(None)
@@ -407,7 +407,7 @@ class BaseRegistryClient(BaseServiceClient):
         logging.info('Service reply: '+str(headers))
 
         if content['status']=='OK':
-            resource = dataobject.Resource.decode(content['value'])()
+            resource = dataobject.Resource.decode(content['value'])
             defer.returnValue(resource)
         else:
             defer.returnValue(None)
@@ -429,7 +429,7 @@ class BaseRegistryClient(BaseServiceClient):
         logging.info('Service reply: '+str(headers))
         
         if content['status'] == 'OK':
-            resource_reference = dataobject.ResourceReference.decode(content['value'])()
+            resource_reference = dataobject.ResourceReference.decode(content['value'])
             defer.returnValue(resource_reference)
         else:
             defer.returnValue(None)
@@ -454,7 +454,7 @@ class BaseRegistryClient(BaseServiceClient):
         
         # Return a list of resources
         if content['status'] == 'OK':            
-            results = dataobject.DataObject.decode(content['value'])()
+            results = dataobject.DataObject.decode(content['value'])
             defer.returnValue(results.resources)
         else:
             defer.returnValue([])
