@@ -91,7 +91,7 @@ class ResourceDescription(InformationResource):
     They describe resources, resource types and resource attributes
     """
     type = TypedAttribute(ResourceType)
-    atts = TypedAttribute(list)
+    atts = TypedAttribute(list,[])
     inherits_from = TypedAttribute(list)
     description = TypedAttribute(str)
 

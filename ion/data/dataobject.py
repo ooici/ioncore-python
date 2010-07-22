@@ -110,11 +110,11 @@ class DataObjectType(type):
                 value.name = '_' + key
                 d[value.name] = value.default
 
-
         for key, value in dict.items():
             if isinstance(value, TypedAttribute):
                 value.name = '_' + key
                 d[value.name] = value.default
+                    
         dict['__dict__'] = d
         return type.__new__(cls, name, bases, dict)
 
@@ -125,6 +125,17 @@ class DataObject(object):
     __metaclass__ = DataObjectType
 
     _types = {}
+
+    def __init__(self):
+        for name, att in self.get_typedattributes().items():
+            if att.type == list:
+                setattr(self,name,[])
+            if att.type == dict:
+                setattr(self,name,{})
+            if att.type == set:
+                setattr(self,name,set([]))
+        
+
 
     def __eq__(self, other):
         """
@@ -273,7 +284,6 @@ class DataObject(object):
         @Brief Get the typed attributes of the class
         @Note What about typed attributes that are over ridden?
         """
-        
         d={}
         ayb = reflect.allYourBase(cls)
         for yb in reversed(ayb):

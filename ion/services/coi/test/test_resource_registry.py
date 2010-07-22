@@ -45,14 +45,13 @@ class ResourceRegistryTest(IonTestCase):
         # put in a bogus resource for now...
         res_to_describe = coi_resource_descriptions.IdentityResource
         res_description = yield self.rrc.register_resource_definition(res_to_describe)
-        
-        #ref = yield self.rrc.set_resource_lcstate_commissioned(res_description)
-
-        
-        #commissioned_description = yield self.rrc.get_resource_definition(ref)
-        
+                
         #self.assertEqual(res2,res)
-        logging.info( str(res_description))
+        #logging.info( str(res_description))
+        print 'List Length',len(res_description.atts)
+        
+        #res_base = yield self.rrc.get_resource_definition(res_description.inherits_from[0])
+        #print 'Base List Length',len(res_base.atts)
         
         
     def test_describe_resource(self):

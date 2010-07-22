@@ -380,6 +380,35 @@ class TestListOfObjects(TestSimpleObject):
                        '"SimpleObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]"]'),
                         ('name', 'str\x00a big list of objects')]
      
+class TestListObjectBehavior(unittest.TestCase):
+    def test_recursive(self,int=None):
+        
+        if not int:
+            int = 1
+        else:
+            int = int +1
+            
+        obj1 = ListObject()
+        obj1.rlist.append(int)
+
+        if int <= 5:
+            self.test_recursive(int=int)
+        else:
+            self.assertEqual(obj1.rlist,[int])
+    
+            
+    def test_two_instances(self):
+        
+        obj1 = ListObject()
+        obj1.rlist.append(1)
+        obj1.rlist.append(2)
+        #obj1.rlist = [1,2,4]
+         
+           
+        obj2 = ListObject()
+        self.assertEqual(obj2.rlist, [])
+     
+     
 class SetObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
     rset = dataobject.TypedAttribute(set)
