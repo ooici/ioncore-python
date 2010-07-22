@@ -1,8 +1,9 @@
 {
   "capabilitycontainer":{
-    "broker":"localhost",
+    "broker":"184.73.158.98",
     "bootscript":"res/scripts/newcc.py",
     "sysname":"cei",
+    "broker_heartbeat":"0",
     "lcaarch_branch":"cei-lcaarch",
     "lcaarch_commit_hash":"HEAD",
     "log_level":"DEBUG"
