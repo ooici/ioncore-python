@@ -7,6 +7,7 @@
 """
 
 import sys, os, time, atexit
+import logging
 from signal import SIGTERM 
 
 class Daemon:
@@ -18,7 +19,8 @@ class Daemon:
     
     def __init__(
                  self, 
-                 pidfile, 
+                 pidfile,
+                 logfile, 
                  stdin='/dev/null', 
                  stdout='/dev/null', 
                  stderr='/dev/null'
@@ -27,6 +29,8 @@ class Daemon:
         self.stdout = stdout
         self.stderr = stderr
         self.pidfile = pidfile
+        self.logfile = logfile
+        logging.basicConfig(filename=self.logfile, level=logging.DEBUG)
     
     
     def daemonize(self):
@@ -36,6 +40,7 @@ class Daemon:
         http://www.erlenstar.demon.co.uk/unix/faq_2.html#SEC16
         """
 
+        logging.debug('Daemonizing process.')
         pid = str(os.getpid())
         f = file(self.pidfile,'w+')
         f.write("%s\n" % pid)
@@ -45,7 +50,9 @@ class Daemon:
             if pid > 0:
                 # exit first parent
                 sys.exit(0) 
+                logging.debug("fork #1 succeeded.\n")
         except OSError, e: 
+            logging.error("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
 
@@ -61,7 +68,9 @@ class Daemon:
             if pid > 0:
                 # exit from second parent
                 sys.exit(0) 
+                logging.debug("fork #2 succeeded.")
         except OSError, e: 
+            logging.error("fork #2 failed: %d (%s)" % (e.errno, e.strerror))
             sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1) 
 
@@ -75,21 +84,25 @@ class Daemon:
         os.dup2(si.fileno(), sys.stdin.fileno())
         os.dup2(so.fileno(), sys.stdout.fileno())
         os.dup2(se.fileno(), sys.stderr.fileno())
+        logging.debug("Detached stdout, stdin, and stderr")
     
         # write pidfile
-        atexit.register(self.delpid)
         pid = str(os.getpid())
+        atexit.register(self.delpid)
         file(self.pidfile,'w+').write("%s\n" % pid)
+        logging.debug("Writing pid file: %s = %s" % (self.pidfile, str(pid)))
 
         
     def delpid(self):
         os.remove(self.pidfile)
+        logging.debug("Deleted pid file: %s = %s" % (self.pidfile, str(pid)))
 
 
     def start(self):
         """
         Start the daemon
         """
+        logging.info("--- Starting daemon ---")
         # Check for a pidfile to see if the daemon already runs
         try:
             pf = file(self.pidfile,'r')
@@ -99,8 +112,8 @@ class Daemon:
             pid = None
     
         if pid:
-            message = "pidfile %s already exist. Daemon already running?\n"
-            sys.stderr.write(message % self.pidfile)
+            logging.error("Pidfile already exists. pid file: %s = %s" % (self.pidfile, str(pid)))
+            sys.stderr.write("Pidfile already exists. pid file: %s = %s\n" % (self.pidfile, str(pid)))
             sys.exit(1)
         
         # Start the daemon
@@ -112,6 +125,7 @@ class Daemon:
         """
         Stop the daemon
         """
+        logging.info("--- Stopping daemon ---")
         # Get the pid from the pidfile
         try:
             pf = file(self.pidfile,'r')
@@ -144,11 +158,13 @@ class Daemon:
         """
         Restart the daemon
         """
+        logging.info("--- Restarting daemon ---")
         self.stop()
         self.start()
 
 
     def status(self, clean=False):
+        logging.info("--- Status ---")
         try:
             pf = file(self.pidfile,'r')
             pid = int(pf.read().strip())
@@ -180,7 +196,6 @@ class Daemon:
             print 'PID file exits but isn''t matched to a running process'
             print 'PID file: %s\nPID:      %s'%(self.pidfile,pid)
             sys.exit(-1)
-        return 'Goog'
 
     
     def processCommandLine(self):
