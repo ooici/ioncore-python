@@ -6,13 +6,11 @@
 @brief test rpc portion of the host status classes
 """
 
-import logging, json, subprocess, sys, socket
+import logging
 logging = logging.getLogger(__name__)
-from twisted.internet import defer
-from twisted.trial import unittest
 
 from ion.test.iontest import IonTestCase
-from ion.services.coi.host_status.host_status import SnmpReader,HostReader
+from ion.services.coi.hostsensor.readers import HostReader
 
 
 class HostStatusTest(IonTestCase):
