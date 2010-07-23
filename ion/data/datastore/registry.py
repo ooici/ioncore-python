@@ -391,6 +391,9 @@ class BaseRegistryClient(BaseServiceClient):
         @param res_id is a resource identifier unique to this resource.
         """
         yield self._check_init()
+        assert isinstance(resource, dataobject.Resource), 'Invalid argument to base_register_resource'
+        assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
+
 
         (content, headers, msg) = yield self.rpc_send(op_name,
                                             resource.encode())
@@ -407,6 +410,8 @@ class BaseRegistryClient(BaseServiceClient):
         @brief Retrieve a resource from the registry by Reference
         """
         yield self._check_init()
+        assert isinstance(resource_reference, dataobject.ResourceReference), 'Invalid argument to base_register_resource'
+        assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
         (content, headers, msg) = yield self.rpc_send(op_name,
                                                       resource_reference.encode())
         logging.info('Service reply: '+str(headers))
@@ -424,7 +429,12 @@ class BaseRegistryClient(BaseServiceClient):
         @brief Retrieve a resource from the registry by its ID
         """
         yield self._check_init()
+        
+        assert isinstance(resource_reference, dataobject.ResourceReference), 'Invalid argument to base_register_resource'
+        assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
+        assert isinstance(lcstate, dataobject.LCState), 'Invalid argument to base_register_resource'
 
+        
         container = coi_resource_descriptions.SetResourceLCStateContainer()
         container.lcstate = lcstate
         container.reference = resource_reference
@@ -447,6 +457,13 @@ class BaseRegistryClient(BaseServiceClient):
         @param attributes is a dictionary of attributes which will be used to select a resource
         """
         yield self._check_init()
+    
+        assert isinstance(description, dataobject.DataObject), 'Invalid argument to base_register_resource'
+        assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
+        assert isinstance(regex, bool), 'Invalid argument to base_register_resource'
+        assert isinstance(ignore_defaults, bool), 'Invalid argument to base_register_resource'
+        assert isinstance(attnames, list), 'Invalid argument to base_register_resource'
+
 
         container = coi_resource_descriptions.FindResourceContainer()
         container.description = description

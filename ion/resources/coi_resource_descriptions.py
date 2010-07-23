@@ -116,7 +116,7 @@ class IdentityResource(StatefulResource):
     Identity Resources describe the identity of human in the OOICI...
     """
     # These are the fields that we get from the Trust Provider
-    ooi_id = TypedAttribute(str)
+    #ooi_id = TypedAttribute(str)
     common_name = TypedAttribute(str)
     country = TypedAttribute(str)
     trust_provider = TypedAttribute(str) # this is the trust provider /O (Organization field)
