@@ -5,6 +5,7 @@ import logging
 logging = logging.getLogger(__name__)
 from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource
 
+from magnet.container import Id
 """
 Container object are used as self describing sendable objects
 """
@@ -115,7 +116,7 @@ class IdentityResource(StatefulResource):
     Identity Resources describe the identity of human in the OOICI...
     """
     # These are the fields that we get from the Trust Provider
-    ooi_id = TypedAttribute(str)
+    #ooi_id = TypedAttribute(str)
     common_name = TypedAttribute(str)
     country = TypedAttribute(str)
     trust_provider = TypedAttribute(str) # this is the trust provider /O (Organization field)
@@ -159,14 +160,20 @@ class ServiceInstance(StatefulResource):
     """
     Resource Instances are stored in the resource registry.
     They describe instances of a resource type
+    Attribute names are taken from ProcessDesc class ?
     """
     description = TypedAttribute(ResourceReference)
-    #owner = TypedAttribute(ResourceReference)
-    spawnargs = TypedAttribute(dict)
-    type = TypedAttribute(str)
-    exchange_name = TypedAttribute(str)
-    process_id = TypedAttribute(str)
-    target = TypedAttribute(str)
+    #proc_module = TypedAttribute(str)
+    proc_node = TypedAttribute(str)
+    proc_id = TypedAttribute(Id, Id(None))
+    proc_name = TypedAttribute(str)
+    spawn_args = TypedAttribute(dict)
+    proc_state = TypedAttribute(str)
+    sup_process = TypedAttribute(ResourceReference)
+    #proc_mod_obj = TypedAttribute(str)
+    #proc_class = TypedAttribute(str)
+
+DataObject._types['Id']=Id
 
 class AgentDescription(InformationResource):
     """

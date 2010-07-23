@@ -106,22 +106,29 @@ class ServiceRegistryClient(registry.BaseRegistryClient):
         """
 
     @defer.inlineCallbacks
-    def register_service_defintion(self,service_class):
+    def register_service_defintion(self,service):
         """
         Client method to register the Definition of a Service Class
         """
-        
-        service_description = self.describe_service(service_class)
-        
-        found_sd = yield self.find_registered_service_definition_from_description(service_description)
-        
-        if found_sd:
-            assert len(found_sd) == 1
-            defer.returnValue(found_sd[0])
+        if isinstance(service, coi_resource_descriptions.ServiceDescription):
+            service_description = service
+            assert service_description.RegistryIdentity, 'Service Description must have a registry Identity'
+
         else:
-            service_description.create_new_reference()
-            service_description = yield self.base_register_resource('register_service_definition', service_description)
-            defer.returnValue(service_description)
+            service_class = service
+            # Build a new description of the service
+            service_description = self.describe_service(service_class)
+            
+            found_sd = yield self.find_registered_service_definition_from_description(service_description)
+            
+            if found_sd:
+                assert len(found_sd) == 1
+                defer.returnValue(found_sd[0])
+            else:
+                service_description.create_new_reference()
+
+        service_description = yield self.base_register_resource('register_service_definition', service_description)
+        defer.returnValue(service_description)
 
      
     def describe_service(self,service_class):
@@ -161,35 +168,61 @@ class ServiceRegistryClient(registry.BaseRegistryClient):
         return self.base_get_resource('get_service_definition', service_description_reference)
 
     @defer.inlineCallbacks
-    def register_service_instance(self,service_instance):
+    def register_service_instance(self,service):
         """
         Client method to register a Service Instance
         """
-        service_resource = describe_instance(service_class)
-
-        found_sir = yield self.find_registered_service_instance_from_description(service_resource)
-        if found_sir:
-            assert len(found_sir) == 1
-            defer.returnValue(found_sir[0])
+        if isinstance(service, coi_resource_descriptions.ServiceInstance):
+            service_resource = service
+            assert resource_description.RegistryIdentity, 'Service Resource must have a registry Identity'            
         else:
-            service_resource.create_new_reference()
-            service_resource.set_lifecyclestate(dataobject.LCStates.developed)
-            service_resource = yield self.base_register_resource('register_service_instance',service_resource)
-            defer.returnValue(service_resource)
+            service_instance = service
+            # Build a new description of this service instance
+            service_resource = yield self.describe_instance(service_instance)
+    
+            found_sir = yield self.find_registered_service_instance_from_description(service_resource)
+            if found_sir:
+                assert len(found_sir) == 1
+                defer.returnValue(found_sir[0])
+            else:
+                service_resource.create_new_reference()
+                service_resource.set_lifecyclestate(dataobject.LCStates.developed)
+
+        service_resource = yield self.base_register_resource('register_service_instance',service_resource)
+        defer.returnValue(service_resource)
 
     @defer.inlineCallbacks
     def describe_instance(self,service_instance):
         """
+        @param service_instance is actually a ProcessDesc object!
         """
+        
         # Do not make a new resource idenity - this is a generic method which
         # is also used to look for an existing description
         service_resource = coi_resource_descriptions.ServiceInstance()
-        service_resource.name=service_instance.svc_name
-        service_resource.description = yield self.register_service_defintion(service_instance.__class__)
-        service_resource.exchange_name = service_instance.svc_reciever
-        service_resource.process_id = service_instance.proc
-        service_resource.target = service_instance.target
-        service_resource.spawnargs = service_instance.spawn_args
+        
+        service_class = getattr(service_instance.proc_mod_obj,service_instance.proc_class)
+        
+        sd = yield self.register_service_defintion(service_class)
+        service_resource.description = sd.reference(head=True)
+        
+        
+        if service_instance.proc_node:
+            service_resource.proc_node = service_instance.proc_node
+        service_resource.proc_id = service_instance.proc_id
+        service_resource.proc_name = service_instance.proc_name
+        if service_instance.spawn_args:
+            service_resource.spawn_args = service_instance.spawn_args
+        service_resource.proc_state = service_instance.proc_state
+
+        # add a reference to the supervisor - can't base process does not have the same fields as ProcessDesc
+        #if service_resource.sup_process:
+        #    print service_instance.sup_process.__dict__
+        #    sr = yield self.register_service_instance(service_instance.sup_process)
+        #    service_resource.sup_process = sr.reference(head=True)
+            
+        # Not sure what to do with name?
+        service_resource.name=service_instance.proc_module
         
         defer.returnValue(service_resource)
 
