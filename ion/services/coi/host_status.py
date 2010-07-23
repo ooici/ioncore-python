@@ -6,20 +6,20 @@
 @brief service for messaging local host status at intervals
 """
 
-import logging
+import logging, xmlrpclib, json
 logging = logging.getLogger(__name__)
-from twisted.internet import defer
-from magnet.spawnable import Receiver
+from twisted.internet import defer, task
 
-import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
+
 
 
 class HostStatusService(BaseService):
     """
     Host status interface
     """
+
     # Declaration of service
     declare = BaseService.service_declare(
         name='host_status',
@@ -28,15 +28,21 @@ class HostStatusService(BaseService):
     )
 
 
-    def slc_init(self):
-        self.lc = task.LoopingCall(self.announce)
-        #self.lc.start(10)
-        logging.info("HostStatusService initialized")
-
-
     
-    def announce(self):
-        print 'Hoorah!'
+    def slc_init(self):
+        timings = [0.3]
+        clock = task.Clock()
+
+        def foo():
+            p = xmlrpclib.ServerProxy('http://localhost:9010')
+            s = p.getStatusPrettyPrint()
+            print s
+            # print json.dumps(s.getStatus(), indent=4)
+            print p.system.listMethods()
+
+        lc = task.LoopingCall(foo)
+        lc.start(1)
+        return defer.succeed(None)        
 
 
     def op_config(self, content, headers, msg):
