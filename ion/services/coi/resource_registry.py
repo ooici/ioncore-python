@@ -104,6 +104,7 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
 
     def register_container_resources(self):
         """
+        Method Stub...
         This method is called when the container is started to inspect the
         resources directory of lca arch and register descriptions for all
         resources.
@@ -112,8 +113,11 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
     @defer.inlineCallbacks
     def register_resource_instance(self,resource,owner=None):
         """
-        Client method to Register a Resource instance
-        An instance is a reference to an owner, a description and the resource
+        @Brief Client method to Register a Resource Instance
+        An instance resource includes a reference to a owner, a description and
+        the resource
+        @param resource can be either the instance to be registered or and
+        existing instance resource to be modified.
         @Note this need architectural clarification
         """
         # Can't have an resource instance for a resource instance - Is that a problem? 
@@ -142,7 +146,9 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         """
         @Brief Extract metadata from a resource instance to store in the resource
         registry
-        @Param resource is an instance of a class which inherits from Resource
+        @Param resource is an instance of a class which inherits from Resource.
+        This method extracts metadata from the instance for the registry.
+        @Param all resource instances must belong to an owner
         """
         assert isinstance(resource_instance, dataobject.Resource)
         assert isinstance(owner, coi_resource_descriptions.IdentityResource)
@@ -166,7 +172,9 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         
     def get_resource_instance(self,resource_reference):
         """
-        Get a resource instance
+        @Brief Get a resource instance
+        @param resource_reference is the unique reference object for a registered
+        resource
         """
         return self.base_get_resource(resource_reference,'get_resource_instance')
         
@@ -174,7 +182,9 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
     @defer.inlineCallbacks
     def register_resource_definition(self,resource):
         """
-        Client method to register the Definition of a Resource Type
+        @Brief Client method to register the definition of a Resource Type
+        @param resource can be either an instance of a Resource Description or
+        the class object of the resource to be described. 
         """
         if isinstance(resource, coi_resource_descriptions.ResourceDescription):
             resource_description = resource
@@ -198,9 +208,13 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
     @defer.inlineCallbacks
     def describe_resource(self,resource_class):
         """
-        @Brief Extract metadata from a resource subclass to store in the resource
-        registry
-        @Param resource is a class which inherits from Resource
+        @Brief Extract metadata from a resource class to create the definition
+        in the resource registry
+        @Param resource is a class object which inherits from Resource
+        @Note As an example, this method recursively registers the bases of the
+        resource class to create a representation of the class inheritance in
+        the registry. This is more of an example of complex behavior than an
+        architectural neccissity.
         """
         assert issubclass(resource_class, dataobject.Resource)
         
@@ -242,6 +256,9 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
 
     @defer.inlineCallbacks
     def get_resource_bases_by_reference(self,resource_class):
+        """
+        @Brief Get or register the base classes of a resource class object.
+        """
         
         bases = self.get_parent_resource_classes(resource_class)
         
@@ -257,6 +274,9 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         
 
     def get_parent_resource_classes(self,resource_class):
+        """
+        @Brief Get the bases
+        """
         assert issubclass(resource_class, dataobject.Resource)
         # Ignore multiple inheritence for now!
         bases=[]
@@ -268,7 +288,9 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
 
     def get_resource_definition(self,resource_reference):
         """
-        Get a resource definition
+        @Brief Get a resource definition
+        @param resource_reference is the unique reference object for a registered
+        resource
         """
         return self.base_get_resource('get_resource_definition',resource_reference)
 
@@ -280,6 +302,7 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
     def find_registered_resource_definition_from_resource(self, resource_class):
         """
         @Brief find the registered definition of a resoruce
+        @param resource_class is the class object for a particular resource.
         """
         resource_description = yield self.describe_resource(resource_class)
         description_list = yield self.base_find_resource('find_registered_resource_definition_from_resource',resource_description,regex=False,ignore_defaults=True)
@@ -293,14 +316,19 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
     def find_registered_resource_definitions_from_description(self, description,regex=True,ignore_defaults=True,attnames=[]):
         """
         @Brief find all registered resources which match the attributes of description
+        @param see the registry docs for params
         """
         return self.base_find_resource('find_registered_resource_definitions_from_description',description,regex,ignore_defaults,attnames)
         
     @defer.inlineCallbacks
-    def find_registered_resource_instance_from_instance(self, resource_instance, owner):
+    def find_registered_resource_instance_from_instance(self, resource_instance, owner=None):
         """
         @Brief Find the registered instance of a resource
+        @param find an instance of a resource in the resource registry
         """
+        if not owner:
+            owner = coi_resource_descriptions.IdentityResource()
+            
         resource_instance_description = yield self.describe_instance(resource_instance,owner)
         resource_list = yield self.base_find_resource('find_registered_resource_instance_from_instance',resource_instance_description,regex=False,ignore_defaults=True)
         # Find returns a list but only one resource should match!
@@ -313,6 +341,7 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
     def find_registered_resource_instance_from_description(self, description,regex=True,ignore_defaults=True,attnames=[]):
         """
         @Brief find all registered resources which match the attributes of description
+        @param see the registry docs for params
         """
         return self.base_find_resource('find_registered_resource_instance_from_description',description,regex,ignore_defaults,attnames)
 
