@@ -3,10 +3,10 @@
 @author Brian Fox
 @brief Simple XMLRPC server for serving host status
 """
-
+import logging
+import encoders
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 from readers import HostReader
-import os,sys,encoders
 from base_daemon import Daemon
  
 
@@ -31,7 +31,7 @@ class HostStatusRPCServer:
         """
         Creates the RPC server
         """
-        self.server = SimpleXMLRPCServer((rpcHost, rpcPort))
+        self.server = SimpleXMLRPCServer((rpcHost, rpcPort), allow_none=True)
         self.status = HostReader(
                                  snmpHost, 
                                  snmpPort, 
@@ -39,8 +39,9 @@ class HostStatusRPCServer:
                                  snmpCommunityName
                                  )
         self.server.register_function(self.getStatus)
+        self.server.register_function(self.getStatusPrettyPrint)
         self.server.register_introspection_functions()
-
+        logging.debug('host_status_daemon intialized')
 
 
     def run(self):
@@ -57,6 +58,12 @@ class HostStatusRPCServer:
         """
         return encoders.encodeJSONToXMLRPC(self.status.getAll())
 
+
+    def getStatusPrettyPrint(self):
+        """
+        Gets the status of this host (RPC registered function)
+        """
+        return encoders.encodeJSONToXMLRPC(self.status.getAllPrettyPrint())
 
         
  
@@ -85,7 +92,7 @@ class HostStatusNoDaemon():
 
 if __name__ == "__main__":
     # runAlways = HostStatusNoDaemon()
-    daemon = HostStatusDaemon('/tmp/host_status_daemon.pid')
+    daemon = HostStatusDaemon('/tmp/host_status_daemon.pid','/tmp/host_status_daemon.log')
     daemon.processCommandLine()
  
         
