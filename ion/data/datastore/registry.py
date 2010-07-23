@@ -245,6 +245,8 @@ class BaseRegistryService(BaseService):
         # use spawn args to determine backend class, second config file
         backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', None))
         backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', {}))
+        
+        # self.backend holds the class which is instantiated to provide the Store for the registry
         if backendcls:
             self.backend = pu.get_class(backendcls)
         else:
@@ -254,6 +256,7 @@ class BaseRegistryService(BaseService):
         # Provide rest of the spawnArgs to init the store
         s = yield self.backend.create_store(**backendargs)
         
+        # Now pass the instance of store to create an instance of the registry
         self.reg = Registry(s)
         
         name = self.__class__.__name__

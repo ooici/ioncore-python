@@ -309,8 +309,11 @@ class DataObject(object):
 
     def get_attributes(self):
         atts={}
-        for key,value in self.__dict__.items():
-            atts[key[1:]]=value
+        #@Note Not sure why dict does not work any more - returns default not value?
+        #for key,value in self.__dict__.items():
+        #    atts[key[1:]]=value
+        for key in self.attributes:
+            atts[key] = getattr(self,key)
         return atts
         
 
