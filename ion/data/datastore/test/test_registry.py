@@ -128,6 +128,7 @@ class RegistryTest(unittest.TestCase):
 
 
         blank = dataobject.Resource()
+        
         results = yield self.reg.find_resource(blank,regex=False,ignore_defaults=False)
         self.assertEqual(results,[])
         

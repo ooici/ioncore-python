@@ -85,23 +85,22 @@ OOIResourceTypes = TypesContainer(OOIResourceTypes)
 # Object Dictionary to be decoded!
 DataObject._types.update(OOIResourceTypes)
 
-class AttributeDescription(DataObject):
-    name = TypedAttribute(str)
-    type = TypedAttribute(str)
-    default = TypedAttribute(str) 
-
 class ResourceDescription(InformationResource):
     """
     Resource Descriptions are stored in the resource registry.
     They describe resources, resource types and resource attributes
     """
     type = TypedAttribute(ResourceType)
-    atts = TypedAttribute(list)
+    atts = TypedAttribute(list,[])
     inherits_from = TypedAttribute(list)
     description = TypedAttribute(str)
 
+class AttributeDescription(DataObject):
+    name = TypedAttribute(str)
+    type = TypedAttribute(str)
+    default = TypedAttribute(str) 
     
-class ResourceInstance(InformationResource):
+class ResourceInstance(StatefulResource):
     """
     Resource Instances are stored in the resource registry.
     They describe instances of a resource type
@@ -135,9 +134,6 @@ class IdentityResource(StatefulResource):
     title = TypedAttribute(str)
 
 
-class ServiceMethodInterface(DataObject):
-    description = TypedAttribute(str)
-    arguments = TypedAttribute(str)
 
 class ServiceDescription(InformationResource):
     """
@@ -149,6 +145,13 @@ class ServiceDescription(InformationResource):
     version = TypedAttribute(str)
     #spawnargs = TypedAttribute(dict,{})
     description = TypedAttribute(str)
+    class_name = TypedAttribute(str)
+    
+
+class ServiceMethodInterface(DataObject):
+    name = TypedAttribute(str)
+    description = TypedAttribute(str)
+    arguments = TypedAttribute(str)
 
    
     
@@ -159,15 +162,11 @@ class ServiceInstance(StatefulResource):
     """
     description = TypedAttribute(ResourceReference)
     #owner = TypedAttribute(ResourceReference)
-    spawnargs = TypedAttribute(str)
+    spawnargs = TypedAttribute(dict)
     type = TypedAttribute(str)
     exchange_name = TypedAttribute(str)
     process_id = TypedAttribute(str)
-
-
-class AgentMethodInterface(StatefulResource):
-    description = TypedAttribute(str)
-    arguments = TypedAttribute(str)
+    target = TypedAttribute(str)
 
 class AgentDescription(InformationResource):
     """
@@ -179,6 +178,10 @@ class AgentDescription(InformationResource):
     version = TypedAttribute(str)
     #spawnargs = TypedAttribute(dict,{})
     description = TypedAttribute(str)
+    
+class AgentMethodInterface(StatefulResource):
+    description = TypedAttribute(str)
+    arguments = TypedAttribute(str)
     
 class AgentInstance(StatefulResource):
     """

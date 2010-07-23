@@ -11,6 +11,8 @@ logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
+import inspect
+
 from ion.core import base_process
 import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
@@ -38,7 +40,7 @@ class ServiceRegistryService(registry.BaseRegistryService):
 
     op_clear_registry = registry.BaseRegistryService.base_clear_registry
 
-    op_register_service_defintion = registry.BaseRegistryService.base_register_resource
+    op_register_service_definition = registry.BaseRegistryService.base_register_resource
     """
     Service operation: Register a service definition with the registry.
     """
@@ -46,6 +48,7 @@ class ServiceRegistryService(registry.BaseRegistryService):
     """
     Service operation: Get a service definition.
     """
+    
     op_register_service_instance = registry.BaseRegistryService.base_register_resource
     """
     Service operation: Register a service instance with the registry.
@@ -54,31 +57,34 @@ class ServiceRegistryService(registry.BaseRegistryService):
     """
     Service operation: Get a service instance.
     """
+    
     op_set_service_lcstate = registry.BaseRegistryService.base_set_resource_lcstate
     """
     Service operation: Set a service life cycle state
     """
-    op_find_service_definition = registry.BaseRegistryService.base_find_resource
+    
+    op_find_registered_service_definition_from_service = registry.BaseRegistryService.base_find_resource
     """
     Service operation: Find the definition of a service
     """
-    op_find_described_service = registry.BaseRegistryService.base_find_resource
+    op_find_registered_service_definition_from_description = registry.BaseRegistryService.base_find_resource
     """
     Service operation: Find service definitions which meet a description
     """
-    op_find_service_instance = registry.BaseRegistryService.base_find_resource
+    
+    op_find_registered_service_instance_from_service = registry.BaseRegistryService.base_find_resource
     """
-    Service operation: Find service instances 
+    Service operation: Find the registered instance that matches the service instance
     """
-    op_find_described_service_instance = registry.BaseRegistryService.base_find_resource
+    op_find_registered_service_instance_from_description = registry.BaseRegistryService.base_find_resource
     """
-    Service operation: Find service instances which meet a description
+    Service operation: Find all the registered service instances which match a description
     """
 # Spawn of the process using the module name
 factory = ProtocolFactory(ServiceRegistryService)
 
 
-class ServiceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin):
+class ServiceRegistryClient(registry.BaseRegistryClient):
     """
     Client class for accessing the service registry. This is most important for
     finding and accessing any other services. This client knows how to find the
@@ -104,96 +110,128 @@ class ServiceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin):
         """
         Client method to register the Definition of a Service Class
         """
-        found = yield self.find_service_definition(service_class)
-        if found:
-            defer.returnValue(found)
-            
-        service_description = coi_resource_descriptions.ServiceDescription.create_new_resource()
-        service_description.describe_service(service_class)
-                        
         
-        service_description.set_lifecyclestate(dataobject.LCStates.developed)
-        service_description = yield self.base_register_resource(service_description, 'register_service_definition')
-        defer.returnValue(resource_type)
+        service_description = self.describe_service(service_class)
+        
+        found_sd = yield self.find_registered_service_definition_from_description(service_description)
+        
+        if found_sd:
+            assert len(found_sd) == 1
+            defer.returnValue(found_sd[0])
+        else:
+            service_description.create_new_reference()
+            service_description = yield self.base_register_resource('register_service_definition', service_description)
+            defer.returnValue(service_description)
 
      
-    def describe_service(self,svc):
+    def describe_service(self,service_class):
         
-        assert issubclass(svc, BaseService)
+        assert issubclass(service_class, BaseService)
+
+        # Do not make a new resource idenity - this is a generic method which
+        # is also used to look for an existing description
+        service_description = coi_resource_descriptions.ServiceDescription()
+
+        service_description.name = service_class.declare['name']
+        service_description.version = service_class.declare['version']
         
-        self.name = svc.declare['name']
-        self.version = svc.declare['version']
-        
-        self.class_name = svc.__name__
-        self.module = svc.__module__
+        service_description.class_name = service_class.__name__
+        service_description.module = service_class.__module__
                 
-        self.description = inspect.getdoc(svc)      
+        service_description.description = inspect.getdoc(service_class)      
+        
+        #@Note need to improve inspection of service!
+        for attr in inspect.classify_class_attrs(service_class):
+            if attr.kind == 'method' and 'op_' in attr.name :
             
-        for attr in inspect.classify_class_attrs(svc):
-            if attr.kind == 'method':
-            
-                opdesc = ServiceMethodInterface()
+                opdesc = coi_resource_descriptions.ServiceMethodInterface()
                 opdesc.name = attr.name
-                opdesc.description = inspect.getdoc(attr.object)
+                #print 'INSEPCT',inspect.getdoc(attr.object)
+                #opdesc.description = inspect.getdoc(attr.object)
                 #Can't seem to get the arguments in any meaningful way...
                 #opdesc.arguments = inspect.getargspec(attr.object)
                 
-                self.interface.append(attdesc)    
-            
+                service_description.interface.append(opdesc)    
+        return service_description
 
-        
-
-    def get_service_definition(self, resource_reference):
+    def get_service_definition(self, service_description_reference):
         """
         Get a service definition
         """
-        return self.base_get_resource(resource_reference,'get_service_definition')
+        return self.base_get_resource('get_service_definition', service_description_reference)
 
     @defer.inlineCallbacks
     def register_service_instance(self,service_instance):
         """
         Client method to register a Service Instance
         """
-        found = yield self.find_service_instance(service_instance)
-        if found:
-            defer.returnValue(found)
-            
-        service_reference = coi_resource_descriptions.ServiceInstance.create_new_resource()
-        service_reference.describe_instance(service_class)
-                        
-        
-        service_description.set_lifecyclestate(dataobject.LCStates.developed)
-        service_description = yield self.base_register_resource(service_description, 'register_service_instance')
-        defer.returnValue(resource_type)
+        service_resource = describe_instance(service_class)
 
-        
-    def describe_instance(self,svc_inst):
+        found_sir = yield self.find_registered_service_instance_from_description(service_resource)
+        if found_sir:
+            assert len(found_sir) == 1
+            defer.returnValue(found_sir[0])
+        else:
+            service_resource.create_new_reference()
+            service_resource.set_lifecyclestate(dataobject.LCStates.developed)
+            service_resource = yield self.base_register_resource('register_service_instance',service_resource)
+            defer.returnValue(service_resource)
+
+    @defer.inlineCallbacks
+    def describe_instance(self,service_instance):
         """
         """
-        self.name=svc_inst.svc_name
-        self.description = inspect.getdoc(svc_inst)
-        self.exchange_name = svc_inst.svc_reciever
+        # Do not make a new resource idenity - this is a generic method which
+        # is also used to look for an existing description
+        service_resource = coi_resource_descriptions.ServiceInstance()
+        service_resource.name=service_instance.svc_name
+        service_resource.description = yield self.register_service_defintion(service_instance.__class__)
+        service_resource.exchange_name = service_instance.svc_reciever
+        service_resource.process_id = service_instance.proc
+        service_resource.target = service_instance.target
+        service_resource.spawnargs = service_instance.spawn_args
+        
+        defer.returnValue(service_resource)
 
-
-    def get_service_instance(self, resource_reference):
+    def get_service_instance(self, service_reference):
         """
         Get a service instance
         """
-        return self.base_get_resource(resource_reference,'get_service_instance')
+        return self.base_get_resource('get_service_instance',service_reference)
 
+    def set_service_lcstate(self, service_reference, lcstate):
+        return self.base_set_service_lcstate('set_service_lcstate',service_reference, lcstate)
 
-    def set_resource_lcstate(self, resource_reference, lcstate):
-        return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_service_lcstate')
+    def set_service_lcstate_new(self, service_reference):
+        return self.set_service_lcstate(service_reference, dataobject.LCStates.new)
+
+    def set_service_lcstate_active(self, service_reference):
+        return self.set_service_lcstate(service_reference, dataobject.LCStates.active)
+        
+    def set_service_lcstate_inactive(self, service_reference):
+        return self.set_service_lcstate(service_reference, dataobject.LCStates.inactive)
+
+    def set_service_lcstate_decomm(self, service_reference):
+        return self.set_service_lcstate(service_reference, dataobject.LCStates.decomm)
+
+    def set_service_lcstate_retired(self, service_reference):
+        return self.set_service_lcstate(service_reference, dataobject.LCStates.retired)
+
+    def set_service_lcstate_developed(self, service_reference):
+        return self.set_service_lcstate(service_reference, dataobject.LCStates.developed)
+
+    def set_service_lcstate_commissioned(self, service_reference):
+        return self.set_service_lcstate(service_reference, dataobject.LCStates.commissioned)
 
 
     @defer.inlineCallbacks
-    def find_service_definition(self, service_class):
+    def find_registered_service_definition_from_service(self, service_class):
         """
         Find the definition of a service 
         """
-        svc_desc = coi_resource_descriptions.ServiceDescription()
-        svc_desc.describe_service(service_class)
-        alist = yield self.base_find_resource(resource_type,'find_service_definition',regex=False,ignore_defaults=True)
+        service_description = self.describe_service(service_class)
+        
+        alist = yield self.base_find_resource('find_registered_service_definition_from_service', service_description,regex=False,ignore_defaults=True)
         # Find returns a list but only one service should match!
         if alist:
             assert len(alist) == 1
@@ -201,21 +239,20 @@ class ServiceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin):
         else:
             defer.returnValue(None)
             
-    def find_described_service(self, description,regex=True,ignore_defaults=True):
+    def find_registered_service_definition_from_description(self, service_description,regex=True,ignore_defaults=True):
         """ 
         Find service definitions which meet a description
         """
-        return self.base_find_resource(description,'find_described_service',regex,ignore_defaults)
+        return self.base_find_resource('find_registered_service_definition_from_description', service_description,regex,ignore_defaults)
         
 
     @defer.inlineCallbacks
-    def find_service_instance(self, service_instance):
+    def find_registered_service_instance_from_service(self, service_instance):
         """
         Find service instances
         """
-        svc_inst = coi_resource_descriptions.ServiceInstance()
-        svc_inst.describe_instance(service_instance)
-        alist = yield self.base_find_resource(resource_type,'find_service_instance',regex=False,ignore_defaults=True)
+        service_resource = yield self.describe_instance(service_instance)
+        alist = yield self.base_find_resource('find_registered_service_instance_from_service', service_resource, regex=False,ignore_defaults=True)
         # Find returns a list but only one service should match!
         if alist:
             assert len(alist) == 1
@@ -223,11 +260,11 @@ class ServiceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin):
         else:
             defer.returnValue(None)
             
-    def find_described_service_instance(self, description,regex=True,ignore_defaults=True):
+    def find_registered_service_instance_from_description(self, service_instance_description,regex=True,ignore_defaults=True):
         """ 
         Find service instances which meet a description
         """
-        return self.base_find_resource(description,'find_described_service_instance',regex,ignore_defaults)
+        return self.base_find_resource('find_registered_service_instance_from_description', service_instance_description,regex,ignore_defaults)
 
 
 

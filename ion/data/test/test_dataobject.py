@@ -311,7 +311,7 @@ class TestSimpleObject(unittest.TestCase):
         self.assertEqual(self.encoded,enc)
         
     def testDecode(self):
-        dec = dataobject.DataObject.decode(self.encoded)()
+        dec = dataobject.DataObject.decode(self.encoded)
         #print 'dec',dec
         #print 'self.obj',self.obj
         self.assertEqual(self.obj,dec)
@@ -379,6 +379,36 @@ class TestListOfObjects(TestSimpleObject):
                        '"PrimaryTypesObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"floating\\", \\"float\\\\u00005.0\\"], [\\"integer\\", \\"int\\\\u00005\\"], [\\"boolen\\", \\"bool\\\\u0000True\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]", '+
                        '"SimpleObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]"]'),
                         ('name', 'str\x00a big list of objects')]
+     
+class TestListObjectBehavior(unittest.TestCase):
+    def test_recursive(self,int=None):
+        
+        if not int:
+            int = 1
+        else:
+            int = int +1
+            
+        obj1 = ListObject()
+        obj1.rlist.append(int)
+
+        if int <= 5:
+            self.test_recursive(int=int)
+        else:
+            self.assertEqual(obj1.rlist,[int])
+    
+            
+    def test_two_instances(self):
+        
+        obj1 = ListObject()
+        obj1.rlist.append(1)
+        obj1.rlist.append(2)
+        #obj1.rlist = [1,2,4]
+         
+           
+        obj2 = ListObject()
+        self.assertEqual(obj2.rlist, [])
+        self.assertEqual(obj1.rlist, [1,2])
+     
      
 class SetObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
@@ -467,7 +497,7 @@ class ResponseService(BaseService):
         logging.info('op_respond: '+str(content))
         
         
-        obj = dataobject.DataObject.decode(content)()
+        obj = dataobject.DataObject.decode(content)
         logging.info(obj)
         response = obj.encode()
 
@@ -492,7 +522,7 @@ class ResponseServiceClient(BaseServiceClient):
         logging.info('Sending Encoded resource:'+str(msg))
         (content, headers, msg) = yield self.rpc_send('respond', msg, {})
         logging.info('Responder replied: '+str(content))
-        response = dataobject.DataObject.decode(content)()
+        response = dataobject.DataObject.decode(content)
         defer.returnValue(response)
 
 # Spawn of the process using the module name
@@ -609,7 +639,7 @@ class TestResource(unittest.TestCase):
     def test_set_lcstate(self):
         
         #logging.info(registry.LCStates)
-        res = dataobject.Resource.create_new_resource()
+        res = dataobject.StatefulResource.create_new_resource()
         #logging.info(res.get_lifecyclestate())
         self.assertEqual(res.lifecycle, dataobject.LCStates.new)
 
@@ -625,7 +655,7 @@ class TestResource(unittest.TestCase):
 
     def test_get_lcstate(self):
  
-        res = dataobject.Resource.create_new_resource()
+        res = dataobject.StatefulResource.create_new_resource()
         
         self.assertEqual(res.get_lifecyclestate(),dataobject.LCState('new'))
  

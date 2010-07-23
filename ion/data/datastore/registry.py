@@ -72,7 +72,7 @@ class IRegistry(object):
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
     
-    def find_resource(self,description):
+    def find_resource(self,description,regex=True,ignore_defaults=True,attnames=[]):
         """
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
@@ -156,7 +156,6 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         """
         Service operation: set the life cycle state of resource
         """
-
         resource = yield self.get_resource(resource_reference)
         
         if resource:
@@ -265,7 +264,7 @@ class BaseRegistryService(BaseService):
 
     @defer.inlineCallbacks
     def base_clear_registry(self, content, headers, msg):
-        logging.info('op_clear_registry!')
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'])
         yield self.reg.clear_registry()
         yield self.reply_ok(msg)
 
@@ -275,8 +274,9 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Register a resource instance with the registry.
         """
-        resource = dataobject.Resource.decode(content)()
-        logging.info('op_register_resource: \n' + str(resource))
+        logging.info('msg headers:'+ str(headers))
+        resource = dataobject.Resource.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Resource: \n' + str(resource))
   
         resource = yield self.reg.register_resource(resource)
         if resource:
@@ -290,8 +290,8 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Get a resource instance.
         """
-        resource_reference = dataobject.Resource.decode(content)()
-        logging.info('op_get_resource: '+str(resource_reference))
+        resource_reference = dataobject.Resource.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
 
         resource = yield self.reg.get_resource(resource_reference)
         logging.info('Got Resource:\n'+str(resource))
@@ -306,10 +306,10 @@ class BaseRegistryService(BaseService):
         """
         Service operation: set the life cycle state of resource
         """
-        container = dataobject.Resource.decode(content)()
+        container = dataobject.Resource.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
 
         if isinstance(container,  coi_resource_descriptions.SetResourceLCStateContainer):
-            logging.info('op_set_resource_lcstate: '+str(container))
             resource_reference = container.reference
             lcstate = container.lcstate
 
@@ -332,8 +332,9 @@ class BaseRegistryService(BaseService):
         ignore_defaults = None
         attnames=[]
                 
-        container = dataobject.Resource.decode(content)()
-        
+        container = dataobject.Resource.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
+
         result_list = []
         if isinstance(container,  coi_resource_descriptions.FindResourceContainer):
             description = container.description
@@ -380,7 +381,7 @@ class BaseRegistryClient(BaseServiceClient):
 
 
     @defer.inlineCallbacks
-    def base_register_resource(self,resource,op_name):
+    def base_register_resource(self,op_name ,resource):
         """
         @brief Store a resource in the registry by its ID. It can be new or
         modified.
@@ -392,13 +393,13 @@ class BaseRegistryClient(BaseServiceClient):
                                             resource.encode())
         logging.info('Service reply: '+str(headers))
         if content['status']=='OK':
-            resource = dataobject.Resource.decode(content['value'])()
+            resource = dataobject.Resource.decode(content['value'])
             defer.returnValue(resource)
         else:
             defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def base_get_resource(self,resource_reference,op_name):
+    def base_get_resource(self,op_name ,resource_reference):
         """
         @brief Retrieve a resource from the registry by Reference
         """
@@ -408,14 +409,14 @@ class BaseRegistryClient(BaseServiceClient):
         logging.info('Service reply: '+str(headers))
 
         if content['status']=='OK':
-            resource = dataobject.Resource.decode(content['value'])()
+            resource = dataobject.Resource.decode(content['value'])
             defer.returnValue(resource)
         else:
             defer.returnValue(None)
 
 
     @defer.inlineCallbacks
-    def base_set_resource_lcstate(self, resource_reference, lcstate,op_name):
+    def base_set_resource_lcstate(self, op_name, resource_reference, lcstate):
         """
         @brief Retrieve a resource from the registry by its ID
         """
@@ -430,14 +431,14 @@ class BaseRegistryClient(BaseServiceClient):
         logging.info('Service reply: '+str(headers))
         
         if content['status'] == 'OK':
-            resource_reference = dataobject.ResourceReference.decode(content['value'])()
+            resource_reference = dataobject.ResourceReference.decode(content['value'])
             defer.returnValue(resource_reference)
         else:
             defer.returnValue(None)
 
 
     @defer.inlineCallbacks
-    def base_find_resource(self,description,op_name, regex=True,ignore_defaults=True,attnames=[]):
+    def base_find_resource(self, op_name, description, regex=True,ignore_defaults=True,attnames=[]):
         """
         @brief Retrieve all the resources in the registry
         @param attributes is a dictionary of attributes which will be used to select a resource
@@ -455,7 +456,7 @@ class BaseRegistryClient(BaseServiceClient):
         
         # Return a list of resources
         if content['status'] == 'OK':            
-            results = dataobject.DataObject.decode(content['value'])()
+            results = dataobject.DataObject.decode(content['value'])
             defer.returnValue(results.resources)
         else:
             defer.returnValue([])
@@ -475,15 +476,15 @@ class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
         return self.base_clear_registry('clear_registry')
 
     def register_resource(self,resource):
-        return self.base_register_resource(resource, 'register_resource')
+        return self.base_register_resource('register_resource', resource)
 
     def get_resource(self,resource_reference):
-        return self.base_get_resource(resource_reference,'get_resource')
+        return self.base_get_resource('get_resource', resource_reference)
         
     def set_resource_lcstate(self, resource_reference, lcstate):
-        return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_resource_lcstate')
+        return self.base_set_resource_lcstate('set_resource_lcstate',resource_reference, lcstate)
 
     def find_resource(self, description,regex=True,ignore_defaults=True, attnames=[]):
-        return self.base_find_resource(description,'find_resource',regex,ignore_defaults,attnames)
+        return self.base_find_resource('find_resource',description,regex,ignore_defaults,attnames)
 
 
