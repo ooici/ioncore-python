@@ -4,8 +4,9 @@
 @brief Various readers for retrieving host status
 """
 
-import xmlrpclib,os,datetime    
-from SimpleXMLRPCServer import SimpleXMLRPCServer
+import os,datetime    
+import logging
+
 try:
     from pysnmp.entity.rfc3413.oneliner import cmdgen
     PysnmpImported = True
@@ -173,65 +174,73 @@ class HostReader:
         ret += '\nRFC2790\n'
         ret += 'Up Time:      %s\n'%str(b['rfc2790_UpTime'])
     
-        ret += '\n\nNETWORK INTERFACES:\n\n'
-        ret += 'Device'.ljust(10)        \
-                + 'Speed'.rjust(15)      \
-                + 'In Oct'.rjust(20)     \
-                + 'In Err'.rjust(8)      \
-                + 'Out Oct'.rjust(20)    \
-                + 'Out Err'.rjust(8)     \
-                + '\n' 
-        for next in status['NetworkInterfaces']:
-            dev = ''
-            dev += str(next['Descr']).ljust(10)
-            dev += str(next['Speed']).rjust(15)
-            dev += str(next['InOctets']).rjust(20)
-            dev += str(next['InErrors']).rjust(8)
-            dev += str(next['OutOctets']).rjust(20)
-            dev += str(next['OutErrors']).rjust(8)
-            ret += dev + '\n'
+        if len(status['NetworkInterfaces']) == 0:
+            ret += 'NO STORAGE INFORMATION\n'
+        else:
+            ret += '\n\nNETWORK INTERFACES:\n\n'
+            ret += 'Device'.ljust(10)        \
+                    + 'Speed'.rjust(15)      \
+                    + 'In Oct'.rjust(20)     \
+                    + 'In Err'.rjust(8)      \
+                    + 'Out Oct'.rjust(20)    \
+                    + 'Out Err'.rjust(8)     \
+                    + '\n' 
+            for next in status['NetworkInterfaces']:
+                dev = ''
+                dev += str(next['Descr']).ljust(10)
+                dev += str(next['Speed']).rjust(15)
+                dev += str(next['InOctets']).rjust(20)
+                dev += str(next['InErrors']).rjust(8)
+                dev += str(next['OutOctets']).rjust(20)
+                dev += str(next['OutErrors']).rjust(8)
+                ret += dev + '\n'
+    
+        if len(status['Storage']) == 0:
+            ret += 'NO STORAGE INFORMATION\n'
+        else:
+            ret += '\n\nSTORAGE:\n\n'
+            ret += 'Device'.ljust(25)            \
+                    + 'AUnit'.rjust(8)              \
+                    + 'Storage Size'.rjust(15)   \
+                    + 'Storage Used'.rjust(15)   \
+                    + 'AErr'.rjust(8) \
+                    + '\n' 
+            for next in status['Storage']:
+                dev = ''
+                dev += str(next['Descr']).ljust(25)
+                dev += str(next['AllocationUnits']).rjust(8)
+                dev += str(next['StorageSize']).rjust(15)
+                dev += str(next['StorageUse']).rjust(15)
+                # dev += str(next['AllocationFailures']).rjust(10)
+                ret += dev + '\n'
     
     
-        ret += '\n\nSTORAGE:\n\n'
-        ret += 'Device'.ljust(25)            \
-                + 'AUnit'.rjust(8)              \
-                + 'Storage Size'.rjust(15)   \
-                + 'Storage Used'.rjust(15)   \
-                + 'AErr'.rjust(8) \
-                + '\n' 
-        for next in status['Storage']:
-            dev = ''
-            dev += str(next['Descr']).ljust(25)
-            dev += str(next['AllocationUnits']).rjust(8)
-            dev += str(next['StorageSize']).rjust(15)
-            dev += str(next['StorageUse']).rjust(15)
-            # dev += str(next['AllocationFailures']).rjust(10)
-            ret += dev + '\n'
-    
-    
-        ret += '\n\nPROCESSES:\n\n'
-        ret += 'RIx'.ljust(8) + " "        \
-                + 'RName'.rjust(25) + " "  \
-                + 'RID'.rjust(15) + " "    \
-                + 'Type'.rjust(15) + " "   \
-                + 'Status'.rjust(15) + " " \
-                + 'CPU'.rjust(15) + " "    \
-                + 'Mem'.rjust(15) + " "    \
-                + 'Path'.rjust(150)        \
-                + 'Parm'.rjust(15) + " "   \
-                + '\n' 
-        for next in status['Processes']:
-            dev = ''
-            dev += str(next['RunIndex']).ljust(8) + " "
-            dev += str(next['RunName']).ljust(25) + " "
-            dev += str(next['RunID']).rjust(15) + " "
-            dev += str(next['RunType']).rjust(15) + " "
-            dev += str(next['RunStatus']).rjust(15) + " "
-            dev += str(next['CPU']).rjust(15) + " "
-            dev += str(next['Mem']).rjust(15) + " "
-            dev += str(next['RunPath']).ljust(150) + " "
-            dev += str(next['RunParameters']).ljust(15) + " "
-            ret += dev + '\n'
+        if len(status['Processes']) == 0:
+            ret += 'NO PROCESS INFORMATION\n'
+        else:
+            ret += '\n\nPROCESSES:\n\n'
+            ret += 'RIx'.ljust(8) + " "        \
+                    + 'RName'.rjust(25) + " "  \
+                    + 'RID'.rjust(15) + " "    \
+                    + 'Type'.rjust(15) + " "   \
+                    + 'Status'.rjust(15) + " " \
+                    + 'CPU'.rjust(15) + " "    \
+                    + 'Mem'.rjust(15) + " "    \
+                    + 'Path'.rjust(150)        \
+                    + 'Parm'.rjust(15) + " "   \
+                    + '\n' 
+            for next in status['Processes']:
+                dev = ''
+                dev += str(next['RunIndex']).ljust(8) + " "
+                dev += str(next['RunName']).ljust(25) + " "
+                dev += str(next['RunID']).rjust(15) + " "
+                dev += str(next['RunType']).rjust(15) + " "
+                dev += str(next['RunStatus']).rjust(15) + " "
+                dev += str(next['CPU']).rjust(15) + " "
+                dev += str(next['Mem']).rjust(15) + " "
+                dev += str(next['RunPath']).ljust(150) + " "
+                dev += str(next['RunParameters']).ljust(15) + " "
+                ret += dev + '\n'
     
         return ret
 
@@ -252,6 +261,7 @@ class SnmpReader:
         self.timeout = timeout
         self.retries = 3
         self._supportsSNMP = True
+        logging.debug('Supports Pysnmp - ' + str(PysnmpImported))
         if not PysnmpImported:
             self._supportsPysnmp = False
             self._supportsRfc2790 = False
