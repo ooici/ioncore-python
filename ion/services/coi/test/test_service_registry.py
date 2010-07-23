@@ -47,32 +47,20 @@ class ServiceRegistryTest(IonTestCase):
         
         print svc_desc
 
-    #@defer.inlineCallbacks
+    @defer.inlineCallbacks
     def test_service_instance_reg(self):
         """
         """
-        raise unittest.SkipTest('Not implimented yet!')
+        #raise unittest.SkipTest('Not implimented yet!')
         
-        #services = [
-        #    {'name':'hello1','module':'ion.play.hello_service','class':'HelloService'},
-        #]
-
-        #sup = yield self._spawn_processes(services)
+        services = [
+            {'name':'hello1','module':'ion.play.hello_service','class':'HelloService'},
+        ]
+        sup = yield self._spawn_processes(services, sup=self.sup)
         
-        #print type(sup)
-        #print sup.__dict__
-        #print sup.child_procs[0]
+        play_desc = yield self.src.register_service_instance(sup.child_procs[1])
+        print play_desc
         
-        #bs_svc = hello_service.HelloService(self.sup.reciever)
-        
-        #print 'HELLO'
-        
-        #@Note Can't get at the service instance Object Need to pass supervisor instead of object instance...
-        
-        #play_desc = yield self.src.register_service_defintion(hello_service.HelloService)
-        #ref = play_desc.reference()
-        #svc_desc = yield self.src.get_service_definition(ref)
-        #print svc_desc
 
 
 class ServiceRegistryCoreServiceTest(IonTestCase):
