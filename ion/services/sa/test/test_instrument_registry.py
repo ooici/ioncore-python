@@ -59,7 +59,7 @@ class InstrumentRegistryTest(IonTestCase):
         res3 = yield self.irc.get_instrument_type(ref)
         
         self.assertEqual(res3.tau,-909.0)
-        print res3
+        #print res3
         
 
 

@@ -45,7 +45,7 @@ class ServiceRegistryTest(IonTestCase):
         
         svc_desc = yield self.src.get_service_definition(ref)
         
-        print svc_desc
+        #print svc_desc
 
     @defer.inlineCallbacks
     def test_service_instance_reg(self):
@@ -59,7 +59,7 @@ class ServiceRegistryTest(IonTestCase):
         sup = yield self._spawn_processes(services, sup=self.sup)
         
         play_desc = yield self.src.register_service_instance(sup.child_procs[1])
-        print play_desc
+        #print play_desc
         
 
 

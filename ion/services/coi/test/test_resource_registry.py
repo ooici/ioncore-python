@@ -73,8 +73,8 @@ class ResourceRegistryTest(IonTestCase):
         
         resource_description = yield self.rrc.get_resource_definition(instance.description)
         
-        print instance
-        print resource_description
+        #print instance
+        #print resource_description
         
         
         
@@ -107,5 +107,5 @@ class ResourceRegistryCoreServiceTest(IonTestCase):
         res_to_describe = coi_resource_descriptions.IdentityResource
         res_description = yield self.rrc.register_resource_definition(res_to_describe)
         
-        print res_description
+        #print res_description
         
