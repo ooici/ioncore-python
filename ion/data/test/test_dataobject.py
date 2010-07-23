@@ -340,6 +340,40 @@ class TestPrimaryTypesObject(TestSimpleObject):
         self.encoded=[('Object_Type', 'PrimaryTypesObject'),('key', 'str\x00seabird'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'),('boolen', 'bool\x00False'), ('name', 'str\x00David')]        
         #self.encoded=[('Object_Type', 'PrimaryTypesObject'),('boolen', 'bool\x00False'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'), ('key', 'str\x00seabird'), ('name', 'str\x00David')]
 
+class TestDataObjectMethods(unittest.TestCase):
+    def setUp(self):
+        obj = PrimaryTypesObject()
+        obj.key = 'seabird'
+        obj.name = 'David'
+        obj.floating = 3.14159
+        obj.boolen = False
+        obj.integer = 42
+        self.obj = obj
+
+    def test_attributes(self):
+        atts = self.obj.attributes
+        self.assertIn('key',atts)
+        self.assertIn('name',atts)
+        self.assertIn('floating',atts)
+        self.assertIn('boolen',atts)
+        self.assertIn('integer',atts)
+
+    def test_get_attributes(self):
+        atts = self.obj.get_attributes()
+        self.assertEqual(atts['key'],self.obj.key)
+        self.assertEqual(atts['name'],self.obj.name)
+        self.assertEqual(atts['floating'],self.obj.floating)
+        self.assertEqual(atts['boolen'],self.obj.boolen)
+        self.assertEqual(atts['integer'],self.obj.integer)
+
+    def test_get_typedattributes(self):
+        atts = self.obj.get_typedattributes()
+        self.assertEqual(atts['key'].type,type(self.obj.key))
+        self.assertEqual(atts['name'].type,type(self.obj.name))
+        self.assertEqual(atts['floating'].type,type(self.obj.floating))
+        self.assertEqual(atts['boolen'].type,type(self.obj.boolen))
+        self.assertEqual(atts['integer'].type,type(self.obj.integer))
+
 class BinaryObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
     binary = dataobject.TypedAttribute(str)

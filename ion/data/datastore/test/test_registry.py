@@ -76,7 +76,7 @@ class RegistryTest(unittest.TestCase):
         ref2 = res.reference()
         res2 = yield self.reg.get_resource(ref2)
         self.failUnless(res == res2)
-        self.assertEqual(res1.name, 'foo')
+        self.assertEqual(res2.name, 'moo')
 
         # Get the original
         res1 = yield self.reg.get_resource(ref1)

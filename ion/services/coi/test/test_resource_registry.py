@@ -54,6 +54,10 @@ class ResourceRegistryTest(IonTestCase):
         
         resource_description = yield self.rrc.get_resource_definition(ref_to_resource)
         
+        resource_description.name = 'Testing changes!'
+        # you can use the same interface to overwrite or change an existing description
+        res_description = yield self.rrc.register_resource_definition(resource_description)        
+        
 
     @defer.inlineCallbacks
     def test_resource_instance_reg(self):

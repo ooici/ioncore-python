@@ -16,6 +16,9 @@ from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.data.datastore import registry
 
+
+from ion.resources import sa_resource_descriptions
+
 '''
 class InstrumentRegistryService(BaseService):
     """Data acquisition service interface
@@ -81,9 +84,13 @@ class InstrumentRegistryService(registry.BaseRegistryService):
     #"""
     #Service operation: Set a resource life cycle state
     #"""
-    op_find_instrument = registry.BaseRegistryService.base_find_resource #changed
+    op_find_instrument_type = registry.BaseRegistryService.base_find_resource #changed
     """
-    Service operation: Set a resource life cycle state
+    Service operation: find and instrument type
+    """
+    op_find_instrument_instance = registry.BaseRegistryService.base_find_resource #changed
+    """
+    Service operation: find an instrument instance
     """
 
 class InstrumentRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin):
@@ -99,35 +106,38 @@ class InstrumentRegistryClient(registry.BaseRegistryClient, registry.LCStateMixi
     def clear_registry(self):
         return self.base_clear_registry('clear_instrument')
 
-    def register_instrument_instance(self,resource):
+    def register_instrument_instance(self,instrument_instance):
         """
         Client method to Register a Resource instance
         """
-        return self.base_register_resource(resource, 'register_instrument_instance')
+        return self.base_register_resource('register_instrument_instance', instrument_instance)
     
-    def register_instrument_type(self,resource):
+    def register_instrument_type(self,instrument_type):
         """
         Client method to register the Definition of a Resource Type
         """
-        return self.base_register_resource(resource, 'register_instrument_type')
+        return self.base_register_resource('register_instrument_type',instrument_type)
 
-    def get_instrument_type(self,resource_reference):
+    def get_instrument_type(self,instrument_type_reference):
         """
-        Get a resource type
+        Get a instrument type
         """
-        return self.base_get_resource(resource_reference,'get_instrument_type')
+        return self.base_get_resource('get_instrument_type',instrument_type_reference)
 
-    def get_instrument_instance(self,resource_reference):
+    def get_instrument_instance(self,instrument_instance_reference):
         """
         Get a resource instance
         """
-        return self.base_get_resource(resource_reference,'get_instrument_instance')
+        return self.base_get_resource('get_instrument_instance',resource_reference)
         
     #def set_resource_lcstate(self, resource_reference, lcstate):
     #    return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_instrument_lcstate')
 
-    def find_instrument(self, description,regex=True,ignore_defaults=True):
-        return self.base_find_resource(description,'find_instrument',regex,ignore_defaults)
+    def find_instrument_type(self, description,regex=True,ignore_defaults=True):
+        return self.base_find_resource('find_instrument_type',description,regex,ignore_defaults)
+        
+    def find_instrument_instance(self, description,regex=True,ignore_defaults=True):
+        return self.base_find_resource('find_instrument_instance',description,regex,ignore_defaults)
 
 
 # Spawn of the process using the module name
