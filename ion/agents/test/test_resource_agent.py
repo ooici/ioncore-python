@@ -87,6 +87,7 @@ class TestResourceAgent(IonTestCase):
         result = yield self.RRClient.get_resource_instance()
         logging.debug("*** get_inst result: %s", result)        
 
+        """
         # assert some stuff
         result = yield self.RRClient.set_resource_lcstate(self.res_inst, LCState.active)
         result = yield self.RRClient.get_resource_instance()
@@ -94,19 +95,27 @@ class TestResourceAgent(IonTestCase):
         result = yield self.RRClient.set_resource_lcstate(self.res_inst, LCState.active)
         result = yield self.RRClient.set_resource_lcstate(self.res_inst, LCState.developed)
         result = yield self.RRClient.set_resource_lcstate(self.res_inst, LCState.active)
-
+        """
         
     @defer.inlineCallbacks
     def test_registration(self):
         # initial registration
-        reg_id = yield self.RAClient.register_resource(self.res_desc)
+        reg_id = yield self.RAClient.register_resource(self.res_desc, self.res_inst)
         result = yield self.RAClient.get_resouce_description(reg_id)
         self.assertEqual(self.res_desc, result)
      
-        # test update/repeat registration
+        # test update/repeat registration of a different description
         new_res_desc = InstrumentAgentResourceDescription()
-        new_res_desc.name = "newTestAgent"
-        result = yield self.RAClient.register_resource(new_res_desc)
+        new_res_desc.name = "newTestAgentDescription"
+        result = yield self.RAClient.register_resource(new_res_desc, self.res_inst)
+        self.assertEqual(reg_id, result)
+        result = yield self.RAClient.get_resouce_description(reg_id)
+        self.assertEqual(new_res_desc, result)
+    
+        # test update/repeat reg if a different instance
+        new_res_inst = InstrumentAgentResourceInstance()
+        new_res_inst.name = "newTestAgentInstance"
+        result = yield self.RAClient.register_resource(self.res_desc, new_res_inst)
         self.assertEqual(reg_id, result)
         result = yield self.RAClient.get_resouce_description(reg_id)
         self.assertEqual(new_res_desc, result)

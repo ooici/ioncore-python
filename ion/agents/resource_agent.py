@@ -98,23 +98,28 @@ class ResourceAgent(BaseProcess):
     def op_register_resource(self, content, headers, msg):
         """
         Registers or re-registers self in the resource registry.
-        @param content Must include an encoded ResourceDescription class to
-            register.
+        @param content Must include an encoded ResourceInstance class
         @todo Turn initial parameter asserts into a decode check
         """
-        assert(isinstance(content, list))
-        assert("lifecycle" == content[0][0])
-        assert("name" == content[1][0])
+        assert(isinstance(content, (tuple, list)))
+        assert(len(content) == 2)
+        res_desc = ResourceDescription.decode(content[0])()
+        res_desc = ResourceDescription.decode(content[1])()
+
         if (self.res_reg_client == None):
             yield self.reply_err(msg,
                                  "No resource registry client has been set!")
-        res_desc = ResourceDescription.decode(content)()
+                    
+        # Register the description
         assert(isinstance(res_desc, ResourceDescription))
         if (self.resource_id == None):
             self.resource_id = \
                 yield self.res_reg_client.register_agent_instance(self)
         else:
             result = yield self.res_reg_client.register_resource(id, res_desc)
+            
+        # Register the instance
+        
         if (result == None):
             yield self.reply_err(msg, "Could not re-register object id %s" %id)
         else:
@@ -248,15 +253,18 @@ class ResourceAgentClient(BaseProcessClient):
             defer.returnValue(False)        
         
     @defer.inlineCallbacks
-    def register_resource(self, resource_desc):
+    def register_resource(self, resource_desc, resource_inst):
         """
         Have the resource register itself with the resource registry via
         the client that has been set via set_resource_registry_client()
+        @param resource_desc The ResourceDescription object to register
+        @param resource_inst The instance object to register
         @see set_resource_registry_client()
         """
         (content, headers, msg) = \
             yield self.rpc_send('register_resource',
-                                 resource_desc.encode())
+                                 (resource_desc.encode(),
+                                  resource_inst.encode())
         if content['status'] == 'OK':
             defer.returnValue(True)
         else:

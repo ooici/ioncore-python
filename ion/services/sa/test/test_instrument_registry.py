@@ -20,7 +20,7 @@ from ion.data import dataobject
 
 import uuid
 
-class ResourceRegistryTest(IonTestCase):
+class InstrumentRegistryTest(IonTestCase):
     """
     Testing service classes of resource registry
     """
