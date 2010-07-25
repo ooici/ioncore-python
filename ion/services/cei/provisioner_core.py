@@ -13,16 +13,16 @@ from itertools import izip
 from twisted.internet import defer, threads
 
 from nimboss.node import NimbusNodeDriver
-from nimboss.ctx import ContextClient
+from nimboss.ctx import ContextClient, BrokerError
 from nimboss.cluster import ClusterDriver
-from nimboss.nimbus import NimbusClusterDocument
+from nimboss.nimbus import NimbusClusterDocument, ValidationError
 from libcloud.types import NodeState as NimbossNodeState
 from libcloud.base import Node as NimbossNode
 from libcloud.drivers.ec2 import EC2NodeDriver
-from ion.core import base_process
-from ion.services.cei.dtrs import DeployableTypeRegistryClient
 from ion.services.cei.provisioner_store import group_records
 from ion.services.cei import states
+
+__all__ = ['ProvisionerCore', 'ProvisioningError']
 
 _NIMBOSS_STATE_MAP = {
         NimbossNodeState.RUNNING : states.Started, 
@@ -64,20 +64,24 @@ class ProvisionerCore(object):
         self.cluster_driver = ClusterDriver(self.ctx_client)
 
     @defer.inlineCallbacks
-    def expand_provision_request(self, request):
-        """Validates request and transforms it into launch and node records.
+    def prepare_provision(self, request):
+        """Validates request and commits to datastore.
+
+        If the request has subscribers, they are notified with the
+        node state records.
+
+        If the request is invalid or is otherwise unable to be prepared, 
+        FAILED records are recorded in data store and subscribers are
+        notified.
 
         Returns a tuple (launch record, node records).
         """
+
         try:
-            deployable_type = request['deployable_type']
-            nodes = request['nodes']
-            launch_id = request['launch_id']
-            subscribers = request['subscribers'] #what will this look like?
+            launch, nodes = _expand_provision_request(request)
         except KeyError:
             logging.error('Request was malformed')
-            #TODO error handling, what?
-            yield defer.fail()
+            raise KeyError('Request was malformed. State messages NOT sent to subscribers. ')
 
         dt = yield self.dtrs.lookup(deployable_type, nodes)
 
@@ -95,73 +99,162 @@ class ProvisionerCore(object):
                     group_name, launch_record))
         result = (launch_record, node_records)
         yield defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def execute_provision_request(self, launch, nodes):
+        """Brings a launch to the PENDING state.
+
+        Any errors or problems will result in FAILURE states
+        which will be recorded in datastore and sent to subscribers.
+        """
+    
+        error_state = None
+        error_description = None
+        try: 
+            yield self._really_execute_provision_request(launch, nodes)
+        
+        except ProvisioningError, e:
+            logging.error('Failed to execute launch. Problem: ' + str(e))
+            error_state = states.FAILED
+            error_description = e.message
+        
+        except Exception, e: # catch all exceptions, need to ensure nodes are marked FAILED
+            logging.error('Launch failed due to an unexpected error. '+
+                    'This is likely a bug and should be reported. Problem: ' + 
+                    str(e))
+            error_state = states.FAILED
+            error_description = 'PROGRAMMER_ERROR '+str(e)
+        
+        if error_state:
+            pass
+            #store and notify launch and nodes with FAILED states
     
     @defer.inlineCallbacks
-    def fulfill_launch(self, launch, nodes):
-        """Follows through on bringing a launch to the Pending state
+    def _really_execute_provision_request(self, launch, nodes):
+        """Brings a launch to the PENDING state.
         """
 
         subscribers = launch['subscribers']
         docstr = launch['document']
-        doc = NimbusClusterDocument(docstr)
+
+        try:
+            doc = NimbusClusterDocument(docstr)
+        except ValidationError, e:
+            raise ProvisioningError('CONTEXT_DOC_INVALID '+str(e))
         
         launch_groups = group_records(nodes, 'ctx_name')
         
         context = None
         if doc.needs_contextualization:
-            context = yield threads.deferToThread(self._create_context)
-            logging.info('Created new context: ' + context.uri)
-            
+            try:
+                context = yield threads.deferToThread(self._create_context)
+            except BrokerError, e:
+                raise ProvisioningError('CONTEXT_CREATE_FAILED ' + str(e))
+
+            logging.debug('Created new context: ' + context.uri)
             launch['context'] = context
-            #could have special launch states?
+            
             yield self.store.put_record(launch, states.Pending)
+        
+        else:
+            raise ProvisioningError('NOT_IMPLEMENTED launches without contextualization '+
+                    'unsupported')
         
         cluster = self.cluster_driver.new_bare_cluster(context.uri)
         specs = doc.build_specs(context)
 
+        # we want to fail early, before we launch anything if possible
+        launch_pairs = self._validate_launch_groups(launch_groups, specs)
+
+        #launch_pairs is a list of (spec, node list) tuples
+        for launch in launch_pairs:
+            launch_spec, launch_nodes = launch 
+            newstate = None
+            try:
+                self._launch_one_group(launch_spec, launch_nodes, cluster)
+            
+            except Exception,e:
+                logging.error('Problem launching group %s: %s', 
+                        launch_spec.name, str(e))
+                newstate = states.FAILED
+                # should we have a backout of earlier groups here? or just leave it up
+                # to EPU controller to decide what to do?
+            
+            yield self.store_and_notify(launch_nodes, subscribers, newstate)
+
+    def _validate_launch_groups(self, groups, specs):
+        if len(specs) != len(groups):
+            raise ProvisioningError('INVALID_REQUEST group count mismatch '+
+                    'between cluster document and request')
+        pairs = []
+        for spec in specs:
+            group = groups.get(spec.name)
+            if not group:
+                raise ProvisioningError('INVALID_REQUEST missing \''+ spec.name +
+                        '\' node group, present in cluster document')
+            if spec.count != len(group):
+                raise ProvisioningError('INVALID_REQUEST node group \''+ 
+                        spec.name + '\' specifies ' + len(group) + 
+                        ' nodes, but cluster document has '+ spec.count)
+            pairs.append((spec, group))
+        return pairs
+
+    def _launch_one_group(self, spec, nodes, cluster):
+        """Launches a single group: a single IaaS request.
+        """
+
         #assumption here is that a launch group does not span sites or
         #allocations. That may be a feature for later.
 
-        for spec in specs:
-            launch_group = launch_groups[spec.name]
-            site = launch_group[0]['site']
-            driver = self.node_drivers[site]
+        one_node = nodes[0]
+        site = one_node['site']
+        driver = self.node_drivers[site]
+        
+        #set some extras in the spec
+        allocation = one_node.get('iaas_allocation')
+        if allocation:
+            spec.size = allocation
+        sshkeyname = one_node.get('iaas_sshkeyname')
+        if sshkeyname:
+            spec.keyname = sshkeyname
 
-            logging.info('Launching group %s - %s nodes', spec.name, spec.count)
-            
+        logging.info('Launching group %s - %s nodes', spec.name, spec.count)
+        
+        try:
             iaas_nodes = yield threads.deferToThread(
-                    self.cluster_driver.launch_node_spec, spec, driver, 
-                    ex_keyname='ooi')
-            
-            # TODO so many failure cases missing
-            
-            cluster.add_node(iaas_nodes)
+                    self.cluster_driver.launch_node_spec, spec, driver)
+        except Exception, e:
+            logging.error('Error launching nodes: ' + str(e))
+            # wrap this up?
+            raise
+        
+        cluster.add_node(iaas_nodes)
 
-            # underlying node driver may return a list or an object
-            if not hasattr(iaas_nodes, '__iter__'):
-                iaas_nodes = [iaas_nodes]
+        # underlying node driver may return a list or an object
+        if not hasattr(iaas_nodes, '__iter__'):
+            iaas_nodes = [iaas_nodes]
 
-            if len(iaas_nodes) != len(launch_group):
-                logging.error('%s nodes from iaas but %s from datastore', 
-                        len(iaas_nodes), len(launch_group))
-                
-            for node_rec, iaas_node in izip(launch_group, iaas_nodes):
-                node_rec['iaas_id'] = iaas_node.id
-                # for some reason, ec2 libcloud driver places IP in a list
-                #TODO if we support drivers that actually have multiple
-                #public and private IPs, we will need to revist this
-                public_ip = iaas_node.public_ip
-                if isinstance(public_ip, list):
-                    public_ip = public_ip[0]
-                private_ip = iaas_node.private_ip
-                if isinstance(private_ip, list):
-                    private_ip = private_ip[0]
-                node_rec['public_ip'] = public_ip
-                node_rec['private_ip'] = private_ip
-                node_rec['extra'] = iaas_node.extra.copy()
-                node_rec['state'] = states.Pending
+        if len(iaas_nodes) != len(nodes):
+            message = '%s nodes from IaaS launch but %s were expected' % (
+                    len(iaas_nodes), len(nodes))
+            logging.error(message)
+            raise ProvisioningError('IAAS_PROBLEM '+ message)
             
-            yield self.store_and_notify(launch_group, subscribers)
+        for node_rec, iaas_node in izip(nodes, iaas_nodes):
+            node_rec['iaas_id'] = iaas_node.id
+            # for some reason, ec2 libcloud driver places IP in a list
+            #TODO if we support drivers that actually have multiple
+            #public and private IPs, we will need to revist this
+            public_ip = iaas_node.public_ip
+            if isinstance(public_ip, list):
+                public_ip = public_ip[0]
+            private_ip = iaas_node.private_ip
+            if isinstance(private_ip, list):
+                private_ip = private_ip[0]
+            node_rec['public_ip'] = public_ip
+            node_rec['private_ip'] = private_ip
+            node_rec['extra'] = iaas_node.extra.copy()
+            node_rec['state'] = states.Pending
     
     @defer.inlineCallbacks
     def store_and_notify(self, records, subscribers, newstate=None):
@@ -359,6 +452,7 @@ def _one_node_record(node_id, group, group_name, launch,
             'site' : group['site'],
             'allocation' : group['allocation'],
             'ctx_name' : group_name,
+            'sshkeyname' : group['sshkeyname'],
             }
 
 def _update_node_from_ctx(self, node, ctx_node, identity):
@@ -374,3 +468,5 @@ def _update_node_from_ctx(self, node, ctx_node, identity):
         node['error_message'] = ctx_node.error_message
     return True
 
+class ProvisioningError(Exception):
+    pass
