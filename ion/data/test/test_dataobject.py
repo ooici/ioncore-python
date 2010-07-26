@@ -517,6 +517,48 @@ class TestNestedObject(TestSimpleObject):
                         ('rset','SetObject\x00[["rset", "set\\u0000[\\"str\\\\u0000a\\", \\"int\\\\u00003\\", \\"float\\\\u00004.0\\"]"], ["name", "str\\u0000a big set"]]'),
                         ('name', 'str\x00stuff')]
         
+"""
+Complex nested Object - similar to the pattern used in DM CDMDataset
+"""
+
+class DataType(dataobject.DataObject):
+    """
+    """
+dataobject.DataObject._types['DataType']=DataType
+    
+    
+class DataType1(DataType):
+    f = dataobject.TypedAttribute(float)
+    s = dataobject.TypedAttribute(str)
+    
+dataobject.DataObject._types['DataType1']=DataType1
+    
+class DataType2(DataType):
+    i = dataobject.TypedAttribute(int)
+    b = dataobject.TypedAttribute(bool)
+    
+dataobject.DataObject._types['DataType2']=DataType2
+    
+class DataContainer(dataobject.DataObject):
+    name = dataobject.TypedAttribute(str)
+    dt = dataobject.TypedAttribute(DataType)
+    
+dataobject.DataObject._types['DataContainer']=DataContainer
+    
+class TestDataContainer(TestSimpleObject):
+    def setUp(self):
+        obj = DataContainer()
+        obj.name = 'a container with datatype1'
+        obj.dt = DataType1()
+        
+        obj.dt.f = 3.14159
+        obj.dt.s = 'Datatype1'
+        
+        self.obj = obj
+        self.encoded=[('Object_Type', 'DataContainer'),
+                    ('dt','DataType1\x00[["f", "float\\u00003.14159"], ["s", "str\\u0000Datatype1"]]'),
+                    ('name', 'str\x00a container with datatype1')]       
+        
 class ResponseService(BaseService):
     """Example service implementation
     """
