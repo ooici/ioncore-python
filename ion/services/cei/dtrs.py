@@ -11,10 +11,11 @@ import logging
 
 from twisted.internet import defer
 
-from magnet.spawnable import Receiver
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.core import ioninit
+
+__all__ = ['DeployableTypeRegistryService', 'DeployableTypeRegistryClient']
 
 #TODO ugggggggggghhhhhhhhh
 _REGISTRY = {}
@@ -41,19 +42,16 @@ class DeployableTypeRegistryService(BaseService):
         try:
             dt = _REGISTRY[dtId]
         except KeyError:
-            #TODO how to throw errors..?
             logging.error('Invalid deployable type specified: ' + dtId)
-            defer.fail()
+            return self.reply_err(msg)
         
         result = {'document' : dt['document'], 'nodes' : nodes}
         sites = dt['sites']
 
-        for node_name in nodes.iterkeys():
-            node = nodes[node_name]
-            # uhhh...
+        for node_name, node in nodes.iteritems():
             node_site = node['site']
             image = sites[node_site][node_name]['image']
-            node['image'] = image
+            node['iaas_image'] = image
 
         logging.debug('Sending DTRS response: ' + str(result))
 
@@ -77,7 +75,14 @@ class DeployableTypeRegistryClient(BaseServiceClient):
             'deployable_type' : dt,
             'nodes' : nodes
         })
-        defer.returnValue(content)
+
+        if content.get('status') == 'ERROR':
+            raise KeyError()
+
+        defer.returnValue({
+            'document' : content.get('document'),
+            'nodes' : content.get('nodes')
+            })
 
 # Direct start of the service as a process with its default name
 factory = ProtocolFactory(DeployableTypeRegistryService)

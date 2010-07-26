@@ -49,7 +49,13 @@ class TestDeployableTypeRegistryService(IonTestCase):
         doc = result['document']
         nodes = result['nodes']
         for node in nodes.itervalues():
-            self.assertTrue('image' in node)
+            self.assertTrue('iaas_image' in node)
 
-
+        got_error = False
+        try:
+            yield client.lookup('this-image-doesnt-exist', nodes)
+        except KeyError:
+            got_error = True
+        
+        self.assertTrue(got_error)
 
