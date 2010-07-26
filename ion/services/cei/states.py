@@ -3,29 +3,29 @@
 """Instance states
 """
 
-Requesting = '100-Requesting'
+REQUESTING = '100-REQUESTING'
 """Request has been made but not acknowledged through SA"""
 
-Requested = '200-Requested'
+REQUESTED = '200-REQUESTED'
 """Request has been acknowledged by provisioner"""
 
-ErrorRetrying = '300-ErrorRetrying'
+ERROR_RETRYING = '300-ERROR_RETRYING'
 """Request encountered an error but is still being attempted"""
 
-Pending = '400-Pending'
+PENDING = '400-PENDING'
 """Request is pending in IaaS layer"""
 
-Started = '500-Started'
+STARTED = '500-STARTED'
 """Instance has been started in IaaS layer"""
 
-Running = '600-Running'
+RUNNING = '600-RUNNING'
 """Instance has been contextualized and is operational"""
 
-Terminating = '700-Terminating'
+TERMINATING = '700-TERMINATING'
 """Termination of the instance has been requested"""
 
-Terminated = '800-Terminated'
+TERMINATED = '800-TERMINATED'
 """Instance has been terminated in IaaS layer"""
 
-Failed = '900-Failed'
+FAILED = '900-FAILED'
 """Instance has failed and will not be retried"""

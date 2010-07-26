@@ -61,7 +61,7 @@ class ControllerCoreState(State):
             self.instance_states[state_item.key].append(state_item)
             
     def new_launch(self, new_instance_id):
-        state = InstanceStates.Requesting
+        state = InstanceStates.REQUESTING
         item = StateItem("instance-state", new_instance_id, time.time(), state)
         self.instance_states[item.key].append(item)
             

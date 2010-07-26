@@ -31,7 +31,7 @@ class DefaultEngine(Engine):
         """Engine API method"""
         all_instance_lists = state.get_all("instance-state")
         
-        bad_states = [InstanceStates.Terminating, InstanceStates.Terminated, InstanceStates.Failed]
+        bad_states = [InstanceStates.TERMINATING, InstanceStates.TERMINATED, InstanceStates.FAILED]
         valid_count = 0
         for instance_list in all_instance_lists:
             ok = True

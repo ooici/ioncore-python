@@ -51,15 +51,15 @@ class ProvisionerServiceTest(IonTestCase):
         client = ProvisionerClient(pid=pId)
         yield client.provision(launch_id, deployable_type, nodes)
 
-        ok = yield notifier.wait_for_state(states.Pending)
+        ok = yield notifier.wait_for_state(states.PENDING)
         self.assertTrue(ok)
         
-        ok = yield notifier.wait_for_state(states.Started,runfirst=client.query)
+        ok = yield notifier.wait_for_state(states.STARTED, runfirst=client.query)
         self.assertTrue(ok)
 
         yield client.terminate_launches(launch_id)
         
-        ok = yield notifier.wait_for_state(states.Terminated, 
+        ok = yield notifier.wait_for_state(states.TERMINATED, 
                 runfirst=client.query)
         self.assertTrue(ok)
 

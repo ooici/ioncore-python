@@ -25,11 +25,11 @@ from ion.services.cei import states
 __all__ = ['ProvisionerCore', 'ProvisioningError']
 
 _NIMBOSS_STATE_MAP = {
-        NimbossNodeState.RUNNING : states.Started, 
-        NimbossNodeState.REBOOTING : states.Started, #TODO hmm
-        NimbossNodeState.PENDING : states.Pending,
-        NimbossNodeState.TERMINATED : states.Terminated,
-        NimbossNodeState.UNKNOWN : states.ErrorRetrying}
+        NimbossNodeState.RUNNING : states.STARTED, 
+        NimbossNodeState.REBOOTING : states.STARTED, #TODO hmm
+        NimbossNodeState.PENDING : states.PENDING,
+        NimbossNodeState.TERMINATED : states.TERMINATED,
+        NimbossNodeState.UNKNOWN : states.ERROR_RETRYING}
 
 class ProvisionerCore(object):
     """Provisioner functionality that is not specific to the service.
@@ -106,7 +106,7 @@ class ProvisionerCore(object):
         
         # from this point on, errors result in failure records, not exceptions.
         # except for, you know, bugs.
-        state = states.Requested
+        state = states.REQUESTED
         state_description = None
         try:
             dt = yield self.dtrs.lookup(deployable_type, dtrs_nodes)
@@ -210,7 +210,7 @@ class ProvisionerCore(object):
             logging.debug('Created new context: ' + context.uri)
             launch['context'] = context
             
-            yield self.store.put_record(launch, states.Pending)
+            yield self.store.put_record(launch, states.PENDING)
         
         else:
             raise ProvisioningError('NOT_IMPLEMENTED launches without contextualization '+
@@ -310,7 +310,7 @@ class ProvisionerCore(object):
             node_rec['public_ip'] = public_ip
             node_rec['private_ip'] = private_ip
             node_rec['extra'] = iaas_node.extra.copy()
-            node_rec['state'] = states.Pending
+            node_rec['state'] = states.PENDING
     
     @defer.inlineCallbacks
     def store_and_notify(self, records, subscribers, newstate=None):
@@ -327,7 +327,7 @@ class ProvisionerCore(object):
 
         for site in self.node_drivers.iterkeys():
             nodes = yield self.store.get_site_nodes(site, 
-                    before_state=states.Terminated)
+                    before_state=states.TERMINATED)
             if nodes:
                 yield self.query_one_site(site, nodes)
 
@@ -344,7 +344,7 @@ class ProvisionerCore(object):
         # note we are walking the nodes from datastore, NOT from nimboss
         for node in nodes:
             state = node['state']
-            if state < states.Pending or state >= states.Terminated:
+            if state < states.PENDING or state >= states.TERMINATED:
                 continue
             
             nimboss_id = node.get('iaas_id')
@@ -357,7 +357,7 @@ class ProvisionerCore(object):
                         'Marking as terminated.', node['node_id'])
 
                 # we must mark it as terminated TODO should this be failed?
-                node['state'] = states.Terminated
+                node['state'] = states.TERMINATED
                 #TODO should make state_desc more formal?
                 node['state_desc'] = 'node disappeared'
 
@@ -379,7 +379,7 @@ class ProvisionerCore(object):
         """Queries all open launch contexts and sends node updates.
         """
         #grab all the launches in the pending state
-        launches = yield self.store.get_launches(state=states.Pending)
+        launches = yield self.store.get_launches(state=states.PENDING)
 
         for launch in launches:
             context = launch.get('context')
@@ -409,7 +409,7 @@ class ProvisionerCore(object):
             if context_status.complete:
                 logging.info('Launch %s context is complete!', launch_id)
                 # update the launch record so this context won't be re-queried
-                launch['state'] = states.Running
+                launch['state'] = states.RUNNING
                 yield self.store.put_record(launch)
             else:
                 logging.debug('Launch %s context is incomplete: %s of %s nodes',
@@ -423,7 +423,7 @@ class ProvisionerCore(object):
         launch = yield self.store.get_launch(launch_id)
         nodes = yield self.store.get_launch_nodes(launch_id)
         yield self.store_and_notify(nodes, launch['subscribers'], 
-                states.Terminating)
+                states.TERMINATING)
     
     @defer.inlineCallbacks
     def terminate_launch(self, launch_id):
@@ -434,7 +434,7 @@ class ProvisionerCore(object):
 
         for node in nodes:
             state = node['state']
-            if state < states.Pending or state >= states.Terminated:
+            if state < states.PENDING or state >= states.TERMINATED:
                 continue
             #would be nice to do this as a batch operation
             yield self._terminate_node(node, launch)
@@ -467,7 +467,7 @@ class ProvisionerCore(object):
         yield threads.deferToThread(driver.destroy_node, nimboss_node)
     
         yield self.store_and_notify([node], launch['subscribers'], 
-                states.Terminated)
+                states.TERMINATED)
 
     def _create_context(self):
         """Synchronous call to context broker to create a new context.
@@ -492,13 +492,13 @@ class ProvisionerCore(object):
 
 def _update_node_from_ctx(self, node, ctx_node, identity):
     node_done = ctx_node.ok_occurred or ctx_node.error_occurred
-    if not node_done or node['state'] >= states.Running:
+    if not node_done or node['state'] >= states.RUNNING:
         return False
     if ctx_node.ok_occurred:
-        node['state'] = states.Running
+        node['state'] = states.RUNNING
         node['pubkey'] = identity.pubkey
     else:
-        node['state'] = states.Failed
+        node['state'] = states.FAILED
         node['error_code'] = ctx_node.error_code
         node['error_message'] = ctx_node.error_message
     return True

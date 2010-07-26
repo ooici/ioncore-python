@@ -30,7 +30,7 @@ class ProvisionerStoreTests(IonTestCase):
         launch_id = new_id()
         
         records = [{'launch_id' : launch_id, 'node_id' : new_id(), 
-            'state' : states.Requested} for i in range(5)]
+            'state' : states.REQUESTED} for i in range(5)]
 
         yield self.store.put_records(records)
 
@@ -38,14 +38,14 @@ class ProvisionerStoreTests(IonTestCase):
         self.assertEqual(len(result), len(records))
 
         one_rec = records[0]
-        yield self.store.put_record(one_rec, states.Pending)
+        yield self.store.put_record(one_rec, states.PENDING)
         result = yield self.store.get_all()
         self.assertEqual(len(result), len(records)+1)
         
         result = yield self.store.get_all(launch_id, one_rec['node_id'])
         self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]['state'], states.Pending)
-        self.assertEqual(result[1]['state'], states.Requested)
+        self.assertEqual(result[0]['state'], states.PENDING)
+        self.assertEqual(result[1]['state'], states.REQUESTED)
 
     def test_group_records(self):
         records = [
