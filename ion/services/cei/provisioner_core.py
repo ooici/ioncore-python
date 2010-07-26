@@ -70,38 +70,86 @@ class ProvisionerCore(object):
         If the request has subscribers, they are notified with the
         node state records.
 
-        If the request is invalid or is otherwise unable to be prepared, 
-        FAILED records are recorded in data store and subscribers are
-        notified.
+        If the request is invalid and doesn't contain enough information
+        to notify subscribers via normal channels, a ProvisioningError
+        is raised. This is almost certainly a client programming error.
+        
+        If the request is well-formed but invalid, for example if the 
+        deployable type does not exist in the DTRS, FAILED records are 
+        recorded in data store and subscribers are notified.
 
         Returns a tuple (launch record, node records).
         """
 
         try:
-            launch, nodes = _expand_provision_request(request)
+            deployable_type = request['deployable_type']
+            launch_id = request['launch_id']
+            subscribers = request['subscribers']
+            nodes = request['nodes']
+        except KeyError,e:
+            raise ProvisioningError('Invalid request. Missing key: ' + str(e))
+
+        if not (isinstance(nodes, dict) and len(nodes) > 0):
+            raise ProvisioningError('Invalid request. nodes must be a non-empty dict')
+
+        #validate nodes and build DTRS request
+        dtrs_nodes = {}
+        for node_name, node in nodes:
+            try:
+                dtrs_nodes[node_name] = {
+                        'count' : len(node['ids']),
+                        'site' : node['site'], 
+                        'allocation' : node['allocation']}
+            except (KeyError, ValueError):
+                raise ProvisioningError('Invalid request. Node %s spec is invalid' % 
+                        node_name)
+        
+        # from this point on, errors result in failure records, not exceptions.
+        # except for, you know, bugs.
+        state = states.Requested
+        state_description = None
+        try:
+            dt = yield self.dtrs.lookup(deployable_type, dtrs_nodes)
+            document = dt['document']
+            dtrs_nodes = dt['nodes']
         except KeyError:
-            logging.error('Request was malformed')
-            raise KeyError('Request was malformed. State messages NOT sent to subscribers. ')
+            logging.error('Failed to lookup deployable type "%s" in DTRS', 
+                    deployable_type)
+            state = states.FAILED
+            state_description = "DTRS_LOOKUP_FAILED"
 
-        dt = yield self.dtrs.lookup(deployable_type, nodes)
-
-        doc = dt['document']
-        node_groups = dt['nodes']
-
-        launch_record = _one_launch_record(launch_id, doc, deployable_type,
-                subscribers)
+        launch_record = {
+                'launch_id' : launch_id,
+                'document' : document,
+                'deployable_type' : deployable_type,
+                'subscribers' : subscribers,
+                'state' : state}
 
         node_records = []
-        for (group_name, group) in node_groups.iteritems():
-            node_ids = group['id']
+        for (group_name, group) in nodes.iteritems():
+            node_ids = group['ids']
             for node_id in node_ids:
-                node_records.append(_one_node_record(node_id, group, 
-                    group_name, launch_record))
-        result = (launch_record, node_records)
-        yield defer.returnValue(result)
+                record = {'launch_id' : launch_id,
+                        'node_id' : node_id,
+                        'state' : state,
+                        'state_desc' : state_description,
+                        'site' : group['site'],
+                        'allocation' : group['allocation'],
+                        'ctx_name' : group_name,
+                        }
+                #DTRS returns a bunch of IaaS specific info:
+                # ssh key name, "real" allocation name, etc.
+                # we fold it in blindly
+                record.update(dtrs_nodes[group_name])
+                node_records.append(record)
+
+        yield self.store.put_record(launch_record)
+        yield self.store_and_notify(node_records, subscribers)
+
+        defer.returnValue((launch_record, node_records))
 
     @defer.inlineCallbacks
-    def execute_provision_request(self, launch, nodes):
+    def execute_provision(self, launch, nodes):
         """Brings a launch to the PENDING state.
 
         Any errors or problems will result in FAILURE states
@@ -126,8 +174,16 @@ class ProvisionerCore(object):
             error_description = 'PROGRAMMER_ERROR '+str(e)
         
         if error_state:
-            pass
+            launch['state'] = error_state
+            launch['state_desc'] = error_description
+
+            for node in nodes:
+                node['state'] = error_state
+                node['state_desc'] = error_description
+
             #store and notify launch and nodes with FAILED states
+            yield self.store.put_record(launch)
+            yield self.store_and_notify(nodes, launch['subscribers'], error_state)
     
     @defer.inlineCallbacks
     def _really_execute_provision_request(self, launch, nodes):
@@ -433,27 +489,6 @@ class ProvisionerCore(object):
         return NimbossNode(id=node['iaas_id'], name=None, state=None,
                 public_ip=None, private_ip=None, 
                 driver=self.node_drivers[node['site']])
-
-def _one_launch_record(launch_id, document, dt, subscribers, 
-        state=states.Requested):
-    return {'launch_id' : launch_id,
-            'document' : document,
-            'deployable_type' : dt,
-            'subscribers' : subscribers,
-            'state' : state,
-            }
-
-def _one_node_record(node_id, group, group_name, launch, 
-        state=states.Requested):
-    return {'launch_id' : launch['launch_id'],
-            'node_id' : node_id,
-            'state' : state,
-            'state_desc' : None,
-            'site' : group['site'],
-            'allocation' : group['allocation'],
-            'ctx_name' : group_name,
-            'sshkeyname' : group['sshkeyname'],
-            }
 
 def _update_node_from_ctx(self, node, ctx_node, identity):
     node_done = ctx_node.ok_occurred or ctx_node.error_occurred

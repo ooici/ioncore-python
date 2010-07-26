@@ -8,7 +8,6 @@ from ion.core.base_process import ProtocolFactory
 from ion.services.cei.provisioner_store import ProvisionerStore
 from ion.services.cei.provisioner_core import ProvisionerCore
 from ion.services.cei.dtrs import DeployableTypeRegistryClient
-from ion.services.cei import states
 
 class ProvisionerService(BaseService):
     """Provisioner service interface
@@ -30,21 +29,14 @@ class ProvisionerService(BaseService):
         """
         logging.debug("op_provision content:"+str(content))
         
-        launch, nodes = yield self.core.expand_provision_request(content)
+        launch, nodes = yield self.core.prepare_provision(content)
         
-        self.store.put_record(launch, states.Requested)
-        self.store.put_records(nodes, states.Requested)
-
-        subscribers = launch['subscribers']
-        if subscribers:
-            self.notifier.send_records(nodes, subscribers)
-
         # now we can ACK the request as it is safe in datastore
 
         # set up a callLater to fulfill the request after the ack. Would be
         # cleaner to have explicit ack control.
-        #reactor.callLater(0, self.core.fulfill_launch, launch, nodes)
-        yield self.core.fulfill_launch(launch, nodes)
+        #reactor.callLater(0, self.core.execute_provision_request, launch, nodes)
+        yield self.core.execute_provision(launch, nodes)
     
     @defer.inlineCallbacks
     def op_terminate_nodes(self, content, headers, msg):
@@ -103,7 +95,7 @@ class ProvisionerClient(BaseServiceClient):
 
         nodes = {}
         for nodename, item in launch_description.iteritems():
-            nodes[nodename] = {'id' : item.instance_ids,
+            nodes[nodename] = {'ids' : item.instance_ids,
                     'site' : item.site,
                     'allocation' : item.allocation_id,
                     'data' : item.data}
