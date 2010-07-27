@@ -27,7 +27,7 @@ except:
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.services.dm.url_manipulation import base_dap_url
+from ion.services.dm.util.url_manipulation import base_dap_url
 
 class FetcherService(BaseService):
     """

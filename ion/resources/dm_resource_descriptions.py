@@ -22,7 +22,13 @@ class PublicationResource(StatefulResource):
     #Name - inherited!
     queue = TypedAttribute(str)
     topics = TypedAttribute(list) # List of refs for registered topics
-    content_type = TypedAttribute()
+    content_type = TypedAttribute(str)
+    
+class AOI(DataObject):
+    """
+    Implement class and comparison methods for AOI!
+    """
+    
     
 class PubSubTopic(InformationResource):
     """
@@ -41,10 +47,6 @@ class SubscriptionResource(StatefulResource):
     interval = TypedAttribute(int,0)
 
 
-class AOI(DataObject):
-    """
-    Implement class and comparison methods for AOI!
-    """
 
 
 """
@@ -58,6 +60,28 @@ class PerservationServiceResource(StatefulResource): # Is it stateful or informa
 class PreservationLocation(DataObject):
     location = TypedAttribute(str)
 
+class TypedObject(DataObject):
+    """
+    """
+    
+class FloatObject(TypedObject):
+    """
+    #@Todo convert to use numpy types
+    """
+    f = TypedAttribute(float)
+    
+class IntegerObject(TypedObject):
+    """
+    #@Todo convert to use numpy types
+    """
+    i = TypedAttribute(int)
+    
+class StringObject(TypedObject):
+    """
+    #@Todo convert to use numpy types
+    """
+    s = TypedAttribute(str)
+    
 
 class CDMDatasetResource(InformationResource):
     '''
@@ -95,7 +119,7 @@ class CDMVariableResource(InformationResource):
     #Name - inherited
     attributes = TypedAttribute(list)
     dimensions = TypedAttribute(list)
-    type = TypedAttribute()
+    type = TypedAttribute(str)
     preservation_archive = TypedAttribute(PerservationServiceResource)
     archive_varid = TypedAttribute(str) # Varid or name?
     
@@ -105,29 +129,7 @@ class CDMStructureResource(InformationResource):
     #Name - inherited
     members = TypedAttribute(list)
     
-class TypedObject(DataObject):
-    """
-    """
-    
-class FloatObject(TypedObject):
-    """
-    #@Todo convert to use numpy types
-    """
-    f = TypedAttribute(float)
-    
-class IntegerObject(TypedObject):
-    """
-    #@Todo convert to use numpy types
-    """
-    i = TypedAttribute(int)
-    
-class StringObject(TypedObject):
-    """
-    #@Todo convert to use numpy types
-    """
-    s = TypedAttribute(str)
-    
-    
+
     
 
     
