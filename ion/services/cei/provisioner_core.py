@@ -35,7 +35,7 @@ class ProvisionerCore(object):
     """Provisioner functionality that is not specific to the service.
     """
 
-    def __init__(self, store, notifier, dtrs):
+    def __init__(self, store, notifier, dtrs, context=None):
         self.store = store
         self.notifier = notifier
         self.dtrs = dtrs
@@ -58,10 +58,11 @@ class ProvisionerCore(object):
                 'ec2-east' : ec2_east_driver,
                 }
         
-        self.ctx_client = ContextClient(
+        self.context = context or ProvisionerContextClient(
                 'https://nimbus.ci.uchicago.edu:8888/ContextBroker/ctx/', 
                 nimbus_key, nimbus_secret)
-        self.cluster_driver = ClusterDriver(self.ctx_client)
+        
+        self.cluster_driver = ClusterDriver()
 
     @defer.inlineCallbacks
     def prepare_provision(self, request):
@@ -203,7 +204,7 @@ class ProvisionerCore(object):
         context = None
         if doc.needs_contextualization:
             try:
-                context = yield threads.deferToThread(self._create_context)
+                context = yield self.context.create()
             except BrokerError, e:
                 raise ProvisioningError('CONTEXT_CREATE_FAILED ' + str(e))
 
@@ -391,8 +392,7 @@ class ProvisionerCore(object):
             
             ctx_uri = context['uri']
             logging.debug('Querying context ' + ctx_uri)
-            context_status = yield threads.deferToThread(self._query_context,
-                    ctx_uri)
+            context_status = yield self.context.query(ctx_uri)
             nodes = yield self.store.get_launch_nodes(launch_id)
             by_ip = group_records(nodes, 'public_ip')
             #TODO this matching could probably be more robust
@@ -469,16 +469,6 @@ class ProvisionerCore(object):
         yield self.store_and_notify([node], launch['subscribers'], 
                 states.TERMINATED)
 
-    def _create_context(self):
-        """Synchronous call to context broker to create a new context.
-        """
-        return self.ctx_client.create_context()
-
-    def _query_context(self, resource):
-        """Synchronous call to context broker to query an existing context
-        """
-        return self.ctx_client.get_status(resource)
-    
     def _to_nimboss_node(self, node):
         """Nimboss drivers need a Node object for termination.
         """
@@ -502,6 +492,25 @@ def _update_node_from_ctx(self, node, ctx_node, identity):
         node['error_code'] = ctx_node.error_code
         node['error_message'] = ctx_node.error_message
     return True
+
+class ProvisionerContextClient(object):
+    """Provisioner calls to context broker.
+    """
+    def __init__(self, broker_uri, key, secret):
+        self.client = ContextClient(broker_uri, key, secret)
+
+    def create(self):
+        """Creates a new context with the broker
+        """
+        return threads.deferToThread(self.client.create_context)
+
+    def query(self, resource):
+        """Queries an existing context.
+
+        resource is the uri returned by create operation
+        """
+        return threads.deferToThread(self.client.get_status, resource)
+
 
 class ProvisioningError(Exception):
     pass
