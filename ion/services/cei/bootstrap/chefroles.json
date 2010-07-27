@@ -3,7 +3,7 @@
     "broker":"184.73.158.98",
     "bootscript":"res/scripts/newcc.py",
     "sysname":"cei",
-    "broker_heartbeat":"0",
+    "broker_heartbeat":"5",
     "lcaarch_branch":"cei",
     "lcaarch_commit_hash":"HEAD",
     "log_level":"DEBUG"
@@ -14,7 +14,7 @@
     "provisioner":"{'name':'provisioner','module':'ion.services.cei.provisioner','class':'ProvisionerService'}",
     "sensor_aggregator":"{'name':'sensor_aggregator','module':'ion.services.cei.sensor_aggregator','class':'SensorAggregatorService'}",
     "epu_work_producer":"{'name':'epu_work_producer','module':'ion.services.cei.epu_work_producer','class':'EPUWorkProducer', 'spawnargs':{'queue_name_work':'cei_work_queue', 'queue_name_events':'rabbitmq_sensor_events'}}",
-    "rabbitmq_sensor":"{'name':'rabbitmq_sensor', 'module':'ion.services.cei.sensors.rabbitmq_sensor', 'class':'RabbitMQSensor', 'spawnargs':{'queue_name_work':'cei_work_queue', 'queue_name_events':'rabbitmq_sensor_events'}}",
+    "rabbitmq_sensor":"{'name':'rabbitmq_sensor', 'module':'ion.services.cei.sensors.rabbitmq_sensor', 'class':'RabbitMQSensor', 'spawnargs':{'queue_name_work':'cei_work_queue', 'queue_name_events':'rabbitmq_sensor_events', 'rabbitmq_node':'rabbit@localhost', 'erlang_cookie':''}}",
     "epu_controller":"{'name':'epu_controller','module':'ion.services.cei.epu_controller','class':'EPUControllerService', 'spawnargs':{'queue_name_work':'cei_work_queue'}}"
   },
 
