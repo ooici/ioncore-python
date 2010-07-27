@@ -11,6 +11,7 @@ from twisted.internet import defer
 from ion.play.web_service import WebServiceClient
 from ion.test.iontest import IonTestCase
 from twisted.web import client
+from twisted.trial import unittest
 
 class HelloTest(IonTestCase):
     """
