@@ -16,7 +16,7 @@ from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
 from ion.core.base_process import BaseProcess
-from ion.services.dm.datapubsub import DataPubsubClient
+from ion.services.dm.pubsub import DataPubsubClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -57,7 +57,7 @@ class PubSubTest(IonTestCase):
     @defer.inlineCallbacks
     def test_pubsub(self):
         services = [
-            {'name':'data_pubsub','module':'ion.services.dm.datapubsub','class':'DataPubsubService'},
+            {'name':'data_pubsub','module':'ion.services.dm.pubsub','class':'DataPubsubService'},
         ]
 
         sup = yield self._spawn_processes(services)

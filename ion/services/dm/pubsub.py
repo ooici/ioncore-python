@@ -16,7 +16,7 @@ from ion.services.base_service import BaseService, BaseServiceClient
 
 
 from ion.data import dataobject
-from ion.services.dm.pubsub import pubsub_registry
+from ion.services.dm.datapubsub import pubsub_registry
 
 
 
