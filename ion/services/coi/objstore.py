@@ -30,6 +30,32 @@ class Serializer(object):
         """
         return  
 
+class ObjectChassis(object):
+    """
+    Distributed implementation of the Object Store Object Chassis
+    object class meta
+    object instance refs
+
+    The chassis presents the revision control functional interface.
+    The chassis provides access to the data of any storable data object.
+
+        This interface relies solely on object/cas store interface methods. 
+        This means that all information stored/retrieved from the backend
+        IStore should be apart of the standard DataObject, or be part of
+        another meta model.
+
+    
+
+    The object chassis is the working version of any data object. Data
+    object content is always extracted from the data store via it's commit
+    object. In this way, the context of a data object (wrt
+    history/ancestry change) is always determinable. 
+
+    """
+
+    interface.implements(objstore.IObjectChassis)
+
+
 class ObjectStoreService(base_service.BaseService):
     """
     The service end of Distributed ObjectStore that mediates between the message based
@@ -60,9 +86,20 @@ class ObjectStoreService(base_service.BaseService):
         """
         """
 
+    @defer.inlineCallbacks
     def op_create(self, content, headers, msg):
         """
+        XXX how to build object chassis?
+
         """
+        try:
+            name = content[0]
+            encoded_baseClass = content[1]
+            baseClass = dataobject.DEncoder().decode(encoded_baseClass)
+            obj_chas = yield self.objstore.create(name, baseClass)
+            yield self.reply_ok(msg, "??")
+        except objstore.ObjectStoreError:
+            yield self.reply_err(msg, None)
 
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
@@ -114,6 +151,7 @@ class ObjectStoreClient(base_service.BaseServiceClient, cas.CAStore):
 
     objectChassis = objstore.ObjectChassis
 
+    @defer.inlineCallbacks
     def create(self, name, baseClass):
         """
         @brief Create a new DataObject with the structure of baseClass.
@@ -123,6 +161,15 @@ class ObjectStoreClient(base_service.BaseServiceClient, cas.CAStore):
         objectChassis.
         @todo Change name to id
         """
+        encoded_baseClass = dataobject.DEncoder().encode(baseClass())
+
+        (content, headers, msg) = yield self.rpc_send('create', [name, encoded_baseClass])
+        if content['status'] == 'OK':
+            obj = content['value']
+            defer.returnValue(obj)
+        else:
+            defer.returnValue(None) #what to return?
+
 
     @defer.inlineCallbacks
     def clone(self, name):

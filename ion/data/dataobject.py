@@ -463,6 +463,9 @@ class TestResource(Resource):
     i = TypedAttribute(int)
     f = TypedAttribute(float)
 
+class SimpleTest(DataObject):
+    field = TypedAttribute(str)
+    name = TypedAttribute(str)
 
 class DEncoder(object):
     """Encode a DataObject into a JSON encodable dict structure.
@@ -475,7 +478,7 @@ class DEncoder(object):
                 str:self.encode_python_type,
                 bool:self.encode_python_type,
                 list:self.encode_list,
-                dict:self.encode_dict,
+                #dict:self.encode_dict,
                 LCState:self.encode_lcstate,
                 DataObject:self.encode_dataobject
                 }
@@ -486,7 +489,7 @@ class DEncoder(object):
                 'str':self.decode_python_type,
                 'bool':self.decode_python_type,
                 'list':self.decode_list,
-                'dict':self.decode_dict,
+                #'dict':self.decode_dict,
                 'LCState':self.decode_lcstate,
                 'DataObject':self.decode_dataobject
                 }
@@ -580,9 +583,23 @@ class DEncoder(object):
 
 
 
+"""
+Instead of TypedAttribute, have explicit classes for each type of field.
+"""
 
 
+class Attribute(object):
 
+    def __init__(self, val):
+        self.val =val
+        self.name = self.__class__.__name__
+        self.type = type(val)
 
+    def __repr__(self):
+        return '%s: %s %s'%(self.name,str(self.val),self.type)
+
+class Temp(Attribute):
+    """
+    """
 
 

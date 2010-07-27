@@ -489,24 +489,27 @@ class Commit(BaseObject):
 
 class ICAStore(Interface):
     """
-    Content addressable value store.
-
-    @brief Uses an instance of a backend key/value store class -- an object
-    providing ion.data.store.IStore
+    @brief Content addressable value store. Stores ICAStoreObject instances
+    in a persistent storage via an object providing ion.data.store.IStore. 
+    @todo Add a delete/remove method to interface?
     """
 
     TYPES = Attribute("""@param TYPES Dict providing map of ICAStoreObject
-        type names to ICAStoreObject implementation class.""")
+        type names to ICAStoreObject content object implementation class.""")
 
     def get(id):
         """
-        @param id of content object
+        @param id key of content object.
         @retval defer.Deferred that fires with an object that provides
         ICAStoreObject.
         """
 
     def put(obj):
         """
+        @brief The key the object is stored at is determined by taking the
+        hash of the content. This ensures the immutability of all content as
+        the keys cannot be directly specified for writing (assuming sha1
+        hash algorithm is used and treating it as collision free.) 
         @param obj instance of object providing ICAStoreObject
         @retval defer.Deferred that fires with the obj id.
         """

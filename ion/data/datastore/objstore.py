@@ -58,7 +58,10 @@ class IObjectChassis(interface.Interface):
 
 class IObjectStore(cas.ICAStore):
     """
-    A CAStore for data objects.
+    @brief Object Store that extends the ion.data.datastore.cas.ICAStore
+    interface. Objects stored in the Object Store have a specific defined
+    structure, decompose into cas.ICAStoreObject content objects, and are
+    derived from the generic Data Object of ion (ion.data.dataobject). 
     """
     objectChassis = interface.Attribute("""@param objectChassis a class
                     implementing IObjectChassis""")
