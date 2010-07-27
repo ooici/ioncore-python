@@ -34,8 +34,24 @@ class AttrStoreServiceTest(IonTestCase):
     def test_put_seperate_backend(self):
         # Test with seperate store backends
         services = [
-            {'name':'attstore1','module':'ion.services.coi.attributestore','class':'AttributeStoreService','spawnargs':{'servicename':'as1','backend_class':'ion.data.store.Store','backend_args':{}}},
-            {'name':'attstore2','module':'ion.services.coi.attributestore','class':'AttributeStoreService','spawnargs':{'servicename':'as2','backend_class':'ion.data.store.Store','backend_args':{}}},
+            {'name':'attstore1',
+            'module':'ion.services.coi.attributestore',
+            'class':'AttributeStoreService',
+            'spawnargs':{
+                'servicename':'as1',
+                'backend_class':'ion.data.store.Store',
+                'backend_args':{}
+                    }
+                },
+            {'name':'attstore2',
+            'module':'ion.services.coi.attributestore',
+            'class':'AttributeStoreService',
+            'spawnargs':{
+                'servicename':'as2',
+                'backend_class':'ion.data.store.Store',
+                'backend_args':{}
+                    }
+                },
         ]
 
         sup = yield self._spawn_processes(services)
