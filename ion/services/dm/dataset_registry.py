@@ -16,8 +16,6 @@ from ion.data import dataobject
 from ion.data.datastore import registry
 from ion.data import store
 
-import inspect
-
 from ion.core import ioninit
 from ion.core import base_process
 from ion.core.base_process import ProtocolFactory, BaseProcess
@@ -56,7 +54,7 @@ factory = ProtocolFactory(DatasetRegistryService)
 
 class DatasetRegistryClient(registry.BaseRegistryClient):
     """
-    Class for the client accessing the resource registry.
+    Class for the client accessing the dataset registry.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
@@ -83,7 +81,7 @@ class DatasetRegistryClient(registry.BaseRegistryClient):
         @param dataset_reference is the unique reference object for a registered
         dataset
         """
-        return self.base_get_resource(dataset_reference,'get_dataset')
+        return self.base_get_resource('get_dataset',dataset_reference)
         
     def find_dataset(self, description,regex=True,ignore_defaults=True,attnames=[]):
         """

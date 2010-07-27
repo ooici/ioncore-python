@@ -8,31 +8,43 @@
 
 
 from twisted.internet import defer
-from ion.data.store import Store
+
+from ion.data import dataobject
+from ion.data.datastore import registry
+from ion.data import store
 
 from ion.core import bootstrap
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 
+
+
 class DataPubSubRegistryService(registry.BaseRegistryService):
-    """Dataset registry service interface
+    """
+    A very simple registry for Data Pub Sub
+    @TODO make the interface more specific for different kinds of pubsub objects
+    Need to specify topic, publisher, subscriber
     """
  
      # Declaration of service
     declare = BaseService.service_declare(name='datapubsub_registry', version='0.1.0', dependencies=[])
 
-    op_  = registry.BaseRegistryService.base_register_resource
+    op_clear_registry = registry.BaseRegistryService.base_clear_registry
     """
-    Service operation: Create or update a dataset resource.
+    Service operation: clear registry
     """
-    op_get_dataset = registry.BaseRegistryService.base_get_resource
+    op_register = registry.BaseRegistryService.base_register_resource
     """
-    Service operation: Get dataset description
+    Service operation: Create or update a pubsub.
+    """    
+    op_get = registry.BaseRegistryService.base_get_resource
     """
-    op_find_dataset = registry.BaseRegistryService.base_find_resource
+    Service operation: Get pubsub
     """
-    Service operation: Find dataset resource by characteristics
+    op_find = registry.BaseRegistryService.base_find_resource
+    """
+    Service operation: Find pubsub by characteristics
     """
 
 
@@ -41,13 +53,15 @@ class DataPubSubRegistryService(registry.BaseRegistryService):
 factory = ProtocolFactory(DatasetRegistryService)
 
 
-class DatasetRegistryClient(registry.BaseRegistryClient):
+class DataPubSubRegistryClient(registry.BaseRegistryClient):
     """
-    Class for the client accessing the resource registry.
+    Class for the client accessing the Data PubSub Registry.
+    @Todo clean up the interface for specific pubsub resource objects
+    Need to specify topic, publisher, subscriber
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "dataset_registry"
+            kwargs['targetname'] = "datapubsub_registry"
         BaseServiceClient.__init__(self, proc, **kwargs)
 
     
@@ -55,29 +69,27 @@ class DatasetRegistryClient(registry.BaseRegistryClient):
         return self.base_clear_registry('clear_registry')
 
 
-    def define_dataset(self,dataset):
+    def register(self,pubsub):
         """
-        @Brief Client method to Register a Dataset
-        
+        @Brief Client method to Register Pubsub resources
         @param dataset is an instance of a dataset resource
         """
-        return  self.base_register_resource('define_dataset', dataset)    
+        return  self.base_register_resource('register', pubsub)    
 
     
-    def get_dataset(self,dataset_reference):
+    def get(self,pubsub_reference):
         """
-        @Brief Get a dataset by reference
-        @param dataset_reference is the unique reference object for a registered
-        dataset
+        @Brief Get a pubsub resource by reference
+        @param dpubsub_resource_reference is the unique reference object for a registered resource
         """
-        return self.base_get_resource(dataset_reference,'get_dataset')
+        return self.base_get_resource('get',pubsub_reference)
         
-    def find_dataset(self, description,regex=True,ignore_defaults=True,attnames=[]):
+    def find(self, description,regex=True,ignore_defaults=True,attnames=[]):
         """
         @Brief find all registered datasets which match the attributes of description
         @param see the registry docs for params
         """
-        return self.base_find_resource('find_dataset',description,regex,ignore_defaults,attnames)
+        return self.base_find_resource('find',description,regex,ignore_defaults,attnames)
 
 
 
@@ -90,9 +102,11 @@ class DataPubsubService(BaseService):
     declare = BaseService.service_declare(name='data_pubsub',
                                           version='0.1.0',
                                           dependencies=[])
-
+    @defer.inlineCallbacks
     def slc_init(self):
-        self.topics = Store()
+        self.topics = yield Store.create_store()
+        #self.reg = DataPubSubRegistryClient(sup)
+        
 
     @defer.inlineCallbacks
     def op_define_topic(self, content, headers, msg):
@@ -148,7 +162,8 @@ factory = ProtocolFactory(DataPubsubService)
 
 
 class DataPubsubClient(BaseServiceClient):
-    """Client class for accessing the data pubsub service.
+    """
+    Client class for accessing the data pubsub service.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
