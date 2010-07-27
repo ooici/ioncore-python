@@ -20,20 +20,20 @@ class PublicationResource(StatefulResource):
     A registry object which contai
     """
     #Name - inherited!
-    queue = TypedAttribute(str)
-    topics = TypedAttribute(list) # List of refs for registered topics
+    topics = TypedAttribute(list) # List of Topic Resource References
     content_type = TypedAttribute(str)
-    
+    queue = TypedAttribute(str)
+
 class AOI(DataObject):
     """
     Implement class and comparison methods for AOI!
-    """
-    
+    """  
     
 class PubSubTopic(InformationResource):
     """
     """
     #Name - inherited
+    queue = TypedAttribute(str)
     keywords = TypedAttribute(str)
     aoi = TypedAttribute(AOI)
 
@@ -41,13 +41,9 @@ class SubscriptionResource(StatefulResource):
     """
     """
     #Name - inherited
-    queue = TypedAttribute(str)
-    topics = TypedAttribute(list)
+    topics = TypedAttribute(list) # List of Topic Resource References
     period = TypedAttribute(list)
     interval = TypedAttribute(int,0)
-
-
-
 
 """
 DM DataSet Resource Descriptions 

@@ -19,7 +19,7 @@ from ion.data import dataobject
 from ion.data.datastore import registry
 from ion.data import store
 
-class DataPubSubRegistryService(registry.BaseRegistryService):
+class DataPubsubRegistryService(registry.BaseRegistryService):
     """
     A very simple registry for Data Pub Sub
     @TODO make the interface more specific for different kinds of pubsub objects
@@ -49,10 +49,10 @@ class DataPubSubRegistryService(registry.BaseRegistryService):
 
         
 # Spawn of the process using the module name
-factory = ProtocolFactory(DatasetRegistryService)
+factory = ProtocolFactory(DataPubsubRegistryService)
 
 
-class DataPubSubRegistryClient(registry.BaseRegistryClient):
+class DataPubsubRegistryClient(registry.BaseRegistryClient):
     """
     Class for the client accessing the Data PubSub Registry.
     @Todo clean up the interface for specific pubsub resource objects
