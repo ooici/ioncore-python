@@ -301,7 +301,11 @@ class DataObject(object):
 
 
     @property
+        
     def attributes(self):
+        """
+        @bug It would be nice if the attributes function only returned the set of keys for attributes that were defined within the object, rather than all attributes (even the ones relating to the underlying registry)
+        """
         names = []
         for key in self.__dict__:
             names.append(key[1:])
