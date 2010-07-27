@@ -13,11 +13,12 @@ class EXAMPLE_RESOURCE(ResourceDescription):
 
 """
 DM Pub Sub Registry Resource Descriptions
+This is a first go - but worth a look!
 """
 
 class PublicationResource(StatefulResource):
     """
-    A registry object which contai
+    A registry object which contains information about publishers
     """
     #Name - inherited!
     topics = TypedAttribute(list) # List of Topic Resource References
@@ -31,6 +32,8 @@ class AOI(DataObject):
     
 class PubSubTopic(InformationResource):
     """
+    A topic definition which can be stored in the registry
+    Contains a Name, a Keyword, an Exchange Queue, and an AOI
     """
     #Name - inherited
     queue = TypedAttribute(str)
@@ -39,6 +42,7 @@ class PubSubTopic(InformationResource):
 
 class SubscriptionResource(StatefulResource):
     """
+    Informaiton about a subscriber
     """
     #Name - inherited
     topics = TypedAttribute(list) # List of Topic Resource References
@@ -46,7 +50,8 @@ class SubscriptionResource(StatefulResource):
     interval = TypedAttribute(int,0)
 
 """
-DM DataSet Resource Descriptions 
+DM DataSet Resource Descriptions
+Preliminary!
 """
 class PerservationServiceResource(StatefulResource): # Is it stateful or information?
     #Name (Logical IRODS Name) - inherited
@@ -56,23 +61,23 @@ class PerservationServiceResource(StatefulResource): # Is it stateful or informa
 class PreservationLocation(DataObject):
     location = TypedAttribute(str)
 
-class TypedObject(DataObject):
+class TypedData(DataObject):
     """
     """
     
-class FloatObject(TypedObject):
+class FloatData(TypedData):
     """
     #@Todo convert to use numpy types
     """
     f = TypedAttribute(float)
     
-class IntegerObject(TypedObject):
+class IntegerData(TypedData):
     """
     #@Todo convert to use numpy types
     """
     i = TypedAttribute(int)
     
-class StringObject(TypedObject):
+class StringData(TypedData):
     """
     #@Todo convert to use numpy types
     """
@@ -96,7 +101,7 @@ class CDMGroupResource(InformationResource):
     
 class CDMAttributeResource(InformationResource):
     #Name - inherited
-    value = TypedAttribute(TypedObject)
+    value = TypedAttribute(TypedData)
     preservation_archive = TypedAttribute(PerservationServiceResource)
     archive_attid = TypedAttribute(int,0) # Varid or name?
     
