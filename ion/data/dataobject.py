@@ -588,18 +588,4 @@ Instead of TypedAttribute, have explicit classes for each type of field.
 """
 
 
-class Attribute(object):
-
-    def __init__(self, val):
-        self.val =val
-        self.name = self.__class__.__name__
-        self.type = type(val)
-
-    def __repr__(self):
-        return '%s: %s %s'%(self.name,str(self.val),self.type)
-
-class Temp(Attribute):
-    """
-    """
-
 
