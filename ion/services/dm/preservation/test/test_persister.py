@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/test/test_persister.py
+@file ion/services/dm/preservation/test/test_persister.py
 @test ion.services.dm.persister Persister unit tests
 @author Paul Hubbard
 @date 6/7/10
@@ -13,9 +13,9 @@ logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.services.dm.persister import PersisterClient, PersisterService
+from ion.services.dm.preservation.persister import PersisterClient, PersisterService
 from ion.services.sa.fetcher import FetcherService, FetcherClient
-from ion.services.dm.url_manipulation import generate_filename
+from ion.services.dm.util.url_manipulation import generate_filename
 
 from ion.test.iontest import IonTestCase
 import base64

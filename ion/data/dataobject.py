@@ -141,7 +141,10 @@ class DataObject(object):
         """
         Compare dataobjects of the same class. All attributes must be equal.
         """
-        assert isinstance(other, DataObject)
+        #assert isinstance(other, DataObject)
+        if not isinstance(other, DataObject):
+            return False
+        
         # comparison of data objects which have different atts must not error out
         atts1 = set(self.attributes)
         atts2 = set(other.attributes)
@@ -159,7 +162,10 @@ class DataObject(object):
         See test case for intended applications
         
         """
-        assert isinstance(other, DataObject)
+        #assert isinstance(other, DataObject)
+        if not isinstance(other, DataObject):
+            return False
+
         # comparison of data objects which have different atts must not error out
         atts = set(other.attributes)
         #print 'SELF',self.get_attributes()
@@ -174,8 +180,10 @@ class DataObject(object):
         """
         Compares only attributes of self by default
         """
-        assert isinstance(other, DataObject)
-
+        #assert isinstance(other, DataObject)
+        if not isinstance(other, DataObject):
+            return False
+        
         atts=None
         if not attnames:
             atts = self.attributes

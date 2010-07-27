@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/persister.py
+@file ion/services/dm/preservation/persister.py
 @author Paul Hubbard
 @date 6/7/10
 @brief The persister writes DAP datasets to disk as netcdf files.
@@ -30,7 +30,7 @@ from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.services.dm.url_manipulation import generate_filename
+from ion.services.dm.util.url_manipulation import generate_filename
 
 class PersisterService(BaseService):
     """

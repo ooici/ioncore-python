@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-@file ion/services/dm/url_manipulation.py
+@file ion/services/dm/util/url_manipulation.py
 @brief DM routines for manipulating URLs
 @author Paul Hubbard
 @date 6/4/10

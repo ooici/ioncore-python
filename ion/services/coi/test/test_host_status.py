@@ -11,7 +11,7 @@ logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-import json
+import simplejson
 from ion.test.iontest import IonTestCase
 from ion.services.coi.host_status import SnmpReader,HostStatus
 

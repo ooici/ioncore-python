@@ -1,0 +1,9 @@
+7/26/2010
+
+This directory contains two scripts. The mkdap.py script takes a netcdf
+file and splits it into a DDS,DAS, and DODS files. The mknetcdf.py performs
+the inversion operation, taking the three files and creating a netcdf file.
+
+The scripts use pydap and currently do not work on all platforms. The scripts work on OSX, but not Linux. This may be due to different netcdf libraries on the different platforms. This is currently under investigation.
+
+
