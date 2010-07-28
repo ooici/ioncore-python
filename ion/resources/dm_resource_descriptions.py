@@ -35,17 +35,20 @@ class PubSubTopic(InformationResource):
     Contains a Name, a Keyword, an Exchange Queue, and an AOI
     """
     #Name - inherited
-    queue = TypedAttribute(dict)
+    queue_properties = TypedAttribute(dict)
     keywords = TypedAttribute(str)
-    aoi = TypedAttribute(AOI)
-        
+    aoi = TypedAttribute(AOI)    
+    
     def set_fanout_topic(self):
         """
+        Create a messaging name and set the queue properties to create it.
+        @TODO fix the hack - don't use global as the scope - but can't get to
+        baseprocess from here to get the scoped name in the usual way?
         """
         self.name = create_unique_identity()
-        #self.name = 'topic2'
-        self.queue = {self.name:{'name_type':'fanout', 'args':{'scope':'system'}}}
-
+        # Cheat and use global name - can't get to BaseProcess from here to set the scoped name for now?
+        self.queue_properties = {self.name:{'name_type':'fanout', 'args':{'scope':'global'}}}
+        
     @classmethod
     def create_fanout_topic(cls,keywords,aoi=None):
         """

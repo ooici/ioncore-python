@@ -53,12 +53,8 @@ class DataPubsubService(BaseService):
         topic = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic: \n' + str(topic))
   
-        msg_topic = topic.queue
-        msg_result = yield bootstrap.declare_messaging(msg_topic)
-        #msg_result = yield bootstrap.declare_messaging({'topic2':{'name_type':'fanout', 'args':{'scope':'system'}}})
-  
-        print 'MSG RESULTS', msg_result
-  
+        yield bootstrap.declare_messaging(topic.queue_properties)
+    
         topic = yield self.reg.register(topic)
         if topic:
             yield self.reply_ok(msg, topic.encode())
