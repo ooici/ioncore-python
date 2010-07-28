@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource
+from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource, create_unique_identity
 
 """
 class EXAMPLE_RESOURCE(ResourceDescription):
@@ -23,7 +23,6 @@ class PublicationResource(StatefulResource):
     #Name - inherited!
     topics = TypedAttribute(list) # List of Topic Resource References
     content_type = TypedAttribute(str)
-    queue = TypedAttribute(str)
 
 class AOI(DataObject):
     """
@@ -36,9 +35,27 @@ class PubSubTopic(InformationResource):
     Contains a Name, a Keyword, an Exchange Queue, and an AOI
     """
     #Name - inherited
-    queue = TypedAttribute(str)
+    queue = TypedAttribute(dict)
     keywords = TypedAttribute(str)
     aoi = TypedAttribute(AOI)
+        
+    def set_fanout_topic(self):
+        """
+        """
+        self.name = create_unique_identity()
+        #self.name = 'topic2'
+        self.queue = {self.name:{'name_type':'fanout', 'args':{'scope':'system'}}}
+
+    @classmethod
+    def create_fanout_topic(cls,keywords,aoi=None):
+        """
+        """
+        inst = cls()
+        inst.keywords = keywords
+        if aoi:
+            inst.aoi = aoi
+        return inst
+
 
 class SubscriptionResource(StatefulResource):
     """

@@ -20,6 +20,8 @@ from ion.services.dm.pubsub import DataPubsubClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
+from ion.resources.dm_resource_descriptions import PubSubTopic
+
 proc = """
 # This is a data processing function that takes a sample message, filters for
 # out of range values, adds to an event queue, and computes a new sample packet
@@ -65,15 +67,19 @@ class PubSubTest(IonTestCase):
     def test_pubsub(self):
 
         dpsc = DataPubsubClient(self.sup)
-        topic_name = yield dpsc.define_topic("topic1")
+        
+        topic = PubSubTopic.create_fanout_topic("topic1")
+        print topic
+        
+        topic_name = yield dpsc.define_topic(topic)
         logging.info('Service reply: '+str(topic_name))
 
         dc1 = DataConsumer()
         dc1_id = yield dc1.spawn()
-        yield dc1.attach(topic_name)
+        yield dc1.attach(topic.name)
 
         dmsg = self._get_datamsg({}, [1,2,1,4,3,2])
-        yield self.sup.send(topic_name, 'data', dmsg)
+        yield self.sup.send(topic.name, 'data', dmsg)
 
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
@@ -83,10 +89,10 @@ class PubSubTest(IonTestCase):
         # Create a second data consumer
         dc2 = DataConsumer()
         dc2_id = yield dc2.spawn()
-        yield dc2.attach(topic_name)
+        yield dc2.attach(topic.name)
 
         dmsg = self._get_datamsg({}, [1,2,1,4,3,2])
-        yield self.sup.send(topic_name, 'data', dmsg, {})
+        yield self.sup.send(topic.name, 'data', dmsg, {})
 
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
