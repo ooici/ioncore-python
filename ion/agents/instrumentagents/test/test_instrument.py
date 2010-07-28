@@ -5,6 +5,7 @@
 @author Michael Meisinger
 @author Stephen Pasco
 @author Steve Foley
+@author Dave Everett
 @todo Test registry of resource into registry
 """
 
@@ -22,6 +23,17 @@ from ion.agents.instrumentagents.SBE49_constants import ci_parameters as IACIPar
 from ion.agents.instrumentagents.SBE49_constants import instrument_commands as IAInstCommands
 from ion.agents.instrumentagents.SBE49_constants import instrument_parameters as IAInstParameters
 
+from magnet.spawnable import Receiver
+from magnet.spawnable import spawn
+from ion.core.base_process import BaseProcess
+from ion.services.dm.datapubsub import DataPubsubClient
+
+import ion.util.procutils as pu
+from subprocess import Popen, PIPE
+
+import os
+
+from twisted.trial import unittest
 
 class TestInstrumentAgent(IonTestCase):
 
@@ -29,14 +41,29 @@ class TestInstrumentAgent(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
-        # Start an instrument agent
+        # Start the simulator
+        logging.info("Starting instrument simulator.")
+
+        """
+        Construct the path to the instrument simulator, starting with the current
+        working directory
+        """
+        cwd = os.getcwd()
+        simPath = cwd.replace("_trial_temp", "ion/agents/instrumentagents/test/sim_SBE49.py")
+        #logging.info("cwd: %s, simPath: %s" %(str(cwd), str(simPath)))
+        self.simProc = Popen(simPath, stdout=PIPE)
+        
+        # Start an instrument agent and the pubsub service
         processes = [
             {'name':'testSBE49IA',
              'module':'ion.agents.instrumentagents.SBE49_IA',
              'class':'SBE49InstrumentAgent'},
             {'name':'resource_registry',
              'module':'ion.services.coi.resource_registry',
-             'class':'ResourceRegistryService'}
+             'class':'ResourceRegistryService'},
+            {'name':'data_pubsub',
+             'module':'ion.services.dm.datapubsub',
+             'class':'DataPubsubService'}
         ]
         self.sup = yield self._spawn_processes(processes)
         self.svc_id = yield self.sup.get_child_id('testSBE49IA')
@@ -53,6 +80,8 @@ class TestInstrumentAgent(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        logging.info("Stopping instrument simulator.")
+        self.simProc.terminate()
         yield self._stop_container()
 
     @defer.inlineCallbacks
@@ -167,13 +196,38 @@ class TestInstrumentAgent(IonTestCase):
     @defer.inlineCallbacks
     def test_status(self):
         """
-        Test to see if the status response is correct
+        Test to see if the status response is correct.  This is probably not the
+        status that we really want to see from this command; in the SBE49
+        instrument driver, this translates to the "ds" command; that might
+        not be the intent of this command, but for now that's what it does.
+        Can change it later; just want to get this stuff checked in.
         @todo Do we even need this function?
         """
-        response = yield self.IAClient.get_status(['some_arg'])
+
+        # Sleep for a while to allow simlator to get set up.
+        yield pu.asleep(2)
+        
+        dpsc = DataPubsubClient(self.super)
+        topic_name = yield dpsc.define_topic("topic1")
+        
+        dc1 = DataConsumer()
+        dc1_id = yield dc1.spawn()
+        yield dc1.attach(topic_name)
+
+        response = yield self.IAClient.getStatus(['some_arg'])
+        
         self.assert_(isinstance(response, dict))
         self.assertEqual(response['status'], "OK")
         self.assertEqual(response['value'], 'a-ok')
+        
+        # await the deliver of data message into consumer
+        yield pu.asleep(2)
+        
+        # now check for response
+        self.assertEqual(dc1.receive_cnt, 1)
+
+        response = yield self.IAClient.disconnect(['some_arg'])
+        
         
     @defer.inlineCallbacks
     def test_translator(self):
@@ -187,3 +241,38 @@ class TestInstrumentAgent(IonTestCase):
         #xlateFn = yield self.IAClient.getTranslator()
         #self.assert_(inspect.isroutine(xlateFn))
         #self.assert_(xlateFn('foo') == 'foo')
+        
+    def _get_datamsg(self, metadata, data):
+        #metadata.update('timestamp':time.clock())
+        return {'metadata':metadata, 'data':data}
+
+
+class DataConsumer(BaseProcess):
+    """
+    A class for spawning as a separate process to consume the responses from
+    the instrument.
+    """
+
+    @defer.inlineCallbacks
+    def attach(self, topic_name):
+        """
+        Attach to the given topic name
+        """
+        yield self.init()
+        self.dataReceiver = Receiver(__name__, topic_name)
+        self.dataReceiver.handle(self.receive)
+        self.dr_id = yield spawn(self.dataReceiver)
+
+        self.receive_cnt = 0
+        self.received_msg = []
+        self.ondata = None
+
+    @defer.inlineCallbacks
+    def op_data(self, content, headers, msg):
+        """
+        Data has been received.  Increment the receive_cnt
+        """
+        self.receive_cnt += 1
+        self.received_msg.append(content)
+
+

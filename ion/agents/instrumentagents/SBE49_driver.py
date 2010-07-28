@@ -65,7 +65,22 @@ class SBE49InstrumentDriver(InstrumentDriver):
             "ptcb2": 0.0
         }
         InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
+
+    def isConnected(self):
+        return self.connected
     
+    def setConnected(self, value):
+        self.connected = value;
+
+    def disconnect(self, command):
+        if (self.isConnected() == True):
+            logging.debug("disconnecting from instrument")
+            self.connector.disconnect()
+        return(1, command)
+        
+    def setAgentService(self, agent):
+        self.agent = agent
+            
     @defer.inlineCallbacks
     def op_fetch_params(self, content, headers, msg):
         """
