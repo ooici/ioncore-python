@@ -34,8 +34,24 @@ class AttrStoreServiceTest(IonTestCase):
     def test_put_seperate_backend(self):
         # Test with seperate store backends
         services = [
-            {'name':'attstore1','module':'ion.services.coi.attributestore','class':'AttributeStoreService','spawnargs':{'servicename':'as1','backend_class':'ion.data.store.Store','backend_args':{}}},
-            {'name':'attstore2','module':'ion.services.coi.attributestore','class':'AttributeStoreService','spawnargs':{'servicename':'as2','backend_class':'ion.data.store.Store','backend_args':{}}},
+            {'name':'attstore1',
+            'module':'ion.services.coi.attributestore',
+            'class':'AttributeStoreService',
+            'spawnargs':{
+                'servicename':'as1',
+                'backend_class':'ion.data.store.Store',
+                'backend_args':{}
+                    }
+                },
+            {'name':'attstore2',
+            'module':'ion.services.coi.attributestore',
+            'class':'AttributeStoreService',
+            'spawnargs':{
+                'servicename':'as2',
+                'backend_class':'ion.data.store.Store',
+                'backend_args':{}
+                    }
+                },
         ]
 
         sup = yield self._spawn_processes(services)
@@ -124,6 +140,9 @@ class AttrStoreServiceTest(IonTestCase):
         tres2 = yield asc2.get('tkey1')
         logging.info('tResult2 get: '+str(tres2))
         self.assertEqual(tres2, 'tvalue1')
+
+        # Let cassandra register the new entry
+        pu.asleep(5)
 
         # With common backends the value should be found.
         resx1 = yield asc2.get('key1')

@@ -8,11 +8,17 @@
 
 
 from twisted.internet import defer
-from ion.data.store import Store
 
 from ion.core import bootstrap
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
+
+from ion.resources import dm_resource_descriptions
+
+from ion.data import dataobject
+from ion.services.dm.datapubsub import pubsub_registry
+
+
 
 class DataPubsubService(BaseService):
     """Data publish/subscribe service interface
@@ -22,9 +28,14 @@ class DataPubsubService(BaseService):
     declare = BaseService.service_declare(name='data_pubsub',
                                           version='0.1.0',
                                           dependencies=[])
-
+    @defer.inlineCallbacks
     def slc_init(self):
-        self.topics = Store()
+        #self.topics = yield Store.create_store()
+
+        # Don't have sup - what do I pass?
+        #print self.__dict__.keys()
+        self.reg = yield pubsub_registry.DataPubsubRegistryClient()
+        
 
     @defer.inlineCallbacks
     def op_define_topic(self, content, headers, msg):
@@ -35,9 +46,15 @@ class DataPubsubService(BaseService):
         topic_name = content['topic_name']
         topic = {topic_name:{'name_type':'fanout', 'args':{'scope':'system'}}}
         yield bootstrap.declare_messaging(topic)
-        qtopic_name = self.get_scoped_name('system',topic_name)
-        yield self.topics.put(topic_name, topic[topic_name])
-        yield self.reply_ok(msg, {'topic_name':qtopic_name}, {})
+        
+        t_reg = dm_resource_descriptions.PubSubTopic.create_new_resource()
+        
+        t_reg.queue = self.get_scoped_name('system',topic_name)
+        t_reg.name =  topic_name
+        t_reg.keyword = topic_name
+        
+        yield self.reg.register(t_reg)
+        yield self.reply_ok(msg, {'topic_name':t_reg.queue}, {})
 
     def op_define_publisher(self, content, headers, msg):
         """Service operation: Register a publisher that subsequently is
@@ -80,7 +97,8 @@ factory = ProtocolFactory(DataPubsubService)
 
 
 class DataPubsubClient(BaseServiceClient):
-    """Client class for accessing the data pubsub service.
+    """
+    Client class for accessing the data pubsub service.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:

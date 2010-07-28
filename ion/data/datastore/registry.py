@@ -23,6 +23,9 @@ import ion.util.procutils as pu
 CONF = ioninit.config(__name__)
 
 class LCStateMixin(object):
+    """
+    @Brief This mixin class is used to add life cycle state convience methods
+    """
     def set_resource_lcstate_new(self, resource_reference):
         return self.set_resource_lcstate(resource_reference, dataobject.LCStates.new)
 
@@ -84,6 +87,7 @@ class RegistryBackend(objstore.ObjectChassis):
 
 class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
     """
+    @Brief Registry is the backend implementation used by all registry services
     """
 
     objectChassis = RegistryBackend
@@ -236,6 +240,8 @@ def test(ns):
 class BaseRegistryService(BaseService):
     """
     @Brief Base Registry Service Clase
+    To create a Registry Service inherit this class and over ride the method
+    names as in the RegistryService class example bellow.
     """
 
     
@@ -354,7 +360,9 @@ class BaseRegistryService(BaseService):
 
 
 class RegistryService(BaseRegistryService):
-
+    """
+    @Brief Example Registry Service implementation using the base class
+    """
      # Declaration of service
     declare = BaseService.service_declare(name='registry_service', version='0.1.0', dependencies=[])
 
@@ -371,7 +379,11 @@ factory = ProtocolFactory(RegistryService)
 
 class BaseRegistryClient(BaseServiceClient):
     """
-    Do not instantiate this class!
+    @Brief Base Registry Client is the base class used to simplify implementation
+    of Registry Service Clients. The client for a particular registry should
+    inherit from this base class and use the base methods to communicate with
+    the service. The client can do what ever business logic is neccissary before
+    calling the base client methods.
     """
             
     @defer.inlineCallbacks
@@ -388,7 +400,10 @@ class BaseRegistryClient(BaseServiceClient):
         """
         @brief Store a resource in the registry by its ID. It can be new or
         modified.
-        @param res_id is a resource identifier unique to this resource.
+        @param op_name The operation name to call in the service
+        @param resource is an instance of a Resource object which has been
+        created using the create_new_resource method. Specific registries may
+        over ride this behavior to create the resource inside the register method
         """
         yield self._check_init()
         assert isinstance(resource, dataobject.Resource), 'Invalid argument to base_register_resource'
@@ -408,6 +423,9 @@ class BaseRegistryClient(BaseServiceClient):
     def base_get_resource(self,op_name ,resource_reference):
         """
         @brief Retrieve a resource from the registry by Reference
+        @param op_name the operation name to call in the service
+        @param resource_reference is the registry identifier for a particular
+        version of an object in the registry.
         """
         yield self._check_init()
         assert isinstance(resource_reference, dataobject.ResourceReference), 'Invalid argument to base_register_resource'
@@ -427,6 +445,11 @@ class BaseRegistryClient(BaseServiceClient):
     def base_set_resource_lcstate(self, op_name, resource_reference, lcstate):
         """
         @brief Retrieve a resource from the registry by its ID
+        @param op_name The operation name to call in the service
+        @param resource_reference is the registry identifier for a particular
+        version of an object in the registry.
+        @parm lcstate is a life cycle state object which provides an enum like
+        behavior. 
         """
         yield self._check_init()
         
@@ -454,7 +477,14 @@ class BaseRegistryClient(BaseServiceClient):
     def base_find_resource(self, op_name, description, regex=True,ignore_defaults=True,attnames=[]):
         """
         @brief Retrieve all the resources in the registry
-        @param attributes is a dictionary of attributes which will be used to select a resource
+        @param description is an instance of a Resource which is compared with
+        those in the registry. The user can select which typed attributes of the
+        description to compare.
+        @param regex flag to use regex when comparing string
+        @param ignore_defaults flag to ignore typed attributes in the description
+        which are still set to their default value.
+        @param attnames is a list of the tyeped attribute names which should
+        match to select a resource
         """
         yield self._check_init()
     
