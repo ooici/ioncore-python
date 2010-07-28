@@ -125,6 +125,9 @@ class AttrStoreServiceTest(IonTestCase):
         logging.info('tResult2 get: '+str(tres2))
         self.assertEqual(tres2, 'tvalue1')
 
+        # Let cassandra register the new entry
+        pu.asleep(5)
+
         # With common backends the value should be found.
         resx1 = yield asc2.get('key1')
         self.assertEqual(resx1, 'value2',msg='Failed to pull value from second service instance')

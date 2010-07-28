@@ -19,6 +19,7 @@ http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Proje
 
 LCAarch is compatible with Python 2.5 and higher, but not Python 3.x
 This project has as dependencies Magnet, Carrot, txAMQP, Twisted and pycassa,
+and msgpack
 (see below)
 
 Get LCAarch with
@@ -98,6 +99,11 @@ carrot (use txamqp branch)
     git clone git://amoeba.ucsd.edu/carrot.git
     (cd carrot; git checkout -b txamqp origin/txamqp)
     (cd carrot; python setup.py install)
+    
+MsgPack
+----------------------------
+::
+    easy_install msgpack-python
 
 Install the Magnet package [NEED Magent 0.3.4 on master branch]
 ------------------------------------------------------------------
@@ -119,6 +125,16 @@ again (see above). Please review the branch logs for any hints.
 ---------------------------------------------------------------------------
 Change log:
 ===========
+
+2010-07-23:
+- Refactored the Registry Services to inherit from a common base class. This
+  will allow easier implementation of the many registries in the OOICI. The
+  Resource Registry and Service Registry now have basic registration of resource
+  descriptions and services.
+- The Ion message is now encoded usig the MsgPack library to allow for binary
+  transport of message content. The JSON library was mangleing string content.
+  This is a temporary fix for a wider problem with the encoding structure which
+  needs to be addressed in construction.
 
 2010-06-07:
 - Redefined logging import to set as module level logger. Each module has now
