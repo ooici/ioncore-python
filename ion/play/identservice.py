@@ -7,9 +7,13 @@ from twisted.internet import defer
 from twisted.python import log
 
 from ion.core import bootstrap
-
+from ion.data import dataobject
+from ion.resources import coi_resource_descriptions
+dataobject.DataObject._types['IdentityResource'] = coi_resource_descriptions.IdentityResource
+                                                   
 @defer.inlineCallbacks
 def main():
+    
     bootstrap._set_container_args("{'sys-name':'mysys'}")
     messaging = {'identity':{'name_type':'worker', 'args':{'scope':'system'}}}
     yield bootstrap.declare_messaging(messaging)
