@@ -1,6 +1,4 @@
-
-import uuid
-
+#!/usr/bin/env python
 
 import logging
 logging = logging.getLogger(__name__)
@@ -12,6 +10,15 @@ from ion.data import store
 from ion.data.backends import store_service
 from ion.data.backends import cassandra
 from ion.data.datastore import registry
+from ion.data import dataobject
+
+
+from ion.test.iontest import IonTestCase
+from twisted.internet import defer
+
+from magnet.spawnable import Receiver
+from ion.core.base_process import ProtocolFactory
+from ion.services.base_service import BaseService, BaseServiceClient
 
 class RegistryTest(unittest.TestCase):
     """
@@ -19,93 +26,184 @@ class RegistryTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        s = yield self._set_up_backend()
-#        s = yield cassandra.CassandraStore.create_store()
-        self.reg = registry.ResourceRegistry(s)
-        self.mystore = s
-
-    
-    def _set_up_backend(self):
-        s = store.Store.create_store()
-        return (s)
+        yield self._setup_backend()
+        
+    @defer.inlineCallbacks
+    def _setup_backend(self):
+        s = yield store.Store.create_store()
+        self.reg = registry.Registry(s)
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self.mystore.clear_store()
+        yield self.reg.clear_registry()
 
 
     @defer.inlineCallbacks
     def test_register(self):
-        res_id = uuid.uuid4().hex
-        res = registry.ResourceDescription()
+        
+        res = dataobject.Resource.create_new_resource()
         res.name = 'foo'
-        id = yield self.reg.register(res_id, res)
-        res2 = yield self.reg.get_description(res_id)
+        
+        #print 'Dataobject Created',dataobject.DataObject._types.has_key('__builtins__')
+        
+        #@Note - always over-write the old argument value!
+        res = yield self.reg.register_resource(res)
+        
+        #print 'Dataobject Registerd!',dataobject.DataObject._types.has_key('__builtins__')
+        
+        ref = res.reference()
+        res2 = yield self.reg.get_resource(ref)
         self.failUnless(res == res2)
-
-    def test_lcstate(self):
-        
-        logging.info(registry.LCStates)
-        
-        res = registry.Generic()
-        logging.info(res.get_lifecyclestate())
-        
-        res.set_lifecyclestate(registry.LCStates.active)
-        logging.info(res.get_lifecyclestate())
-        res.set_lifecyclestate(registry.LCStates['retired'])
-        logging.info(res.get_lifecyclestate())
 
 
 
     @defer.inlineCallbacks
     def test_register_overwrite(self):
-        res_id = uuid.uuid4().hex
-        res = registry.ResourceDescription()
+        res = dataobject.Resource.create_new_resource()
         res.name = 'foo'
-        id = yield self.reg.register(res_id, res)
+        res = yield self.reg.register_resource(res)
+        ref1 = res.reference()
+        # get this version back again
+        res1 = yield self.reg.get_resource(ref1)
+        self.failUnless(res == res1)
+        self.assertEqual(res1.name, 'foo')
+        
+        #update with new data
+        res.name = 'moo'
+        res = yield self.reg.register_resource(res)
 
-        resn = registry.ResourceDescription()
-        resn.name = 'moo'
-        id = yield self.reg.register(res_id, resn)
+        # get the new version back again
+        ref2 = res.reference()
+        res2 = yield self.reg.get_resource(ref2)
+        self.failUnless(res == res2)
+        self.assertEqual(res2.name, 'moo')
 
-        res2 = yield self.reg.get_description(res_id)
-        self.failUnless(resn == res2)
+        # Get the original
+        res1 = yield self.reg.get_resource(ref1)
+        self.assertEqual(res1.name, 'foo')
+        
+    def test_register_select_ancestor(self):
+        raise unittest.SkipTest('Not implimented yet!')
+
+
+    def test_set_lcastate(self):
+        res = dataobject.Resource.create_new_resource()
+        res.name = 'foo'
+        res = yield self.reg.register_resource(res)
+        ref1 = res.reference()
+        
+        #set by resource (Includes reference):
+        ref2 = yield self.reg.set_resource_lcstate(res, dataobject.LCStates.active)
+        
+        # Used returend reference to set again:
+        ref3 = yield self.reg.set_resource_lcstate(ref2, dataobject.LCStates.retired)
+        
+        ref4 = yield self.reg.set_resource_lcstate_commissioned(ref3)
+        
+        res = yield self.reg.get_resource(ref4)
+        self.assertEqual(res.lifecycle,dataobject.LCStates.retired)
+        
+        res = yield self.reg.get_resource(ref3)
+        self.assertEqual(res.lifecycle,dataobject.LCStates.retired)
+        
+        res = yield self.reg.get_resource(ref2)
+        self.assertEqual(res.lifecycle,dataobject.LCStates.active)
+        
+        res = yield self.reg.get_resource(ref1)
+        self.assertEqual(res.lifecycle,dataobject.LCStates.new)
+        
+        
+
 
     @defer.inlineCallbacks
-    def test_register_get_list(self):
-        res_id = uuid.uuid4().hex
-        res = registry.ResourceDescription()
-        res.name = 'foo'
-        id = yield self.reg.register(res_id, res)
+    def test_registry_find(self):
 
-        res_id = uuid.uuid4().hex
-        res.name = 'moo'
-        id = yield self.reg.register(res_id, res)
+        res1 = dataobject.Resource.create_new_resource()
+        res1.name = 'foo'
+        res1 = yield self.reg.register_resource(res1)
+        
+        res2 = dataobject.Resource.create_new_resource()
+        res2.name = 'moo'
+        res2 = yield self.reg.register_resource(res2)
 
-        res_list = yield self.reg.list()
-        #print res_list
-        
-        self.assertIn(res_id, res_list)
-        
-        res_s = yield self.reg.list_descriptions()
-        for res in res_s:
-            logging.info( str(res))
-            
-        self.assertIn(res, res_s)
-        self.assertNotEqual(res_s[1],res_s[0])
-        
 
+        blank = dataobject.Resource()
+        
+        results = yield self.reg.find_resource(blank,regex=False,ignore_defaults=False)
+        self.assertEqual(results,[])
+        
+        results = yield self.reg.find_resource(res1,regex=False,ignore_defaults=False)
+        self.assertIn(res1, results)
+        self.assertNotIn(res2, results)
+        
+        results = yield self.reg.find_resource(blank,regex=False,ignore_defaults=True)
+        self.assertIn(res1, results)
+        self.assertIn(res2, results)
+        
+        results = yield self.reg.find_resource(blank,regex=True,ignore_defaults=True)
+        self.assertIn(res1, results)
+        self.assertIn(res2, results)
+        
+        blank.name='oo'
+        results = yield self.reg.find_resource(blank,regex=True,ignore_defaults=True)
+        self.assertIn(res1, results)
+        self.assertIn(res2, results)
+        
+        blank.name='mo'
+        results = yield self.reg.find_resource(blank,regex=True,ignore_defaults=True)
+        self.assertNotIn(res1, results)
+        self.assertIn(res2, results)
+        
+        blank.name='mo'
+        results = yield self.reg.find_resource(blank,regex=True,attnames=['name',])
+        self.assertNotIn(res1, results)
+        self.assertIn(res2, results)
+        
+        blank.name='moo'
+        results = yield self.reg.find_resource(blank,attnames=['name',])
+        self.assertNotIn(res1, results)
+        self.assertIn(res2, results)
+        
+        
 
 class RegistryCassandraTest(RegistryTest):
     """
     """
 
-    def _set_up_backend(self):
+    @defer.inlineCallbacks
+    def _setup_backend(self):
         clist = ['amoeba.ucsd.edu:9160']
-        ds = cassandra.CassandraStore.create_store(
+        s = yield cassandra.CassandraStore.create_store(
             cass_host_list=clist,
-            cf_super=False,
-            keyspace='Datasets',
-            colfamily='Catalog'
+            cf_super=True,            
+            keyspace='Datastore',
+            colfamily='DS1'
             )
-        return ds
+        self.reg = registry.Registry(s)
+
+
+class RegistryServiceTest(IonTestCase, RegistryTest):
+    """
+    """
+    @defer.inlineCallbacks
+    def _setup_backend(self):
+        yield self._start_container()
+        
+        services = [
+            {'name':'registry1','module':'ion.data.datastore.registry','class':'RegistryService'},
+        ]
+        
+        #description_utility.load_descriptions()
+        sup = yield self._spawn_processes(services)
+        self.reg = registry.RegistryClient(proc=sup)
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.reg.clear_registry()
+        yield self._stop_container()
+
+
+
+
+
+

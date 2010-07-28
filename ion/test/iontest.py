@@ -20,6 +20,9 @@ from ion.core.base_process import BaseProcess
 from ion.data.store import Store
 import ion.util.procutils as pu
 
+from ion.resources import description_utility
+
+
 CONF = ioninit.config(__name__)
 
 class IonTestCase(unittest.TestCase):
@@ -51,6 +54,10 @@ class IonTestCase(unittest.TestCase):
         bootstrap.init_container()
         self.procRegistry = base_process.procRegistry
         self.test_sup = yield bootstrap.create_supervisor()
+
+        #Load All Resource Descriptions for future decoding
+        description_utility.load_descriptions()
+        
         logging.info("============Magnet container started, "+repr(self.cont_conn))
 
     @defer.inlineCallbacks

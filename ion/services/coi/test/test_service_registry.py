@@ -11,9 +11,10 @@ logging = logging.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.services.coi.service_registry import ServiceDesc, ServiceRegistryClient,\
- ServiceInstanceDesc
+from ion.services.coi.service_registry import ServiceRegistryClient 
 from ion.test.iontest import IonTestCase
+
+from ion.play import hello_service
 
 class ServiceRegistryTest(IonTestCase):
     """
@@ -27,6 +28,7 @@ class ServiceRegistryTest(IonTestCase):
             {'name':'serviceregistry1','module':'ion.services.coi.service_registry','class':'ServiceRegistryService'}]
         sup = yield self._spawn_processes(services)
 
+        self.sup = sup
         self.src = ServiceRegistryClient(proc=sup)
 
 
@@ -36,23 +38,33 @@ class ServiceRegistryTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_service_reg(self):
-        sd1 = ServiceDesc()
-        sd1.svc_name='svc1'
-        sd1.name = 'service'
         
-        res1 = yield self.src.register_service(sd1)
-
-        si1 = ServiceInstanceDesc()
-        si1.xname='self.sup.id.full'
-        si1.svc_name='svcinst1'
-        si1.name = 'service instance'
+        # Register a service class object
+        play_desc = yield self.src.register_service_defintion(hello_service.HelloService)
         
-        ri1 = yield self.src.register_service_instance(si1)
+        # create a reference to the description in the registry
+        ref = play_desc.reference()
+        
+        # get the description back from its reference
+        svc_desc = yield self.src.get_service_definition(ref)
+        
+        #print svc_desc
 
-        # Return string with xname
-        ri2 = yield self.src.get_service_instance_name('svcinst1')
-        self.assertEqual(ri2, 'self.sup.id.full')
-
+    @defer.inlineCallbacks
+    def test_service_instance_reg(self):
+        """
+        """        
+        services = [
+            {'name':'hello1','module':'ion.play.hello_service','class':'HelloService'},
+        ]
+        # Create a process supervisor class
+        sup = yield self._spawn_processes(services, sup=self.sup)
+        
+        # Register the service instance from the supervisors child_procs - Agument is a ProcessDesc object.
+        # See base process!
+        play_desc = yield self.src.register_service_instance(sup.child_procs[1])
+        #print play_desc
+        
 
 
 class ServiceRegistryCoreServiceTest(IonTestCase):
@@ -69,19 +81,11 @@ class ServiceRegistryCoreServiceTest(IonTestCase):
     def tearDown(self):
         yield self._stop_container()
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def test_service_reg(self):
-        sd1 = ServiceDesc()
-        sd1.name='svc1'
+        raise unittest.SkipTest('Not implimented yet!')
+        # Not sure what the point is here?
+        # Lets get it integrated with base process!
         
-        c = ServiceRegistryClient(proc=self.sup)
-        res1 = yield c.register_service(sd1)
-            
-        si1 = ServiceInstanceDesc()
-        si1.xname=self.sup.id.full
-        si1.svc_name='svc1'
         
-        ri1 = yield c.register_service_instance(si1)
-
-        ri2 = yield c.get_service_instance_name('svc1')
-        self.assertEqual(ri2, self.sup.id.full)
+        

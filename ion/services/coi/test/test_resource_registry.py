@@ -13,12 +13,12 @@ from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.data.datastore import registry
+from ion.resources import coi_resource_descriptions
 
 from ion.services.coi.resource_registry import ResourceRegistryClient
 from ion.test.iontest import IonTestCase
 from ion.data import dataobject
 
-import uuid
 
 class ResourceRegistryTest(IonTestCase):
     """
@@ -37,128 +37,62 @@ class ResourceRegistryTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        # You must explicitly clear the registry in case cassandra is used as a back end!
+        yield self.rrc.clear_registry
         yield self._stop_container()
 
     @defer.inlineCallbacks
     def test_resource_reg(self):
 
-        rd2 = registry.Generic()
-        rd2.name = 'David'
+        # Pick a resource class object to put in the registry
+        res_to_describe = coi_resource_descriptions.IdentityResource
         
-        rid = yield self.rrc.register_resource(str(uuid.uuid4()),rd2) 
-        logging.info('Resource registered with id '+str(rid))
-
-        rd3 = yield self.rrc.get_resource(rid)
-        logging.info('Resource desc:\n '+str(rd3))
-        self.assertEqual(rd3,rd2)
+        # Registration creates the resource description from the class object
+        res_description = yield self.rrc.register_resource_definition(res_to_describe)
+        # the act of registration also registers the resources from which it inherits
+                
+        # show that Identity, which is a stateful resource also caused StatefulResource to be registerd
+        stateful_description = yield self.rrc.find_registered_resource_definition_from_resource(dataobject.StatefulResource)
+             
+        # from the StatefulResource description extract the reference to its base class, Resource
+        self.assertEqual(len(stateful_description.inherits_from),1)
+        ref_to_resource = stateful_description.inherits_from[0]
+        
+        # Get the description of the class Resource
+        resource_description = yield self.rrc.get_resource_definition(ref_to_resource)
+        
+        # change an attribute of resource and check it back in
+        resource_description.name = 'Testing changes!'
+        
+        # you can use the same interface to overwrite or change an existing description
+        res_description = yield self.rrc.register_resource_definition(resource_description)        
+        
 
     @defer.inlineCallbacks
-    def test_resource_state(self):
-
-        rd2 = registry.Generic()
-        rd2.name = 'David'
+    def test_resource_instance_reg(self):
+        # Create an instance to register
+        res_inst = coi_resource_descriptions.IdentityResource.create_new_resource()
         
-        rid = yield self.rrc.register_resource(str(uuid.uuid4()),rd2) 
-        logging.info('Resource registered with id '+str(rid))
-
-        rd3 = yield self.rrc.get_resource(rid)
-        logging.info('Resource desc:\n '+str(rd3))
-        self.assertEqual(rd3,rd2)
+        # Create an owner identity to register the instance with.
+        # this should be in an identity registry before being used... 
+        me = coi_resource_descriptions.IdentityResource.create_new_resource()
+        me.name = 'david'
+        me.ooi_id = 'just a programmer...'
         
-        # Change the state and make sure the result is correct
-        yield self.rrc.set_lcstate(rid,registry.LCStates.active)
-        rd4 = yield self.rrc.get_resource(rid)
-        logging.info('Resource desc:\n '+str(rd4))
-        self.assertNotEqual(rd3,rd4)
-
-
-        # Make sure set_lcstate returns true for a valid id
-        success = yield self.rrc.set_lcstate_new(rid)
-        self.assertEqual(success,True)
+        # Register the instance with 'me' as the owner
+        instance = yield self.rrc.register_resource_instance(res_inst,me)
         
-        # Try to set the state of a resource which does not exist
-        success = yield self.rrc.set_lcstate_new('dklhshkaviohe23290')
-        self.assertEqual(success,False)
-        
-        
-        
+        # Show that registration of the instance also resulted in registration of its description
+        resource_description = yield self.rrc.get_resource_definition(instance.description)
         
     @defer.inlineCallbacks
-    def test_find_resource(self):
+    def test_describe_resource(self):        
+        # Test a simple, non-recursive resource description
+        rd = yield self.rrc.describe_resource(dataobject.Resource)
+        self.assertEqual(rd.name, 'Resource')
         
-        class test_resource(registry.ResourceDescription):
-            ival = dataobject.TypedAttribute(int)
+        
 
-        rd1 = test_resource()
-        rd1.name = 'David'
-        rd1.ival = 1000
-                
-        rd1.set_lifecyclestate(registry.LCStates.active)
-                
-        rd2 = test_resource()
-        rd2.name = 'Dorian'
-        
-        rd3 = registry.Generic()
-        rd3.name = 'John'
-        
-#        rid1 = yield self.rrc.register_resource(str(uuid.uuid4()),rd1)
-#        rid2 = yield self.rrc.register_resource(str(uuid.uuid4()),rd2)
-#       rid3 = yield self.rrc.register_resource(str(uuid.uuid4()),rd3)
-        
-        rid1 = yield self.rrc.register_resource('foo',rd1)
-        rid2 = yield self.rrc.register_resource('poo',rd2)
-        rid3 = yield self.rrc.register_resource(str(uuid.uuid4()),rd3)
-        
-        # Just to see what happens modify John
-        rd3.name = 'John Graybeal'
-        rid3 = yield self.rrc.register_resource(rid3,rd3)
-        
-        test = yield self.rrc.get_resource(rid3)
-        self.assertEqual(test,rd3)
-        
-        logging.info('**find a resource**')
-        # Test for a valid attribute
-        resources = yield self.rrc.find_resources({'name':'David','ival':1000})
-        #print resources[0]
-        self.assertIn(rd1,resources)
-        self.assertNotIn(rd2, resources)
-        self.assertNotIn(rd3, resources)
-
-        
-        resources = yield self.rrc.find_resources({'name':'David','ival':2000})
-        #print resources[0]
-        self.assertEqual(resources,[])
-        
-        
-        # test for an invalid attribute
-        resources = yield self.rrc.find_resources({'names':'David'})
-        self.assertEqual(resources,[])
-        
-        
-        
-        resources = yield self.rrc.find_resources({'name':'D'})
-        self.assertIn(rd1, resources)
-        self.assertIn(rd2, resources)
-        self.assertNotIn(rd3, resources)
-
-        resources = yield self.rrc.find_resources({'name':None})
-        self.assertIn(rd1, resources)
-        self.assertIn(rd2, resources)
-        self.assertIn(rd3, resources)
-
-
-        resources = yield self.rrc.find_resources({'lifecycle':None})
-        self.assertIn(rd1, resources)
-        self.assertIn(rd2, resources)
-        self.assertIn(rd3, resources)
-                
-        # Finding lifecycle is bogus for now!
-        # you can not transmitt a LCState object in a dict - must use the string
-        resources = yield self.rrc.find_resources({'lifecycle':'active'})
-        self.assertIn(rd1, resources)
-        self.assertNotIn(rd2, resources)
-        self.assertNotIn(rd3, resources)
-        
 
 
 class ResourceRegistryCoreServiceTest(IonTestCase):
@@ -171,23 +105,17 @@ class ResourceRegistryCoreServiceTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        # You must explicitly clear the registry in case cassandra is used as a back end!
+        yield self.rrc.clear_registry
         yield self._stop_container()
 
-
     @defer.inlineCallbacks
-    def test_resource_reg(self):
-
-        rd2 = registry.Generic()
-        rd2.name = 'David'
+    def test_reg_startup(self):
+        self.rrc = ResourceRegistryClient(proc=self.sup)
         
-        reg = ResourceRegistryClient(proc=self.sup)
-        rid = yield reg.register_resource(str(uuid.uuid4()),rd2) 
-        logging.info('Resource registered with id '+str(rid))
-
-        rd3 = yield reg.get_resource(rid)
-        logging.info('Resource desc:\n '+str(rd3))
-        self.assertEqual(rd3,rd2)
-
-        rd4 = yield reg.get_resource('NONE')
-        logging.info('rd4'+str(rd4))
-        self.assertFalse(rd4,'resource desc not None')
+        # Show that the registry work when started as a core service
+        res_to_describe = coi_resource_descriptions.IdentityResource
+        res_description = yield self.rrc.register_resource_definition(res_to_describe)
+        
+        #print res_description
+        
