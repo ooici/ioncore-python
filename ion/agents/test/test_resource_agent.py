@@ -4,8 +4,6 @@
 @file ion/agents/test/test_resource_agent.py
 @author Steve Foley
 """
-
-import uuid
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
@@ -13,10 +11,10 @@ from ion.data.dataobject import LCState
 
 from ion.test.iontest import IonTestCase
 from ion.agents.resource_agent import ResourceAgentClient
-from ion.services.coi.resource_registry import ResourceRegistryClient
+from ion.services.coi.agent_registry import AgentRegistryClient
 from ion.resources.ipaa_resource_descriptions \
     import InstrumentAgentResourceDescription, InstrumentAgentResourceInstance
-from ion.data.dataobject import InformationResource, TypedAttribute
+from ion.data.dataobject import TypedAttribute, LCStates
 
 class TestResourceAgent(IonTestCase):
     
@@ -29,48 +27,33 @@ class TestResourceAgent(IonTestCase):
             {'name':'testAgent',
              'module':'ion.agents.instrumentagents.SBE49_IA',
              'class':'SBE49InstrumentAgent'},
-            {'name':'resource_registry',
-             'module':'ion.services.coi.resource_registry',
-             'class':'ResourceRegistryService'}
+            {'name':'agent_registry',
+             'module':'ion.services.coi.agent_registry',
+             'class':'AgentRegistryService'}
         ]
         self.sup = yield self._spawn_processes(processes)
         self.svc_id = self.sup.get_child_id('testAgent')
-        self.rr_id = self.sup.get_child_id('resource_registry')
+        self.rr_id = self.sup.get_child_id('agent_registry')
         
         # Start a client (for the RPC)
         self.RAClient = ResourceAgentClient(proc=self.sup, target=self.svc_id)
         # RR Client is ,,,,,desired only for testing
-        self.RRClient = ResourceRegistryClient(proc=self.sup, target=self.rr_id)
-        yield self.RRClient.clear_registry()
+        self.reg_client = AgentRegistryClient(proc=self.sup, target=self.rr_id)
+        yield self.reg_client.clear_registry()
         
-        # setup the resource registry client
-        yield self.RAClient.set_resource_registry_client(str(self.rr_id))
+        # setup the registry client
+        yield self.RAClient.set_registry_client(str(self.rr_id))
 
-        """
-        res_to_describe = dataobject.InformationResource.create_new_resource()
-        res_description = yield self.rrc.register_resource_definition(res_to_describe)
-        ref = yield self.rrc.set_resource_lcstate_commissioned(res_description)
-        commissioned_description = yield self.rrc.get_resource_definition(ref)
-        """
-        
-        """
-        I want to:
-        - create a resource description with specific fields (where do I inherit from?)
-        - create an instance of that description with some data specific to my instance
-        - Link the instance to the description
-        - register the resource description and instance
-        - Change the lifecycle state of the resource, get it to confirm
-        
-        """
         # need any non-generic resource...use an instrument agent one for now
         self.res_desc = InstrumentAgentResourceDescription.create_new_resource()
-        self.resource_desc.driver_class = TypedAttribute( \
-            "ion.agent.instrumentagents.SBE49_instrument_driver.SBE49InstrumentDriver")
+        self.res_desc.version = '1.23'
+        self.res_desc.name = 'I am a test IA resource description'
         
         self.res_inst = InstrumentAgentResourceInstance.create_new_resource()
-        self.res_inst.driver_process_id = "something_for_now.1"
+        self.res_inst.driver_process_id = 'something_for_now.1'
+        self.res_inst.name = 'I am an instantiation of a test IA resource'
         
-        logging.debug("*** resource: %s", self.resource)
+        logging.debug("*** res_desc: %s, res_inst: %s", self.res_desc, self.res_inst)
         
     @defer.inlineCallbacks
     def tearDown(self):
@@ -78,47 +61,70 @@ class TestResourceAgent(IonTestCase):
         
     @defer.inlineCallbacks
     def test_reg_setstate_direct(self):
-        result = yield self.RRClient.register_resource_definition(self.res_desc)
-        logging.debug("*** register_def result: %s", result)
-        result = yield self.RRClient.register_resource_instance(self.res_inst)
-        logging.debug("*** register_inst result: %s", result)        
-        result = yield self.RRClient.get_resource_definition()
-        logging.debug("*** get_def result: %s", result)        
-        result = yield self.RRClient.get_resource_instance()
-        logging.debug("*** get_inst result: %s", result)        
-
-        """
-        # assert some stuff
-        result = yield self.RRClient.set_resource_lcstate(self.res_inst, LCState.active)
-        result = yield self.RRClient.get_resource_instance()
-        # get the state out of this somehow and assert stuff
-        result = yield self.RRClient.set_resource_lcstate(self.res_inst, LCState.active)
-        result = yield self.RRClient.set_resource_lcstate(self.res_inst, LCState.developed)
-        result = yield self.RRClient.set_resource_lcstate(self.res_inst, LCState.active)
-        """
+        registered_agent_desc = \
+           yield self.reg_client.register_agent_definition(self.res_desc)
+        logging.debug("*** register_def result: %s", registered_agent_desc)
+        # Not committed, so not equal, but parts should be
+        self.assertNotEqual(registered_agent_desc, self.res_desc)
+        self.assertEqual(registered_agent_desc.RegistryIdentity,
+                         self.res_desc.RegistryIdentity)
+        self.assertEqual(registered_agent_desc.version,
+                         self.res_desc.version)
+        
+        registered_agent_instance = \
+            yield self.reg_client.register_agent_instance(self.res_inst)
+        logging.debug("*** register_inst result: %s",
+                      registered_agent_instance)        
+        # Not committed, so not equal, but parts should be
+        self.assertNotEqual(registered_agent_instance, self.res_inst)
+        self.assertEqual(registered_agent_instance.RegistryIdentity,
+                         self.res_inst.RegistryIdentity)
+                
+        recv_agent_desc = \
+            yield self.reg_client.get_agent_definition(self.res_desc)
+        logging.debug("*** get_def result: %s", recv_agent_desc)        
+        self.assertEqual(recv_agent_desc, registered_agent_desc)
+        self.assertEqual(recv_agent_desc.RegistryIdentity,
+                         self.res_desc.RegistryIdentity)
+        # Not committed, so not equal
+        self.assertNotEqual(recv_agent_desc, self.res_desc)
+        
+        recv_agent_inst = yield self.reg_client.get_agent_instance(self.res_inst)
+        logging.debug("*** get_inst result: %s", recv_agent_inst)        
+        self.assertEqual(recv_agent_inst, registered_agent_instance)
+        # Not commiteed, so not equal, but parts should be
+        self.assertNotEqual(recv_agent_inst, self.res_inst)
+        self.assertEqual(recv_agent_inst.RegistryIdentity,
+                         self.res_inst.RegistryIdentity)
         
     @defer.inlineCallbacks
     def test_registration(self):
-        # initial registration
-        reg_id = yield self.RAClient.register_resource(self.res_desc, self.res_inst)
-        result = yield self.RAClient.get_resouce_description(reg_id)
-        self.assertEqual(self.res_desc, result)
+        # initial registration of instance
+        reg_id = yield self.RAClient.register_resource(self.res_inst)
+        result = yield self.RAClient.get_resource_instance()
+        logging.debug("*** res_desc: %s, result: %s", self.res_inst, result)
+        self.assertNotEqual(result, None)
+        self.assertNotEqual(result, self.res_inst)
+        self.assertNotEqual(result.RegistryCommit,
+                            self.res_inst.RegistryCommit)
+        self.assertEqual(self.res_inst.RegistryIdentity,
+                         result.RegistryIdentity)
      
-        # test update/repeat registration of a different description
-        new_res_desc = InstrumentAgentResourceDescription()
-        new_res_desc.name = "newTestAgentDescription"
-        result = yield self.RAClient.register_resource(new_res_desc, self.res_inst)
-        self.assertEqual(reg_id, result)
-        result = yield self.RAClient.get_resouce_description(reg_id)
-        self.assertEqual(new_res_desc, result)
-    
+        # Verify the reference is the same   
+        result = yield self.RAClient.get_resource_ref()
+        self.assertEqual(result, reg_id)
+         
         # test update/repeat reg if a different instance
-        new_res_inst = InstrumentAgentResourceInstance()
-        new_res_inst.name = "newTestAgentInstance"
-        result = yield self.RAClient.register_resource(self.res_desc, new_res_inst)
+        new_res_inst = yield self.RAClient.get_resource_instance()
+        new_res_inst.name = "UPDATED TestAgentInstance"
+        new_res_inst.driver_process_id = 'something_else.1'
+
+        result = yield self.RAClient.register_resource(new_res_inst)
         self.assertEqual(reg_id, result)
-        result = yield self.RAClient.get_resouce_description(reg_id)
-        self.assertEqual(new_res_desc, result)
+        result = yield self.RAClient.get_resource_instance()
+        self.assertEqual(new_res_inst.name, result.name)
+        self.assertEqual(new_res_inst.driver_process_id,
+                         result.driver_process_id)
     
     @defer.inlineCallbacks
     def test_lifecycle(self):

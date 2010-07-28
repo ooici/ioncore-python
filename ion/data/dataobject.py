@@ -141,6 +141,8 @@ class DataObject(object):
         """
         Compare dataobjects of the same class. All attributes must be equal.
         """
+        if (other == None):
+            return False
         assert isinstance(other, DataObject)
         # comparison of data objects which have different atts must not error out
         atts1 = set(self.attributes)

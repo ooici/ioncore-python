@@ -5,39 +5,27 @@
 
 Definitions for resource descriptions used within the IPAA subsystem
 """
-from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, Resource, ResourceReference, InformationResource, StatefulResource
-from ion.resources.coi_resource_descriptions import ResourceDescription, AgentDescription, AgentInstance
+from ion.data.dataobject import TypedAttribute, ResourceReference, StatefulResource
+from ion.resources.coi_resource_descriptions import ResourceDescription, ResourceInstance, AgentDescription, AgentInstance
 
 class InstrumentAgentResourceDescription(AgentDescription):
     """
     The description of an instrument agent resource to go into the
-    "Resource Registry". Should track metadata about the instrument agent
+    "Agent Registry". Should track metadata about the instrument agent
     that is running/registered.
     """
 
 class InstrumentAgentResourceInstance(AgentInstance):
     """
-    Intended for the "Resource Registry", this is the instance information for
+    Intended for the "Agent Registry", this is the instance information for
     an instrument agent that is running. This should reflect the individual
     instrument agent information.
     """
+    driver_process_id = TypedAttribute(str)
 
-class InstrumentDriverResourceDescription(ResourceDescription):
+class InstrumentDriverResource(StatefulResource):
     """
-    The description of an instrument agent resource to go into the
-    "Resource Registry". Should track metadata about the instrument driver
-    that is running/registered.
-    """
-    instrument_type = TypedAttribute()
-    interface = TypedAttribute(list)
-    module = TypedAttribute(str)
-    version = TypedAttribute(str)
-    #spawnargs = TypedAttribute(dict,{})
-    description = TypedAttribute(str)
-
-class InstrumentDriverResourceInstance(StatefulResource):
-    """
-    Intended for the "Resource Registry", this is the instance information for
+    Intended for the "Agent Registry", this is the instance information for
     an instrument driver that is running. This should reflect the individual
     instrument driver information.
     """
@@ -49,6 +37,7 @@ class InstrumentDriverResourceInstance(StatefulResource):
     type = TypedAttribute(str)
     process_id = TypedAttribute(str)
     subject = TypedAttribute(ResourceReference)
+    data_sets = TypedAttribute(list)
 
 
 class InstrumentResourceDescription(ResourceDescription):

@@ -39,7 +39,7 @@ class ServiceRegistryTest(IonTestCase):
     @defer.inlineCallbacks
     def test_service_reg(self):
         
-        play_desc = yield self.src.register_service_defintion(hello_service.HelloService)
+        play_desc = yield self.src.register_service_definition(hello_service.HelloService)
         
         ref = play_desc.reference()
         

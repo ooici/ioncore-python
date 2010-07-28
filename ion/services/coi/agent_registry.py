@@ -106,7 +106,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         """
 
     @defer.inlineCallbacks
-    def register_agent_defintion(self,agent):
+    def register_agent_definition(self,agent):
         """
         Client method to register the Definition of a Agent Class
         """
@@ -174,7 +174,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         """
         if isinstance(agent, coi_resource_descriptions.AgentInstance):
             agent_resource = agent
-            assert resource_description.RegistryIdentity, 'Agent Resource must have a registry Identity'            
+            assert agent_resource.RegistryIdentity, 'Agent Resource must have a registry Identity'            
         else:
             agent_instance = agent
             # Build a new description of this agent instance
@@ -203,7 +203,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         
         agent_class = getattr(agent_instance.proc_mod_obj,agent_instance.proc_class)
         
-        sd = yield self.register_agent_defintion(agent_class)
+        sd = yield self.register_agent_definition(agent_class)
         agent_resource.description = sd.reference(head=True)
         
         
@@ -233,7 +233,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         return self.base_get_resource('get_agent_instance',agent_reference)
 
     def set_agent_lcstate(self, agent_reference, lcstate):
-        return self.base_set_agent_lcstate('set_agent_lcstate',agent_reference, lcstate)
+        return self.base_set_resource_lcstate('set_agent_lcstate',agent_reference, lcstate)
 
     def set_agent_lcstate_new(self, agent_reference):
         return self.set_agent_lcstate(agent_reference, dataobject.LCStates.new)
@@ -255,7 +255,6 @@ class AgentRegistryClient(registry.BaseRegistryClient):
 
     def set_agent_lcstate_commissioned(self, agent_reference):
         return self.set_agent_lcstate(agent_reference, dataobject.LCStates.commissioned)
-
 
     @defer.inlineCallbacks
     def find_registered_agent_definition_from_agent(self, agent_class):
