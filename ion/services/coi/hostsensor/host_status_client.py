@@ -4,8 +4,7 @@
 @brief Simple XMLRPC client for retrieving host status
 """
 
-import xmlrpclib, json
-
-s = xmlrpclib.ServerProxy('http://localhost:9010')
-print json.dumps(s.getStatus(), indent=4)
-print s.system.listMethods()
+from twisted.web import xmlrpc
+s = xmlrpc.Proxy('http://localhost:9010')
+r = s.callRemote("getStatusPrettyPrint")
+print r

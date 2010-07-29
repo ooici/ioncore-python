@@ -6,19 +6,20 @@
 @brief service for messaging local host status at intervals
 """
 
-import logging, xmlrpclib, json
+import logging, json
 logging = logging.getLogger(__name__)
 from twisted.internet import defer, task
+from twisted.web import xmlrpc
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
-
 
 
 class HostStatusService(BaseService):
     """
     Host status interface
     """
+
 
     # Declaration of service
     declare = BaseService.service_declare(
@@ -30,21 +31,31 @@ class HostStatusService(BaseService):
 
     
     def slc_init(self):
-        timings = [0.3]
-        clock = task.Clock()
+        self.INTERVAL = 1 # seconds
+        self.COUNT    = 1
 
-        def foo():
-            p = xmlrpclib.ServerProxy('http://localhost:9010')
-            s = p.getStatusPrettyPrint()
-            print s
-            # print json.dumps(s.getStatus(), indent=4)
-            print p.system.listMethods()
-
-        lc = task.LoopingCall(foo)
-        lc.start(1)
-        return defer.succeed(None)        
+        self.count = self.COUNT
+        self.client = xmlrpc.Proxy('http://localhost:9010')
+        self.lc = task.LoopingCall(self.report)
+        self.lc.start(self.INTERVAL)
 
 
+    @defer.inlineCallbacks
+    def report(self):
+        self.count -= 1
+        if self.count < 0:
+            logging.debug('Shutting down host status looping call')
+            self.lc.stop()
+            return
+            
+        logging.debug('Starting report query')
+        status = yield self.client.callRemote("getStatusPrettyPrint")
+        logging.debug('Received report')
+        print status
+    
+    def isRunning(self):
+        return self.lc.running
+    
     def op_config(self, content, headers, msg):
         pass
 
