@@ -65,6 +65,8 @@ class SubscriptionResource(StatefulResource):
     Informaiton about a subscriber
     """
     #Name - inherited
+    # Subscription is not to a topic but to the Exchange queue where the filtered
+    # messages arive from a topic!
     topics = TypedAttribute(list) # List of Topic Resource References
     period = TypedAttribute(list)
     interval = TypedAttribute(int,0)

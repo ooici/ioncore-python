@@ -53,6 +53,7 @@ class DataPubsubService(BaseService):
         topic = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic: \n' + str(topic))
   
+        # This should come from the COI Exchange registry
         yield bootstrap.declare_messaging(topic.queue_properties)
     
         topic = yield self.reg.register(topic)
@@ -65,19 +66,29 @@ class DataPubsubService(BaseService):
         """Service operation: Register a publisher that subsequently is
         authorized to publish on a topic.
         """
+        
+        
+        
+        
 
     def op_subscribe(self, content, headers, msg):
         """Service operation: Register a subscriber's intent to receive
         subscriptions on a topic, with additional filter and delivery method
         details.
         """
+        # Subscribe should decouple the exchange point where data is published
+        # and the subscription exchange point where a process receives it.
+        # That allows for an intermediary process to filter it.
+        
         subscriber = None
         topic = None
         eventOnly = False
 
     def op_unsubscribe(self, content, headers, msg):
         """Service operation: Stop one's existing subscription to a topic.
+            And remove the Queue if no one else is listening...
         """
+        
 
     @defer.inlineCallbacks
     def op_publish(self, content, headers, msg):
