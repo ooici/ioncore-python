@@ -48,7 +48,7 @@ class TestInstrumentAgent(IonTestCase):
         #self.rrc = ResourceRegistryClient(proc=self.sup)
         #self.rrc = ResourceRegistryClient(target=self.sup.get_scoped_name('global', self.res_reg_id))
         
-        yield self.IAClient.set_resource_registry_client(str(self.res_reg_id))
+        yield self.IAClient.set_registry_client(str(self.res_reg_id))
 
 
     @defer.inlineCallbacks
