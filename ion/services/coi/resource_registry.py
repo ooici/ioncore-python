@@ -111,7 +111,7 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         """
 
     @defer.inlineCallbacks
-    def register_resource_instance(self,resource_instance,owner):
+    def register_resource_instance(self,resource,owner=None):
         """
         @Brief Client method to Register a Resource Instance
         An instance resource includes a reference to a owner, a description and
@@ -120,17 +120,26 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         existing instance resource to be modified.
         @Note this need architectural clarification
         """
-        resource_instance_description = yield self.describe_instance(resource_instance,owner)
-        
-        found_rid = yield self.find_registered_resource_instance_from_description(resource_instance,regex=False,ignore_defaults=True)
-        if found_rid:
-            assert len(found_rid) == 1
-            defer.returnValue(found_rid[0])
+        # Can't have an resource instance for a resource instance - Is that a problem? 
+        if isinstance(resource, coi_resource_descriptions.ResourceInstance):
+            resource_instance_description = resource
+            assert resource_instance_description.RegistryIdentity, 'Resource Instance Description must have a registry Identity'
         else:
-            # Give it a new Unique ID and put it in the registry
-            resource_instance_description.create_new_reference()
-            resource_instance_description = yield self.base_register_resource('register_resource_instance', resource_instance_description)    
-            defer.returnValue(resource_instance_description)
+            resource_instance = resource
+            # Build a new description of the resource instance
+            resource_instance_description = yield self.describe_instance(resource_instance,owner)
+            
+            found_rid = yield self.find_registered_resource_instance_from_description(resource_instance,regex=False,ignore_defaults=True)
+            if found_rid:
+                assert len(found_rid) == 1
+                defer.returnValue(found_rid[0])
+            else:
+                # Give it a new Unique ID and put it in the registry
+                resource_instance_description.create_new_reference()
+                resource_instance_description.set_lifecyclestate(dataobject.LCStates.developed)
+                
+        resource_instance_description = yield self.base_register_resource('register_resource_instance', resource_instance_description)    
+        defer.returnValue(resource_instance_description)
         
     @defer.inlineCallbacks
     def describe_instance(self,resource_instance,owner):
@@ -171,22 +180,30 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         
         
     @defer.inlineCallbacks
-    def register_resource_definition(self,resource_class):
+    def register_resource_definition(self,resource):
         """
         @Brief Client method to register the definition of a Resource Type
         @param resource can be either an instance of a Resource Description or
         the class object of the resource to be described. 
         """
-        resource_description = yield self.describe_resource(resource_class)
+        if isinstance(resource, coi_resource_descriptions.ResourceDescription):
+            resource_description = resource
+            assert resource_description.RegistryIdentity, 'Resource Description must have a registry Identity'
 
-        found_rd = yield self.find_registered_resource_definitions_from_description(resource_description,regex=False,ignore_defaults=True)
-        if found_rd:
-            assert len(found_rd) == 1
-            defer.returnValue(found_rd[0])
         else:
-            resource_description.create_new_reference()
-            resource_description = yield self.base_register_resource('register_resource_definition', resource_description)
-            defer.returnValue(resource_description)
+            resource_class = resource
+            # Build a new description of the resource
+            resource_description = yield self.describe_resource(resource_class)
+
+            found_rd = yield self.find_registered_resource_definitions_from_description(resource_description,regex=False,ignore_defaults=True)
+            if found_rd:
+                assert len(found_rd) == 1
+                defer.returnValue(found_rd[0])
+            else:
+                resource_description.create_new_reference()
+            
+        resource_description = yield self.base_register_resource('register_resource_definition', resource_description)
+        defer.returnValue(resource_description)
         
     @defer.inlineCallbacks
     def describe_resource(self,resource_class):
@@ -280,27 +297,6 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         
     def set_resource_lcstate(self, resource_reference, lcstate):
         return self.base_set_resource_lcstate('set_resource_lcstate',resource_reference, lcstate)
-
-    def set_agent_lcstate_new(self, agent_reference):
-        return self.set_agent_lcstate(agent_reference, dataobject.LCStates.new)
-
-    def set_agent_lcstate_active(self, agent_reference):
-        return self.set_agent_lcstate(agent_reference, dataobject.LCStates.active)
-        
-    def set_agent_lcstate_inactive(self, agent_reference):
-        return self.set_agent_lcstate(agent_reference, dataobject.LCStates.inactive)
-
-    def set_agent_lcstate_decomm(self, agent_reference):
-        return self.set_agent_lcstate(agent_reference, dataobject.LCStates.decomm)
-
-    def set_agent_lcstate_retired(self, agent_reference):
-        return self.set_agent_lcstate(agent_reference, dataobject.LCStates.retired)
-
-    def set_agent_lcstate_developed(self, agent_reference):
-        return self.set_agent_lcstate(agent_reference, dataobject.LCStates.developed)
-
-    def set_agent_lcstate_commissioned(self, agent_reference):
-        return self.set_agent_lcstate(agent_reference, dataobject.LCStates.commissioned)
 
     @defer.inlineCallbacks
     def find_registered_resource_definition_from_resource(self, resource_class):
