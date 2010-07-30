@@ -47,7 +47,7 @@ def serialize(filename, dap_components):
 
     
         
-
+"""
 def main():
     option_parser = OptionParser()
     option_parser.add_option("-f", "--file", dest="filename",
@@ -59,3 +59,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+"""
