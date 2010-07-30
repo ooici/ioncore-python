@@ -435,22 +435,33 @@ class ResourceReference(DataObject):
             self.RegistryBranch = RegistryBranch
 
     @classmethod
-    def create_new_resource(cls):
+    def create_new_resource(cls, id='', branch='master'):
         """
         @Brief Use this method to instantiate any new resource with a unique id!
         """
         inst = cls()
-        inst.RegistryIdentity = create_unique_identity()
-        inst.RegistryBranch = 'master'
+
+        
+        if id:
+            inst.RegistryIdentity = id
+        else:
+            inst.RegistryIdentity = create_unique_identity()
+
+        inst.RegistryBranch = branch
         return inst
     
-    def create_new_reference(self):
+    def create_new_reference(self, id='', branch='master', commit=''):
         """
         @Brief Create or overwrite the reference identity for this resource
         """
-        self.RegistryIdentity = create_unique_identity()
+        if id:
+            self.RegistryIdentity = id
+        else:
+            self.RegistryIdentity = create_unique_identity()
+
         self.RegistryBranch = 'master'
-        self.RegistryCommit = ''
+
+        self.RegistryCommit = commit        
         return self
     
     def reference(self,head=False):
