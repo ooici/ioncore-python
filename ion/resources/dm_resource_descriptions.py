@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource
+from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource, create_unique_identity
 
 """
 class EXAMPLE_RESOURCE(ResourceDescription):
@@ -23,7 +23,6 @@ class PublicationResource(StatefulResource):
     #Name - inherited!
     topics = TypedAttribute(list) # List of Topic Resource References
     content_type = TypedAttribute(str)
-    queue = TypedAttribute(str)
 
 class AOI(DataObject):
     """
@@ -36,15 +35,38 @@ class PubSubTopic(InformationResource):
     Contains a Name, a Keyword, an Exchange Queue, and an AOI
     """
     #Name - inherited
-    queue = TypedAttribute(str)
+    queue_properties = TypedAttribute(dict)
     keywords = TypedAttribute(str)
-    aoi = TypedAttribute(AOI)
+    aoi = TypedAttribute(AOI)    
+    
+    def set_fanout_topic(self):
+        """
+        Create a messaging name and set the queue properties to create it.
+        @TODO fix the hack - don't use global as the scope - but can't get to
+        baseprocess from here to get the scoped name in the usual way?
+        """
+        self.name = create_unique_identity()
+        # Cheat and use global name - can't get to BaseProcess from here to set the scoped name for now?
+        self.queue_properties = {self.name:{'name_type':'fanout', 'args':{'scope':'global'}}}
+        
+    @classmethod
+    def create_fanout_topic(cls,keywords,aoi=None):
+        """
+        """
+        inst = cls()
+        inst.keywords = keywords
+        if aoi:
+            inst.aoi = aoi
+        return inst
+
 
 class SubscriptionResource(StatefulResource):
     """
     Informaiton about a subscriber
     """
     #Name - inherited
+    # Subscription is not to a topic but to the Exchange queue where the filtered
+    # messages arive from a topic!
     topics = TypedAttribute(list) # List of Topic Resource References
     period = TypedAttribute(list)
     interval = TypedAttribute(int,0)

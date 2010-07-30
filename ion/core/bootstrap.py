@@ -78,7 +78,7 @@ def init_container():
         Container.interceptor_system = cls()
     # Collect all service declarations in local code modules
     ModuleLoader().load_modules()
-    yield bs_register_services()
+    #yield bs_register_services()
 
 def _set_container_args(contargs=None):
     ioninit.cont_args['_args'] = contargs

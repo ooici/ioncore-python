@@ -18,6 +18,7 @@ def parse_dataset(filename):
     dataset.data = DapUnpacker(xdrdata, dataset).getvalue()
     netcdf.save(dataset, ".".join((filename, "nc")))
  
+"""
 def main():
     optparse = OptionParser()
     optparse.add_option("-f", "--file", dest="filename", 
@@ -29,3 +30,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+"""
