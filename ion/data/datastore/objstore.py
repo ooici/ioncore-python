@@ -85,6 +85,21 @@ class IObjectStore(cas.ICAStore):
         objectChassis.
         """
 
+    def update(obj):
+        """
+        @brief Update the reference/heads of an object
+        @param obj object store object.
+        @retval 
+        @note This is used to update the state of an object after a commit.
+        The reference object only needs to keep a record of the object
+        heads, which are the most recent commit id[s].
+        Ensure the last commit matches the parent of the new commit.
+        Any object should only be updated by one IObjectStore at a time.
+        How to make the commit concept distributed? Branching can be used
+        instead of dealing with race conditions. Define the atom of this
+        abstraction layer. 
+        """
+
 class Element(cas.Element):
 
     def load(self, backend):

@@ -55,6 +55,13 @@ class ObjectChassis(object):
 
     interface.implements(objstore.IObjectChassis)
 
+    def __init__(self, objstore):
+        """
+        @note Not using the 'keyspace' arg of the original implementation.
+        All ref information should come from one description object.
+        @param objstore provider of objstore.IObjectStore
+        """
+
 
 class ObjectStoreService(base_service.BaseService):
     """
@@ -68,7 +75,7 @@ class ObjectStoreService(base_service.BaseService):
     @defer.inlineCallbacks
     def slc_init(self):
         """
-        setup creation of ObjectStore instance 
+        @brief setup creation of ObjectStore instance 
         decide on which backend to use based on option
 
         It would be nice to separate the existence/creation of the
@@ -78,6 +85,8 @@ class ObjectStoreService(base_service.BaseService):
         connection can be managed elsewhere....actually, that is a good
         question, how is that connection managed?
         """
+        # Need to make this an option:
+        # IStore interface to local persistent store. 
         backend = yield store.Store.create_store()
         self.objstore = yield objstore.ObjectStore(backend)
 
@@ -100,6 +109,14 @@ class ObjectStoreService(base_service.BaseService):
             yield self.reply_ok(msg, "??")
         except objstore.ObjectStoreError:
             yield self.reply_err(msg, None)
+
+    def op_update(self, content, headers, msg):
+        """
+        @note A data object id is a topic that can be subscribed
+        to/conversation. There needs to be a way to enforce an affinity
+        (with in some messaging domain) between object operations and
+        IObjectStore service process instances. 
+        """
 
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
@@ -150,6 +167,17 @@ class ObjectStoreClient(base_service.BaseServiceClient, cas.CAStore):
     interface.implements(objstore.IObjectStore, cas.ICAStore)
 
     objectChassis = objstore.ObjectChassis
+
+    def ObjectChassis(self):
+        """
+        @brief Factory for creating an active object chassis without
+        explicitly specifying its context (object name/id).
+        @retval objectChassis instance that uses this ObjectStore instance.
+
+        @note clone and create are the only IObjectStore methods that
+        should be used directly. get and put are use by IObjectChassis...
+        """
+        return self.objectChassis(self)
 
     @defer.inlineCallbacks
     def create(self, name, baseClass):
