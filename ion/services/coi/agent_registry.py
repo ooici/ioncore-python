@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/service_registry.py
+@file ion/services/coi/agent_registry.py
 @author Michael Meisinger
+@author David Stuebe
 @brief service for registering agent (types and instances).
 """
 

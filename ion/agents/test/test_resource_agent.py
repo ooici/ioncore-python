@@ -166,7 +166,6 @@ class TestResourceAgent(IonTestCase):
         ref2 = yield RAClient2.register_resource()
         refinst2 = yield RAClient2.get_resource_instance()
         refinst1 = yield self.RAClient.get_resource_ref()
-        logging.debug("*** made it here")
 
         self.assertNotEqual(refinst1.RegistryCommit, refinst2.RegistryCommit)
         self.assertNotEqual(refinst1.RegistryIdentity,
