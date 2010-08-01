@@ -1,9 +1,4 @@
-from optparse import OptionParser
 
-from pydap.parsers.dds import DDSParser
-from pydap.parsers.das import DASParser
-from pydap.xdr import DapUnpacker
-from pydap.responses import netcdf
 
 def parse_dataset(filename):
     dds_file = open(".".join((filename, "dds"))) 
