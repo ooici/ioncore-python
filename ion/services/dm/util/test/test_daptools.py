@@ -28,7 +28,12 @@ import numpy
 
 class DapToolsBaseTest(IonTestCase):
     """
-    Test the message read and write for a DAP data Object.
+    @Brief Test the message read and write for a DAP data Object.
+    @Note The conversion of all value types should be tested, and any edge cases
+    that come to mind. (Single values, arrays of values? Max and min IEEE
+    numbers for all value types.)  It isn't minimal but it is probably necessary
+    for everyone to be convinced it is OK.
+    @TODO Flesh out the test cases with more data types!
     """
     fname ='../ion/services/dm/util/test/test_files/grid_surf_el.nc'
     def setUp(self):
