@@ -47,7 +47,7 @@ class DapToolsTest(unittest.TestCase):
                 self.assertEqual(os.path.isfile(fullyqualifiedfile),True,'Bad file in data directory for tesing Dap Tools')
                 logging.info('FILES:'+fullyqualifiedfile)
                 
-                self._inverse_test_from_nc(fullyqualifiedfile)
+                #self._inverse_test_from_nc(fullyqualifiedfile)
                 self._inverse_test_from_dap(fullyqualifiedfile)
                 
 
