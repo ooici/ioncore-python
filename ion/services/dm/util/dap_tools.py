@@ -30,10 +30,8 @@ def ds2dap_msg(pydap_dataset,headeronly=False):
     msg.dds = dds_output[0]
     if not headeronly:
         dods = dap_gen(pydap_dataset)
-        #msg.dods = base64.b64encode(dods)
-        msg.dods = dods
-        #print 'DODS:',dods
-    
+        msg.dods = base64.b64encode(dods)
+        #msg.dods = dods    
     return (msg)
 
 def dap_gen(ds):
@@ -63,15 +61,9 @@ def dap_msg2ds(msg):
     dataset = DASParser(msg.das, dataset).parse()
     
     if msg.dods:
-        #dataset.data = DapUnpacker(msg['dods'], dataset).getvalue()
-
         # This block is from open_dods in client.py
-        #dds, xdrdata = msg['dods'].split('\nData:\n', 1)
-        #dataset.data = DapUnpacker(base64.b64decode(msg.dods), dataset).getvalue()
-        dataset.data = DapUnpacker(msg.dods, dataset).getvalue()
-        
-        #data = DapUnpacker(msg['dods'], dataset)
-        #print 'DapUnpacker Data:',data.__dict__.keys()
+        dataset.data = DapUnpacker(base64.b64decode(msg.dods), dataset).getvalue()
+        #dataset.data = DapUnpacker(msg.dods, dataset).getvalue()
         
     return dataset
 
