@@ -1,0 +1,101 @@
+Dataset {
+    Grid {
+        Array:
+            Float32 atmp[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } atmp;
+    Grid {
+        Array:
+            Float32 avgpd[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } avgpd;
+    Grid {
+        Array:
+            Float32 vis[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } vis;
+    Grid {
+        Array:
+            Int32 wdir[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } wdir;
+    Grid {
+        Array:
+            Float32 gust[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } gust;
+    Float32 lon[lon = 1];
+    Grid {
+        Array:
+            Float32 wvhgt[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } wvhgt;
+    Grid {
+        Array:
+            Float32 wtmp[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } wtmp;
+    Grid {
+        Array:
+            Float32 dewpt[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } dewpt;
+    Grid {
+        Array:
+            Int32 mwdir[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } mwdir;
+    Grid {
+        Array:
+            Float32 dompd[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } dompd;
+    Grid {
+        Array:
+            Float32 wspd[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } wspd;
+    Int32 time[time = 1405];
+    Float32 lat[lat = 1];
+    Grid {
+        Array:
+            Float32 baro[time = 1405][lat = 1][lon = 1];
+        Maps:
+            Int32 time[time = 1405];
+            Float32 lat[lat = 1];
+            Float32 lon[lon = 1];
+    } baro;
+} station%252Enc;

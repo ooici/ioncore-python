@@ -153,7 +153,10 @@ class CDMStructureResource(InformationResource):
     members = TypedAttribute(list)
     
 
-    
+class DAPMessageObject(DataObject):
+    das = TypedAttribute(str)
+    dds = TypedAttribute(str)
+    dods = TypedAttribute(str)
 
     
     
