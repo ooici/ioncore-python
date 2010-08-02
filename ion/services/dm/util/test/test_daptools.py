@@ -17,6 +17,8 @@ import os
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
+from ion.data.test import test_dataobject
+
 import pydap
 import numpy
 
@@ -38,18 +40,18 @@ class DapToolsTest(unittest.TestCase):
         fnames = os.listdir(fullyqualifieddir)
         
         for fname in fnames:
-            if fname.rfind('.nc'):
+            filestem, ext = os.path.splitext(fname)
+            if ext == '.nc':
                 
                 fullyqualifiedfile = os.path.join(fullyqualifieddir,fname)
                 self.assertEqual(os.path.isfile(fullyqualifiedfile),True,'Bad file in data directory for tesing Dap Tools')
                 logging.info('FILES:'+fullyqualifiedfile)
                 
-                self._compare_inverse(fullyqualifiedfile)
+                #self._inverse_test_from_nc(fullyqualifiedfile)
+                self._inverse_test_from_dap(fullyqualifiedfile)
                 
-                
-    def _compare_inverse(self,fname):
-        
-        # Load a pydap dataset from a netcdf file
+
+    def _inverse_test_from_nc(self,fname):
         orig_dataset = dap_tools.read_netcdf_from_file(fname)
     
         # Create a DAP message object out of it
@@ -58,46 +60,75 @@ class DapToolsTest(unittest.TestCase):
         # Unpack the dataset from the message object
         unpacked_dataset = dap_tools.dap_msg2ds(msg_obj)
         
+        self._comparison_test(unpacked_dataset, orig_dataset)
+                
+                
+    def _inverse_test_from_dap(self,fname):
+        
+        # Load a pydap dataset from a netcdf file
+        orig_msg = dap_tools.read_msg_from_dap_files(fname)
+    
+        orig_dataset = dap_tools.dap_msg2ds(orig_msg)
+        
+        # Create a DAP message object out of it
+        msg_obj = dap_tools.ds2dap_msg(orig_dataset)
+                
+        # Unpack the dataset from the message object
+        unpacked_dataset = dap_tools.dap_msg2ds(msg_obj)
+        
+        self._comparison_test(unpacked_dataset, orig_dataset)
+        
+        
+    def _comparison_test(self,ds1,ds2):
                 
         # Test for equality of the attributes
-        for key, value in unpacked_dataset.attributes.items():
+        for key, value in ds1.attributes.items():
             
-            logging.debug('Global Attribute: %s, types %s, %s' % (key, type(value), type(orig_dataset.attributes[key])) ) 
+            logging.debug('Global Attribute: %s, types %s, %s' % (key, type(value), type(ds2.attributes[key])) ) 
             
             if isinstance(value,numpy.ndarray):
-                barray = value == orig_dataset.attributes[key]
+                barray = value == ds2.attributes[key]
                 self.assert_(barray.all(),'Global array type attribute is not equal')
             else:
-                self.assertEqual(value, orig_dataset.attributes[key])
+                self.assertEqual(value, ds2.attributes[key])
         
         
         # Test for equality of the variables
-        for key,value in unpacked_dataset.items():
+        for key,value in ds1.items():
 
-            logging.debug('Variable: %s, types %s, %s' % (key, type(value), type(orig_dataset[key])) )           
+            logging.debug('Variable: %s, types %s, %s' % (key, type(value), type(ds2[key])) )           
             
             if isinstance(value, pydap.model.BaseType):
-
-                self.assertEqual(unpacked_dataset[key].data.var,unpacked_dataset[key].data.var)
+                barray =  value.data == ds2[key].data
+                self.assert_(barray.all(), 'Variable %s array content is not equal!' % key)
 
             elif isinstance(value, pydap.model.GridType):
-                self.assertEqual(unpacked_dataset[key].array.data.var,unpacked_dataset[key].array.data.var)
-            else:                
-                self.assertEqual(unpacked_dataset[key],orig_dataset[key])
-            
-            
-            
-            for attkey, attvalue in unpacked_dataset[key].attributes.items():
                 
-                    logging.debug('Variable Att: %s, types %s, %s' % (attkey, type(attvalue), type(orig_dataset[key].attributes[attkey])) )
+                if key == 'atmp':
+                    print value.array.data
+                    print ds2[key].array.data[:]
+                barray =  value.array.data == ds2[key].array.data
+                self.assert_(barray.all(),'Variable %s array content is not equal!' % key)
+            else:
+                # Structure comparison not implemented yet!
+                self.assertEqual(False,ds2[key],'Not set up to handle structures yet')
+            
+            for attkey, attvalue in ds1[key].attributes.items():
+                
+                    logging.debug('Variable Att: %s, types %s, %s' % (attkey, type(attvalue), type(ds2[key].attributes[attkey])) )
 
                     if isinstance(attvalue,(numpy.ndarray, list)):
-                        barray = attvalue == orig_dataset[key].attributes[attkey]
-                        self.assert_(barray.all(),'Variable array attribute are not equal')
+                        barray = attvalue == ds2[key].attributes[attkey]
+                        if hasattr(barray,'all'):
+                            barray = barray.all()
+                        self.assert_(barray,'Variable array attribute are not equal')
+                    elif isinstance(attvalue, (str,bool)):
+                        self.assertEqual(attvalue, ds2[key].attributes[attkey])
+
                     else:
-                        self.assertEqual(attvalue, orig_dataset[key].attributes[attkey])
+                        self.assertAlmostEqual(attvalue, ds2[key].attributes[attkey])
                 
                     
-        
+    
 
         
