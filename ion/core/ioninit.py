@@ -14,7 +14,8 @@ import re
 from ion.core import ionconst as ic
 from ion.util.config import Config
 
-print "ION (Integrated Observatory Network) packages initializing ("+ic.VERSION+")"
+print "ION (Integrated Observatory Network) packages initializing (ion %s, magnet %s)" % \
+        (ic.VERSION, magnet.__version__)
 
 # Configure logging system (console, logfile, other loggers)
 logging.config.fileConfig(ic.LOGCONF_FILENAME)
@@ -50,7 +51,8 @@ def check_magnet_version():
     mv = magnet.__version__.split('.')
     mv[2] = mv[2].partition('+')[0]
     if mv[0]<minmv[0] or mv[1]<minmv[1] or mv[2]<minmv[2]:
-        logging.error("*********** ATTENTION! Magnet %s required. Is %s ***********" % (ic.MIN_MAGNET, magnet.__version__))
+        logging.error("*********** ATTENTION! Magnet %s required. Is %s ***********" %
+                      (ic.MIN_MAGNET, magnet.__version__))
 
 check_magnet_version()
 
