@@ -14,6 +14,7 @@ import base64
 import StringIO
 
 import os
+import warnings
 
 from ion.resources import dm_resource_descriptions
 
@@ -29,7 +30,12 @@ def ds2dap_msg(pydap_dataset,headeronly=False):
     msg.das = das_output[0]
     msg.dds = dds_output[0]
     if not headeronly:
-        dods = dap_gen(pydap_dataset)
+        
+        # Catch depricated warnings!
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore",category=DeprecationWarning)
+            dods = dap_gen(pydap_dataset)
+
         msg.dods = base64.b64encode(dods)
         #msg.dods = dods    
     return (msg)
