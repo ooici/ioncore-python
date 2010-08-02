@@ -18,6 +18,7 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
 import pydap
+import numpy
 
 class DapToolsTest(unittest.TestCase):
     """
@@ -41,36 +42,40 @@ class DapToolsTest(unittest.TestCase):
                 
                 fullyqualifiedfile = os.path.join(fullyqualifieddir,fname)
                 self.assertEqual(os.path.isfile(fullyqualifiedfile),True,'Bad file in data directory for tesing Dap Tools')
-                print 'FILES:',fullyqualifiedfile
+                logging.info('FILES:'+fullyqualifiedfile)
                 
                 self._compare_inverse(fullyqualifiedfile)
                 
                 
     def _compare_inverse(self,fname):
         
+        # Load a pydap dataset from a netcdf file
         orig_dataset = dap_tools.read_netcdf_from_file(fname)
     
-        msg_content = dap_tools.ds2dap_msg(orig_dataset)
-        
-        #print msg_content.keys()
-        
-        
-        unpacked_dataset = dap_tools.dap_msg2ds(msg_content)
-        
-        #unpacked_dataset.attributes['NC_GLOBAL']['ooi-source-url'] = 'STRING!'
+        # Create a DAP message object out of it
+        msg_obj = dap_tools.ds2dap_msg(orig_dataset)
                 
+        # Unpack the dataset from the message object
+        unpacked_dataset = dap_tools.dap_msg2ds(msg_obj)
+        
+                
+        # Test for equality of the attributes
+        for key, value in unpacked_dataset.attributes.items():
             
-        for key, value in unpacked_dataset.attributes.items():            
-            self.assertEqual(value, orig_dataset.attributes[key])
+            logging.debug('Global Attribute: %s, types %s, %s' % (key, type(value), type(orig_dataset.attributes[key])) ) 
+            
+            if isinstance(value,numpy.ndarray):
+                barray = value == orig_dataset.attributes[key]
+                self.assert_(barray.all(),'Global array type attribute is not equal')
+            else:
+                self.assertEqual(value, orig_dataset.attributes[key])
         
         
+        # Test for equality of the variables
         for key,value in unpacked_dataset.items():
+
+            logging.debug('Variable: %s, types %s, %s' % (key, type(value), type(orig_dataset[key])) )           
             
-            logging.info('Comparing values for variable:' +key)           
-            
-            for attkey, attvalue in unpacked_dataset[key].attributes.items():
-                    self.assertEqual(attvalue, orig_dataset[key].attributes[attkey])
-        
             if isinstance(value, pydap.model.BaseType):
 
                 self.assertEqual(unpacked_dataset[key].data.var,unpacked_dataset[key].data.var)
@@ -79,11 +84,20 @@ class DapToolsTest(unittest.TestCase):
                 self.assertEqual(unpacked_dataset[key].array.data.var,unpacked_dataset[key].array.data.var)
             else:                
                 self.assertEqual(unpacked_dataset[key],orig_dataset[key])
-   
+            
+            
+            
+            for attkey, attvalue in unpacked_dataset[key].attributes.items():
+                
+                    logging.debug('Variable Att: %s, types %s, %s' % (attkey, type(attvalue), type(orig_dataset[key].attributes[attkey])) )
+
+                    if isinstance(attvalue,(numpy.ndarray, list)):
+                        barray = attvalue == orig_dataset[key].attributes[attkey]
+                        self.assert_(barray.all(),'Variable array attribute are not equal')
+                    else:
+                        self.assertEqual(attvalue, orig_dataset[key].attributes[attkey])
+                
+                    
         
-        print 'TESTING WRITE:'
-        
-        #dap_tools.write_dap_files_from_msg('testme',msg_content)
-        
-        
+
         
