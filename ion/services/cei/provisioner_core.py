@@ -113,6 +113,7 @@ class ProvisionerCore(object):
             dt = yield self.dtrs.lookup(deployable_type, dtrs_nodes)
             document = dt['document']
             dtrs_nodes = dt['nodes']
+            logging.debug('got dtrs nodes: ' + str(dtrs_nodes))
         except KeyError:
             logging.error('Failed to lookup deployable type "%s" in DTRS', 
                     deployable_type)
@@ -275,7 +276,8 @@ class ProvisionerCore(object):
         if sshkeyname:
             spec.keyname = sshkeyname
 
-        logging.debug('Launching group %s - %s nodes', spec.name, spec.count)
+        logging.debug('Launching group %s - %s nodes (keypair=%s)', 
+                spec.name, spec.count, spec.keyname)
         
         try:
             iaas_nodes = yield threads.deferToThread(

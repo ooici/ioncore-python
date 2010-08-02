@@ -66,7 +66,7 @@ class DeployableTypeRegistryService(BaseService):
             response_nodes[node_name] = {
                     'iaas_image' : site_node.get('image'),
                     'iaas_allocation' : site_node.get('allocation'),
-                    'iaas_sshkeypair' : site_node.get('sshkeypair'),
+                    'iaas_sshkeyname' : site_node.get('sshkeyname'),
                     }
 
         logging.debug('Sending DTRS response: ' + str(result))
