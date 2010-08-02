@@ -10,10 +10,10 @@ from pydap.parsers.dds import DDSParser
 from pydap.parsers.das import DASParser
 from pydap.xdr import DapUnpacker
 from pydap.responses import netcdf
-
+import base64
 import StringIO
 
-NULL_CHR = '\x00'
+from ion.resources import dm_resource_descriptions
 
 def ds2dap_msg(pydap_dataset,headeronly=False): 
     """
@@ -23,12 +23,12 @@ def ds2dap_msg(pydap_dataset,headeronly=False):
     das_output = DASResponse.serialize(pydap_dataset)
     #dods_output = DODSResponse.serialize(ds) 
     
-    msg ={}
-    msg['das'] = das_output[0]
-    msg['dds'] = dds_output[0]
+    msg=dm_resource_descriptions.DAPMessageObject()
+    msg.das = das_output[0]
+    msg.dds = dds_output[0]
     if not headeronly:
         dods = dap_gen(pydap_dataset)
-        msg['dods'] = dods
+        msg.dods = base64.b64encode(dods)
         #print 'DODS:',dods
     
     return (msg)
@@ -55,22 +55,23 @@ def dap_msg2ds(msg):
     """
     @Brief Convert dap encoded message content in a dictionary to a pydap dataset object.
     """
-    dataset = DDSParser(msg['dds']).parse()
+    dataset = DDSParser(msg.dds).parse()
     
-    dataset = DASParser(msg['das'], dataset).parse()
+    dataset = DASParser(msg.das, dataset).parse()
     
-    if msg.has_key('dods'):
+    if msg.dods:
         #dataset.data = DapUnpacker(msg['dods'], dataset).getvalue()
 
         # This block is from open_dods in client.py
         #dds, xdrdata = msg['dods'].split('\nData:\n', 1)
-        dataset.data = DapUnpacker(msg['dods'], dataset).getvalue()
+        dataset.data = DapUnpacker(base64.b64decode(msg.dods), dataset).getvalue()
         
         #data = DapUnpacker(msg['dods'], dataset)
         #print 'DapUnpacker Data:',data.__dict__.keys()
         
     return dataset
  
+"""
 
 def read_msg_from_dap_files(filename):
     dds_file = open(".".join((filename, "dds"))) 
@@ -100,12 +101,12 @@ def write_dap_files_from_msg(filename,msg):
         dods_file.write(line)
     dods_file.close()    
     return 0
-
+"""
 
 def write_netcdf_from_dataset(filename, dataset):
     netcdf.save(dataset, ".".join((filename, "nc")))
     return 0
- 
+
 def read_netcdf_from_file(filename): 
     h = Handler(filename)
     ds = h.parse_constraints({'pydap.ce':(None,None)})

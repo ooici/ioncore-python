@@ -83,7 +83,7 @@ class DapToolsTest(unittest.TestCase):
         
         print 'TESTING WRITE:'
         
-        dap_tools.write_dap_files_from_msg('testme',msg_content)
+        #dap_tools.write_dap_files_from_msg('testme',msg_content)
         
         
         
