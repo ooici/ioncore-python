@@ -95,7 +95,7 @@ class ProvisionerCore(object):
 
         #validate nodes and build DTRS request
         dtrs_nodes = {}
-        for node_name, node in nodes:
+        for node_name, node in nodes.iteritems():
             try:
                 dtrs_nodes[node_name] = {
                         'count' : len(node['ids']),
@@ -224,14 +224,13 @@ class ProvisionerCore(object):
         launch_pairs = self._validate_launch_groups(launch_groups, specs)
 
         #launch_pairs is a list of (spec, node list) tuples
-        for launch in launch_pairs:
-            launch_spec, launch_nodes = launch 
+        for launch_spec, launch_nodes in launch_pairs:
             newstate = None
             try:
-                self._launch_one_group(launch_spec, launch_nodes, cluster)
+                yield self._launch_one_group(launch_spec, launch_nodes, cluster)
             
             except Exception,e:
-                logging.error('Problem launching group %s: %s', 
+                logging.exception('Problem launching group %s: %s', 
                         launch_spec.name, str(e))
                 newstate = states.FAILED
                 # should we have a backout of earlier groups here? or just leave it up
@@ -256,6 +255,7 @@ class ProvisionerCore(object):
             pairs.append((spec, group))
         return pairs
 
+    @defer.inlineCallbacks
     def _launch_one_group(self, spec, nodes, cluster):
         """Launches a single group: a single IaaS request.
         """
@@ -275,13 +275,13 @@ class ProvisionerCore(object):
         if sshkeyname:
             spec.keyname = sshkeyname
 
-        logging.info('Launching group %s - %s nodes', spec.name, spec.count)
+        logging.debug('Launching group %s - %s nodes', spec.name, spec.count)
         
         try:
             iaas_nodes = yield threads.deferToThread(
                     self.cluster_driver.launch_node_spec, spec, driver)
         except Exception, e:
-            logging.error('Error launching nodes: ' + str(e))
+            logging.exception('Error launching nodes: ' + str(e))
             # wrap this up?
             raise
         
