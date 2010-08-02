@@ -68,14 +68,14 @@ class DapToolsTest(unittest.TestCase):
             
             logging.info('Comparing values for variable:' +key)           
             
+            for attkey, attvalue in unpacked_dataset[key].attributes.items():
+                    self.assertEqual(attvalue, orig_dataset[key].attributes[attkey])
         
             if isinstance(value, pydap.model.BaseType):
-                self.assertEqual(unpacked_dataset[key].attributes,orig_dataset[key].attributes)
+
                 self.assertEqual(unpacked_dataset[key].data.var,unpacked_dataset[key].data.var)
 
             elif isinstance(value, pydap.model.GridType):
-                #self.assertEqual(unpacked_dataset[key].data,orig_dataset[key].data)
-                self.assertEqual(unpacked_dataset[key].attributes,orig_dataset[key].attributes)
                 self.assertEqual(unpacked_dataset[key].array.data.var,unpacked_dataset[key].array.data.var)
             else:                
                 self.assertEqual(unpacked_dataset[key],orig_dataset[key])
