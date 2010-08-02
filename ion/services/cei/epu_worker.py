@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import time
 import logging
 from twisted.internet import defer
 from magnet.spawnable import Receiver
@@ -16,8 +17,8 @@ class EPUWorkerService(BaseService):
 
     @defer.inlineCallbacks
     def op_work(self, content, headers, msg):
-        logging.info("doing work  content:"+str(content))
-        # time.spleep(content['work'])
+        logging.info("EPUWorkerService ---doing work--- content:"+str(content))
+        time.sleep(content['work_amount'])
         yield self.reply(msg, 'result', {'result':'work_complete'}, {})        
  
 
