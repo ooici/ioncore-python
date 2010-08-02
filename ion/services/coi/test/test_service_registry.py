@@ -40,7 +40,7 @@ class ServiceRegistryTest(IonTestCase):
     def test_service_reg(self):
         
         # Register a service class object
-        play_desc = yield self.src.register_service_defintion(hello_service.HelloService)
+        play_desc = yield self.src.register_service_definition(hello_service.HelloService)
         
         # create a reference to the description in the registry
         ref = play_desc.reference()

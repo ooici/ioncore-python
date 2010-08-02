@@ -503,7 +503,9 @@ class LCState(object):
         return self._state
 
     def __eq__(self, other):
-        assert isinstance(other, LCState)
+        if ((other == None) or (other == False)
+            or (not isinstance(other, LCState))):
+            return (False)
         return str(self) == str(other)
 
 LCStates = dict([('LCState', LCState)] + [(name, LCState(name)) for name in LCStateNames])

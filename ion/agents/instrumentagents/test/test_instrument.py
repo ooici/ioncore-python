@@ -48,7 +48,7 @@ class TestInstrumentAgent(IonTestCase):
         #self.rrc = ResourceRegistryClient(proc=self.sup)
         #self.rrc = ResourceRegistryClient(target=self.sup.get_scoped_name('global', self.res_reg_id))
         
-        yield self.IAClient.set_resource_registry_client(str(self.res_reg_id))
+        yield self.IAClient.set_registry_client(str(self.res_reg_id))
 
 
     @defer.inlineCallbacks
@@ -105,12 +105,7 @@ class TestInstrumentAgent(IonTestCase):
         Tests the ability of an instrument agent to successfully register
         ifself with the resource registry.
         """
-        # Setup a registry client that ties to the same place and query for it
-        # ...problem is we need the id that it registered with
-        #rid = yield self.IAClient.get(resource_id)
-        #rd3 = yield self.rrc.get_resource(rid)
-        raise unittest.SkipTest('Needs a working registration plan')
-
+        raise unittest.SkipTest('Needs instrument-specific registration')
         
         
     @defer.inlineCallbacks
@@ -118,7 +113,7 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test the resource lifecycle management
         """
-        raise unittest.SkipTest('Still needs resource registry integration')
+        raise unittest.SkipTest('Still needs instrument-specific agent registry integration')
         """
         response = yield self.IAClient.set_lifecycle_state(LCS.inactive)
         self.assertEqual(response, LCS.inactive)
