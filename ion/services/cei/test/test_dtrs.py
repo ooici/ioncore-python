@@ -42,7 +42,7 @@ class TestDeployableTypeRegistryService(IonTestCase):
 
         client = DeployableTypeRegistryClient(pid=dtrsId)
         nodes = {
-            'head-node' : {'site' : 'ec2-west'},
+            'head-node' : {'site' : 'nimbus-test'},
             'worker-node' : {'site' : 'nimbus-test'}}
 
         result = yield client.lookup('base-cluster', nodes=nodes)
@@ -54,6 +54,14 @@ class TestDeployableTypeRegistryService(IonTestCase):
         got_error = False
         try:
             yield client.lookup('this-image-doesnt-exist', nodes)
+        except KeyError:
+            got_error = True
+        self.assertTrue(got_error)
+
+        nodes['head-node']['site'] = 'this-site-doesnt-exist'
+        got_error = False
+        try:
+            yield client.lookup('base-cluster', nodes)
         except KeyError:
             got_error = True
         

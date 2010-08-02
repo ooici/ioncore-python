@@ -45,13 +45,29 @@ class DeployableTypeRegistryService(BaseService):
             logging.error('Invalid deployable type specified: ' + dtId)
             return self.reply_err(msg)
         
-        result = {'document' : dt['document'], 'nodes' : nodes}
+        response_nodes = {}
+        result = {'document' : dt['document'], 'nodes' : response_nodes}
         sites = dt['sites']
 
         for node_name, node in nodes.iteritems():
-            node_site = node['site']
-            image = sites[node_site][node_name]['image']
-            node['iaas_image'] = image
+
+            try:
+                node_site = node['site']
+            except KeyError:
+                logging.error('Node request missing site: ' + node_name)
+                return self.reply_err(msg)
+                
+            try:
+                site_node = sites[node_site][node_name]
+            except KeyError:
+                logging.error('Invalid deployable type site specified: ' + node_site)
+                return self.reply_err(msg)
+
+            response_nodes[node_name] = {
+                    'iaas_image' : site_node.get('image'),
+                    'iaas_allocation' : site_node.get('allocation'),
+                    'iaas_sshkeypair' : site_node.get('sshkeypair'),
+                    }
 
         logging.debug('Sending DTRS response: ' + str(result))
 
