@@ -531,9 +531,15 @@ class Resource(ResourceReference):
     @note could build in explicit link back to ResourceRegistryClient so
     user can make changes through this object.
     """
-    
-
     name = TypedAttribute(str)
+    lifecycle = TypedAttribute(LCState, default=LCStates.new)
+
+    def set_lifecyclestate(self, state):
+        self.lifecycle = state
+
+    def get_lifecyclestate(self):
+        return self.lifecycle
+
 
 DataObject._types['Resource']=Resource
 
@@ -549,14 +555,6 @@ class StatefulResource(Resource):
     """
     @brief Base for all OOI Stateful resource objects
     """
-    lifecycle = TypedAttribute(LCState, default=LCStates.new)
-
-    def set_lifecyclestate(self, state):
-        self.lifecycle = state
-
-    def get_lifecyclestate(self):
-        return self.lifecycle
-
     
 DataObject._types['StatefulResource']=StatefulResource
 
