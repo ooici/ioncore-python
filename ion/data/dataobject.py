@@ -568,6 +568,47 @@ class SimpleTest(DataObject):
     field = TypedAttribute(str)
     name = TypedAttribute(str)
 
+class IEncoder(object):
+    """
+    @brief DataObject Encoder/Decoder interface definition.
+    @note This is a loose place-holder. IEncoder encapsulates both encoding
+    and decoding.
+    """
+
+    def encode(o):
+        """
+        @param o instance of subclass of DataObject (or object form allowed
+        TypedAttribute)
+        @retval data of serialized DataObject.
+        """
+
+    def decode(self, data):
+        """
+        @param data 'encoded' DataObject
+        @retval DataObject instance. 
+        """
+
+
+class AlphaEncoder(object):
+    """
+    This calls the encode/decode methods of the original prototype
+    DataObject. It provides the 'Encoder' interface and is used by the
+    uniform serialization mechanism.
+    """
+
+    def encode(self, o):
+        """
+        @param o instance of subclass of DataObject
+        """
+        assert issubclass(type(o), DataObject)
+        return o.encode()
+
+    def decode(self, data):
+        """
+        @param data 'encoded' DataObject
+        """
+        return Resource.decode(data)
+
 class DEncoder(object):
     """Encode a DataObject into a JSON encodable dict structure.
     """
@@ -682,11 +723,96 @@ class DEncoder(object):
         return self._type_decoders[odict['type']](odict)
 
 
+class JSONDEncoder(object):
+
+    def __init__(self):
+        self._dencoder = DEncoder()
+
+    def encode(self, o):
+        return json.dumps(o, default=self._dencoder.encode)
+
+    def decode(self, data):
+        odict = json.loads(data)
+        return self._dencoder.decode(odict)
+
+class Serializer(object):
+    """
+    @brief Registry of DataObject Encoders and uniform interface for
+    encoding/decoding a DataObject.
+    @note Aug 3, 2010 - DataObjects still implement their own [partial]
+    encoding. We are incrementally moving towards a full serialization of a
+    DataObject that makes sense with both how data objects are stored and
+    how they are messaged and without making language specific
+    assumptions/implementation features.
+    """
+
+    def __init__(self):
+        self._encoders = {}
+        self._decoders = {}
+        self._default_encode = None
+        self._default_content_type = None
+        self._default_content_encoding = None
+
+    def register(self, name, encoder, decoder, content_type, content_encoding):
+        """
+        """
+        self._encoders[name] = (content_type, content_encoding, encoder)
+        self._decoders[content_type] = decoder
+
+    def _set_default(self, name):
+        (self._default_content_type, self._default_content_encoding,
+            self._default_encode) = self._encoders[name]
 
 
-"""
-Instead of TypedAttribute, have explicit classes for each type of field.
-"""
+    def encode(self, o, serializer=None):
+        """
+        Serialize data object
+        """
+        if serializer:
+            (content_type, content_encoding, encoder) = self._encoders[serializer]
+        else:
+            encoder = self._default_encode
+            content_type = self._default_content_type
+            content_encoding = self._default_content_encoding
+        data = encoder(o)
+        return content_type, content_encoding, data
+
+
+    def decode(self, data, content_type, content_encoding):
+        """
+        @note assume encoding is always binary, for now.
+        @todo See what we learn from java for content_encoding
+        """
+        try:
+            decoder = self._decoders[content_type]
+        except KeyError:
+            return data
+        return decoder(data)
+
+serializer = Serializer()
+
+def register_alpha():
+    alpha = AlphaEncoder()
+    serializer.register('alpha', alpha.encode, alpha.decode, 
+            content_type='application/ion-dataobject',
+            content_encoding='binary')
+
+def register_jsond():
+    jd = JSONDEncoder()
+    serializer.register('jsond', jd.encode, jd.decode,
+        content_type='application/ion-jsond',
+        content_encoding='utf-8')
+
+register_alpha()
+register_jsond()
+serializer._set_default('alpha')
+
+
+
+
+
+
+
 
 
 
