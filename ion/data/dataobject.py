@@ -688,7 +688,8 @@ class DEncoder(object):
         for name, vdict in fields.iteritems():
             val = self.decode(vdict)
             __dict[name] = TypedAttribute(type(val), val)
-        o = type(cls, (DataObject,), __dict)()
+        #o = type(cls, (DataObject,), __dict)()
+        o = type(cls, (Resource,), __dict)()
         return o
 
     def decode_lcstate(self, odict):
@@ -778,7 +779,7 @@ class Serializer(object):
         return content_type, content_encoding, data
 
 
-    def decode(self, data, content_type, content_encoding):
+    def decode(self, data, content_type, content_encoding=None):
         """
         @note assume encoding is always binary, for now.
         @todo See what we learn from java for content_encoding
@@ -805,7 +806,7 @@ def register_jsond():
 
 register_alpha()
 register_jsond()
-serializer._set_default('alpha')
+serializer._set_default('jsond')
 
 
 

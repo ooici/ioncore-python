@@ -51,6 +51,9 @@ class RegistryTest(unittest.TestCase):
         
         #print 'Dataobject Registerd!',dataobject.DataObject._types.has_key('__builtins__')
         
+        #res.reference is a DataObject function. DataObject can't specify
+        #functions, only data; this does not work with with DEncoder and
+        #would not work with a object description language
         ref = res.reference()
         res2 = yield self.reg.get_resource(ref)
         self.failUnless(res == res2)
