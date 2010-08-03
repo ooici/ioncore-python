@@ -12,7 +12,7 @@ logging = logging.getLogger(__name__)
 
 from twisted.trial import unittest
 
-from ion.services.dm.url_manipulation import base_dap_url, generate_filename, rewrite_url
+from ion.services.dm.util.url_manipulation import base_dap_url, generate_filename, rewrite_url
 from ion.core import ioninit
 
 class BaseUrlTester(unittest.TestCase):
@@ -23,7 +23,7 @@ class BaseUrlTester(unittest.TestCase):
         pass
 
     def test_config_file(self):
-        cfg =  ioninit.config('ion.services.dm.url_manipulation')
+        cfg =  ioninit.config('ion.services.dm.util.url_manipulation')
         ldir = cfg.getValue('local_dir', None)
         self.failUnless(len(ldir) > 0)
         cname = cfg.getValue('cache_hostname', None)
@@ -154,7 +154,7 @@ class FilenameTester(unittest.TestCase):
     Test filename generation, no communications necessary.
     """
     def setUp(self):
-        cfg =  ioninit.config('ion.services.dm.url_manipulation')
+        cfg =  ioninit.config('ion.services.dm.util.url_manipulation')
         self.prefix = cfg.getValue('local_dir', None)
 
     def test_most_basic(self):

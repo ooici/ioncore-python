@@ -106,7 +106,7 @@ class ServiceRegistryClient(registry.BaseRegistryClient):
         """
 
     @defer.inlineCallbacks
-    def register_service_defintion(self,service):
+    def register_service_definition(self,service):
         """
         Client method to register the Definition of a Service Class
         """
@@ -203,7 +203,7 @@ class ServiceRegistryClient(registry.BaseRegistryClient):
         
         service_class = getattr(service_instance.proc_mod_obj,service_instance.proc_class)
         
-        sd = yield self.register_service_defintion(service_class)
+        sd = yield self.register_service_definition(service_class)
         service_resource.description = sd.reference(head=True)
         
         

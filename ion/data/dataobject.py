@@ -141,7 +141,10 @@ class DataObject(object):
         """
         Compare dataobjects of the same class. All attributes must be equal.
         """
-        assert isinstance(other, DataObject)
+        #assert isinstance(other, DataObject)
+        if not isinstance(other, DataObject):
+            return False
+        
         # comparison of data objects which have different atts must not error out
         atts1 = set(self.attributes)
         atts2 = set(other.attributes)
@@ -159,7 +162,10 @@ class DataObject(object):
         See test case for intended applications
         
         """
-        assert isinstance(other, DataObject)
+        #assert isinstance(other, DataObject)
+        if not isinstance(other, DataObject):
+            return False
+
         # comparison of data objects which have different atts must not error out
         atts = set(other.attributes)
         #print 'SELF',self.get_attributes()
@@ -174,8 +180,10 @@ class DataObject(object):
         """
         Compares only attributes of self by default
         """
-        assert isinstance(other, DataObject)
-
+        #assert isinstance(other, DataObject)
+        if not isinstance(other, DataObject):
+            return False
+        
         atts=None
         if not attnames:
             atts = self.attributes
@@ -301,7 +309,11 @@ class DataObject(object):
 
 
     @property
+        
     def attributes(self):
+        """
+        @bug It would be nice if the attributes function only returned the set of keys for attributes that were defined within the object, rather than all attributes (even the ones relating to the underlying registry)
+        """
         names = []
         for key in self.__dict__:
             names.append(key[1:])
@@ -423,22 +435,33 @@ class ResourceReference(DataObject):
             self.RegistryBranch = RegistryBranch
 
     @classmethod
-    def create_new_resource(cls):
+    def create_new_resource(cls, id='', branch='master'):
         """
         @Brief Use this method to instantiate any new resource with a unique id!
         """
         inst = cls()
-        inst.RegistryIdentity = create_unique_identity()
-        inst.RegistryBranch = 'master'
+
+        
+        if id:
+            inst.RegistryIdentity = id
+        else:
+            inst.RegistryIdentity = create_unique_identity()
+
+        inst.RegistryBranch = branch
         return inst
     
-    def create_new_reference(self):
+    def create_new_reference(self, id='', branch='master', commit=''):
         """
         @Brief Create or overwrite the reference identity for this resource
         """
-        self.RegistryIdentity = create_unique_identity()
+        if id:
+            self.RegistryIdentity = id
+        else:
+            self.RegistryIdentity = create_unique_identity()
+
         self.RegistryBranch = 'master'
-        self.RegistryCommit = ''
+
+        self.RegistryCommit = commit        
         return self
     
     def reference(self,head=False):
@@ -480,7 +503,9 @@ class LCState(object):
         return self._state
 
     def __eq__(self, other):
-        assert isinstance(other, LCState)
+        if ((other == None) or (other == False)
+            or (not isinstance(other, LCState))):
+            return (False)
         return str(self) == str(other)
 
 LCStates = dict([('LCState', LCState)] + [(name, LCState(name)) for name in LCStateNames])

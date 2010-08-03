@@ -15,6 +15,8 @@ from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
 from ion.services.dm.ingest import IngestClient, IngestService
+
+#from ion.services.dm.ingest import IngestClient, IngestService
 from ion.services.sa.fetcher import FetcherService
 
 class IngesterTester(IonTestCase):
