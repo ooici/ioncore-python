@@ -86,7 +86,7 @@ class RegistryTest(unittest.TestCase):
         raise unittest.SkipTest('Not implimented yet!')
 
 
-    def test_set_lcastate(self):
+    def test_set_lcstate(self):
         res = dataobject.Resource.create_new_resource()
         res.name = 'foo'
         res = yield self.reg.register_resource(res)

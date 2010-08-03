@@ -9,19 +9,15 @@
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
-from magnet.spawnable import Receiver
 
 import inspect
 
-from ion.core import base_process
-import ion.util.procutils as pu
+from ion.core.base_process import BaseProcess
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
-
 from ion.data.datastore import registry
 from ion.data import dataobject
-from ion.data import store
 
 from ion.resources import coi_resource_descriptions
 
@@ -106,7 +102,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         """
 
     @defer.inlineCallbacks
-    def register_agent_defintion(self,agent):
+    def register_agent_definition(self,agent):
         """
         Client method to register the Definition of a Agent Class
         """
@@ -133,14 +129,14 @@ class AgentRegistryClient(registry.BaseRegistryClient):
      
     def describe_agent(self,agent_class):
         
-        assert issubclass(agent_class, BaseService)
+        assert issubclass(agent_class, BaseProcess)
 
         # Do not make a new resource idenity - this is a generic method which
         # is also used to look for an existing description
         agent_description = coi_resource_descriptions.AgentDescription()
 
-        agent_description.name = agent_class.declare['name']
-        agent_description.version = agent_class.declare['version']
+        #agent_description.name = agent_class.declare['name']
+        #agent_description.version = agent_class.declare['version']
         
         agent_description.class_name = agent_class.__name__
         agent_description.module = agent_class.__module__
@@ -174,7 +170,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         """
         if isinstance(agent, coi_resource_descriptions.AgentInstance):
             agent_resource = agent
-            assert resource_description.RegistryIdentity, 'Agent Resource must have a registry Identity'            
+            assert agent_resource.RegistryIdentity, 'Agent Resource must have a registry Identity'            
         else:
             agent_instance = agent
             # Build a new description of this agent instance
@@ -194,35 +190,34 @@ class AgentRegistryClient(registry.BaseRegistryClient):
     @defer.inlineCallbacks
     def describe_instance(self,agent_instance):
         """
-        @param agent_instance is actually a ProcessDesc object!
+        @param agent_instance should be of type ResourceAgent
         """
-        
         # Do not make a new resource idenity - this is a generic method which
         # is also used to look for an existing description
         agent_resource = coi_resource_descriptions.AgentInstance()
         
-        agent_class = getattr(agent_instance.proc_mod_obj,agent_instance.proc_class)
+        agent_class = agent_instance.__class__
         
-        sd = yield self.register_agent_defintion(agent_class)
+        sd = yield self.register_agent_definition(agent_class)
         agent_resource.description = sd.reference(head=True)
         
-        
-        if agent_instance.proc_node:
-            agent_resource.proc_node = agent_instance.proc_node
-        agent_resource.proc_id = agent_instance.proc_id
-        agent_resource.proc_name = agent_instance.proc_name
+        #if agent_instance.id:
+        #    agent_resource.process_id = agent_instance.id
+        if agent_instance.proc_name:
+            agent_resource.proc_name = agent_instance.proc_name
         if agent_instance.spawn_args:
             agent_resource.spawn_args = agent_instance.spawn_args
-        agent_resource.proc_state = agent_instance.proc_state
-
+        if agent_instance.proc_state:    
+            agent_resource.process_state = agent_instance.proc_state
+       
         # add a reference to the supervisor - can't base process does not have the same fields as ProcessDesc
         #if agent_resource.sup_process:
         #    print agent_instance.sup_process.__dict__
         #    sr = yield self.register_agent_instance(agent_instance.sup_process)
         #    agent_resource.sup_process = sr.reference(head=True)
-            
-        # Not sure what to do with name?
-        agent_resource.name=agent_instance.proc_module
+ 
+        if agent_instance.name:
+            agent_resource.name = agent_instance.name
         
         defer.returnValue(agent_resource)
 
@@ -233,7 +228,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         return self.base_get_resource('get_agent_instance',agent_reference)
 
     def set_agent_lcstate(self, agent_reference, lcstate):
-        return self.base_set_agent_lcstate('set_agent_lcstate',agent_reference, lcstate)
+        return self.base_set_resource_lcstate('set_agent_lcstate',agent_reference, lcstate)
 
     def set_agent_lcstate_new(self, agent_reference):
         return self.set_agent_lcstate(agent_reference, dataobject.LCStates.new)
@@ -255,7 +250,6 @@ class AgentRegistryClient(registry.BaseRegistryClient):
 
     def set_agent_lcstate_commissioned(self, agent_reference):
         return self.set_agent_lcstate(agent_reference, dataobject.LCStates.commissioned)
-
 
     @defer.inlineCallbacks
     def find_registered_agent_definition_from_agent(self, agent_class):

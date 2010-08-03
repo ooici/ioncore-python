@@ -283,14 +283,16 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Register a resource instance with the registry.
         """
-        logging.info('msg headers:'+ str(headers))
+        logging.debug('Registry Service MSG:'+ str(headers))
         resource = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Resource: \n' + str(resource))
   
         resource = yield self.reg.register_resource(resource)
         if resource:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
             yield self.reply_ok(msg, resource.encode())
         else:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
 
 
@@ -299,14 +301,17 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Get a resource instance.
         """
+        logging.debug('Registry Service MSG:'+ str(headers))
         resource_reference = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
 
         resource = yield self.reg.get_resource(resource_reference)
-        logging.info('Got Resource:\n'+str(resource))
+        #logging.info('Got Resource:\n'+str(resource))
         if resource:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
             yield self.reply_ok(msg, resource.encode())
         else:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
 
         
@@ -315,6 +320,7 @@ class BaseRegistryService(BaseService):
         """
         Service operation: set the life cycle state of resource
         """
+        logging.debug('Registry Service MSG:'+ str(headers))
         container = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
 
@@ -325,9 +331,11 @@ class BaseRegistryService(BaseService):
             resource = yield self.reg.set_resource_lcstate(resource_reference, lcstate)
         
             if resource:
+                logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
                 yield self.reply_ok(msg, resource.reference().encode())
 
         else:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
 
     @defer.inlineCallbacks
@@ -341,6 +349,7 @@ class BaseRegistryService(BaseService):
         ignore_defaults = None
         attnames=[]
                 
+        logging.debug('Registry Service MSG:'+ str(headers))
         container = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
 
@@ -355,7 +364,8 @@ class BaseRegistryService(BaseService):
         
         results=coi_resource_descriptions.ResourceListContainer()
         results.resources = result_list
-        
+
+        logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
         yield self.reply_ok(msg, results.encode())
 
 
@@ -406,17 +416,23 @@ class BaseRegistryClient(BaseServiceClient):
         over ride this behavior to create the resource inside the register method
         """
         yield self._check_init()
+        logging.info(self.__class__.__name__ + '; Calling:'+ op_name)
+        
         assert isinstance(resource, dataobject.Resource), 'Invalid argument to base_register_resource'
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
 
 
         (content, headers, msg) = yield self.rpc_send(op_name,
                                             resource.encode())
-        logging.info('Service reply: '+str(headers))
+        
+        logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
+        
         if content['status']=='OK':
             resource = dataobject.Resource.decode(content['value'])
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
             defer.returnValue(resource)
         else:
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
             defer.returnValue(None)
 
     @defer.inlineCallbacks
@@ -428,16 +444,22 @@ class BaseRegistryClient(BaseServiceClient):
         version of an object in the registry.
         """
         yield self._check_init()
+        logging.info(self.__class__.__name__ + '; Calling:'+ op_name)
+        
         assert isinstance(resource_reference, dataobject.ResourceReference), 'Invalid argument to base_register_resource'
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
+        
         (content, headers, msg) = yield self.rpc_send(op_name,
                                                       resource_reference.encode())
-        logging.info('Service reply: '+str(headers))
+        
+        logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
         if content['status']=='OK':
             resource = dataobject.Resource.decode(content['value'])
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
             defer.returnValue(resource)
         else:
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
             defer.returnValue(None)
 
 
@@ -452,6 +474,7 @@ class BaseRegistryClient(BaseServiceClient):
         behavior. 
         """
         yield self._check_init()
+        logging.info(self.__class__.__name__ + '; Calling:'+ op_name)
         
         assert isinstance(resource_reference, dataobject.ResourceReference), 'Invalid argument to base_register_resource'
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
@@ -464,12 +487,15 @@ class BaseRegistryClient(BaseServiceClient):
 
         (content, headers, msg) = yield self.rpc_send(op_name,
                                                       container.encode())
-        logging.info('Service reply: '+str(headers))
+
+        logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
         
         if content['status'] == 'OK':
             resource_reference = dataobject.ResourceReference.decode(content['value'])
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
             defer.returnValue(resource_reference)
         else:
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
             defer.returnValue(None)
 
 
@@ -487,6 +513,7 @@ class BaseRegistryClient(BaseServiceClient):
         match to select a resource
         """
         yield self._check_init()
+        logging.info(self.__class__.__name__ + '; Calling:'+ op_name)
     
         assert isinstance(description, dataobject.DataObject), 'Invalid argument to base_register_resource'
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
@@ -502,13 +529,16 @@ class BaseRegistryClient(BaseServiceClient):
         container.attnames = attnames
         
         (content, headers, msg) = yield self.rpc_send(op_name,container.encode())
-        logging.info('Service reply: '+str(headers))
+
+        logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
         
         # Return a list of resources
         if content['status'] == 'OK':            
             results = dataobject.DataObject.decode(content['value'])
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
             defer.returnValue(results.resources)
         else:
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
             defer.returnValue([])
 
 

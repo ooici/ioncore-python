@@ -435,22 +435,33 @@ class ResourceReference(DataObject):
             self.RegistryBranch = RegistryBranch
 
     @classmethod
-    def create_new_resource(cls):
+    def create_new_resource(cls, id='', branch='master'):
         """
         @Brief Use this method to instantiate any new resource with a unique id!
         """
         inst = cls()
-        inst.RegistryIdentity = create_unique_identity()
-        inst.RegistryBranch = 'master'
+
+        
+        if id:
+            inst.RegistryIdentity = id
+        else:
+            inst.RegistryIdentity = create_unique_identity()
+
+        inst.RegistryBranch = branch
         return inst
     
-    def create_new_reference(self):
+    def create_new_reference(self, id='', branch='master', commit=''):
         """
         @Brief Create or overwrite the reference identity for this resource
         """
-        self.RegistryIdentity = create_unique_identity()
+        if id:
+            self.RegistryIdentity = id
+        else:
+            self.RegistryIdentity = create_unique_identity()
+
         self.RegistryBranch = 'master'
-        self.RegistryCommit = ''
+
+        self.RegistryCommit = commit        
         return self
     
     def reference(self,head=False):
@@ -492,7 +503,9 @@ class LCState(object):
         return self._state
 
     def __eq__(self, other):
-        assert isinstance(other, LCState)
+        if ((other == None) or (other == False)
+            or (not isinstance(other, LCState))):
+            return (False)
         return str(self) == str(other)
 
 LCStates = dict([('LCState', LCState)] + [(name, LCState(name)) for name in LCStateNames])
@@ -518,9 +531,15 @@ class Resource(ResourceReference):
     @note could build in explicit link back to ResourceRegistryClient so
     user can make changes through this object.
     """
-    
-
     name = TypedAttribute(str)
+    lifecycle = TypedAttribute(LCState, default=LCStates.new)
+
+    def set_lifecyclestate(self, state):
+        self.lifecycle = state
+
+    def get_lifecyclestate(self):
+        return self.lifecycle
+
 
 DataObject._types['Resource']=Resource
 
@@ -536,14 +555,6 @@ class StatefulResource(Resource):
     """
     @brief Base for all OOI Stateful resource objects
     """
-    lifecycle = TypedAttribute(LCState, default=LCStates.new)
-
-    def set_lifecyclestate(self, state):
-        self.lifecycle = state
-
-    def get_lifecyclestate(self):
-        return self.lifecycle
-
     
 DataObject._types['StatefulResource']=StatefulResource
 
