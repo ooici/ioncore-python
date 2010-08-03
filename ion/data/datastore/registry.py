@@ -156,6 +156,14 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         defer.returnValue(resource)
 
     @defer.inlineCallbacks
+    def get_resource_by_id(self, id):
+        resource_client = yield self.clone(id)
+        resource = yield resource_client.checkout()
+        resource.RegistryCommit = resource_client.cur_commit
+        resource.RegistryBranch = 'master'
+        defer.returnValue(resource)
+
+    @defer.inlineCallbacks
     def set_resource_lcstate(self, resource_reference, lcstate):
         """
         Service operation: set the life cycle state of resource
@@ -327,6 +335,18 @@ class BaseRegistryService(BaseService):
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
 
+    @defer.inlineCallbacks
+    def base_get_resource_by_id(self, content, headers, msg):
+        resource = yield self.reg.get_resource_by_id(content)
+        if resource:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
+            #yield self.reply_ok(msg, resource.encode())
+            encoding, _, data = dataobject.serializer.encode(resource)
+            headers = dict(encoding=encoding)
+            yield self.reply_ok(msg, data, headers)
+        else:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
+            yield self.reply_err(msg, None)
         
     @defer.inlineCallbacks
     def base_set_resource_lcstate(self, content, headers, msg):
@@ -407,6 +427,7 @@ class RegistryService(BaseRegistryService):
     op_clear_registry = BaseRegistryService.base_clear_registry
     op_register_resource = BaseRegistryService.base_register_resource
     op_get_resource = BaseRegistryService.base_get_resource
+    op_get_resource_by_id = BaseRegistryService.base_get_resource_by_id
     op_set_resource_lcstate = BaseRegistryService.base_set_resource_lcstate
     op_find_resource = BaseRegistryService.base_find_resource
 
@@ -482,6 +503,22 @@ class BaseRegistryClient(BaseServiceClient):
         headers = dict(encoding=encoding)
         (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
         
+        logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
+
+        if content['status']=='OK':
+            #resource = dataobject.Resource.decode(content['value'])
+            resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+            defer.returnValue(resource)
+        else:
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
+            defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def base_get_resource_by_id(self, op_name, id):
+        yield self._check_init()
+        logging.info(self.__class__.__name__ + '; Calling:'+ op_name)
+        (content, headers, msg) = yield self.rpc_send(op_name, id)
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
         if content['status']=='OK':
@@ -603,4 +640,5 @@ class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
     def find_resource(self, description,regex=True,ignore_defaults=True, attnames=[]):
         return self.base_find_resource('find_resource',description,regex,ignore_defaults,attnames)
 
-
+    def get_resource_by_id(self, id):
+        return self.base_get_resource_by_id('get_resource_by_id', id)
