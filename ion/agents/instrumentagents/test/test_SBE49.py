@@ -13,13 +13,28 @@ from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriverClient
 from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriver
 from ion.core import bootstrap
 
+from subprocess import Popen, PIPE
+import os
+
 class TestSBE49(IonTestCase):
     
     
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        
+
+        # Start the simulator
+        logging.info("Starting instrument simulator.")
+
+        """
+        Construct the path to the instrument simulator, starting with the current
+        working directory
+        """
+        cwd = os.getcwd()
+        simPath = cwd.replace("_trial_temp", "ion/agents/instrumentagents/test/sim_SBE49.py")
+        #logging.info("cwd: %s, simPath: %s" %(str(cwd), str(simPath)))
+        self.simProc = Popen(simPath, stdout=PIPE)
+
         self.sup = yield bootstrap.create_supervisor()
         self.driver = SBE49InstrumentDriver()
         self.driver_pid = yield self.driver.spawn()
@@ -29,6 +44,8 @@ class TestSBE49(IonTestCase):
         
     @defer.inlineCallbacks
     def tearDown(self):
+        logging.info("Stopping instrument simulator.")
+        self.simProc.terminate()
         yield self._stop_container()
         
     @defer.inlineCallbacks
@@ -68,4 +85,8 @@ class TestSBE49(IonTestCase):
         self.assertEqual(result['status'], 'OK')
         result = yield self.driver_client.execute(cmd2)
         self.assertEqual(result['status'], 'OK')
+
+        # DHE: disconnecting; a connect would probably be good.
+        result = yield self.driver_client.disconnect(['some arg'])
+        
         

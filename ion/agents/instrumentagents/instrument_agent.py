@@ -62,6 +62,11 @@ class InstrumentDriver(BaseProcess):
         @param content A dict with parameters for the driver 
         """
         
+    def op_disconnect(self, content, headers, msg):
+        """
+        Disconnect from the instrument
+        @param none
+        """
         
 class InstrumentDriverClient(BaseProcessClient):
     """
@@ -135,6 +140,19 @@ class InstrumentDriverClient(BaseProcessClient):
                                                           config_vals)
         defer.returnValue(content)
         
+    @defer.inlineCallbacks
+    def disconnect(self, command):
+        """
+        Disconnect from the instrument
+        @param none
+        @retval Result code of some sort
+        """
+        #assert(isinstance(command, dict))
+        logging.debug("DHE: in disconnect!")
+        (content, headers, message) = yield self.rpc_send('disconnect',
+                                                          command)
+        defer.returnValue(content)
+    
     
 class InstrumentAgent(ResourceAgent):
     """
