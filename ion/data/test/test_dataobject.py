@@ -40,9 +40,23 @@ class Inherit210(Inherit2, Inherit1, Inherit0):
     """
     """
 
+class InheritOver(Inherit210,Inherit3):
+    inheritover = dataobject.TypedAttribute(str, 'a new one')
+    inherit2 = dataobject.TypedAttribute(str, 'over')
+    inherit0 = dataobject.TypedAttribute(str, 'over')
+    
+#class InheritOverOver(Inherit210,InheritOver):
+    """
+    This will fail - it is an illegal inheritance pattern
+    """
+class InheritOverUnder(InheritOver,Inherit210):
+    """
+    Legal but does nothing?
+    """
+
 class TestInheritedObject(unittest.TestCase):
     
-    def test_inherit(self):
+    def test_inheritance(self):
         i0 = Inherit0()
         i1 = Inherit1()
         i2 = Inherit2()
@@ -74,6 +88,62 @@ class TestInheritedObject(unittest.TestCase):
         self.failUnlessIn('inherit0',i3.attributes)
         self.assertEqual(len(i3.attributes),4)
 
+
+    def test_Inherit210(self):
+        i210 = Inherit210()
+        logging.info(i210)
+        self.assertEqual(i210.inherit2, '2')
+        self.assertEqual(i210.inherit1, '1')
+        self.assertEqual(i210.inherit0, '0')
+
+    def test_InheritOver(self):
+        io = InheritOver()
+        logging.info(io)
+        self.assertEqual(io.inherit2, 'over')
+        self.assertEqual(io.inherit1, '1')
+        self.assertEqual(io.inherit0, 'over')
+        self.assertEqual(io.inheritover, 'a new one')
+
+    def test_InheritOverOver(self):
+        raise unittest.SkipTest('This is not a legal inheritance pattern!')
+        #ioo = InheritOverOver()
+        #logging.info(io)
+        #self.assertEqual(ioo.inherit2, 'over')
+        #self.assertEqual(ioo.inherit1, '1')
+        #self.assertEqual(ioo.inherit0, 'over')
+        #self.assertEqual(ioo.inheritover, 'a new one')
+
+    def test_InheritOverUnder(self):
+        iou = InheritOverUnder()
+        logging.info(iou)
+        self.assertEqual(iou.inherit2, 'over')
+        self.assertEqual(iou.inherit1, '1')
+        self.assertEqual(iou.inherit0, 'over')
+        self.assertEqual(iou.inheritover, 'a new one')
+
+    def test_get_typedattributes(self):
+        io = InheritOver()
+    
+        atts = io.get_typedattributes()
+        
+        cls_atts = InheritOver.get_typedattributes()
+        
+        # Make sure the method works for both class and instance
+        self.assertEqual(atts, cls_atts)
+
+        # check that the dict of atts is correct
+        self.assertEqual(atts['inherit2'].default,io.inherit2)
+        self.assertEqual(atts['inherit2'].type,type(io.inherit2))
+
+        self.assertEqual(atts['inherit1'].default,io.inherit1)  
+        self.assertEqual(atts['inherit1'].type,type(io.inherit1))
+
+        self.assertEqual(atts['inherit0'].default,io.inherit0)  
+        self.assertEqual(atts['inherit0'].type,type(io.inherit0))
+        
+        self.assertEqual(atts['inheritover'].default,io.inheritover)  
+        self.assertEqual(atts['inheritover'].type,type(io.inheritover))
+        
 class TestDataObjectComparison(unittest.TestCase):
 
     def test_eq_inherit(self):
@@ -241,7 +311,7 @@ class TestSimpleObject(unittest.TestCase):
         self.assertEqual(self.encoded,enc)
         
     def testDecode(self):
-        dec = dataobject.DataObject.decode(self.encoded)()
+        dec = dataobject.DataObject.decode(self.encoded)
         #print 'dec',dec
         #print 'self.obj',self.obj
         self.assertEqual(self.obj,dec)
@@ -269,6 +339,40 @@ class TestPrimaryTypesObject(TestSimpleObject):
         self.obj = obj
         self.encoded=[('Object_Type', 'PrimaryTypesObject'),('key', 'str\x00seabird'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'),('boolen', 'bool\x00False'), ('name', 'str\x00David')]        
         #self.encoded=[('Object_Type', 'PrimaryTypesObject'),('boolen', 'bool\x00False'), ('floating', 'float\x003.14159'), ('integer', 'int\x0042'), ('key', 'str\x00seabird'), ('name', 'str\x00David')]
+
+class TestDataObjectMethods(unittest.TestCase):
+    def setUp(self):
+        obj = PrimaryTypesObject()
+        obj.key = 'seabird'
+        obj.name = 'David'
+        obj.floating = 3.14159
+        obj.boolen = False
+        obj.integer = 42
+        self.obj = obj
+
+    def test_attributes(self):
+        atts = self.obj.attributes
+        self.assertIn('key',atts)
+        self.assertIn('name',atts)
+        self.assertIn('floating',atts)
+        self.assertIn('boolen',atts)
+        self.assertIn('integer',atts)
+
+    def test_get_attributes(self):
+        atts = self.obj.get_attributes()
+        self.assertEqual(atts['key'],self.obj.key)
+        self.assertEqual(atts['name'],self.obj.name)
+        self.assertEqual(atts['floating'],self.obj.floating)
+        self.assertEqual(atts['boolen'],self.obj.boolen)
+        self.assertEqual(atts['integer'],self.obj.integer)
+
+    def test_get_typedattributes(self):
+        atts = self.obj.get_typedattributes()
+        self.assertEqual(atts['key'].type,type(self.obj.key))
+        self.assertEqual(atts['name'].type,type(self.obj.name))
+        self.assertEqual(atts['floating'].type,type(self.obj.floating))
+        self.assertEqual(atts['boolen'].type,type(self.obj.boolen))
+        self.assertEqual(atts['integer'].type,type(self.obj.integer))
 
 class BinaryObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
@@ -310,6 +414,36 @@ class TestListOfObjects(TestSimpleObject):
                        '"SimpleObject\\u0000[[\\"key\\", \\"str\\\\u0000xxx\\"], [\\"name\\", \\"str\\\\u0000blank\\"]]"]'),
                         ('name', 'str\x00a big list of objects')]
      
+class TestListObjectBehavior(unittest.TestCase):
+    def test_recursive(self,int=None):
+        
+        if not int:
+            int = 1
+        else:
+            int = int +1
+            
+        obj1 = ListObject()
+        obj1.rlist.append(int)
+
+        if int <= 5:
+            self.test_recursive(int=int)
+        else:
+            self.assertEqual(obj1.rlist,[int])
+    
+            
+    def test_two_instances(self):
+        
+        obj1 = ListObject()
+        obj1.rlist.append(1)
+        obj1.rlist.append(2)
+        #obj1.rlist = [1,2,4]
+         
+           
+        obj2 = ListObject()
+        self.assertEqual(obj2.rlist, [])
+        self.assertEqual(obj1.rlist, [1,2])
+     
+     
 class SetObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str)
     rset = dataobject.TypedAttribute(set)
@@ -339,6 +473,25 @@ class TestTupleObject(TestSimpleObject):
         self.obj = obj
         self.encoded=[('Object_Type', 'TupleObject'),('rtuple', 'tuple\x00["str\\u0000a", "int\\u00003", "float\\u00004.0"]'),('name', 'str\x00a big tuple')]
      
+     
+class DictObject(dataobject.DataObject):
+    name = dataobject.TypedAttribute(str)
+    rdict = dataobject.TypedAttribute(dict)
+     
+dataobject.DataObject._types['DictObject']=DictObject
+
+class TestDictObject(TestSimpleObject):
+    def setUp(self):
+        obj = DictObject()
+        obj.name = 'David'
+        obj.rdict = {'a':'a','b':5,'data':3.14159}
+        self.obj = obj
+        self.encoded=[('Object_Type', 'DictObject'),
+                    ('rdict', 'dict\x00{"a": "a", "b": 5, "data": 3.1415899999999999}'),
+                    ('name', 'str\x00David')]
+    
+     
+     
 class NestedObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str,'stuff')
     rset = dataobject.TypedAttribute(SetObject)
@@ -364,6 +517,48 @@ class TestNestedObject(TestSimpleObject):
                         ('rset','SetObject\x00[["rset", "set\\u0000[\\"str\\\\u0000a\\", \\"int\\\\u00003\\", \\"float\\\\u00004.0\\"]"], ["name", "str\\u0000a big set"]]'),
                         ('name', 'str\x00stuff')]
         
+"""
+Complex nested Object - similar to the pattern used in DM CDMDataset
+"""
+
+class DataType(dataobject.DataObject):
+    """
+    """
+dataobject.DataObject._types['DataType']=DataType
+    
+    
+class DataType1(DataType):
+    f = dataobject.TypedAttribute(float)
+    s = dataobject.TypedAttribute(str)
+    
+dataobject.DataObject._types['DataType1']=DataType1
+    
+class DataType2(DataType):
+    i = dataobject.TypedAttribute(int)
+    b = dataobject.TypedAttribute(bool)
+    
+dataobject.DataObject._types['DataType2']=DataType2
+    
+class DataContainer(dataobject.DataObject):
+    name = dataobject.TypedAttribute(str)
+    dt = dataobject.TypedAttribute(DataType)
+    
+dataobject.DataObject._types['DataContainer']=DataContainer
+    
+class TestDataContainer(TestSimpleObject):
+    def setUp(self):
+        obj = DataContainer()
+        obj.name = 'a container with datatype1'
+        obj.dt = DataType1()
+        
+        obj.dt.f = 3.14159
+        obj.dt.s = 'Datatype1'
+        
+        self.obj = obj
+        self.encoded=[('Object_Type', 'DataContainer'),
+                    ('dt','DataType1\x00[["f", "float\\u00003.14159"], ["s", "str\\u0000Datatype1"]]'),
+                    ('name', 'str\x00a container with datatype1')]       
+        
 class ResponseService(BaseService):
     """Example service implementation
     """
@@ -378,7 +573,7 @@ class ResponseService(BaseService):
         logging.info('op_respond: '+str(content))
         
         
-        obj = dataobject.DataObject.decode(content)()
+        obj = dataobject.DataObject.decode(content)
         logging.info(obj)
         response = obj.encode()
 
@@ -403,7 +598,7 @@ class ResponseServiceClient(BaseServiceClient):
         logging.info('Sending Encoded resource:'+str(msg))
         (content, headers, msg) = yield self.rpc_send('respond', msg, {})
         logging.info('Responder replied: '+str(content))
-        response = dataobject.DataObject.decode(content)()
+        response = dataobject.DataObject.decode(content)
         defer.returnValue(response)
 
 # Spawn of the process using the module name
@@ -520,7 +715,7 @@ class TestResource(unittest.TestCase):
     def test_set_lcstate(self):
         
         #logging.info(registry.LCStates)
-        res = dataobject.Resource.create_new_resource()
+        res = dataobject.StatefulResource.create_new_resource()
         #logging.info(res.get_lifecyclestate())
         self.assertEqual(res.lifecycle, dataobject.LCStates.new)
 
@@ -536,7 +731,7 @@ class TestResource(unittest.TestCase):
 
     def test_get_lcstate(self):
  
-        res = dataobject.Resource.create_new_resource()
+        res = dataobject.StatefulResource.create_new_resource()
         
         self.assertEqual(res.get_lifecyclestate(),dataobject.LCState('new'))
  

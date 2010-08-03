@@ -45,8 +45,10 @@ class TypedAttribute(object):
         @param _types is a dictionary of types which can be decoded
         """
                 
+        #print '=================================================='
         types = _types.copy()
         stype, default = value.split(NULL_CHR)
+        #print '---------- ', stype, default
         
         #the use of str is temporary unti lcaarch msging is fixed
         mytype = eval(str(stype), types)
@@ -56,7 +58,7 @@ class TypedAttribute(object):
             #print 'type, default:',type, default
             #return cls(type, eval(str(default), types))
             if issubclass(mytype, DataObject):
-                data_object = mytype.decode(json.loads(default),header=False)()
+                data_object = mytype.decode(json.loads(default),header=False)
                 return cls(mytype, data_object)
                 
             elif issubclass(mytype, (list, set, tuple)):
@@ -68,12 +70,16 @@ class TypedAttribute(object):
                     itype = eval(str(itype), types)
                     
                     if issubclass(itype, DataObject):
-                        objs.append(itype.decode(json.loads(ival),header=False)() )
+                        objs.append(itype.decode(json.loads(ival),header=False) )
                     else:
                         objs.append(itype(str(ival)))
                     
                 return cls(mytype, mytype(objs))
-
+            elif issubclass(mytype, dict):
+                # since dicts are 'just' json encoded load and return!
+                
+                return cls(mytype, json.loads(default))
+            
             elif issubclass(mytype, bool):
                 return cls(mytype, eval(str(default)))
             
@@ -95,21 +101,21 @@ class DataObjectType(type):
         d = {}
         base_dicts = []
 
-        for base in bases:
+        for base in reversed(bases):
             ayb = reflect.allYourBase(base)
             base_dicts.extend(base.__dict__.items())
-            for ay in ayb:
+            for ay in reversed(ayb):
                 base_dicts.extend(ay.__dict__.items())
         for key, value in base_dicts:
             if isinstance(value, TypedAttribute):
                 value.name = '_' + key
                 d[value.name] = value.default
 
-
         for key, value in dict.items():
             if isinstance(value, TypedAttribute):
                 value.name = '_' + key
                 d[value.name] = value.default
+                    
         dict['__dict__'] = d
         return type.__new__(cls, name, bases, dict)
 
@@ -121,11 +127,24 @@ class DataObject(object):
 
     _types = {}
 
+    def __init__(self):
+        for name, att in self.get_typedattributes().items():
+            if att.type == list:
+                setattr(self,name,[])
+            if att.type == dict:
+                setattr(self,name,{})
+            if att.type == set:
+                setattr(self,name,set([]))
+
+
     def __eq__(self, other):
         """
         Compare dataobjects of the same class. All attributes must be equal.
         """
-        assert isinstance(other, DataObject)
+        #assert isinstance(other, DataObject)
+        if not isinstance(other, DataObject):
+            return False
+        
         # comparison of data objects which have different atts must not error out
         atts1 = set(self.attributes)
         atts2 = set(other.attributes)
@@ -143,7 +162,10 @@ class DataObject(object):
         See test case for intended applications
         
         """
-        assert isinstance(other, DataObject)
+        #assert isinstance(other, DataObject)
+        if not isinstance(other, DataObject):
+            return False
+
         # comparison of data objects which have different atts must not error out
         atts = set(other.attributes)
         #print 'SELF',self.get_attributes()
@@ -158,8 +180,10 @@ class DataObject(object):
         """
         Compares only attributes of self by default
         """
-        assert isinstance(other, DataObject)
-
+        #assert isinstance(other, DataObject)
+        if not isinstance(other, DataObject):
+            return False
+        
         atts=None
         if not attnames:
             atts = self.attributes
@@ -168,6 +192,13 @@ class DataObject(object):
             
         if ignore_defaults:
             atts = self.non_default_atts(atts)
+                
+        #print 'ATTTTS',atts
+        
+        #print 'REGEX',regex
+        #print 'ignore_defaults',ignore_defaults
+        #print 'other',other.get_typedattributes()['name'].default
+        #print 'self',self.get_typedattributes()['name'].default
                         
         if not atts:
             # A degenerate case
@@ -212,13 +243,18 @@ class DataObject(object):
         
     def non_default_atts(self,attnames):
         atts=[]
-        data_object_class = self._types[self.__class__.__name__]
-        default = data_object_class()
-        #default = self.__class__()
+        # There is something wrong with the way the dataobject is decoded
+        # unless you pull the class definition from _types, the defaults
+        # are incorrect when using the results of a message?
+        r_class = self._types[self.__class__.__name__]
+        typedatts = r_class.get_typedattributes()        
+        
         if not attnames:
             attnames=self.attributes
+                    
         for a in attnames:
-            if getattr(self, a) !=  getattr(default,a):
+            #print a, getattr(self, a), typedatts[a].default
+            if getattr(self, a) !=  typedatts[a].default:
                 atts.append(a)
         return atts
         
@@ -250,8 +286,34 @@ class DataObject(object):
         strng += indent + head*4
         return strng
 
+    @classmethod
+    def get_typedattributes(cls):
+        """
+        @Brief Get the typed attributes of the class
+        @Note What about typed attributes that are over ridden?
+        """
+        d={}
+        ayb = reflect.allYourBase(cls)
+        for yb in reversed(ayb):
+            if issubclass(yb, DataObject):
+                d.update(yb.__dict__)
+        
+        d.update(cls.__dict__)
+        
+        atts = {}
+        for key,value in d.items():
+            if isinstance(value, TypedAttribute):
+                atts[key]=value
+        return  atts
+        
+
+
     @property
+        
     def attributes(self):
+        """
+        @bug It would be nice if the attributes function only returned the set of keys for attributes that were defined within the object, rather than all attributes (even the ones relating to the underlying registry)
+        """
         names = []
         for key in self.__dict__:
             names.append(key[1:])
@@ -259,8 +321,11 @@ class DataObject(object):
 
     def get_attributes(self):
         atts={}
-        for key,value in self.__dict__.items():
-            atts[key[1:]]=value
+        #@Note Not sure why dict does not work any more - returns default not value?
+        #for key,value in self.__dict__.items():
+        #    atts[key[1:]]=value
+        for key in self.attributes:
+            atts[key] = getattr(self,key)
         return atts
         
 
@@ -279,6 +344,7 @@ class DataObject(object):
                 value_enc = value.encode(header = False)
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(value_enc),)))
             elif isinstance(value,(list,tuple,set)):
+                # List can contain other data object or decodable types
                 list_enc = []
                 for val in value:
                     if isinstance(val, DataObject):
@@ -288,7 +354,10 @@ class DataObject(object):
                         list_enc.append("%s%s%s" % (type(val).__name__, NULL_CHR, str(val)))
                 
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(list_enc),)))
-
+            elif isinstance(value,dict):
+                # dict can only contain JSONable types!
+                encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(value),)))
+                
             else:
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
 
@@ -313,11 +382,24 @@ class DataObject(object):
             #print 'clsname',clsname
             clsobj = eval(str(clsname), cls._types)
             
+        obj = clsobj()
+            
+            
         for name, value in attrs:
             #print 'name',name
             #print 'value',value
-            d[str(name)] = TypedAttribute.decode(value, cls._types)       
-        return type(clsobj.__name__, (clsobj,), d)
+            ta = TypedAttribute.decode(value, cls._types)
+            #print 'ta',ta.default
+            
+            setattr(obj,name, ta.default)
+            #print name, d[str(name)].default
+        #print 'clsobj', clsobj
+            
+        
+            
+        #
+        #return type(clsobj.__name__, (clsobj,), d)
+        return obj
 
 
 
@@ -344,6 +426,7 @@ class ResourceReference(DataObject):
     RegistryBranch = TypedAttribute(str,'master')
 
     def __init__(self,RegistryIdentity='',RegistryCommit='',RegistryBranch=''):
+        DataObject.__init__(self)
         if RegistryIdentity:
             self.RegistryIdentity = RegistryIdentity
         if RegistryCommit:
@@ -351,18 +434,24 @@ class ResourceReference(DataObject):
         if RegistryBranch:
             self.RegistryBranch = RegistryBranch
 
-
     @classmethod
     def create_new_resource(cls):
         """
-        @Brief Use this method to instantiate any new resource!
+        @Brief Use this method to instantiate any new resource with a unique id!
         """
         inst = cls()
         inst.RegistryIdentity = create_unique_identity()
         inst.RegistryBranch = 'master'
         return inst
     
-    
+    def create_new_reference(self):
+        """
+        @Brief Create or overwrite the reference identity for this resource
+        """
+        self.RegistryIdentity = create_unique_identity()
+        self.RegistryBranch = 'master'
+        self.RegistryCommit = ''
+        return self
     
     def reference(self,head=False):
         """
@@ -432,13 +521,6 @@ class Resource(ResourceReference):
     
 
     name = TypedAttribute(str)
-    lifecycle = TypedAttribute(LCState, default=LCStates.new)
-
-    def set_lifecyclestate(self, state):
-        self.lifecycle = state
-
-    def get_lifecyclestate(self):
-        return self.lifecycle
 
 DataObject._types['Resource']=Resource
 
@@ -454,6 +536,14 @@ class StatefulResource(Resource):
     """
     @brief Base for all OOI Stateful resource objects
     """
+    lifecycle = TypedAttribute(LCState, default=LCStates.new)
+
+    def set_lifecyclestate(self, state):
+        self.lifecycle = state
+
+    def get_lifecyclestate(self):
+        return self.lifecycle
+
     
 DataObject._types['StatefulResource']=StatefulResource
 

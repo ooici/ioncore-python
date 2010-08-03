@@ -35,12 +35,16 @@ class StoreService(BaseService):
         # use spawn args to determine backend class, second config file
         backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.data.store.Store'))
         backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', default={}))
+
+        self.backend = None
+        # self.backend holds the class which is instantiated to provide the Store
         if backendcls:
             self.backend = pu.get_class(backendcls)
         else:
             self.backend = Store
         assert issubclass(self.backend, IStore)
 
+        # Now create an instance of the backend class
         # Provide rest of the spawnArgs to init the store
         self.store = yield self.backend.create_store(**backendargs)
         

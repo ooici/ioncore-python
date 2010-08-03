@@ -53,7 +53,6 @@ class TestInstrumentAgent(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._shutdown_processes()
         yield self._stop_container()
 
     @defer.inlineCallbacks

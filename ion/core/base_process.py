@@ -462,7 +462,7 @@ class ProcessDesc(object):
             self.proc_id = proc_id
             self.proc_state = 'SPAWNED'
 
-            logging.info("Process "+self.proc_class+" ID: "+str(proc_id))
+            logging.info("Process "+str(self.proc_class)+" ID: "+str(proc_id))
         else:
             logging.error('Cannot spawn '+self.proc_class+' on node='+str(self.proc_node))
         defer.returnValue(self.proc_id)

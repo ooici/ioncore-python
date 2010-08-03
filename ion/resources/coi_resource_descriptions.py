@@ -5,6 +5,7 @@ import logging
 logging = logging.getLogger(__name__)
 from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource
 
+from magnet.container import Id
 """
 Container object are used as self describing sendable objects
 """
@@ -41,12 +42,14 @@ Resource Description object are used in the OOICI Registries
 
 """
 Define properties of resource types
+@Note What is the intent with Resource Types? 
 """
 ResourceTypes = ['generic',
                 'unassigned',
                 'information',
                 'service',
-                'stateful'
+                'stateful',
+                'taskable'
                 ]
 
 class ResourceType(object):
@@ -83,65 +86,37 @@ OOIResourceTypes = TypesContainer(OOIResourceTypes)
 # Object Dictionary to be decoded!
 DataObject._types.update(OOIResourceTypes)
 
-class AttributeDescription(DataObject):
-    name = TypedAttribute(str)
-    type = TypedAttribute(str)
-    #default = TypedAttribute(str) Ignore defaults for now - can't get at it!
-
-
 class ResourceDescription(InformationResource):
     """
     Resource Descriptions are stored in the resource registry.
     They describe resources, resource types and resource attributes
     """
     type = TypedAttribute(ResourceType)
-    atts = TypedAttribute(list)
-    inherits_from = TypedAttribute(ResourceReference)
+    atts = TypedAttribute(list,[])
+    inherits_from = TypedAttribute(list)
     description = TypedAttribute(str)
 
+class AttributeDescription(DataObject):
+    name = TypedAttribute(str)
+    type = TypedAttribute(str)
+    default = TypedAttribute(str) 
     
-    def describe_resource(self,resource):
-        """
-        @Brief Extract metadata from a resource object to store in the resource
-        registry
-        @Param resource is an instance of a class which inherits from Resource
-        """
-        assert isinstance(resource, Resource)
-        
-        self.name = resource.__class__.__name__
-        
-        if isinstance(resource, InformationResource):
-            self.type = OOIResourceTypes.information
-        elif isinstance(resource, StatefulResource):
-            self.type = OOIResourceTypes.stateful
-        else:
-            self.type = OOIResourceTypes.unassigned
-        
-        self.description = inspect.getdoc(resource)
-            
-        for att in resource.attributes:
-            attdesc = AttributeDescription()
-            attdesc.name = att
-            attdesc.type = str(type(getattr(resource, att)))
-            self.atts.append(attdesc)    
-            
-    
-class ResourceInstance(InformationResource):
+class ResourceInstance(StatefulResource):
     """
     Resource Instances are stored in the resource registry.
     They describe instances of a resource type
     """
-    instance_description = TypedAttribute(ResourceReference)
-    instance_owner = TypedAttribute(ResourceReference)
-    instance = TypedAttribute(ResourceReference)
+    description = TypedAttribute(ResourceReference)
+    owner = TypedAttribute(ResourceReference)
+    resource = TypedAttribute(ResourceReference)
     
-class IdentityResource(InformationResource):
+class IdentityResource(StatefulResource):
     """
     Identity Resources are stored in the identity registry
     Identity Resources describe the identity of human in the OOICI...
     """
     # These are the fields that we get from the Trust Provider
-    ooi_id = TypedAttribute(str)
+    #ooi_id = TypedAttribute(str)
     common_name = TypedAttribute(str)
     country = TypedAttribute(str)
     trust_provider = TypedAttribute(str) # this is the trust provider /O (Organization field)
@@ -160,9 +135,6 @@ class IdentityResource(InformationResource):
     title = TypedAttribute(str)
 
 
-class ServiceMethodInterface(DataObject):
-    description = TypedAttribute(str)
-    arguments = TypedAttribute(str)
 
 class ServiceDescription(InformationResource):
     """
@@ -174,48 +146,61 @@ class ServiceDescription(InformationResource):
     version = TypedAttribute(str)
     #spawnargs = TypedAttribute(dict,{})
     description = TypedAttribute(str)
+    class_name = TypedAttribute(str)
+    
 
+class ServiceMethodInterface(DataObject):
+    name = TypedAttribute(str)
+    description = TypedAttribute(str)
+    arguments = TypedAttribute(str)
+
+   
     
-    def describe_service(self,svc):
-        
-        assert issubclass(svc, BaseService)
-        
-        self.name = svc.declare['name']
-        self.version = svc.declare['version']
-        
-        self.class_name = svc.__name__
-        self.module = svc.__module__
-                
-        self.description = inspect.getdoc(svc)      
-            
-        for attr in inspect.classify_class_attrs(svc):
-            if attr.kind == 'method':
-            
-                opdesc = ServiceMethodInterface()
-                opdesc.name = attr.name
-                opdesc.description = inspect.getdoc(attr.object)
-                #Can't seem to get the arguments in any meaningful way...
-                #opdesc.arguments = inspect.getargspec(attr.object)
-                
-                self.interface.append(attdesc)    
-            
-    
-class ServiceInstance(InformationResource):
+class ServiceInstance(StatefulResource):
     """
     Resource Instances are stored in the resource registry.
     They describe instances of a resource type
+    Attribute names are taken from ProcessDesc class ?
+    """
+    description = TypedAttribute(ResourceReference)
+    #proc_module = TypedAttribute(str)
+    proc_node = TypedAttribute(str)
+    proc_id = TypedAttribute(Id, Id(None))
+    proc_name = TypedAttribute(str)
+    spawn_args = TypedAttribute(dict)
+    proc_state = TypedAttribute(str)
+    sup_process = TypedAttribute(ResourceReference)
+    #proc_mod_obj = TypedAttribute(str)
+    #proc_class = TypedAttribute(str)
+
+DataObject._types['Id']=Id
+
+class AgentDescription(InformationResource):
+    """
+    Agent Descriptions are stored in the agent registry.
+    They describe an agent, its interface and attributes
+    """
+    interface = TypedAttribute(list)
+    module = TypedAttribute(str)
+    version = TypedAttribute(str)
+    #spawnargs = TypedAttribute(dict,{})
+    description = TypedAttribute(str)
+    
+class AgentMethodInterface(StatefulResource):
+    description = TypedAttribute(str)
+    arguments = TypedAttribute(str)
+    
+class AgentInstance(StatefulResource):
+    """
+    Agent Instances are stored in the agent registry.
+    They describe instances of an agent and reference its description and
+    the subject of the agent.
     """
     description = TypedAttribute(ResourceReference)
     #owner = TypedAttribute(ResourceReference)
     spawnargs = TypedAttribute(str)
     type = TypedAttribute(str)
-    exchange_name = TypedAttribute(str)
-    
-    def describe_instance(self,svc_inst):
-        """
-        """
-        self.name=svc_inst.svc_name
-        self.description = inspect.getdoc(svc_inst)
-        self.exchange_name = svc_inst.svc_reciever
+    process_id = TypedAttribute(str)
+    subject = TypedAttribute(ResourceReference)
 
 
