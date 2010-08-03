@@ -20,7 +20,11 @@ from ion.services.dm.pubsub import DataPubsubClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
-from ion.resources.dm_resource_descriptions import PubSubTopic
+from ion.data import dataobject
+from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource, DAPMessageObject
+
+
+from ion.services.dm.util import dap_tools
 
 proc = """
 # This is a data processing function that takes a sample message, filters for
@@ -68,17 +72,33 @@ class PubSubTest(IonTestCase):
 
         dpsc = DataPubsubClient(self.sup)
         
-        topic = PubSubTopic.create_fanout_topic("topic1")
-        
-        topic_name = yield dpsc.define_topic(topic)
-        logging.info('Service reply: '+str(topic_name))
+        # Create and Register a topic
+        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")        
+        topic = yield dpsc.define_topic(topic)
+        logging.info('Defined Topic: '+str(topic))
+
+    
+        #Create and register self.sup as a publisher
+        publisher = PublisherResource.create('Test Publisher', self.sup, topic, 'DataObject')
+        publisher = yield dpsc.define_publisher(publisher)
+
+        logging.info('Defined Publisher: '+str(publisher))
 
         dc1 = DataConsumer()
         dc1_id = yield dc1.spawn()
-        yield dc1.attach(topic.name)
+        # @Todo replace attach with subscribe!
+        yield dc1.attach(topic)
 
-        dmsg = self._get_datamsg({}, [1,2,1,4,3,2])
-        yield self.sup.send(topic.name, 'data', dmsg)
+
+        # Create and send a data message
+        data = DAPMessageObject()
+        data.das = 'junk'
+        data.dds = 'junk for testing only'
+        result = yield dpsc.publish(self.sup, topic.reference(), data)
+        if result:
+            logging.info('Published Message')
+        else:
+            logging.info('Failed to Published Message')
 
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
@@ -88,11 +108,13 @@ class PubSubTest(IonTestCase):
         # Create a second data consumer
         dc2 = DataConsumer()
         dc2_id = yield dc2.spawn()
-        yield dc2.attach(topic.name)
+        yield dc2.attach(topic)
 
         dmsg = self._get_datamsg({}, [1,2,1,4,3,2])
-        yield self.sup.send(topic.name, 'data', dmsg, {})
-
+        result = yield dpsc.publish(self.sup, topic.reference(), dmsg)
+        
+        
+        
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
 
@@ -109,38 +131,49 @@ class PubSubTest(IonTestCase):
 
         dpsc = DataPubsubClient(self.sup)
         
-        topic_raw = PubSubTopic.create_fanout_topic("topic_raw")
+        #Create and register 3 topics!
+        topic_raw = PubSubTopicResource.create("topic_raw","oceans, oil spill, fun things to do") 
         topic_raw = yield dpsc.define_topic(topic_raw)
 
-        topic_qc = PubSubTopic.create_fanout_topic("topic_qc")
+        topic_qc = PubSubTopicResource.create("topic_qc","oceans_qc, oil spill") 
         topic_qc = yield dpsc.define_topic(topic_qc)
         
-        topic_evt = PubSubTopic.create_fanout_topic("topic_evt")
+        topic_evt = PubSubTopicResource.create("topic_evt", "spill events")
         topic_evt = yield dpsc.define_topic(topic_evt)
+
+
+        #Create and register self.sup as a publisher
+        publisher = PublisherResource.create('Test Publisher', self.sup, topic_raw, 'DataObject')
+        publisher = yield dpsc.define_publisher(publisher)
+
+        logging.info('Defined Publisher: '+str(publisher))
 
         dc1 = DataConsumer()
         dc1_id = yield dc1.spawn()
-        yield dc1.attach(topic_raw.name)
-#        dp = DataProcess(proc)
-        #dc1.set_ondata(dp.get_ondata())
+        # Use subscribe
+        yield dc1.attach(topic_raw)
         
-        # Create the object and pass it the topics
-        #ep = event_process(topic_qc,topic_evt)
-        #dc1.set_ondata(ep.run)
         dc1.set_ondata(e_process,topic_qc,topic_evt)
         
 
         dc2 = DataConsumer()
         dc2_id = yield dc2.spawn()
-        yield dc2.attach(topic_qc.name)
+        yield dc2.attach(topic_qc)
 
         dc3 = DataConsumer()
         dc3_id = yield dc3.spawn()
-        yield dc3.attach(topic_evt.name)
+        # Use subscribe
+        yield dc3.attach(topic_evt)
 
         # Create an example data message with time
-        dmsg = self._get_datamsg({}, [(101,5),(102,2),(103,4),(104,5),(105,-1),(106,9),(107,3),(108,888),(109,3),(110,4)])
-        yield self.sup.send(topic_raw.name, 'data', dmsg, {})
+        dmsg = self._get_datamsg(('time','height'), [(101,5),(102,2),(103,4),(104,5),(105,-1),(106,9),(107,3),(108,888),(109,3),(110,4)])
+        
+        result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
+        if result:
+            logging.info('Published Message')
+        else:
+            logging.info('Failed to Published Message')
+
 
         # Need to await the delivery of data messages into the consumers
         yield pu.asleep(2)
@@ -149,7 +182,7 @@ class PubSubTest(IonTestCase):
         self.assertEqual(dc2.receive_cnt, 1)
         self.assertEqual(dc3.receive_cnt, 2)
 
-        dmsg = self._get_datamsg({}, [(111,8),(112,6),(113,4),(114,-2),(115,-1),(116,5),(117,3),(118,1),(119,4),(120,5)])
+        dmsg = self._get_datamsg(('time','height'), [(111,8),(112,6),(113,4),(114,-2),(115,-1),(116,5),(117,3),(118,1),(119,4),(120,5)])
         yield self.sup.send(topic_raw.name, 'data', dmsg, {})
 
         # Need to await the delivery of data messages into the consumers
@@ -161,10 +194,14 @@ class PubSubTest(IonTestCase):
 
 
     def _get_datamsg(self, metadata, data):
-        #metadata.update('timestamp':time.clock())
-        return {'metadata':metadata, 'data':data}
+        
+        # Convert metadata and data to a dap dataset
+        ds = 5
+        
+        return dap_tools.ds2dap_msg(ds)
 
 
+"""
 class event_process(object):
     
     def __init__(self,topic1,topic2):
@@ -192,16 +229,23 @@ class event_process(object):
         #print "messages", messages
         result = messages
     
+"""
+
 
 def e_process(content,headers,topic1,topic2):
     # This is a data processing function that takes a sample message, filters for   
     # out of range values, adds to an event queue, and computes a new sample packet
     # where outlyers are zero'ed out
     #print "In data process"
-    data = content['data']
+    
+    logging.debug('e_process recieved:' + str(content))
+    
+    
+    
+    data = dataobject.DataObject.decode(content)
     resdata = []
     messages = []
-    for (ts,samp) in data:
+    for (ts,samp) in data.data:
         if samp<0 or samp>100:
             messages.append((topic2,{'event':(ts,'out_of_range',samp)}))
             samp = 0
@@ -224,12 +268,12 @@ class DataConsumer(BaseProcess):
         self.topic2 = topic2
 
     @defer.inlineCallbacks
-    def attach(self, topic_name):
+    def attach(self, topic):
         yield self.init()
-        self.dataReceiver = Receiver(__name__, topic_name)
+        self.dataReceiver = Receiver(__name__, topic.queue.name)
         self.dataReceiver.handle(self.receive)
         self.dr_id = yield spawn(self.dataReceiver)
-        logging.info("DataConsumer.attach "+str(self.dr_id)+" to topic "+str(topic_name))
+        logging.info("DataConsumer.attach "+str(self.dr_id)+" to topic "+str(topic.queue.name))
 
         self.receive_cnt = 0
         self.received_msg = []
@@ -250,7 +294,7 @@ class DataConsumer(BaseProcess):
                     #print 'TKTKTKTKTKTKTKT'
                     #print topic
                     #print msg
-                    yield self.send(topic.name, 'data', msg, {})
+                    yield self.send(topic.queue.name, 'data', msg, {})
 
 class DataProcess(object):
 

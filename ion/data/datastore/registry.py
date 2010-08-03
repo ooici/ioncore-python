@@ -283,7 +283,7 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Register a resource instance with the registry.
         """
-        logging.debug('Registry Service MSG:'+ str(headers))
+        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
         resource = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Resource: \n' + str(resource))
   
@@ -301,7 +301,7 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Get a resource instance.
         """
-        logging.debug('Registry Service MSG:'+ str(headers))
+        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
         resource_reference = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
 
@@ -320,7 +320,7 @@ class BaseRegistryService(BaseService):
         """
         Service operation: set the life cycle state of resource
         """
-        logging.debug('Registry Service MSG:'+ str(headers))
+        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
         container = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
 
@@ -349,7 +349,7 @@ class BaseRegistryService(BaseService):
         ignore_defaults = None
         attnames=[]
                 
-        logging.debug('Registry Service MSG:'+ str(headers))
+        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
         container = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
 
@@ -420,7 +420,6 @@ class BaseRegistryClient(BaseServiceClient):
         
         assert isinstance(resource, dataobject.Resource), 'Invalid argument to base_register_resource'
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
-
 
         (content, headers, msg) = yield self.rpc_send(op_name,
                                             resource.encode())
@@ -536,7 +535,7 @@ class BaseRegistryClient(BaseServiceClient):
         if content['status'] == 'OK':            
             results = dataobject.DataObject.decode(content['value'])
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(results.resources)
+            defer.returnValue(results.resources) # Returns a list of resources
         else:
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
             defer.returnValue([])

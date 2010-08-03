@@ -13,6 +13,9 @@ from pydap.responses import netcdf
 import base64
 import StringIO
 
+from pydap import model
+import numpy
+
 import os
 import warnings
 
@@ -113,5 +116,29 @@ def read_netcdf_from_file(filename):
     h = Handler(filename)
     ds = h.parse_constraints({'pydap.ce':(None,None)})
     return ds
+
+
+def create_dataset():
+    
+    ds = model.DatasetType(name='Mine')
+    
+    ds.attributes['history']='David made a dataset'
+    ds.attributes['conventions']='OOIs special format'
+    
+    data = numpy.arange(8)
+    
+    shape=(8,)
+    
+    type = model.Int32
+    
+    var = model.BaseType(name='var1', data=data, shape=shape, dimensions=dims, type=type, attributes={'long_name':'long variable name one'})
+
+    #grid = model.GridType(name='grid1')
+
+
+    ds['var'] = var
+
+    return ds
+
 
 
