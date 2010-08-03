@@ -283,6 +283,19 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Register a resource instance with the registry.
         """
+        
+        logging.debug("=====================================")
+        logging.debug("============ BEGIN DEBUG ============")
+        logging.debug("=====================================")
+        logging.debug(str(content))
+        logging.debug("=====================================")
+        
+        logging.debug(str(dataobject.Resource.decode(content)))
+        
+        logging.debug("=====================================")
+        logging.debug("============  END  DEBUG ============")
+        logging.debug("=====================================")
+        
         logging.debug('Registry Service MSG:'+ str(headers))
         resource = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Resource: \n' + str(resource))

@@ -70,7 +70,7 @@ def give_form(user):
             if (field_name == 'lifecycle'):
                 page += '<tr><td>' + field_name + '</td><td>'
                 page += '<SELECT NAME="lifecycle">'
-                for lc_state in ('New', 'Active', 'Inactive', 'Commissioned', 'Decommissioned', 'Developed', 'Retired'):
+                for lc_state in ('new', 'active', 'inactive', 'commissioned', 'decomm', 'developed', 'retired'):
                     if (field_value == lc_state.lower() ):
                         page += '<OPTION VALUE="' + lc_state + '" SELECTED>' + lc_state
                     else:
@@ -160,7 +160,6 @@ class EraseAllUsers(resource.Resource):
 
 
 class FindUser(resource.Resource):
-
     def __init__(self, identity_service_client):
         resource.Resource.__init__(self)
         self.client = identity_service_client
@@ -169,6 +168,8 @@ class FindUser(resource.Resource):
         
         
         def show_array_cb(result):
+            print "+++++++++++++++++++++++++++++++++ "
+
             request.write('<html><body>')
             if ((len(result) == 0) or (result == None)):
                 request.write("no matches<br\>")
@@ -224,17 +225,30 @@ class FindUser(resource.Resource):
                 d.addCallback(show_single_cb)
             if ('ooi_id' in request.args.keys()):
                 user = IdentityResource.create_new_resource(id=request.args['ooi_id'][0],  branch=request.args['branch'][0]) # was supposed to need commit=request.args['commit'][0], but doesnt want it. need to ask davif
-                d = self.client.get_user(user.reference())
+                d = self.client.get_user(user.reference(head=True))
                 d.addCallback(show_single_cb)
                 return server.NOT_DONE_YET
             else:    
                 user_description = coi_resource_descriptions.IdentityResource()
+                print "YYYYYYYYYYYYYYYYYYYYYYYY"
+                print str(user_description)
+                print "YYYYYYYYYYYYYYYYYYYYYYYY"
                 for field_name in user_description.attributes:
                     if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle")):
                         if (len(request.args[field_name]) > 0):
                             setattr(user_description, field_name, request.args[field_name][0])
-    
-                d = self.client.find_users(user_description, regex=True)
+                #
+                #
+                # need if field lcstate is not set to *, then search for its setting, and add its attribute name to the attnames paramater below
+                #
+                #
+                #foo = dataobject.LCState(state=request.args["lifecycle"][0].lower())
+                #user_description.set_lifecyclestate(foo)
+                
+                print "XXXXXXXXXXXXXXXXXXXXXXXX"
+                print str(user_description)
+                print "XXXXXXXXXXXXXXXXXXXXXXXX"
+                d = self.client.find_users(user_description, regex=True) #, ignore_defaults=True) # ,attnames=['name',]
                 d.addCallback(show_array_cb)
                 return server.NOT_DONE_YET
         else:
