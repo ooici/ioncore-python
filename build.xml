@@ -23,7 +23,7 @@
   </target>
 
   <target name="compile" depends="init"
-        description="compile the source" >
+        description="compile the source">
     <!-- Precompiles all Python code without executing. Finds compile errors -->
     <py-compile dir="${src}" pythonpath="${src}" optimize="0"/>
  </target>
@@ -56,6 +56,13 @@
       <arg value="sysname=${user.name}"/>
       <arg value="-n"/>
       <arg value="res/scripts/newcc.py"/>
+    </exec>
+  </target>
+
+  <target name="test" depends="clean"
+        description="exdecutes all trial unit test cases" >
+    <exec executable="trial">
+      <arg value="${src}"/>
     </exec>
   </target>
 </project>
