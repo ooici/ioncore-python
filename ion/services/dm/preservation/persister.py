@@ -9,7 +9,10 @@
 """
 
 from urlparse import urlsplit, urlunsplit
-import simplejson as json
+try:
+    import json
+except:
+    import simplejson as json
 import base64
 
 from pydap.model import BaseType, SequenceType

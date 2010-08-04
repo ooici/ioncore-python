@@ -13,7 +13,15 @@ from pydap.responses import netcdf
 import base64
 import StringIO
 
+from pydap.model import BaseType, DapType, DatasetType, Float32, Float64, \
+    GridType, Int16, Int32, SequenceData, SequenceType, StructureType, UInt16, \
+    UInt32, String
+
+
+import numpy
+
 import os
+import warnings
 
 from ion.resources import dm_resource_descriptions
 
@@ -29,11 +37,14 @@ def ds2dap_msg(pydap_dataset,headeronly=False):
     msg.das = das_output[0]
     msg.dds = dds_output[0]
     if not headeronly:
-        dods = dap_gen(pydap_dataset)
-        #msg.dods = base64.b64encode(dods)
-        msg.dods = dods
-        #print 'DODS:',dods
-    
+        
+        # Catch depricated warnings!
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore",category=DeprecationWarning)
+            dods = dap_gen(pydap_dataset)
+
+        msg.dods = base64.b64encode(dods)
+        #msg.dods = dods    
     return (msg)
 
 def dap_gen(ds):
@@ -63,15 +74,9 @@ def dap_msg2ds(msg):
     dataset = DASParser(msg.das, dataset).parse()
     
     if msg.dods:
-        #dataset.data = DapUnpacker(msg['dods'], dataset).getvalue()
-
         # This block is from open_dods in client.py
-        #dds, xdrdata = msg['dods'].split('\nData:\n', 1)
-        #dataset.data = DapUnpacker(base64.b64decode(msg.dods), dataset).getvalue()
-        dataset.data = DapUnpacker(msg.dods, dataset).getvalue()
-        
-        #data = DapUnpacker(msg['dods'], dataset)
-        #print 'DapUnpacker Data:',data.__dict__.keys()
+        dataset.data = DapUnpacker(base64.b64decode(msg.dods), dataset).getvalue()
+        #dataset.data = DapUnpacker(msg.dods, dataset).getvalue()
         
     return dataset
 
@@ -116,4 +121,61 @@ def read_netcdf_from_file(filename):
     ds = h.parse_constraints({'pydap.ce':(None,None)})
     return ds
 
+
+def demo_dataset():
+    '''
+    @Brief Example methods for creating a dataset
+    http://pydap.org/developer.html#the-dap-data-model
+    '''
+    
+    #Create a dataset object
+    ds = DatasetType(name='Mine')
+    
+    #Add Some attributes
+    ds.attributes['history']='David made a dataset'
+    ds.attributes['conventions']='OOIs special format'
+    
+    # Create some data and put it in a variable
+    varname = 'var1'
+    data = (1,2,3,4,5,8)
+    shape=(8,) 
+    type = Int32 #
+    dims=('time',)
+    attributes={'long_name':'long variable name one'}
+    ds[varname] = BaseType(name=varname, data=data, shape=shape, dimensions=dims, type=type, attributes=attributes)
+
+    # Now make a grid data object
+    g = GridType(name='g')
+    data = numpy.arange(6.)
+    data.shape = (2, 3)
+    # The name in the dictionary must match the name in the basetype
+    g['a'] = BaseType(name='a', data=data, shape=data.shape, type=Float32, dimensions=('x', 'y'))
+    g['x'] = BaseType(name='x', data=numpy.arange(2.), shape=(2,), type=Float64)
+    g['y'] = BaseType(name='y', data=numpy.arange(3.), shape=(3,), type=Float64)
+    
+    ds[g.name]=g
+
+    return ds
+
+def simple_dataset(metadata, data):
+    '''
+    Create a simple dap dataset object from dictionary content
+    '''
+    # Convert metadata and data to a dap dataset
+    ds = DatasetType(name=metadata['DataSet Name'])
+    
+    for varname,atts in metadata['variables'].items():
+        
+        var = BaseType(name=varname, \
+                data=data[varname], \
+                shape=(len(data[varname]),), \
+                dimensions=(varname,), \
+                type=Int32, \
+                attributes=atts)
+        ds[varname] = var
+    return ds
+    
+def simple_datamessage(metadata, data):
+    ds = simple_dataset(metadata, data)
+    return ds2dap_msg(ds)
 
