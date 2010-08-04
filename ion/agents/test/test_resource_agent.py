@@ -150,14 +150,14 @@ class TestResourceAgent(IonTestCase):
         
         # Start a client (for the RPC)
         RAClient2 = ResourceAgentClient(proc=sup2, target=svc_id2)
-        reg_client2 = AgentRegistryClient(proc=sup2, target=self.rr_id)
+        #reg_client2 = AgentRegistryClient(proc=sup2, target=self.rr_id)
         #yield RAClient2.set_registry_client(reg_client2) 
         
         # setup the registry client
         yield RAClient2.set_registry_client(str(self.rr_id))
                 
         # test update/repeat reg if a different instance
-        ref2 = yield RAClient2.register_resource()
+        yield RAClient2.register_resource()
         refinst2 = yield RAClient2.get_resource_instance()
         refinst1 = yield self.RAClient.get_resource_ref()
 
