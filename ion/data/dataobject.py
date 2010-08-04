@@ -689,7 +689,7 @@ class DEncoder(object):
             val = self.decode(vdict)
             __dict[name] = TypedAttribute(type(val), val)
         #o = type(cls, (DataObject,), __dict)()
-        o = type(cls, (Resource,), __dict)()
+        o = type(str(cls), (Resource,), __dict)()
         return o
 
     def decode_lcstate(self, odict):
@@ -798,6 +798,12 @@ def register_alpha():
             content_type='application/ion-dataobject',
             content_encoding='binary')
 
+def register_dencoder():
+    de = DEncoder()
+    serializer.register('dencoder', de.encode, de.decode,
+            content_type='application/ion-dencoder',
+            content_encoding='binary')
+
 def register_jsond():
     jd = JSONDEncoder()
     serializer.register('jsond', jd.encode, jd.decode,
@@ -806,6 +812,7 @@ def register_jsond():
 
 register_alpha()
 register_jsond()
+register_dencoder()
 serializer._set_default('jsond')
 
 

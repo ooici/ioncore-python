@@ -60,7 +60,7 @@ def install_msgpacker():
     registry.register('msgpack', msgpack.packb, msgpack.unpackb, content_type='application/msgpack', content_encoding='binary')
     registry._set_default_serializer('msgpack')
 
-install_msgpacker()
+#install_msgpacker()
 
 def set_log_levels(levelfilekey=None):
     """
