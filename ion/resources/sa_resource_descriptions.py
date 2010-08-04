@@ -2,10 +2,8 @@
 """
 @file ion/resources/sa_resource_descriptions.py
 """
-from twisted.trial import unittest
-
-from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource
-from ion.resources.coi_resource_descriptions import ResourceDescription, ResourceInstance
+from ion.data.dataobject import TypedAttribute, ResourceReference, StatefulResource
+from ion.resources.coi_resource_descriptions import ResourceDescription
     
 class InstrumentResource(StatefulResource):
     '''

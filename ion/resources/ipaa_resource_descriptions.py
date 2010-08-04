@@ -6,7 +6,7 @@
 Definitions for resource descriptions used within the IPAA subsystem
 """
 from ion.data.dataobject import TypedAttribute, ResourceReference, StatefulResource
-from ion.resources.coi_resource_descriptions import ResourceDescription, ResourceInstance, AgentDescription, AgentInstance
+from ion.resources.coi_resource_descriptions import ResourceDescription, AgentDescription, AgentInstance
 
 class InstrumentAgentResourceDescription(AgentDescription):
     """

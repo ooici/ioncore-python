@@ -48,7 +48,8 @@ class TestInstrumentAgent(IonTestCase):
                                                  target=self.svc_id)
        
         # Start an Agent Registry to test against
-        self.reg_client = AgentRegistryClient(proc=self.sup, target=self.reg_id)
+        self.reg_client = AgentRegistryClient(proc=self.sup,
+                                              target=self.reg_id)
         yield self.reg_client.clear_registry()
        
         yield self.IAClient.set_registry_client(str(self.reg_id))
@@ -65,8 +66,7 @@ class TestInstrumentAgent(IonTestCase):
         capabilities
         """
         result = yield self.IAClient.get_capabilities()
-        logging.debug("*** result: %s", result)
-        self.assert_(set(IACICommands).issubset(set(result[IA.ci_commands])))
+        self.assert_(set(IACIParameters).issubset(set(result[IA.ci_parameters])))
         self.assert_(IA.driver_address in
                      result[IA.ci_parameters])
         self.assert_(list(IACICommands) == result[IA.ci_commands])
@@ -81,7 +81,8 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability of the SBE49 driver to send and receive get, set,
         and other messages. Best called as RPC message pairs.
         """
-        response = yield self.IAClient.get_from_instrument(['baudrate','outputformat'])
+        response = yield self.IAClient.get_from_instrument(['baudrate',
+                                                            'outputformat'])
         self.assert_(response['status'] == 'OK')
         self.assertEqual(response['baudrate'], 9600)
         self.assertEqual(response['outputformat'], 0)
@@ -92,7 +93,8 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(response['baudrate'], 19200)
         self.assertEqual(response['outputformat'], 1)
         
-        response = yield self.IAClient.get_from_instrument(['baudrate', 'outputformat'])
+        response = yield self.IAClient.get_from_instrument(['baudrate',
+                                                            'outputformat'])
         self.assert_(response['status'] == 'OK')
         self.assertEqual(response['baudrate'], 19200)
         self.assertEqual(response['outputformat'], 1)
@@ -161,7 +163,8 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_('stop' in response['value'])
         self.assert_(response['status'] == 'OK')
 
-        response = yield self.IAClient.execute_instrument({'badcommand':['now', '1']})
+        response = yield self.IAClient.execute_instrument({'badcommand':['now',
+                                                                         '1']})
     
         self.assert_(isinstance(response, dict))
         self.assertEqual(response['status'], 'ERROR') 
