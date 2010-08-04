@@ -816,7 +816,7 @@ def register_jsond():
 register_alpha()
 register_jsond()
 register_dencoder()
-serializer.set_default('jsond')
+serializer.set_default('alpha')
 
 
 
