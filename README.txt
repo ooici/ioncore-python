@@ -99,7 +99,7 @@ carrot (use txamqp branch)
     git clone git://amoeba.ucsd.edu/carrot.git
     (cd carrot; git checkout -b txamqp origin/txamqp)
     (cd carrot; python setup.py install)
-    
+
 MsgPack
 ----------------------------
 ::
@@ -125,6 +125,10 @@ again (see above). Please review the branch logs for any hints.
 ---------------------------------------------------------------------------
 Change log:
 ===========
+
+2010-08-03:
+- Added ant build.xml file to LCAarch root dir. Start with ant.
+  Supports ant clean, which removes all *.pyc from ion path.
 
 2010-07-23:
 - Refactored the Registry Services to inherit from a common base class. This

@@ -1,0 +1,68 @@
+<!-- Ant build file for LCAarch -->
+<project name="LCAarch" default="info" basedir=".">
+    <description>
+        This is the ANT build file for the LCAarch OOI CI Python capability
+        container and service platform.
+    </description>
+
+  <!-- load python specific ant tasks from jar file -->
+  <taskdef resource="pyAntTasks.properties" classpath="res/lib/pyAntTasks-1.3.3.jar"/>
+
+  <!-- set global properties for this build -->
+  <property name="src" location="ion"/>
+  <property name="build" location="build"/>
+  <property name="dist"  location="dist"/>
+
+  <target name="info">
+    <echo message="LCAarch ant build file. Specify a target to build"/>
+  </target>
+
+  <target name="init">
+    <!-- Create the time stamp -->
+    <tstamp/>
+  </target>
+
+  <target name="compile" depends="init"
+        description="compile the source">
+    <!-- Precompiles all Python code without executing. Finds compile errors -->
+    <py-compile dir="${src}" pythonpath="${src}" optimize="0"/>
+ </target>
+
+  <target name="dist" depends="compile"
+        description="generate the distribution" >
+    <!-- Create the distribution directory -->
+    <mkdir dir="${dist}/lib"/>
+  </target>
+
+  <target name="clean"
+        description="clean up" >
+    <delete>
+      <fileset dir="${src}" includes="**/*.pyc"/>
+    </delete>
+    <delete dir="${build}"/>
+    <delete dir="${dist}"/>
+  </target>
+
+  <target name="newcc" depends=""
+        description="start a Python CC" >
+    <!-- Run new empty capability container without shell -->
+    <echo message="Starting empty ION PyCC with sysname=${user.name}"/>
+    <exec executable="twistd">
+      <arg value="-n"/>
+      <arg value="magnet"/>
+      <arg value="-h"/>
+      <arg value="amoeba.ucsd.edu"/>
+      <arg value="-a"/>
+      <arg value="sysname=${user.name}"/>
+      <arg value="-n"/>
+      <arg value="res/scripts/newcc.py"/>
+    </exec>
+  </target>
+
+  <target name="test" depends="clean"
+        description="exdecutes all trial unit test cases" >
+    <exec executable="trial">
+      <arg value="${src}"/>
+    </exec>
+  </target>
+</project>
