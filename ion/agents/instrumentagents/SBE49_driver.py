@@ -48,9 +48,10 @@ class InstrumentClientFactory(ClientFactory):
 
     protocol = InstrumentClient
     
-    def __init__(self, parent, deferred):
+    #def __init__(self, parent, deferred):
+    def __init__(self, parent):
         self.parent = parent
-        self.deferred = deferred
+        #self.deferred = deferred
     
     def startedConnecting(self, connector):
         print 'DHE: Started to connect.'
@@ -58,20 +59,25 @@ class InstrumentClientFactory(ClientFactory):
     def got_connection(self, instrument):
         logging.debug("DHE: got_connection()!")
         self.instrument = instrument
+        """
         if self.deferred is not None:
             #logging.debug("calling callback!")
             d, self.deferred = self.deferred, None
             d.callback(instrument)
+        """
 
     def prompt_received(self, instrument):
         logging.debug("DHE: prompt_received()!")
         self.instrument = instrument
+        """
         if self.deferred is not None:
             #logging.debug("calling callback")
             d, self.deferred = self.deferred, None
             d.callback(instrument)
         #else:
             #logging.debug("no more deferred!")
+        """
+        self.parent.gotConnected(instrument)
 
     def data_received(self, data):
         logging.debug("DHE: data_received()!")
@@ -160,10 +166,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         
         # DHE Probably don't need to do it this way anymore 
-        self.d = defer.Deferred()
-        factory = InstrumentClientFactory(self, self.d)
+        #self.d = defer.Deferred()
+        #factory = InstrumentClientFactory(self, self.d)
+        factory = InstrumentClientFactory(self)
         self.connector = reactor.connectTCP("localhost", 9000, factory)
-        return self.d
+        #return self.d
     
     def gotConnected(self, instrument):
         """
@@ -255,9 +262,17 @@ class SBE49InstrumentDriver(InstrumentDriver):
         assert(isinstance(content, dict))
 
         logging.info("DHE: in op_execute!!!")
+        """
+        This connection stuff could be abstracted into a communications object.
+        """
         if self.isConnected() == False:
-            d = self.getConnected()
-            d.addCallback(self.gotConnected);
+            #d = self.getConnected()
+            logging.info("DHE: yielding for connect")
+            yield self.getConnected()
+            logging.info("DHE: connect returned")
+            # DHE: using neither of these right now, but we would use only
+            # one if we were using the deferred.
+            #d.addCallback(self.gotConnected);
             #d.addCallback(self.gotPrompt);
             logging.debug("waiting to be connected...")
                     
@@ -266,6 +281,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         for command in content.keys():
             if command not in instrument_commands:
                 yield self.reply_err(msg, "Invalid Command")
+            else:
+                logging.info("DHE: command: %s" % command)
         yield self.reply_ok(msg, content.keys())
 
     

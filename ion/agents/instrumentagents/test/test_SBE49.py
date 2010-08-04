@@ -13,6 +13,7 @@ from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriverClient
 from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriver
 from ion.core import bootstrap
 
+import ion.util.procutils as pu
 from subprocess import Popen, PIPE
 import os
 
@@ -31,9 +32,18 @@ class TestSBE49(IonTestCase):
         working directory
         """
         cwd = os.getcwd()
-        simPath = cwd.replace("_trial_temp", "ion/agents/instrumentagents/test/sim_SBE49.py")
-        #logging.info("cwd: %s, simPath: %s" %(str(cwd), str(simPath)))
-        self.simProc = Popen(simPath, stdout=PIPE)
+        simDir = cwd.replace("_trial_temp", "ion/agents/instrumentagents/test/")
+        #simPath = simDir("sim_SBE49.py")
+        simPath = simDir + "sim_SBE49.py"
+        #logPath = simDir.append("sim.log")
+        logPath = simDir + "sim.log"
+        logging.info("cwd: %s, simPath: %s, logPath: %s" %(str(cwd), str(simPath), str(logPath)))
+        simLogObj = open(logPath, 'a')
+        #self.simProc = Popen(simPath, stdout=PIPE)
+        self.simProc = Popen(simPath, stdout=simLogObj)
+
+        # Sleep for a while to allow simlator to get set up.
+        yield pu.asleep(2)
 
         self.sup = yield bootstrap.create_supervisor()
         self.driver = SBE49InstrumentDriver()

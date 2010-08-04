@@ -180,6 +180,7 @@ class Instrument(protocol.Protocol):
         elif data in self.commands:
             # Any command that falls to this point gets handled with the general
             # command response that is in the commands dictionary. 
+            print "command received: %s" % (data)
             self.transport.write(self.commands[data])
         else:
             print "Invalid command received: %s" % (data)
