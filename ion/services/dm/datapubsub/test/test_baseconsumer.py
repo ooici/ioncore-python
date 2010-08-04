@@ -40,7 +40,7 @@ from ion.services.dm.datapubsub import base_consumer
 
 class MyConsumer(base_consumer.BaseConsumer):
     
-    def ondata(data, notification):
+    def ondata(data, notification, timestamp):
         """
         Override this method
         """

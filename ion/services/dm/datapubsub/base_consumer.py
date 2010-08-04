@@ -77,27 +77,31 @@ class BaseConsumer(BaseProcess):
         self.receive_cnt += 1
         self.received_msg.append(content)
         
+        # Unpack the message and turn it into data
         datamessage = dataobject.DataObject.decode(content)
         
         if isinstance(datamessage, DAPMessageObject):
             data = dap_tools.dap_msg2ds(datamessage)
-            notification = datamessage.notification
         elif isinstance(datamessage, (StringMessageObject, DictionaryMessageObject)):
             data = datamessage.data
-            notification = datamessage.notification
-        elif isinstance(datamessage, DataMessageObject):
+        else:
             data = None
-            notification = datamessage.notification
             
+        notification = datamessage.notification
+        timestamp = datamessage.timestamp
         
-        res = self.ondata(data, notification)
-        logging.info("op_data: Finished data process")
+        res = self.ondata(data, notification,timestamp)
+        logging.info(self.__class__.__name__ +"; op_data: Finished data processing")
 
-        for ind in range(len(self.msgs_to_send)):
-            queue, msg = self.msgs_to_send.pop[0]
-            yield self.send(queue, 'data', msg) 
+        if self.msgs_to_send:
+            for ind in range(len(self.msgs_to_send)):
+                queue, msg = self.msgs_to_send.pop[0]
+                yield self.send(queue, 'data', msg) 
+    
+            logging.info(self.__class__.__name__ +"; op_data: Finished sending results")
 
-    def ondata(data, notification):
+
+    def ondata(data, notification,timestamp):
         """
         Override this method
         """
