@@ -115,8 +115,8 @@ class ResourceAgent(BaseProcess):
     def op_register_resource(self, content, headers, msg):
         """
         Registers or re-registers self in the agent registry.
-        @param content Must include an encoded ResourceInstance class that may
-            or may not have been previously created. The instance class
+        @param content Must include an encoded AgentInstance subclass that may
+            or may not have been previously filled out. The instance class
             should be appropriate to the type of resource being registered.
             Perhaps the client is checking the type?
         @todo Turn initial parameter asserts into a decode check
@@ -124,9 +124,11 @@ class ResourceAgent(BaseProcess):
         if (self.reg_client == None):
             yield self.reply_err(msg,
                                  "No agent registry client has been set!")
-
+        logging.debug("*** content: %s", content)
+        descriptor = AgentInstance.decode(content)
         # Register the instance/description
-        returned_instance = yield self.reg_client.register_agent_instance(self)
+        returned_instance = \
+            yield self.reg_client.register_agent_instance(self, descriptor)
         self.resource_ref = returned_instance.reference(head=True)
         if (self.resource_ref == None) or (self.resource_ref == False):
             yield self.reply_err(msg, "Could not register instance!")
@@ -266,7 +268,7 @@ class ResourceAgentClient(BaseProcessClient):
             defer.returnValue(None)  
           
     @defer.inlineCallbacks
-    def register_resource(self, agent_instance=None):
+    def register_resource(self, agent_instance=None, descriptor=None):
         """
         Have the resource register itself with the agent registry via
         the client that has been set via set__client()

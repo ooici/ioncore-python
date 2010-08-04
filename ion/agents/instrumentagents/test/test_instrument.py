@@ -16,7 +16,8 @@ from twisted.trial import unittest
 from ion.data.dataobject import LCStates as LCS
 from ion.test.iontest import IonTestCase
 from ion.agents.instrumentagents import instrument_agent as IA
-from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
+from ion.services.coi.agent_registry import AgentRegistryClient
+from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 from ion.agents.instrumentagents.SBE49_constants import ci_commands as IACICommands
 from ion.agents.instrumentagents.SBE49_constants import ci_parameters as IACIParameters
 from ion.agents.instrumentagents.SBE49_constants import instrument_commands as IAInstCommands
@@ -34,21 +35,23 @@ class TestInstrumentAgent(IonTestCase):
             {'name':'testSBE49IA',
              'module':'ion.agents.instrumentagents.SBE49_IA',
              'class':'SBE49InstrumentAgent'},
-            {'name':'resource_registry',
-             'module':'ion.services.coi.resource_registry',
+            {'name':'agent_registry',
+             'module':'ion.services.coi.agent_registry',
              'class':'ResourceRegistryService'}
         ]
         self.sup = yield self._spawn_processes(processes)
         self.svc_id = yield self.sup.get_child_id('testSBE49IA')
-        self.res_reg_id = yield self.sup.get_child_id('resource_registry')
+        self.reg_id = yield self.sup.get_child_id('agent_registry')
         
         # Start a client (for the RPC)
-        self.IAClient = InstrumentAgentClient(proc=self.sup, target=self.svc_id)
-        # These might work, too, for starting a client
-        #self.rrc = ResourceRegistryClient(proc=self.sup)
-        #self.rrc = ResourceRegistryClient(target=self.sup.get_scoped_name('global', self.res_reg_id))
-        
-        yield self.IAClient.set_registry_client(str(self.res_reg_id))
+        self.IAClient = IA.InstrumentAgentClient(proc=self.sup,
+                                                 target=self.svc_id)
+       
+        # Start an Agent Registry to test against
+        self.reg_client = AgentRegistryClient(proc=self.sup, target=self.reg_id)
+        yield self.reg_client.clear_registry()
+       
+        yield self.IAClient.set_registry_client(str(self.reg_id))
 
 
     @defer.inlineCallbacks
@@ -62,14 +65,15 @@ class TestInstrumentAgent(IonTestCase):
         capabilities
         """
         result = yield self.IAClient.get_capabilities()
-        self.assert_(list(IACICommands)
-                     == list(result[IA.ci_commands]))
-        self.assert_(list(IACIParameters)
-                     == list(result[IA.ci_parameters]))
-        self.assert_(list(IAInstCommands)
-                     == list(result[IA.instrument_commands]))
-        self.assert_(list(IAInstParameters)
-                     == list(result[IA.instrument_parameters]))
+        logging.debug("*** result: %s", result)
+        self.assert_(set(IACICommands).issubset(set(result[IA.ci_commands])))
+        self.assert_(IA.driver_address in
+                     result[IA.ci_parameters])
+        self.assert_(list(IACICommands) == result[IA.ci_commands])
+        self.assert_(list(IAInstCommands) ==
+                     result[IA.instrument_commands])
+        self.assert_(list(IAInstParameters) ==
+                     result[IA.instrument_parameters])
 
     @defer.inlineCallbacks
     def test_get_set_SBE49_params(self):
@@ -105,16 +109,30 @@ class TestInstrumentAgent(IonTestCase):
         Tests the ability of an instrument agent to successfully register
         ifself with the resource registry.
         """
-        raise unittest.SkipTest('Needs instrument-specific registration')
+        reg_ref = yield self.IAClient.register_resource()
         
+        result = yield self.IAClient.get_resource_instance()
+        self.assertNotEqual(result, None)
+        
+        self.assert_(isinstance(result, InstrumentAgentResourceInstance))
+        self.assertNotEqual(result.driver_process_id, None)
+        
+        self.assertEqual(reg_ref.RegistryCommit, '')
+        self.assertNotEqual(result.RegistryCommit, reg_ref.RegistryCommit)
+        self.assertEqual(reg_ref.RegistryIdentity, result.RegistryIdentity)
+        
+        # Verify the reference is the same   
+        result = yield self.IAClient.get_resource_ref()
+        
+        self.assertEqual(result, reg_ref)
         
     @defer.inlineCallbacks
     def test_lifecycle_states(self):
         """
         Test the resource lifecycle management
         """
-        raise unittest.SkipTest('Still needs instrument-specific agent registry integration')
-        """
+        yield self.IAClient.register_resource()
+        
         response = yield self.IAClient.set_lifecycle_state(LCS.inactive)
         self.assertEqual(response, LCS.inactive)
 
@@ -122,15 +140,11 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(response, LCS.inactive)
         self.assertNotEqual(response, LCS.active)
 
-        response = yield self.IAClient.set_lifecycle_state(active)
-        self.assertEqual(response, active)
+        response = yield self.IAClient.set_lifecycle_state(LCS.active)
+        self.assertEqual(response, LCS.active)
 
         response = yield self.IAClient.get_lifecycle_state()
-        self.assertEqual(response, active)
-
-        response = yield self.IAClient.set_lifecycle_state(LCS('foobar'))
-        self.assertEqual(response, active)
-        """
+        self.assertEqual(response, LCS.active)
 
     @defer.inlineCallbacks
     def test_execute(self):
@@ -156,8 +170,21 @@ class TestInstrumentAgent(IonTestCase):
         self.assert_(isinstance(response, dict))
         self.assertEqual(response['status'], 'ERROR')
         
-        
-
+    @defer.inlineCallbacks
+    def test_get_driver_proc(self):
+        """
+        Test the methods for retreiving the driver process directly from
+        the instrument agent.
+        """
+        response = yield self.IAClient.get_from_CI([IA.driver_address])
+        self.assertNotEqual(response, None)
+        """
+        Not the best test or logic, but see if the format is at least close
+        Need a better way to get at the process id of the driver...maybe
+        out of the registry?
+        """
+        self.assertEqual(str(response[IA.driver_address]).rsplit('.', 1)[0],
+                         str(self.svc_id).rsplit('.', 1)[0])
         
     @defer.inlineCallbacks
     def test_status(self):
