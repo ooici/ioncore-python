@@ -473,7 +473,7 @@ class BaseRegistryClient(BaseServiceClient):
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
 
         encoding, _, data = dataobject.serializer.encode(resource)
-        headers = dict(encoding=encoding)
+        headers = {'encoding':encoding, 'accept-encoding':encoding}
         (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
         
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
@@ -502,7 +502,7 @@ class BaseRegistryClient(BaseServiceClient):
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
         
         encoding, _, data = dataobject.serializer.encode(resource_reference)
-        headers = dict(encoding=encoding)
+        headers = {'encoding':encoding, 'accept-encoding':encoding}
         (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
         
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
@@ -520,7 +520,9 @@ class BaseRegistryClient(BaseServiceClient):
     def base_get_resource_by_id(self, op_name, id):
         yield self._check_init()
         logging.info(self.__class__.__name__ + '; Calling:'+ op_name)
-        (content, headers, msg) = yield self.rpc_send(op_name, id)
+        encoding = dataobject.serializer._default_content_type
+        headers = {'encoding':encoding, 'accept-encoding':encoding}
+        (content, headers, msg) = yield self.rpc_send(op_name, id, headers)
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
         if content['status']=='OK':
@@ -556,7 +558,7 @@ class BaseRegistryClient(BaseServiceClient):
         container.reference = resource_reference
 
         encoding, _, data = dataobject.serializer.encode(container)
-        headers = dict(encoding=encoding)
+        headers = {'encoding':encoding, 'accept-encoding':encoding}
         (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
 
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
@@ -601,7 +603,7 @@ class BaseRegistryClient(BaseServiceClient):
         container.attnames = attnames
         
         encoding, _, data = dataobject.serializer.encode(container)
-        headers = dict(encoding=encoding)
+        headers = {'encoding':encoding, 'accept-encoding':encoding}
         (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
 
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))

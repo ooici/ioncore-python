@@ -749,6 +749,7 @@ class Serializer(object):
 
     def __init__(self):
         self._encoders = {}
+        self._encoders_by_type = {}
         self._decoders = {}
         self._default_encode = None
         self._default_content_type = None
@@ -762,18 +763,21 @@ class Serializer(object):
         """
         """
         self._encoders[name] = (content_type, content_encoding, encoder)
+        self._encoders_by_type[content_type] = (content_type, content_encoding, encoder)
         self._decoders[content_type] = decoder
 
     def set_default(self, name):
         (self._default_content_type, self._default_content_encoding,
             self._default_encode) = self._encoders[name]
 
-    def encode(self, o, serializer=None):
+    def encode(self, o, content_type=None, serializer=None):
         """
         Serialize data object
         """
         if serializer:
             (content_type, content_encoding, encoder) = self._encoders[serializer]
+        elif content_type:
+            (content_type, content_encoding, encoder) = self._encoders_by_type[content_type]
         else:
             encoder = self._default_encode
             content_type = self._default_content_type
