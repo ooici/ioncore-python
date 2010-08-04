@@ -38,6 +38,7 @@ from ion.services.dm.util import dap_tools
 
 class BaseConsumer(BaseProcess):
 
+    '''
     def __init__(self,**kwargs):
         """
         @Brief Initialize the consumer with parameters:
@@ -47,10 +48,11 @@ class BaseConsumer(BaseProcess):
         """
         
         BaseProcess.__init__(self)
+
         for k,v in kwargs.items():
             setattr(self,k,v)
-
-
+    '''
+    
 
     @defer.inlineCallbacks
     def attach(self, consume_queue):

@@ -293,22 +293,5 @@ class DataPubsubClient(BaseServiceClient):
 
 
     @defer.inlineCallbacks
-    def subscribe(self, subscription_name='', identity=None, select_on={}, workflow=(), delivery='', deliver_to=None, notification={}):
-        """
-        subscription_name - the name of this subscription, Should be unique to your subscriptions
-        identity - ResourceReference for your OOI identity
-        select_on - a dictionary describing the topics to find and register for
-            {'name':'<regex>','keyword':'<regex>','AOI':<Not Yet!>}
-        workflow - a tuple of consumer methods to process the data
-        deliver - digest 
-        
-        workflow=[{name:consumer1,
-                    class:path.module,
-                    args:{<queuearg>:consumername,...kwargs}},
-                   {name:consumer2 ...)
-                   
-        delivery='asap' or 'digest'
-        deliver_to - A topic to publish the results on or None
-        notification - {'twitter':'<params>'}, {'email':'<params>'}, {'sms':'<params>'}, {'rss':'<params>'}
-        """
-        pass
+    def subscribe(self, subscription):
+        pass       

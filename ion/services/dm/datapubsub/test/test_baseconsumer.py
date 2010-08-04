@@ -74,6 +74,7 @@ class BaseConsumerTest(IonTestCase):
         yield self._stop_container()
         # Kill the queues?
         
+    '''
     #@defer.inlineCallbacks
     def test_init(self):
         dc1 = MyConsumer(queues=[1,2,3],param1=3.14159)
@@ -81,7 +82,8 @@ class BaseConsumerTest(IonTestCase):
         self.assertIn(2,dc1.queues)
         self.assertIn(3,dc1.queues)
         self.assertEqual(3.14159,dc1.param1)
-        
+    '''
+    
     @defer.inlineCallbacks
     def test_attach(self):
         dc1 = MyConsumer()

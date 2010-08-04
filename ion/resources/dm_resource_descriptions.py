@@ -114,11 +114,48 @@ class SubscriptionResource(StatefulResource):
     Informaiton about a subscriber
     """
     #Name - inherited
-    # Subscription is not to a topic but to the Exchange queue where the filtered
-    # messages arive from a topic!
-    topics = TypedAttribute(list) # List of Topic Resource References
-    period = TypedAttribute(list)
-    interval = TypedAttribute(int,0)
+
+    identity = TypedAttribute(ResourceReference)
+    select_on = TypedAttribute(PubSubTopicResource)
+    workflow = TypedAttribute(dict)
+    delivery = TypedAttribute(str)
+    deliver_to = TypedAttribute(ResourceReference) # Registerd Topic Reference
+    notification = TypedAttribute(dict)
+
+    #Used internally
+    current_topics = TypedAttribute(list) # List of Topic Resource References
+    current_procs = TypedAttribute(list) # Of what? - need a process registry
+    current_queues = TypedAttribute(list) 
+
+    @classmethod
+    def create(cls,subscription_name='', identity=None, select_on={}, workflow=(), delivery='', deliver_to=None, notification={}):
+        """
+        subscription_name - the name of this subscription, Should be unique to your subscriptions
+        identity - ResourceReference for your OOI identity
+        select_on - Topic, a topic description
+        workflow - a tuple of consumer methods to process the data
+        deliver - digest 
+        workflow=[{name:consumer1,
+                    class:path.module,
+                    args:{<queuearg>:consumername,...kwargs}},
+                   {name:consumer2 ...)
+                   
+        delivery='asap' or 'digest'
+        deliver_to - A topic to publish the results on or None
+        notification - {'twitter':'<params>'}, {'email':'<params>'}, {'sms':'<params>'}, {'rss':'<params>'}
+        """
+        
+        inst = cls()
+
+        inst.name = subscription_name
+        if identity:
+            inst.identity = identity 
+        inst.select_on
+        inst.workflow
+        inst.delivery
+        inst.deliver_to
+        inst.notification
+
 
 """
 DM DataSet Resource Descriptions

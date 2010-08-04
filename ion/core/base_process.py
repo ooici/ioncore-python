@@ -171,6 +171,7 @@ class BaseProcess(object):
         distinguished into RPC replies (by conversation ID) and other received
         messages.
         """
+        
         # Check if this response is in reply to an RPC call
         if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
             self._receive_rpc(payload, msg)
