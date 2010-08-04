@@ -90,11 +90,15 @@ class TestSBE49(IonTestCase):
         Lame test since this doesnt do much
         """
         cmd1 = {'start': ['now']}
-        cmd2 = {'pumpoff':['3600', '1']}
+        cmd2 = {'stop':['now']}
+        #cmd2 = {'pumpoff':['3600', '1']}
         result = yield self.driver_client.execute(cmd1)
         self.assertEqual(result['status'], 'OK')
         result = yield self.driver_client.execute(cmd2)
         self.assertEqual(result['status'], 'OK')
+
+        # DHE: wait a while...
+        yield pu.asleep(4)
 
         # DHE: disconnecting; a connect would probably be good.
         result = yield self.driver_client.disconnect(['some arg'])

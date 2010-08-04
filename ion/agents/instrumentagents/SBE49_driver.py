@@ -9,7 +9,7 @@ import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer, reactor
 
-from twisted.internet.protocol import Protocol, ClientFactory
+from twisted.internet.protocol import Protocol, ClientFactory, ClientCreator
 
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient
@@ -23,9 +23,13 @@ class InstrumentClient(Protocol):
     The InstrumentClient class; inherits from Protocol.  Override dataReceived
     and call the factory data_received() method to get the data to the agent.
     """
+    def __init__(self, parent):
+        self.parent = parent
+        
     def connectionMade(self):
-        #logging.debug("connectionMade.")
-        self.factory.got_connection(self)
+        logging.debug("connectionMade.")
+        #self.factory.got_connection(self)
+        self.parent.gotConnected(self)
         
     def dataReceived(self, data):
         """
@@ -34,16 +38,22 @@ class InstrumentClient(Protocol):
         of state machine or something; for instance, the agent sends a getStatus
         command, we need to know that we're expecting a status message.
         """
+        logging.info("DHE: dataReceived!")
         if data == 'S>':
-            #logging.debug("received Seabird prompt.")
-            self.factory.prompt_received(self)
+            logging.debug("received Seabird prompt.")
+            #self.factory.prompt_received(self)
+            self.parent.gotPrompt(self)
         elif data == '?CMD':
             logging.info("Seabird doesn't understand command.")
         else:
-            #logging.debug("dataReceived()!")
-            self.factory.data_received(data)
+            logging.debug("dataReceived()!")
+            #self.factory.data_received(data)
+            self.parent.gotData(data)
 
-    
+
+"""
+This isn't use anymore
+"""
 class InstrumentClientFactory(ClientFactory):
 
     protocol = InstrumentClient
@@ -140,6 +150,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
 
     connected = False
+    instrument = None
     
     def isConnected(self):
         return self.connected
@@ -150,6 +161,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
     def setAgentService(self, agent):
         self.agent = agent
 
+    @defer.inlineCallbacks
     def getConnected(self):
         """
         @brief A method to get connected to the instrument device server.  Right
@@ -168,8 +180,17 @@ class SBE49InstrumentDriver(InstrumentDriver):
         # DHE Probably don't need to do it this way anymore 
         #self.d = defer.Deferred()
         #factory = InstrumentClientFactory(self, self.d)
-        factory = InstrumentClientFactory(self)
-        self.connector = reactor.connectTCP("localhost", 9000, factory)
+        
+        # Now thinking I might try clientcreator since this will only be a
+        # single connection.
+        #factory = InstrumentClientFactory(self)
+        #self.connector = reactor.connectTCP("localhost", 9000, factory)
+        logging.info("DHE: calling ClientCreator")
+        cc = ClientCreator(reactor, InstrumentClient, self)
+        logging.info("DHE: calling connectTCP")
+        self.proto = yield cc.connectTCP("localhost", 9000)
+        logging.info("DHE: connectTCP returned")
+        
         #return self.d
     
     def gotConnected(self, instrument):
@@ -188,7 +209,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         This is ad hoc right now.  Need a state machine or something to handle
         the possible cases (connected, not-connected)
         """
-        instrument.transport.write("ds")
+        logging.debug("DHE: gotConnected!!!")
+        #instrument.transport.write("ds")
         
     def gotData(self, data):
         """
@@ -206,20 +228,23 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         This needs to be the general receive routine for the instrument driver
         """
+        logging.debug("DHE: gotPrompt!")
         self.instrument = instrument
         self.setConnected(True)
         
         """
         Need some sort of state machine so we'll know what data we're supposed to send...
         """
-        instrument.transport.write("ds")
+        #instrument.transport.write("ds")
+        #instrument.transport.write(self.command)
 
     @defer.inlineCallbacks
     def op_disconnect(self, content, headers, msg):
         logging.debug("DHE: in Instrument Driver op_disconnect!")
         if (self.isConnected() == True):
             logging.debug("DHE: disconnecting from instrument")
-            self.connector.disconnect()
+            #self.connector.disconnect()
+            self.proto.transport.loseConnection()
         yield self.reply_ok(msg, content)
         
     @defer.inlineCallbacks
@@ -274,7 +299,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             # one if we were using the deferred.
             #d.addCallback(self.gotConnected);
             #d.addCallback(self.gotPrompt);
-            logging.debug("waiting to be connected...")
+            #logging.debug("waiting to be connected...")
                     
         if (content == {}):
             yield self.reply_err(msg, "Empty command")
@@ -283,6 +308,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 yield self.reply_err(msg, "Invalid Command")
             else:
                 logging.info("DHE: command: %s" % command)
+                self.command = command
+                if self.instrument != None:
+                    logging.debug("DHE: sending command: %s" % command)
+                    self.instrument.transport.write(self.command)
         yield self.reply_ok(msg, content.keys())
 
     
