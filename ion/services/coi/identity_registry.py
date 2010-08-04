@@ -44,15 +44,6 @@ class IdentityRegistryClient(BaseRegistryClient):
         return self.base_register_resource('register_user', user)
         
     def update_user(self, user):
-        logging.debug("=====================================")
-        logging.debug("============ BEGIN DEBUG ============")
-        logging.debug("=====================================")
-        
-        logging.debug(str(user))
-        
-        logging.debug("=====================================")
-        logging.debug("============  END  DEBUG ============")
-        logging.debug("=====================================")
         return self.base_register_resource('update_user', user)
 
     def get_user(self,user_reference):
@@ -87,7 +78,7 @@ class IdentityRegistryClient(BaseRegistryClient):
 
 class IdentityRegistryService(BaseRegistryService):
 
-    # Declaration of service
+     # Declaration of service
     declare = BaseService.service_declare(name='identity_service', version='0.1.0', dependencies=[])
 
     op_clear_identity_registry = BaseRegistryService.base_clear_registry
