@@ -156,14 +156,4 @@ class UserRegistrationClientTest(IonTestCase):
         result = yield self.identity_registry_client.set_identity_lcstate_retired(ooi_id) # Wishful thinking Roger!
         user2 = yield self.identity_registry_client.get_user(ooi_id)
         self.assertEqual(str(user2.lifecycle), 'retired') # Should be retired now
-        user3 = yield self.identity_registry_client.update_user(user2)
-
-        print str(user2) + "^^******************************************************"
-
-        print str(user3) + "^^******************************************************"
-
-
-
-
-
 
