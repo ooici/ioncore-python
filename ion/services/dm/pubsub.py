@@ -26,6 +26,8 @@ import ion.util.procutils as pu
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
+from ion.services.dm.util import dap_tools 
+from pydap.model import DatasetType
 
 class DataPubsubService(BaseService):
     """Data publish/subscribe service interface
@@ -169,6 +171,11 @@ class DataPubsubService(BaseService):
             yield self.reply_err(msg, 'Publisher not registered for topic!')
             return
         
+        if not data.notification:
+            data.notification = 'Data topic: ' + topic.name
+        
+        data.timestamp = pu.currenttime()
+        
         # Todo: impersonate message as from sender
         yield self.send(topic.queue.name, 'data', data.encode(), {})
 
@@ -179,7 +186,7 @@ class DataPubsubService(BaseService):
     def find_topic(self, content, headers, msg):
         """Service operation: For a given resource, find the topic that contains
         updates to the resource or resource description. Might involve creation
-        of this topic of this topic does not yet exist
+        of this topic if this topic does not yet exist
         """
 
 # Spawn of the process using the module name
@@ -242,8 +249,6 @@ class DataPubsubClient(BaseServiceClient):
             defer.returnValue(None)
 
     
-    
-    
     @defer.inlineCallbacks
     def publish(self, publisher_proc, topic_ref, data):
         """
@@ -258,19 +263,20 @@ class DataPubsubClient(BaseServiceClient):
         
         #Load the args and pass to the publisher
         if isinstance(data, dm_resource_descriptions.DataMessageObject):
-            publication.data = data
+            do = data
+        elif isinstance(data, DatasetType):
+            do = dap_tools.ds2dap_msg(data)
         elif isinstance(data, dict):
             do = dm_resource_descriptions.DictionaryMessageObject()
             do.data=data
-            publication.data = do
         elif isinstance(data, str):
             do = dm_resource_descriptions.StringMessageObject()
             do.data=data
-            publication.data = do
         else:
-            logging.info(self.__class__.__name__ + '; publish: Failed!')
-            defer.returnValue('Invalid data - can not be published')
+            logging.info('%s; publish: Failed! Invalid DataType: %s' % (self.__class__.__name__, type(data)))
+            raise RuntimeError('%s; publish: Invalid DataType: %s' % (self.__class__.__name__, type(data)))
         
+        publication.data = do
         publication.topic_ref = topic_ref
         publication.publisher = publisher_proc.receiver.spawned.id.full
         
@@ -283,9 +289,21 @@ class DataPubsubClient(BaseServiceClient):
             defer.returnValue('sent')
         else:
             logging.info(self.__class__.__name__ + '; publish: Failed!')
-            defer.returnValue('error')
+            defer.returnValue('error sending message!')
 
 
     @defer.inlineCallbacks
-    def subscribe(self, topic_name):
+    def subscribe(self, subscription_name='', select_on={}, workflow=(), delivery='', deliver_to=None, notification='twitter'):
+        """
+        subscription_name - the name of this subscription, need not be unique
+        select_on - a dictionary describing the topics to find and register for
+            {'name':'<regex>','keyword':'<regex>','AOI':<Not Yet!>}
+        workflow - a tuple of consumer methods to process the data
+        deliver - digest 
+        
+        workflow=(consumer1,consumer2, consumer3) - the actual class objects!
+        delivery='asap' or 'digest'
+        deliver_to - A topic to publish the results on or None
+        notification - {'twitter':'<params>'}, {'email':'<params>'}, {'sms':'<params>'}, {'rss':'<params>'}
+        """
         pass

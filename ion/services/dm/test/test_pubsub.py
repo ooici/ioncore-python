@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/test/test_datapubsub.py
+@file ion/services/dm/test/test_pubsub.py
 @author Michael Meisinger
+@author David Stuebe
 @brief test service for registering topics for data pub sub
 """
 

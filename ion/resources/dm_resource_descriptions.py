@@ -43,7 +43,10 @@ class DataMessageObject(DataObject):
     """
     Base Class for Data PubSub Message Objects
     """
-
+    notification = TypedAttribute(str)
+    timestamp = TypedAttribute(float)
+    
+    
 class DAPMessageObject(DataMessageObject):
     """Container object for messaging DAP data"""
     das = TypedAttribute(str)
