@@ -59,6 +59,22 @@
     </exec>
   </target>
 
+  <target name="javalca" depends=""
+        description="start Python CC with Java Integration LCA Demo" >
+    <!-- Run new empty capability container without shell -->
+    <echo message="Starting ION PyCC with sysname=${user.name}"/>
+    <exec executable="twistd">
+      <arg value="-n"/>
+      <arg value="magnet"/>
+      <arg value="-h"/>
+      <arg value="amoeba.ucsd.edu"/>
+      <arg value="-a"/>
+      <arg value="sysname=${user.name}"/>
+      <arg value="-n"/>
+      <arg value="res/scripts/javalca.py"/>
+    </exec>
+  </target>
+
   <target name="test" depends="clean"
         description="exdecutes all trial unit test cases" >
     <exec executable="trial">

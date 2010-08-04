@@ -2,7 +2,7 @@
 LCAarch - OOI Release 1 LCA architecture prototype
 ==================================================
 
-April 2010 - May 2010
+April 2010 - August 2010
 
 This project provides a service framwork and auxilliary functions for running
 architecturally complete, but functionally limited versions of all the
@@ -19,7 +19,7 @@ http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Proje
 
 LCAarch is compatible with Python 2.5 and higher, but not Python 3.x
 This project has as dependencies Magnet, Carrot, txAMQP, Twisted and pycassa,
-and msgpack
+and msgpack, pydap, simplejson
 (see below)
 
 Get LCAarch with
@@ -42,7 +42,7 @@ Start system by executing within the CC shell:
     from ion.core import bootstrap
     bootstrap.start()
 
-Alternatively from shell executing a script:
+Alternatively (better) from UNIX shell executing a script:
 ::
     twistd -n magnet -h amoeba.ucsd.edu res/scripts/bootstrap.py
     twistd -n magnet -h amoeba.ucsd.edu res/scripts/newcc.py
