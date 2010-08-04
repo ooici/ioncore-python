@@ -66,11 +66,17 @@ def give_form(user):
     for field_name in user.attributes:
         field_value = str(getattr(user, field_name))
         if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "certificate", "rsa_private_key")):
+            
+            
+            
+            
+            
+            
             # need something here to count the linefeeds and turn it into a text area if it has 0 or more LF
             if (field_name == 'lifecycle'):
                 page += '<tr><td>' + field_name + '</td><td>'
                 page += '<SELECT NAME="lifecycle">'
-                for lc_state in ('new', 'active', 'inactive', 'commissioned', 'decomm', 'developed', 'retired'):
+                for lc_state in ('*','new', 'active', 'inactive', 'commissioned', 'decomm', 'developed', 'retired'):
                     if (field_value == lc_state.lower() ):
                         page += '<OPTION VALUE="' + lc_state + '" SELECTED>' + lc_state
                     else:
@@ -83,13 +89,13 @@ def give_form(user):
         else:
             if (field_name  in ("certificate", "rsa_private_key")):
                 page += '<tr><td>' + field_name + '</td><td><textarea rows="2" cols="20" name="' + field_name + '"/>' + field_value + '</textarea></td></tr>\n'
-            
+
+
+
+
 
 
     page += '</table>\n'
-    #page += '<INPUT TYPE="submit" NAME="add" VALUE="Add" />\n'
-    #page += '<INPUT TYPE="submit" NAME="update" VALUE="Update" />\n'
-    #page += '</FORM>'
         
     return page
 
@@ -104,11 +110,8 @@ class AddUser(resource.Resource):
         def _cb(result):
             request.write('<html><body>')
             request.write("User " + result.first_name + " " + result.last_name + " ( " + result.name + " ) added.")
-            
             user = IdentityResource.create_new_resource()
             request.write(wrap_form(give_form(user) + '<INPUT TYPE="submit" NAME="add" VALUE="Add User" /><p/>\n', "/add_user"))
-            
-            
             request.write(give_links())
             request.write('</body></html>')
             request.finish()
@@ -129,6 +132,7 @@ class AddUser(resource.Resource):
             return wrap_html(wrap_form(give_form(user) + '<INPUT TYPE="submit" NAME="add" VALUE="Add User" /><p/>\n', "/add_user") + give_links())
       
         return server.NOT_DONE_YET
+    
 class EraseAllUsers(resource.Resource):
 
     def __init__(self, identity_service_client):
@@ -139,16 +143,11 @@ class EraseAllUsers(resource.Resource):
         
         def _cb(result):
             request.write('<html><body>')
-
             user = IdentityResource.create_new_resource()
             request.write(wrap_form(give_form(user) + '<INPUT TYPE="submit" NAME="add" VALUE="Add User" /><p/>\n', "/erase_registry"))
-            
-            
             request.write(give_links())
             request.write('</body></html>')
             request.finish()
-            
-            
             
         if ('confirm' in request.args):          
             d = self.client.clear_identity_registry()
@@ -166,22 +165,17 @@ class FindUser(resource.Resource):
 
     def render(self, request):
         
-        
         def show_array_cb(result):
-            print "+++++++++++++++++++++++++++++++++ "
-
             request.write('<html><body>')
             if ((len(result) == 0) or (result == None)):
                 request.write("no matches<br\>")
                 user = IdentityResource.create_new_resource()
                 request.write(wrap_form(give_form(user) + '<INPUT TYPE="submit" NAME="search" VALUE="Search" /><p/>\n' + give_links(), "/find_user"))
             else:
-                
                 request.write("Found " + str(len(result)) + " matches<br/>\n")
                 
                 for i in result:
                     request.write('<dd/><a href="/find_user?ooi_id=' +  i.RegistryIdentity + '&branch=' + i.RegistryBranch + '&commit=' + i.RegistryCommit +'">' + i.first_name + ' ' + i.last_name + '(' + i.name + ')</a><br/>\n')
-                    
                 
                 user = result[0]
                 request.write("<hr>")
@@ -209,8 +203,6 @@ class FindUser(resource.Resource):
         
         if ((len(request.args) > 0) and ('clear' not in request.args)) :
             if ('update' in request.args.keys()):
-                """
-                """
                 updated_user = coi_resource_descriptions.IdentityResource()
                 for field_name in updated_user.attributes:
                     if (field_name not in ("lifecycle")):
@@ -220,37 +212,31 @@ class FindUser(resource.Resource):
                 foo = dataobject.LCState(state=request.args["lifecycle"][0].lower())
                 updated_user.set_lifecyclestate(foo)
                 
-                print "************************************************\n" + str(updated_user)
                 d = self.client.update_user(updated_user)
                 d.addCallback(show_single_cb)
-            if ('ooi_id' in request.args.keys()):
-                user = IdentityResource.create_new_resource(id=request.args['ooi_id'][0],  branch=request.args['branch'][0]) # was supposed to need commit=request.args['commit'][0], but doesnt want it. need to ask davif
-                d = self.client.get_user(user.reference(head=True))
-                d.addCallback(show_single_cb)
-                return server.NOT_DONE_YET
             else:    
-                user_description = coi_resource_descriptions.IdentityResource()
-                print "YYYYYYYYYYYYYYYYYYYYYYYY"
-                print str(user_description)
-                print "YYYYYYYYYYYYYYYYYYYYYYYY"
-                for field_name in user_description.attributes:
-                    if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle")):
-                        if (len(request.args[field_name]) > 0):
-                            setattr(user_description, field_name, request.args[field_name][0])
-                #
-                #
-                # need if field lcstate is not set to *, then search for its setting, and add its attribute name to the attnames paramater below
-                #
-                #
-                #foo = dataobject.LCState(state=request.args["lifecycle"][0].lower())
-                #user_description.set_lifecyclestate(foo)
-                
-                print "XXXXXXXXXXXXXXXXXXXXXXXX"
-                print str(user_description)
-                print "XXXXXXXXXXXXXXXXXXXXXXXX"
-                d = self.client.find_users(user_description, regex=True) #, ignore_defaults=True) # ,attnames=['name',]
-                d.addCallback(show_array_cb)
-                return server.NOT_DONE_YET
+                if ('ooi_id' in request.args.keys()):
+                    user = IdentityResource.create_new_resource(id=request.args['ooi_id'][0],  branch=request.args['branch'][0]) # was supposed to need commit=request.args['commit'][0], but doesnt want it. need to ask davif
+                    d = self.client.get_user(user.reference(head=True))
+                    d.addCallback(show_single_cb)
+                else:    
+                    user_description = coi_resource_descriptions.IdentityResource()
+
+                    attnames = []
+                    for field_name in user_description.attributes:
+                        if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle")):
+                            if (len(request.args[field_name]) > 0):
+                                setattr(user_description, field_name, request.args[field_name][0])
+                                attnames.append(field_name)
+     
+                    if (request.args["lifecycle"][0] != '*'):
+                        attnames.append('lifecycle')
+                        foo = dataobject.LCState(state=request.args["lifecycle"][0].lower())
+                        user_description.set_lifecyclestate(foo)
+
+                    d = self.client.find_users(user_description, regex=True,attnames=attnames) #, ignore_defaults=True) # ,attnames=['name',]
+                    d.addCallback(show_array_cb)
+            return server.NOT_DONE_YET
         else:
             user = IdentityResource.create_new_resource()
             return wrap_html(wrap_form(give_form(user) + '<INPUT TYPE="submit" NAME="search" VALUE="Search" /><p/>\n', "/find_user") + give_links())
@@ -258,7 +244,7 @@ class FindUser(resource.Resource):
 
 
         
-#@defer.inlineCallbacks
+
 def main(ns={}):
     
     from ion.services.coi import identity_registry
@@ -267,19 +253,10 @@ def main(ns={}):
     
     from ion.resources import description_utility
     description_utility.load_descriptions()
-    
-                                #yield Container.configure_messaging('mysys.identity', {'name_type':'worker', 'args':{'scope':'system'}, 'scope':'system'})
+
     client = identity_registry.IdentityRegistryClient(target='mysys.identity')
-                                #r = coi.IdentityResource.create_new_resource()
-                                #Hack.
-    #r = dataobject.Resource.create_new_resource()
-    #r.name = 'thing'
-    #yield client.register_user(r)
-    
-    #ref = r.reference()
-    
-    #r2 = yield client.get_user(ref)
-    #print r2
+                           
+
     ns.update(locals())
     webservice = IdentityWebResource(client)
     site = server.Site(webservice)
