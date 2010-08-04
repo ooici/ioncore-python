@@ -106,6 +106,8 @@ def send(receiver, send, recv, operation, content, headers=None):
     msg['reply-to'] = str(send)
     # Wire form encoding, such as 'json', 'fudge', 'XDR', 'XML', 'custom'
     msg['encoding'] = 'json'
+    # See ion.data.dataobject Serializers for choices
+    msg['accept-encoding'] = ''
     # Language of the format specification
     msg['language'] = 'ion1'
     # Identifier of a registered format specification (i.e. message schema)

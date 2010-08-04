@@ -754,16 +754,19 @@ class Serializer(object):
         self._default_content_type = None
         self._default_content_encoding = None
 
+    def __repr__(self):
+        s = ["%s\t\t%s\n" % (k, v[0]) for k, v in self._encoders.items()]
+        return ''.join(s).expandtabs()
+
     def register(self, name, encoder, decoder, content_type, content_encoding):
         """
         """
         self._encoders[name] = (content_type, content_encoding, encoder)
         self._decoders[content_type] = decoder
 
-    def _set_default(self, name):
+    def set_default(self, name):
         (self._default_content_type, self._default_content_encoding,
             self._default_encode) = self._encoders[name]
-
 
     def encode(self, o, serializer=None):
         """
@@ -813,11 +816,7 @@ def register_jsond():
 register_alpha()
 register_jsond()
 register_dencoder()
-serializer._set_default('jsond')
-
-
-
-
+serializer.set_default('jsond')
 
 
 

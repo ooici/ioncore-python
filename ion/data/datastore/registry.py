@@ -293,6 +293,7 @@ class BaseRegistryService(BaseService):
         """
         logging.debug('Registry Service MSG:'+ str(headers))
         #resource = dataobject.Resource.decode(content)
+        accept_encoding = headers.get('accept-encoding', '')
         resource = dataobject.serializer.decode(content, headers['encoding'])
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Resource: \n' + str(resource))
   
@@ -302,7 +303,7 @@ class BaseRegistryService(BaseService):
         if resource:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
             #yield self.reply_ok(msg, resource.encode())
-            encoding, _, data = dataobject.serializer.encode(resource)
+            encoding, _, data = dataobject.serializer.encode(resource, accept_encoding)
             headers = dict(encoding=encoding)
             yield self.reply_ok(msg, data, headers)
         else:
@@ -317,9 +318,7 @@ class BaseRegistryService(BaseService):
         """
         logging.debug('Registry Service MSG:'+ str(headers))
         #resource_reference = dataobject.Resource.decode(content)
-        logging.debug('%%%%%%%%%%%%')
-        logging.debug(content)
-        logging.debug(headers)
+        accept_encoding = headers.get('accept-encoding', '')
         resource_reference = dataobject.serializer.decode(content, headers['encoding'])
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
 
@@ -328,7 +327,7 @@ class BaseRegistryService(BaseService):
         if resource:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
             #yield self.reply_ok(msg, resource.encode())
-            encoding, _, data = dataobject.serializer.encode(resource)
+            encoding, _, data = dataobject.serializer.encode(resource, accept_encoding)
             headers = dict(encoding=encoding)
             yield self.reply_ok(msg, data, headers)
         else:
@@ -337,11 +336,12 @@ class BaseRegistryService(BaseService):
 
     @defer.inlineCallbacks
     def base_get_resource_by_id(self, content, headers, msg):
+        accept_encoding = headers.get('accept-encoding', '')
         resource = yield self.reg.get_resource_by_id(content)
         if resource:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
             #yield self.reply_ok(msg, resource.encode())
-            encoding, _, data = dataobject.serializer.encode(resource)
+            encoding, _, data = dataobject.serializer.encode(resource, accept_encoding)
             headers = dict(encoding=encoding)
             yield self.reply_ok(msg, data, headers)
         else:
@@ -355,6 +355,7 @@ class BaseRegistryService(BaseService):
         """
         logging.debug('Registry Service MSG:'+ str(headers))
         #container = dataobject.Resource.decode(content)
+        accept_encoding = headers.get('accept-encoding', '')
         container = dataobject.serializer.decode(content, headers['encoding'])
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
 
@@ -368,7 +369,7 @@ class BaseRegistryService(BaseService):
         
             if resource:
                 logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
-                encoding, _, data = dataobject.serializer.encode(resource.reference())
+                encoding, _, data = dataobject.serializer.encode(resource.reference(), accept_encoding)
                 headers = dict(encoding=encoding)
                 #yield self.reply_ok(msg, resource.reference().encode())
                 yield self.reply_ok(msg, data, headers)
@@ -391,6 +392,7 @@ class BaseRegistryService(BaseService):
         logging.debug('Registry Service MSG:'+ str(headers))
         #container = dataobject.Resource.decode(content)
         #This container object is expected to have certain functionality
+        accept_encoding = headers.get('accept-encoding', '')
         container = dataobject.serializer.decode(content, headers['encoding'])
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
 
@@ -412,7 +414,7 @@ class BaseRegistryService(BaseService):
         results.resources = result_list
 
         logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
-        encoding, _, data = dataobject.serializer.encode(results)
+        encoding, _, data = dataobject.serializer.encode(results, accept_encoding)
         headers = dict(encoding=encoding)
         yield self.reply_ok(msg, data, headers)
 
