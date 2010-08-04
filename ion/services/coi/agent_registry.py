@@ -172,7 +172,6 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         @param descriptor The empty, partial or full storage area for additial,
             subclass-specific values.
         """
-        logging.debug("*** descriptor: %s", descriptor)
         assert((descriptor == None) or
                (isinstance(descriptor,
                            coi_resource_descriptions.AgentInstance)))
@@ -214,7 +213,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         # Do not make a new resource idenity - this is a generic method which
         # is also used to look for an existing description
         if (descriptor == None):
-            agent_resource = coi_resource_descriptions.AgentInstance    
+            agent_resource = coi_resource_descriptions.AgentInstance()    
         else:
             agent_resource = descriptor
         

@@ -124,7 +124,13 @@ class ResourceAgent(BaseProcess):
         if (self.reg_client == None):
             yield self.reply_err(msg,
                                  "No agent registry client has been set!")
-        descriptor = AgentInstance.decode(content)
+        logging.debug("*** content: %s", content)
+        if (content == ""):
+            descriptor = None
+        elif (content != None):
+            descriptor = AgentInstance.decode(content)
+        assert((descriptor == None) or (isinstance(descriptor, AgentInstance)))
+        assert(descriptor != "")
         # Register the instance/description
         returned_instance = \
             yield self.reg_client.register_agent_instance(self, descriptor)

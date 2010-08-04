@@ -113,25 +113,19 @@ class TestResourceAgent(IonTestCase):
         # Even pulling it, modifiying it, then re-registering makes a new one
         new_result = yield self.RAClient.get_resource_instance()
         new_result.name = "UPDATED TestAgentInstance"
-        new_result.driver_process_id = 'something_else.1'
+        new_result.driver_process_id = 'something_else.2'
         new_reg_ref = yield self.RAClient.register_resource(new_res_inst)
         self.assertNotEqual(reg_id, new_reg_ref)
-        new_result = yield self.RAClient.get_resource_instance()
-        self.assertNotEqual(new_result.RegistryIdentity,
+        new_result2 = yield self.RAClient.get_resource_instance()
+        self.assertNotEqual(new_result2.RegistryIdentity,
                             orig_result.RegistryIdentity)
-        self.assertNotEqual(new_result.RegistryCommit,
+        self.assertNotEqual(new_result2.RegistryCommit,
                             orig_result.RegistryCommit)
-        self.assertEqual(new_result.name, orig_result.name)
-
-        # Different instance registered, slightly different, new entry
-        new_reg_ref = yield self.RAClient.register_resource(new_res_inst)
-        self.assertNotEqual(reg_id, new_reg_ref)
-        new_result = yield self.RAClient.get_resource_instance()
-        self.assertNotEqual(new_result.RegistryIdentity,
-                            orig_result.RegistryIdentity)
-        self.assertNotEqual(new_result.RegistryCommit,
-                            orig_result.RegistryCommit)
-        self.assertEqual(new_result.name, orig_result.name)
+        self.assertNotEqual(new_result2.name, orig_result.name)
+        self.assertEqual(new_result2.name, new_res_inst.name)
+        self.assertEqual(new_result2.driver_process_id,
+                         new_res_inst.driver_process_id)
+        self.assertNotEqual(new_result2.name, new_result.name)
     
     @defer.inlineCallbacks
     def test_agent_self_registration(self):
