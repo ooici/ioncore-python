@@ -23,30 +23,16 @@ import ion.util.procutils as pu
 from ion.data import dataobject
 from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource, DAPMessageObject
 
+from ion.services.dm.util import dap_tools
+
+from pydap.model import BaseType, DapType, DatasetType, Float32, Float64, \
+    GridType, Int16, Int32, SequenceData, SequenceType, StructureType, UInt16, \
+    UInt32, String
+
+import numpy
 
 from ion.services.dm.util import dap_tools
 
-proc = """
-# This is a data processing function that takes a sample message, filters for
-# out of range values, adds to an event queue, and computes a new sample packet
-# where outlyers are zero'ed out
-#print "In data process"
-data = content['data']
-resdata = []
-messages = []
-for (ts,samp) in data:
-    if samp<0 or samp>100:
-        messages.append(('topic_qcevent',{'event':(ts,'out_of_range',samp)}))
-        samp = 0
-    newsamp = samp * samp
-    ds = (ts,newsamp)
-    resdata.append(ds)
-
-messages.append(('topic_qc',{'metadata':{},'data':resdata}))
-
-#print "messages", messages
-result = messages
-"""
 
 class PubSubTest(IonTestCase):
     """Testing service classes of resource registry
@@ -91,9 +77,7 @@ class PubSubTest(IonTestCase):
 
 
         # Create and send a data message
-        data = DAPMessageObject()
-        data.das = 'junk'
-        data.dds = 'junk for testing only'
+        data = {'Data':'in a dictionary'}
         result = yield dpsc.publish(self.sup, topic.reference(), data)
         if result:
             logging.info('Published Message')
@@ -110,7 +94,13 @@ class PubSubTest(IonTestCase):
         dc2_id = yield dc2.spawn()
         yield dc2.attach(topic)
 
-        dmsg = self._get_datamsg({}, [1,2,1,4,3,2])
+        # Create a DAP data set and send that!
+        dmsg = dap_tools.simple_datamessage(\
+            {'DataSet Name':'Simple Data','variables':\
+                {'time':{'long_name':'Data and Time','units':'seconds'},\
+                'height':{'long_name':'person height','units':'meters'}}}, \
+            {'time':(111,112,123,114,115,116,117,118,119,120), \
+            'height':(8,6,4,-2,-1,5,3,1,4,5)})
         result = yield dpsc.publish(self.sup, topic.reference(), dmsg)
         
         
@@ -120,6 +110,24 @@ class PubSubTest(IonTestCase):
 
         self.assertEqual(dc1.receive_cnt, 2)
         self.assertEqual(dc2.receive_cnt, 1)
+
+
+        # Create and send a data message - a simple string
+        data = 'a string of data' # usually not a great idea!
+        result = yield dpsc.publish(self.sup, topic.reference(), data)
+        if result:
+            logging.info('Published Message')
+        else:
+            logging.info('Failed to Published Message')
+
+        # Need to await the delivery of data messages into the (separate) consumers
+        yield pu.asleep(1)
+
+        self.assertEqual(dc1.receive_cnt, 3)
+        self.assertEqual(dc2.receive_cnt, 2)
+
+
+
 
     @defer.inlineCallbacks
     def test_chainprocess(self):
@@ -150,7 +158,7 @@ class PubSubTest(IonTestCase):
 
         dc1 = DataConsumer()
         dc1_id = yield dc1.spawn()
-        # Use subscribe
+        # Use subscribe - does not exist yet
         yield dc1.attach(topic_raw)
         
         dc1.set_ondata(e_process,topic_qc,topic_evt)
@@ -158,15 +166,21 @@ class PubSubTest(IonTestCase):
 
         dc2 = DataConsumer()
         dc2_id = yield dc2.spawn()
+        # Use subscribe - does not exist yet
         yield dc2.attach(topic_qc)
 
         dc3 = DataConsumer()
         dc3_id = yield dc3.spawn()
-        # Use subscribe
+        # Use subscribe - does not exist yet
         yield dc3.attach(topic_evt)
 
         # Create an example data message with time
-        dmsg = self._get_datamsg(('time','height'), [(101,5),(102,2),(103,4),(104,5),(105,-1),(106,9),(107,3),(108,888),(109,3),(110,4)])
+        dmsg = dap_tools.simple_datamessage(\
+            {'DataSet Name':'Simple Data','variables':\
+                {'time':{'long_name':'Data and Time','units':'seconds'},\
+                'height':{'long_name':'person height','units':'meters'}}}, \
+            {'time':(101,102,103,104,105,106,107,108,109,110), \
+            'height':(5,2,4,5,-1,9,3,888,3,4)})
         
         result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
         if result:
@@ -178,58 +192,30 @@ class PubSubTest(IonTestCase):
         # Need to await the delivery of data messages into the consumers
         yield pu.asleep(2)
 
+        # asser that the correct number of message have been received
         self.assertEqual(dc1.receive_cnt, 1)
         self.assertEqual(dc2.receive_cnt, 1)
         self.assertEqual(dc3.receive_cnt, 2)
 
-        dmsg = self._get_datamsg(('time','height'), [(111,8),(112,6),(113,4),(114,-2),(115,-1),(116,5),(117,3),(118,1),(119,4),(120,5)])
-        yield self.sup.send(topic_raw.name, 'data', dmsg, {})
+        # Publish a second message with different data
+        dmsg = dap_tools.simple_datamessage(\
+            {'DataSet Name':'Simple Data','variables':\
+                {'time':{'long_name':'Data and Time','units':'seconds'},\
+                'height':{'long_name':'person height','units':'meters'}}}, \
+            {'time':(111,112,123,114,115,116,117,118,119,120), \
+            'height':(8,6,4,-2,-1,5,3,1,4,5)})
+        
+        result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
 
         # Need to await the delivery of data messages into the consumers
         yield pu.asleep(2)
 
+
+        # Assert that the correct number of message have been received
         self.assertEqual(dc1.receive_cnt, 2)
         self.assertEqual(dc2.receive_cnt, 2)
         self.assertEqual(dc3.receive_cnt, 4)
 
-
-    def _get_datamsg(self, metadata, data):
-        
-        # Convert metadata and data to a dap dataset
-        ds = 5
-        
-        return dap_tools.ds2dap_msg(ds)
-
-
-"""
-class event_process(object):
-    
-    def __init__(self,topic1,topic2):
-        self.topic1 = topic1
-        self.topic2 = topic2
-
-    def run(self,content,headers):
-        # This is a data processing function that takes a sample message, filters for   
-        # out of range values, adds to an event queue, and computes a new sample packet
-        # where outlyers are zero'ed out
-        #print "In data process"
-        data = content['data']
-        resdata = []
-        messages = []
-        for (ts,samp) in data:
-            if samp<0 or samp>100:
-                messages.append((self.topic2,{'event':(ts,'out_of_range',samp)}))
-                samp = 0
-            newsamp = samp * samp
-            ds = (ts,newsamp)
-            resdata.append(ds)
-        
-        messages.append((self.topic1,{'metadata':{},'data':resdata}))
-        
-        #print "messages", messages
-        result = messages
-    
-"""
 
 
 def e_process(content,headers,topic1,topic2):
@@ -238,24 +224,34 @@ def e_process(content,headers,topic1,topic2):
     # where outlyers are zero'ed out
     #print "In data process"
     
+
     logging.debug('e_process recieved:' + str(content))
+    # Convert the message to a DAPMessageObject
+    dap_msg = dataobject.DataObject.decode(content)
+    logging.debug('DAP Data:'+str(dap_msg))
+    # Read the message object and convert to a pydap object
+    data = dap_tools.dap_msg2ds(dap_msg)
     
-    
-    
-    data = dataobject.DataObject.decode(content)
     resdata = []
     messages = []
-    for (ts,samp) in data.data:
+    # Process the array of data
+    for ind in range(data.height.shape[0]):
+        
+        ts = data.time[ind]
+        samp = data.height[ind]
         if samp<0 or samp>100:
-            messages.append((topic2,{'event':(ts,'out_of_range',samp)}))
+            # Must convert pydap/numpy Int32 to int!
+            messages.append((topic2,{'event':(int(ts),'out_of_range',int(samp))}))
             samp = 0
         newsamp = samp * samp
-        ds = (ts,newsamp)
+        # Must convert pydap/numpy Int32 to int!
+        ds = (int(ts),int(newsamp))
         resdata.append(ds)
     
+    # Messages contains a list of tuples, (topic, data) to send 
     messages.append((topic1,{'metadata':{},'data':resdata}))
     
-    #print "messages", messages
+    logging.debug("messages" + str(messages))
     return messages
 
 
@@ -296,6 +292,7 @@ class DataConsumer(BaseProcess):
                     #print msg
                     yield self.send(topic.queue.name, 'data', msg, {})
 
+'''
 class DataProcess(object):
 
     def __init__(self, procdef):
@@ -310,3 +307,27 @@ class DataProcess(object):
         if 'result' in loc:
             return loc['result']
         return None
+
+proc = """
+# This is a data processing function that takes a sample message, filters for
+# out of range values, adds to an event queue, and computes a new sample packet
+# where outlyers are zero'ed out
+#print "In data process"
+data = content['data']
+resdata = []
+messages = []
+for (ts,samp) in data:
+    if samp<0 or samp>100:
+        messages.append(('topic_qcevent',{'event':(ts,'out_of_range',samp)}))
+        samp = 0
+    newsamp = samp * samp
+    ds = (ts,newsamp)
+    resdata.append(ds)
+
+messages.append(('topic_qc',{'metadata':{},'data':resdata}))
+
+#print "messages", messages
+result = messages
+"""
+'''
+

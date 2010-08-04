@@ -49,7 +49,7 @@ class DataPubsubService(BaseService):
         AMQP topic notion. A topic is basically a data stream.
         """
         
-        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
+        logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' + str(headers))
         topic = dataobject.Resource.decode(content)
   
         if not topic.RegistryIdentity:
@@ -93,19 +93,14 @@ class DataPubsubService(BaseService):
 
         defer.returnValue(topic)
 
-
-
-
-
-
     @defer.inlineCallbacks
     def op_define_publisher(self, content, headers, msg):
         """Service operation: Register a publisher that subsequently is
         authorized to publish on a topic.
         """
-        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
+        logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
         publisher = dataobject.Resource.decode(content)
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic: \n' + str(publisher))
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publisher: \n' + str(publisher))
     
         publisher = yield self.reg.register(publisher)
         if publisher:
@@ -139,7 +134,7 @@ class DataPubsubService(BaseService):
     def op_publish(self, content, headers, msg):
         """Service operation: Publish data message on a topic
         """
-        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
+        logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
         publication = dataobject.Resource.decode(content)
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publication: \n' + str(publication))
         
@@ -152,6 +147,7 @@ class DataPubsubService(BaseService):
         if not topic:
             logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic invalid!')
             yield self.reply_err(msg, 'Topic does not exist')
+            return
         
         #Check publisher is valid!
         publisher = dm_resource_descriptions.PublisherResource()
@@ -171,7 +167,7 @@ class DataPubsubService(BaseService):
         if not valid:
             logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publisher not registered for topic!')
             yield self.reply_err(msg, 'Publisher not registered for topic!')
-        
+            return
         
         # Todo: impersonate message as from sender
         yield self.send(topic.queue.name, 'data', data.encode(), {})

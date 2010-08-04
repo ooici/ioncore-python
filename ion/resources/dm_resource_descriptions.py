@@ -38,16 +38,7 @@ class PublisherResource(StatefulResource):
 
 """
 Pub Sub Messaging objects!
-"""
-class Publication(DataObject):
-    """
-    A container message for things published
-    """
-    topic_ref = TypedAttribute(ResourceReference) # The registered reference to a topic
-    data = TypedAttribute(DataMessageObject) # Any Data Object!
-    publisher = TypedAttribute(str) # The identity of the publisher
-
-    
+"""    
 class DataMessageObject(DataObject):
     """
     Base Class for Data PubSub Message Objects
@@ -67,6 +58,15 @@ class DictionaryMessageObject(DataMessageObject):
     """Container object for messaging DICTIONARY data"""
     data = TypedAttribute(dict)
     
+    
+class Publication(DataObject):
+    """
+    A container message for things published
+    """
+    topic_ref = TypedAttribute(ResourceReference) # The registered reference to a topic
+    data = TypedAttribute(DataMessageObject) # Any Data Object!
+    publisher = TypedAttribute(str) # The identity of the publisher
+
 
 class AOI(DataObject):
     """
