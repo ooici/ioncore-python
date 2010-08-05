@@ -208,6 +208,32 @@ class BaseConsumerTest(IonTestCase):
         sent = msg_cnt.get('sent',{})
         self.assertEqual(sent.get(self.queue2),1)
         self.assertEqual(received.get(self.queue1),1)
+
+
+    @defer.inlineCallbacks
+    def test_send_chain(self):
+        pd1={'name':'consumer_number_1',
+                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer',
+                 'procclass':'MyConsumer',
+                 'spawnargs':{'attach':self.queue1,\
+                              'Process Parameters':{'queues':[self.queue2]}}\
+                    }
+        child1 = base_consumer.ConsumerDesc(**pd1)
+
+        child1_id = yield self.test_sup.spawn_child(child1)
+
+        dmsg = DataMessageObject()
+        dmsg.notifcation = 'Junk'
+        dmsg.timestamp = pu.currenttime()
+        dmsg = dmsg.encode()
+        
+        yield self.test_sup.send(self.queue1, 'data', dmsg)
+        
+        msg_cnt = yield child1.get_msg_count()
+        received = msg_cnt.get('received',{})
+        sent = msg_cnt.get('sent',{})
+        self.assertEqual(sent.get(self.queue2),1)
+        self.assertEqual(received.get(self.queue1),1)
         
         
         #Spawn another process to listen to queue 2  
@@ -288,9 +314,49 @@ class BaseConsumerTest(IonTestCase):
         self.assertEqual(received.get(self.queue1),1)
         self.assertEqual(received.get(self.queue2),1)
         
-        
-        
-        
-        
         yield child1.shutdown()
+        
+        
+        
+    @defer.inlineCallbacks
+    def test_deattach(self):
+        pd1={'name':'consumer_number_1',
+                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer',
+                 'procclass':'MyConsumer',
+                 'spawnargs':{'attach':self.queue1,\
+                              'Process Parameters':{'queues':[self.queue2]}}\
+                    }
+        child1 = base_consumer.ConsumerDesc(**pd1)
+
+        child1_id = yield self.test_sup.spawn_child(child1)
+
+        dmsg = DataMessageObject()
+        dmsg.notifcation = 'Junk'
+        dmsg.timestamp = pu.currenttime()
+        dmsg = dmsg.encode()
+        
+        yield self.test_sup.send(self.queue1, 'data', dmsg)
+        
+        msg_cnt = yield child1.get_msg_count()
+        received = msg_cnt.get('received',{})
+        sent = msg_cnt.get('sent',{})
+        self.assertEqual(sent.get(self.queue2),1)
+        self.assertEqual(received.get(self.queue1),1)
+        
+        res = yield child1.deattach(self.queue1)
+        self.assertEqual(res,'OK')
+        
+        
+        yield self.test_sup.send(self.queue1, 'data', dmsg)
+        
+        msg_cnt = yield child1.get_msg_count()
+        received = msg_cnt.get('received',{})
+        sent = msg_cnt.get('sent',{})
+        self.assertEqual(sent.get(self.queue2),1)
+        self.assertEqual(received.get(self.queue1),1)
+        
+        
+        
+        
+
         

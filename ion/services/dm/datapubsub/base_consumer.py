@@ -105,6 +105,41 @@ class BaseConsumer(BaseProcess):
         else:
             yield self.reply_err(msg)
         
+    #@defer.inlineCallbacks
+    def deattach(self, queue):
+        #@Note - I tried to put a try/except here, but it did not catch the error from magnet
+        
+        # Check and make sure it is not already attached?
+        
+        del self.dataReceivers[queue]
+    
+        logging.info("DataConsumer.deattach; Deattached Queue:"+str(queue))
+        return defer.succeed('OK')
+
+        
+    @defer.inlineCallbacks
+    def op_deattach(self, content, headers, msg):
+        '''
+        Message interface to attach to another queue
+        '''
+        logging.info(self.__class__.__name__ +'; Calling Deattach; Queues:' + str(content))
+        queues = content.get('queues',None)
+        if not queues:
+            yield self.reply_err(msg)
+            return
+        
+        if not hasattr(queues,'__iter__'):
+            queues = [queues]
+        
+        for queue in queues:
+            res = yield self.deattach(queue)
+        
+        if res:
+            yield self.reply_ok(msg)
+        else:
+            yield self.reply_err(msg)
+        
+        
         
     @defer.inlineCallbacks
     def op_set_process_parameters(self, content, headers, msg):
@@ -225,6 +260,17 @@ class ConsumerDesc(ProcessDesc):
     def attach(self,queues):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
                                                 'attach', {'queues':queues})
+        if content.get('status','ERROR') == 'OK':
+            #self.proc_attached = queue
+            defer.returnValue('OK')
+        else:
+            #self.proc_attached = None
+            defer.returnValue('ERROR')
+        
+    @defer.inlineCallbacks
+    def deattach(self,queues):
+        (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
+                                                'deattach', {'queues':queues})
         if content.get('status','ERROR') == 'OK':
             #self.proc_attached = queue
             defer.returnValue('OK')
