@@ -109,6 +109,8 @@ class PubSubTopicResource(InformationResource):
         return inst
 
 
+
+
 class SubscriptionResource(StatefulResource):
     """
     Informaiton about a subscriber
@@ -127,13 +129,21 @@ class SubscriptionResource(StatefulResource):
     current_procs = TypedAttribute(list) # Of what? - need a process registry
     current_queues = TypedAttribute(list) 
 
+    # Constance used in SubscriptionResource
+    ASAP = 'asap'
+    DIGEST = 'digest'
+    TWITTER = 'twitter'
+    EMAIL = 'email'
+    SMS = 'sms'
+    RSS = 'rss'    
+    
     @classmethod
-    def create(cls,subscription_name='', identity=None, select_on={}, workflow=(), delivery='', deliver_to=None, notification={}):
+    def create(cls,subscription_name='', identity=None, select_on={}, workflow=[], delivery=ASAP, deliver_to=None, notification={}):
         """
         subscription_name - the name of this subscription, Should be unique to your subscriptions
         identity - ResourceReference for your OOI identity
         select_on - Topic, a topic description
-        workflow - a tuple of consumer methods to process the data
+        workflow - a list of ProcessDesc objects
         deliver - digest 
         workflow=[{name:consumer1,
                     class:path.module,
@@ -148,14 +158,30 @@ class SubscriptionResource(StatefulResource):
         inst = cls()
 
         inst.name = subscription_name
+
         if identity:
             inst.identity = identity 
-        inst.select_on
-        inst.workflow
-        inst.delivery
-        inst.deliver_to
-        inst.notification
+        
+        inst.select_on = select_on
+        if workflow:
+            inst.workflow = workflow
+        
+        if delivery == ASAP or delivery == DIGEST:
+            inst.delivery = delivery
+        else:
+            raise RuntimeError('Invalid setting in Subscription Resource: delivery')
 
+        if deliver_to: # Else - no final destination topic...
+            inst.deliver_to =  deliver_to
+
+        if notification: # Else - no final notification of publication
+            if notification.keys() in [TWITTER, EMAIL, RSS, SMS]:
+                inst.notification = notication
+            else:
+                raise RuntimeError('Invalid setting in Subscription Resource: notification')
+            
+            
+        return inst
 
 """
 DM DataSet Resource Descriptions

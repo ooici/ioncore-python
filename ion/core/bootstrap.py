@@ -171,7 +171,8 @@ def create_supervisor():
     sup_seq += 1
     defer.returnValue(sup)
 
-
+'''
+This method is out of date with the service registry
 @defer.inlineCallbacks
 def bs_register_services():
     """
@@ -182,7 +183,7 @@ def bs_register_services():
         sd = service_registry.ServiceDesc()
         sd.name = proc['name']
         res = yield src.register_service(sd)
-
+'''
 def reset_container():
     """
     Resets the container for warm restart. Simple implementation

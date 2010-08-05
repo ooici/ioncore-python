@@ -16,8 +16,9 @@ from magnet.container import Container
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
+from ion.core.base_process import ProtocolFactory
 from ion.core import bootstrap
-from ion.core.base_process import BaseProcess
+from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.services.dm.pubsub import DataPubsubClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
@@ -48,7 +49,9 @@ class MyConsumer(base_consumer.BaseConsumer):
         if hasattr(self,'queues'):
             for queue in self.queues:                
                 self.send_result(queue,data,notification)
-
+                
+# Spawn of the process using the module name
+factory = ProtocolFactory(MyConsumer)
 
 class BaseConsumerTest(IonTestCase):
     
@@ -74,20 +77,49 @@ class BaseConsumerTest(IonTestCase):
         yield self._stop_container()
         # Kill the queues?
         
-    '''
-    #@defer.inlineCallbacks
-    def test_init(self):
-        dc1 = MyConsumer(queues=[1,2,3],param1=3.14159)
-        self.assertIn(1,dc1.queues)
-        self.assertIn(2,dc1.queues)
-        self.assertIn(3,dc1.queues)
-        self.assertEqual(3.14159,dc1.param1)
-    '''
+
+    @defer.inlineCallbacks
+    def test_spawn_child(self):
+            
+        '''
+        procDef={'name':'consumer_number_1', \
+                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer', \
+                 'procclass':'MyConsumer', \
+                 'spawnargs':{}}
+        '''
+        procDef={'name':'consumer_number_1', \
+                 'module':'ion.core.base_process', \
+                 'procclass':'BaseProcess'}            
+        pd = ProcessDesc(**procDef)
+            
+        self.test_sup.spawn_child(pd)
+            
+        #pd.init()
+            
+        #pd.shutdown()
+        
+        #dc1 = MyConsumer(queues=[1,2,3],param1=3.14159)
+        #self.assertIn(1,dc1.queues)
+        #self.assertIn(2,dc1.queues)
+        #self.assertIn(3,dc1.queues)
+        #self.assertEqual(3.14159,dc1.param1)
+
     
     @defer.inlineCallbacks
     def test_attach(self):
-        dc1 = MyConsumer()
-        dc1_id = yield dc1.spawn()
+        
+        procDef={name:'consumer_number_1', \
+                 module:'ion.services.dm.datapubsub.test.test_baseconsumer', \
+                 procclass:'MyConsumer', \
+                 spawnargs:{}}
+        
+        pd = ProcessDesc(**procDef)
+        
+        #dc1 = MyConsumer()
+        #dc1_id = yield dc1.spawn()
+
+        self.test_sup.spawn
+
         yield dc1.attach(self.queue1)
         
         self.assertEqual(dc1.receive_cnt, 0)
