@@ -40,26 +40,26 @@ from ion.services.dm.util import dap_tools
 from ion.services.dm.datapubsub import base_consumer
 
 class MyConsumer(base_consumer.BaseConsumer):
-    
-    def ondata(data, notification, timestamp):
+
+    def ondata(self, data, notification, timestamp):
         """
         Override this method
         """
-        
+
         if hasattr(self,'queues'):
-            for queue in self.queues:                
+            for queue in self.queues:
                 self.send_result(queue,data,notification)
-                
+
 # Spawn of the process using the module name
 factory = ProtocolFactory(MyConsumer)
 
 class BaseConsumerTest(IonTestCase):
-    
+
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
         #self.sup = yield self._spawn_processes(services)
-        
+
         #Create two test queues
         queue1=dataobject.create_unique_identity()
         queue_properties = {queue1:{'name_type':'fanout', 'args':{'scope':'global'}}}
@@ -76,75 +76,66 @@ class BaseConsumerTest(IonTestCase):
     def tearDown(self):
         yield self._stop_container()
         # Kill the queues?
-        
+
 
     @defer.inlineCallbacks
     def test_spawn_child(self):
-            
-        '''
-        procDef={'name':'consumer_number_1', \
-                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer', \
-                 'procclass':'MyConsumer', \
-                 'spawnargs':{}}
-        '''
-        procDef={'name':'consumer_number_1', \
-                 'module':'ion.core.base_process', \
-                 'procclass':'BaseProcess'}            
+
+        procDef={'name':'consumer_number_1',
+                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer',
+                 'procclass':'MyConsumer',
+                 'spawnargs':{'queue':self.queue1}}
         pd = ProcessDesc(**procDef)
-            
-        self.test_sup.spawn_child(pd)
-            
-        #pd.init()
-            
-        #pd.shutdown()
-        
+
+        pd_id = yield self.test_sup.spawn_child(pd)
+
+        dc1 = self._get_procinstance(pd_id)
+
         #dc1 = MyConsumer(queues=[1,2,3],param1=3.14159)
         #self.assertIn(1,dc1.queues)
         #self.assertIn(2,dc1.queues)
         #self.assertIn(3,dc1.queues)
         #self.assertEqual(3.14159,dc1.param1)
 
-    
+
     @defer.inlineCallbacks
     def test_attach(self):
-        
-        procDef={name:'consumer_number_1', \
-                 module:'ion.services.dm.datapubsub.test.test_baseconsumer', \
-                 procclass:'MyConsumer', \
-                 spawnargs:{}}
-        
+
+        procDef={'name':'consumer_number_1',
+                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer',
+                 'procclass':'MyConsumer',
+                 'spawnargs':{'queue':self.queue1}}
         pd = ProcessDesc(**procDef)
-        
-        #dc1 = MyConsumer()
-        #dc1_id = yield dc1.spawn()
 
-        self.test_sup.spawn
+        pd_id = yield self.test_sup.spawn_child(pd)
+        dc1 = self._get_procinstance(pd_id)
 
-        yield dc1.attach(self.queue1)
-        
         self.assertEqual(dc1.receive_cnt, 0)
         self.assertEqual(dc1.consume_queue, self.queue1)
         self.assertEqual(dc1.received_msg, [])
         self.assertEqual(dc1.msgs_to_send, [])
-         
-        # Not working?       
+
+        # Not working?
         #self.failUnlessRaises(RuntimeError,dc1.attach, 'sdkfen')
-        
-    
+
+
     @defer.inlineCallbacks
     def test_attach_and_send(self):
-        dc1 = MyConsumer()
-        dc1_id = yield dc1.spawn()
-        yield dc1.attach(self.queue1)
-        
+        procDef={'name':'consumer_number_1',
+                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer',
+                 'procclass':'MyConsumer',
+                 'spawnargs':{'queue':self.queue1}}
+        pd = ProcessDesc(**procDef)
+
+        pd_id = yield self.test_sup.spawn_child(pd)
+        dc1 = self._get_procinstance(pd_id)
+
         dmsg = DataMessageObject()
         dmsg.notifcation = 'Junk'
         dmsg.timestamp = pu.currenttime()
         dmsg = dmsg.encode()
-        
-        
+
         yield self.test_sup.send(self.queue1, 'data', dmsg)
-        
-        pu.asleep(3)
+
+        yield pu.asleep(3)
         self.assertEqual(dc1.receive_cnt, 1)
-        
