@@ -106,9 +106,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
         assert(isinstance(content, dict))
         if (content == {}):
             yield self.reply_err(msg, "Empty command")
+            return
         for command in content.keys():
             if command not in instrument_commands:
                 yield self.reply_err(msg, "Invalid Command")
+                return
         yield self.reply_ok(msg, content.keys())
 
     

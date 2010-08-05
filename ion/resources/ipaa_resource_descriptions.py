@@ -6,7 +6,7 @@
 Definitions for resource descriptions used within the IPAA subsystem
 """
 from ion.data.dataobject import TypedAttribute, ResourceReference, StatefulResource
-from ion.resources.coi_resource_descriptions import ResourceDescription, ResourceInstance, AgentDescription, AgentInstance
+from ion.resources.coi_resource_descriptions import ResourceDescription, AgentDescription, AgentInstance
 
 class InstrumentAgentResourceDescription(AgentDescription):
     """
@@ -47,17 +47,5 @@ class InstrumentResourceDescription(ResourceDescription):
     """
     # The type of instrument we are registering
     instrument_type = TypedAttribute(str)
-    
-class InstrumentResourceInstance(ResourceInstance):
-    """
-    Intended for the "Instrument Registry," some basic instrument metadata to
-    hang onto for now. A few fields to start with can always be appended to
-    for a more complete listing (or even subclassing as needed).
-    @todo Flesh this out with much much much more comprehensive metadata
-    """
-    manufacturer = TypedAttribute(str)
-    model = TypedAttribute(str)
-    serial_num = TypedAttribute(str)
-    fw_version= TypedAttribute(str)
-    
+
     
