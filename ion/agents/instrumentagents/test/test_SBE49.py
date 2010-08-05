@@ -13,6 +13,10 @@ from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriverClient
 from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriver
 from ion.core import bootstrap
 
+from magnet.spawnable import Receiver
+from magnet.spawnable import spawn
+from ion.core.base_process import BaseProcess
+
 import ion.util.procutils as pu
 from subprocess import Popen, PIPE
 import os
@@ -102,5 +106,37 @@ class TestSBE49(IonTestCase):
 
         # DHE: disconnecting; a connect would probably be good.
         result = yield self.driver_client.disconnect(['some arg'])
+        
+        
+class DataConsumer(BaseProcess):
+    """
+    A class for spawning as a separate process to consume the responses from
+    the instrument.
+    """
+
+    @defer.inlineCallbacks
+    def attach(self, topic_name):
+        """
+        Attach to the given topic name
+        """
+        yield self.init()
+        self.dataReceiver = Receiver(__name__, topic_name)
+        self.dataReceiver.handle(self.receive)
+        self.dr_id = yield spawn(self.dataReceiver)
+
+        self.receive_cnt = 0
+        self.received_msg = []
+        self.ondata = None
+
+    @defer.inlineCallbacks
+    def op_data(self, content, headers, msg):
+        """
+        Data has been received.  Increment the receive_cnt
+        """
+        self.receive_cnt += 1
+        self.received_msg.append(content)
+
+
+
         
         
