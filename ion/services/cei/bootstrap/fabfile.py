@@ -42,7 +42,7 @@ def install_chef():
     run("sudo ln -s /var/lib/gems/1.8/bin/chef-solo /usr/local/bin/")
     run("sudo ln -s /var/lib/gems/1.8/bin/ohai /usr/local/bin/")
 
-def put_chef_data():
+def put_chef_data(rolesfile=None):
     run("if [ -d /opt/chef ]; then sudo rm -rf /opt/chef; fi")
     run("sudo mkdir /opt/chef && sudo chown ubuntu:ubuntu /opt/chef")
     # checkout the latest cookbooks:
