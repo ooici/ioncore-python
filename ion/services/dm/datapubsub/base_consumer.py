@@ -47,10 +47,17 @@ class BaseConsumer(BaseProcess):
         self.received_msg = []
         self.msgs_to_send = []
         self.send_cnt = {}
+        self.dataReceivers = {}
         
-        queuename = self.spawn_args.get('attach',None)
-        if queuename:
-            res = yield self.attach(queuename)
+        
+        queuenames = self.spawn_args.get('attach',None)
+        if queuenames:
+            
+            if not hasattr(queuenames,'__iter__'):
+                queuenames = [queuenames]
+                
+            for queue in queuenames:
+                res = yield self.attach(queue)
         
             if not res:
                 #@Todo - raise an error here?
@@ -63,25 +70,35 @@ class BaseConsumer(BaseProcess):
         #@Note - I tried to put a try/except here, but it did not catch the error from magnet
         
         # Check and make sure it is not already attached?
+        
+        dataReceiver = Receiver(__name__, queue)
+        dataReceiver.handle(self.receive)
+        dr_id = yield spawn(dataReceiver)
+        
+        #print dr_id, dataReceiver.name
+        
+        self.dataReceivers[dataReceiver.name] = dataReceiver
+        
         self.receive_cnt[queue]=0
-        self.dataReceiver = Receiver(__name__, queue)
-        self.dataReceiver.handle(self.receive)
-        self.dr_id = yield spawn(self.dataReceiver)
-        logging.info("DataConsumer.attach "+str(self.dr_id)+" to topic "+str(queue))
-        defer.returnValue(self.dr_id)
+        logging.info("DataConsumer.attach "+str(dr_id)+" to topic "+str(queue))
+        defer.returnValue(dr_id)
         
     @defer.inlineCallbacks
     def op_attach(self, content, headers, msg):
         '''
         Message interface to attach to another queue
         '''
-        logging.info(self.__class__.__name__ +'; Calling Attach; Queue:' + str(content))
-        queue = content.get('queue',None)
-        if not queue:
+        logging.info(self.__class__.__name__ +'; Calling Attach; Queues:' + str(content))
+        queues = content.get('queues',None)
+        if not queues:
             yield self.reply_err(msg)
             return
         
-        id = yield self.attach(queue)
+        if not hasattr(queues,'__iter__'):
+            queues = [queues]
+        
+        for queue in queues:
+            id = yield self.attach(queue)
         
         if id:
             yield self.reply_ok(msg)
@@ -205,9 +222,9 @@ class ConsumerDesc(ProcessDesc):
         #self.proc_params = None
     
     @defer.inlineCallbacks
-    def attach(self,queue):
+    def attach(self,queues):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
-                                                'attach', {'queue':queue})
+                                                'attach', {'queues':queues})
         if content.get('status','ERROR') == 'OK':
             #self.proc_attached = queue
             defer.returnValue('OK')
