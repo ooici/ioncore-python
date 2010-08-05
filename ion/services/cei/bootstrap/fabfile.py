@@ -13,7 +13,7 @@ except KeyError:
 
 def bootstrap():
     update()
-    install_chef()
+    #install_chef()
     put_chef_data()
     run_chef_solo()
 
@@ -50,6 +50,7 @@ def install_chef():
     run("sudo ln -s /var/lib/gems/1.8/bin/ohai /usr/local/bin/")
 
 def put_chef_data():
+    run("if [ -d /opt/chef ]; then sudo rm -rf /opt/chef; fi")
     run("sudo mkdir /opt/chef && sudo chown ubuntu:ubuntu /opt/chef")
     # checkout the latest cookbooks:
     run("sudo apt-get install -y git-core")
