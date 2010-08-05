@@ -165,7 +165,6 @@ class TestInstrumentAgent(IonTestCase):
 
         response = yield self.IAClient.execute_instrument({'badcommand':['now',
                                                                          '1']})
-    
         self.assert_(isinstance(response, dict))
         self.assertEqual(response['status'], 'ERROR') 
                 
