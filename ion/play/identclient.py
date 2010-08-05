@@ -1,4 +1,9 @@
 """
+
+@file ion/play/identclient.py
+@author Roger Unwin with help from Dorian Raymer
+@brief client for registering and authenticating identities via a web interface
+
 run this from lcaarch like this:
     twistd -n --pidfile=m2 magnet -h amoeba.ucsd.edu ion/play/identclient.py
 """

@@ -1,4 +1,10 @@
 """
+
+@file ion/play/identservice.py
+@author Roger Unwin with help from Dorian Raymer
+@brief service for registering and authenticating identities via a web interface
+
+
 run this from lcaarch like this:
     twistd -n magnet -n -h amoeba.ucsd.edu  ion/play/identservice.py
 """
