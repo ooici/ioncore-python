@@ -41,14 +41,13 @@ from ion.services.dm.datapubsub import base_consumer
 
 class MyConsumer(base_consumer.BaseConsumer):
     
-    def ondata(data, notification, timestamp):
+    def ondata(self, data, notification, timestamp, queues=[]):
         """
         Override this method
         """
-        
-        if hasattr(self,'queues'):
-            for queue in self.queues:                
-                self.send_result(queue,data,notification)
+
+        for queue in queues:
+            self.queue_result(queue,data,notification)
                 
 # Spawn of the process using the module name
 factory = ProtocolFactory(MyConsumer)
@@ -70,7 +69,8 @@ class BaseConsumerTest(IonTestCase):
         queue_properties = {queue2:{'name_type':'fanout', 'args':{'scope':'global'}}}
         yield bootstrap.declare_messaging(queue_properties)
         self.queue2 = queue2
-
+        
+        
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -80,23 +80,15 @@ class BaseConsumerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_spawn_child(self):
-            
-        '''
+           
         procDef={'name':'consumer_number_1', \
                  'module':'ion.services.dm.datapubsub.test.test_baseconsumer', \
-                 'procclass':'MyConsumer', \
-                 'spawnargs':{}}
-        '''
-        procDef={'name':'consumer_number_1', \
-                 'module':'ion.core.base_process', \
-                 'procclass':'BaseProcess'}            
-        pd = ProcessDesc(**procDef)
+                 'procclass':'MyConsumer'}
+        child = base_consumer.ConsumerDesc(**procDef)
+                
+        id = yield self.test_sup.spawn_child(child)
             
-        self.test_sup.spawn_child(pd)
-            
-        #pd.init()
-            
-        #pd.shutdown()
+        yield child.shutdown()
         
         #dc1 = MyConsumer(queues=[1,2,3],param1=3.14159)
         #self.assertIn(1,dc1.queues)
@@ -106,45 +98,95 @@ class BaseConsumerTest(IonTestCase):
 
     
     @defer.inlineCallbacks
-    def test_attach(self):
+    def test_spawn_child_attach(self):
         
-        procDef={name:'consumer_number_1', \
-                 module:'ion.services.dm.datapubsub.test.test_baseconsumer', \
-                 procclass:'MyConsumer', \
-                 spawnargs:{}}
+        procDef={'name':'consumer_number_1', \
+                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer', \
+                 'procclass':'MyConsumer'}
+        child = base_consumer.ConsumerDesc(**procDef)
+                
+        id = yield self.test_sup.spawn_child(child)
+            
+        res = yield child.attach(self.queue1)
+        self.assertEqual(res,'OK')
+        #self.assertEqual(child.proc_attached,self.queue1)
         
-        pd = ProcessDesc(**procDef)
         
-        #dc1 = MyConsumer()
-        #dc1_id = yield dc1.spawn()
+        res = yield child.attach(None)
+        self.assertEqual(res,'ERROR')
+        #self.assertEqual(child.proc_attached,None)
+        
+        yield child.shutdown()
 
-        self.test_sup.spawn
-
-        yield dc1.attach(self.queue1)
-        
-        self.assertEqual(dc1.receive_cnt, 0)
-        self.assertEqual(dc1.consume_queue, self.queue1)
-        self.assertEqual(dc1.received_msg, [])
-        self.assertEqual(dc1.msgs_to_send, [])
-         
-        # Not working?       
-        #self.failUnlessRaises(RuntimeError,dc1.attach, 'sdkfen')
-        
-    
     @defer.inlineCallbacks
-    def test_attach_and_send(self):
-        dc1 = MyConsumer()
-        dc1_id = yield dc1.spawn()
-        yield dc1.attach(self.queue1)
+    def test_spawn_child_params(self):
+        
+        procDef={'name':'consumer_number_1', \
+                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer', \
+                 'procclass':'MyConsumer'}
+        child = base_consumer.ConsumerDesc(**procDef)
+                
+        id = yield self.test_sup.spawn_child(child)
+            
+        # Send a dictionary
+        res = yield child.set_params(procDef)
+        self.assertEqual(res,'OK')
+
+        params = yield child.get_params()
+        
+        self.assertEqual(procDef,params)
+        
+        yield child.shutdown()
+
+        
+
+    @defer.inlineCallbacks
+    def test_attach_and_data(self):
+        
+        pd1={'name':'consumer_number_1', \
+                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer', \
+                 'procclass':'MyConsumer'}
+        child1 = base_consumer.ConsumerDesc(**pd1)
+                
+        id = yield self.test_sup.spawn_child(child1)
+        res = yield child1.attach(self.queue1)
+        
+        msg_cnt = yield child1.get_msg_count()
+        self.assertEqual(msg_cnt,0)
         
         dmsg = DataMessageObject()
         dmsg.notifcation = 'Junk'
         dmsg.timestamp = pu.currenttime()
         dmsg = dmsg.encode()
         
+        yield self.test_sup.send(self.queue1, 'data', dmsg)
+        
+        msg_cnt = yield child1.get_msg_count()
+        self.assertEqual(msg_cnt,1)
+        
+        
+        #Spawn another process to listen to queue 2  
+        pd2={'name':'consumer_number_2', \
+                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer', \
+                 'procclass':'MyConsumer'}
+        child2 = base_consumer.ConsumerDesc(**pd2)
+                
+        id = yield self.test_sup.spawn_child(child2)
+        res = yield child2.attach(self.queue2)
+       
+        # Tell the first consumer to pass results to the second!
+        res = yield child1.set_params({'queues':[self.queue2]})
         
         yield self.test_sup.send(self.queue1, 'data', dmsg)
         
-        pu.asleep(3)
-        self.assertEqual(dc1.receive_cnt, 1)
+        msg_cnt = yield child1.get_msg_count()
+        self.assertEqual(msg_cnt,2)
+        
+        msg_cnt = yield child2.get_msg_count()
+        self.assertEqual(msg_cnt,1)
+        
+        yield child1.shutdown()
+        yield child2.shutdown()
+        
+        
         
