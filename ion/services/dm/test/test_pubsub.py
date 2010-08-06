@@ -57,13 +57,13 @@ class PubSubTest(IonTestCase):
     def test_pubsub(self):
 
         dpsc = DataPubsubClient(self.sup)
-        
+
         # Create and Register a topic
-        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")        
+        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")
         topic = yield dpsc.define_topic(topic)
         logging.info('Defined Topic: '+str(topic))
 
-    
+
         #Create and register self.sup as a publisher
         publisher = PublisherResource.create('Test Publisher', self.sup, topic, 'DataObject')
         publisher = yield dpsc.define_publisher(publisher)
@@ -102,9 +102,9 @@ class PubSubTest(IonTestCase):
             {'time':(111,112,123,114,115,116,117,118,119,120), \
             'height':(8,6,4,-2,-1,5,3,1,4,5)})
         result = yield dpsc.publish(self.sup, topic.reference(), dmsg)
-        
-        
-        
+
+
+
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
 
@@ -138,14 +138,14 @@ class PubSubTest(IonTestCase):
 
 
         dpsc = DataPubsubClient(self.sup)
-        
+
         #Create and register 3 topics!
-        topic_raw = PubSubTopicResource.create("topic_raw","oceans, oil spill, fun things to do") 
+        topic_raw = PubSubTopicResource.create("topic_raw","oceans, oil spill, fun things to do")
         topic_raw = yield dpsc.define_topic(topic_raw)
 
-        topic_qc = PubSubTopicResource.create("topic_qc","oceans_qc, oil spill") 
+        topic_qc = PubSubTopicResource.create("topic_qc","oceans_qc, oil spill")
         topic_qc = yield dpsc.define_topic(topic_qc)
-        
+
         topic_evt = PubSubTopicResource.create("topic_evt", "spill events")
         topic_evt = yield dpsc.define_topic(topic_evt)
 
@@ -160,9 +160,9 @@ class PubSubTest(IonTestCase):
         dc1_id = yield dc1.spawn()
         # Use subscribe - does not exist yet
         yield dc1.attach(topic_raw)
-        
+
         dc1.set_ondata(e_process,topic_qc,topic_evt)
-        
+
 
         dc2 = DataConsumer()
         dc2_id = yield dc2.spawn()
@@ -181,7 +181,7 @@ class PubSubTest(IonTestCase):
                 'height':{'long_name':'person height','units':'meters'}}}, \
             {'time':(101,102,103,104,105,106,107,108,109,110), \
             'height':(5,2,4,5,-1,9,3,888,3,4)})
-        
+
         result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
         if result:
             logging.info('Published Message')
@@ -204,7 +204,7 @@ class PubSubTest(IonTestCase):
                 'height':{'long_name':'person height','units':'meters'}}}, \
             {'time':(111,112,123,114,115,116,117,118,119,120), \
             'height':(8,6,4,-2,-1,5,3,1,4,5)})
-        
+
         result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
 
         # Need to await the delivery of data messages into the consumers
@@ -219,11 +219,11 @@ class PubSubTest(IonTestCase):
 
 
 def e_process(content,headers,topic1,topic2):
-    # This is a data processing function that takes a sample message, filters for   
+    # This is a data processing function that takes a sample message, filters for
     # out of range values, adds to an event queue, and computes a new sample packet
     # where outlyers are zero'ed out
     #print "In data process"
-    
+
 
     logging.debug('e_process recieved:' + str(content))
     # Convert the message to a DAPMessageObject
@@ -231,12 +231,12 @@ def e_process(content,headers,topic1,topic2):
     logging.debug('DAP Data:'+str(dap_msg))
     # Read the message object and convert to a pydap object
     data = dap_tools.dap_msg2ds(dap_msg)
-    
+
     resdata = []
     messages = []
     # Process the array of data
     for ind in range(data.height.shape[0]):
-        
+
         ts = data.time[ind]
         samp = data.height[ind]
         if samp<0 or samp>100:
@@ -247,10 +247,10 @@ def e_process(content,headers,topic1,topic2):
         # Must convert pydap/numpy Int32 to int!
         ds = (int(ts),int(newsamp))
         resdata.append(ds)
-    
-    # Messages contains a list of tuples, (topic, data) to send 
+
+    # Messages contains a list of tuples, (topic, data) to send
     messages.append((topic1,{'metadata':{},'data':resdata}))
-    
+
     logging.debug("messages" + str(messages))
     return messages
 
@@ -265,7 +265,6 @@ class DataConsumer(BaseProcess):
 
     @defer.inlineCallbacks
     def attach(self, topic):
-        yield self.init()
         self.dataReceiver = Receiver(__name__, topic.queue.name)
         self.dataReceiver.handle(self.receive)
         self.dr_id = yield spawn(self.dataReceiver)
@@ -330,4 +329,3 @@ messages.append(('topic_qc',{'metadata':{},'data':resdata}))
 result = messages
 """
 '''
-
