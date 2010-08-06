@@ -120,6 +120,31 @@ class ResourceAgent(BaseProcess):
             should be appropriate to the type of resource being registered.
             Perhaps the client is checking the type?
         @todo Turn initial parameter asserts into a decode check
+        @note Registering an existing InstrumentAgent with an existing registry
+        @msc
+       	hscale = "2";
+	 User, InstrumentAgentClient, InstrumentAgentResourceInstance, InstrumentAgent, ResourceAgent, ResourceAgentClient, AgentRegistryClient, AgentRegistry;
+         User -> InstrumentAgent [label="instantiate and spawn IA subclass"];
+         User -> InstrumentAgentClient[label="instantiate IAClient subclass"];
+         User => InstrumentAgentClient [label="set_registry_client()"];
+         AgentRegistryClient -> InstrumentAgent [label="reference stored in IA"];
+         --- [label="All setup now, registry must already have a client on hand"];
+         User => InstrumentAgentClient [label="register_resource()"];
+         InstrumentAgentClient -> InstrumentAgentResourceInstance [label="instantiate"];
+         InstrumentAgentClient -> InstrumentAgentResourceInstance [label="get driver address"];
+         InstrumentAgentClient <- InstrumentAgentResourceInstance [label="driver address"];
+         InstrumentAgentClient => InstrumentAgentClient [label="ResourceAgentClient.register_resource()"];
+         InstrumentAgentClient =>> InstrumentAgent [label="op_register_resource() via AMQP"];
+         InstrumentAgent => AgentRegistryClient [label="register_agent_instance(self, custom_descriptor)"];
+         AgentRegistryClient => AgentRegistryClient [label="describe_instance(agent_instance, custom_descriptor)"];
+         AgentRegistryClient << AgentRegistryClient [label="return AgentDescription"];
+         AgentRegistryClient => AgentRegistryClient [label="find_registered_agent_instance_from_description(above)"];
+         AgentRegistryClient =>> AgentRegistry [label="register_resource() via base class AMQP"];
+         AgentRegistryClient <<= AgentRegistry [label="return via AMQP"];
+         InstrumentAgent << AgentRegistryClient [label="Success/failure"];
+         InstrumentAgentClient <<= ResourceAgent [label="Success/failure via InstrumentAgent via AMQP"]; 
+         User << InstrumentAgentClient [label="return"];
+        @endmsc
         """
         if (self.reg_client == None):
             yield self.reply_err(msg,
