@@ -15,7 +15,10 @@ from ion.services.base_service import BaseService, BaseServiceClient
 
 from pydap.parsers.dds import DDSParser
 from pydap.parsers.das import DASParser
-import simplejson as json
+try:
+    import json
+except:
+    import simplejson as json
 
 class IngestService(BaseService):
     """Ingestion service interface
