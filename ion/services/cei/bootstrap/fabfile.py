@@ -25,6 +25,7 @@ def put_provisioner_secrets():
         print "ERROR.  Please export AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
         sys.exit(1)
 
+    run("sudo mkdir /opt")
     run("sudo sh -c 'echo export NIMBUS_KEY=%s >> /opt/cei_environment'" % nimbus_key)
     run("sudo sh -c 'echo export AWS_ACCESS_KEY_ID=%s >> /opt/cei_environment'" % ec2_key)
     
