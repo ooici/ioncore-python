@@ -14,7 +14,7 @@ from twisted.trial import unittest
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
-from ion.services.dm.ingest import IngestClient, IngestService
+from ion.services.dm.ingestion.ingest import IngestClient, IngestService
 
 #from ion.services.dm.ingest import IngestClient, IngestService
 from ion.services.sa.fetcher import FetcherService
@@ -25,7 +25,7 @@ class IngesterTester(IonTestCase):
         yield self._start_container()
         self.timeout = 60
         services = [
-            {'name': 'ingest', 'module': 'ion.services.dm.ingest',
+            {'name': 'ingest', 'module': 'ion.services.dm.ingestion.ingest',
              'class':'IngestService'}
         ]
         sup = yield self._spawn_processes(services)

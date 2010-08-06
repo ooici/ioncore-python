@@ -27,9 +27,7 @@ from ion.resources.dm_resource_descriptions import PubSubTopicResource, \
 
 from ion.services.dm.util import dap_tools
 
-from pydap.model import BaseType, DapType, DatasetType, Float32, Float64, \
-    GridType, Int16, Int32, SequenceData, SequenceType, StructureType, UInt16, \
-    UInt32, String
+from pydap.model import DatasetType
 
 import numpy
 

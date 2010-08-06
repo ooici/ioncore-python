@@ -138,7 +138,8 @@ class DataPubsubService(BaseService):
         """
         logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
         publication = dataobject.Resource.decode(content)
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publication: \n' + str(publication))
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publication')
+        #logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publication: \n' + str(publication))
         
         #Get the data
         data = publication.data
@@ -163,7 +164,7 @@ class DataPubsubService(BaseService):
             
             if topic.reference(head=True) in pub.topics:
                 valid = True
-                logging.info(self.__class__.__name__ + '; Publishing to topic: \n' + str(topic))
+                logging.debug(self.__class__.__name__ + '; Publishing to topic: \n' + str(topic))
                 break
         
         if not valid:

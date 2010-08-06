@@ -18,7 +18,6 @@ from magnet.spawnable import spawn
 from ion.core.base_process import ProtocolFactory
 from ion.core import bootstrap
 from ion.core.base_process import BaseProcess, ProcessDesc
-from ion.services.dm.pubsub import DataPubsubClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -33,7 +32,7 @@ import numpy
 
 from ion.services.dm.util import dap_tools
 
-from ion.services.dm.datapubsub import base_consumer
+from ion.services.dm.distribution import base_consumer
 
 class MyConsumer(base_consumer.BaseConsumer):
 
@@ -83,7 +82,7 @@ class BaseConsumerTest(IonTestCase):
     def test_spawn_attach_args(self):
         
         pd1={'name':'consumer_number_1',
-                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer',
+                 'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':[self.queue1]}}
         child1 = base_consumer.ConsumerDesc(**pd1)
@@ -101,7 +100,7 @@ class BaseConsumerTest(IonTestCase):
     def test_spawn_attach_msg(self):
         
         pd1={'name':'consumer_number_1', \
-                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer', \
+                 'module':'ion.services.dm.distribution.test.test_baseconsumer', \
                  'procclass':'MyConsumer'}
         child1 = base_consumer.ConsumerDesc(**pd1)
                 
@@ -122,7 +121,7 @@ class BaseConsumerTest(IonTestCase):
     def test_spawn_attach_inst(self):
         
         pd1={'name':'consumer_number_1', \
-                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer', \
+                 'module':'ion.services.dm.distribution.test.test_baseconsumer', \
                  'procclass':'MyConsumer'}
         child1 = base_consumer.ConsumerDesc(**pd1)
                 
@@ -144,7 +143,7 @@ class BaseConsumerTest(IonTestCase):
     def test_params(self):
         
         pd1={'name':'consumer_number_1', \
-                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer', \
+                 'module':'ion.services.dm.distribution.test.test_baseconsumer', \
                  'procclass':'MyConsumer'}
         child1 = base_consumer.ConsumerDesc(**pd1)
                 
@@ -165,7 +164,7 @@ class BaseConsumerTest(IonTestCase):
     @defer.inlineCallbacks
     def test_send(self):
         pd1={'name':'consumer_number_1',
-                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer',
+                 'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':self.queue1,\
                               'Process Parameters':{'queues':[self.queue2]}}\
@@ -191,7 +190,7 @@ class BaseConsumerTest(IonTestCase):
     @defer.inlineCallbacks
     def test_send_chain(self):
         pd1={'name':'consumer_number_1',
-                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer',
+                 'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':self.queue1,\
                               'Process Parameters':{'queues':[self.queue2]}}\
@@ -216,7 +215,7 @@ class BaseConsumerTest(IonTestCase):
         
         #Spawn another process to listen to queue 2  
         pd2={'name':'consumer_number_2', \
-                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer', \
+                 'module':'ion.services.dm.distribution.test.test_baseconsumer', \
                  'procclass':'MyConsumer',\
                  'spawnargs':{'attach':self.queue2}}
         
@@ -253,7 +252,7 @@ class BaseConsumerTest(IonTestCase):
     def test_attach2_send(self):
         
         pd1={'name':'consumer_number_1',
-                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer',
+                 'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':[self.queue1, self.queue2],\
                     'Process Parameters':{'queues':[self.queue3]}}\
@@ -299,7 +298,7 @@ class BaseConsumerTest(IonTestCase):
     @defer.inlineCallbacks
     def test_deattach(self):
         pd1={'name':'consumer_number_1',
-                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer',
+                 'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':self.queue1,\
                               'Process Parameters':{'queues':[self.queue2]}}\
