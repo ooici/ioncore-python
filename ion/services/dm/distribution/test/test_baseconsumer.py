@@ -29,9 +29,6 @@ from ion.resources.dm_resource_descriptions import DAPMessageObject, \
 
 from ion.services.dm.util import dap_tools
 
-from pydap.model import BaseType, DapType, DatasetType, Float32, Float64, \
-    GridType, Int16, Int32, SequenceData, SequenceType, StructureType, UInt16, \
-    UInt32, String
 
 import numpy
 
@@ -94,30 +91,11 @@ class BaseConsumerTest(IonTestCase):
         
         child1_id = yield self.test_sup.spawn_child(child1)
         
+        # Don't do this - you can only get the instance in a test case -
+        # this is not a valid pattern in OTP
         dc1 = self._get_procinstance(child1_id)
         
         self.assertIn(self.queue1,dc1.dataReceivers)
-
-
-
-    @defer.inlineCallbacks
-    def test_spawn_attach_args(self):
-        
-        pd1={'name':'consumer_number_1',
-                 'module':'ion.services.dm.datapubsub.test.test_baseconsumer',
-                 'procclass':'MyConsumer',
-                 'spawnargs':{'attach':[self.queue1]}}
-        child1 = base_consumer.ConsumerDesc(**pd1)
-        
-        child1_id = yield self.test_sup.spawn_child(child1)
-        
-        dc1 = self._get_procinstance(child1_id)
-
-        #dc1 = MyConsumer(queues=[1,2,3],param1=3.14159)
-        #self.assertIn(1,dc1.queues)
-        #self.assertIn(2,dc1.queues)
-        #self.assertIn(3,dc1.queues)
-        #self.assertEqual(3.14159,dc1.param1)
 
 
     @defer.inlineCallbacks
@@ -151,6 +129,7 @@ class BaseConsumerTest(IonTestCase):
                 
         child1_id = yield self.test_sup.spawn_child(child1)
             
+        # NOT VALID IN OTP TO GET THE INSTANCE ONLY FOR TEST CASE
         dc1 = self._get_procinstance(child1_id)
             
         res = yield dc1.attach(self.queue1)
@@ -343,9 +322,10 @@ class BaseConsumerTest(IonTestCase):
         self.assertEqual(sent.get(self.queue2),1)
         self.assertEqual(received.get(self.queue1),1)
         
+        raise unittest.SkipTest("Magnet does not yet support deattach.")
+        
         res = yield child1.deattach(self.queue1)
         self.assertEqual(res,'OK')
-        
         
         yield self.test_sup.send(self.queue1, 'data', dmsg)
         

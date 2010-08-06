@@ -104,24 +104,23 @@ class BaseConsumer(BaseProcess):
             yield self.reply_ok(msg)
         else:
             yield self.reply_err(msg)
-        
-    #@defer.inlineCallbacks
+    '''
+    Magnet does not yet support Deattach
+    @defer.inlineCallbacks
     def deattach(self, queue):
         #@Note - I tried to put a try/except here, but it did not catch the error from magnet
         
         # Check and make sure it is not already attached?
-        
         del self.dataReceivers[queue]
-    
         logging.info("DataConsumer.deattach; Deattached Queue:"+str(queue))
-        return defer.succeed('OK')
+        return defer.returnValued('OK')
 
         
     @defer.inlineCallbacks
     def op_deattach(self, content, headers, msg):
-        '''
+        """
         Message interface to attach to another queue
-        '''
+        """
         logging.info(self.__class__.__name__ +'; Calling Deattach; Queues:' + str(content))
         queues = content.get('queues',None)
         if not queues:
@@ -133,12 +132,12 @@ class BaseConsumer(BaseProcess):
         
         for queue in queues:
             res = yield self.deattach(queue)
-        
+            
         if res:
             yield self.reply_ok(msg)
         else:
             yield self.reply_err(msg)
-        
+    '''
         
         
     @defer.inlineCallbacks
@@ -199,10 +198,11 @@ class BaseConsumer(BaseProcess):
         timestamp = datamessage.timestamp
 
 
-        res = yield defer.maybeDeferred(self.ondata, data, notification, timestamp, **self.params)
+        yield defer.maybeDeferred(self.ondata, data, notification, timestamp, **self.params)
 
         logging.info(self.__class__.__name__ +"; op_data: Finished data processing")
 
+        # Send data only when the process is complete!
         if self.msgs_to_send:
             for ind in range(len(self.msgs_to_send)):
                 queue, msg = self.msgs_to_send.pop(0)
@@ -267,6 +267,8 @@ class ConsumerDesc(ProcessDesc):
             #self.proc_attached = None
             defer.returnValue('ERROR')
         
+    '''
+    Magnet does not yet support Deattach
     @defer.inlineCallbacks
     def deattach(self,queues):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
@@ -277,7 +279,8 @@ class ConsumerDesc(ProcessDesc):
         else:
             #self.proc_attached = None
             defer.returnValue('ERROR')
-        
+    '''
+    
     @defer.inlineCallbacks
     def set_process_parameters(self,params):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
