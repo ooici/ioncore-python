@@ -10,13 +10,9 @@
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
-from twisted.trial import unittest
-
-from ion.data.datastore import registry
 
 from ion.services.sa.instrument_registry import InstrumentRegistryClient
 from ion.test.iontest import IonTestCase
-from ion.data import dataobject
 from ion.resources import sa_resource_descriptions
 
 
@@ -52,15 +48,13 @@ class InstrumentRegistryTest(IonTestCase):
         
         res2 = yield self.irc.get_instrument_type(ref)
         
-        res2.tau = -909.0
+        res2.manufacturer = "SeaBird Electronics"
         
         res2 = yield self.irc.register_instrument_type(res2)
         
         res3 = yield self.irc.get_instrument_type(ref)
         
-        self.assertEqual(res3.tau,-909.0)
-        #print res3
-        
+        self.assertEqual(res3.manufacturer, "SeaBird Electronics")        
 
 
 class ResourceRegistryCoreServiceTest(IonTestCase):
