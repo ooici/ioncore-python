@@ -28,7 +28,11 @@ from ion.resources.dm_resource_descriptions import Publication, PublisherResourc
 
 from ion.services.dm.util import dap_tools
 
-from ion.services.dm.datapubsub import base_consumer
+from ion.services.dm.distribution.consumers import forwarding_consumer
+
+from ion.services.dm.distribution.consumers import logging_consumer
+
+from ion.services.dm.distribution.consumers import example_consumer
 
 import numpy
 
@@ -244,46 +248,3 @@ class PubSubTest(IonTestCase):
         self.assertEqual(dc2.receive_cnt, 2)
         self.assertEqual(dc3.receive_cnt, 4)
 
-class ExampleConsumer(base_consumer.BaseConsumer):
-
-    def ondata(self, data, notification, timestamp, event_queue='', processed_queue=''):
-        """
-        This is an example data consumer process. It applies a process to the data
-        and sends the results to a 'qaqc' queue and an event queue. The send-to
-        location is a parameter specified in the consumer class spawn args,
-        'process parameters' which is passed as **kwargs to ondata
-        """
-    
-        logging.debug('ExampleConsumer recieved new data')
-            
-        resdata = []
-        messages = []
-        # Process the array of data
-        for ind in range(data.height.shape[0]):
-            
-            ts = data.time[ind]
-            samp = data.height[ind]
-            if samp<0 or samp>100:
-                # Must convert pydap/numpy Int32 to int!
-                self.queue_result(event_queue,\
-                                  {'event':(int(ts),'out_of_range',int(samp))},\
-                                    'out_of_range')
-                samp = 0
-            newsamp = samp * samp
-            # Must convert pydap/numpy Int32 to int!
-            resdata.append(int(newsamp))
-        
-        dset = dap_tools.simple_dataset(\
-            {'DataSet Name':'Simple Data','variables':\
-                {'time':{'long_name':'Data and Time','units':'seconds'},\
-                'height squared':{'long_name':'person height squared','units':'meters^2'}}}, \
-            {'time':(111,112,123,114,115,116,117,118,119,120), \
-            'height':resdata})
-        
-        # Messages contains a new dap dataset to send to send 
-        self.queue_result(processed_queue,dset,'Example processed data')
-        
-        logging.debug("messages" + str(messages))
-
-# Spawn of the process using the module name
-factory = ProtocolFactory(ExampleConsumer)
