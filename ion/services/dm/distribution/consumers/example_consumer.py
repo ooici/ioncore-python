@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/distribution/consumers/test/test_logging_consumer.py
+@file ion/services/dm/distribution/consumers/example_consumer.py
 @author David Stuebe
-@brief test for the logging consumer process
+@brief example consumer process. Consumes a simple kind of dap data message
+producing an event for samples less than 0 or greater than 100. The qaqc result
+is sent to a separate queue. These destinations are set as part of the spawnargs
 """
 
 from ion.services.dm.distribution import base_consumer
@@ -18,14 +20,14 @@ from pydap.model import DatasetType
 from ion.services.dm.util import dap_tools
 
 class ExampleConsumer(base_consumer.BaseConsumer):
-
-    def ondata(self, data, notification, timestamp, event_queue='', processed_queue=''):
-        """
+    """
         This is an example data consumer process. It applies a process to the data
         and sends the results to a 'qaqc' queue and an event queue. The send-to
         location is a parameter specified in the consumer class spawn args,
         'process parameters' which is passed as **kwargs to ondata
         """
+    def ondata(self, data, notification, timestamp, event_queue='', processed_queue=''):
+        
             
         resdata = []
         tsdata = []

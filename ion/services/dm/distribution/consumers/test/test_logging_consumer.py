@@ -19,7 +19,11 @@ from ion.services.dm.util import dap_tools
 
 
 class TestLoggingConsumer(IonTestCase):
-    
+    '''
+    @Brief Test case for a simple logging consumer. This is a test for the
+    business logic of the ondata method.
+    @TODO How to veryify that the correct content is sent to the log?
+    '''
     
     def setUp(self):
         

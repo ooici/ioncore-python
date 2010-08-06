@@ -3,21 +3,21 @@
 """
 @file ion/services/dm/distribution/test/test_baseconsumer.py
 @author David Stuebe
-@brief test for the base consumer process
+@brief test cases for the base consumer process
 """
 
 import logging
 logging = logging.getLogger(__name__)
-import time
+#import time
 from twisted.internet import defer
 from twisted.trial import unittest
-from magnet.container import Container
+#from magnet.container import Container
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
 from ion.core.base_process import ProtocolFactory
 from ion.core import bootstrap
-from ion.core.base_process import BaseProcess, ProcessDesc
+#from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -26,15 +26,14 @@ from ion.resources.dm_resource_descriptions import DAPMessageObject, \
     DataMessageObject, DictionaryMessageObject, StringMessageObject
 
 from ion.services.dm.util import dap_tools
-
-
-import numpy
-
-from ion.services.dm.util import dap_tools
-
 from ion.services.dm.distribution import base_consumer
 
 class MyConsumer(base_consumer.BaseConsumer):
+    '''
+    @Brief MyConsumer is a test consumer for examining the functionality of the
+    base consumer class. 
+    '''
+
 
     def ondata(self, data, notification, timestamp, queues=[]):
         """
@@ -49,6 +48,11 @@ class MyConsumer(base_consumer.BaseConsumer):
 factory = ProtocolFactory(MyConsumer)
 
 class BaseConsumerTest(IonTestCase):
+    '''
+    Test cases for the base consumer method. They examine the message based
+    control of the child processes and ensure that ondata is called properly
+    '''
+
 
     @defer.inlineCallbacks
     def setUp(self):

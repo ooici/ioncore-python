@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/datapubsub.py
+@file ion/services/dm/distribution/pubsub_service.py
 @author Michael Meisinger
-@brief service for publishing on data streams, and for subscribing to streams
-@Note Should the pubsub service use the pubsub registry client or should it
-implement the communication with the pubsub registry service?
+@author David Stuebe
+@brief service for publishing on data streams, and for subscribing to streams.
+The service includes methods for defining topics, defining publishers, publishing,
+and defining subscriptions.
 """
 
 import logging
@@ -30,7 +31,8 @@ from ion.services.dm.util import dap_tools
 from pydap.model import DatasetType
 
 class DataPubsubService(BaseService):
-    """Data publish/subscribe service interface
+    """
+    @Brief Service for Publicaiton and Subscription to topics
     """
 
     # Declaration of service
@@ -196,7 +198,7 @@ factory = ProtocolFactory(DataPubsubService)
 
 class DataPubsubClient(BaseServiceClient):
     """
-    Client class for accessing the data pubsub service.
+    @Brief Client class for accessing the data pubsub service.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:

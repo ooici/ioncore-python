@@ -2,7 +2,7 @@
 
 
 """
-@file ion/services/dm/datapubsub/base_consumer.py
+@file ion/services/dm/distribution/base_consumer.py
 @author David Stuebe
 @brief the base class for pubsub consumer processes
 """
@@ -14,7 +14,7 @@ import time
 
 from twisted.internet import defer
 
-from magnet.container import Container
+#from magnet.container import Container
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
@@ -29,13 +29,17 @@ from ion.services.dm.util import dap_tools
 
 from pydap.model import DatasetType
 
-import numpy
+#import numpy
 
 from ion.services.dm.util import dap_tools
 
 
 class BaseConsumer(BaseProcess):
-
+    '''
+    @Brief This is the base class from which all consumer processes should inherit.
+    All tranformaitons and data presentation methods should inherit for this
+    and implement the ondata method to perform the desired task.
+    '''
     
 
     @defer.inlineCallbacks
@@ -245,6 +249,11 @@ class BaseConsumer(BaseProcess):
         
         
 class ConsumerDesc(ProcessDesc):
+    '''
+    @Brief The ConsumerDesc class inherits from the ProcessDesc class and is used
+    to create and control consumer processes.
+    '''
+    
     
     def __init__(self, **kwargs):
         

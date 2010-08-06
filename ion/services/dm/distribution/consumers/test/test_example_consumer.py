@@ -20,7 +20,12 @@ from ion.services.dm.util import dap_tools
 from twisted.internet import defer
 
 
-class TestLoggingConsumer(IonTestCase):
+class TestExampleConsumer(IonTestCase):
+    '''
+    @Brief Test case for a simple Example consumer. The test is a unit test for
+    the business logic of the consumer only - the ondata method.
+    '''
+    
     
     @defer.inlineCallbacks
     def setUp(self):

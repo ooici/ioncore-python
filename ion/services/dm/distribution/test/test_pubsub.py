@@ -1,24 +1,24 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/test/test_pubsub.py
+@file ion/services/dm/distribution/test/test_pubsub.py
 @author Michael Meisinger
 @author David Stuebe
-@brief test service for registering topics for data pub sub
+@brief test service for registering topics for data publication & subscription
 """
 
 import logging
 logging = logging.getLogger(__name__)
-import time
+#import time
 from twisted.internet import defer
 from twisted.trial import unittest
-from magnet.container import Container
-from magnet.spawnable import Receiver
-from magnet.spawnable import spawn
+#from magnet.container import Container
+#from magnet.spawnable import Receiver
+#from magnet.spawnable import spawn
 
-from ion.core.base_process import ProtocolFactory
+#from ion.core.base_process import ProtocolFactory
 from ion.core import bootstrap
-from ion.core.base_process import BaseProcess
+#from ion.core.base_process import BaseProcess
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
@@ -33,13 +33,15 @@ from ion.services.dm.distribution.consumers import forwarding_consumer
 from ion.services.dm.distribution.consumers import logging_consumer
 from ion.services.dm.distribution.consumers import example_consumer
 
-import numpy
+#import numpy
 
 from ion.services.dm.util import dap_tools
 
 
 class PubSubTest(IonTestCase):
-    """Testing service classes of resource registry
+    """
+    Testing PubSub service methods to define topics, define publishers, define
+    subscriptions and publish data. 
     """
 
     @defer.inlineCallbacks
