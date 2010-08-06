@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/ingest.py
+@file ion/services/dm/ingestion/ingest.py
 @author Michael Meisinger
 @brief service for ingesting information into DM
 """
@@ -22,6 +22,8 @@ except:
 
 class IngestService(BaseService):
     """Ingestion service interface
+    @Note Needs work - Should create a subscription to ingest a data source
+    What should the service interface look like for this?
     """
 
     # Declaration of service

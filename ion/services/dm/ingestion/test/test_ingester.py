@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/test/test_ingester.py
+@file ion/services/dm/ingestion/test/test_ingester.py
 @author Paul Hubbard
 @date 6/11/10
 """
