@@ -16,6 +16,9 @@ from ion.core import bootstrap
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 from ion.core.base_process import BaseProcess
+from ion.services.dm.pubsub import DataPubsubClient
+from ion.services.base_service import BaseServiceClient
+from ion.resources.dm_resource_descriptions import PubSubTopic
 
 import ion.util.procutils as pu
 from subprocess import Popen, PIPE
@@ -49,6 +52,13 @@ class TestSBE49(IonTestCase):
         # Sleep for a while to allow simlator to get set up.
         yield pu.asleep(2)
 
+        services = [
+            {'name':'datapubsub_registry','module':'ion.services.dm.datapubsub.pubsub_registry','class':'DataPubSubRegistryService'},
+            {'name':'data_pubsub','module':'ion.services.dm.pubsub','class':'DataPubsubService'}
+         ]
+
+        self.pubsubSuper = yield self._spawn_processes(services)
+        
         self.sup = yield bootstrap.create_supervisor()
         self.driver = SBE49InstrumentDriver()
         self.driver_pid = yield self.driver.spawn()
@@ -93,6 +103,17 @@ class TestSBE49(IonTestCase):
         """
         Lame test since this doesnt do much
         """
+        
+        dpsc = DataPubsubClient(self.pubsubSuper)
+        topic = PubSubTopic.create_fanout_topic("topic1")
+        
+        topic_name = yield dpsc.define_topic(topic)
+        logging.info('DHE: Service reply: '+str(topic_name))
+        
+        dc1 = DataConsumer()
+        dc1_id = yield dc1.spawn()
+        yield dc1.attach(topic.name)
+        
         cmd1 = {'start': ['now']}
         cmd2 = {'stop':['now']}
         #cmd2 = {'pumpoff':['3600', '1']}
@@ -135,7 +156,7 @@ class DataConsumer(BaseProcess):
         """
         self.receive_cnt += 1
         self.received_msg.append(content)
-
+        
 
 
         
