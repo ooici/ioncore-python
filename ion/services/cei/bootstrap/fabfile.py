@@ -2,6 +2,7 @@ from __future__ import with_statement
 import os
 import sys
 from fabric.api import env, run, local, put, cd, hide
+from fabric.decorators import runs_once
 
 def bootstrap(rolesfile=None):
     update()
@@ -25,7 +26,7 @@ def put_provisioner_secrets():
         print "ERROR.  Please export AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
         sys.exit(1)
 
-    run("sudo mkdir /opt")
+    ensure_opt()
     run("sudo sh -c 'echo export NIMBUS_KEY=%s >> /opt/cei_environment'" % nimbus_key)
     run("sudo sh -c 'echo export AWS_ACCESS_KEY_ID=%s >> /opt/cei_environment'" % ec2_key)
     
@@ -43,7 +44,12 @@ def install_chef():
     run("sudo ln -s /var/lib/gems/1.8/bin/chef-solo /usr/local/bin/")
     run("sudo ln -s /var/lib/gems/1.8/bin/ohai /usr/local/bin/")
 
+@runs_once
+def ensure_opt():
+    run("if [ ! -d /opt ]; then sudo mkdir /opt; fi")
+    
 def put_chef_data(rolesfile=None):
+    ensure_opt()
     run("if [ -d /opt/chef ]; then sudo rm -rf /opt/chef; fi")
     run("sudo mkdir /opt/chef && sudo chown ubuntu:ubuntu /opt/chef")
     # checkout the latest cookbooks:
