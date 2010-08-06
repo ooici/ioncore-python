@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/test/test_pubsub.py
-@author Michael Meisinger
+@file ion/services/dm/distribution/test/test_baseconsumer.py
 @author David Stuebe
-@brief test service for registering topics for data pub sub
+@brief test for the base consumer process
 """
 
 import logging
