@@ -307,16 +307,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
         for command in content.keys():
             if command not in instrument_commands:
                 yield self.reply_err(msg, "Invalid Command")
-<<<<<<< HEAD
             else:
                 logging.info("DHE: command: %s" % command)
                 self.command = command
                 if self.instrument != None:
                     logging.debug("DHE: sending command: %s" % command)
                     self.instrument.transport.write(self.command)
-=======
-                return
->>>>>>> master
         yield self.reply_ok(msg, content.keys())
 
     
