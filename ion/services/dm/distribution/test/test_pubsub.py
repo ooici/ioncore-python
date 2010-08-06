@@ -19,7 +19,7 @@ from magnet.spawnable import spawn
 from ion.core.base_process import ProtocolFactory
 from ion.core import bootstrap
 from ion.core.base_process import BaseProcess
-from ion.services.dm.pubsub import DataPubsubClient
+from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -28,10 +28,9 @@ from ion.resources.dm_resource_descriptions import Publication, PublisherResourc
 
 from ion.services.dm.util import dap_tools
 
+from ion.services.dm.distribution import base_consumer
 from ion.services.dm.distribution.consumers import forwarding_consumer
-
 from ion.services.dm.distribution.consumers import logging_consumer
-
 from ion.services.dm.distribution.consumers import example_consumer
 
 import numpy
@@ -47,8 +46,8 @@ class PubSubTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
         services = [
-            {'name':'datapubsub_registry','module':'ion.services.dm.datapubsub.pubsub_registry','class':'DataPubSubRegistryService'},
-            {'name':'data_pubsub','module':'ion.services.dm.pubsub','class':'DataPubsubService'}
+            {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
+            {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'}
             ]
 
         self.sup = yield self._spawn_processes(services)
@@ -71,12 +70,12 @@ class PubSubTest(IonTestCase):
 
         #Create two test queues - don't use topics to test the consumer
         # To be replaced when the subscription service is ready
-        evt_queue=dataobject.create_unique_identity()
-        queue_properties = {evt_queue:{'name_type':'fanout', 'args':{'scope':'global'}}}
+        queue1=dataobject.create_unique_identity()
+        queue_properties = {queue1:{'name_type':'fanout', 'args':{'scope':'global'}}}
         yield bootstrap.declare_messaging(queue_properties)
 
-        pr_queue=dataobject.create_unique_identity()
-        queue_properties = {pr_queue:{'name_type':'fanout', 'args':{'scope':'global'}}}
+        queue2=dataobject.create_unique_identity()
+        queue_properties = {queue2:{'name_type':'fanout', 'args':{'scope':'global'}}}
         yield bootstrap.declare_messaging(queue_properties)
 
     
@@ -90,12 +89,11 @@ class PubSubTest(IonTestCase):
 
 
         pd1={'name':'example_consumer_1',
-                 'module':'ion.services.dm.test.test_pubsub',
-                 'procclass':'ExampleConsumer',
+                 'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'procclass':'ForwardingConsumer',
                  'spawnargs':{'attach':topic.queue.name,\
                               'Process Parameters':\
-                              {'event_queue':evt_queue,\
-                               'processed_queue':pr_queue}}\
+                              {'queues':[queue1,queue2]}}\
                     }
         child1 = base_consumer.ConsumerDesc(**pd1)
 
@@ -116,34 +114,40 @@ class PubSubTest(IonTestCase):
         msg_cnt = yield child1.get_msg_count()
         received = msg_cnt.get('received',{})
         sent = msg_cnt.get('sent',{})
-        self.assertEqual(sent.get(pr_queue),1)
+        self.assertEqual(sent.get(queue1),1)
+        self.assertEqual(sent.get(queue2),1)
         self.assertEqual(received.get(topic.queue.name),1)
 
-        print 'HEKEKNMSNDCLKELIHFILNBSLKDCNVLIEHWOIVBJKLB'
+        pd2={'name':'example_consumer_2',
+                 'module':'ion.services.dm.distribution.consumers.logging_consumer',
+                 'procclass':'LoggingConsumer',
+                 'spawnargs':{'attach':queue1,\
+                              'Process Parameters':{}}\
+                    }
+        child2 = base_consumer.ConsumerDesc(**pd2)
 
-        # Create a second data consumer
-        dc2 = DataConsumer()
-        dc2_id = yield dc2.spawn()
-        yield dc2.attach(topic)
+        child2_id = yield self.test_sup.spawn_child(child2)
 
-        # Create a DAP data set and send that!
-        dmsg = dap_tools.simple_datamessage(\
-            {'DataSet Name':'Simple Data','variables':\
-                {'time':{'long_name':'Data and Time','units':'seconds'},\
-                'height':{'long_name':'person height','units':'meters'}}}, \
-            {'time':(111,112,123,114,115,116,117,118,119,120), \
-            'height':(8,6,4,-2,-1,5,3,1,4,5)})
-        result = yield dpsc.publish(self.sup, topic.reference(), dmsg)
-        
-        
+        # Send the simple message again
+        result = yield dpsc.publish(self.sup, topic.reference(), data)
         
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
 
-        self.assertEqual(dc1.receive_cnt, 2)
-        self.assertEqual(dc2.receive_cnt, 1)
+        msg_cnt = yield child1.get_msg_count()
+        received = msg_cnt.get('received',{})
+        sent = msg_cnt.get('sent',{})
+        self.assertEqual(sent.get(queue1),2)
+        self.assertEqual(sent.get(queue2),2)
+        self.assertEqual(received.get(topic.queue.name),2)
 
+        msg_cnt = yield child2.get_msg_count()
+        received = msg_cnt.get('received',{})
+        sent = msg_cnt.get('sent',{})
+        self.assertEqual(sent,{})
+        self.assertEqual(received.get(queue1),1)
 
+        '''
         # Create and send a data message - a simple string
         data = 'a string of data' # usually not a great idea!
         result = yield dpsc.publish(self.sup, topic.reference(), data)
@@ -157,7 +161,7 @@ class PubSubTest(IonTestCase):
 
         self.assertEqual(dc1.receive_cnt, 3)
         self.assertEqual(dc2.receive_cnt, 2)
-
+        '''
 
 
 
@@ -187,6 +191,15 @@ class PubSubTest(IonTestCase):
         publisher = yield dpsc.define_publisher(publisher)
 
         logging.info('Defined Publisher: '+str(publisher))
+
+        pd1={'name':'example_consumer_1',
+                 'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'procclass':'ForwardingConsumer',
+                 'spawnargs':{'attach':topic.queue.name,\
+                              'Process Parameters':\
+                              {'event_queue':evt_queue,\
+                               'processed_queue':pr_queue}}\
+                    }
 
         dc1 = DataConsumer()
         dc1_id = yield dc1.spawn()

@@ -20,7 +20,7 @@ from ion.services.base_service import BaseService, BaseServiceClient
 from ion.resources import dm_resource_descriptions
 
 from ion.data import dataobject
-from ion.services.dm.datapubsub import pubsub_registry
+from ion.services.dm.distribution import pubsub_registry
 
 import ion.util.procutils as pu
 from ion.core import ioninit
