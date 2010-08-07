@@ -57,7 +57,7 @@ class IonTestCase(unittest.TestCase):
 
         #Load All Resource Descriptions for future decoding
         description_utility.load_descriptions()
-        
+
         logging.info("============Magnet container started, "+repr(self.cont_conn))
 
     @defer.inlineCallbacks
@@ -107,6 +107,15 @@ class IonTestCase(unittest.TestCase):
         """
         return self.procRegistry.get(name)
 
+    def _get_procinstance(self, pid):
+        """
+        @param pid  process id
+        @retval BaseProcess instance for process id
+        """
+        for rec in base_process.receivers:
+            if rec.spawned.id.full == str(pid):
+                return rec.procinst
+        return None
 
 class ReceiverProcess(BaseProcess):
     """
