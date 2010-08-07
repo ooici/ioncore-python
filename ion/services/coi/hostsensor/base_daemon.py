@@ -198,26 +198,21 @@ class Daemon:
             sys.exit(-1)
 
     
-    def processCommandLine(self):
-        if len(sys.argv) == 2:
-            if 'start' == sys.argv[1]:
-                self.start()
-            elif 'stop' == sys.argv[1]:
-                self.stop()
-            elif 'restart' == sys.argv[1]:
-                self.restart()
-            elif 'status' == sys.argv[1]:
-                self.status()
-            elif 'clean' == sys.argv[1]:
-                self.status(True)
-            else:
-                print "Unknown command"
-                sys.exit(2)
-            sys.exit(0)
+    def doCommand(self, command):
+        if command == 'start':
+            self.start()
+        elif command == 'stop':
+            self.stop()
+        elif command == 'restart':
+            self.restart()
+        elif command == 'status':
+            self.status()
+        elif command == 'clean':
+            self.status(True)
         else:
-            print "usage: %s start|stop|restart" % sys.argv[0]
+            print "Unknown command"
             sys.exit(2)
-
+        sys.exit(0)
 
     def run(self):
         """
