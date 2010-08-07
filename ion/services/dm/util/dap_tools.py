@@ -4,7 +4,7 @@
 """
 @file ion/services/dm/util/dap_tools.py
 @author David Stuebe
-@brief Tools for working with dap data messages and dap datasets
+@brief Functions for working with dap data messages and dap datasets
 """
 
 
