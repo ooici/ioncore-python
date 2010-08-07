@@ -43,7 +43,10 @@ class DataMessageObject(DataObject):
     """
     Base Class for Data PubSub Message Objects
     """
-
+    notification = TypedAttribute(str)
+    timestamp = TypedAttribute(float)
+    
+    
 class DAPMessageObject(DataMessageObject):
     """Container object for messaging DAP data"""
     das = TypedAttribute(str)
@@ -106,16 +109,79 @@ class PubSubTopicResource(InformationResource):
         return inst
 
 
+
+
 class SubscriptionResource(StatefulResource):
     """
     Informaiton about a subscriber
     """
     #Name - inherited
-    # Subscription is not to a topic but to the Exchange queue where the filtered
-    # messages arive from a topic!
-    topics = TypedAttribute(list) # List of Topic Resource References
-    period = TypedAttribute(list)
-    interval = TypedAttribute(int,0)
+
+    identity = TypedAttribute(ResourceReference)
+    select_on = TypedAttribute(PubSubTopicResource)
+    workflow = TypedAttribute(dict)
+    delivery = TypedAttribute(str)
+    deliver_to = TypedAttribute(ResourceReference) # Registerd Topic Reference
+    notification = TypedAttribute(dict)
+
+    #Used internally
+    current_topics = TypedAttribute(list) # List of Topic Resource References
+    current_procs = TypedAttribute(list) # Of what? - need a process registry
+    current_queues = TypedAttribute(list) 
+
+    # Constance used in SubscriptionResource
+    ASAP = 'asap'
+    DIGEST = 'digest'
+    TWITTER = 'twitter'
+    EMAIL = 'email'
+    SMS = 'sms'
+    RSS = 'rss'    
+    
+    @classmethod
+    def create(cls,subscription_name='', identity=None, select_on={}, workflow=[], delivery=ASAP, deliver_to=None, notification={}):
+        """
+        subscription_name - the name of this subscription, Should be unique to your subscriptions
+        identity - ResourceReference for your OOI identity
+        select_on - Topic, a topic description
+        workflow - a list of ProcessDesc objects
+        deliver - digest 
+        workflow=[{name:consumer1,
+                    class:path.module,
+                    args:{<queuearg>:consumername,...kwargs}},
+                   {name:consumer2 ...)
+                   
+        delivery='asap' or 'digest'
+        deliver_to - A topic to publish the results on or None
+        notification - {'twitter':'<params>'}, {'email':'<params>'}, {'sms':'<params>'}, {'rss':'<params>'}
+        """
+        
+        inst = cls()
+
+        inst.name = subscription_name
+
+        if identity:
+            inst.identity = identity 
+        
+        inst.select_on = select_on
+        if workflow:
+            inst.workflow = workflow
+        
+        if delivery == ASAP or delivery == DIGEST:
+            inst.delivery = delivery
+        else:
+            raise RuntimeError('Invalid setting in Subscription Resource: delivery')
+
+        if deliver_to: # Else - no final destination topic...
+            inst.deliver_to =  deliver_to
+
+        if notification: # Else - no final notification of publication
+            if notification.keys() in [TWITTER, EMAIL, RSS, SMS]:
+                inst.notification = notication
+            else:
+                raise RuntimeError('Invalid setting in Subscription Resource: notification')
+            
+            
+        return inst
 
 """
 DM DataSet Resource Descriptions

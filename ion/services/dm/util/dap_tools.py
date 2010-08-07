@@ -1,3 +1,13 @@
+#!/usr/bin/env python
+
+
+"""
+@file ion/services/dm/util/dap_tools.py
+@author David Stuebe
+@brief Tools for working with dap data messages and dap datasets
+"""
+
+
 from optparse import OptionParser
 
 from pydap.handlers.netcdf import Handler
