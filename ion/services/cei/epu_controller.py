@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import logging
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from twisted.internet.task import LoopingCall
 from magnet.spawnable import Receiver
 from ion.services.base_service import BaseService
@@ -21,11 +21,11 @@ class EPUControllerService(BaseService):
     declare = BaseService.service_declare(name='epu_controller', version='0.1.0', dependencies=[])
     
     def slc_init(self):
-        #actually create work_queue:  (TODO: create events queue here)
         self.queue_name_work = self.get_scoped_name("system", self.spawn_args["queue_name_work"])
-        worker_queue = {self.queue_name_work:{'name_type':'worker'}}
-        yield bootstrap.declare_messaging(worker_queue)
-
+        self.worker_queue = {self.queue_name_work:{'name_type':'worker'}}
+        self.laterinitialized = False
+        reactor.callLater(0, self.later_init)
+        
         # todo: make this class configurable
         engineclass = "ion.services.cei.decisionengine.default.DefaultEngine"
         self.provisioner_client = ProvisionerClient(self)
@@ -45,7 +45,14 @@ class EPUControllerService(BaseService):
         self.query_loop.start(query_sleep_seconds, now=False)
 
     @defer.inlineCallbacks
+    def later_init(self):
+        yield bootstrap.declare_messaging(self.worker_queue)
+        self.laterinitialized = True
+
+    @defer.inlineCallbacks
     def op_sensor_info(self, content, headers, msg):
+        if not self.laterinitialized:
+            logging.error("message got here without the later-init")
         self.core.new_sensor_info(content)
 
     def op_cei_test(self, content, headers, msg):

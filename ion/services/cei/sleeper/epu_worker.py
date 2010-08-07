@@ -35,7 +35,7 @@ class EPUWorkerService(BaseService):
     @defer.inlineCallbacks
     def op_work(self, content, headers, msg):
         if not self.laterinitialized:
-            logger.error("message got here without the later-init")
+            logging.error("message got here without the later-init")
         sleepsecs = int(content['work_amount'])
         logging.info("WORK: sleeping for %d seconds ---" % sleepsecs)
         yield pu.asleep(sleepsecs)
