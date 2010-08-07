@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 """
-This module has test cases to test out SeaBird SBE49 instrument software
-including the driver
-@author Steve Foley
 @file ion/agents/test/test_SBE49.py
+@brief This module has test cases to test out SeaBird SBE49 instrument software
+    including the driver. This assumes that generic InstrumentAgent code has
+    been tested by another test case
+@author Steve Foley
+@see ion.agents.instrumentagents.test.test_instrument
 """
 import logging
 from twisted.internet import defer

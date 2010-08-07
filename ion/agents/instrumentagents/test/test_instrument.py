@@ -2,10 +2,14 @@
 
 """
 @file ion/agents/instrumentagents/test/test_instrument.py
+@brief This test file should test logic that is common across various
+    instrument agent classes. This might include registration, lifecycle
+    set/get, etc. It may use a specific class as an example, but
+    the tests should reflect the larger features that are mostly implemented
+    by the InstrumentAgent class.
 @author Michael Meisinger
 @author Stephen Pasco
 @author Steve Foley
-@todo Test registry of resource into registry
 """
 
 import logging
