@@ -49,7 +49,6 @@ class EPUControllerService(BaseService):
         yield bootstrap.declare_messaging(self.worker_queue)
         self.laterinitialized = True
 
-    @defer.inlineCallbacks
     def op_sensor_info(self, content, headers, msg):
         if not self.laterinitialized:
             logging.error("message got here without the later-init")
