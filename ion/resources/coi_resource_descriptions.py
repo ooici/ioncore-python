@@ -182,9 +182,10 @@ class AgentDescription(InformationResource):
     """
     interface = TypedAttribute(list)
     module = TypedAttribute(str)
-    version = TypedAttribute(str)
+    #version = TypedAttribute(str)
     #spawnargs = TypedAttribute(dict,{})
     description = TypedAttribute(str)
+    class_name = TypedAttribute(str)
     
 class AgentMethodInterface(StatefulResource):
     description = TypedAttribute(str)
@@ -199,8 +200,9 @@ class AgentInstance(StatefulResource):
     description = TypedAttribute(ResourceReference)
     #owner = TypedAttribute(ResourceReference)
     spawnargs = TypedAttribute(str)
-    type = TypedAttribute(str)
-    process_id = TypedAttribute(str)
+    #process_id = TypedAttribute(str)
+    process_name = TypedAttribute(str)
+    process_state = TypedAttribute(str)
     subject = TypedAttribute(ResourceReference)
 
 

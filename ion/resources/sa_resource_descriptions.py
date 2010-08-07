@@ -1,35 +1,53 @@
 #!/usr/bin/env python
-
-from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource
-from twisted.trial import unittest
-
 """
-class EXAMPLE_RESOURCE(ResourceDescription):
-    '''
-    @Note <class> must be a type which python can instantiate with eval!
-    '''
-    att1 = TypedAttribute(<class>, default=None)
-    att2 = TypedAttribute(<class>)
+@file ion/resources/sa_resource_descriptions.py
 """
-
-class ExampleResource(StatefulResource):
-    '''
-    @Note <class> must be a type which python can instantiate with eval!
-    '''
-    att1 = TypedAttribute(int, default=None)
-    att2 = TypedAttribute(str)
-
-class TestResource(unittest.TestCase):
-    def test_print(self):
-        res = ExampleResource()
-        print res
-        
+from ion.data.dataobject import TypedAttribute, ResourceReference, StatefulResource
+from ion.resources.coi_resource_descriptions import ResourceDescription
+    
 class InstrumentResource(StatefulResource):
     '''
-    @Note <class> must be a type which python can instantiate with eval!
+    Intended for the "Instrument Registry," some basic instrument metadata to
+    hang onto for now. A few fields to start with can always be appended to
+    for a more complete listing (or even subclassing as needed).
+    @todo Flesh this out with much much much more comprehensive metadata
     '''
+    manufacturer = TypedAttribute(str)
+    model = TypedAttribute(str)
+    serial_num = TypedAttribute(str)
+    fw_version= TypedAttribute(str)
+
+    '''
+    These are things that can be used to talk to an instrument in the CI
+    '''
+    agent_message_address = TypedAttribute(str)
+    agent_event_address = TypedAttribute(str)
+    
+
+class SBE49InstrumentDescription(ResourceDescription):
+    """
+    This has the metadata common to SBE49 instruments
+    """
+    manufacturer = TypedAttribute(str)
+    model = TypedAttribute(str)
+    """
+    And eventually add things that characterize the class of instrument such as
+    power_draw, precision, accuracy, etc.
+    """
+    
+class SBE49InstrumentResource(InstrumentResource):
+    """
+    The stuff specific to SBE49s so that you can actually talk to it enough
+    to get more information for now.
+    """
     baudrate = TypedAttribute(int, default=9600)
     outputformat =TypedAttribute(int, default=0)
+    description = TypedAttribute(ResourceReference) #reference the description
+    
+    """
+    This stuff is already in the instrument, so to keep it here opens the
+    gotta-keep-it-in-sync can of worms that we will eventually get to.
+    
     outputsal = TypedAttribute(bool, default=True)
     outputsv = TypedAttribute(bool, default=True)
     navg = TypedAttribute(int, default=0)
@@ -68,5 +86,5 @@ class InstrumentResource(StatefulResource):
     ptcb0 = TypedAttribute(float, default=0.0)
     ptcb1 = TypedAttribute(float, default=0.0)
     ptcb2 = TypedAttribute(float, default=0.0)
-            
-          
+    """
+    
