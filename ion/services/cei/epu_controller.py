@@ -20,7 +20,6 @@ class EPUControllerService(BaseService):
     
     declare = BaseService.service_declare(name='epu_controller', version='0.1.0', dependencies=[])
     
-    @defer.inlineCallbacks
     def slc_init(self):
         #actually create work_queue:  (TODO: create events queue here)
         self.queue_name_work = self.get_scoped_name("system", self.spawn_args["queue_name_work"])
@@ -32,9 +31,6 @@ class EPUControllerService(BaseService):
         self.provisioner_client = ProvisionerClient(self)
         self.core = ControllerCore(self.provisioner_client, engineclass)
         
-        #TODO trying to flush out a boot order issue
-        yield pu.asleep(10)
-
         self.core.begin_controlling()
 
         #TODO right now the controller regularly polls the provisioner for
@@ -46,14 +42,14 @@ class EPUControllerService(BaseService):
         logging.debug('Starting provisioner query loop - %s second interval', 
                 query_sleep_seconds)
         self.query_loop = LoopingCall(self.provisioner_client.query)
-        self.query_loop.start(query_sleep_seconds)
+        self.query_loop.start(query_sleep_seconds, now=False)
 
     @defer.inlineCallbacks
     def op_sensor_info(self, content, headers, msg):
         self.core.new_sensor_info(content)
 
     def op_cei_test(self, content, headers, msg):
-        logging.info('EPU Controller: CEI test worked!!!!11! '+ content)
+        logging.info('EPU Controller: CEI test'+ content)
 
 # Direct start of the service as a process with its default name
 factory = ProtocolFactory(EPUControllerService)

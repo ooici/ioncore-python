@@ -41,7 +41,7 @@ class ControllerCore(object):
                 self.control.sleep_seconds)
         self.control_loop = LoopingCall(self.engine.decide, self.control, 
                 self.state)
-        self.control_loop.start(self.control.sleep_seconds)
+        self.control_loop.start(self.control.sleep_seconds, now=False)
 
 class ControllerCoreState(State):
     """Keeps data, also what is passed to decision engine.
