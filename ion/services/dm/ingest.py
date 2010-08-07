@@ -15,7 +15,10 @@ from ion.services.base_service import BaseService, BaseServiceClient
 
 from pydap.parsers.dds import DDSParser
 from pydap.parsers.das import DASParser
-import simplejson as json
+try:
+    import json
+except:
+    import simplejson as json
 
 class IngestService(BaseService):
     """Ingestion service interface
@@ -43,7 +46,7 @@ class IngestService(BaseService):
             dds = json.loads(str(content['dds']))
             das = json.loads(str(content['das']))
         except KeyError, ke:
-            logging.exception(ke)
+            logging.exception('Unable to find headers in DAP message!')
             logging.error('Unable to find headers in DAP message!')
             raise ke
 

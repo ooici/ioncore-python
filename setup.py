@@ -32,10 +32,11 @@ try:
     from setuptools import setup, find_packages
     setupdict['packages'] = find_packages()
     setupdict['test_suite'] = 'lcaarch.test'
-    setupdict['install_requires'] = ['Twisted >=10.1', 'magnet', 'pycassa', 'numpy',
-                                     'Paste', 'Pydap>=3.0.rc.10', 'simplejson', 'httplib2',
-                                     'pydap.handlers.netcdf >=0.4.9',
-                                     'pydap.responses.netcdf >= 0.1.3']
+    setupdict['install_requires'] = ['Twisted', 'magnet', 'pycassa', 'numpy',
+                                     'Paste', 'Pydap', 'simplejson', 'httplib2',
+                                     'pydap.handlers.netcdf',
+                                     'pydap.responses.netcdf',
+                                     'msgpack-python']
     setupdict['include_package_data'] = True
     setup(**setupdict)
 

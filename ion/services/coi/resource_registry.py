@@ -10,13 +10,14 @@
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
+from twisted.python import reflect
 from magnet.spawnable import Receiver
 
 from ion.data import dataobject
 from ion.data.datastore import registry
-
-import re
 from ion.data import store
+
+import inspect
 
 from ion.core import ioninit
 from ion.core import base_process
@@ -24,100 +25,12 @@ from ion.core.base_process import ProtocolFactory, BaseProcess
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
 
+from ion.resources import coi_resource_descriptions
+
 CONF = ioninit.config(__name__)
 
-class BaseResourceRegistryService(BaseService):
-    """
-    Base class for resource registries
-    @TODO make sure this is a pure virtual class
-    """
 
-    
-    # For now, keep registration in local memory store.
-    @defer.inlineCallbacks
-    def slc_init(self):
-        # use spawn args to determine backend class, second config file
-        backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', None))
-        backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', {}))
-        if backendcls:
-            self.backend = pu.get_class(backendcls)
-        else:
-            self.backend = store.Store
-        assert issubclass(self.backend, store.IStore)
-
-        # Provide rest of the spawnArgs to init the store
-        s = yield self.backend.create_store(**backendargs)
-        
-        self.reg = registry.ResourceRegistry(s)
-        
-        name = self.__class__.__name__
-        logging.info(name + " initialized")
-        logging.info(name + " backend:"+str(backendcls))
-        logging.info(name + " backend args:"+str(backendargs))
-        
-    @defer.inlineCallbacks
-    def op_set_resource_lcstate(self, content, headers, msg):
-        """
-        Service operation: set the life cycle state of resource
-        """
-        res_id = str(content['res_id'])
-        lifecycle = str(content['lifecycle'])
-        logging.info('op_set_resource_lcstate: '+str(res_id) + ', LCState:' + str(lifecycle))
-
-        resource = yield self.reg.get_description(res_id)
-        
-        if resource:
-            resource.set_lifecyclestate(registry.LCStates[lifecycle])
-            yield self.reg.register(res_id,resource)
-            yield self.reply_ok(msg, {'res_id':str(res_id)},)
-
-        else:
-            yield self.reply_err(msg, {'res_id':None})
-
-
-    @defer.inlineCallbacks
-    def op_find_resources(self, content, headers, msg):
-        """
-        Service operation: find resources by criteria
-        Content is a dictionary of attributes which must match a resource:
-        """
-
-        reslist = yield self.reg.list_descriptions()
-        find_list=[]
-        for res in reslist:                        
-            # Test for failure and break
-            test=True
-            for k,v in content.items():                
-                # if this resource does not contain this attribute move on
-                if not k in res.attributes:
-                    test = False
-                    break
-                
-                att = getattr(res, k, None)
-                
-                # Bogus - can't send lcstate objects in a dict must convert to sting to test
-                if isinstance(att, registry.LCState):
-                    att = str(att)
-                
-                if isinstance(v, (str, unicode) ):
-                    # Use regex
-                    if not re.search(v, att):
-                        test=False
-                        break
-                else:
-                    # test equality
-                    #@TODO add tests for range and in list...
-                    
-                    
-                    if att != v and v != None:
-                       test=False
-                       break                    
-            if test:
-                find_list.append(res)
-
-        yield self.reply_ok(msg, {'res_enc':list([res.encode() for res in find_list])} )
-
-class ResourceRegistryService(BaseResourceRegistryService):
+class ResourceRegistryService(registry.BaseRegistryService):
     """
     Resource registry service interface
     The Resource Registry Service uses an IStore interface to a backend Key
@@ -131,109 +44,52 @@ class ResourceRegistryService(BaseResourceRegistryService):
     # Declaration of service
     declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
 
-        
-        
-    @defer.inlineCallbacks
-    def op_register_resource(self, content, headers, msg):
-        """
-        Service operation: Register a resource instance with the registry.
-        """
-        res_id = str(content['res_id'])
-        res_enc = content['res_enc']
-        resource = registry.ResourceDescription.decode(res_enc)()
-        logging.info('op_register_resource: \n' + str(resource))
-  
-        yield self.reg.register(res_id,resource)
-        yield self.reply_ok(msg, {'res_id':str(res_id)},)
-
-    def op_define_resource_type(self, content, headers, msg):
-        """
-        Service operation: Create or update a resource type with the registry.
-        """
-
-    @defer.inlineCallbacks
-    def op_get_resource(self, content, headers, msg):
-        """
-        Service operation: Get a resource instance.
-        """
-        res_id = content['res_id']
-        logging.info('op_get_resource: '+str(res_id))
-
-        resource = yield self.reg.get_description(res_id)
-        logging.info('Got Resource:\n'+str(resource))
-        if resource:
-            yield self.reply_ok(msg, {'res_enc':resource.encode()})
-        else:
-            yield self.reply_err(msg, {'res_enc':None})
     
-
-class BaseRegistryClient(BaseServiceClient):
-    """
-    Do not instantiate this class!
-    """
-
-    @defer.inlineCallbacks
-    def set_lcstate(self, res_id, lcstate):
-        """
-        @brief Retrieve a resource from the registry by its ID
-        @param res_id is a resource identifier unique to this resource
-        @param lcstate is a resource life cycle stae
-        """
-        yield self._check_init()
-
-        (content, headers, msg) = yield self.rpc_send('set_resource_lcstate',
-                                                      {'res_id':res_id,'lifecycle':str(lcstate)})
-        logging.info('Service reply: '+str(content))
-        
-        if content['status'] == 'OK':
-            defer.returnValue(True)
-        else:
-            defer.returnValue(False)
-
-    def set_lcstate_new(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.new)
-
-    def set_lcstate_active(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.active)
-        
-    def set_lcstate_inactive(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.inactive)
-
-    def set_lcstate_decomm(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.decomm)
-
-    def set_lcstate_retired(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.retired)
-
-    def set_lcstate_developed(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.developed)
-
-    def set_lcstate_commissioned(self, res_id):
-        return self.set_lcstate(res_id, registry.LCStates.commissioned)
+    op_clear_registry = registry.BaseRegistryService.base_clear_registry
     
-
-
-    @defer.inlineCallbacks
-    def find_resources(self,attributes):
-        """
-        @brief Retrieve all the resources in the registry
-        @param attributes is a dictionary of attributes which will be used to select a resource
-        """
-        yield self._check_init()
-
-        (content, headers, msg) = yield self.rpc_send('find_resources',attributes)
-        logging.info('Service reply: '+str(content))
-        
-        res_enc = content['res_enc']
-        resources=[]
-        if res_enc != None:
-            for res in res_enc:
-                resources.append(registry.ResourceDescription.decode(res)())
-        defer.returnValue(resources)
-
-        
-
-class ResourceRegistryClient(BaseRegistryClient):
+    
+    op_register_resource_instance = registry.BaseRegistryService.base_register_resource
+    """
+    Service operation: Register a resource instance with the registry.
+    """
+    op_get_resource_instance = registry.BaseRegistryService.base_get_resource
+    """
+    Service operation: Get a resource instance.
+    """
+    
+    op_register_resource_definition = registry.BaseRegistryService.base_register_resource
+    """
+    Service operation: Create or update a resource definition with the registry.
+    """
+    op_get_resource_definition = registry.BaseRegistryService.base_get_resource
+    """
+    Service operation: Get a resource definition.
+    """
+    
+    op_set_resource_lcstate = registry.BaseRegistryService.base_set_resource_lcstate
+    """
+    Service operation: Set a resource life cycle state
+    """
+    
+    op_find_registered_resource_definition_from_resource = registry.BaseRegistryService.base_find_resource
+    """
+    Service operation: Find the registered definition of a resource
+    """
+    op_find_registered_resource_definitions_from_description = registry.BaseRegistryService.base_find_resource
+    """
+    Service operation: find all registered resources which match the attributes of description
+    """
+    
+    op_find_registered_resource_instance_from_instance = registry.BaseRegistryService.base_find_resource
+    """
+    Service operation: Find the registered instances that matches the service class
+    """
+    op_find_registered_resource_instance_from_description = registry.BaseRegistryService.base_find_resource
+    """
+    Service operation: find all registered resources which match the attributes of description
+    """
+    
+class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin):
     """
     Class for the client accessing the resource registry.
     """
@@ -242,56 +98,252 @@ class ResourceRegistryClient(BaseRegistryClient):
             kwargs['targetname'] = "resource_registry"
         BaseServiceClient.__init__(self, proc, **kwargs)
 
-    def registerResourceType(self, rt_desc):
-        pass
+    
+    def clear_registry(self):
+        return self.base_clear_registry('clear_registry')
+
+    def register_container_resources(self):
+        """
+        Method Stub...
+        This method is called when the container is started to inspect the
+        resources directory of lca arch and register descriptions for all
+        resources.
+        """
 
     @defer.inlineCallbacks
-    def register_resource(self, res_id, resource):
+    def register_resource_instance(self,resource,owner=None):
         """
-        @brief Store a resource in the registry by its ID. It can be new or
-        modified.
-        @param res_id is a resource identifier unique to this resource.
+        @Brief Client method to Register a Resource Instance
+        An instance resource includes a reference to a owner, a description and
+        the resource
+        @param resource can be either the instance to be registered or and
+        existing instance resource to be modified.
+        @Note this need architectural clarification
         """
-        yield self._check_init()
+        # Can't have an resource instance for a resource instance - Is that a problem? 
+        if isinstance(resource, coi_resource_descriptions.ResourceInstance):
+            resource_instance_description = resource
+            assert resource_instance_description.RegistryIdentity, 'Resource Instance Description must have a registry Identity'
+        else:
+            resource_instance = resource
+            # Build a new description of the resource instance
+            resource_instance_description = yield self.describe_instance(resource_instance,owner)
+            
+            found_rid = yield self.find_registered_resource_instance_from_description(resource_instance,regex=False,ignore_defaults=True)
+            if found_rid:
+                assert len(found_rid) == 1
+                defer.returnValue(found_rid[0])
+            else:
+                # Give it a new Unique ID and put it in the registry
+                resource_instance_description.create_new_reference()
+                resource_instance_description.set_lifecyclestate(dataobject.LCStates.developed)
+                
+        resource_instance_description = yield self.base_register_resource('register_resource_instance', resource_instance_description)    
+        defer.returnValue(resource_instance_description)
+        
+    @defer.inlineCallbacks
+    def describe_instance(self,resource_instance,owner):
+        """
+        @Brief Extract metadata from a resource instance to store in the resource
+        registry
+        @Param resource is an instance of a class which inherits from Resource.
+        This method extracts metadata from the instance for the registry.
+        @Param all resource instances must belong to an owner
+        """
+        assert isinstance(resource_instance, dataobject.Resource)
+        assert isinstance(owner, coi_resource_descriptions.IdentityResource)
 
-        (content, headers, msg) = yield self.rpc_send('register_resource',
-                                            {'res_id':res_id,'res_enc':resource.encode()})
-        logging.info('Service reply: '+str(headers))
-        defer.returnValue(str(content['res_id']))
+        # Do not make a new resource idenity - this is a generic method which
+        # is also used to look for an existing description
+        resource_instance_description = coi_resource_descriptions.ResourceInstance()
+        resource_instance_description.name = resource_instance.__class__.__name__ 
+
+        #Get the registry description for this resource
+        resource_description = yield self.register_resource_definition(resource_instance.__class__)
+        resource_instance_description.description = resource_description.reference(head=True)
+
+        resource_instance_description.owner = owner.reference(head=True)
+        resource_instance_description.resource = resource_instance.reference(head=True)
+        
+        # Set the life cycle state to developed?
+        resource_instance_description.set_lifecyclestate(dataobject.LCStates.developed)
+        
+        defer.returnValue(resource_instance_description)
+        
+    def get_resource_instance(self,resource_reference):
+        """
+        @Brief Get a resource instance
+        @param resource_reference is the unique reference object for a registered
+        resource
+        """
+        return self.base_get_resource(resource_reference,'get_resource_instance')
+        
+        
+    @defer.inlineCallbacks
+    def register_resource_definition(self,resource):
+        """
+        @Brief Client method to register the definition of a Resource Type
+        @param resource can be either an instance of a Resource Description or
+        the class object of the resource to be described. 
+        """
+        if isinstance(resource, coi_resource_descriptions.ResourceDescription):
+            resource_description = resource
+            assert resource_description.RegistryIdentity, 'Resource Description must have a registry Identity'
+
+        else:
+            resource_class = resource
+            # Build a new description of the resource
+            resource_description = yield self.describe_resource(resource_class)
+
+            found_rd = yield self.find_registered_resource_definitions_from_description(resource_description,regex=False,ignore_defaults=True)
+            if found_rd:
+                assert len(found_rd) == 1
+                defer.returnValue(found_rd[0])
+            else:
+                resource_description.create_new_reference()
+            
+        resource_description = yield self.base_register_resource('register_resource_definition', resource_description)
+        defer.returnValue(resource_description)
+        
+    @defer.inlineCallbacks
+    def describe_resource(self,resource_class):
+        """
+        @Brief Extract metadata from a resource class to create the definition
+        in the resource registry
+        @Param resource is a class object which inherits from Resource
+        @Note As an example, this method recursively registers the bases of the
+        resource class to create a representation of the class inheritance in
+        the registry. This is more of an example of complex behavior than an
+        architectural neccissity.
+        """
+        assert issubclass(resource_class, dataobject.Resource)
+        
+        # Do not make a new resource idenity - this is a generic method which
+        # is also used to look for an existing description
+        resource_description = coi_resource_descriptions.ResourceDescription()        
+        resource_description.name = resource_class.__name__
+        resource_description.description = inspect.getdoc(resource_class)
+                
+        # Get all the typed attributes of the resource
+        for name, att in resource_class.get_typedattributes().items():
+            attdesc = coi_resource_descriptions.AttributeDescription()
+            attdesc.name = name
+            attdesc.type = str(att.type)
+            attdesc.default = str(att.default)
+            resource_description.atts.append(attdesc)    
+        
+        
+        # Get the reference to the resource it inherits from
+        
+        base_ref = yield self.get_resource_bases_by_reference(resource_class)
+                
+        resource_description.inherits_from = base_ref
+        
+        # Set the type based on inheritance?
+        if issubclass(resource_class, dataobject.InformationResource):
+            resource_description.type = coi_resource_descriptions.OOIResourceTypes.information
+        elif issubclass(resource_class, dataobject.StatefulResource):
+            resource_description.type = coi_resource_descriptions.OOIResourceTypes.stateful
+        else:
+            resource_description.type = coi_resource_descriptions.OOIResourceTypes.unassigned
+        
+        # Update the lifecycle state and return
+        #resource_description.set_lifecyclestate(dataobject.LCStates.developed)
+        defer.returnValue(resource_description)
+        
+        
+        
 
     @defer.inlineCallbacks
-    def get_resource(self, res_id):
+    def get_resource_bases_by_reference(self,resource_class):
         """
-        @brief Retrieve a resource from the registry by its ID
-        @param res_id is a resource identifier unique to this resource
+        @Brief Get or register the base classes of a resource class object.
         """
         
-        yield self._check_init()
+        bases = self.get_parent_resource_classes(resource_class)
+        
+        bases_refs=[]
+        for base in bases:
+            parent_resource_description = yield self.find_registered_resource_definition_from_resource(base)
+            if not parent_resource_description:
+                parent_resource_description = yield self.register_resource_definition(base)
+            
+            bases_refs.append(parent_resource_description.reference())
 
-        (content, headers, msg) = yield self.rpc_send('get_resource',
-                                                      {'res_id':res_id})
-        logging.info('Service reply: '+str(content))
-        res_enc = content['res_enc']
-        if res_enc != None:
-            resource = registry.ResourceDescription.decode(res_enc)()
-            defer.returnValue(resource)
+        defer.returnValue(bases_refs)
+        
+
+    def get_parent_resource_classes(self,resource_class):
+        """
+        @Brief Get the bases
+        """
+        assert issubclass(resource_class, dataobject.Resource)
+        # Ignore multiple inheritence for now!
+        bases=[]
+        for base in resource_class.__bases__:
+            if issubclass(base, dataobject.Resource):
+                bases.append(base)
+        return bases
+        
+
+    def get_resource_definition(self,resource_reference):
+        """
+        @Brief Get a resource definition
+        @param resource_reference is the unique reference object for a registered
+        resource
+        """
+        return self.base_get_resource('get_resource_definition',resource_reference)
+
+        
+    def set_resource_lcstate(self, resource_reference, lcstate):
+        return self.base_set_resource_lcstate('set_resource_lcstate',resource_reference, lcstate)
+
+    @defer.inlineCallbacks
+    def find_registered_resource_definition_from_resource(self, resource_class):
+        """
+        @Brief find the registered definition of a resoruce
+        @param resource_class is the class object for a particular resource.
+        """
+        resource_description = yield self.describe_resource(resource_class)
+        description_list = yield self.base_find_resource('find_registered_resource_definition_from_resource',resource_description,regex=False,ignore_defaults=True)
+        # Find returns a list but only one resource should match!
+        if description_list:
+            assert len(description_list) == 1
+            defer.returnValue(description_list[0])
+        else:
+            defer.returnValue(None)
+            
+    def find_registered_resource_definitions_from_description(self, description,regex=True,ignore_defaults=True,attnames=[]):
+        """
+        @Brief find all registered resources which match the attributes of description
+        @param see the registry docs for params
+        """
+        return self.base_find_resource('find_registered_resource_definitions_from_description',description,regex,ignore_defaults,attnames)
+        
+    @defer.inlineCallbacks
+    def find_registered_resource_instance_from_instance(self, resource_instance, owner=None):
+        """
+        @Brief Find the registered instance of a resource
+        @param find an instance of a resource in the resource registry
+        """
+        if not owner:
+            owner = coi_resource_descriptions.IdentityResource()
+            
+        resource_instance_description = yield self.describe_instance(resource_instance,owner)
+        resource_list = yield self.base_find_resource('find_registered_resource_instance_from_instance',resource_instance_description,regex=False,ignore_defaults=True)
+        # Find returns a list but only one resource should match!
+        if resource_list:
+            assert len(resource_list) == 1
+            defer.returnValue(resource_list[0])
         else:
             defer.returnValue(None)
 
-
-
-
-#class ResourceTypes(object):
-#    """Static class with constant definitions for resource types.
-#    Do not instantiate
-#    """
-#    RESTYPE_GENERIC = 'rt_generic'
-#    RESTYPE_SERVICE = 'rt_service'
-#    RESTYPE_UNASSIGNED = 'rt_unassigned'
-#
-#    def __init__(self):
-#        raise RuntimeError('Do not instantiate '+self.__class__.__name__)
-#
+    def find_registered_resource_instance_from_description(self, description,regex=True,ignore_defaults=True,attnames=[]):
+        """
+        @Brief find all registered resources which match the attributes of description
+        @param see the registry docs for params
+        """
+        return self.base_find_resource('find_registered_resource_instance_from_description',description,regex,ignore_defaults,attnames)
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(ResourceRegistryService)

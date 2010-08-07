@@ -78,7 +78,7 @@ def init_container():
         Container.interceptor_system = cls()
     # Collect all service declarations in local code modules
     ModuleLoader().load_modules()
-    yield bs_register_services()
+    #yield bs_register_services()
 
 def _set_container_args(contargs=None):
     ioninit.cont_args['_args'] = contargs
@@ -166,7 +166,6 @@ def create_supervisor():
     sup = suprec.procinst
     sup.receiver.group = supname
     supId = yield sup.spawn()
-    yield sup.init()
     yield base_process.procRegistry.put(supname, str(supId))
     sup_seq += 1
     defer.returnValue(sup)

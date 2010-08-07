@@ -10,16 +10,18 @@
 
 import logging
 logging = logging.getLogger(__name__)
-import inspect
 from twisted.internet import defer
-
-from ion.data.datastore.registry import LCStates as LCS
-from ion.test.iontest import IonTestCase
-from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
-from ion.agents.instrumentagents.SBE49 import instrumentCommands as IAcommands
-from ion.agents.instrumentagents.SBE49 import instrumentParameters as IAparameters
-
 from twisted.trial import unittest
+
+from ion.data.dataobject import LCStates as LCS
+from ion.test.iontest import IonTestCase
+from ion.agents.instrumentagents import instrument_agent as IA
+from ion.services.coi.agent_registry import AgentRegistryClient
+from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
+from ion.agents.instrumentagents.SBE49_constants import ci_commands as IACICommands
+from ion.agents.instrumentagents.SBE49_constants import ci_parameters as IACIParameters
+from ion.agents.instrumentagents.SBE49_constants import instrument_commands as IAInstCommands
+from ion.agents.instrumentagents.SBE49_constants import instrument_parameters as IAInstParameters
 
 
 class TestInstrumentAgent(IonTestCase):
@@ -30,107 +32,175 @@ class TestInstrumentAgent(IonTestCase):
 
         # Start an instrument agent
         processes = [
-            {'name':'testSBE49IA','module':'ion.agents.instrumentagents.SBE49'},
+            {'name':'testSBE49IA',
+             'module':'ion.agents.instrumentagents.SBE49_IA',
+             'class':'SBE49InstrumentAgent'},
+            {'name':'agent_registry',
+             'module':'ion.services.coi.agent_registry',
+             'class':'ResourceRegistryService'}
         ]
-        sup = yield self._spawn_processes(processes)
-        svc_id = sup.get_child_id('testSBE49IA')
-
+        self.sup = yield self._spawn_processes(processes)
+        self.svc_id = yield self.sup.get_child_id('testSBE49IA')
+        self.reg_id = yield self.sup.get_child_id('agent_registry')
+        
         # Start a client (for the RPC)
-        self.IAClient = InstrumentAgentClient(proc=sup, target=svc_id)
+        self.IAClient = IA.InstrumentAgentClient(proc=self.sup,
+                                                 target=self.svc_id)
+       
+        # Start an Agent Registry to test against
+        self.reg_client = AgentRegistryClient(proc=self.sup,
+                                              target=self.reg_id)
+        yield self.reg_client.clear_registry()
+       
+        yield self.IAClient.set_registry_client(str(self.reg_id))
+
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self._stop_container()
 
     @defer.inlineCallbacks
-    def testGetSBE49Capabilities(self):
+    def test_get_SBE49_capabilities(self):
         """
         Test the ability to gather capabilities from the SBE49 instrument
         capabilities
         """
-        raise unittest.SkipTest('Needs Refactor of LifeCycle State and Resource Descriptions')
-
-        result = yield self.IAClient.getCapabilities()
-        self.assert_(set(IAcommands) == set(result['commands']))
-        self.assert_(set(IAparameters) == set(result['parameters']))
+        result = yield self.IAClient.get_capabilities()
+        self.assert_(set(IACIParameters).issubset(set(result[IA.ci_parameters])))
+        self.assert_(IA.driver_address in
+                     result[IA.ci_parameters])
+        self.assert_(list(IACICommands) == result[IA.ci_commands])
+        self.assert_(list(IAInstCommands) ==
+                     result[IA.instrument_commands])
+        self.assert_(list(IAInstParameters) ==
+                     result[IA.instrument_parameters])
 
     @defer.inlineCallbacks
-    def testGetSetSBE49Params(self):
+    def test_get_set_SBE49_params(self):
         """
         Test the ability of the SBE49 driver to send and receive get, set,
         and other messages. Best called as RPC message pairs.
         """
-        raise unittest.SkipTest('Needs Refactor of LifeCycle State and Resource Descriptions')
-
-        response = yield self.IAClient.get(['baudrate','outputformat'])
+        response = yield self.IAClient.get_from_instrument(['baudrate',
+                                                            'outputformat'])
         self.assert_(response['status'] == 'OK')
         self.assertEqual(response['baudrate'], 9600)
         self.assertEqual(response['outputformat'], 0)
 
-        response = yield self.IAClient.set({'baudrate': 19200,
+        response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
                                             'outputformat': 1})
         self.assert_(response['status'] == 'OK')
         self.assertEqual(response['baudrate'], 19200)
         self.assertEqual(response['outputformat'], 1)
         
-        response = yield self.IAClient.get(['baudrate', 'outputformat'])
+        response = yield self.IAClient.get_from_instrument(['baudrate',
+                                                            'outputformat'])
         self.assert_(response['status'] == 'OK')
         self.assertEqual(response['baudrate'], 19200)
         self.assertEqual(response['outputformat'], 1)
         
         # Try setting something bad
-        response = yield self.IAClient.set({'baudrate': 19200,
+        response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
                                             'badvalue': 1})
         self.assert_(response['status'] == 'ERROR')
         self.assert_('baudrate' not in response)
-        
-        response = yield self.IAClient.setLifecycleState(LCS['inactive'])
-        self.assertEqual(response, LCS['inactive'])
-
-        response = yield self.IAClient.getLifecycleState()
-        self.assertEqual(response, LCS['inactive'])
-
-        response = yield self.IAClient.setLifecycleState(LCS['active'])
-        self.assertEqual(response, LCS['active'])
-
-        response = yield self.IAClient.getLifecycleState()
-        self.assertEqual(response, LCS['active'])
 
     @defer.inlineCallbacks
-    def testExecute(self):
+    def test_registration(self):
+        """
+        Tests the ability of an instrument agent to successfully register
+        ifself with the resource registry.
+        """
+        reg_ref = yield self.IAClient.register_resource()
+        
+        result = yield self.IAClient.get_resource_instance()
+        self.assertNotEqual(result, None)
+        
+        self.assert_(isinstance(result, InstrumentAgentResourceInstance))
+        self.assertNotEqual(result.driver_process_id, None)
+        
+        self.assertEqual(reg_ref.RegistryCommit, '')
+        self.assertNotEqual(result.RegistryCommit, reg_ref.RegistryCommit)
+        self.assertEqual(reg_ref.RegistryIdentity, result.RegistryIdentity)
+        
+        # Verify the reference is the same   
+        result = yield self.IAClient.get_resource_ref()
+        
+        self.assertEqual(result, reg_ref)
+        
+    @defer.inlineCallbacks
+    def test_lifecycle_states(self):
+        """
+        Test the resource lifecycle management
+        """
+        yield self.IAClient.register_resource()
+        
+        response = yield self.IAClient.set_lifecycle_state(LCS.inactive)
+        self.assertEqual(response, LCS.inactive)
+
+        response = yield self.IAClient.get_lifecycle_state()
+        self.assertEqual(response, LCS.inactive)
+        self.assertNotEqual(response, LCS.active)
+
+        response = yield self.IAClient.set_lifecycle_state(LCS.active)
+        self.assertEqual(response, LCS.active)
+
+        response = yield self.IAClient.get_lifecycle_state()
+        self.assertEqual(response, LCS.active)
+
+    @defer.inlineCallbacks
+    def test_execute(self):
         """
         Test the ability of the SBE49 driver to execute commands through the
         InstrumentAgentClient class
         """
-        raise unittest.SkipTest('Needs Refactor of LifeCycle State and Resource Descriptions')
-
-        response = yield self.IAClient.execute(['start', 'badcommand', 'stop'])
+        response = yield self.IAClient.execute_instrument({'start':['now', 1],
+                                                           'stop':[]})
         self.assert_(isinstance(response, dict))
-        self.assert_('badcommand' in response)
-        self.assert_('start' in response)
-        self.assert_('stop' in response)
-        self.assert_(isinstance(response['start'], dict))
-        self.assert_(isinstance(response['stop'], dict))
-        self.assert_(isinstance(response['badcommand'], dict))
-        self.assert_(response['start']['status'] == 'OK')
-        self.assert_(response['stop']['status'] == 'OK')
-        self.assert_(response['badcommand']['status'] == 'ERROR')
+        self.assert_('status' in response.keys())
+        self.assertEqual(response['status'], 'OK')
+        self.assert_('start' in response['value'])
+        self.assert_('stop' in response['value'])
+        self.assert_(response['status'] == 'OK')
+
+        response = yield self.IAClient.execute_instrument({'badcommand':['now',
+                                                                         '1']})
+        self.assert_(isinstance(response, dict))
+        self.assertEqual(response['status'], 'ERROR') 
+                
+        response = yield self.IAClient.execute_instrument({})
+        self.assert_(isinstance(response, dict))
+        self.assertEqual(response['status'], 'ERROR')
         
     @defer.inlineCallbacks
-    def testStatus(self):
+    def test_get_driver_proc(self):
+        """
+        Test the methods for retreiving the driver process directly from
+        the instrument agent.
+        """
+        response = yield self.IAClient.get_from_CI([IA.driver_address])
+        self.assertNotEqual(response, None)
+        """
+        Not the best test or logic, but see if the format is at least close
+        Need a better way to get at the process id of the driver...maybe
+        out of the registry?
+        """
+        self.assertEqual(str(response[IA.driver_address]).rsplit('.', 1)[0],
+                         str(self.svc_id).rsplit('.', 1)[0])
+        
+    @defer.inlineCallbacks
+    def test_status(self):
         """
         Test to see if the status response is correct
+        @todo Do we even need this function?
         """
-        raise unittest.SkipTest('Needs Refactor of LifeCycle State and Resource Descriptions')
-
-        response = yield self.IAClient.getStatus(['some_arg'])
-        logging.debug("testStatus response: %s", response)
+        response = yield self.IAClient.get_status(['some_arg'])
         self.assert_(isinstance(response, dict))
         self.assertEqual(response['status'], "OK")
-        self.assertEqual(response['result'], 'a-ok')
+        self.assertEqual(response['value'], 'a-ok')
         
     @defer.inlineCallbacks
-    def testTranslator(self):
+    def test_translator(self):
         """
         Test to see if the translator function is coming back cleanly
         @todo make this not a stub when we can pass functions through AMQP

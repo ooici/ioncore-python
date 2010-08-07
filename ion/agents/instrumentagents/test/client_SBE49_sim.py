@@ -7,7 +7,6 @@ Client to test Seabird SBE49 Instrument Simulator.
 """
 
 from twisted.internet import stdio, reactor, protocol
-from twisted.protocols import basic
 import re
 
 class DataForwardingProtocol(protocol.Protocol):

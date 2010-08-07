@@ -20,6 +20,9 @@ from ion.core.base_process import BaseProcess
 from ion.data.store import Store
 import ion.util.procutils as pu
 
+from ion.resources import description_utility
+
+
 CONF = ioninit.config(__name__)
 
 class IonTestCase(unittest.TestCase):
@@ -43,6 +46,7 @@ class IonTestCase(unittest.TestCase):
         mopt['broker_host'] = CONF['broker_host']
         mopt['broker_port'] = CONF['broker_port']
         mopt['broker_vhost'] = CONF['broker_vhost']
+        mopt['broker_heartbeat'] = CONF['broker_heartbeat']
         mopt['boot_script'] = None
         mopt['script'] = None
 
@@ -50,6 +54,10 @@ class IonTestCase(unittest.TestCase):
         bootstrap.init_container()
         self.procRegistry = base_process.procRegistry
         self.test_sup = yield bootstrap.create_supervisor()
+
+        #Load All Resource Descriptions for future decoding
+        description_utility.load_descriptions()
+
         logging.info("============Magnet container started, "+repr(self.cont_conn))
 
     @defer.inlineCallbacks
@@ -99,6 +107,15 @@ class IonTestCase(unittest.TestCase):
         """
         return self.procRegistry.get(name)
 
+    def _get_procinstance(self, pid):
+        """
+        @param pid  process id
+        @retval BaseProcess instance for process id
+        """
+        for rec in base_process.receivers:
+            if rec.spawned.id.full == str(pid):
+                return rec.procinst
+        return None
 
 class ReceiverProcess(BaseProcess):
     """

@@ -2,7 +2,6 @@
 
 """
 @file ion/play/hello_service.py
-@package ion.play.hello_service Sample code to get you started.
 @author Michael Meisinger
 @brief An example service definition that can be used as template.
 """

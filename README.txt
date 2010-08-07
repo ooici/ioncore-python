@@ -2,24 +2,24 @@
 LCAarch - OOI Release 1 LCA architecture prototype
 ==================================================
 
-April 2010 - May 2010
+April 2010 - August 2010
 
-This project provides a service framwork and auxilliary functions for running
-architecturally complete, but functionally limited versions of all the
-services of the OOI release 1 system with their full architectural dependencies.
-In "shore" a data distribution network based on pub-sub messaging with underlying
+This project provides a service framwork with auxilliary functions for running
+architecturally complete versions of all the services of the OOI release 1
+system with their full architectural dependencies.
+In "short" a data distribution network based on pub-sub messaging with underlying
 infrastructure services (security, persistence) and provisioning.
 
 The "core" part of LCAarch provides base classes and a framework for spawnable,
 message communicating processes, for services with defined names, for
-bootstrapping the system, for managing logging and configuration etc.
+bootstrapping the system, for managing logging and configuration etc. This
+is an early implementation of the OOI Python Capability Container.
 
 For more information, please see:
 http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project
 
 LCAarch is compatible with Python 2.5 and higher, but not Python 3.x
-This project has as dependencies Magnet, Carrot, txAMQP, Twisted and pycassa,
-(see below)
+This project has several dependencies on libraries and packages, see below.
 
 Get LCAarch with
 ::
@@ -41,7 +41,7 @@ Start system by executing within the CC shell:
     from ion.core import bootstrap
     bootstrap.start()
 
-Alternatively from shell executing a script:
+Alternatively (better) from UNIX shell executing a script:
 ::
     twistd -n magnet -h amoeba.ucsd.edu res/scripts/bootstrap.py
     twistd -n magnet -h amoeba.ucsd.edu res/scripts/newcc.py
@@ -73,24 +73,10 @@ Recommendation:
     Create a virtualenv for installing Magnet and its dependencies.
 
 Twisted Framework
------------------
-::
-    easy_install twisted
+::  easy_install twisted
 
 txAMQP
-------
-::
-    easy_install txamqp
-
-Pycassa
--------
-::
-    easy_install -U --find-links http://ooici.net/packages pycassa
-
-SimpleJSON (only when running Python2.5)
-----------------------------------------
-::
-    easy_install simplejson
+::  easy_install txamqp
 
 carrot (use txamqp branch)
 --------------------------
@@ -99,7 +85,7 @@ carrot (use txamqp branch)
     (cd carrot; git checkout -b txamqp origin/txamqp)
     (cd carrot; python setup.py install)
 
-Install the Magnet package [NEED Magent 0.3.4 on master branch]
+Magnet (NEED Magent 0.3.4 on master branch)
 ------------------------------------------------------------------
 Get the latest version of the repository, if you haven't already.
 ::
@@ -108,17 +94,44 @@ Get the latest version of the repository, if you haven't already.
     git clone git@amoeba.ucsd.edu:magnet.git # need ooi credential
     (cd magnet; python setup.py install)
 
-
-Note:
-=====
-This project dependes closely on magnet. Whenever you do a "git pull" on
-this project, there is a chance that you need to update and install magnet
-again (see above). Please review the branch logs for any hints.
+Other Dependencies
+----------------------------
+::
+    easy_install msgpack-python
+    easy_install pydap
+    easy_install pydap.handlers.netcdf
+    easy_install pydap.responses.netcdf
+    easy_install numpy
+    easy_install httplib2
+    easy_install -U --find-links http://ooici.net/packages pycassa
+    easy_install simplejson
 
 
 ---------------------------------------------------------------------------
 Change log:
 ===========
+
+2010-08-06:
+- BaseProcess.spawn() now calls init() automatically. No need to call init()
+  on a process anymore manually. For testing only. Note: The correct way to
+  spawn a process is through a parent process with spawn_child()
+- Modified and fixed the BaseProcess states, when receiving messages
+- MAJOR update to BaseProcess message dispatching and subsequent error handling.
+  On error, reply_err messages are sent back, if reply-to header set.
+
+2010-08-03:
+- Added ant build.xml file to LCAarch root dir. Start with ant.
+  Supports ant clean, which removes all *.pyc from ion path.
+
+2010-07-23:
+- Refactored the Registry Services to inherit from a common base class. This
+  will allow easier implementation of the many registries in the OOICI. The
+  Resource Registry and Service Registry now have basic registration of resource
+  descriptions and services.
+- The Ion message is now encoded usig the MsgPack library to allow for binary
+  transport of message content. The JSON library was mangleing string content.
+  This is a temporary fix for a wider problem with the encoding structure which
+  needs to be addressed in construction.
 
 2010-06-07:
 - Redefined logging import to set as module level logger. Each module has now

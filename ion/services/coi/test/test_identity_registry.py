@@ -12,10 +12,9 @@ from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.test.iontest import IonTestCase
-from ion.services.coi.identity_registry import IdentityRegistryService, IdentityRegistryClient, Person
+from ion.services.coi.identity_registry import IdentityRegistryClient
 
-
-
+from ion.resources import coi_resource_descriptions
 
 class UserRegistrationClientTest(IonTestCase):
     """
@@ -36,6 +35,7 @@ class UserRegistrationClientTest(IonTestCase):
         
     @defer.inlineCallbacks
     def tearDown(self):
+        yield self.identity_registry_client.clear_identity_registry()
         yield self._stop_container()
         
     @defer.inlineCallbacks
@@ -44,7 +44,7 @@ class UserRegistrationClientTest(IonTestCase):
         """
         
         
-        user = Person()
+        user = coi_resource_descriptions.IdentityResource.create_new_resource()
 
         # initialize the user
         user.common_name = "Roger Unwin A13"
@@ -112,8 +112,10 @@ class UserRegistrationClientTest(IonTestCase):
         
         
     
-        ooi_id = yield self.identity_registry_client.register_user(user)
+        user = yield self.identity_registry_client.register_user(user)
 
+        ooi_id = user.reference()
+        print str(ooi_id.RegistryIdentity) + "******************************************************"
         # load the user back
         user0 = yield self.identity_registry_client.get_user(ooi_id)
         
@@ -122,28 +124,36 @@ class UserRegistrationClientTest(IonTestCase):
         self.assertEqual(user0.common_name, "Roger Unwin A13")
         
         # Test the ooi_id was properly set within the Person object
-        self.assertEqual(user0.ooi_id, ooi_id)
+        self.assertEqual(user0.reference(), ooi_id)
         
         # Test that updates work
         user0.common_name = "Roger Unwin CHANGED"
-        ooi_id = yield self.identity_registry_client.update_user(user0)
+        user0 = yield self.identity_registry_client.update_user(user0)
+        ooi_id = user0.reference()
+        
+        
         user1 = yield self.identity_registry_client.get_user(ooi_id)
         self.assertEqual("Roger Unwin CHANGED", user1.common_name)
         
         # Test for user not found handled properly.
-        result = yield self.identity_registry_client.get_user("bogus-ooi_id")
+        ooi_id.RegistryIdentity = "bogus-ooi_id"
+        result = yield self.identity_registry_client.get_user(ooi_id)
         self.assertEqual(result, None)
         
         # Test if we can find the user we have stuffed in.
-        users1 = yield self.identity_registry_client.find_users({'first_name': "oger"})
+        user_description = coi_resource_descriptions.IdentityResource()
+        user_description.first_name = 'oger'
+        
+        users1 = yield self.identity_registry_client.find_users(user_description,regex=True)
         self.assertEqual(len(users1), 1) # should only return 1 match
         self.assertEqual("Roger Unwin CHANGED", users1[0].common_name)
         
         # Test if we can set the life cycle state
         self.assertEqual(str(user1.lifecycle), 'new') # Should start as new
         
-        result = yield self.identity_registry_client.set_lcstate_retired(ooi_id)
-        self.assertEqual(result, True) # should return True on success
+        ooi_id = user0.reference(head=True)
+        
+        result = yield self.identity_registry_client.set_identity_lcstate_retired(ooi_id) # Wishful thinking Roger!
         user2 = yield self.identity_registry_client.get_user(ooi_id)
         self.assertEqual(str(user2.lifecycle), 'retired') # Should be retired now
 
