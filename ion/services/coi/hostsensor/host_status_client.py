@@ -6,5 +6,5 @@
 
 from twisted.web import xmlrpc
 s = xmlrpc.Proxy('http://localhost:9010')
-r = s.callRemote("getStatusPrettyPrint")
+r = s.callRemote("getStatusString")
 print r
