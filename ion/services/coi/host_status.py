@@ -49,7 +49,7 @@ class HostStatusService(BaseService):
             return
             
         logging.debug('Starting report query')
-        status = yield self.client.callRemote("getStatusPrettyPrint")
+        status = yield self.client.callRemote("getStatusString","all")
         logging.debug('Received report')
         print status
     
