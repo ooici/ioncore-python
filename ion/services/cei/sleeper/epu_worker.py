@@ -7,6 +7,7 @@ from magnet.spawnable import spawn, Receiver
 from ion.core import bootstrap
 from ion.services.base_service import BaseService
 from ion.core.base_process import ProtocolFactory
+import ion.util.procutils as pu
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
@@ -16,7 +17,6 @@ class EPUWorkerService(BaseService):
     """
     declare = BaseService.service_declare(name='epu_worker', version='0.1.0', dependencies=[])
 
-    @defer.inlineCallbacks
     def slc_init(self):
         self.queue_name_work = self.get_scoped_name("system", self.spawn_args["queue_name_work"])
         self.workReceiver = Receiver(__name__, self.queue_name_work)
@@ -36,8 +36,9 @@ class EPUWorkerService(BaseService):
     def op_work(self, content, headers, msg):
         if not self.laterinitialized:
             logger.error("message got here without the later-init")
-        logging.info("EPUWorkerService ---doing work--- content:"+str(content))
-        time.sleep(content['work_amount'])
+        sleepsecs = int(content['work_amount'])
+        logging.info("WORK: sleeping for %d seconds ---" % sleepsecs)
+        yield pu.asleep(sleepsecs)
         yield self.reply(msg, 'result', {'result':'work_complete'}, {})
 
 
