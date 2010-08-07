@@ -6,7 +6,7 @@
 @brief test service for sending host_ tatus messages
 """
 
-import logging, subprocess, sys
+import logging, subprocess, sys, os
 logging = logging.getLogger(__name__)
 
 from twisted.internet import defer
@@ -15,6 +15,7 @@ from twisted.internet.task import LoopingCall
 
 from ion.services.coi.hostsensor.readers import HostReader
 from ion.test.iontest import IonTestCase
+import ion
 import ion.util.procutils as pu
 
 from ion.services.coi.host_status import HostStatusClient
@@ -24,8 +25,8 @@ class HostStatusTest(IonTestCase):
     """
     Testing client classes of host_status
     """
-    
-    HOST_STATUS_DAEMON = 'ion/services/coi/hostsensor/host_status_daemon.py'
+    IONPATH = os.path.abspath(ion.__path__[0])
+    HOST_STATUS_DAEMON = IONPATH + '/services/coi/hostsensor/host_status_daemon.py'
     
     
     
@@ -36,13 +37,12 @@ class HostStatusTest(IonTestCase):
         daemon serves SNMP and other host data.
         """    
         
-        logging.debug('Starting Host Status XMLRPC Server')
+        logging.debug('Starting host status daemon')
         p = subprocess.Popen(
-                     [sys.executable, self.HOST_STATUS_DAEMON,'start'], 
+                     [sys.executable, self.HOST_STATUS_DAEMON, 'start'], 
                      stdout=subprocess.PIPE, 
                      stderr=subprocess.PIPE
                      )
-        
         # wait 10 seconds for the daemon to power up
         retries = 20
         while p.poll() is None and retries > 0:
@@ -50,8 +50,12 @@ class HostStatusTest(IonTestCase):
             yield pu.asleep(0.5)
             retries -= 1
         logging.debug('XMLRPC daemon started with return code %s'%str(p.returncode))
-        self.assertEqual(p.returncode,0,"XMLRPC daemon started uncleanly.  Already running?")
-
+        if p.returncode != 0:
+            logging.warn("XMLRPC daemon started uncleanly.")
+            out = p.stdout.read()
+            logging.warn("STDOUT: " + str(out))
+            out = p.stderr.read()
+            logging.warn("STDERR: " + str(out))
 
     @defer.inlineCallbacks
     def _stop_xmlrpc_daemon(self):
@@ -59,7 +63,7 @@ class HostStatusTest(IonTestCase):
         Stops the XMLRPC server (daemon) on the local host.
         """    
         p = subprocess.Popen(
-                     [sys.executable, self.HOST_STATUS_DAEMON,'stop'], 
+                     [sys.executable, self.HOST_STATUS_DAEMON, 'stop'], 
                      stdout=subprocess.PIPE, 
                      stderr=subprocess.PIPE
                      )
@@ -70,7 +74,8 @@ class HostStatusTest(IonTestCase):
             yield pu.asleep(0.5)
             retries -= 1
         logging.debug('XMLRPC daemon stopped with return code %s'%str(p.returncode))
-        self.assertEqual(p.returncode,0,"XMLRPC daemon stopped uncleanly.")
+        if p.returncode != 0:
+            logging.debug('XMLRPC daemon stopped uncleanly.')
 
 
     @defer.inlineCallbacks
@@ -91,10 +96,11 @@ class HostStatusTest(IonTestCase):
                 'class':'HostStatusService',
                 'spawnargs':
                     {
-                        'sys-name':'host_status',
-                        'servicename':'host_status',
+                        'sys-name':'hoststatus1',
+                        'servicename':'hoststatus1',
                         'count':1,
-                        'interval':1
+                        'interval':1,
+                        'scope':'system'
                     }
             }
         ]
@@ -117,8 +123,8 @@ class HostStatusTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_BasicService(self):
-        retries = 20
+        retries = 100
         while retries > 0:
             retries -= 1
-            print 'Waiting...'
+            print 'Waiting for reply...'
             yield pu.asleep(0.5)
