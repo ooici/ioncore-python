@@ -26,21 +26,19 @@ class HostStatusTest(IonTestCase):
     
     # Test SNMP
     
-    def test_DoomedSnmpReader(self):
-        reader = HostReader('localhost', 180, 'ccagent', 'ooicinet',timeout=0.5, retries=0)
-        status = reader.getAll()
-        self.assertFalse(status['SupportsSNMP'])
-        self.assertFalse(status['SupportsRFC1213'])
-        self.assertFalse(status['SupportsRFC2790'])
+#    def test_DoomedSnmpReader(self):
+#        reader = HostReader('localhost', 180, 'ccagent', 'ooicinet',timeout=0.5, retries=0)
+#        status = reader.getAll()
+#        self.assertFalse(status['SupportsSNMP'])
+#        self.assertFalse(status['SupportsRFC1213'])
+#        self.assertFalse(status['SupportsRFC2790'])
 
         
     def test_GoodSnmpReader(self):
         reader = HostReader('localhost', 161, 'ccagent', 'ooicinet')
-        status = reader.getAll()
-        self.assertTrue(status['SupportsSNMP'])
-        self.assertTrue(status['SupportsRFC1213'])
-        self.assertTrue(status['SupportsRFC2790'])
-        print reader.getAllPrettyPrint()
+        report = reader.get('all')
+        status = reader.pprint(report)
+        print status
     
 
 
