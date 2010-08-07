@@ -3,14 +3,15 @@
 @author Brian Fox
 @brief Simple XMLRPC server for serving host status
 """
-import logging
+import logging, sys
 import encoders
+from optparse import OptionParser
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 from readers import HostReader
 from base_daemon import Daemon
  
 
-class HostStatusRPCServer:
+class HostStatusRPCServer(Daemon):
     """
     XMLRPC server for returning host status on request.  This wraps 
     the various classes in readers.py into an XMLRPC server.
@@ -22,6 +23,9 @@ class HostStatusRPCServer:
 
     def __init__(
                  self, 
+                 pidfile,
+                 logfile,
+                 testmode = False, 
                  snmpHost          = 'localhost', 
                  snmpPort          = 161,
                  snmpAgentName     = 'ooici',
@@ -31,16 +35,15 @@ class HostStatusRPCServer:
         """
         Creates the RPC server
         """
-        self.server = SimpleXMLRPCServer((rpcHost, rpcPort), allow_none=True)
-        self.status = HostReader(
+        Daemon.__init__(self, pidfile, logfile)
+        self.hostreader = HostReader(
                                  snmpHost, 
                                  snmpPort, 
                                  snmpAgentName, 
                                  snmpCommunityName
                                  )
-        self.server.register_function(self.getStatus)
-        self.server.register_function(self.getStatusPrettyPrint)
-        self.server.register_introspection_functions()
+        self.rpcPort = rpcPort
+        self.rpcHost = rpcHost
         logging.debug('host_status_daemon intialized')
 
 
@@ -48,51 +51,62 @@ class HostStatusRPCServer:
         """
         Puts the server in motion.  Blocks forever.
         """
-        self.server.serve_forever()
+        server = SimpleXMLRPCServer((self.rpcHost, self.rpcPort), allow_none=True)
+        server.register_function(self.getStatus)
+        server.register_function(self.getStatusString)
+        server.register_introspection_functions()
+        server.serve_forever()
 
 
-        
-    def getStatus(self):
+    def getStatus(self,system):
         """
         Gets the status of this host (RPC registered function)
         """
-        return encoders.encodeJSONToXMLRPC(self.status.getAll())
+        report = self.hostreader.get(system)
+        return encoders.encodeJSONToXMLRPC(report)
 
 
-    def getStatusPrettyPrint(self):
+    def getStatusString(self,system):
         """
         Gets the status of this host (RPC registered function)
         """
-        return encoders.encodeJSONToXMLRPC(self.status.getAllPrettyPrint())
+        report = self.hostreader.get(system)
+        report = self.hostreader.pformat(report)
+        return report
 
         
- 
-class HostStatusDaemon(Daemon):
+
+class _OptionParser(OptionParser):
     """
-    Runs a HostStatusRPCServer as a Unix daemon. 
-    """    
-    def run(self):
-        server = HostStatusRPCServer()
-        server.run()
-
-
-
-
-class HostStatusNoDaemon():
+    Subclassed only to create a more meaningful error message.
     """
-    Runs a HostStatusRPCServer as a process which stays in the
-    foreground. 
-    """   
-    def __init__(self): 
-        server = HostStatusRPCServer()
-        server.run()
+    def error(self,message):
+        print "error: " + str(message)
+        print "try -h for help"
+        sys.exit(-1)
 
 
+def main():
+    usage = "usage: %prog [options] command\n\ncommand = [start,stop,restart,status]"
+    parser = _OptionParser(usage=usage)
+    parser.add_option("-t", "--test",
+                      action="store_true",
+                      dest="test_flag",
+                      default=False,
+                      help="place the daemon in test mode (faster but with limited SNMP queries)")
+    (options, args) = parser.parse_args()
 
+    if len(args) != 1 or args[0] not in ['start','stop','restart','status']:
+        parser.error("you must specify a command: start,stop,restart,status")
 
-if __name__ == "__main__":
     # runAlways = HostStatusNoDaemon()
-    daemon = HostStatusDaemon('/tmp/host_status_daemon.pid','/tmp/host_status_daemon.log')
-    daemon.processCommandLine()
- 
+    daemon = HostStatusRPCServer(
+        '/tmp/host_status_daemon.pid',
+        '/tmp/host_status_daemon.log',
+        testmode=False # testmode=options['test_flag']
+    )
+    daemon.doCommand(args[0])
+
+if __name__ == '__main__':
+    main()
         
