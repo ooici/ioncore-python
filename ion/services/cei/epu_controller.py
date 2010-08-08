@@ -27,7 +27,7 @@ class EPUControllerService(BaseService):
         reactor.callLater(0, self.later_init)
         
         # todo: make this class configurable
-        engineclass = "ion.services.cei.decisionengine.default.DefaultEngine"
+        engineclass = "ion.services.cei.decisionengine.impls.DefaultEngine"
         self.provisioner_client = ProvisionerClient(self)
         self.core = ControllerCore(self.provisioner_client, engineclass)
         
