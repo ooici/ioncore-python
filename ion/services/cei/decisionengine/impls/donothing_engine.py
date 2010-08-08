@@ -8,6 +8,25 @@ class DoNothingEngine(Engine):
     and ssh in to the controller node and kill/relaunch the controller
     unix process as you develop.
     
+    Before you kill the PID, save the twistd command into a shell script:
+    
+    echo '#!/bin/bash' > relaunch_controller.sh
+    chmod +x relaunch_controller.sh
+    echo "cd $PWD" >> relaunch_controller.sh
+    CONTROLLER_PID=`cat sleeper_epu_controller-service.pid`
+    ps -p $CONTROLLER_PID -o cmd h >> relaunch_controller.sh
+    
+    -------------------------
+    
+    Change the engine classname in this cfg file to the one you are working on:
+        res/config/sleeper_epu_controller-ionservices.cfg
+        
+    -------------------------  
+    
+    kill `cat sleeper_epu_controller-service.pid`
+    rm *epu_controller-service.log
+    ./relaunch_controller.sh
+    
     """
     
     def __init__(self):
