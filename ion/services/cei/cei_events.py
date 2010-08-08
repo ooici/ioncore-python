@@ -25,7 +25,7 @@ def event(source, name, logger, extra=None):
     @param source The event source, can use this for grouping events.
     @param name The event name.
     @param logger logger must be provided from outside.
-    @param extra Some opaque string that you will consult after parsing.
+    @param extra Some opaque dict that you will consult after parsing.
     """
     if not logger:
         raise Exception("logger is required")
@@ -49,7 +49,7 @@ def _event_dict(source, name, extra=None):
         raise Exception("event name is required")
     _valid(source)
     _valid(name)
-    _valid(extra)
+    _valid_dict(extra)
         
     uniquekey = str(uuid.uuid4())
     timestamp = _timestamp_to_dict(_timestamp_now())
@@ -68,11 +68,27 @@ def _valid(string):
     if string.rfind("\n") >= 0:
         raise Exception("Cannot contain newline: %s" % string)
         
+def _valid_dict(adict):
+    if not adict:
+        return
+    # usually frowned upon, but feel strictness will do more good than harm here
+    if not isinstance(adict, dict):
+        raise Exception("the extra portion of an event needs to be a dict")
+        
+    # only checks the first level for now..
+    for k in adict.keys():
+        if isinstance(k, int):
+            raise Exception("the json module won't support integer keys")
+    
+    # check by serializing everything first, this lets us support
+    # an arbitrary dict hierarchy
+    json_text = json.dumps(adict)
+    _valid(json_text)
 
 # ------------------ EVENT HARVESTING --------------------------------
 
 class CEIEvent:
-    """Convenience class for a parsed event
+    """Convenience class for a parsed event.
     """
     
     def __init__(self, source, name, key, timestamp, extra):

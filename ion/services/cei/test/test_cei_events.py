@@ -123,10 +123,47 @@ class CEIEventsTestCase(unittest.TestCase):
         assert len(uniqs) == 7
 
     def test_extra(self):
-        cei_events.event("unittest", "TRIAL1", logger, extra="hello1")
+        adict = {"hello1":"hello2"}
+        cei_events.event("unittest", "TRIAL1", logger, extra=adict)
         events = cei_events.events_from_file(self.logfilepath)
         assert len(events) == 1
-        assert events[0].extra == "hello1"
+        assert events[0].extra["hello1"] == "hello2"
+        
+    def test_bad_extra(self):
+        self.assertRaises(Exception, cei_events.event, 
+                          "unittest", None, logger)
+
+    def test_extra_integer_values(self):
+        adict = {"hello1":34}
+        cei_events.event("unittest", "TRIAL1", logger, extra=adict)
+        events = cei_events.events_from_file(self.logfilepath)
+        assert len(events) == 1
+        assert events[0].extra["hello1"] == 34
+
+    def test_extra_integer_keys(self):
+        # This does not serialize as an integer, fails.  Added rule
+        # to events recorder to not allow integer keys.
+        pass
+        #adict = {23:"something"}
+        #cei_events.event("unittest", "TRIAL1", logger, extra=adict)
+        #events = cei_events.events_from_file(self.logfilepath)
+        #assert len(events) == 1
+        #assert events[0].extra[23] == "something"
+
+    def test_extra_hierarchy(self):
+        # note the conflicting "hello3" key in higher level:
+        innerdict = {"hello3":"hello4"}
+        adict = {"hello1":"hello2", "hello5":innerdict, "hello3":"hello6"}
+        
+        cei_events.event("unittest", "TRIAL1", logger, extra=adict)
+        events = cei_events.events_from_file(self.logfilepath)
+        assert len(events) == 1
+        assert events[0].extra["hello1"] == "hello2"
+        assert events[0].extra["hello3"] == "hello6"
+        
+        innerdict = events[0].extra["hello5"]
+        assert isinstance(innerdict, dict)
+        assert innerdict["hello3"] == "hello4"
         
     def test_newline_rules(self):
         self.assertRaises(Exception, cei_events.event, 
