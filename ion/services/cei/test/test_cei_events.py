@@ -131,7 +131,7 @@ class CEIEventsTestCase(unittest.TestCase):
         
     def test_bad_extra(self):
         self.assertRaises(Exception, cei_events.event, 
-                          "unittest", None, logger)
+                          "unittest", "TRIAL1", logger, extra="astring")
 
     def test_extra_integer_values(self):
         adict = {"hello1":34}

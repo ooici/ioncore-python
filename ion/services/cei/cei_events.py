@@ -80,10 +80,6 @@ def _valid_dict(adict):
         if isinstance(k, int):
             raise Exception("the json module won't support integer keys")
     
-    # check by serializing everything first, this lets us support
-    # an arbitrary dict hierarchy
-    json_text = json.dumps(adict)
-    _valid(json_text)
 
 # ------------------ EVENT HARVESTING --------------------------------
 
