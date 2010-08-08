@@ -13,17 +13,17 @@ class DoNothingEngine(Engine):
     echo '#!/bin/bash' > relaunch_controller.sh
     chmod +x relaunch_controller.sh
     echo "cd $PWD" >> relaunch_controller.sh
-    CONTROLLER_PID=`cat sleeper_epu_controller-service.pid`
+    CONTROLLER_PID=`cat *_epu_controller-service.pid`
     ps -p $CONTROLLER_PID -o cmd h >> relaunch_controller.sh
     
     -------------------------
     
     Change the engine classname in this cfg file to the one you are working on:
-        res/config/sleeper_epu_controller-ionservices.cfg
-        
+        nano -w res/config/*_epu_controller-ionservices.cfg
+    
     -------------------------  
     
-    kill `cat sleeper_epu_controller-service.pid`
+    kill `cat *_epu_controller-service.pid`
     rm *epu_controller-service.log
     ./relaunch_controller.sh
     
