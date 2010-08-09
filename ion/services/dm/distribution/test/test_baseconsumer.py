@@ -316,7 +316,7 @@ class BaseConsumerTest(IonTestCase):
         pd1={'name':'consumer_number_1',
                  'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
-                 'spawnargs':{'attach':self.queue1,\
+                 'spawnargs':{'attach':[self.queue1],\
                               'Process Parameters':{},\
                               'delivery queues':{'queues':[self.queue2]}}\
                     }

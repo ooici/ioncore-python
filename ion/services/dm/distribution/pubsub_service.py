@@ -85,8 +85,21 @@ class DataPubsubService(BaseService):
         # Give the topic anidentity
         topic.create_new_reference()
         
-        # Pick a topic name and declare the queue - this should be done in the exchange registry        
+        # Declare the queue - this should be done in the exchange registry        
         # Create a new queue object
+        queue = yield self.create_queue()
+
+        topic.queue = queue
+
+        defer.returnValue(topic)
+        
+    @defer.inlineCallbacks
+    def create_queue(self):
+        """
+        Create a queue
+        @TODO fix the hack - This should come from the exchange registry!
+        """
+        
         queue = dm_resource_descriptions.Queue()
         queue.name = dataobject.create_unique_identity()
         queue.type = 'fanout'
@@ -95,10 +108,10 @@ class DataPubsubService(BaseService):
         queue_properties = {queue.name:{'name_type':queue.type, 'args':queue.args}}
         # This should come from the COI Exchange registry
         yield bootstrap.declare_messaging(queue_properties)
-
-        topic.queue = queue
-
-        defer.returnValue(topic)
+        
+        defer.returnValue(queue)
+        
+    
 
     @defer.inlineCallbacks
     def op_define_publisher(self, content, headers, msg):
@@ -151,6 +164,27 @@ class DataPubsubService(BaseService):
     def create_subscription(subscription):
         '''
         '''
+    
+        """    
+        Name - inherited    
+        # hack for now to allow naming one-three more topic descriptions
+        topic1 = TypedAttribute(PubSubTopicResource)
+        topic2 = TypedAttribute(PubSubTopicResource) 
+        topic3 = TypedAttribute(PubSubTopicResource)
+        
+        workflow = TypedAttribute(dict)
+        '''
+        <consumer name>:{'module':'path.to.module','cosumeclass':'<ConsumerClassName>',\
+            'attach':(<topicX>) or (<consumer name>, <consumer queue keyword>) or <list of consumers and topics>,\
+            'Process Parameters':{<conumser property keyword arg>: <property value>},\
+        '''
+    
+        #Used internally
+        current_topics = TypedAttribute(list) # List of Topic Resource References
+        current_procs = TypedAttribute(list) # Of what? - need a process registry
+        current_queues = TypedAttribute(dict) 
+        """
+        
         #A for each topic1, topic2, topic3 get the list of queues
             
         topics={'topic1':[],'topic2':[],'topic3':[]}
@@ -167,11 +201,7 @@ class DataPubsubService(BaseService):
             
             
         #B process the workflow dictionary,
-        '''
-        <consumer name>:{'module':'path.to.module','cosumeclass':'<ConsumerClassName>',\
-            'attach':<topicX> or (consumer name, consumer queue keyword) or <list of consumers and topics>,\
-            'Process Parameters':{<conumser property keyword arg>: <property value>},\
-        '''
+        
         
         #0) Check for valid workflow
         # how can I check whether the workflow is a loop ? difficult!
@@ -179,33 +209,86 @@ class DataPubsubService(BaseService):
         # 1) create new queues for workflow
         # 2) create ConsumerDesc for each consumer
         
-        # for each consumer and it attachements...
+        # create place holders for each consumers spawn args
+        consumers = {}
+        consumer_names =  subscription.workflow.keys()
+        for consumer, args in subscription.workflow.items():
+
+            spargs ={'attach':[],
+                     'process parameters':{},
+                     'delivery queues':{}}
+            
+            cd = {}
+            cd['name'] = consumer
+            cd['module'] = args.get('module')
+            cd['procclass'] = args.get('consumerclass')
+            cd['spawnargs'] = spargs
+            
+            consumers[consumer]=cd
+        
+        
+        # for each consumer and it attachements and create delivery queues
         for consumer, args in subscription.workflow.items():
             
-            #examine attach args an make sure they are valid 
-            if hasattr(args.attach,'__iter__'):
-                attach = args.attach
-            else:
-                attach = [args.attach]
+            params = args.get('process parameters')
+            attach = []
+            queues = {}
+
+            # Get teh attach to topic or consumer - make it a list and iterate            
+            attach_to= args['attach']
+            if not hasattr(attach_to,'__iter__'):
+                attach_to = [attach_to]
                 
-            for name in attach:
+            for item in attach_to:
+                
+                #Each item may be a topic or a consumer/keyword pair - make it a list
+                # and extract the contents
+                if not hasattr(item,'__iter__'):
+                    item = [item]
+                
+                if len(item) ==1:
+                    name = item[0]
+                    keyword = None
+                elif len(item)==2:
+                    name = item[0]
+                    keyword = item[1]
+                else:
+                    raise RuntimeError('Invalid attach argument!')
+                
                 
                 # is it a topic?
                 if name in topics.keys():
-                    topic_name = topics[name].name # get the registered topic name
-                    logging.debug('Consumer %s attaches to topic %s' % (consumer, topic_name))
-
+                    topic_list = topics[name] # get the list of topics
+                    # add each queue to the list of attach_to
+                    for topic in topic_list:
+                        attach.append(topic.queue.name)
+                        logging.logging('Consumer %s attaches to topic %s' % (consumer, topic.name))
+                    
                 # See if it is consuming another resultant
-                elif name[0] in subscription.workflow.keys(): # Could fail badly!
+                elif name in consumer_names: # Could fail badly!
                     
+                    logging.logging('Consumer %s attaches to queue for producer/keyword: %s/%s' % (consumer, name, keyword))
                     
-                    producer = subscription.workflow[name[0]]
-                    if name[1] in producer['delivery queues'].itervalues():
-                        queue_arg = producer['delivery queues'][name[1]]
-                        logging.debug('Consumer %s attaches to producer %s delivery queue %s'\
-                            % (consumer, name[0],queue_arg))
+                    # Does this producer already have a queue?
+                    # This is not 'safe' - lots of ways to get a key error!
+                    q = consumers[name]['spawnargs']['delivery queues'].get(keyword,None)
+                    if q:
+                        attach.append(q)
+                        logging.logging('Consumer %s attaches to existing queue for producer/keyword: %s/%s' % (consumer, name, keyword))
+                    else: 
+                        # Create the queue!
+                        #@TODO - replace with call to exchange registry service
+                        queue = yield self.create_queue()
+                        attach.append(queue.name)
+                        
+                        # Add to the delivery list for the producer...
+                        consumers[name]['spawnargs']['delivery queues'][keyword]=queue.name
+                        logging.logging('Consumer %s attaches to new queue for producer/keyword: %s/%s' % (consumer, name, keyword))
+                else:
+                    raise RuntimeError('Can not determine how to attach consumer %s \
+                                       to topic/consumer %s' % (consumer, item))
                     
-                    
+                
         
         # 3) spawn consumers
         
