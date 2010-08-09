@@ -11,7 +11,7 @@ from readers import HostReader
 from base_daemon import Daemon
  
 
-class HostStatusRPCServer(Daemon):
+class HostStatusDaemon(Daemon):
     """
     XMLRPC server for returning host status on request.  This wraps 
     the various classes in readers.py into an XMLRPC server.
@@ -100,7 +100,7 @@ def main():
         parser.error("you must specify a command: start,stop,restart,status")
 
     # runAlways = HostStatusNoDaemon()
-    daemon = HostStatusRPCServer(
+    daemon = HostStatusDaemon(
         '/tmp/host_status_daemon.pid',
         '/tmp/host_status_daemon.log',
         testmode=False # testmode=options['test_flag']
