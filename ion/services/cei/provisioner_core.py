@@ -21,6 +21,7 @@ from libcloud.base import Node as NimbossNode
 from libcloud.drivers.ec2 import EC2NodeDriver
 from ion.services.cei.provisioner_store import group_records
 from ion.services.cei import states
+from ion.services.cei import cei_events
 
 __all__ = ['ProvisionerCore', 'ProvisioningError']
 
@@ -314,6 +315,10 @@ class ProvisionerCore(object):
             node_rec['private_ip'] = private_ip
             node_rec['extra'] = iaas_node.extra.copy()
             node_rec['state'] = states.PENDING
+            
+            extradict = {'public_ip': public_ip, 'iaas_id': iaas_node.id}
+            cei_events.event("provisioner", "new_node", 
+                             logging, extra=extradict)
     
     @defer.inlineCallbacks
     def store_and_notify(self, records, subscribers, newstate=None):
