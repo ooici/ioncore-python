@@ -1,9 +1,9 @@
-from optparse import OptionParser
+#This is for python2.5 compatibility    
+from __future__ import with_statement 
 
 from pydap.handlers.netcdf import Handler
 from pydap.responses.dds import DDSResponse
 from pydap.responses.das import DASResponse
-from pydap.responses.dods import DODSResponse
 from pydap.xdr import DapPacker
 
 from pydap.parsers.dds import DDSParser
@@ -13,10 +13,8 @@ from pydap.responses import netcdf
 import base64
 import StringIO
 
-from pydap.model import BaseType, DapType, DatasetType, Float32, Float64, \
-    GridType, Int16, Int32, SequenceData, SequenceType, StructureType, UInt16, \
-    UInt32, String
-
+from pydap.model import BaseType,  DatasetType, Float32, Float64, \
+    GridType, Int32
 
 import numpy
 
