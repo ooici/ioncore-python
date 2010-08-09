@@ -19,6 +19,7 @@ class RabbitMQSensor(SensorProcess):
         SensorProcess.plc_init(self)
         self.queue_name_work = self.get_scoped_name("system", self.spawn_args["queue_name_work"])
         self.queue_name_events = self.get_scoped_name("system", self.spawn_args["queue_name_events"])
+        self.epu_controller = self.get_scoped_name("system", "epu_controller")
 
         erlang_cookie = self.spawn_args.get("erlang_cookie", None)
         if erlang_cookie is None:
@@ -55,14 +56,12 @@ class RabbitMQSensor(SensorProcess):
         logging.info("=== messages_in_queue ===")
         for q in allqueues["result"]:
             if q[0] == self.queue_name_work:
-                messages = q[1]["messages"]
-                logging.info("in queue '%s' there are '%s' messages"% (self.queue_name_work, messages))
-                extradict = {"msg_number": messages,
-                             "queue_name": self.queue_name_work}
-                cei_events.event("queue_sensor", "queuelen", 
-                                 logging, extra=extradict)
-                content = {"queue_name_work":self.queue_name_work, "messages":messages}
-                yield self.send(self.queue_name_events, "event", content)
+                queuelen = q[1]["queuelen"]
+                logging.info("in queue '%s' there are '%s' messages"% (self.queue_name_work, queuelen))
+                extradict = {"queuelen": queuelen, "queue_name": self.queue_name_work}
+                cei_events.event("queue_sensor", "queuelen", logging, extra=extradict)
+                content = {"queue_id":self.queue_name_work, "queuelen":queuelen}
+                yield self.send(self.epu_controller, "sensor_info", content)
 
 # Direct start of the service as a process with its default name
 factory = ProtocolFactory(RabbitMQSensor)
