@@ -239,6 +239,7 @@ class InstrumentAgent(ResourceAgent):
         result = yield self.driver_client.set_params(content)
         if result == {}:
             yield self.reply_err(msg, "Could not set %s" % content)
+            return
         else:
             response.update(result)
         assert(response != {})
