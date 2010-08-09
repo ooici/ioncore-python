@@ -95,8 +95,8 @@ class PubSubTest(IonTestCase):
                  'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
                  'procclass':'ForwardingConsumer',
                  'spawnargs':{'attach':topic.queue.name,\
-                              'Process Parameters':\
-                              {'queues':[queue1,queue2]}}\
+                              'Process Parameters':{},\
+                              'delivery queues':{'queues':[queue1,queue2]}}\
                     }
         child1 = base_consumer.ConsumerDesc(**pd1)
 
@@ -129,8 +129,7 @@ class PubSubTest(IonTestCase):
         pd2={'name':'example_consumer_2',
                  'module':'ion.services.dm.distribution.consumers.logging_consumer',
                  'procclass':'LoggingConsumer',
-                 'spawnargs':{'attach':queue1,\
-                              'Process Parameters':{}}\
+                 'spawnargs':{'attach':queue1}\
                     }
         child2 = base_consumer.ConsumerDesc(**pd2)
 
@@ -196,7 +195,8 @@ class PubSubTest(IonTestCase):
                  'module':'ion.services.dm.distribution.consumers.example_consumer',
                  'procclass':'ExampleConsumer',
                  'spawnargs':{'attach':topic_raw.queue.name,\
-                              'Process Parameters':\
+                              'Process Parameters':{},\
+                              'delivery queues':\
                               {'event_queue':evt_queue,\
                                'processed_queue':pr_queue}}\
                     }

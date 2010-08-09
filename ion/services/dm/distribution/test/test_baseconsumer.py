@@ -162,6 +162,15 @@ class BaseConsumerTest(IonTestCase):
         
         self.assertEqual(res,params)
         
+        params2 = {'more junk':'my trunk'}
+        res = yield child1.set_process_parameters(params2)
+        self.assertEqual(res,'OK')
+
+        res = yield child1.get_process_parameters()
+        
+        ptest = dict(params)
+        ptest.update(params2)
+        self.assertEqual(res,ptest)
         yield child1.shutdown()
 
 
@@ -171,7 +180,8 @@ class BaseConsumerTest(IonTestCase):
                  'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':self.queue1,\
-                              'Process Parameters':{'queues':[self.queue2]}}\
+                              'process parameters':{},
+                              'delivery queues':{'queues':[self.queue2]}}\
                     }
         child1 = base_consumer.ConsumerDesc(**pd1)
 
@@ -197,7 +207,8 @@ class BaseConsumerTest(IonTestCase):
                  'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':self.queue1,\
-                              'Process Parameters':{'queues':[self.queue2]}}\
+                              'Process Parameters':{},\
+                              'delivery queues':{'queues':[self.queue2]}}\
                     }
         child1 = base_consumer.ConsumerDesc(**pd1)
 
@@ -259,7 +270,8 @@ class BaseConsumerTest(IonTestCase):
                  'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':[self.queue1, self.queue2],\
-                    'Process Parameters':{'queues':[self.queue3]}}\
+                    'Process Parameters':{},\
+                    'delivery queues':{'queues':[self.queue3]}}\
             }
             
         child1 = base_consumer.ConsumerDesc(**pd1)
@@ -305,7 +317,8 @@ class BaseConsumerTest(IonTestCase):
                  'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':self.queue1,\
-                              'Process Parameters':{'queues':[self.queue2]}}\
+                              'Process Parameters':{},\
+                              'delivery queues':{'queues':[self.queue2]}}\
                     }
         child1 = base_consumer.ConsumerDesc(**pd1)
 

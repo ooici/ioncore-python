@@ -1,5 +1,14 @@
 #!/usr/bin/env python
 
+"""
+@file ion/resources/dm_resource_descriptions.py
+@author David Stuebe
+@brief Resource descriptions for DM services and resources. Includes some
+container objects used in messaging.
+"""
+
+
+
 from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource, create_unique_identity
 
 
@@ -108,81 +117,32 @@ class PubSubTopicResource(InformationResource):
             inst.aoi = aoi
         return inst
 
-
-
-
 class SubscriptionResource(StatefulResource):
     """
     Informaiton about a subscriber
     """
     #Name - inherited
 
-    identity = TypedAttribute(ResourceReference)
-    select_on = TypedAttribute(PubSubTopicResource)
+    #owner = TypedAttribute(ResourceReference) # Don't worry about owner yet
+    
+    # hack for now to allow naming one-three more topic descriptions
+    topic1 = TypedAttribute(PubSubTopicResource)
+    topic2 = TypedAttribute(PubSubTopicResource) 
+    topic3 = TypedAttribute(PubSubTopicResource)
+    
     workflow = TypedAttribute(dict)
-    delivery = TypedAttribute(str)
-    deliver_to = TypedAttribute(ResourceReference) # Registerd Topic Reference
-    notification = TypedAttribute(dict)
+    '''
+    Only specify who you attach to - not who you produce to - consistent with pubsub model!
+    <consumer name>:{'module':'path.to.module','cosumeclass':'<ConsumerClassName>',\
+        'attach':<topicX> or <consumer name> or <list of consumers and topics>,\
+        'Process Parameters':{<conumser property keyword arg>: <property value>},\
+    '''
 
     #Used internally
     current_topics = TypedAttribute(list) # List of Topic Resource References
     current_procs = TypedAttribute(list) # Of what? - need a process registry
-    current_queues = TypedAttribute(list) 
-
-    # Constance used in SubscriptionResource
-    ASAP = 'asap'
-    DIGEST = 'digest'
-    TWITTER = 'twitter'
-    EMAIL = 'email'
-    SMS = 'sms'
-    RSS = 'rss'    
+    current_queues = TypedAttribute(dict) 
     
-    @classmethod
-    def create(cls,subscription_name='', identity=None, select_on={}, workflow=[], delivery=ASAP, deliver_to=None, notification={}):
-        """
-        subscription_name - the name of this subscription, Should be unique to your subscriptions
-        identity - ResourceReference for your OOI identity
-        select_on - Topic, a topic description
-        workflow - a list of ProcessDesc objects
-        deliver - digest 
-        workflow=[{name:consumer1,
-                    class:path.module,
-                    args:{<queuearg>:consumername,...kwargs}},
-                   {name:consumer2 ...)
-                   
-        delivery='asap' or 'digest'
-        deliver_to - A topic to publish the results on or None
-        notification - {'twitter':'<params>'}, {'email':'<params>'}, {'sms':'<params>'}, {'rss':'<params>'}
-        """
-        
-        inst = cls()
-
-        inst.name = subscription_name
-
-        if identity:
-            inst.identity = identity 
-        
-        inst.select_on = select_on
-        if workflow:
-            inst.workflow = workflow
-        
-        if delivery == ASAP or delivery == DIGEST:
-            inst.delivery = delivery
-        else:
-            raise RuntimeError('Invalid setting in Subscription Resource: delivery')
-
-        if deliver_to: # Else - no final destination topic...
-            inst.deliver_to =  deliver_to
-
-        if notification: # Else - no final notification of publication
-            if notification.keys() in [TWITTER, EMAIL, RSS, SMS]:
-                inst.notification = notication
-            else:
-                raise RuntimeError('Invalid setting in Subscription Resource: notification')
-            
-            
-        return inst
-
 """
 DM DataSet Resource Descriptions
 Preliminary!

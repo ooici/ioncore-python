@@ -44,7 +44,8 @@ class BaseConsumer(BaseProcess):
 
     @defer.inlineCallbacks
     def plc_init(self):
-        self.params = self.spawn_args.get('Process Parameters',{})
+        self.params = self.spawn_args.get('process parameters',{})
+        self.deliver = self.spawn_args.get('delivery queues',{})
         self.receive_cnt = {}
         self.received_msg = []
         self.msgs_to_send = []
@@ -151,7 +152,7 @@ class BaseConsumer(BaseProcess):
         if not content:
             yield self.reply_err(msg)
             return
-        self.params = content
+        self.params.update(content)
         yield self.reply_ok(msg)
         
     @defer.inlineCallbacks
@@ -162,6 +163,27 @@ class BaseConsumer(BaseProcess):
         logging.info(self.__class__.__name__ +'; Calling Get Process Parameters;')
         
         yield self.reply_ok(msg,self.params)
+        
+    @defer.inlineCallbacks
+    def op_set_delivery_queues(self, content, headers, msg):
+        '''
+        Message interface to set parameters
+        '''
+        logging.info(self.__class__.__name__ +'; Calling Set Delivery Queues; Queues:' + str(content))
+        if not content:
+            yield self.reply_err(msg)
+            return
+        self.params.update(content)
+        yield self.reply_ok(msg)
+        
+    @defer.inlineCallbacks
+    def op_get_delivery_queues(self, content, headers, msg):
+        '''
+        Message interface to get parameters
+        '''
+        logging.info(self.__class__.__name__ +'; Calling Get Delivery Queues;')
+        
+        yield self.reply_ok(msg,self.deliver)
         
     @defer.inlineCallbacks
     def op_get_msg_count(self, content, headers, msg):
@@ -199,8 +221,11 @@ class BaseConsumer(BaseProcess):
         notification = datamessage.notification
         timestamp = datamessage.timestamp
 
+        args = dict(self.params)
+        args.update(self.deliver)
 
-        yield defer.maybeDeferred(self.ondata, data, notification, timestamp, **self.params)
+        logging.debug('**ARGS to ondata:'+str(args))
+        yield defer.maybeDeferred(self.ondata, data, notification, timestamp, **args)
 
         logging.info(self.__class__.__name__ +"; op_data: Finished data processing")
 
@@ -303,6 +328,26 @@ class ConsumerDesc(ProcessDesc):
     def get_process_parameters(self):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
                                                 'get_process_parameters', {})
+        if content.pop('status','ERROR') == 'OK':
+            defer.returnValue(content)
+        else:
+            defer.returnValue('ERROR')
+
+    @defer.inlineCallbacks
+    def set_delivery_queues(self,params):
+        (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
+                                                'set_delivery_queues', params)
+        if content.get('status','ERROR') == 'OK':
+            #self.proc_params = params
+            defer.returnValue('OK')
+        else:
+            #self.proc_params = None
+            defer.returnValue('ERROR')
+        
+    @defer.inlineCallbacks
+    def get_delivery_queues(self):
+        (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
+                                                'get_delivery_queues', {})
         if content.pop('status','ERROR') == 'OK':
             defer.returnValue(content)
         else:

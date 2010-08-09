@@ -56,15 +56,18 @@ class DataPubsubService(BaseService):
         logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' + str(headers))
         topic = dataobject.Resource.decode(content)
   
-        if not topic.RegistryIdentity:
+        if topic.RegistryIdentity:
+            pass # Just change the keywords in the registry - nothing to do!
+        else:
             # it is a new topic and must be declared
             topic = yield self.create_and_declare_topic(topic)
-        # Otherwise assume we are updating the keywords or some such change
-        # That does not affect the queue!
     
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic: \n' + str(topic))
     
         topic = yield self.reg.register(topic)
+        
+        #@todo call some process to update all the subscriptions? Or only on interval?
+        
         if topic:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
             yield self.reply_ok(msg, topic.encode())
@@ -115,20 +118,115 @@ class DataPubsubService(BaseService):
             yield self.reply_err(msg, None)
         
         
-    
-    def op_subscribe(self, content, headers, msg):
+    @defer.inlineCallbacks
+    def op_define_subscription(self, content, headers, msg):
         """Service operation: Register a subscriber's intent to receive
-        subscriptions on a topic, with additional filter and delivery method
-        details.
+        subscriptions on a topic, with the workflow described to produce the
+        desired result
         """
         # Subscribe should decouple the exchange point where data is published
         # and the subscription exchange point where a process receives it.
         # That allows for an intermediary process to filter it.
         
-        subscriber = None
-        topic = None
-        eventOnly = False
+        logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
+        subscription = dataobject.Resource.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', subscription: \n' + str(subscription))
+    
+        
+        if subscription.RegistryIdentity:
+            # it is an existing topic and must be updated
+            subscription = yield self.update_subscription(subscription)
+        else:
+            subscription = yield self.create_subscription(subscription)
+    
+        subscription = yield self.reg.register(subscription)
+        if subscription:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
+            yield self.reply_ok(msg, subscription.encode())
+        else:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
+            yield self.reply_err(msg, None)
 
+    @defer.inlineCallbacks        
+    def create_subscription(subscription):
+        '''
+        '''
+        #A for each topic1, topic2, topic3 get the list of queues
+            
+        topics={'topic1':[],'topic2':[],'topic3':[]}
+            
+            
+        if subscription.topic1.name or subscription.topic1.keywords:
+            topics['topic1'] = yield self.find_topics(subscription.topic1)
+            
+        if subscription.topic2.name or subscription.topic2.keywords:
+            topics['topic2'] = yield self.find_topics(subscription.topic2)
+        
+        if subscription.topic3.name or subscription.topic3.keywords:
+            topics['topic3'] = yield self.find_topics(subscription.topic3)
+            
+            
+        #B process the workflow dictionary,
+        '''
+        <consumer name>:{'module':'path.to.module','cosumeclass':'<ConsumerClassName>',\
+            'attach':<topicX> or (consumer name, consumer queue keyword) or <list of consumers and topics>,\
+            'Process Parameters':{<conumser property keyword arg>: <property value>},\
+        '''
+        
+        #0) Check for valid workflow
+        # how can I check whether the workflow is a loop ? difficult!
+                
+        # 1) create new queues for workflow
+        # 2) create ConsumerDesc for each consumer
+        
+        # for each consumer and it attachements...
+        for consumer, args in subscription.workflow.items():
+            
+            #examine attach args an make sure they are valid 
+            if hasattr(args.attach,'__iter__'):
+                attach = args.attach
+            else:
+                attach = [args.attach]
+                
+            for name in attach:
+                
+                # is it a topic?
+                if name in topics.keys():
+                    topic_name = topics[name].name # get the registered topic name
+                    logging.debug('Consumer %s attaches to topic %s' % (consumer, topic_name))
+
+                # See if it is consuming another resultant
+                elif name[0] in subscription.workflow.keys(): # Could fail badly!
+                    
+                    
+                    producer = subscription.workflow[name[0]]
+                    if name[1] in producer['delivery queues'].itervalues():
+                        queue_arg = producer['delivery queues'][name[1]]
+                        logging.debug('Consumer %s attaches to producer %s delivery queue %s'\
+                            % (consumer, name[0],queue_arg))
+                    
+                    
+        
+        # 3) spawn consumers
+        
+        #C add the queues, ConsumerDesc's and topics to the subscription definition
+        
+        
+        
+        
+    #@defer.inlineCallbacks        
+    def update_subscription(subscription):
+        '''
+        '''
+        # Determine the difference between the current and existing subscription
+        
+        # act accordingly ????
+        pass   
+        
+        
+        
+        
+        
     def op_unsubscribe(self, content, headers, msg):
         """Service operation: Stop one's existing subscription to a topic.
             And remove the Queue if no one else is listening...
@@ -214,7 +312,7 @@ class DataPubsubClient(BaseServiceClient):
         """
         
         logging.info(self.__class__.__name__ + '; Calling: define_topic')
-        assert isinstance(topic, dataobject.Resource), 'Invalid argument to base_register_resource'
+        assert isinstance(topic, dataobject.Resource), 'Invalid argument to define_topic'
         
         (content, headers, msg) = yield self.rpc_send('define_topic',
                                             topic.encode())
@@ -236,7 +334,7 @@ class DataPubsubClient(BaseServiceClient):
         """
 
         logging.info(self.__class__.__name__ + '; Calling: define_publisher')
-        assert isinstance(publisher, dm_resource_descriptions.PublisherResource), 'Invalid argument to base_register_resource'
+        assert isinstance(publisher, dm_resource_descriptions.PublisherResource), 'Invalid argument to define_publisher'
         
 
         (content, headers, msg) = yield self.rpc_send('define_publisher',
@@ -296,5 +394,24 @@ class DataPubsubClient(BaseServiceClient):
 
 
     @defer.inlineCallbacks
-    def subscribe(self, subscription):
-        pass       
+    def define_subscription(self, subscription):
+        """
+        @Brief define and register a subscription, or update existing
+        """
+
+        logging.info(self.__class__.__name__ + '; Calling: define_subscription')
+        assert isinstance(subscription, dm_resource_descriptions.SubscriptionResource), 'Invalid argument to define_subscription'
+        
+
+        (content, headers, msg) = yield self.rpc_send('define_subscription',
+                                            publisher.encode())
+        logging.debug(self.__class__.__name__ + ': define_subscription; Result:' + str(headers))
+        
+        if content['status']=='OK':
+            logging.info(self.__class__.__name__ + '; define_subscription: Success!')
+            publisher = dataobject.Resource.decode(content['value'])
+            defer.returnValue(publisher)
+        else:
+            logging.info(self.__class__.__name__ + '; define_subscription: Failed!')
+            defer.returnValue(None)
+
