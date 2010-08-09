@@ -207,7 +207,7 @@ class BaseConsumerTest(IonTestCase):
                  'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':self.queue1,\
-                              'Process Parameters':{},\
+                              'process parameters':{},\
                               'delivery queues':{'queues':[self.queue2]}}\
                     }
         child1 = base_consumer.ConsumerDesc(**pd1)
@@ -270,7 +270,7 @@ class BaseConsumerTest(IonTestCase):
                  'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':[self.queue1, self.queue2],\
-                    'Process Parameters':{},\
+                    'process parameters':{},\
                     'delivery queues':{'queues':[self.queue3]}}\
             }
             
@@ -317,7 +317,7 @@ class BaseConsumerTest(IonTestCase):
                  'module':'ion.services.dm.distribution.test.test_baseconsumer',
                  'procclass':'MyConsumer',
                  'spawnargs':{'attach':[self.queue1],\
-                              'Process Parameters':{},\
+                              'process parameters':{},\
                               'delivery queues':{'queues':[self.queue2]}}\
                     }
         child1 = base_consumer.ConsumerDesc(**pd1)

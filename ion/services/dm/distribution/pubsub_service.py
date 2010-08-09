@@ -230,11 +230,12 @@ class DataPubsubService(BaseService):
         # for each consumer and it attachements and create delivery queues
         for consumer, args in subscription.workflow.items():
             
+            #params for this consumer
             params = args.get('process parameters')
+            # list of queues to attach to for this consumer
             attach = []
-            queues = {}
-
-            # Get teh attach to topic or consumer - make it a list and iterate            
+            
+            # Get the attach to topic or consumer - make it a list and iterate            
             attach_to= args['attach']
             if not hasattr(attach_to,'__iter__'):
                 attach_to = [attach_to]
@@ -288,7 +289,8 @@ class DataPubsubService(BaseService):
                     raise RuntimeError('Can not determine how to attach consumer %s \
                                        to topic/consumer %s' % (consumer, item))
                     
-                
+                consumers[consumer]['spawnargs']['attach'].append(attach)
+                consumers[consumer]['spawnargs']['process parameters']=params
         
         # 3) spawn consumers
         
