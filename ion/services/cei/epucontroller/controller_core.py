@@ -67,6 +67,7 @@ class ControllerCoreState(State):
         self.instance_states[item.key].append(item)
             
     def new_queuelen(self, content):
+        logging.debug("received new queulen state message: '%s'" % content)
         state_item = None # TODO: not implemented, need sample message
         if state_item:
             self.queue_lengths[state_item.key].append(state_item)
