@@ -12,6 +12,9 @@ class InstrumentResource(StatefulResource):
     for a more complete listing (or even subclassing as needed).
     @todo Flesh this out with much much much more comprehensive metadata
     '''
+    
+    instrumentID = TypedAttribute(str)
+    direct_access = TypedAttribute(str, default="off")
     manufacturer = TypedAttribute(str)
     model = TypedAttribute(str)
     serial_num = TypedAttribute(str)
@@ -87,4 +90,11 @@ class SBE49InstrumentResource(InstrumentResource):
     ptcb1 = TypedAttribute(float, default=0.0)
     ptcb2 = TypedAttribute(float, default=0.0)
     """
+    
+class DataProductResource(StatefulResource):
+    '''
+    Intended for the data product registry.  
+    '''
+    topic = TypedAttribute(ResourceReference)
+    dataformat = TypedAttribute(str)
     
