@@ -56,7 +56,7 @@ class RabbitMQSensor(SensorProcess):
         logging.info("=== messages_in_queue ===")
         for q in allqueues["result"]:
             if q[0] == self.queue_name_work:
-                queuelen = q[1]["queuelen"]
+                queuelen = q[1]["messages"]
                 logging.info("in queue '%s' there are '%s' messages"% (self.queue_name_work, queuelen))
                 extradict = {"queuelen": queuelen, "queue_name": self.queue_name_work}
                 cei_events.event("queue_sensor", "queuelen", logging, extra=extradict)
