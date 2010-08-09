@@ -9,7 +9,7 @@ from ion.services.base_service import BaseService, BaseServiceClient
 from ion.core.base_process import ProtocolFactory
 import Queue
 import uuid
-import ion.services.cei.cei_events as cei_events
+from ion.services.cei import cei_events
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
@@ -36,9 +36,11 @@ class EPUWorkProducer(BaseService):
                 
                 yield self.send(self.queue_name_work, 'work', {"work_amount":job.length, "batchid":job.batchid, "jobid":job.jobid})
                 
-                # events need dict support first
-                #extra = {"batchid":job.batchid, "jobid":job.jobid, "work_amount":job.length}
-                cei_events.event("workproducer", "JOBSENT", logging)
+                extradict = {"batchid":job.batchid, 
+                             "jobid":job.jobid,
+                             "work_amount":job.length}
+                cei_events.event("workproducer", "job_sent", 
+                                 logging, extra=extradict)
                 
         except Queue.Empty:
             return
