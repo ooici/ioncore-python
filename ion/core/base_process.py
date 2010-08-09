@@ -56,7 +56,8 @@ class BaseProcess(object):
         @param receiver  instance of a Receiver for process control
         @param spawnArgs  standard and additional spawn arguments
         """
-        self.proc_state = "UNINITIALIZED"
+        self.proc_state = "NEW"
+        self.id = None
         spawnArgs = spawnArgs.copy() if spawnArgs else {}
         self.spawn_args = spawnArgs
         self.proc_init_time = pu.currenttime_ms()
@@ -99,8 +100,8 @@ class BaseProcess(object):
     @defer.inlineCallbacks
     def spawn(self):
         """
-        Spawns this process using the process' receiver. Self spawn can
-        only be called once per instance.
+        Spawns this process using the process' receiver and initializes it in
+        the same call. Self spawn can only be called once per instance.
         @note this method is not called when spawned through magnet. This makes
         it tricky to do consistent initialization on spawn.
         """
@@ -108,7 +109,26 @@ class BaseProcess(object):
         self.id = yield spawn(self.receiver)
         logging.debug('spawn()=' + str(self.id))
         yield defer.maybeDeferred(self.plc_spawn)
+
+        # Call init right away. This is what you would expect anyways in a
+        # container executed spawn
+        yield self.init()
+
         defer.returnValue(self.id)
+
+    def init(self):
+        """
+        DO NOT CALL. Automatically called by spawn().
+        Initializes this process instance. Typically a call should not be
+        necessary because the init message is received from the supervisor
+        process. It may be necessary for the root supervisor and for test
+        processes.
+        @retval Deferred
+        """
+        if self.proc_state == "NEW":
+            return self.op_init(None, None, None)
+        else:
+            return defer.succeed(None)
 
     def plc_spawn(self):
         """
@@ -123,14 +143,31 @@ class BaseProcess(object):
         """
         Init operation, on receive of the init message
         """
-        if self.proc_state == "UNINITIALIZED":
-            yield defer.maybeDeferred(self.plc_init)
-            logging.info('----- Process %s INITIALIZED -----' % (self.proc_name))
+        if self.proc_state == "NEW":
+            # @TODO: Right after giving control to the process specific init,
+            # the process can enable message consumption and messages can be
+            # received. How to deal with the situation that the process is not
+            # fully initialized yet???? Stop message floodgate until init'd?
 
-            if msg != None:
-                # msg is None only if called from local process self.init()
-                yield self.reply_ok(msg)
-            self.proc_state = "INITIALIZED"
+            # Change state from NEW early, to prevent consistenct probs.
+            self.proc_state = "INIT"
+
+            try:
+                yield defer.maybeDeferred(self.plc_init)
+                self.proc_state = "ACTIVE"
+                logging.info('----- Process %s INIT OK -----' % (self.proc_name))
+                if msg != None:
+                    # msg is None only if called from local process self.init()
+                    yield self.reply_ok(msg)
+            except Exception, ex:
+                self.proc_state = "ERROR"
+                logging.exception('----- Process %s INIT ERROR -----' % (self.proc_name))
+                if msg != None:
+                    # msg is None only if called from local process self.init()
+                    yield self.reply_err(msg, "Process %s INIT ERROR" % (self.proc_name) + str(ex))
+        else:
+            self.proc_state = "ERROR"
+            logging.error('Process %s in wrong state %s for op_init' % (self.proc_name, self.proc_state))
 
     def plc_init(self):
         """
@@ -143,7 +180,7 @@ class BaseProcess(object):
         """
         Init operation, on receive of the init message
         """
-        assert self.proc_state == "INITIALIZED", "Process must be initalized"
+        assert self.proc_state == "ACTIVE", "Process not initalized"
 
         if len(self.child_procs) > 0:
             logging.info("Shutting down child processes")
@@ -167,25 +204,39 @@ class BaseProcess(object):
 
     def receive(self, payload, msg):
         """
-        This is the main entry point for received messages. Messages are
-        distinguished into RPC replies (by conversation ID) and other received
+        This is the first and MAIN entry point for received messages. Messages are
+        separated into RPC replies (by conversation ID) and other received
         messages.
         """
-        
-        # Check if this response is in reply to an RPC call
-        if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
-            self._receive_rpc(payload, msg)
-        else:
-            self._receive_msg(payload, msg)
+        try:
+            # Check if this response is in reply to an outstanding RPC call
+            if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
+                d = self._receive_rpc(payload, msg)
+            else:
+                d = self._receive_msg(payload, msg)
+        except Exception, ex:
+            # Unexpected error condition in message processing (only before
+            # any callback is called)
+            logging.exception('Error in process %s receive ' % self.proc_name)
+            # @TODO: There was an error and now what??
+            if msg and msg.payload['reply-to']:
+                d = self.reply_err(msg, 'ERROR in process receive(): '+str(ex))
 
     def _receive_rpc(self, payload, msg):
         """
-        Handling of RPC replies.
+        Handling of RPC reply messages.
+        @TODO: Handle the error case
         """
-        logging.info('BaseProcess: Received RPC reply.')
+        logging.info('>>> BaseProcess.receive(): Message received, RPC reply. <<<')
         d = self.rpc_conv.pop(payload['conv-id'])
         content = payload.get('content', None)
         res = (content, payload, msg)
+        if type(content) is dict and content.get('status',None) == 'OK':
+            pass
+        elif type(content) is dict and content.get('status',None) == 'ERROR':
+            logging.warn('RPC reply is an ERROR')
+        else:
+            logging.error('RPC reply is not well formed. Use reply_ok or reply_err')
         # @todo is it OK to ack the response at this point already?
         d1 = msg.ack()
         if d1:
@@ -202,15 +253,27 @@ class BaseProcess(object):
         Handling of non-RPC messages. Messages are dispatched according to
         message attributes.
         """
-        logging.info('BaseProcess: Message received, dispatching...')
+        logging.info('>>> BaseProcess.receive(): Message received, dispatching... >>>')
         convid = payload.get('conv-id', None)
         conv = self.conversations.get(convid, None) if convid else None
         # Perform a dispatch of message by operation
+        # @todo: Handle failure case. Message reject?
         d = self._dispatch_message(payload, msg, self, conv)
         def _cb(res):
-            logging.info("ACK msg")
-            d1 = msg.ack()
-        d.addCallbacks(_cb, logging.error)
+            if msg._state == "RECEIVED":
+                # Only if msg has not been ack/reject/requeued before
+                logging.debug("<<< ACK msg")
+                d1 = msg.ack()
+        def _err(res):
+            logging.error("Error in message processing: "+str(res))
+            if msg._state == "RECEIVED":
+                # Only if msg has not been ack/reject/requeued before
+                logging.debug("<<< ACK msg")
+                d1 = msg.ack()
+            # @todo Should we send an err or rather reject the msg?
+            if msg and msg.payload['reply-to']:
+                d2 = self.reply_err(msg, 'ERROR in process receive(): '+str(res))
+        d.addCallbacks(_cb, _err)
         return d
 
     def _dispatch_message(self, payload, msg, target, conv):
@@ -221,10 +284,26 @@ class BaseProcess(object):
         @retval deferred
         """
         #@BUG Added hack to handle messages from plc_init in cc_agent!
-        #assert payload['op'] == 'init' or self.proc_state == "INITIALIZED"
-        assert payload['op'] == 'init' or self.proc_state == "INITIALIZED" or (payload['op'] == 'identify' and payload['content']=='started')
-        d = pu.dispatch_message(payload, msg, target, conv)
-        return d
+        if payload['op'] == 'init' or \
+                self.proc_state == "INIT" or self.proc_state == "ACTIVE" or \
+                (payload['op'] == 'identify' and payload['content']=='started'):
+            # Regular message handling in expected state
+            if payload['op'] != 'init' and self.proc_state == "INIT":
+                logging.warn('Process %s received message before completed init' % (self.proc_name))
+
+            d = pu.dispatch_message(payload, msg, target, conv)
+            return d
+        else:
+            text = "Process %s in invalid state %s." % (self.proc_name, self.proc_state)
+            logging.error(text)
+
+            # @todo: Requeue would be ok, but does not work (Rabbit limitation)
+            #d = msg.requeue()
+            if msg and msg.payload['reply-to']:
+                d = self.reply_err(msg, text)
+            if not d:
+                d = defer.succeed(None)
+            return d
 
     def op_none(self, content, headers, msg):
         """
@@ -394,16 +473,6 @@ class BaseProcess(object):
         """
         child = self.get_child_def(name)
         return child.proc_id if child else None
-
-    def init(self):
-        """
-        Initializes this process instance. Typically a call should not be
-        necessary because the init message is received from the supervisor
-        process. It may be necessary for the root supervisor and for test
-        processes.
-        @retval Deferred
-        """
-        return self.op_init(None, None, None)
 
     def shutdown(self):
         """

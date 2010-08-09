@@ -111,6 +111,14 @@ Other Dependencies
 Change log:
 ===========
 
+2010-08-06:
+- BaseProcess.spawn() now calls init() automatically. No need to call init()
+  on a process anymore manually. For testing only. Note: The correct way to
+  spawn a process is through a parent process with spawn_child()
+- Modified and fixed the BaseProcess states, when receiving messages
+- MAJOR update to BaseProcess message dispatching and subsequent error handling.
+  On error, reply_err messages are sent back, if reply-to header set.
+
 2010-08-03:
 - Added ant build.xml file to LCAarch root dir. Start with ant.
   Supports ant clean, which removes all *.pyc from ion path.
