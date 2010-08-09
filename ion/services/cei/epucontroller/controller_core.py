@@ -4,6 +4,7 @@ import uuid
 from collections import defaultdict
 from ion.services.cei.decisionengine import EngineLoader
 import ion.services.cei.states as InstanceStates
+from ion.services.cei import cei_events
 from twisted.internet.task import LoopingCall
 
 from forengine import Control
@@ -176,15 +177,21 @@ class ControllerCoreControl(Control):
         
         launch_id = str(uuid.uuid4())
         logging.info("Request for DP '%s' is a new launch with id '%s'" % (deployable_type_id, launch_id))
+        new_instance_id_list = []
         for group,item in launch_description.iteritems():
             logging.info(" - %s is %d %s from %s" % (group, item.num_instances, item.allocation_id, item.site))
             for i in range(item.num_instances):
                 new_instance_id = str(uuid.uuid4())
                 self.state.new_launch(new_instance_id)
                 item.instance_ids.append(new_instance_id)
+                new_instance_id_list.append(new_instance_id)
                 
         self.provisioner.provision(launch_id, deployable_type_id, 
                 launch_description)
+        extradict = {"launch_id":launch_id,
+                     "new_instance_ids":new_instance_id_list}
+        cei_events.event("controller", "new_launch", 
+                         logging, extra=extradict)
         return (launch_id, launch_description)
     
     def destroy_instances(self, instance_list):

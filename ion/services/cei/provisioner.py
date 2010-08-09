@@ -8,6 +8,7 @@ from ion.core.base_process import ProtocolFactory
 from ion.services.cei.provisioner_store import ProvisionerStore
 from ion.services.cei.provisioner_core import ProvisionerCore
 from ion.services.cei.dtrs import DeployableTypeRegistryClient
+from ion.services.cei import cei_events
 
 class ProvisionerService(BaseService):
     """Provisioner service interface
@@ -17,11 +18,13 @@ class ProvisionerService(BaseService):
     declare = BaseService.service_declare(name='provisioner', version='0.1.0', dependencies=[])
 
     def slc_init(self):
+        cei_events.event("provisioner", "init_begin", logging)
         self.store = ProvisionerStore()
         notifier = self.spawn_args.get('notifier')
         self.notifier = notifier or ProvisionerNotifier(self)
         self.dtrs = DeployableTypeRegistryClient(self)
         self.core = ProvisionerCore(self.store, self.notifier, self.dtrs)
+        cei_events.event("provisioner", "init_end", logging)
     
     @defer.inlineCallbacks
     def op_provision(self, content, headers, msg):

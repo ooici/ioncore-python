@@ -7,6 +7,8 @@ from twisted.internet.task import LoopingCall
 
 from ion.core.base_process import ProtocolFactory
 
+from ion.services.cei import cei_events
+
 class RabbitMQSensor(SensorProcess):
     """Obtain specific RabbitMQ data.
 
@@ -55,6 +57,10 @@ class RabbitMQSensor(SensorProcess):
             if q[0] == self.queue_name_work:
                 messages = q[1]["messages"]
                 logging.info("in queue '%s' there are '%s' messages"% (self.queue_name_work, messages))
+                extradict = {"msg_number": messages,
+                             "queue_name": self.queue_name_work}
+                cei_events.event("queue_sensor", "queuelen", 
+                                 logging, extra=extradict)
                 content = {"queue_name_work":self.queue_name_work, "messages":messages}
                 yield self.send(self.queue_name_events, "event", content)
 

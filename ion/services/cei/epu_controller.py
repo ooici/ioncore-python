@@ -10,6 +10,7 @@ from ion.core import bootstrap
 import ion.util.procutils as pu
 from ion.services.cei.epucontroller import ControllerCore
 from ion.services.cei.provisioner import ProvisionerClient
+from ion.services.cei import cei_events
 
 logging.basicConfig(level=logging.DEBUG)
 logging.debug('Loaded: '+__name__)
@@ -22,6 +23,8 @@ class EPUControllerService(BaseService):
     
     def slc_init(self):
         self.queue_name_work = self.get_scoped_name("system", self.spawn_args["queue_name_work"])
+        extradict = {"queue_name_work":self.queue_name_work}
+        cei_events.event("controller", "init_begin", logging, extra=extradict)
         self.worker_queue = {self.queue_name_work:{'name_type':'worker'}}
         self.laterinitialized = False
         reactor.callLater(0, self.later_init)
@@ -53,6 +56,8 @@ class EPUControllerService(BaseService):
     def later_init(self):
         yield bootstrap.declare_messaging(self.worker_queue)
         self.laterinitialized = True
+        extradict = {"queue_name_work":self.queue_name_work}
+        cei_events.event("controller", "init_end", logging, extra=extradict)
 
     def op_sensor_info(self, content, headers, msg):
         if not self.laterinitialized:
