@@ -140,7 +140,7 @@ class SubscriptionResource(StatefulResource):
 
     #Used internally
     #current_topics = TypedAttribute(list) # List of Topic Resource References
-    consumer_procids = TypedAttribute(dict) # list of child consumer ids - need a process registry
+    #consumer_procids = TypedAttribute(dict) # list of child consumer ids - need a process registry
     queues = TypedAttribute(list) # list of queue objects
     consumer_args = TypedAttribute(dict)
 """

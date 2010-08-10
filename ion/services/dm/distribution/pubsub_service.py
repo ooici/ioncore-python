@@ -188,7 +188,8 @@ class DataPubsubService(BaseService):
     def create_subscription(self,subscription):
         '''
         '''
-    
+        subscription.create_new_reference()
+        
         subscription = yield self.create_consumer_args(subscription)
 
         consumer_args = subscription.consumer_args
@@ -196,12 +197,12 @@ class DataPubsubService(BaseService):
         for name, args in consumer_args.items():
             child = base_consumer.ConsumerDesc(**args)        
             child_id = yield self.spawn_child(child)
-            subscription.current_consumers.append(child_id)
+            #subscription.consumer_procids[name]=child_id
     
     
         subscription = yield self.reg.register(subscription)
 
-
+        defer.returnValue(subscription)
 
     @defer.inlineCallbacks        
     def create_consumer_args(self,subscription):
@@ -246,7 +247,7 @@ class DataPubsubService(BaseService):
         for consumer, args in subscription.workflow.items():
 
             spargs ={'attach':[],
-                     'process parameters':args.get('process parameters'),
+                     'process parameters':args.get('process parameters',{}),
                      'delivery queues':{}}
             
             cd = {}
@@ -296,7 +297,7 @@ class DataPubsubService(BaseService):
                         attach.append(topic.queue.name)
                         # Add it to the list for this subscription
                         subscription_queues.append(topic.queue)
-                        logging.info('Consumer %s attaches to topic %s' % (consumer, topic.name))
+                        logging.info('''Consumer '%s' attaches to topic name '%s' ''' % (consumer, topic.name))
                     
                 # See if it is consuming another resultant
                 elif name in consumer_names: # Could fail badly!
@@ -306,7 +307,7 @@ class DataPubsubService(BaseService):
                     q = consumers[name]['spawnargs']['delivery queues'].get(keyword,None)
                     if q:
                         attach.append(q)
-                        logging.info('Consumer %s attaches to existing queue for producer/keyword: %s/%s' % (consumer, name, keyword))
+                        logging.info('''Consumer '%s' attaches to existing queue for producer/keyword: '%s'/'%s' ''' % (consumer, name, keyword))
                     else: 
                         # Create the queue!
                         #@TODO - replace with call to exchange registry service
@@ -318,10 +319,10 @@ class DataPubsubService(BaseService):
                         
                         # Add to the delivery list for the producer...
                         consumers[name]['spawnargs']['delivery queues'][keyword]=queue.name
-                        logging.info('Consumer %s attaches to new queue for producer/keyword: %s/%s' % (consumer, name, keyword))
+                        logging.info('''Consumer '%s' attaches to new queue for producer/keyword: '%s'/'%s' ''' % (consumer, name, keyword))
                 else:
-                    raise RuntimeError('Can not determine how to attach consumer %s \
-                                       to topic/consumer %s' % (consumer, item))
+                    raise RuntimeError('''Can not determine how to attach consumer '%s' \
+                                       to topic or consumer '%s' ''' % (consumer, item))
                     
             consumers[consumer]['spawnargs']['attach'].extend(attach)        
         

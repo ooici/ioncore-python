@@ -228,13 +228,13 @@ class PubSubServiceMethodTest(IonTestCase):
          'spawnargs': {
             'attach': [consume2_attach[0], topic.queue.name],
             'delivery queues': {},
-            'process parameters': None}},
+            'process parameters': {}}},
             subscription.consumer_args['consumer3'])
         
         
     
     @defer.inlineCallbacks
-    def test_create_subscription(self):
+    def test_create_subscription1(self):
         '''
         @Brief Create a subscription!
         '''
@@ -251,13 +251,76 @@ class PubSubServiceMethodTest(IonTestCase):
         subscription = SubscriptionResource()
         subscription.topic1 = t_search
         
-        subscription.workflow = {'consumer1':{'module':'path.to.module','cosumerclass':'<ConsumerClassName>',\
-            'attach':'topic1',\
-            'Process Parameters':{'param1':'my parameter'}}}
+        subscription.workflow = {
+            'consumer1':
+                {'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'consumerclass':'ForwardingConsumer',\
+                 'attach':'topic1'}}
 
         subscription = yield self.pubsub.create_subscription(subscription)
 
         logging.info('Defined subscription: '+str(subscription))
+
+        msg=DataMessageObject()
+        self.sup.send(topic.queue.name,'data',msg.encode())
+        
+        # Wait for message to be received
+        yield pu.asleep(1)
+        child_id = self.pubsub.get_child_id('consumer1')
+        dc1 = self._get_procinstance(child_id)
+        rec = dc1.receive_cnt[topic.queue.name]
+        self.assertEqual(rec,1)
+
+    @defer.inlineCallbacks
+    def test_create_subscription2(self):
+        '''
+        @Brief Create a subscription!
+        '''
+
+        # Create and Register a topic
+        topic1 = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")        
+        # Use the service to create a queue and register the topic
+        topic1 = yield self.pubsub.create_and_register_topic(topic1)
+        
+        topic2 = PubSubTopicResource.create('Johns Topic',"oceans, mbari, working really hard")        
+        # Use the service to create a queue and register the topic
+        topic2 = yield self.pubsub.create_and_register_topic(topic2)
+        
+        subscription = SubscriptionResource()
+        subscription.topic1 = PubSubTopicResource.create('Davids Topic','')
+        subscription.topic2 = PubSubTopicResource.create('','oceans')
+        
+        subscription.workflow = {
+            'consumer1':
+                {'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'consumerclass':'ForwardingConsumer',\
+                 'attach':'topic1'},
+            'consumer2':
+                {'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'consumerclass':'ForwardingConsumer',\
+                 'attach':[['consumer1','queues']]}
+                }
+
+        subscription = yield self.pubsub.create_subscription(subscription)
+
+        logging.info('Defined subscription: '+str(subscription))
+
+        msg=DataMessageObject()
+        self.sup.send(topic1.queue.name,'data',msg.encode())
+        
+        # Wait for message to be received
+        yield pu.asleep(1)
+        child1_id = self.pubsub.get_child_id('consumer1')
+        dc1 = self._get_procinstance(child1_id)
+        rec = dc1.receive_cnt[topic1.queue.name]
+        self.assertEqual(rec,1)
+                
+        child2_id = self.pubsub.get_child_id('consumer2')
+        dc2 = self._get_procinstance(child2_id)
+        
+        q = subscription.consumer_args['consumer2']['spawnargs']['attach']
+        rec = dc2.receive_cnt[q[0]]
+        self.assertEqual(rec,1)
 
 
 

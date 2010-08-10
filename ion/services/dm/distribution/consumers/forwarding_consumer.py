@@ -23,6 +23,9 @@ class ForwardingConsumer(base_consumer.BaseConsumer):
     """
     def ondata(self, data, notification, timestamp, queues=[]):
         
+        if not hasattr(queues,'__iter__'):
+            queues = [queues]
+        
         for queue in queues:
             self.queue_result(queue,data,notification)
 
