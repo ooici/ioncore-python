@@ -8,8 +8,10 @@
 
 import logging
 import uuid
-from twisted.internet import defer
+import os
 
+from twisted.internet import defer
+from twisted.trial import unittest
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -30,7 +32,7 @@ class ProvisionerServiceTest(IonTestCase):
         yield self._stop_container()
 
     @defer.inlineCallbacks
-    def test_provisioner(self):
+    def _set_it_up(self):
         messaging = {'cei':{'name_type':'worker', 'args':{'scope':'local'}}}
         notifier = FakeProvisionerNotifier()
         procs = [
@@ -43,12 +45,23 @@ class ProvisionerServiceTest(IonTestCase):
 
         pId = yield self.procRegistry.get("provisioner")
         
-        launch_id = _new_id()
+        client = ProvisionerClient(pid=pId)
+        defer.returnValue((client, notifier))
+
+    @defer.inlineCallbacks
+    def test_provisioner(self):
+
+        # skip this test if IaaS credentials are unavailable
+        maybe_skip_test()
+
+        client, notifier = yield self._set_it_up()
+        
         deployable_type = 'base-cluster'
         nodes = {'head-node' : FakeLaunchItem(1, 'nimbus-test', 'small', None),
                 'worker-node' : FakeLaunchItem(3, 'nimbus-test', 'small', None)}
         
-        client = ProvisionerClient(pid=pId)
+        launch_id = _new_id()
+
         yield client.provision(launch_id, deployable_type, nodes)
 
         ok = yield notifier.wait_for_state(states.PENDING)
@@ -134,3 +147,12 @@ class FakeLaunchItem(object):
         self.site = site 
         self.allocation_id = allocation_id
         self.data = data
+
+def maybe_skip_test():
+    """Some tests require IaaS credentials. Skip if they are not available
+    """
+    for key in ['NIMBUS_KEY', 'NIMBUS_SECRET', 
+            'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY']:
+        if not os.environ.get(key):
+            raise unittest.SkipTest('Test requires IaaS credentials, skipping')
+
