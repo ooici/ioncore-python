@@ -12,6 +12,7 @@ from twisted.internet import defer
 from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
 from ion.core.base_process import BaseProcess, BaseProcessClient
+from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 
 """
 Constants/Enumerations for tags in capabiltiies dict structures
@@ -20,6 +21,9 @@ ci_commands = 'ci_commands'
 ci_parameters = 'ci_parameters'
 instrument_commands = 'instrument_commands'
 instrument_parameters = 'instrument_parameters'
+
+# CI parameter key constant
+driver_address = 'driver_address'
 
 
 class InstrumentDriver(BaseProcess):
@@ -146,7 +150,7 @@ class InstrumentAgent(ResourceAgent):
     """
     
     driver_client = None
-        
+    
     @defer.inlineCallbacks
     def op_get_translator(self, content, headers, msg):
         """
@@ -197,7 +201,11 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(content, (list, tuple)))
         assert(self.driver_client != None)
         response = {}
-        #get data somewhere, or just punt this lower in the class hierarchy
+        
+        # get data somewhere, or just punt this lower in the class hierarchy
+        if ("driver_address" in content):
+            response['driver_address'] = str(self.driver_client.target)
+            
         if response != {}:
             yield self.reply_ok(msg, response)
         else:
@@ -231,6 +239,7 @@ class InstrumentAgent(ResourceAgent):
         result = yield self.driver_client.set_params(content)
         if result == {}:
             yield self.reply_err(msg, "Could not set %s" % content)
+            return
         else:
             response.update(result)
         assert(response != {})
@@ -434,16 +443,23 @@ class InstrumentAgentClient(ResourceAgentClient):
         (content, headers, message) = yield self.rpc_send('get_capabilities',
                                                           ())
         assert(isinstance(content, dict))
-        assert('ci_commands' in content)
-        assert('ci_parameters' in content)
-        assert(isinstance(content['ci_commands'], (tuple, list)))
-        assert(isinstance(content['ci_parameters'], (tuple, list)))
-        assert('instrument_commands' in content)
-        assert('instrument_parameters' in content)
-        assert(isinstance(content['instrument_commands'], (tuple, list)))
-        assert(isinstance(content['instrument_parameters'], (tuple, list)))
+        assert(ci_commands in content.keys())
+        assert(ci_parameters in content.keys())
+        assert(isinstance(content[ci_commands], (tuple, list)))
+        assert(isinstance(content[ci_parameters], (tuple, list)))
+        assert(instrument_commands in content.keys())
+        assert(instrument_parameters in content.keys())
+        assert(isinstance(content[instrument_commands], (tuple, list)))
+        assert(isinstance(content[instrument_parameters], (tuple, list)))
 
-        defer.returnValue(content)
+        listified = {}
+        for listing in content.keys():
+            listified[listing] = list(content[listing])
+
+        # Add in the special stuff that all instruments know
+        listified[ci_parameters].append(driver_address)
+                                         
+        defer.returnValue(listified)
         
     @defer.inlineCallbacks
     def get_translator(self):
@@ -455,4 +471,18 @@ class InstrumentAgentClient(ResourceAgentClient):
         """
         (content, headers, message) = yield self.rpc_send('get_translator', ())
         #assert(inspect.isroutine(content))
-        defer.returnValue(content)  
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def register_resource(self):
+        """
+        Register the resource. Since this is a subclass, make the appropriate
+        resource description for the registry and pass that into the
+        registration call.
+        """
+        ia_instance = InstrumentAgentResourceInstance()
+        ci_params = yield self.get_from_CI([driver_address])   
+        ia_instance.driver_process_id = ci_params[driver_address]
+        result = yield ResourceAgentClient.register_resource(self,
+                                                             ia_instance)
+        defer.returnValue(result)

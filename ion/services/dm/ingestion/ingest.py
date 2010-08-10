@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/ingest.py
+@file ion/services/dm/ingestion/ingest.py
 @author Michael Meisinger
 @brief service for ingesting information into DM
 """
@@ -15,10 +15,15 @@ from ion.services.base_service import BaseService, BaseServiceClient
 
 from pydap.parsers.dds import DDSParser
 from pydap.parsers.das import DASParser
-import simplejson as json
+try:
+    import json
+except:
+    import simplejson as json
 
 class IngestService(BaseService):
     """Ingestion service interface
+    @Note Needs work - Should create a subscription to ingest a data source
+    What should the service interface look like for this?
     """
 
     # Declaration of service
@@ -43,7 +48,7 @@ class IngestService(BaseService):
             dds = json.loads(str(content['dds']))
             das = json.loads(str(content['das']))
         except KeyError, ke:
-            logging.exception(ke)
+            logging.exception('Unable to find headers in DAP message!')
             logging.error('Unable to find headers in DAP message!')
             raise ke
 

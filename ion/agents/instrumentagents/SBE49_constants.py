@@ -73,6 +73,9 @@ instrument_parameters = (
     "ptcb2"
 )
 
+"""
+Some generalized instrument items added by instrument_agent module
+"""
 ci_parameters = (
     
 )

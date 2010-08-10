@@ -9,7 +9,10 @@
 
 NULL_CHR = '\x00'
 
-import simplejson as json
+try:
+    import json
+except:
+    import simplejson as json
 import uuid
 import re
 
@@ -17,7 +20,7 @@ from twisted.python import reflect
 
 class TypedAttribute(object):
     """
-    @brief Descriptor class for Data Object Attributes. Data Objects are
+    @brief Descriptor class for Data Object attributes. Data Objects are
     containers of typed attributes.
     """
 
@@ -34,7 +37,7 @@ class TypedAttribute(object):
 
     def __set__(self, inst, value):
         if not isinstance(value, self.type):
-            raise TypeError("Error setting typed attribute %s \n Attribute must be of class %s \n Recieved Value of Class: %s" % (self.name, self.type, value.__class__))
+            raise TypeError("Error setting typed attribute %s \n Attribute must be of class %s \n Received Value of Class: %s" % (self.name, self.type, value.__class__))
         setattr(inst, self.name, value)
         #self.cache = value
 
@@ -46,12 +49,12 @@ class TypedAttribute(object):
         @param value is the string which is to be decoded
         @param _types is a dictionary of types which can be decoded
         """
-                
+
         #print '=================================================='
         types = _types.copy()
         stype, default = value.split(NULL_CHR)
         #print '---------- ', stype, default
-        
+
         #the use of str is temporary unti lcaarch msging is fixed
         mytype = eval(str(stype), types)
 
@@ -62,29 +65,29 @@ class TypedAttribute(object):
             if issubclass(mytype, DataObject):
                 data_object = mytype.decode(json.loads(default),header=False)
                 return cls(mytype, data_object)
-                
+
             elif issubclass(mytype, (list, set, tuple)):
                 list_enc = json.loads(default)
-                    
+
                 objs=[]
                 for item in list_enc:
                     itype, ival = item.split(NULL_CHR)
                     itype = eval(str(itype), types)
-                    
+
                     if issubclass(itype, DataObject):
                         objs.append(itype.decode(json.loads(ival),header=False) )
                     else:
                         objs.append(itype(str(ival)))
-                    
+
                 return cls(mytype, mytype(objs))
             elif issubclass(mytype, dict):
                 # since dicts are 'just' json encoded load and return!
-                
+
                 return cls(mytype, json.loads(default))
-            
+
             elif issubclass(mytype, bool):
                 return cls(mytype, eval(str(default)))
-            
+
             else:
                 return cls(mytype, mytype(str(default)))
         return cls(mytype)
@@ -117,13 +120,16 @@ class DataObjectType(type):
             if isinstance(value, TypedAttribute):
                 value.name = '_' + key
                 d[value.name] = value.default
-                    
+
         dict['__dict__'] = d
         return type.__new__(cls, name, bases, dict)
 
 class DataObject(object):
     """
-    @brief [Abstract] Base class for all data objects.
+    @brief [Abstract] Base class for all data objects. The design intent behind
+    DataObjects is to do transparent persistence and transport. Therefore,
+    they know how to encode and decode their internal state, and how to describe
+    their structure definition.
     """
     __metaclass__ = DataObjectType
 
@@ -146,7 +152,7 @@ class DataObject(object):
         #assert isinstance(other, DataObject)
         if not isinstance(other, DataObject):
             return False
-        
+
         # comparison of data objects which have different atts must not error out
         atts1 = set(self.attributes)
         atts2 = set(other.attributes)
@@ -157,12 +163,12 @@ class DataObject(object):
         except:
             return False
 
-    
+
     def __ge__(self,other):
         """
         Compare data object which inherit from eachother - common attributes must be equal!
         See test case for intended applications
-        
+
         """
         #assert isinstance(other, DataObject)
         if not isinstance(other, DataObject):
@@ -177,7 +183,7 @@ class DataObject(object):
             return reduce(lambda a, b: a and b, m)
         except:
             return False
-        
+
     def compared_to(self,other,regex=False,ignore_defaults=False,attnames=None):
         """
         Compares only attributes of self by default
@@ -185,27 +191,27 @@ class DataObject(object):
         #assert isinstance(other, DataObject)
         if not isinstance(other, DataObject):
             return False
-        
+
         atts=None
         if not attnames:
             atts = self.attributes
         else:
             atts=attnames
-            
+
         if ignore_defaults:
             atts = self.non_default_atts(atts)
-                
+
         #print 'ATTTTS',atts
-        
+
         #print 'REGEX',regex
         #print 'ignore_defaults',ignore_defaults
         #print 'other',other.get_typedattributes()['name'].default
         #print 'self',self.get_typedattributes()['name'].default
-                        
+
         if not atts:
             # A degenerate case
             return True
-            
+
         if not regex:
             try:
                 m=[]
@@ -214,9 +220,9 @@ class DataObject(object):
                         m.append(getattr(self, a).compared_to(
                                                 getattr(other, a),
                                                 ignore_defaults=ignore_defaults))
-                    else:                        
+                    else:
                         m.append(getattr(self, a) == getattr(other, a))
-                    
+
                 return reduce(lambda a, b: a and b, m)
             except:
                 return False
@@ -235,32 +241,32 @@ class DataObject(object):
                                                     ignore_defaults=ignore_defaults))
                     else:
                         m.append(False)
-                    
+
                 return reduce(lambda a, b: a and b, m)
             except:
                 return False
-            
 
-        
-        
+
+
+
     def non_default_atts(self,attnames):
         atts=[]
         # There is something wrong with the way the dataobject is decoded
         # unless you pull the class definition from _types, the defaults
         # are incorrect when using the results of a message?
         r_class = self._types[self.__class__.__name__]
-        typedatts = r_class.get_typedattributes()        
-        
+        typedatts = r_class.get_typedattributes()
+
         if not attnames:
             attnames=self.attributes
-                    
+
         for a in attnames:
             #print a, getattr(self, a), typedatts[a].default
             if getattr(self, a) !=  typedatts[a].default:
                 atts.append(a)
         return atts
-        
-        
+
+
     #    def __le__(self,other):
     #        """
     #        """
@@ -283,7 +289,7 @@ class DataObject(object):
             elif isinstance(value, DataObject):
                 strng += """%s= '%s':'%s':%s\n""" % (indent, name,value.__str__(indent + '>'),type(value))
             else:
-                
+
                 strng += """%s= '%s':'%s':%s\n""" % (indent, name,value,type(value))
         strng += indent + head*4
         return strng
@@ -299,19 +305,19 @@ class DataObject(object):
         for yb in reversed(ayb):
             if issubclass(yb, DataObject):
                 d.update(yb.__dict__)
-        
+
         d.update(cls.__dict__)
-        
+
         atts = {}
         for key,value in d.items():
             if isinstance(value, TypedAttribute):
                 atts[key]=value
         return  atts
-        
+
 
 
     @property
-        
+
     def attributes(self):
         """
         @bug It would be nice if the attributes function only returned the set of keys for attributes that were defined within the object, rather than all attributes (even the ones relating to the underlying registry)
@@ -329,7 +335,7 @@ class DataObject(object):
         for key in self.attributes:
             atts[key] = getattr(self,key)
         return atts
-        
+
 
     def encode(self,header=True):
         """
@@ -337,10 +343,10 @@ class DataObject(object):
         encoded = []
         if header:
             encoded.append(('Object_Type', "%s" % (type(self).__name__)))
-            
+
         for name in self.attributes:
             value = getattr(self, name)
-            
+
             # Attempt to handle nested Resources
             if isinstance(value, DataObject):
                 value_enc = value.encode(header = False)
@@ -354,16 +360,16 @@ class DataObject(object):
                         list_enc.append("%s%s%s" % (type(val).__name__, NULL_CHR, json.dumps(val_enc),))
                     else:
                         list_enc.append("%s%s%s" % (type(val).__name__, NULL_CHR, str(val)))
-                
+
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(list_enc),)))
             elif isinstance(value,dict):
                 # dict can only contain JSONable types!
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, json.dumps(value),)))
-                
+
             else:
                 encoded.append((name, "%s%s%s" % (type(value).__name__, NULL_CHR, str(value),)))
 
-                
+
         return encoded
 
 
@@ -377,28 +383,28 @@ class DataObject(object):
         clsobj = cls
         if isinstance(attrs, tuple):
             attrs = list(attrs)
-        
+
         if header:
             header,clsname = attrs.pop(0)
             #print 'header',header
             #print 'clsname',clsname
             clsobj = eval(str(clsname), cls._types)
-            
+
         obj = clsobj()
-            
-            
+
+
         for name, value in attrs:
             #print 'name',name
             #print 'value',value
             ta = TypedAttribute.decode(value, cls._types)
             #print 'ta',ta.default
-            
+
             setattr(obj,name, ta.default)
             #print name, d[str(name)].default
         #print 'clsobj', clsobj
-            
-        
-            
+
+
+
         #
         #return type(clsobj.__name__, (clsobj,), d)
         return obj
@@ -412,7 +418,7 @@ Add some important proprieties for OOICI Resource Descriptions
 
 def create_unique_identity():
     """
-    @Brief Method to create global unique identity for any new resource 
+    @Brief Method to create global unique identity for any new resource
     """
     return str(uuid.uuid4())
 
@@ -421,7 +427,7 @@ class ResourceReference(DataObject):
     @Brief The ResourceReference class is the base class for all resources.
     It contains the context of the resource from the repository where it is stored.
     """
-    
+
     RegistryIdentity = TypedAttribute(str,None)
     #@TODO Make the commit ref a list so that an object can be a merge
     RegistryCommit = TypedAttribute(str,None)
@@ -443,7 +449,7 @@ class ResourceReference(DataObject):
         """
         inst = cls()
 
-        
+
         if id:
             inst.RegistryIdentity = id
         else:
@@ -451,7 +457,7 @@ class ResourceReference(DataObject):
 
         inst.RegistryBranch = branch
         return inst
-    
+
     def create_new_reference(self, id='', branch='master', commit=''):
         """
         @Brief Create or overwrite the reference identity for this resource
@@ -463,9 +469,9 @@ class ResourceReference(DataObject):
 
         self.RegistryBranch = 'master'
 
-        self.RegistryCommit = commit        
+        self.RegistryCommit = commit
         return self
-    
+
     def reference(self,head=False):
         """
         @Brief Use this method to make a reference to any resource
@@ -550,7 +556,7 @@ class InformationResource(Resource):
     """
     @brief Base for all OOI information resource objects
     """
-    
+
 DataObject._types['InformationResource']=InformationResource
 
 class StatefulResource(Resource):
@@ -830,9 +836,5 @@ register_alpha()
 register_jsond()
 register_dencoder()
 serializer.set_default('alpha')
-
-
-
-
 
 

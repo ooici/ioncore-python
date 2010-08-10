@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/test/test_url_manipulation.py
-@test Tests for ion.services.dm.url_manipulation
+@file ion/services/dm/util/test/test_url_manipulation.py
+@test Tests for ion.services.dm.util/url_manipulation
 @author Paul Hubbard
 @date 6/4/10
 """

@@ -19,7 +19,10 @@ from ion.services.dm.util.url_manipulation import generate_filename
 
 from ion.test.iontest import IonTestCase
 import base64
-import simplejson as json
+try:
+    import json
+except:
+    import simplejson as json
 
 TEST_DSET = 'http://ooici.net:8001/coads.nc'
 class TransportTester(IonTestCase):
@@ -87,7 +90,7 @@ class ServiceTester(unittest.TestCase):
         to get and persist a full dataset from amoeba (5.2MB)
         """
         raise unittest.SkipTest('Causes timeout on my workstation')
-        
+
         # generate filename so we can look for it after saving
         local_dir = '/tmp/'
         fname = generate_filename(TEST_DSET, local_dir=local_dir)

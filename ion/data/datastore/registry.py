@@ -408,8 +408,6 @@ class BaseRegistryService(BaseService):
             regex = container.regex
             ignore_defaults = container.ignore_defaults
             attnames = container.attnames
-            logging.debug('^^^^^^^^^^^^^^^^^')
-            logging.debug(attnames)
             
             result_list = yield self.reg.find_resource(description,regex,ignore_defaults, attnames)
         
@@ -616,9 +614,6 @@ class BaseRegistryClient(BaseServiceClient):
             #results = dataobject.DataObject.decode(content['value'])
             results = dataobject.serializer.decode(content['value'], headers['encoding'])
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            logging.info(type(results))
-            logging.info(type(content['value']))
-            logging.info(content['value'])
             defer.returnValue(results.resources)
         else:
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
@@ -627,6 +622,8 @@ class BaseRegistryClient(BaseServiceClient):
 
 class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
     """
+    #@TODO How can we make it so that the client infact uses a local registry
+    for testing rather than using the registry service? Can we switch it in init?
     """
     
     def __init__(self, proc=None, **kwargs):

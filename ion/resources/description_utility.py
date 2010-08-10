@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+"""
+@file ion/resources/description_utility.py
+@author David Stuebe
+@brief This is a method required to load all resource descriptions into the
+dataobject dictionary as possible types for decoding. This is a temporary
+requirement until we have a proper self describing datatype.
+"""
+
 import logging
 logging = logging.getLogger(__name__)
 from ion.core import ioninit
