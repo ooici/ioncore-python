@@ -6,8 +6,11 @@
 @brief service for messaging local host status at intervals
 """
 
-import logging, json
+import logging
 logging = logging.getLogger(__name__)
+
+import simplejson as json
+
 from twisted.internet import defer, task
 from twisted.web import xmlrpc
 
