@@ -21,6 +21,7 @@ class LatestConsumer(base_consumer.BaseConsumer):
         # Wipe the list of messages to send then add the latest ones
         self.msgs_to_send=[]
         
+        # Queue new messages to send
         if not hasattr(queues,'__iter__'):
             queues = [queues]
         
@@ -28,6 +29,10 @@ class LatestConsumer(base_consumer.BaseConsumer):
             self.queue_result(queue,data,notification)
 
     def onschedule(self, intrval_cnt, **kwargs):
+        '''
+        This method is called when it is time to actually send the results
+        in this case it is not needed, but must be over-riden...
+        '''
         pass
 
 
