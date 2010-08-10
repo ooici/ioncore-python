@@ -15,11 +15,10 @@ class ControllerCore(object):
     """Controller functionality that is not specific to the messaging layer.
     """
     
-    def __init__(self, provisioner_client, engineclass):
+    def __init__(self, provisioner_client, engineclass, conf=None):
         self.state = ControllerCoreState()
         self.control = ControllerCoreControl(provisioner_client, self.state)
         self.engine = EngineLoader().load(engineclass)
-        conf = {}
         self.engine.initialize(self.control, self.state, conf)
         
     def new_sensor_info(self, content):
@@ -53,6 +52,7 @@ class ControllerCoreState(State):
     def __init__(self):
         super(ControllerCoreState, self).__init__()
         self.instance_state_parser = InstanceStateParser()
+        self.queuelen_parser = QueueLengthParser()
         self.instance_states = defaultdict(list)
         self.queue_lengths = defaultdict(list)
         
@@ -67,8 +67,7 @@ class ControllerCoreState(State):
         self.instance_states[item.key].append(item)
             
     def new_queuelen(self, content):
-        logging.debug("received new queulen state message: '%s'" % content)
-        state_item = None # TODO: not implemented, need sample message
+        state_item = self.queuelen_parser.state_item(content)
         if state_item:
             self.queue_lengths[state_item.key].append(state_item)
 
@@ -129,6 +128,34 @@ class InstanceStateParser(object):
             logging.error("could not capture sensor info (full message: '%s')" % content)
             return None
         return StateItem("instance-state", instance_id, time.time(), state)
+        
+    def _expected(self, content, key):
+        if content.has_key(key):
+            return str(content[key])
+        else:
+            logging.error("message does not contain part with key '%s'" % key)
+            raise KeyError()
+
+class QueueLengthParser(object):
+    """Converts queuelen message into a StateItem
+    """
+    
+    def __init__(self):
+        pass
+    
+    def state_item(self, content):
+        logging.debug("received new queulen state message: '%s'" % content)
+        try:
+            queuelen = self._expected(content, "queuelen")
+            queuelen = int(queuelen)
+            queueid = self._expected(content, "queue_id")
+        except KeyError:
+            logging.error("could not capture sensor info (full message: '%s')" % content)
+            return None
+        except ValueError:
+            logging.error("could not convert queulen into integer (full message: '%s')" % content)
+            return None
+        return StateItem("queue-length", queueid, time.time(), queuelen)
         
     def _expected(self, content, key):
         if content.has_key(key):

@@ -37,7 +37,12 @@ class EPUControllerService(BaseService):
             logging.info("Using default decision engine: %s" % engineclass)
         
         self.provisioner_client = ProvisionerClient(self)
-        self.core = ControllerCore(self.provisioner_client, engineclass)
+        
+        if self.spawn_args.has_key("engine_conf"):
+            engine_conf = self.spawn_args["engine_conf"]
+        else:
+            engine_conf = None
+        self.core = ControllerCore(self.provisioner_client, engineclass, conf=engine_conf)
         
         self.core.begin_controlling()
 

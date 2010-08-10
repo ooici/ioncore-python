@@ -1,15 +1,18 @@
 import logging
 import os
+import random
 import signal
 import sys
 import time
 import uuid
+from collections import defaultdict
 
 from ion.services.cei.decisionengine import EngineLoader
 from ion.services.cei.epucontroller import Control
 from ion.services.cei.epucontroller import State
 from ion.services.cei.epucontroller import StateItem
-    
+import ion.services.cei.states as InstanceStates
+
 # -------
 # HARNESS
 # -------
@@ -30,10 +33,11 @@ class DecisionEngineExerciser(object):
     def run_forever(self):
         """Initialize the decision engine and call 'decide' until killed.""" 
         
-        conf = {}
+        conf = {'queuelen_high_water':'50', 'queuelen_low_water':'10'}
         self.engine.initialize(self.control, self.state, conf)
         while self.continue_running:
             time.sleep(self.control.sleep_seconds)
+            self.update()
             self.engine.decide(self.control, self.state)
         logging.warn("Controller is exiting")
     
@@ -41,6 +45,19 @@ class DecisionEngineExerciser(object):
         """Experiment with crash scenarios (should the engine API change?)"""
         self.continue_running = False
 
+    def update(self):
+        all_qlens = self.state.get_all("queue-length")
+        if not all_qlens:
+            self.state.new_qlen(45)
+        else:
+            if len(all_qlens) != 1:
+                raise Exception("only one queue at a time can be handled")
+            qlens = all_qlens[0]
+            latest = qlens[0]
+            next = latest.value + random.randint(-40,40)
+            if next < 0:
+                next == 0
+            self.state.new_qlen(next)
 
 # ----------------------
 # CONTROLLER API OBJECTS
@@ -66,12 +83,15 @@ class DeeControl(Control):
         for group,item in launch_description.iteritems():
             logging.info(" - %s is %d %s from %s" % (group, item.num_instances, item.allocation_id, item.site))
             for i in range(item.num_instances):
-                item.instance_ids.append(uuid.uuid4())
+                instanceid = uuid.uuid4()
+                item.instance_ids.append(instanceid)
+                self.deestate.new_launch(instanceid)
         return (launch_id, launch_description)
     
     def destroy_instances(self, instance_list):
         """Control API method"""
-        raise NotImplementedError
+        for instanceid in instance_list:
+            self.deestate.new_kill(instanceid)
     
     def destroy_launch(self, launch_id):
         """Control API method"""
@@ -81,10 +101,24 @@ class DeeControl(Control):
 class DeeState(State):
     def __init__(self):
         super(DeeState, self).__init__()
-        self.instance_states = {}
-        self.queue_lengths = {}
+        self.instance_states = defaultdict(list)
+        self.queue_lengths = defaultdict(list)
         
-    def get_all(typename):
+    def new_launch(self, new_instance_id):
+        state = InstanceStates.RUNNING # magical instant-start
+        item = StateItem("instance-state", new_instance_id, time.time(), state)
+        self.instance_states[item.key].append(item)
+    
+    def new_kill(self, instanceid):
+        state = InstanceStates.TERMINATING
+        item = StateItem("instance-state", instanceid, time.time(), state)
+        self.instance_states[item.key].append(item)
+    
+    def new_qlen(self, qlen):
+        qlen_item = StateItem("queue-length", "x", time.time(), qlen)
+        self.queue_lengths[qlen_item.key].append(qlen_item)
+        
+    def get_all(self, typename):
         if typename == "instance-state":
             data = self.instance_states
         elif typename == "queue-length":
@@ -94,7 +128,7 @@ class DeeState(State):
         
         return data.values()
     
-    def get(typename, key):
+    def get(self, typename, key):
         if typename == "instance-state":
             data = self.instance_states
         elif typename == "queue-length":
