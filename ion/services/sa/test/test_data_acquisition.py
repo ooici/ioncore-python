@@ -8,55 +8,91 @@
 
 from twisted.internet import defer
 
-from ion.services.sa.data_acquisition import DataAcquisitionServiceClient
-from ion.services.sa.data_acquisition import DataAcquisitionDataStore
+from ion.services.sa.data_acquisition import DAInstrumentRegistry, DADataProductRegistry
 from ion.test.iontest import IonTestCase
 
 from twisted.trial import unittest
 
+class Instance():
+	 instrument = {}
+	 dataproduct = {}
+
 class DataAcquisitionTest(IonTestCase):
-    """
-    Testing example data acquisition service.
-    """
+	"""
+	Testing example data acquisition service.
+	"""
 
-    @defer.inlineCallbacks
-    def setUp(self):
-        yield self._start_container()
-        services = [
-            {'name':'data_acquisition','module':'ion.services.sa.data_acquisition','class':'DataAcquisitionService'},
-        ]
+	@defer.inlineCallbacks
+	def setUp(self):
+		yield self._start_container()
+		
+#===============================================================================
+#		services = [
+#			{'name':'data_acquisition','module':'ion.services.sa.data_acquisition','class':'DataAcquisitionService'},
+#		]
+# 
+#		sup = yield self._spawn_processes(services)
+# 
+#		self.da = DataAcquisitionServiceClient(proc=sup)
+#===============================================================================
+		
+		services = [
+			{'name':'resourceregistry1','module':'ion.services.sa.instrument_registry','class':'InstrumentRegistryService'}]
+		sup = yield self._spawn_processes(services)
+		self.IR = DAInstrumentRegistry(proc=sup)
+		
+		services = [
+			{'name':'resourceregistry1','module':'ion.services.sa.data_product_registry','class':'DataProductRegistryService'}]
+		sup = yield self._spawn_processes(services)
 
-        sup = yield self._spawn_processes(services)
+		self.DP = DADataProductRegistry(proc=sup)
+		
 
-        self.da = DataAcquisitionServiceClient(proc=sup)
+	@defer.inlineCallbacks
+	def tearDown(self):
+		yield self._stop_container()
 
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self._stop_container()
+    
+#===============================================================================
+#	@defer.inlineCallbacks
+#	def test_acquire_message(self):
+# 
+#		 yield self.da.acquire_message("accessing acquire message")
+# 
+#	@defer.inlineCallbacks
+#	def test_acquire_block(self):
+# 
+#		 yield self.da.acquire_block("accessing acquire block")
+#===============================================================================
+		 
+    
+	
+	@defer.inlineCallbacks
+	def test_register_instrument(self):
+		"""
+		Accepts a dictionary of items describing an instrument and stores the items
+		in the registries.  
+		""" 
+		userInput = {'manufacturer' : "SeaBird Electronics", 
+				 'model' : "SBE49",
+				 'serial_num' : "1234",
+				 'fw_version' : "1"}
+			
+		userInput['instrumentID'] = "500"
+		
+		Instance.instrument = yield self.IR.register_instrument(userInput)
+	   
+		
+		dataProductInput = {'dataformat' : "binary"}	   
+		Instance.dataproduct = yield self.DP.register_data_product(dataProductInput)
+		
+		self.assertEqual(Instance.instrument.instrumentID, "500")
+		self.assertEqual(Instance.instrument.manufacturer, "SeaBird Electronics")
+		self.assertEqual(Instance.instrument.model, "SBE49") 
+		self.assertEqual(Instance.instrument.serial_num, "1234") 
+		self.assertEqual(Instance.instrument.fw_version, "1")	  
+		self.assertEqual(Instance.dataproduct.dataformat, "binary")
 
-    @defer.inlineCallbacks
-    def test_acquire_message(self):
-
-         yield self.da.acquire_message("accessing acquire message")
-
-    @defer.inlineCallbacks
-    def test_acquire_block(self):
-
-         yield self.da.acquire_block("accessing acquire block")
-
- 
-    @defer.inlineCallbacks
-    def test_push_pull(self):
-        raise unittest.SkipTest('code not completed')
-        
-        services = [
-            {'name':'DataStoreService1','module':'ion.data.datastore.datastore_service','class':'DataStoreService','spawnargs':{'MyFrontend':'afrontend'}},
-        ]
-
-        sup = yield self._spawn_processes(services)
-
-        rsc = DataAcquisitionDataStore('localFrontend',proc=sup)
-        
-        yield self.rsc.test_data_store()
-        
-        
+	
+		
+	

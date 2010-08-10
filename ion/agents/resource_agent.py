@@ -73,6 +73,7 @@ class ResourceAgent(BaseProcess):
         if (self.reg_client == None):
             yield self.reply_err(msg,
                                  "No agent registry client has been set!")
+            return
         if (self.resource_ref != None):
             result = \
                 yield self.reg_client.get_agent_instance(self.resource_ref)
@@ -92,6 +93,7 @@ class ResourceAgent(BaseProcess):
         if (self.reg_client == None):
             yield self.reply_err(msg,
                                  "No agent registry client has been set!")
+            return
         assert(isinstance(content, basestring))
         state = str(content)
         assert(state in LCStateNames)
@@ -102,10 +104,12 @@ class ResourceAgent(BaseProcess):
             self.resource_ref = result.reference(head=True)
             if (result):
                 yield self.reply_ok(msg, str(state))
+                return
             else:
                 yield self.reply_err(msg, \
                     "Could not set lifecycle state for %s" \
-                        % self.resource_ref.name) 
+                        % self.resource_ref.name)
+                return
         else:
             yield self.reply_err(msg, \
               "Could not set lifecycle state. Resource %s does not exist." \
@@ -149,6 +153,7 @@ class ResourceAgent(BaseProcess):
         if (self.reg_client == None):
             yield self.reply_err(msg,
                                  "No agent registry client has been set!")
+            return
         if (content == ""):
             descriptor = None
         elif (content != None):
