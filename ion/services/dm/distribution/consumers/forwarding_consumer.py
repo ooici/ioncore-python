@@ -19,7 +19,7 @@ from ion.core.base_process import ProtocolFactory
 class ForwardingConsumer(base_consumer.BaseConsumer):
     """
     This is an simple consumer to forward messages to 'queues' from spawn_args,
-    'process parameters' which is passed as **kwargs to ondata
+    'delivery queues' which is passed as **kwargs to ondata
     """
     def ondata(self, data, notification, timestamp, queues=[]):
         

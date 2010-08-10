@@ -13,6 +13,9 @@ logging = logging.getLogger(__name__)
 import time
 
 from twisted.internet import defer
+from twisted.internet.task import LoopingCall
+from twisted.internet import reactor
+
 
 #from magnet.container import Container
 from magnet.spawnable import Receiver
@@ -46,12 +49,25 @@ class BaseConsumer(BaseProcess):
     def plc_init(self):
         self.params = self.spawn_args.get('process parameters',{})
         self.deliver = self.spawn_args.get('delivery queues',{})
+        
+        
+        # Scheduled interval delivery - digest mode!
+        self.delivery_interval = self.spawn_args.get('delivery interval',None)
+        if self.delivery_interval:
+            assert isinstance(self.delivery_interval, (int,float)), 'delivery interval must be a float or a integer'        
+        self.last_delivered = None
+        self.interval_cnt = 0
+        self.loop = None
+        #if self.delivery_interval:
+        #    self.loop = LoopingCall(self.digest)
+        self.loop_running = False        
+
+        
         self.receive_cnt = {}
         self.received_msg = []
         self.msgs_to_send = []
         self.send_cnt = {}
         self.dataReceivers = {}
-        
         
         queuenames = self.spawn_args.get('attach',None)
         if queuenames:
@@ -210,7 +226,6 @@ class BaseConsumer(BaseProcess):
 
         # Unpack the message and turn it into data
         datamessage = dataobject.DataObject.decode(content)
-
         if isinstance(datamessage, DAPMessageObject):
             data = dap_tools.dap_msg2ds(datamessage)
         elif isinstance(datamessage, (StringMessageObject, DictionaryMessageObject)):
@@ -221,6 +236,7 @@ class BaseConsumer(BaseProcess):
         notification = datamessage.notification
         timestamp = datamessage.timestamp
 
+        # Build the keyword args for ondata
         args = dict(self.params)
         args.update(self.deliver)
 
@@ -229,17 +245,41 @@ class BaseConsumer(BaseProcess):
 
         logging.info(self.__class__.__name__ +"; op_data: Finished data processing")
 
-        # Send data only when the process is complete!
-        if self.msgs_to_send:
-            for ind in range(len(self.msgs_to_send)):
-                queue, msg = self.msgs_to_send.pop(0)
-                yield self.send(queue, 'data', msg)
-                if self.send_cnt.has_key(queue):
-                    self.send_cnt[queue] += 1
-                else:
-                    self.send_cnt[queue] = 1
-                    
+
+        # Is this a consumer with digest delivery?
+        if not self.delivery_interval:
+            # if not send the messages from ondata...
+            yield self.deliver_messages()
             logging.info(self.__class__.__name__ +"; op_data: Finished sending results")
+            
+        else: # Do the digets thing...
+            
+            self.interval_cnt +=1
+            
+            logging.debug(self.__class__.__name__ +"; op_data: digest state: \n" + \
+                          "Last Delivered: " +str(self.last_delivered) +";\n" +\
+                          "Loop Running: " +str(self.loop_running))
+            
+            # First time data has arrived?
+            if self.last_delivered == None:
+                self.last_delivered = pu.currenttime()
+                    
+            if not self.loop_running:
+
+                # Is it already time to go?
+                if self.last_delivered + self.delivery_interval <= pu.currenttime():            
+                    yield self.digest()
+                        
+                # if data has arrived but it is not yet time to deliver, schedule a call back
+                else:
+                    self.loop_running = True
+                    delta_t = self.last_delivered + self.delivery_interval - pu.currenttime()
+                    logging.debug('Scheduling a call back in %s seconds' % delta_t)
+                    #self.loop.start(delta_t)
+                    reactor.callLater(delta_t, self.digest)
+
+                    #IReactorTime.callLater(delta_t, self.digest)
+
 
 
     def ondata(self, data, notification,timestamp, **kwargs):
@@ -247,6 +287,33 @@ class BaseConsumer(BaseProcess):
         Override this method
         """
         raise NotImplementedError, "BaseConsumer class does not implement ondata"
+    
+    @defer.inlineCallbacks
+    def digest(self):
+        
+        logging.info(self.__class__.__name__ +"; Digesting results!")
+        
+        # Stop the loop if it is running - start again when next data is received
+        if self.loop_running:
+            #self.loop.stop()
+            self.loop_running = False
+        
+        args = dict(self.params)
+        args.update(self.deliver)
+        
+        yield defer.maybeDeferred(self.onschedule, self.interval_cnt, **args)
+        
+        yield self.deliver_messages()
+        # Update last_delivered
+        self.last_delivered = pu.currenttime()
+        logging.info(self.__class__.__name__ +"; digest: Finished sending results")
+        
+    def onschedule(self, intrval_cnt, **kwargs):
+        """
+        Override this method
+        """
+        raise NotImplementedError, "BaseConsumer class does not implement onschedule"
+    
 
     def queue_result(self,queue, data=None, notification=''):
         
@@ -272,6 +339,18 @@ class BaseConsumer(BaseProcess):
         
         self.msgs_to_send.append((queue, msg.encode()))
         
+    @defer.inlineCallbacks
+    def deliver_messages(self):
+        
+        # Send data only when the process is complete!
+        if self.msgs_to_send:
+            for ind in range(len(self.msgs_to_send)):
+                queue, msg = self.msgs_to_send.pop(0)
+                yield self.send(queue, 'data', msg)
+                if self.send_cnt.has_key(queue):
+                    self.send_cnt[queue] += 1
+                else:
+                    self.send_cnt[queue] = 1
         
 class ConsumerDesc(ProcessDesc):
     '''

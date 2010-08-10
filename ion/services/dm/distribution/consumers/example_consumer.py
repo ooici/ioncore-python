@@ -24,7 +24,7 @@ class ExampleConsumer(base_consumer.BaseConsumer):
         This is an example data consumer process. It applies a process to the data
         and sends the results to a 'qaqc' queue and an event queue. The send-to
         location is a parameter specified in the consumer class spawn args,
-        'process parameters' which is passed as **kwargs to ondata
+        'delivery queues' which is passed as **kwargs to ondata
         """
     def ondata(self, data, notification, timestamp, event_queue='', processed_queue=''):
         
