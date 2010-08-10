@@ -66,9 +66,8 @@ class InstrumentManagementService(BaseService):
             newinstrument.fw_version = userInput['fw_version']
 
         instrument_res = yield self.irc.register_instrument_instance(newinstrument)
-        print "****1"
+
         yield self.reply_ok(msg, instrument_res.encode())
-        print "****2"
 
     @defer.inlineCallbacks
     def op_register_data_product(self, content, headers, msg):
@@ -103,7 +102,6 @@ class InstrumentManagementClient(BaseServiceClient):
 
         (content, headers, message) = yield self.rpc_send('create_new_instrument',
                                                           reqcont)
-        print "***3"
         defer.returnValue(DataObject.decode(content['value']))
 
     @defer.inlineCallbacks
