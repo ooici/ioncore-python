@@ -210,6 +210,8 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         results=[]
         if isinstance(description,dataobject.DataObject):
             refs = yield self._list()
+            logging.info('!!!!!!!!!@@@@@@@@!!!!')
+            logging.info(description)
 
             # Get the list of descriptions in this registry
             
@@ -217,6 +219,7 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
 
             for ref in refs:
                 res = yield self.get_resource(ref)
+                logging.info(res)
                 
                 if description.compared_to(res,
                                         regex=regex,
@@ -604,7 +607,7 @@ class BaseRegistryClient(BaseServiceClient):
         
         encoding, _, data = dataobject.serializer.encode(container)
         headers = {'encoding':encoding, 'accept-encoding':encoding}
-        (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
+        content, headers, msg = yield self.rpc_send(op_name, data, headers)
 
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
         
@@ -613,6 +616,9 @@ class BaseRegistryClient(BaseServiceClient):
             #results = dataobject.DataObject.decode(content['value'])
             results = dataobject.serializer.decode(content['value'], headers['encoding'])
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+            logging.info(type(results))
+            logging.info(type(content['value']))
+            logging.info(content['value'])
             defer.returnValue(results.resources)
         else:
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')

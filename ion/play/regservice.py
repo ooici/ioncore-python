@@ -4,6 +4,9 @@ from twisted.python import log
 
 from ion.core import bootstrap
 
+from ion.resources import description_utility
+description_utility.load_descriptions()
+
 @defer.inlineCallbacks
 def main():
     bootstrap._set_container_args("{'sys-name':'mysys'}")

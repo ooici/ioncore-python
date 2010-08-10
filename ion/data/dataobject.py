@@ -25,16 +25,18 @@ class TypedAttribute(object):
         self.name = None
         self.type = type
         self.default = default if default else type()
-        self.cache = None
+        self.cache = self.default
 
     def __get__(self, inst, cls):
         value = getattr(inst, self.name, self.default)
+        #return self.cache
         return value
 
     def __set__(self, inst, value):
         if not isinstance(value, self.type):
             raise TypeError("Error setting typed attribute %s \n Attribute must be of class %s \n Recieved Value of Class: %s" % (self.name, self.type, value.__class__))
         setattr(inst, self.name, value)
+        #self.cache = value
 
 
     @classmethod
@@ -613,6 +615,11 @@ class DEncoder(object):
     """Encode a DataObject into a JSON encodable dict structure.
     """
 
+    class Resource(Resource):
+        def __init__(self):
+            """undo what DataObject.__init__ does
+            """
+
     def __init__(self):
         self._type_encoders = {
                 int:self.encode_python_type,
@@ -689,7 +696,8 @@ class DEncoder(object):
             val = self.decode(vdict)
             __dict[name] = TypedAttribute(type(val), val)
         #o = type(cls, (DataObject,), __dict)()
-        o = type(str(cls), (Resource,), __dict)()
+        #o = type(str(cls), (Resource,), __dict)()
+        o = type(str(cls), (self.Resource,), __dict)()
         return o
 
     def decode_lcstate(self, odict):
@@ -730,7 +738,8 @@ class JSONDEncoder(object):
         self._dencoder = DEncoder()
 
     def encode(self, o):
-        return json.dumps(o, default=self._dencoder.encode)
+        odict = self._dencoder.encode(o)
+        return json.dumps(odict)
 
     def decode(self, data):
         odict = json.loads(data)
