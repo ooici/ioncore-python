@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/test/test_daptools.py
+@file ion/services/dm/util/test/test_daptools.py
 @author David Stuebe
 @date 7/30/2010
 """

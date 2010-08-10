@@ -316,7 +316,7 @@ class TestSimpleObject(unittest.TestCase):
         dec = dataobject.DataObject.decode(self.encoded)
         #print 'dec',dec
         #print 'self.obj',self.obj
-        self.assertEqual(self.obj,dec)
+        self.assertEqual(self.obj,dec,'Original: %s \n Decoded: %s' % (str(self.obj), str(dec)))
         self.assertEqual(type(self.obj).__name__,type(dec).__name__)
 
         
@@ -486,7 +486,7 @@ class TestDictObject(TestSimpleObject):
     def setUp(self):
         obj = DictObject()
         obj.name = 'David'
-        obj.rdict = {'a':'a','b':5,'data':3.14159}
+        obj.rdict = {'a':'a','b':5,'data':3.14159} # Must be 'Jasonable'
         self.obj = obj
         self.encoded=[('Object_Type', 'DictObject'),
                     ('rdict', 'dict\x00{"a": "a", "b": 5, "data": 3.1415899999999999}'),
@@ -496,14 +496,23 @@ class TestDictObject2(TestSimpleObject):
     def setUp(self):
         obj = DictObject()
         obj.name = 'David'
-        obj.rdict = {'a':'a','b':5,'data':3.14159,'tuple':(1,2,3)}
+        obj.rdict = {'a':'a','b':5,'data':3.14159,'list':[1,2,3]} # Must be 'Jasonable'
         self.obj = obj
         self.encoded=[('Object_Type', 'DictObject'),
-                    ('rdict', 'dict\x00{"a": "a", "b": 5, "data": 3.1415899999999999, "tuple": [1, 2, 3]}'),
-                    ('name', 'str\x00David')]
+                     ('rdict',
+                      'dict\x00{"a": "a", "list": [1, 2, 3], "b": 5, "data": 3.1415899999999999}'),
+                     ('name', 'str\x00David')]
      
-    def testDecode(self):
-        raise unittest.SkipTest('This kind of data inside a dictionary does not work!')
+
+class TestDictObject3(TestSimpleObject):
+    def setUp(self):
+        obj = DictObject()
+        obj.name = 'David'
+        obj.rdict = {'a':'a','b':5,'data':3.14159,'d3':{'1':2,'3':4}} # Must be 'Jasonable'
+        self.obj = obj
+        self.encoded=[('Object_Type', 'DictObject'),
+                    ('rdict', 'dict\x00{"a": "a", "b": 5, "data": 3.1415899999999999, "d3": {"1": 2, "3": 4}}'),
+                    ('name', 'str\x00David')]
 
      
 class NestedObject(dataobject.DataObject):
@@ -592,7 +601,7 @@ class ResponseService(BaseService):
         response = obj.encode()
 
         # The following line shows how to reply to a message
-        yield self.reply(msg, 'reply', response, {})
+        yield self.reply_ok(msg, response)
 
 class ResponseServiceClient(BaseServiceClient):
     """
@@ -612,7 +621,7 @@ class ResponseServiceClient(BaseServiceClient):
         logging.info('Sending Encoded resource:'+str(msg))
         (content, headers, msg) = yield self.rpc_send('respond', msg, {})
         logging.info('Responder replied: '+str(content))
-        response = dataobject.DataObject.decode(content)
+        response = dataobject.DataObject.decode(content['value'])
         defer.returnValue(response)
 
 # Spawn of the process using the module name

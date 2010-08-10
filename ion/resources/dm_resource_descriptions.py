@@ -1,5 +1,14 @@
 #!/usr/bin/env python
 
+"""
+@file ion/resources/dm_resource_descriptions.py
+@author David Stuebe
+@brief Resource descriptions for DM services and resources. Includes some
+container objects used in messaging.
+"""
+
+
+
 from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource, create_unique_identity
 
 
@@ -43,7 +52,10 @@ class DataMessageObject(DataObject):
     """
     Base Class for Data PubSub Message Objects
     """
-
+    notification = TypedAttribute(str)
+    timestamp = TypedAttribute(float)
+    
+    
 class DAPMessageObject(DataMessageObject):
     """Container object for messaging DAP data"""
     das = TypedAttribute(str)
@@ -105,18 +117,32 @@ class PubSubTopicResource(InformationResource):
             inst.aoi = aoi
         return inst
 
-
 class SubscriptionResource(StatefulResource):
     """
     Informaiton about a subscriber
     """
     #Name - inherited
-    # Subscription is not to a topic but to the Exchange queue where the filtered
-    # messages arive from a topic!
-    topics = TypedAttribute(list) # List of Topic Resource References
-    period = TypedAttribute(list)
-    interval = TypedAttribute(int,0)
 
+    #owner = TypedAttribute(ResourceReference) # Don't worry about owner yet
+    
+    # hack for now to allow naming one-three more topic descriptions
+    topic1 = TypedAttribute(PubSubTopicResource)
+    topic2 = TypedAttribute(PubSubTopicResource) 
+    topic3 = TypedAttribute(PubSubTopicResource)
+    
+    workflow = TypedAttribute(dict)
+    '''
+    Only specify who you attach to - not who you produce to - consistent with pubsub model!
+    <consumer name>:{'module':'path.to.module','cosumeclass':'<ConsumerClassName>',\
+        'attach':<topicX> or <consumer name> or <list of consumers and topics>,\
+        'Process Parameters':{<conumser property keyword arg>: <property value>},\
+    '''
+
+    #Used internally
+    #current_topics = TypedAttribute(list) # List of Topic Resource References
+    #consumer_procids = TypedAttribute(dict) # list of child consumer ids - need a process registry
+    queues = TypedAttribute(list) # list of queue objects
+    consumer_args = TypedAttribute(dict)
 """
 DM DataSet Resource Descriptions
 Preliminary!
