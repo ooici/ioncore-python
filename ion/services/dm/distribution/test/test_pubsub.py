@@ -93,7 +93,10 @@ class PubSubServiceMethodTest(IonTestCase):
         msg=DataMessageObject()
         self.sup.send(topic.queue.name,'data',msg.encode())
         
+        yield pu.asleep(1)
+
         dc1 = self._get_procinstance(child1_id)
+        print 'DC1',dc1.receive_cnt
         rec = dc1.receive_cnt[topic.queue.name]
         self.assertEqual(rec,1)
         
