@@ -7,6 +7,10 @@ import ion.services.cei.states as InstanceStates
 
 BAD_STATES = [InstanceStates.TERMINATING, InstanceStates.TERMINATED, InstanceStates.FAILED]
 
+CONF_HIGH_WATER = "queuelen_high_water"
+CONF_LOW_WATER = "queuelen_low_water"
+CONF_MIN_INSTANCES = "min_instances"
+
 class QueueLengthBoundedEngine(Engine):
     """
     A decision engine that looks at queue length.  If there are more queued
@@ -19,6 +23,7 @@ class QueueLengthBoundedEngine(Engine):
         super(QueueLengthBoundedEngine, self).__init__()
         self.high_water = 0
         self.low_water = 0
+        self.min_instances = 0
         # todo: get all of this from conf:
         self.available_allocations = ["small"]
         self.available_sites = ["ec2-east"]
@@ -30,14 +35,19 @@ class QueueLengthBoundedEngine(Engine):
         if not conf:
             raise Exception("cannot initialize without external configuration")
         
-        high = "queuelen_high_water"
-        low = "queuelen_low_water"
-        if not conf.has_key(high):
-            raise Exception("cannot initialize without %s" % high)
-        if not conf.has_key(low):
-            raise Exception("cannot initialize without %s" % low)
-        self.high_water = int(conf[high])
-        self.low_water = int(conf[low])
+        if not conf.has_key(CONF_HIGH_WATER):
+            raise Exception("cannot initialize without %s" % CONF_HIGH_WATER)
+        if not conf.has_key(CONF_LOW_WATER):
+            raise Exception("cannot initialize without %s" % CONF_LOW_WATER)
+        self.high_water = int(conf[CONF_HIGH_WATER])
+        self.low_water = int(conf[CONF_LOW_WATER])
+        
+        if conf.has_key(CONF_MIN_INSTANCES):
+            self.min_instances = int(conf[CONF_MIN_INSTANCES])
+            if self.min_instances < 0:
+                raise Exception("cannot have negative %s conf" % CONF_MIN_INSTANCES)
+        else:
+            self.min_instances = 0
         
         logging.info("Bounded queue length engine initialized, high water mark is %d, low water %d" % (self.high_water, self.low_water))
         
@@ -56,6 +66,15 @@ class QueueLengthBoundedEngine(Engine):
                     break
             if ok:
                 valid_count += 1
+        
+        
+        # If there is an explicit minimum, always respect that.
+        if valid_count < self.min_instances:
+            logging.info("Bringing instance count up to the explicit minimum")
+            while valid_count < self.min_instances:
+                self._launch_one(control)
+                valid_count += 1
+        
         
         # Won't make a decision if there are pending instances. This would
         # need to be a lot more elaborate (requiring a datastore) to get a
@@ -127,8 +146,12 @@ class QueueLengthBoundedEngine(Engine):
             return 1
         elif recent < self.low_water:
             logging.debug(msg + " (below low water)")
-            if valid_count == 1:
-                logging.info("Down to one instance, cannot reduce")
+            if valid_count == self.min_instances:
+                if self.min_instances == 1:
+                    txt = "1 instance"
+                else:
+                    txt = "%d instances" % self.min_instances
+                logging.info("Down to %s, cannot reduce" % txt)
                 return 0
             else:
                 return -1

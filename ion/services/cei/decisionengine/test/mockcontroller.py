@@ -68,6 +68,9 @@ class DeeControl(Control):
         super(DeeControl, self).__init__()
         self.sleep_seconds = 5.0
         self.deestate = deestate
+        
+        # mini "mock" framework
+        self.num_launched = 0
     
     def configure(self, parameters):
         """Control API method"""
@@ -86,12 +89,14 @@ class DeeControl(Control):
                 instanceid = uuid.uuid4()
                 item.instance_ids.append(instanceid)
                 self.deestate.new_launch(instanceid)
+        self.num_launched += 1
         return (launch_id, launch_description)
     
     def destroy_instances(self, instance_list):
         """Control API method"""
         for instanceid in instance_list:
             self.deestate.new_kill(instanceid)
+            self.num_launched -= 1
     
     def destroy_launch(self, launch_id):
         """Control API method"""
