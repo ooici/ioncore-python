@@ -64,21 +64,23 @@ class Sidechannel(resource.Resource):
         parts = request.postpath
         if parts[-1] == "":
             parts = parts[:-1]
-        if len(parts) != 3:
-            request.setResponseCode(500, "expecting three 'args', /batchid/#jobs/#sleepsecs")
+        if len(parts) != 4:
+            request.setResponseCode(500, "expecting four 'args', /batchid/jobidx/#jobs/#sleepsecs")
             return
         
         try:
             batchid = parts[0]
-            jobnum = int(parts[1])
-            secperjob = int(parts[2])
+            jobidx = int(parts[1])
+            jobnum = int(parts[2])
+            secperjob = int(parts[3])
         except Exception,e:
-            request.setResponseCode(500, "expecting three args, /batchid/#jobs/#sleepsecs, those should be INTEGERS..  %s" % e)
+            request.setResponseCode(500, "expecting four args, /batchid/jobidx/#jobs/#sleepsecs, those should be ints (except batch id): %s" % e)
             return
 
         sleepjobs = []
         for i in range(jobnum):
-            sleepjobs.append(SleepJob(i, batchid, secperjob))
+            jobid = i + jobidx
+            sleepjobs.append(SleepJob(jobid, batchid, secperjob))
         
         for job in sleepjobs:
             self.queue.put(job)
