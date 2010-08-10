@@ -20,6 +20,7 @@ from libcloud.types import NodeState as NimbossNodeState
 from libcloud.base import Node as NimbossNode
 from libcloud.drivers.ec2 import EC2NodeDriver
 from ion.services.cei.provisioner_store import group_records, calc_record_age
+from ion.services.cei.dtrs import DeployableTypeLookupError
 from ion.services.cei import states
 from ion.services.cei import cei_events
 
@@ -120,11 +121,11 @@ class ProvisionerCore(object):
             document = dt['document']
             dtrs_nodes = dt['nodes']
             logging.debug('got dtrs nodes: ' + str(dtrs_nodes))
-        except KeyError:
-            logging.error('Failed to lookup deployable type "%s" in DTRS', 
-                    deployable_type)
+        except DeployableTypeLookupError, e:
+            logging.error('Failed to lookup deployable type "%s" in DTRS: %s', 
+                    deployable_type, str(e))
             state = states.FAILED
-            state_description = "DTRS_LOOKUP_FAILED"
+            state_description = "DTRS_LOOKUP_FAILED " + str(e)
 
         launch_record = {
                 'launch_id' : launch_id,
