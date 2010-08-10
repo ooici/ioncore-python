@@ -11,6 +11,8 @@ from twisted.internet import defer, reactor
 
 from twisted.internet.protocol import Protocol, ClientFactory, ClientCreator
 
+from ion.services.dm.distribution.pubsub_service import DataPubsubClient
+
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient
 from ion.agents.instrumentagents.SBE49_constants import instrument_commands
@@ -222,7 +224,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         # send this up to the agent to publish.
         logging.debug("gotData() %s Calling publish." % (data))
-        #self.agent.publish(data, 'topic1')
+        self.publish(data, 'topic1')
       
     def gotPrompt(self, instrument):
         """
@@ -237,6 +239,18 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         #instrument.transport.write("ds")
         #instrument.transport.write(self.command)
+        
+    def publish(self, data, topic):
+        """
+        @Brief Publish the given data to the given topic.
+        @param data The data to publish
+        @param topic The topic to which to pubish
+        @retval none
+        """
+        logging.debug("DHE: publish(): %s" %str(self.__dict__))
+        
+        self.dpsc = DataPubsubClient(self.sup)
+        
 
     @defer.inlineCallbacks
     def op_disconnect(self, content, headers, msg):
