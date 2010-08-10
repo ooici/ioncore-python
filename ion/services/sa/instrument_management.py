@@ -6,89 +6,114 @@
 @brief service for data acquisition
 """
 
-
 import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
-from magnet.spawnable import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
+from ion.data.dataobject import DataObject
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.data.datastore.datastore_service import DataStoreServiceClient
 
-from ion.resources import sa_resource_descriptions
+from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
 from ion.services.sa.instrument_registry import InstrumentRegistryClient
 from ion.services.sa.data_product_registry import DataProductRegistryClient
 
+class InstrumentManagementService(BaseService):
+    """
+    Instrument management service interface.
+    This service provides overall coordination for instrument management within
+    an observatory context. In particular it coordinates the access to the
+    instrument and data product registries and the interaction with instrument
+    agents.
+    """
 
-class DAInstrumentRegistry(InstrumentRegistryClient):
-    """
-    Updates the instrument registry.
-    """
+    # Declaration of service
+    declare = BaseService.service_declare(name='instrument_management',
+                                          version='0.1.0',
+                                          dependencies=[])
+
+    def slc_init(self):
+        self.irc = InstrumentRegistryClient(proc=self)
+        self.dprc = DataProductRegistryClient(proc=self)
+
     @defer.inlineCallbacks
-    def register_instrument(self, userInput):
+    def op_create_new_instrument(self, content, headers, msg):
         """
-        Accepts a dictionary containing user inputs and updates the instrument
+        Service operation: Accepts a dictionary containing user inputs and updates the instrument
         registry.
-        """   
-        
-        res = sa_resource_descriptions.InstrumentResource.create_new_resource()
-        res = yield self.register_instrument_type(res)
-        
-       
-        
-        ref = res.reference(head=True)
-        
-        res2 = yield self.get_instrument_type(ref)
-        
+        """
+        userInput = content['userInput']
+
+        newinstrument = InstrumentResource.create_new_resource()
+
         if 'direct_access' in userInput:
-            res2.direct_access = userInput['direct_access']
-            
+            newinstrument.direct_access = userInput['direct_access']
+
         if 'instrumentID' in userInput:
-            res2.instrumentID = userInput['instrumentID']
-        
+            newinstrument.instrumentID = userInput['instrumentID']
+
         if 'manufacturer' in userInput:
-            res2.manufacturer = userInput['manufacturer']
-            
+            newinstrument.manufacturer = userInput['manufacturer']
+
         if 'model' in userInput:
-            res2.model = userInput['model']
-            
+            newinstrument.model = userInput['model']
+
         if 'serial_num' in userInput:
-            res2.serial_num = userInput['serial_num']
-            
+            newinstrument.serial_num = userInput['serial_num']
+
         if 'fw_version' in userInput:
-            res2.fw_version = userInput['fw_version']
-            
-        
-        res2 = yield self.register_instrument_type(res2)
-        
-        res3 = yield self.get_instrument_type(ref)
-        
-        defer.returnValue(res3)
-        
-class DADataProductRegistry(DataProductRegistryClient):
+            newinstrument.fw_version = userInput['fw_version']
+
+        instrument_res = yield self.irc.register_instrument_instance(newinstrument)
+        print "****1"
+        yield self.reply_ok(msg, instrument_res.encode())
+        print "****2"
+
+    @defer.inlineCallbacks
+    def op_register_data_product(self, content, headers, msg):
+        """
+        Service operation: Accepts a dictionary containing user inputs and
+        updates the data product registry.
+        """
+        dataProductInput = content['dataProductInput']
+
+        newdp = DataProductResource.create_new_resource()
+        if 'dataformat' in dataProductInput:
+            newdp.dataformat = dataProductInput['dataformat']
+
+        res = yield self.dprc.register_data_product(newdp)
+        ref = res.reference(head=True)
+
+        yield self.reply_ok(msg, res.encode())
+
+class InstrumentManagementClient(BaseServiceClient):
     """
-    Updates the data product registry
-    """  
+    Class for the client accessing the instrument management service.
+    """
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "instrument_management"
+        BaseServiceClient.__init__(self, proc, **kwargs)
+
+    @defer.inlineCallbacks
+    def create_new_instrument(self, userInput):
+        reqcont = {}
+        reqcont['userInput'] = userInput
+
+        (content, headers, message) = yield self.rpc_send('create_new_instrument',
+                                                          reqcont)
+        print "***3"
+        defer.returnValue(DataObject.decode(content['value']))
+
     @defer.inlineCallbacks
     def register_data_product(self, dataProductInput):
-        """
-        Accepts a dictionary containing user inputs and updates the data product
-        registry.
-        """  
-        res = sa_resource_descriptions.DataProductResource.create_new_resource()
-        res = yield self.register_data_product_type(res)
-                
-        ref = res.reference(head=True)
-        
-        res2 = yield self.get_data_product_type(ref)
-        if 'dataformat' in dataProductInput:
-            res2.dataformat = dataProductInput['dataformat']
-        
-        res2 = yield self.register_data_product_type(res2)
-        
-        res3 = yield self.get_data_product_type(ref)
-        
-        defer.returnValue(res3)
-    
+        reqcont = {}
+        reqcont['dataProductInput'] = dataProductInput
+
+        (content, headers, message) = yield self.rpc_send('register_data_product',
+                                                          reqcont)
+        defer.returnValue(DataObject.decode(content['value']))
+
+# Spawn of the process using the module name
+factory = ProtocolFactory(InstrumentManagementService)
