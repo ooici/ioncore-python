@@ -65,8 +65,9 @@ class ProvisionerServiceTest(IonTestCase):
 
 class FakeProvisionerNotifier(object):
 
-    nodes = {}
-    nodes_rec_count = {}
+    def __init__(self):
+        self.nodes = {}
+        self.nodes_rec_count = {}
 
     def send_record(self, record, subscribers, operation='node_status'):
         """Send a single node record to all subscribers.

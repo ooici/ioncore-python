@@ -24,7 +24,8 @@ class ProvisionerStore(object):
 
     # Using a simple in-memory dict for now, until it is clear how
     # to use CEI datastore
-    data = {}
+    def __init__(self):
+        self.data = {}
 
     def put_record(self, record, newstate=None, timestamp=None):
         """Stores a record, optionally first updating state.
@@ -41,6 +42,8 @@ class ProvisionerStore(object):
 
         newid = str(uuid.uuid4())
         ts = str(timestamp or int(time.time() * 1e6))
+
+        record['state_timestamp'] = ts
         key = '|'.join([launch_id, node_id, state, ts, newid])
         self.data[key] = json.dumps(record)
         logging.debug('Added provisioner state: "%s"', key)
@@ -154,3 +157,10 @@ def group_records(records, *args):
     for key, group in groupby(sorted_records, keyf):
         groups[key] = list(group)
     return groups
+
+def calc_record_age(record):
+    """Calculates the time since a record's timestamp, in seconds (float)
+    """
+    now = time.time()
+    return now - (long(record['state_timestamp']) / 1e6)
+    

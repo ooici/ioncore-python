@@ -12,7 +12,7 @@ import uuid
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
-from ion.services.cei.provisioner_store import ProvisionerStore, group_records
+from ion.services.cei.provisioner_store import *
 from ion.services.cei import states
 
 class ProvisionerStoreTests(IonTestCase):
@@ -68,6 +68,21 @@ class ProvisionerStoreTests(IonTestCase):
         self.assertEqual(chicago_big[0]['site'], 'chicago')
         for group in groups.itervalues():
             self.assertEqual(len(group), 1)
+
+
+    @defer.inlineCallbacks
+    def test_calc_record_age(self):
+        launch_id = new_id()
+
+        yield self.store.put_record({'launch_id': launch_id, 'node_id' : new_id(),
+            'state' : states.REQUESTED
+            })
+        record = yield self.store.get_launch(launch_id)
+
+        age = calc_record_age(record) 
+        self.assertTrue(age >= 0)
+        self.assertTrue(age < 5)
+        
 
 def new_id():
     return str(uuid.uuid4())

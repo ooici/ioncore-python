@@ -19,7 +19,7 @@ from nimboss.nimbus import NimbusClusterDocument, ValidationError
 from libcloud.types import NodeState as NimbossNodeState
 from libcloud.base import Node as NimbossNode
 from libcloud.drivers.ec2 import EC2NodeDriver
-from ion.services.cei.provisioner_store import group_records
+from ion.services.cei.provisioner_store import group_records, calc_record_age
 from ion.services.cei import states
 from ion.services.cei import cei_events
 
@@ -31,6 +31,11 @@ _NIMBOSS_STATE_MAP = {
         NimbossNodeState.PENDING : states.PENDING,
         NimbossNodeState.TERMINATED : states.TERMINATED,
         NimbossNodeState.UNKNOWN : states.ERROR_RETRYING}
+
+# Window of time in which nodes are allowed to be launched 
+# but not returned in queries to the IaaS. After this, nodes
+# are assumed to be terminated out of band and marked FAILED
+_IAAS_NODE_QUERY_WINDOW_SECONDS = 60
 
 class ProvisionerCore(object):
     """Provisioner functionality that is not specific to the service.
@@ -342,8 +347,8 @@ class ProvisionerCore(object):
         yield self.query_contexts()
 
     @defer.inlineCallbacks
-    def query_one_site(self, site, nodes):
-        node_driver = self.node_drivers[site]
+    def query_one_site(self, site, nodes, driver=None):
+        node_driver = driver or self.node_drivers[site]
 
         logging.info('Querying site "%s"', site)
         nimboss_nodes = yield threads.deferToThread(node_driver.list_nodes)
@@ -360,17 +365,24 @@ class ProvisionerCore(object):
             if not nimboss_node:
                 # this state is unknown to underlying IaaS. What could have
                 # happened? IaaS error? Recovery from loss of net to IaaS?
+                
+                # Or lazily-updated records. On EC2, there can be a short
+                # window where pending instances are not included in query
+                # response
 
-                logging.warn('node %s: in data store but unknown to IaaS. '+
-                        'Marking as terminated.', node['node_id'])
+                if calc_record_age(node) <= _IAAS_NODE_QUERY_WINDOW_SECONDS:
+                    logging.debug('node %s: not in query of IaaS, but within '+
+                            'allowed startup window (%d seconds)',
+                            node['node_id'], _IAAS_NODE_QUERY_WINDOW_SECONDS)
+                else:
+                    logging.warn('node %s: in data store but unknown to IaaS. '+
+                            'Marking as terminated.', node['node_id'])
 
-                # we must mark it as terminated TODO should this be failed?
-                node['state'] = states.TERMINATED
-                #TODO should make state_desc more formal?
-                node['state_desc'] = 'node disappeared'
+                    node['state'] = states.FAILED
+                    node['state_desc'] = 'NODE_DISAPPEARED'
 
-                launch = yield self.store.get_launch(node['launch_id'])
-                yield self.store_and_notify([node], launch['subscribers'])
+                    launch = yield self.store.get_launch(node['launch_id'])
+                    yield self.store_and_notify([node], launch['subscribers'])
             else:
                 nimboss_state = _NIMBOSS_STATE_MAP[nimboss_node.state]
                 if nimboss_state > node['state']:
