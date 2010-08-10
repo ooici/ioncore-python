@@ -95,7 +95,7 @@ class Daemon:
         
     def delpid(self):
         os.remove(self.pidfile)
-        logging.debug("Deleted pid file: %s = %s" % (self.pidfile, str(pid)))
+        logging.debug("Deleted pid file")
 
 
     def start(self):

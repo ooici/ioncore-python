@@ -7,7 +7,7 @@
 ### This module requires pyasn1 and pysnmp
 
 
-import os,datetime,operator    
+import os,datetime    
 import logging
 
 try:
@@ -71,35 +71,12 @@ class HostReader:
             
         return ret
 
-
-
-
-    def pformat(self, subsystem):
-        """
-        Produces a dictionary for the specified subsystem.  Valid subsystems
-        may be a string ('all','base','network','storage','cpu','python','java') 
-        or a list of said strings.
-        """
-        ret = {}
- 
-        if (subsystem in ['base','all']):       
-            ret['base'] = self._getBase()
-        if (subsystem in ['network','all']):       
-            ret['network'] = self._getNetworkInterfaces()
-        if (subsystem in ['storage','all']):       
-            ret['storage'] = self._getStorage()
-        if (subsystem in ['cpu','all']):       
-            ret['cpu'] = self._getProcesses()
-        return SnmpReader.pformat(ret)    
-
     
     
     def _getBase(self):
         """
         Gets basic machine information.
         """
-        uname = os.uname()
-
         ret = {}
         ret['SupportsSNMP']      = self.reader.supportsSNMP()
         ret['SupportsRFC1213']   = self.reader.supportsRFC1213()
@@ -117,6 +94,9 @@ class HostReader:
         return ret
 
     def _getPython(self):
+
+        uname = os.uname()
+
         ret = {}
         ret['python_SystemName'] = uname[0]
         ret['python_NodeName']   = uname[1]
@@ -209,7 +189,7 @@ class HostReader:
         rows = self.reader.stitchTables([oid1,oid2], [fields1,fields2])
 
         return {
-            'source' : 'RFC2790MIB',
+            'source' : source,
             'cols' : cols,
             'rows' : rows
             }
