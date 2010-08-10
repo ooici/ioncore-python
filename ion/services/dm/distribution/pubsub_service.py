@@ -29,6 +29,8 @@ CONF = ioninit.config(__name__)
 
 from ion.services.dm.util import dap_tools 
 from pydap.model import DatasetType
+from ion.services.dm.distribution import base_consumer
+
 
 class DataPubsubService(BaseService):
     """
@@ -57,15 +59,13 @@ class DataPubsubService(BaseService):
         topic = dataobject.Resource.decode(content)
   
         if topic.RegistryIdentity:
-            pass # Just change the keywords in the registry - nothing to do!
+            yield self.update_topic_registration(topic)
         else:
             # it is a new topic and must be declared
-            topic = yield self.create_and_declare_topic(topic)
+            topic = yield self.create_and_register_topic(topic)
     
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic: \n' + str(topic))
-    
-        topic = yield self.reg.register(topic)
-        
+            
         #@todo call some process to update all the subscriptions? Or only on interval?
         
         if topic:
@@ -75,8 +75,14 @@ class DataPubsubService(BaseService):
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
 
+    #@defer.inlineCallback
+    def update_topic_registration(self,topic):
+        #topic = yield self.reg.register(topic)
+        return self.reg.register(topic)
+
+
     @defer.inlineCallbacks
-    def create_and_declare_topic(self,topic):
+    def create_and_register_topic(self,topic):
         """
         Create a messaging name and set the queue properties to create it.
         @TODO fix the hack - This should come from the exchange registry!
@@ -90,6 +96,8 @@ class DataPubsubService(BaseService):
         queue = yield self.create_queue()
 
         topic.queue = queue
+
+        topic = yield self.reg.register(topic)
 
         defer.returnValue(topic)
         
@@ -160,30 +168,52 @@ class DataPubsubService(BaseService):
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
 
+    """
+    Subscription Object:
+    Name - inherited    
+    # hack for now to allow naming one-three more topic descriptions
+    topic1 = TypedAttribute(PubSubTopicResource)
+    topic2 = TypedAttribute(PubSubTopicResource) 
+    topic3 = TypedAttribute(PubSubTopicResource)
+    
+    workflow = TypedAttribute(dict)
+    '''
+    <consumer name>:{'module':'path.to.module','cosumeclass':'<ConsumerClassName>',\
+        'attach':(<topicX>) or (<consumer name>, <consumer queue keyword>) or <list of consumers and topics>,\
+        'Process Parameters':{<conumser property keyword arg>: <property value>}}
+    '''
+    """
+
     @defer.inlineCallbacks        
-    def create_subscription(subscription):
+    def create_subscription(self,subscription):
         '''
         '''
     
-        """    
-        Name - inherited    
-        # hack for now to allow naming one-three more topic descriptions
-        topic1 = TypedAttribute(PubSubTopicResource)
-        topic2 = TypedAttribute(PubSubTopicResource) 
-        topic3 = TypedAttribute(PubSubTopicResource)
+        subscription = yield self.create_consumer_args(subscription)
+
+        consumer_args = subscription.consumer_args
         
-        workflow = TypedAttribute(dict)
-        '''
-        <consumer name>:{'module':'path.to.module','cosumeclass':'<ConsumerClassName>',\
-            'attach':(<topicX>) or (<consumer name>, <consumer queue keyword>) or <list of consumers and topics>,\
-            'Process Parameters':{<conumser property keyword arg>: <property value>},\
-        '''
+        for name, args in consumer_args.items():
+            child = base_consumer.ConsumerDesc(**args)        
+            child_id = yield self.spawn_child(child)
+            subscription.current_consumers.append(child_id)
     
-        #Used internally
-        current_topics = TypedAttribute(list) # List of Topic Resource References
-        current_procs = TypedAttribute(list) # Of what? - need a process registry
-        current_queues = TypedAttribute(dict) 
-        """
+    
+        subscription = yield self.reg.register(subscription)
+
+
+
+    @defer.inlineCallbacks        
+    def create_consumer_args(self,subscription):
+        '''
+        @Brief Turn the workflow argument into the arguments used to create a
+        new consumer. This includes spawning the queues needed to deliver the
+        product of one consumer to the attachment point of another!
+        @Note This is probably too complex - it should be refactored into seperate
+        methods where possible.
+        '''
+        
+        logging.info('Processing Subscription Workflow:'+str(subscription.workflow))
         
         #A for each topic1, topic2, topic3 get the list of queues
             
@@ -210,12 +240,13 @@ class DataPubsubService(BaseService):
         # 2) create ConsumerDesc for each consumer
         
         # create place holders for each consumers spawn args
+        subscription_queues=[]
         consumers = {}
         consumer_names =  subscription.workflow.keys()
         for consumer, args in subscription.workflow.items():
 
             spargs ={'attach':[],
-                     'process parameters':{},
+                     'process parameters':args.get('process parameters'),
                      'delivery queues':{}}
             
             cd = {}
@@ -226,12 +257,11 @@ class DataPubsubService(BaseService):
             
             consumers[consumer]=cd
         
+        #logging.info('CONSUMERS:' + str(consumers))
         
-        # for each consumer and it attachements and create delivery queues
+        # for each consumer and add its attachements and create delivery queues
         for consumer, args in subscription.workflow.items():
             
-            #params for this consumer
-            params = args.get('process parameters')
             # list of queues to attach to for this consumer
             attach = []
             
@@ -262,36 +292,46 @@ class DataPubsubService(BaseService):
                     topic_list = topics[name] # get the list of topics
                     # add each queue to the list of attach_to
                     for topic in topic_list:
+                        # Add it to the list for this consumer
                         attach.append(topic.queue.name)
-                        logging.logging('Consumer %s attaches to topic %s' % (consumer, topic.name))
+                        # Add it to the list for this subscription
+                        subscription_queues.append(topic.queue)
+                        logging.info('Consumer %s attaches to topic %s' % (consumer, topic.name))
                     
                 # See if it is consuming another resultant
                 elif name in consumer_names: # Could fail badly!
-                    
-                    logging.logging('Consumer %s attaches to queue for producer/keyword: %s/%s' % (consumer, name, keyword))
-                    
+                                        
                     # Does this producer already have a queue?
                     # This is not 'safe' - lots of ways to get a key error!
                     q = consumers[name]['spawnargs']['delivery queues'].get(keyword,None)
                     if q:
                         attach.append(q)
-                        logging.logging('Consumer %s attaches to existing queue for producer/keyword: %s/%s' % (consumer, name, keyword))
+                        logging.info('Consumer %s attaches to existing queue for producer/keyword: %s/%s' % (consumer, name, keyword))
                     else: 
                         # Create the queue!
                         #@TODO - replace with call to exchange registry service
                         queue = yield self.create_queue()
+                        # Add it to the list for this consumer
                         attach.append(queue.name)
+                        # Add it to the list for this subscription
+                        subscription_queues.append(queue)
                         
                         # Add to the delivery list for the producer...
                         consumers[name]['spawnargs']['delivery queues'][keyword]=queue.name
-                        logging.logging('Consumer %s attaches to new queue for producer/keyword: %s/%s' % (consumer, name, keyword))
+                        logging.info('Consumer %s attaches to new queue for producer/keyword: %s/%s' % (consumer, name, keyword))
                 else:
                     raise RuntimeError('Can not determine how to attach consumer %s \
                                        to topic/consumer %s' % (consumer, item))
                     
-                consumers[consumer]['spawnargs']['attach'].append(attach)
-                consumers[consumer]['spawnargs']['process parameters']=params
+            consumers[consumer]['spawnargs']['attach'].extend(attach)        
         
+        logging.info('CONSUMERS:' + str(consumers))
+        
+        subscription.queues = subscription_queues
+        subscription.consumer_args = consumers
+        
+        defer.returnValue(subscription)
+
         # 3) spawn consumers
         
         #C add the queues, ConsumerDesc's and topics to the subscription definition
@@ -305,7 +345,7 @@ class DataPubsubService(BaseService):
         '''
         # Determine the difference between the current and existing subscription
         
-        # act accordingly ????
+        # act accordingly - but very difficult to figure out what to do!
         pass   
         
         
@@ -368,12 +408,18 @@ class DataPubsubService(BaseService):
         logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
         yield self.reply_ok(msg, '')
         
-    
-    def find_topic(self, content, headers, msg):
+    #@defer.inlineCallbacks
+    def find_topics(self, topic_description):
         """Service operation: For a given resource, find the topic that contains
-        updates to the resource or resource description. Might involve creation
-        of this topic if this topic does not yet exist
+        updates to the resource or resource description.
+        @Notes - should this create a topic if none yet exist?
         """
+        
+        #Note - AOI does not do anything yet and keyword needs to be improved...
+        #topic_list = yield self.reg.find(topic_description,regex=True, attnames=['name','keywords','aoi'])
+        return self.reg.find(topic_description,regex=True, attnames=['name','keywords','aoi'])
+        
+        
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(DataPubsubService)

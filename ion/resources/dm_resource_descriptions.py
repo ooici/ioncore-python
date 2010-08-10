@@ -139,10 +139,10 @@ class SubscriptionResource(StatefulResource):
     '''
 
     #Used internally
-    current_topics = TypedAttribute(list) # List of Topic Resource References
-    current_procs = TypedAttribute(list) # Of what? - need a process registry
-    current_queues = TypedAttribute(dict) 
-    
+    #current_topics = TypedAttribute(list) # List of Topic Resource References
+    consumer_procids = TypedAttribute(dict) # list of child consumer ids - need a process registry
+    queues = TypedAttribute(list) # list of queue objects
+    consumer_args = TypedAttribute(dict)
 """
 DM DataSet Resource Descriptions
 Preliminary!

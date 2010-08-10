@@ -7,7 +7,9 @@
 @author David Stuebe
 @brief Simple consumer to forward messages. This is not the correct way to
 distribute messages between queues, but it is expediante to have such a method
-for demonstration purposes.
+for demonstration purposes. This is not currently an accessible pattern from the
+pubsub subscription service - a delivery queue argument can have at most one
+queue due to the way consumers are created from a work flow.
 """
 
 from ion.services.dm.distribution import base_consumer
