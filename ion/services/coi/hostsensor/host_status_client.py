@@ -5,6 +5,6 @@
 """
 
 from twisted.web import xmlrpc
-s = xmlrpc.Proxy('http://localhost:9010')
-r = s.callRemote("getStatusString")
-print r
+#s = xmlrpc.Proxy('http://localhost:9010')
+#r = s.callRemote("getStatusString")
+#print r
