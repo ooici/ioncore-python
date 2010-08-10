@@ -349,6 +349,7 @@ class PubSubTest(IonTestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         
+        logging.info('Tearing Down PubSub Test')
         # Clear the registry on the way out!
         child_id = yield self.sup.get_child_id('pubsub_service')
         logging.debug('PubSub Test Service ID:' + str(child_id))
@@ -356,8 +357,13 @@ class PubSubTest(IonTestCase):
         pubsub = self._get_procinstance(child_id)
         pubsub.reg.clear_registry()
         
+        yield pu.asleep(1)
         
         yield self._stop_container()
+
+    def test_setup_teardown(self):
+        pass
+
 
     @defer.inlineCallbacks
     def test_pubsub(self):
@@ -393,7 +399,7 @@ class PubSubTest(IonTestCase):
                  'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
                  'procclass':'ForwardingConsumer',
                  'spawnargs':{'attach':topic.queue.name,\
-                              'Process Parameters':{},\
+                              'process parameters':{},\
                               'delivery queues':{'queues':[queue1,queue2]}}\
                     }
         child1 = base_consumer.ConsumerDesc(**pd1)
@@ -427,7 +433,9 @@ class PubSubTest(IonTestCase):
         pd2={'name':'example_consumer_2',
                  'module':'ion.services.dm.distribution.consumers.logging_consumer',
                  'procclass':'LoggingConsumer',
-                 'spawnargs':{'attach':queue1}\
+                 'spawnargs':{'attach':queue1,\
+                              'process parameters':{},\
+                              'delivery queues':{}}\
                     }
         child2 = base_consumer.ConsumerDesc(**pd2)
 
@@ -442,12 +450,13 @@ class PubSubTest(IonTestCase):
         yield pu.asleep(1)
 
         msg_cnt = yield child1.get_msg_count()
+
         received = msg_cnt.get('received',{})
         sent = msg_cnt.get('sent',{})
         self.assertEqual(sent.get(queue1),2)
         self.assertEqual(sent.get(queue2),2)
         self.assertEqual(received.get(topic.queue.name),2)
-
+        
         msg_cnt = yield child2.get_msg_count()
         received = msg_cnt.get('received',{})
         sent = msg_cnt.get('sent',{})

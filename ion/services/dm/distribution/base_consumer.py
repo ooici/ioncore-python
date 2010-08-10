@@ -207,9 +207,8 @@ class BaseConsumer(BaseProcess):
         Message interface to get the message count
         '''
         logging.info(self.__class__.__name__ +'; Calling Get Msg Count;')
-        
+                
         yield self.reply_ok(msg,{'received':self.receive_cnt,'sent':self.send_cnt})
-        
 
     @defer.inlineCallbacks
     def op_data(self, content, headers, msg):
