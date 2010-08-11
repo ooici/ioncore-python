@@ -434,11 +434,17 @@ class ProvisionerCore(object):
             for ctx_node in context_status.nodes:
                 for id in ctx_node.identities:
                     ip_nodes = by_ip.get(id.ip)
+                    if not ip_nodes:
+                        # this isn't necessarily an exceptional condition. could be a private
+                        # IP for example. Right now we are only matching against public
+                        logging.debug('Context info for node has unknown IP (%s)', id.ip)
+                        continue
+
                     if len(ip_nodes) > 1:
                         logging.warn('Found multiple nodes with the same IP address (%s)',
                                 id.ip)
 
-                    if ip_nodes and _update_node_from_ctx(ip_nodes[0], ctx_node, id):
+                    if _update_node_from_ctx(ip_nodes[0], ctx_node, id):
                         updated_nodes.append(ip_nodes[0])
                         break
 
