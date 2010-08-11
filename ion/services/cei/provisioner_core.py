@@ -549,6 +549,7 @@ def _update_one_node_from_ctx(node, ctx_node, identity):
     node_done = ctx_node.ok_occurred or ctx_node.error_occurred
     if not node_done or node['state'] >= states.RUNNING:
         logging.debug("No update, ctx node: iaas_id '%s', state '%s', ok? '%s', err? '%s'" % (node['iaas_id'], node['state'], ctx_node.ok_occurred, ctx_node.error_occurred))
+        logging.debug('bail '+node['state'])
         return False
     if ctx_node.ok_occurred:
         node['state'] = states.RUNNING
