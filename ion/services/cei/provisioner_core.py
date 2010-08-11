@@ -428,14 +428,20 @@ class ProvisionerCore(object):
             context_status = yield self.context.query(ctx_uri)
             nodes = yield self.store.get_launch_nodes(launch_id)
             by_ip = group_records(nodes, 'public_ip')
+            
             #TODO this matching could probably be more robust
             updated_nodes = []
             for ctx_node in context_status.nodes:
                 for id in ctx_node.identities:
-                    node = by_ip.get(id.ip)
-                    if node and _update_node_from_ctx(node, ctx_node, id):
-                        updated_nodes.append(node)
+                    ip_nodes = by_ip.get(id.ip)
+                    if len(ip_nodes) > 1:
+                        logging.warn('Found multiple nodes with the same IP address (%s)',
+                                id.ip)
+
+                    if ip_nodes and _update_node_from_ctx(ip_nodes[0], ctx_node, id):
+                        updated_nodes.append(ip_nodes[0])
                         break
+
             if updated_nodes:
                 logging.debug("%d nodes need to be updated as a result of the context query" % len(updated_nodes))
                 yield self.store_and_notify(updated_nodes, launch['subscribers'])
@@ -514,7 +520,7 @@ class ProvisionerCore(object):
                 public_ip=None, private_ip=None, 
                 driver=self.node_drivers[node['site']])
 
-def _update_node_from_ctx(self, node, ctx_node, identity):
+def _update_node_from_ctx(node, ctx_node, identity):
     node_done = ctx_node.ok_occurred or ctx_node.error_occurred
     if not node_done or node['state'] >= states.RUNNING:
         return False
