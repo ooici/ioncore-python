@@ -50,7 +50,9 @@ class InstrumentRegistryService(registry.BaseRegistryService):
     Service operation: Get a instrument instance.
     """
 
-    op_get_instrument_type = registry.BaseRegistryService.base_get_resource
+    op_get_instrument_by_id = registry.BaseRegistryService.base_get_resource_by_id
+
+    op_get_instrument_type = registry.BaseRegistryService.base_get_resource #changed
     """
     Service operation: Get a instrument type.
     """
@@ -101,8 +103,11 @@ class InstrumentRegistryClient(registry.BaseRegistryClient, registry.LCStateMixi
         """
         Get a resource instance
         """
-        return self.base_get_resource('get_instrument_instance', resource_reference)
+        return self.base_get_resource('get_instrument_instance',resource_reference)
 
+    def get_instrument_by_id(self, id):
+        return self.base_get_resource_by_id('get_instrument_by_id', id)
+        
     #def set_resource_lcstate(self, resource_reference, lcstate):
     #    return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_instrument_lcstate')
 

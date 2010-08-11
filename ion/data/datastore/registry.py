@@ -156,6 +156,14 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         defer.returnValue(resource)
 
     @defer.inlineCallbacks
+    def get_resource_by_id(self, id):
+        resource_client = yield self.clone(id)
+        resource = yield resource_client.checkout()
+        resource.RegistryCommit = resource_client.cur_commit
+        resource.RegistryBranch = 'master'
+        defer.returnValue(resource)
+
+    @defer.inlineCallbacks
     def set_resource_lcstate(self, resource_reference, lcstate):
         """
         Service operation: set the life cycle state of resource
@@ -202,6 +210,8 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         results=[]
         if isinstance(description,dataobject.DataObject):
             refs = yield self._list()
+            logging.info('!!!!!!!!!@@@@@@@@!!!!')
+            logging.info(description)
 
             # Get the list of descriptions in this registry
             
@@ -209,6 +219,7 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
 
             for ref in refs:
                 res = yield self.get_resource(ref)
+                logging.info(res)
                 
                 if description.compared_to(res,
                                         regex=regex,
@@ -283,14 +294,21 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Register a resource instance with the registry.
         """
-        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
-        resource = dataobject.Resource.decode(content)
+        logging.debug('Registry Service MSG:'+ str(headers))
+        #resource = dataobject.Resource.decode(content)
+        accept_encoding = headers.get('accept-encoding', '')
+        resource = dataobject.serializer.decode(content, headers['encoding'])
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Resource: \n' + str(resource))
   
         resource = yield self.reg.register_resource(resource)
+        logging.debug('%%%%%%%%%%%%')
+        logging.debug(resource)
         if resource:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
-            yield self.reply_ok(msg, resource.encode())
+            #yield self.reply_ok(msg, resource.encode())
+            encoding, _, data = dataobject.serializer.encode(resource, accept_encoding)
+            headers = dict(encoding=encoding)
+            yield self.reply_ok(msg, data, headers)
         else:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
@@ -301,29 +319,51 @@ class BaseRegistryService(BaseService):
         """
         Service operation: Get a resource instance.
         """
-        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
-        resource_reference = dataobject.Resource.decode(content)
+        logging.debug('Registry Service MSG:'+ str(headers))
+        #resource_reference = dataobject.Resource.decode(content)
+        accept_encoding = headers.get('accept-encoding', '')
+        resource_reference = dataobject.serializer.decode(content, headers['encoding'])
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
 
         resource = yield self.reg.get_resource(resource_reference)
         #logging.info('Got Resource:\n'+str(resource))
         if resource:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
-            yield self.reply_ok(msg, resource.encode())
+            #yield self.reply_ok(msg, resource.encode())
+            encoding, _, data = dataobject.serializer.encode(resource, accept_encoding)
+            headers = dict(encoding=encoding)
+            yield self.reply_ok(msg, data, headers)
         else:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
 
+    @defer.inlineCallbacks
+    def base_get_resource_by_id(self, content, headers, msg):
+        accept_encoding = headers.get('accept-encoding', '')
+        resource = yield self.reg.get_resource_by_id(content)
+        if resource:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
+            #yield self.reply_ok(msg, resource.encode())
+            encoding, _, data = dataobject.serializer.encode(resource, accept_encoding)
+            headers = dict(encoding=encoding)
+            yield self.reply_ok(msg, data, headers)
+        else:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
+            yield self.reply_err(msg, None)
         
     @defer.inlineCallbacks
     def base_set_resource_lcstate(self, content, headers, msg):
         """
         Service operation: set the life cycle state of resource
         """
-        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
-        container = dataobject.Resource.decode(content)
+        logging.debug('Registry Service MSG:'+ str(headers))
+        #container = dataobject.Resource.decode(content)
+        accept_encoding = headers.get('accept-encoding', '')
+        container = dataobject.serializer.decode(content, headers['encoding'])
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
 
+        #This makes things difficult; shouldn't use python class resolution
+        #to determine DataObject stuff
         if isinstance(container,  coi_resource_descriptions.SetResourceLCStateContainer):
             resource_reference = container.reference
             lcstate = container.lcstate
@@ -332,7 +372,10 @@ class BaseRegistryService(BaseService):
         
             if resource:
                 logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
-                yield self.reply_ok(msg, resource.reference().encode())
+                encoding, _, data = dataobject.serializer.encode(resource.reference(), accept_encoding)
+                headers = dict(encoding=encoding)
+                #yield self.reply_ok(msg, resource.reference().encode())
+                yield self.reply_ok(msg, data, headers)
 
         else:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
@@ -349,12 +392,18 @@ class BaseRegistryService(BaseService):
         ignore_defaults = None
         attnames=[]
                 
-        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
-        container = dataobject.Resource.decode(content)
+        logging.debug('Registry Service MSG:'+ str(headers))
+        #container = dataobject.Resource.decode(content)
+        #This container object is expected to have certain functionality
+        accept_encoding = headers.get('accept-encoding', '')
+        container = dataobject.serializer.decode(content, headers['encoding'])
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
 
         result_list = []
-        if isinstance(container,  coi_resource_descriptions.FindResourceContainer):
+        #This makes things difficult; shouldn't use python class resolution
+        #to determine DataObject stuff
+        #if isinstance(container,  coi_resource_descriptions.FindResourceContainer):
+        if type(container).__name__ == coi_resource_descriptions.FindResourceContainer.__name__:
             description = container.description
             regex = container.regex
             ignore_defaults = container.ignore_defaults
@@ -366,7 +415,9 @@ class BaseRegistryService(BaseService):
         results.resources = result_list
 
         logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
-        yield self.reply_ok(msg, results.encode())
+        encoding, _, data = dataobject.serializer.encode(results, accept_encoding)
+        headers = dict(encoding=encoding)
+        yield self.reply_ok(msg, data, headers)
 
 
 class RegistryService(BaseRegistryService):
@@ -379,6 +430,7 @@ class RegistryService(BaseRegistryService):
     op_clear_registry = BaseRegistryService.base_clear_registry
     op_register_resource = BaseRegistryService.base_register_resource
     op_get_resource = BaseRegistryService.base_get_resource
+    op_get_resource_by_id = BaseRegistryService.base_get_resource_by_id
     op_set_resource_lcstate = BaseRegistryService.base_set_resource_lcstate
     op_find_resource = BaseRegistryService.base_find_resource
 
@@ -421,13 +473,15 @@ class BaseRegistryClient(BaseServiceClient):
         assert isinstance(resource, dataobject.Resource), 'Invalid argument to base_register_resource'
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
 
-        (content, headers, msg) = yield self.rpc_send(op_name,
-                                            resource.encode())
+        encoding, _, data = dataobject.serializer.encode(resource)
+        headers = {'encoding':encoding, 'accept-encoding':encoding}
+        (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
         
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
         
         if content['status']=='OK':
-            resource = dataobject.Resource.decode(content['value'])
+            #resource = dataobject.Resource.decode(content['value'])
+            resource = dataobject.serializer.decode(content['value'], headers['encoding'])
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
             defer.returnValue(resource)
         else:
@@ -448,13 +502,33 @@ class BaseRegistryClient(BaseServiceClient):
         assert isinstance(resource_reference, dataobject.ResourceReference), 'Invalid argument to base_register_resource'
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
         
-        (content, headers, msg) = yield self.rpc_send(op_name,
-                                                      resource_reference.encode())
+        encoding, _, data = dataobject.serializer.encode(resource_reference)
+        headers = {'encoding':encoding, 'accept-encoding':encoding}
+        (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
         
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
         if content['status']=='OK':
-            resource = dataobject.Resource.decode(content['value'])
+            #resource = dataobject.Resource.decode(content['value'])
+            resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+            defer.returnValue(resource)
+        else:
+            logging.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
+            defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def base_get_resource_by_id(self, op_name, id):
+        yield self._check_init()
+        logging.info(self.__class__.__name__ + '; Calling:'+ op_name)
+        encoding = dataobject.serializer._default_content_type
+        headers = {'encoding':encoding, 'accept-encoding':encoding}
+        (content, headers, msg) = yield self.rpc_send(op_name, id, headers)
+        logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
+
+        if content['status']=='OK':
+            #resource = dataobject.Resource.decode(content['value'])
+            resource = dataobject.serializer.decode(content['value'], headers['encoding'])
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
             defer.returnValue(resource)
         else:
@@ -484,13 +558,15 @@ class BaseRegistryClient(BaseServiceClient):
         container.lcstate = lcstate
         container.reference = resource_reference
 
-        (content, headers, msg) = yield self.rpc_send(op_name,
-                                                      container.encode())
+        encoding, _, data = dataobject.serializer.encode(container)
+        headers = {'encoding':encoding, 'accept-encoding':encoding}
+        (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
 
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
         
         if content['status'] == 'OK':
-            resource_reference = dataobject.ResourceReference.decode(content['value'])
+            #resource_reference = dataobject.ResourceReference.decode(content['value'])
+            resource_reference = dataobject.serializer.decode(content['value'], headers['encoding'])
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
             defer.returnValue(resource_reference)
         else:
@@ -527,15 +603,18 @@ class BaseRegistryClient(BaseServiceClient):
         container.regex = regex
         container.attnames = attnames
         
-        (content, headers, msg) = yield self.rpc_send(op_name,container.encode())
+        encoding, _, data = dataobject.serializer.encode(container)
+        headers = {'encoding':encoding, 'accept-encoding':encoding}
+        content, headers, msg = yield self.rpc_send(op_name, data, headers)
 
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
         
         # Return a list of resources
         if content['status'] == 'OK':            
-            results = dataobject.DataObject.decode(content['value'])
+            #results = dataobject.DataObject.decode(content['value'])
+            results = dataobject.serializer.decode(content['value'], headers['encoding'])
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(results.resources) # Returns a list of resources
+            defer.returnValue(results.resources)
         else:
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
             defer.returnValue([])
@@ -568,4 +647,5 @@ class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
     def find_resource(self, description,regex=True,ignore_defaults=True, attnames=[]):
         return self.base_find_resource('find_resource',description,regex,ignore_defaults,attnames)
 
-
+    def get_resource_by_id(self, id):
+        return self.base_get_resource_by_id('get_resource_by_id', id)
