@@ -389,6 +389,16 @@ class ProvisionerCore(object):
                 if nimboss_state > node['state']:
                     #TODO nimboss could go backwards in state.
                     node['state'] = nimboss_state
+                    
+                    public_ip = nimboss_node.public_ip
+                    if isinstance(public_ip, list):
+                        public_ip = public_ip[0]
+                    private_ip = nimboss_node.private_ip
+                    if isinstance(private_ip, list):
+                        private_ip = private_ip[0]
+                    node['public_ip'] = public_ip
+                    node['private_ip'] = private_ip
+                    
                     launch = yield self.store.get_launch(node['launch_id'])
                     yield self.store_and_notify([node], launch['subscribers'])
         #TODO nimboss_nodes now contains any other running instances that
