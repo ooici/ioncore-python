@@ -424,33 +424,20 @@ class ProvisionerCore(object):
                 continue
             
             ctx_uri = context['uri']
-            logging.debug('Querying context ' + ctx_uri)
+            logging.debug('Querying context %s for launch %s ', ctx_uri, launch_id)
             context_status = yield self.context.query(ctx_uri)
-            nodes = yield self.store.get_launch_nodes(launch_id)
-            logging.debug("Launch nodes: %s" % nodes)
-            by_ip = group_records(nodes, 'public_ip')
             
-            #TODO this matching could probably be more robust
-            updated_nodes = []
-            for ctx_node in context_status.nodes:
-                for id in ctx_node.identities:
-                    ip_nodes = by_ip.get(id.ip)
-                    if not ip_nodes:
-                        # this isn't necessarily an exceptional condition. could be a private
-                        # IP for example. Right now we are only matching against public
-                        logging.debug('Context info for node has unknown IP (%s)', id.ip)
-                        continue
+            ctx_nodes = context_status.nodes
+            if not ctx_nodes:
+                logging.debug('Launch %s context has no nodes (yet)', launch_id)
+                continue
 
-                    if len(ip_nodes) > 1:
-                        logging.warn('Found multiple nodes with the same IP address (%s)',
-                                id.ip)
-
-                    if _update_node_from_ctx(ip_nodes[0], ctx_node, id):
-                        updated_nodes.append(ip_nodes[0])
-                        break
+            nodes = yield self.store.get_launch_nodes(launch_id)
+            updated_nodes = update_nodes_from_context(nodes, ctx_nodes)
 
             if updated_nodes:
-                logging.debug("%d nodes need to be updated as a result of the context query" % len(updated_nodes))
+                logging.debug("%d nodes need to be updated as a result of the context query" % 
+                        len(updated_nodes))
                 yield self.store_and_notify(updated_nodes, launch['subscribers'])
             
             if context_status.complete:
@@ -527,9 +514,41 @@ class ProvisionerCore(object):
                 public_ip=None, private_ip=None, 
                 driver=self.node_drivers[node['site']])
 
-def _update_node_from_ctx(node, ctx_node, identity):
+def update_nodes_from_context(nodes, ctx_nodes):
+    updated_nodes = []
+    for ctx_node in ctx_nodes:
+        for ident in ctx_node.identities:
+
+            match_reason = None
+            match_node = None
+            for node in nodes:
+                if ident.ip and ident.ip == node['public_ip']:
+                    match_node = node
+                    match_reason = 'public IP match'
+                    break
+                elif ident.hostname and ident.hostname == node['public_ip']:
+                    match_node = node
+                    match_reason = 'nimboss IP matches ctx hostname'
+                # can add more matches if needed
+
+            if match_node:
+                logging.debug('Matched ctx identity to node by: ' + match_reason)
+                
+                if _update_one_node_from_ctx(match_node, ctx_node, ident):
+                    updated_nodes.append(match_node)
+                    break
+
+            else:
+                # this isn't necessarily an exceptional condition. could be a private
+                # IP for example. Right now we are only matching against public
+                logging.debug('Context identity has unknown IP (%s) and hostname (%s)', 
+                        ident.ip, ident.hostname)
+    return updated_nodes
+
+def _update_one_node_from_ctx(node, ctx_node, identity):
     node_done = ctx_node.ok_occurred or ctx_node.error_occurred
     if not node_done or node['state'] >= states.RUNNING:
+        logging.debug('bail '+node['state'])
         return False
     if ctx_node.ok_occurred:
         node['state'] = states.RUNNING

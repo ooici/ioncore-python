@@ -7,7 +7,7 @@ import time
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
-from ion.services.cei.provisioner_core import ProvisionerCore
+from ion.services.cei.provisioner_core import ProvisionerCore, update_nodes_from_context
 from ion.services.cei.provisioner_store import ProvisionerStore
 from ion.services.cei import states
 from ion.services.cei.test.test_provisioner import FakeProvisionerNotifier
@@ -56,17 +56,14 @@ class ProvisionerCoreTests(IonTestCase):
     @defer.inlineCallbacks
     def test_query_ctx(self):
         launch_id = _new_id()
-        launch_record = {
-                'launch_id' : launch_id, 
-                'state' : states.PENDING, 'subscribers' : 'fake-subscribers',
-                'context' : {'uri' : 'http://fakey.com'}}
-        node_records = [{'launch_id' : launch_id, 'node_id' : _new_id(),
-            'state' : states.STARTED, 'public_ip' : _new_id()} for i in range(3)]
+        launch_record = _one_fake_launch_record(launch_id, states.PENDING)
+        node_records = [_one_fake_node_record(launch_id, states.STARTED) 
+                for i in range(3)]
 
         yield self.store.put_record(launch_record)
         yield self.store.put_records(node_records)
 
-        self.ctx.nodes = [_one_fake_ctx_node_ok(node['public_ip'], _new_id()) 
+        self.ctx.nodes = [_one_fake_ctx_node_ok(node['public_ip'], _new_id(),  _new_id()) 
                 for node in node_records]
         self.ctx.expected_count = len(node_records)
         self.complete = True
@@ -76,8 +73,36 @@ class ProvisionerCoreTests(IonTestCase):
 
         self.assertTrue(self.notifier.assure_state(states.RUNNING))
 
-def _one_fake_ctx_node_ok(ip, pubkey):
-    identity = Mock(ip=ip, pubkey=pubkey)
+    def test_update_nodes_from_ctx(self):
+        launch_id = _new_id()
+        nodes = [_one_fake_node_record(launch_id, states.STARTED)
+                for i in range(5)]
+        ctx_nodes = [_one_fake_ctx_node_ok(node['public_ip'], _new_id(), 
+            _new_id()) for node in nodes]
+
+        self.assertEquals(len(nodes), len(update_nodes_from_context(nodes, ctx_nodes)))
+        
+    def test_update_nodes_from_ctx_with_hostname(self):
+        launch_id = _new_id()
+        nodes = [_one_fake_node_record(launch_id, states.STARTED)
+                for i in range(5)]
+        #libcloud puts the hostname in the public_ip field
+        ctx_nodes = [_one_fake_ctx_node_ok(ip=_new_id(), hostname=node['public_ip'],
+            pubkey=_new_id()) for node in nodes]
+
+        self.assertEquals(len(nodes), len(update_nodes_from_context(nodes, ctx_nodes)))
+
+def _one_fake_launch_record(launch_id, state):
+    return {'launch_id' : launch_id, 
+            'state' : state, 'subscribers' : 'fake-subscribers',
+            'context' : {'uri' : 'http://fakey.com'}}
+
+def _one_fake_node_record(launch_id, state):
+    return {'launch_id' : launch_id, 'node_id' : _new_id(),
+            'state' : state, 'public_ip' : _new_id()}
+
+def _one_fake_ctx_node_ok(ip, hostname, pubkey):
+    identity = Mock(ip=ip, hostname=hostname, pubkey=pubkey)
     return Mock(ok_occurred=True, error_occurred=False, identities=[identity])
 
 class FakeContextClient(object):
