@@ -146,10 +146,12 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         
         #@Note need to improve inspection of agent!
         for attr in inspect.classify_class_attrs(agent_class):
-            if attr.kind == 'method' and 'op_' in attr.name :
+            #if attr.kind == 'method' and 'op_' in attr.name :
+            if attr[1] == 'method' and 'op_' in attr[0] :
             
                 opdesc = coi_resource_descriptions.AgentMethodInterface()
-                opdesc.name = attr.name
+                #opdesc.name = attr.name
+                opdesc.name = attr[0]
                 #print 'INSEPCT',inspect.getdoc(attr.object)
                 #opdesc.description = inspect.getdoc(attr.object)
                 #Can't seem to get the arguments in any meaningful way...
