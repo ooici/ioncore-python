@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/dataset_registry.py
+@file ion/services/dm/inventory/dataset_registry.py
 @author Michael Meisinger
+@author David Stuebe
 @brief service for registering datasets
 """
 
@@ -27,7 +28,8 @@ from ion.resources import coi_resource_descriptions
 CONF = ioninit.config(__name__)
 
 class DatasetRegistryService(registry.BaseRegistryService):
-    """Dataset registry service interface
+    """
+    @Brief Dataset registry service interface
     """
  
      # Declaration of service

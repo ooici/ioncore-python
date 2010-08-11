@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/service_registry.py
+@file ion/services/coi/agent_registry.py
 @author Michael Meisinger
+@author David Stuebe
 @brief service for registering agent (types and instances).
 """
 
@@ -145,16 +146,18 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         
         #@Note need to improve inspection of agent!
         for attr in inspect.classify_class_attrs(agent_class):
-            if attr.kind == 'method' and 'op_' in attr.name :
+            #if attr.kind == 'method' and 'op_' in attr.name :
+            if attr[1] == 'method' and 'op_' in attr[0] :
             
                 opdesc = coi_resource_descriptions.AgentMethodInterface()
-                opdesc.name = attr.name
+                #opdesc.name = attr.name
+                opdesc.name = attr[0]
                 #print 'INSEPCT',inspect.getdoc(attr.object)
                 #opdesc.description = inspect.getdoc(attr.object)
                 #Can't seem to get the arguments in any meaningful way...
                 #opdesc.arguments = inspect.getargspec(attr.object)
                 
-                agent_description.interface.append(opdesc)    
+                agent_description.interface.append(opdesc)
         return agent_description
 
     def get_agent_definition(self, agent_description_reference):
@@ -164,17 +167,25 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         return self.base_get_resource('get_agent_definition', agent_description_reference)
 
     @defer.inlineCallbacks
-    def register_agent_instance(self,agent):
+    def register_agent_instance(self, agent, descriptor=None):
         """
         Client method to register a Agent Instance
+        @param agent takes in the agent to create a class and register a new instrument
+        @param descriptor The empty, partial or full storage area for additial,
+            subclass-specific values.
         """
+        assert((descriptor == None) or
+               (isinstance(descriptor,
+                           coi_resource_descriptions.AgentInstance)))
+        
         if isinstance(agent, coi_resource_descriptions.AgentInstance):
             agent_resource = agent
             assert agent_resource.RegistryIdentity, 'Agent Resource must have a registry Identity'            
+            
         else:
             agent_instance = agent
             # Build a new description of this agent instance
-            agent_resource = yield self.describe_instance(agent_instance)
+            agent_resource = yield self.describe_instance(agent_instance, descriptor)
     
             found_sir = yield self.find_registered_agent_instance_from_description(agent_resource)
             if found_sir:
@@ -188,13 +199,25 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         defer.returnValue(agent_resource)
 
     @defer.inlineCallbacks
-    def describe_instance(self,agent_instance):
+    def describe_instance(self, agent_instance, descriptor=None):
         """
+        From an instance of an agent, generate a simple description object
         @param agent_instance should be of type ResourceAgent
+        @param descriptor The instance resource description that will have
+            its core values from the AgentInstance parent class filled out.
+            For example, this will be an instantiated object of type
+            ion.resources.ipaa_resource_descriptions.InstrumentAgentResourceInstance
         """
+        assert((descriptor == None) or
+               (isinstance(descriptor,
+                           coi_resource_descriptions.AgentInstance)))
+        
         # Do not make a new resource idenity - this is a generic method which
         # is also used to look for an existing description
-        agent_resource = coi_resource_descriptions.AgentInstance()
+        if (descriptor == None):
+            agent_resource = coi_resource_descriptions.AgentInstance()    
+        else:
+            agent_resource = descriptor
         
         agent_class = agent_instance.__class__
         

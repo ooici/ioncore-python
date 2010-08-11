@@ -73,6 +73,7 @@ class ResourceAgent(BaseProcess):
         if (self.reg_client == None):
             yield self.reply_err(msg,
                                  "No agent registry client has been set!")
+            return
         if (self.resource_ref != None):
             result = \
                 yield self.reg_client.get_agent_instance(self.resource_ref)
@@ -92,6 +93,7 @@ class ResourceAgent(BaseProcess):
         if (self.reg_client == None):
             yield self.reply_err(msg,
                                  "No agent registry client has been set!")
+            return
         assert(isinstance(content, basestring))
         state = str(content)
         assert(state in LCStateNames)
@@ -102,10 +104,12 @@ class ResourceAgent(BaseProcess):
             self.resource_ref = result.reference(head=True)
             if (result):
                 yield self.reply_ok(msg, str(state))
+                return
             else:
                 yield self.reply_err(msg, \
                     "Could not set lifecycle state for %s" \
-                        % self.resource_ref.name) 
+                        % self.resource_ref.name)
+                return
         else:
             yield self.reply_err(msg, \
               "Could not set lifecycle state. Resource %s does not exist." \
@@ -115,18 +119,50 @@ class ResourceAgent(BaseProcess):
     def op_register_resource(self, content, headers, msg):
         """
         Registers or re-registers self in the agent registry.
-        @param content Must include an encoded ResourceInstance class that may
-            or may not have been previously created. The instance class
+        @param content Must include an encoded AgentInstance subclass that may
+            or may not have been previously filled out. The instance class
             should be appropriate to the type of resource being registered.
             Perhaps the client is checking the type?
         @todo Turn initial parameter asserts into a decode check
+        @note Registering an existing InstrumentAgent with an existing registry
+        @msc
+       	hscale = "2";
+	 User, InstrumentAgentClient, InstrumentAgentResourceInstance, InstrumentAgent, ResourceAgent, ResourceAgentClient, AgentRegistryClient, AgentRegistry;
+         User -> InstrumentAgent [label="instantiate and spawn IA subclass"];
+         User -> InstrumentAgentClient[label="instantiate IAClient subclass"];
+         User => InstrumentAgentClient [label="set_registry_client()"];
+         AgentRegistryClient -> InstrumentAgent [label="reference stored in IA"];
+         --- [label="All setup now, registry must already have a client on hand"];
+         User => InstrumentAgentClient [label="register_resource()"];
+         InstrumentAgentClient -> InstrumentAgentResourceInstance [label="instantiate"];
+         InstrumentAgentClient -> InstrumentAgentResourceInstance [label="get driver address"];
+         InstrumentAgentClient <- InstrumentAgentResourceInstance [label="driver address"];
+         InstrumentAgentClient => InstrumentAgentClient [label="ResourceAgentClient.register_resource()"];
+         InstrumentAgentClient =>> InstrumentAgent [label="op_register_resource() via AMQP"];
+         InstrumentAgent => AgentRegistryClient [label="register_agent_instance(self, custom_descriptor)"];
+         AgentRegistryClient => AgentRegistryClient [label="describe_instance(agent_instance, custom_descriptor)"];
+         AgentRegistryClient << AgentRegistryClient [label="return AgentDescription"];
+         AgentRegistryClient => AgentRegistryClient [label="find_registered_agent_instance_from_description(above)"];
+         AgentRegistryClient =>> AgentRegistry [label="register_resource() via base class AMQP"];
+         AgentRegistryClient <<= AgentRegistry [label="return via AMQP"];
+         InstrumentAgent << AgentRegistryClient [label="Success/failure"];
+         InstrumentAgentClient <<= ResourceAgent [label="Success/failure via InstrumentAgent via AMQP"]; 
+         User << InstrumentAgentClient [label="return"];
+        @endmsc
         """
         if (self.reg_client == None):
             yield self.reply_err(msg,
                                  "No agent registry client has been set!")
-
+            return
+        if (content == ""):
+            descriptor = None
+        elif (content != None):
+            descriptor = AgentInstance.decode(content)
+        assert((descriptor == None) or (isinstance(descriptor, AgentInstance)))
+        assert(descriptor != "")
         # Register the instance/description
-        returned_instance = yield self.reg_client.register_agent_instance(self)
+        returned_instance = \
+            yield self.reg_client.register_agent_instance(self, descriptor)
         self.resource_ref = returned_instance.reference(head=True)
         if (self.resource_ref == None) or (self.resource_ref == False):
             yield self.reply_err(msg, "Could not register instance!")
@@ -266,7 +302,7 @@ class ResourceAgentClient(BaseProcessClient):
             defer.returnValue(None)  
           
     @defer.inlineCallbacks
-    def register_resource(self, agent_instance=None):
+    def register_resource(self, agent_instance=None, descriptor=None):
         """
         Have the resource register itself with the agent registry via
         the client that has been set via set__client()

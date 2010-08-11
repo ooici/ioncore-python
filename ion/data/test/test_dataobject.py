@@ -104,6 +104,7 @@ class TestInheritedObject(unittest.TestCase):
         self.assertEqual(io.inherit0, 'over')
         self.assertEqual(io.inheritover, 'a new one')
 
+    '''
     def test_InheritOverOver(self):
         raise unittest.SkipTest('This is not a legal inheritance pattern!')
         #ioo = InheritOverOver()
@@ -112,6 +113,7 @@ class TestInheritedObject(unittest.TestCase):
         #self.assertEqual(ioo.inherit1, '1')
         #self.assertEqual(ioo.inherit0, 'over')
         #self.assertEqual(ioo.inheritover, 'a new one')
+    '''
 
     def test_InheritOverUnder(self):
         iou = InheritOverUnder()
@@ -314,7 +316,7 @@ class TestSimpleObject(unittest.TestCase):
         dec = dataobject.DataObject.decode(self.encoded)
         #print 'dec',dec
         #print 'self.obj',self.obj
-        self.assertEqual(self.obj,dec)
+        self.assertEqual(self.obj,dec,'Original: %s \n Decoded: %s' % (str(self.obj), str(dec)))
         self.assertEqual(type(self.obj).__name__,type(dec).__name__)
 
         
@@ -484,13 +486,34 @@ class TestDictObject(TestSimpleObject):
     def setUp(self):
         obj = DictObject()
         obj.name = 'David'
-        obj.rdict = {'a':'a','b':5,'data':3.14159}
+        obj.rdict = {'a':'a','b':5,'data':3.14159} # Must be 'Jasonable'
         self.obj = obj
         self.encoded=[('Object_Type', 'DictObject'),
                     ('rdict', 'dict\x00{"a": "a", "b": 5, "data": 3.1415899999999999}'),
                     ('name', 'str\x00David')]
     
+class TestDictObject2(TestSimpleObject):
+    def setUp(self):
+        obj = DictObject()
+        obj.name = 'David'
+        obj.rdict = {'a':'a','b':5,'data':3.14159,'list':[1,2,3]} # Must be 'Jasonable'
+        self.obj = obj
+        self.encoded=[('Object_Type', 'DictObject'),
+                     ('rdict',
+                      'dict\x00{"a": "a", "list": [1, 2, 3], "b": 5, "data": 3.1415899999999999}'),
+                     ('name', 'str\x00David')]
      
+
+class TestDictObject3(TestSimpleObject):
+    def setUp(self):
+        obj = DictObject()
+        obj.name = 'David'
+        obj.rdict = {'a':'a','b':5,'data':3.14159,'d3':{'1':2,'3':4}} # Must be 'Jasonable'
+        self.obj = obj
+        self.encoded=[('Object_Type', 'DictObject'),
+                    ('rdict', 'dict\x00{"a": "a", "b": 5, "data": 3.1415899999999999, "d3": {"1": 2, "3": 4}}'),
+                    ('name', 'str\x00David')]
+
      
 class NestedObject(dataobject.DataObject):
     name = dataobject.TypedAttribute(str,'stuff')
@@ -578,7 +601,7 @@ class ResponseService(BaseService):
         response = obj.encode()
 
         # The following line shows how to reply to a message
-        yield self.reply(msg, 'reply', response, {})
+        yield self.reply_ok(msg, response)
 
 class ResponseServiceClient(BaseServiceClient):
     """
@@ -598,7 +621,7 @@ class ResponseServiceClient(BaseServiceClient):
         logging.info('Sending Encoded resource:'+str(msg))
         (content, headers, msg) = yield self.rpc_send('respond', msg, {})
         logging.info('Responder replied: '+str(content))
-        response = dataobject.DataObject.decode(content)
+        response = dataobject.DataObject.decode(content['value'])
         defer.returnValue(response)
 
 # Spawn of the process using the module name

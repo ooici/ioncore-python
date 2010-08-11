@@ -210,6 +210,8 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         results=[]
         if isinstance(description,dataobject.DataObject):
             refs = yield self._list()
+            logging.info('!!!!!!!!!@@@@@@@@!!!!')
+            logging.info(description)
 
             # Get the list of descriptions in this registry
             
@@ -217,6 +219,7 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
 
             for ref in refs:
                 res = yield self.get_resource(ref)
+                logging.info(res)
                 
                 if description.compared_to(res,
                                         regex=regex,
@@ -405,8 +408,6 @@ class BaseRegistryService(BaseService):
             regex = container.regex
             ignore_defaults = container.ignore_defaults
             attnames = container.attnames
-            logging.debug('^^^^^^^^^^^^^^^^^')
-            logging.debug(attnames)
             
             result_list = yield self.reg.find_resource(description,regex,ignore_defaults, attnames)
         
@@ -604,7 +605,7 @@ class BaseRegistryClient(BaseServiceClient):
         
         encoding, _, data = dataobject.serializer.encode(container)
         headers = {'encoding':encoding, 'accept-encoding':encoding}
-        (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
+        content, headers, msg = yield self.rpc_send(op_name, data, headers)
 
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
         
@@ -621,6 +622,8 @@ class BaseRegistryClient(BaseServiceClient):
 
 class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
     """
+    #@TODO How can we make it so that the client infact uses a local registry
+    for testing rather than using the registry service? Can we switch it in init?
     """
     
     def __init__(self, proc=None, **kwargs):

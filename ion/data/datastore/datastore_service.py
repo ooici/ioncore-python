@@ -2,7 +2,7 @@
 
 """
 @file ion/play/rdf_store/rdf_service.py
-@package ion.play.rdf_store.rdf_service 
+@package ion.play.rdf_store.rdf_service
 @author David Stuebe
 @brief A service that provides git symantics for push pull commit and diff to
 the rdf workspace composed of associations and objects.
@@ -29,7 +29,7 @@ class DataStoreService(BaseService):
 
     def __init__(self, receiver, spawnArgs=None):
         """
-        @brief Init method for the DataStore Frontend service 
+        @brief Init method for the DataStore Frontend service
         @param frontend - an instance of a CAStore Frontend
         """
         # Service class initializer. Basic config, but no yields allowed.
@@ -45,7 +45,7 @@ class DataStoreService(BaseService):
     def op_push(self, content, headers, msg):
         logging.info('op_push: '+str(content)+ ', Remote Frontend:'+self.frontend)
 
-        
+
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg)
@@ -53,7 +53,7 @@ class DataStoreService(BaseService):
     @defer.inlineCallbacks
     def op_pull(self, content, headers, msg):
         logging.info('op_pull: '+str(content) + ', Remote Frontend:'+self.frontend)
-        
+
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg)
@@ -74,7 +74,7 @@ class DataStoreServiceClient(BaseServiceClient):
     """
     def __init__(self, frontend, proc=None, **kwargs):
         """
-        @brief Init method for the DataStore Frontend client 
+        @brief Init method for the DataStore Frontend client
         @param frontend - an instance of a CAStore Frontend
         """
         if not 'targetname' in kwargs:
@@ -99,7 +99,7 @@ class DataStoreServiceClient(BaseServiceClient):
         logging.info('pushing: '+repository_name+ ', Local Frontend:'+self.frontend)
         (content, headers, msg) = yield self.rpc_send('push', repository_name)
 
-        """ 
+        """
         Steps:
         Send the commit DAG to the service
         Receive the Commits which need to be pushed
@@ -118,12 +118,12 @@ class DataStoreServiceClient(BaseServiceClient):
         """
         yield self._check_init()
         logging.info('pulling: '+repository_name+ ', Local Frontend:'+self.frontend)
-        """ 
+        """
         Steps:
         Send the current commit DAG to the service
         Receive the Commits which need to be pulled
         """
-        
+
         (content, headers, msg) = yield self.rpc_send('pull', repository_name)
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content))
@@ -132,16 +132,16 @@ class DataStoreServiceClient(BaseServiceClient):
     @defer.inlineCallbacks
     def clone(self, repository_name):
         """
-        @brief Clone a repository to the local object store from the remote datastore 
+        @brief Clone a repository to the local object store from the remote datastore
         @param repository_name - the name (key) of a repository in the remote datastore
         """
         yield self._check_init()
         logging.info('cloning: '+repository_name+ ', Local Frontend:'+self.frontend)
-        """ 
+        """
         Steps:
         Send the repo name
         Receive the Commits which need to be pulled
-        """        
+        """
         (content, headers, msg) = yield self.rpc_send('clone', repository_name)
         logging.info('Service reply: '+str(content))
         defer.returnValue(str(content))
@@ -151,5 +151,3 @@ class DataStoreServiceClient(BaseServiceClient):
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(DataStoreService)
-
-

@@ -13,6 +13,7 @@ from datetime import datetime
 import time
 import logging
 logging = logging.getLogger(__name__)
+import uuid
 from twisted.internet import defer, reactor
 from magnet.container import Id
 
@@ -77,6 +78,12 @@ def log_message(msg):
         lstr += "\n============="
     logging.info(lstr)
 
+def create_guid():
+    """
+    @retval Return global unique id string
+    """
+    return str(uuid.uuid4())
+
 def get_process_id(long_id):
     """Returns the instance part of a long process id
     """
@@ -100,9 +107,11 @@ def send(receiver, send, recv, operation, content, headers=None):
     """
     msg = {}
     # The following headers are FIPA ACL Message Format based
-    # Exchange name of sender, receiver, reply-to
+    # Exchange name of sender (DO NOT SEND replies here)
     msg['sender'] = str(send)
+    # Exchange name of message recipient
     msg['receiver'] = str(recv)
+    # Exchange name for message replies
     msg['reply-to'] = str(send)
     # Wire form encoding, such as 'json', 'fudge', 'XDR', 'XML', 'custom'
     msg['encoding'] = 'json'
@@ -134,8 +143,8 @@ def send(receiver, send, recv, operation, content, headers=None):
     #logging.debug("Send message op="+operation+" to="+str(recv))
     try:
         yield receiver.send(recv, msg)
-    except StandardError, e:
-        log_exception("Send error: ", e)
+    except Exception, ex:
+        log_exception("Send error: ", ex)
     else:
         logging.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
 
@@ -166,8 +175,8 @@ def dispatch_message(payload, msg, dispatchIn, conv=None):
                 logging.error("Receive() failed. Cannot dispatch to catch")
         else:
             logging.error("Invalid message. No 'op' in header", payload)
-    except StandardError, e:
-        log_exception('Exception while dispatching: ',e)
+    except Exception, ex:
+        log_exception('Exception while dispatching: ',ex)
 
 id_seqs = {}
 def create_unique_id(ns):
