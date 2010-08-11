@@ -143,6 +143,19 @@ class InstrumentDriverClient(BaseProcessClient):
         (content, headers, message) = yield self.rpc_send('configure_driver',
                                                           config_vals)
         defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def initialize(self, arg):
+        """
+        Disconnect from the instrument
+        @param none
+        @retval Result code of some sort
+        """
+        #assert(isinstance(command, dict))
+        logging.debug("DHE: in initialize!")
+        (content, headers, message) = yield self.rpc_send('initialize',
+                                                          arg)
+        defer.returnValue(content)
         
     @defer.inlineCallbacks
     def disconnect(self, command):

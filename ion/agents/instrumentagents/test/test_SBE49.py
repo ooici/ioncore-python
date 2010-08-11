@@ -17,7 +17,7 @@ from ion.core import bootstrap
 
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
-from ion.core.base_process import BaseProcess
+from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.services.base_service import BaseServiceClient
 
@@ -71,11 +71,25 @@ class TestSBE49(IonTestCase):
         self.pubsubSuper = yield self._spawn_processes(services)
         
         self.sup = yield bootstrap.create_supervisor()
-        self.driver = SBE49InstrumentDriver()
-        self.driver_pid = yield self.driver.spawn()
-        yield self.driver.init()
+
+        driverParms = {'name':'SBE49_Driver',
+                 'module':'ion.agents.instrumentagents.SBE49_driver',
+                 'procclass':'SBE49InstrumentDriver'
+                }
+        driverEgg = ProcessDesc(**driverParms)
+
+        self.driver_pid = yield self.test_sup.spawn_child(driverEgg)
+        print("pid %s" % (self.driver_pid))
+
+        #self.driver = SBE49InstrumentDriver()
+        #self.driver_pid = yield self.driver.spawn()
+
+        #yield self.driver.init()
         self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
                                                          target=self.driver_pid)
+        #self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
+        #                                                 target="SBE49_Driver")
+
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -119,8 +133,27 @@ class TestSBE49(IonTestCase):
         """
         Lame test since this doesnt do much
         """
-        
+        result = yield self.driver_client.initialize('some arg')
+        yield pu.asleep(4)
+
         dpsc = DataPubsubClient(self.pubsubSuper)
+
+        subscription = SubscriptionResource()
+        subscription.topic1 = PubSubTopicResource.create('SBE49 Topic','')
+        #subscription.topic2 = PubSubTopicResource.create('','oceans')
+        
+        subscription.workflow = {
+            'consumer1':
+                {'module':'ion.services.dm.distribution.consumers.logging_consumer',
+                 'consumerclass':'LoggingConsumer',\
+                 'attach':'topic1'}
+                }
+
+        subscription = yield self.pubsub.create_subscription(subscription)
+
+        logging.info('Defined subscription: '+str(subscription))
+
+        """
 
         # Create and Register a topic
         topic = PubSubTopicResource.create('Daves Topic',"surfing, sailing, diving")        
@@ -134,12 +167,13 @@ class TestSBE49(IonTestCase):
         publisher = yield dpsc.define_publisher(publisher)
 
         logging.info('Defined Publisher: '+str(publisher))
+        """
         
-
         # === Create a Consumer and queues - this will become part of define_subscription.
         
         #Create two test queues - don't use topics to test the consumer
         # To be replaced when the subscription service is ready
+        """
         queue1 = dataobject.create_unique_identity()
         queue_properties = {queue1:{'name_type':'fanout', 'args':{'scope':'global'}}}
         yield bootstrap.declare_messaging(queue_properties)
@@ -160,6 +194,7 @@ class TestSBE49(IonTestCase):
         child1_id = yield self.test_sup.spawn_child(child1)
 
         # === End to be replaces with Define_Consumer
+        """
 
         cmd1 = {'ds': ['now']}
         #cmd1 = {'start': ['now']}
@@ -168,7 +203,7 @@ class TestSBE49(IonTestCase):
         result = yield self.driver_client.execute(cmd1)
         self.assertEqual(result['status'], 'OK')
         # DHE: wait a while...
-        yield pu.asleep(2)
+        yield pu.asleep(5)
         #result = yield self.driver_client.execute(cmd2)
         #self.assertEqual(result['status'], 'OK')
 

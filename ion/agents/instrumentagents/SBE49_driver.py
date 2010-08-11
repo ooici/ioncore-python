@@ -64,7 +64,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
     connected = False
     instrument = None
     command = None
-    TopicDefined = False
+    topicDefined = False
+
 
     """    
     lifecycleState = LCS['new']
@@ -176,7 +177,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
        
         #return self.d
     
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def gotConnected(self, instrument):
         """
         @brief This method is called when a connection has been made to the
@@ -197,15 +198,26 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         #instrument.transport.write("ds")
 
+        """
         # Instantiate a pubsubclient
         dpsc = DataPubsubClient(self)
         
         # Create and Register a topic
-        topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
-        topic = yield dpsc.define_topic(topic)
-        #topic = dpsc.define_topic(topic)
-        logging.debug('DHE: Defined Topic: '+str(topic))
+        DHE: not sure the driver should be creating the topic; for right
+        now I'll have the test case do it.
+        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
+        self.topic = yield dpsc.define_topic(self.topic)
+        #logging.debug('DHE: Defined Topic: '+str(topic))
+        logging.debug('DHE: Defined Topic')
+        
+        self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
+        self.publisher = yield dpsc.define_publisher(self.publisher)
+
+        #logging.info('DHE: Defined Publisher: '+str(self.publisher))
+        logging.info('DHE: Defined Publisher')
+
         self.topicDefined = True
+        """
 
     def gotData(self, data):
         """
@@ -241,18 +253,49 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         @Brief Publish the given data to the given topic.
         @param data The data to publish
-        @param topic The topic to which to pubish
+        @param topic The topic to which to publish.  Currently this is not the
+        topic as defined by pubsub.
         @retval none
         """
         #logging.debug("DHE: publish(): %s" %str(self.__dict__))
         logging.debug("DHE: publish()")
+        if self.topicDefined == True:
+            logging.debug("DHE: publishing!")
+
+            # Create and send a data message
+            result = yield dpsc.publish(self.sup, self.topic.reference(), data)
+            if result:
+                logging.info('DHE: Published Message')
+            else:
+                logging.info('DHE: Failed to Published Message')
+        else:
+            logging.debug("DHE: NOT READY TO PUBLISH")
         
-        self.publisher = PublisherResource.create('Test Publisher', self, topic, 'DataObject')
+
+    @defer.inlineCallbacks
+    def op_initialize(self, content, headers, msg):
+        logging.debug('DHE: in driver initialize')
+
+        # Instantiate a pubsubclient
+        dpsc = DataPubsubClient(self)
+        
+        # Create and Register a topic
+        """
+        DHE: not sure the driver should be creating the topic; for right
+        now I'll have the test case do it.
+        """
+        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
+        self.topic = yield dpsc.define_topic(self.topic)
+        logging.debug('DHE: Defined Topic')
+        
+        self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
         self.publisher = yield dpsc.define_publisher(self.publisher)
 
-        logging.info('DHE: Defined Publisher: '+str(self.publisher))
+        logging.info('DHE: Defined Publisher')
 
-
+        self.topicDefined = True
+        yield self.reply_ok(msg, content)
+    
     @defer.inlineCallbacks
     def op_disconnect(self, content, headers, msg):
         logging.debug("DHE: in Instrument Driver op_disconnect!")
@@ -321,7 +364,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         BECAUSE THAT CALL YIELDS (UP IN gotConnected)
         """
         
-        #while self.TopicDefined != True:
+        #while self.topicDefined != True:
         #    yield pu.asleep(1)
             
         if (content == {}):
