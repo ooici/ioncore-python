@@ -2,26 +2,24 @@
 
 
 """
-@file ion/services/dm/pubsub/pubsub_registry.py
+@file ion/services/dm/distribution/pubsub_registry.py
 @author David Stuebe
-@brief registry service for data publication and subscription
+@brief registry service for data topics, publication & subscription
 """
 
 from twisted.internet import defer
 
-from ion.core import bootstrap
+#from ion.core import bootstrap
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
-
-
 from ion.data import dataobject
 from ion.data.datastore import registry
-from ion.data import store
+#from ion.data import store
 
 class DataPubsubRegistryService(registry.BaseRegistryService):
     """
-    A very simple registry for Data Pub Sub
+    @Brief A very simple registry for Data Pub Sub
     @TODO make the interface more specific for different kinds of pubsub objects
     Need to specify topic, publisher, subscriber
     """
@@ -54,7 +52,7 @@ factory = ProtocolFactory(DataPubsubRegistryService)
 
 class DataPubsubRegistryClient(registry.BaseRegistryClient):
     """
-    Class for the client accessing the Data PubSub Registry.
+    @Brief Class for the client accessing the Data PubSub Registry.
     @Todo clean up the interface for specific pubsub resource objects
     Need to specify topic, publisher, subscriber
     """

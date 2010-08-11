@@ -601,7 +601,7 @@ class ResponseService(BaseService):
         response = obj.encode()
 
         # The following line shows how to reply to a message
-        yield self.reply(msg, 'reply', response, {})
+        yield self.reply_ok(msg, response)
 
 class ResponseServiceClient(BaseServiceClient):
     """
@@ -621,7 +621,7 @@ class ResponseServiceClient(BaseServiceClient):
         logging.info('Sending Encoded resource:'+str(msg))
         (content, headers, msg) = yield self.rpc_send('respond', msg, {})
         logging.info('Responder replied: '+str(content))
-        response = dataobject.DataObject.decode(content)
+        response = dataobject.DataObject.decode(content['value'])
         defer.returnValue(response)
 
 # Spawn of the process using the module name

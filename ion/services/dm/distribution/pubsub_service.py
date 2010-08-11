@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/datapubsub.py
+@file ion/services/dm/distribution/pubsub_service.py
 @author Michael Meisinger
-@brief service for publishing on data streams, and for subscribing to streams
-@Note Should the pubsub service use the pubsub registry client or should it
-implement the communication with the pubsub registry service?
+@author David Stuebe
+@brief service for publishing on data streams, and for subscribing to streams.
+The service includes methods for defining topics, defining publishers, publishing,
+and defining subscriptions.
 """
 
 import logging
@@ -28,9 +29,12 @@ CONF = ioninit.config(__name__)
 
 from ion.services.dm.util import dap_tools 
 from pydap.model import DatasetType
+from ion.services.dm.distribution import base_consumer
+
 
 class DataPubsubService(BaseService):
-    """Data publish/subscribe service interface
+    """
+    @Brief Service for Publicaiton and Subscription to topics
     """
 
     # Declaration of service
@@ -54,15 +58,16 @@ class DataPubsubService(BaseService):
         logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' + str(headers))
         topic = dataobject.Resource.decode(content)
   
-        if not topic.RegistryIdentity:
+        if topic.RegistryIdentity:
+            yield self.update_topic_registration(topic)
+        else:
             # it is a new topic and must be declared
-            topic = yield self.create_and_declare_topic(topic)
-        # Otherwise assume we are updating the keywords or some such change
-        # That does not affect the queue!
+            topic = yield self.create_and_register_topic(topic)
     
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic: \n' + str(topic))
-    
-        topic = yield self.reg.register(topic)
+            
+        #@todo call some process to update all the subscriptions? Or only on interval?
+        
         if topic:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
             yield self.reply_ok(msg, topic.encode())
@@ -70,8 +75,14 @@ class DataPubsubService(BaseService):
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
 
+    #@defer.inlineCallback
+    def update_topic_registration(self,topic):
+        #topic = yield self.reg.register(topic)
+        return self.reg.register(topic)
+
+
     @defer.inlineCallbacks
-    def create_and_declare_topic(self,topic):
+    def create_and_register_topic(self,topic):
         """
         Create a messaging name and set the queue properties to create it.
         @TODO fix the hack - This should come from the exchange registry!
@@ -80,8 +91,23 @@ class DataPubsubService(BaseService):
         # Give the topic anidentity
         topic.create_new_reference()
         
-        # Pick a topic name and declare the queue - this should be done in the exchange registry        
+        # Declare the queue - this should be done in the exchange registry        
         # Create a new queue object
+        queue = yield self.create_queue()
+
+        topic.queue = queue
+
+        topic = yield self.reg.register(topic)
+
+        defer.returnValue(topic)
+        
+    @defer.inlineCallbacks
+    def create_queue(self):
+        """
+        Create a queue
+        @TODO fix the hack - This should come from the exchange registry!
+        """
+        
         queue = dm_resource_descriptions.Queue()
         queue.name = dataobject.create_unique_identity()
         queue.type = 'fanout'
@@ -90,10 +116,10 @@ class DataPubsubService(BaseService):
         queue_properties = {queue.name:{'name_type':queue.type, 'args':queue.args}}
         # This should come from the COI Exchange registry
         yield bootstrap.declare_messaging(queue_properties)
-
-        topic.queue = queue
-
-        defer.returnValue(topic)
+        
+        defer.returnValue(queue)
+        
+    
 
     @defer.inlineCallbacks
     def op_define_publisher(self, content, headers, msg):
@@ -113,20 +139,220 @@ class DataPubsubService(BaseService):
             yield self.reply_err(msg, None)
         
         
-    
-    def op_subscribe(self, content, headers, msg):
+    @defer.inlineCallbacks
+    def op_define_subscription(self, content, headers, msg):
         """Service operation: Register a subscriber's intent to receive
-        subscriptions on a topic, with additional filter and delivery method
-        details.
+        subscriptions on a topic, with the workflow described to produce the
+        desired result
         """
         # Subscribe should decouple the exchange point where data is published
         # and the subscription exchange point where a process receives it.
         # That allows for an intermediary process to filter it.
         
-        subscriber = None
-        topic = None
-        eventOnly = False
+        logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
+        subscription = dataobject.Resource.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', subscription: \n' + str(subscription))
+    
+        
+        if subscription.RegistryIdentity:
+            # it is an existing topic and must be updated
+            subscription = yield self.update_subscription(subscription)
+        else:
+            subscription = yield self.create_subscription(subscription)
+    
+        subscription = yield self.reg.register(subscription)
+        if subscription:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
+            yield self.reply_ok(msg, subscription.encode())
+        else:
+            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
+            yield self.reply_err(msg, None)
 
+    """
+    Subscription Object:
+    Name - inherited    
+    # hack for now to allow naming one-three more topic descriptions
+    topic1 = TypedAttribute(PubSubTopicResource)
+    topic2 = TypedAttribute(PubSubTopicResource) 
+    topic3 = TypedAttribute(PubSubTopicResource)
+    
+    workflow = TypedAttribute(dict)
+    '''
+    <consumer name>:{'module':'path.to.module','cosumeclass':'<ConsumerClassName>',\
+        'attach':(<topicX>) or (<consumer name>, <consumer queue keyword>) or <list of consumers and topics>,\
+        'Process Parameters':{<conumser property keyword arg>: <property value>}}
+    '''
+    """
+
+    @defer.inlineCallbacks        
+    def create_subscription(self,subscription):
+        '''
+        '''
+        subscription.create_new_reference()
+        
+        subscription = yield self.create_consumer_args(subscription)
+
+        consumer_args = subscription.consumer_args
+        
+        for name, args in consumer_args.items():
+            child = base_consumer.ConsumerDesc(**args)        
+            child_id = yield self.spawn_child(child)
+            #subscription.consumer_procids[name]=child_id
+    
+    
+        subscription = yield self.reg.register(subscription)
+
+        defer.returnValue(subscription)
+
+    @defer.inlineCallbacks        
+    def create_consumer_args(self,subscription):
+        '''
+        @Brief Turn the workflow argument into the arguments used to create a
+        new consumer. This includes spawning the queues needed to deliver the
+        product of one consumer to the attachment point of another!
+        @Note This is probably too complex - it should be refactored into seperate
+        methods where possible.
+        '''
+        
+        logging.info('Processing Subscription Workflow:'+str(subscription.workflow))
+        
+        #A for each topic1, topic2, topic3 get the list of queues
+            
+        topics={'topic1':[],'topic2':[],'topic3':[]}
+            
+            
+        if subscription.topic1.name or subscription.topic1.keywords:
+            topics['topic1'] = yield self.find_topics(subscription.topic1)
+            
+        if subscription.topic2.name or subscription.topic2.keywords:
+            topics['topic2'] = yield self.find_topics(subscription.topic2)
+        
+        if subscription.topic3.name or subscription.topic3.keywords:
+            topics['topic3'] = yield self.find_topics(subscription.topic3)
+            
+            
+        #B process the workflow dictionary,
+        
+        
+        #0) Check for valid workflow
+        # how can I check whether the workflow is a loop ? difficult!
+                
+        # 1) create new queues for workflow
+        # 2) create ConsumerDesc for each consumer
+        
+        # create place holders for each consumers spawn args
+        subscription_queues=[]
+        consumers = {}
+        consumer_names =  subscription.workflow.keys()
+        for consumer, args in subscription.workflow.items():
+
+            spargs ={'attach':[],
+                     'process parameters':args.get('process parameters',{}),
+                     'delivery queues':{}}
+            
+            cd = {}
+            cd['name'] = consumer
+            cd['module'] = args.get('module')
+            cd['procclass'] = args.get('consumerclass')
+            cd['spawnargs'] = spargs
+            
+            consumers[consumer]=cd
+        
+        #logging.info('CONSUMERS:' + str(consumers))
+        
+        # for each consumer and add its attachements and create delivery queues
+        for consumer, args in subscription.workflow.items():
+            
+            # list of queues to attach to for this consumer
+            attach = []
+            
+            # Get the attach to topic or consumer - make it a list and iterate            
+            attach_to= args['attach']
+            if not hasattr(attach_to,'__iter__'):
+                attach_to = [attach_to]
+                
+            for item in attach_to:
+                
+                #Each item may be a topic or a consumer/keyword pair - make it a list
+                # and extract the contents
+                if not hasattr(item,'__iter__'):
+                    item = [item]
+                
+                if len(item) ==1:
+                    name = item[0]
+                    keyword = None
+                elif len(item)==2:
+                    name = item[0]
+                    keyword = item[1]
+                else:
+                    raise RuntimeError('Invalid attach argument!')
+                
+                
+                # is it a topic?
+                if name in topics.keys():
+                    topic_list = topics[name] # get the list of topics
+                    # add each queue to the list of attach_to
+                    for topic in topic_list:
+                        # Add it to the list for this consumer
+                        attach.append(topic.queue.name)
+                        # Add it to the list for this subscription
+                        subscription_queues.append(topic.queue)
+                        logging.info('''Consumer '%s' attaches to topic name '%s' ''' % (consumer, topic.name))
+                    
+                # See if it is consuming another resultant
+                elif name in consumer_names: # Could fail badly!
+                                        
+                    # Does this producer already have a queue?
+                    # This is not 'safe' - lots of ways to get a key error!
+                    q = consumers[name]['spawnargs']['delivery queues'].get(keyword,None)
+                    if q:
+                        attach.append(q)
+                        logging.info('''Consumer '%s' attaches to existing queue for producer/keyword: '%s'/'%s' ''' % (consumer, name, keyword))
+                    else: 
+                        # Create the queue!
+                        #@TODO - replace with call to exchange registry service
+                        queue = yield self.create_queue()
+                        # Add it to the list for this consumer
+                        attach.append(queue.name)
+                        # Add it to the list for this subscription
+                        subscription_queues.append(queue)
+                        
+                        # Add to the delivery list for the producer...
+                        consumers[name]['spawnargs']['delivery queues'][keyword]=queue.name
+                        logging.info('''Consumer '%s' attaches to new queue for producer/keyword: '%s'/'%s' ''' % (consumer, name, keyword))
+                else:
+                    raise RuntimeError('''Can not determine how to attach consumer '%s' \
+                                       to topic or consumer '%s' ''' % (consumer, item))
+                    
+            consumers[consumer]['spawnargs']['attach'].extend(attach)        
+        
+        logging.info('CONSUMERS:' + str(consumers))
+        
+        subscription.queues = subscription_queues
+        subscription.consumer_args = consumers
+        
+        defer.returnValue(subscription)
+
+        # 3) spawn consumers
+        
+        #C add the queues, ConsumerDesc's and topics to the subscription definition
+        
+        
+        
+        
+    #@defer.inlineCallbacks        
+    def update_subscription(subscription):
+        '''
+        '''
+        # Determine the difference between the current and existing subscription
+        
+        # act accordingly - but very difficult to figure out what to do!
+        pass   
+        
+        
+        
+        
+        
     def op_unsubscribe(self, content, headers, msg):
         """Service operation: Stop one's existing subscription to a topic.
             And remove the Queue if no one else is listening...
@@ -183,12 +409,18 @@ class DataPubsubService(BaseService):
         logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
         yield self.reply_ok(msg, '')
         
-    
-    def find_topic(self, content, headers, msg):
+    #@defer.inlineCallbacks
+    def find_topics(self, topic_description):
         """Service operation: For a given resource, find the topic that contains
-        updates to the resource or resource description. Might involve creation
-        of this topic if this topic does not yet exist
+        updates to the resource or resource description.
+        @Notes - should this create a topic if none yet exist?
         """
+        
+        #Note - AOI does not do anything yet and keyword needs to be improved...
+        #topic_list = yield self.reg.find(topic_description,regex=True, attnames=['name','keywords','aoi'])
+        return self.reg.find(topic_description,regex=True, attnames=['name','keywords','aoi'])
+        
+        
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(DataPubsubService)
@@ -196,7 +428,7 @@ factory = ProtocolFactory(DataPubsubService)
 
 class DataPubsubClient(BaseServiceClient):
     """
-    Client class for accessing the data pubsub service.
+    @Brief Client class for accessing the data pubsub service.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
@@ -212,7 +444,7 @@ class DataPubsubClient(BaseServiceClient):
         """
         
         logging.info(self.__class__.__name__ + '; Calling: define_topic')
-        assert isinstance(topic, dataobject.Resource), 'Invalid argument to base_register_resource'
+        assert isinstance(topic, dataobject.Resource), 'Invalid argument to define_topic'
         
         (content, headers, msg) = yield self.rpc_send('define_topic',
                                             topic.encode())
@@ -234,7 +466,7 @@ class DataPubsubClient(BaseServiceClient):
         """
 
         logging.info(self.__class__.__name__ + '; Calling: define_publisher')
-        assert isinstance(publisher, dm_resource_descriptions.PublisherResource), 'Invalid argument to base_register_resource'
+        assert isinstance(publisher, dm_resource_descriptions.PublisherResource), 'Invalid argument to define_publisher'
         
 
         (content, headers, msg) = yield self.rpc_send('define_publisher',
@@ -294,5 +526,24 @@ class DataPubsubClient(BaseServiceClient):
 
 
     @defer.inlineCallbacks
-    def subscribe(self, subscription):
-        pass       
+    def define_subscription(self, subscription):
+        """
+        @Brief define and register a subscription, or update existing
+        """
+
+        logging.info(self.__class__.__name__ + '; Calling: define_subscription')
+        assert isinstance(subscription, dm_resource_descriptions.SubscriptionResource), 'Invalid argument to define_subscription'
+        
+
+        (content, headers, msg) = yield self.rpc_send('define_subscription',
+                                            publisher.encode())
+        logging.debug(self.__class__.__name__ + ': define_subscription; Result:' + str(headers))
+        
+        if content['status']=='OK':
+            logging.info(self.__class__.__name__ + '; define_subscription: Success!')
+            publisher = dataobject.Resource.decode(content['value'])
+            defer.returnValue(publisher)
+        else:
+            logging.info(self.__class__.__name__ + '; define_subscription: Failed!')
+            defer.returnValue(None)
+

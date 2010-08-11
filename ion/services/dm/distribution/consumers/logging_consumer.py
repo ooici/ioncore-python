@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/distribution/consumers/test/test_logging_consumer.py
+@file ion/services/dm/distribution/consumers/logging_consumer.py
 @author David Stuebe
-@brief test for the logging consumer process
+@brief The logging consumer process - it logs a message about whatever data it
+receives.
 """
 
 from ion.services.dm.distribution import base_consumer

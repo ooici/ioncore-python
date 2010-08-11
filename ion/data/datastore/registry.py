@@ -543,6 +543,8 @@ class BaseRegistryClient(BaseServiceClient):
 
 class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
     """
+    #@TODO How can we make it so that the client infact uses a local registry
+    for testing rather than using the registry service? Can we switch it in init?
     """
     
     def __init__(self, proc=None, **kwargs):

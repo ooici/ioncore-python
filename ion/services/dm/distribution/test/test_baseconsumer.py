@@ -3,21 +3,21 @@
 """
 @file ion/services/dm/distribution/test/test_baseconsumer.py
 @author David Stuebe
-@brief test for the base consumer process
+@brief test cases for the base consumer process
 """
 
 import logging
 logging = logging.getLogger(__name__)
-import time
+#import time
 from twisted.internet import defer
 from twisted.trial import unittest
-from magnet.container import Container
+#from magnet.container import Container
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
 
 from ion.core.base_process import ProtocolFactory
 from ion.core import bootstrap
-from ion.core.base_process import BaseProcess, ProcessDesc
+#from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -26,29 +26,14 @@ from ion.resources.dm_resource_descriptions import DAPMessageObject, \
     DataMessageObject, DictionaryMessageObject, StringMessageObject
 
 from ion.services.dm.util import dap_tools
-
-
-import numpy
-
-from ion.services.dm.util import dap_tools
-
 from ion.services.dm.distribution import base_consumer
 
-class MyConsumer(base_consumer.BaseConsumer):
-
-    def ondata(self, data, notification, timestamp, queues=[]):
-        """
-        This is an example of pulling the parameter 'queues' from spawn_args,
-        'process parameters' which is passed as **kwargs to ondata
-        """
-        for queue in queues:
-            self.queue_result(queue,data,notification)
-                
-
-# Spawn of the process using the module name
-factory = ProtocolFactory(MyConsumer)
-
 class BaseConsumerTest(IonTestCase):
+    '''
+    Test cases for the base consumer method. They examine the message based
+    control of the child processes and ensure that ondata is called properly
+    '''
+
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -82,8 +67,8 @@ class BaseConsumerTest(IonTestCase):
     def test_spawn_attach_args(self):
         
         pd1={'name':'consumer_number_1',
-                 'module':'ion.services.dm.distribution.test.test_baseconsumer',
-                 'procclass':'MyConsumer',
+                 'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'procclass':'ForwardingConsumer',
                  'spawnargs':{'attach':[self.queue1]}}
         child1 = base_consumer.ConsumerDesc(**pd1)
         
@@ -100,8 +85,8 @@ class BaseConsumerTest(IonTestCase):
     def test_spawn_attach_msg(self):
         
         pd1={'name':'consumer_number_1', \
-                 'module':'ion.services.dm.distribution.test.test_baseconsumer', \
-                 'procclass':'MyConsumer'}
+                 'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'procclass':'ForwardingConsumer',}
         child1 = base_consumer.ConsumerDesc(**pd1)
                 
         child1_id = yield self.test_sup.spawn_child(child1)
@@ -121,8 +106,8 @@ class BaseConsumerTest(IonTestCase):
     def test_spawn_attach_inst(self):
         
         pd1={'name':'consumer_number_1', \
-                 'module':'ion.services.dm.distribution.test.test_baseconsumer', \
-                 'procclass':'MyConsumer'}
+                 'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'procclass':'ForwardingConsumer',}
         child1 = base_consumer.ConsumerDesc(**pd1)
                 
         child1_id = yield self.test_sup.spawn_child(child1)
@@ -143,8 +128,8 @@ class BaseConsumerTest(IonTestCase):
     def test_params(self):
         
         pd1={'name':'consumer_number_1', \
-                 'module':'ion.services.dm.distribution.test.test_baseconsumer', \
-                 'procclass':'MyConsumer'}
+                 'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'procclass':'ForwardingConsumer',}
         child1 = base_consumer.ConsumerDesc(**pd1)
                 
         child1_id = yield self.test_sup.spawn_child(child1)
@@ -158,16 +143,26 @@ class BaseConsumerTest(IonTestCase):
         
         self.assertEqual(res,params)
         
+        params2 = {'more junk':'my trunk'}
+        res = yield child1.set_process_parameters(params2)
+        self.assertEqual(res,'OK')
+
+        res = yield child1.get_process_parameters()
+        
+        ptest = dict(params)
+        ptest.update(params2)
+        self.assertEqual(res,ptest)
         yield child1.shutdown()
 
 
     @defer.inlineCallbacks
     def test_send(self):
         pd1={'name':'consumer_number_1',
-                 'module':'ion.services.dm.distribution.test.test_baseconsumer',
-                 'procclass':'MyConsumer',
+                 'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'procclass':'ForwardingConsumer',
                  'spawnargs':{'attach':self.queue1,\
-                              'Process Parameters':{'queues':[self.queue2]}}\
+                              'process parameters':{},
+                              'delivery queues':{'queues':[self.queue2]}}\
                     }
         child1 = base_consumer.ConsumerDesc(**pd1)
 
@@ -190,10 +185,11 @@ class BaseConsumerTest(IonTestCase):
     @defer.inlineCallbacks
     def test_send_chain(self):
         pd1={'name':'consumer_number_1',
-                 'module':'ion.services.dm.distribution.test.test_baseconsumer',
-                 'procclass':'MyConsumer',
+                 'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'procclass':'ForwardingConsumer',
                  'spawnargs':{'attach':self.queue1,\
-                              'Process Parameters':{'queues':[self.queue2]}}\
+                              'process parameters':{},\
+                              'delivery queues':{'queues':[self.queue2]}}\
                     }
         child1 = base_consumer.ConsumerDesc(**pd1)
 
@@ -215,8 +211,8 @@ class BaseConsumerTest(IonTestCase):
         
         #Spawn another process to listen to queue 2  
         pd2={'name':'consumer_number_2', \
-                 'module':'ion.services.dm.distribution.test.test_baseconsumer', \
-                 'procclass':'MyConsumer',\
+                 'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'procclass':'ForwardingConsumer',\
                  'spawnargs':{'attach':self.queue2}}
         
         child2 = base_consumer.ConsumerDesc(**pd2)
@@ -252,10 +248,11 @@ class BaseConsumerTest(IonTestCase):
     def test_attach2_send(self):
         
         pd1={'name':'consumer_number_1',
-                 'module':'ion.services.dm.distribution.test.test_baseconsumer',
-                 'procclass':'MyConsumer',
+                 'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'procclass':'ForwardingConsumer',
                  'spawnargs':{'attach':[self.queue1, self.queue2],\
-                    'Process Parameters':{'queues':[self.queue3]}}\
+                    'process parameters':{},\
+                    'delivery queues':{'queues':[self.queue3]}}\
             }
             
         child1 = base_consumer.ConsumerDesc(**pd1)
@@ -298,10 +295,11 @@ class BaseConsumerTest(IonTestCase):
     @defer.inlineCallbacks
     def test_deattach(self):
         pd1={'name':'consumer_number_1',
-                 'module':'ion.services.dm.distribution.test.test_baseconsumer',
-                 'procclass':'MyConsumer',
-                 'spawnargs':{'attach':self.queue1,\
-                              'Process Parameters':{'queues':[self.queue2]}}\
+                 'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
+                 'procclass':'ForwardingConsumer',
+                 'spawnargs':{'attach':[self.queue1],\
+                              'process parameters':{},\
+                              'delivery queues':{'queues':[self.queue2]}}\
                     }
         child1 = base_consumer.ConsumerDesc(**pd1)
 
@@ -332,6 +330,42 @@ class BaseConsumerTest(IonTestCase):
         sent = msg_cnt.get('sent',{})
         self.assertEqual(sent.get(self.queue2),1)
         self.assertEqual(received.get(self.queue1),1)
+        
+        
+    @defer.inlineCallbacks
+    def test_digest_latest(self):
+        pd1={'name':'consumer_number_1',
+                 'module':'ion.services.dm.distribution.consumers.latest_consumer',
+                 'procclass':'LatestConsumer',
+                 'spawnargs':{'attach':self.queue1,
+                              'process parameters':{},
+                              'delivery queues':{'queues':[self.queue2]},
+                              'delivery interval':2}
+                    }
+        child1 = base_consumer.ConsumerDesc(**pd1)
+
+        child1_id = yield self.test_sup.spawn_child(child1)
+
+        dmsg = DataMessageObject()
+        dmsg.notifcation = 'Junk'
+        dmsg.timestamp = pu.currenttime()
+        dmsg = dmsg.encode()
+        
+        yield self.test_sup.send(self.queue1, 'data', dmsg)
+        
+        yield self.test_sup.send(self.queue1, 'data', dmsg)
+        
+        yield self.test_sup.send(self.queue1, 'data', dmsg)
+        
+        yield self.test_sup.send(self.queue1, 'data', dmsg)
+        
+        yield pu.asleep(2)
+        
+        msg_cnt = yield child1.get_msg_count()
+        received = msg_cnt.get('received',{})
+        sent = msg_cnt.get('sent',{})
+        self.assertEqual(sent.get(self.queue2),1)
+        self.assertEqual(received.get(self.queue1),4)
         
         
         

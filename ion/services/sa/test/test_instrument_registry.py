@@ -24,9 +24,8 @@ class InstrumentRegistryTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        #self.sup = yield self._start_core_services()
         services = [
-            {'name':'resourceregistry1','module':'ion.services.sa.instrument_registry','class':'InstrumentRegistryService'}]
+            {'name':'inst_registry','module':'ion.services.sa.instrument_registry','class':'InstrumentRegistryService'}]
         sup = yield self._spawn_processes(services)
 
         self.irc = InstrumentRegistryClient(proc=sup)
@@ -41,32 +40,18 @@ class InstrumentRegistryTest(IonTestCase):
         # put in a bogus resource for now...
         res = sa_resource_descriptions.InstrumentResource.create_new_resource()
         res = yield self.irc.register_instrument_type(res)
-        
+
         #res = yield self.irc.set_resource_lcstate_commissioned(res)
-        
+
         ref = res.reference(head=True)
-        
+
         res2 = yield self.irc.get_instrument_type(ref)
-        
+
         res2.manufacturer = "SeaBird Electronics"
-        
+
         res2 = yield self.irc.register_instrument_type(res2)
-        
+
         res3 = yield self.irc.get_instrument_type(ref)
-        
-        self.assertEqual(res3.manufacturer, "SeaBird Electronics")        
 
-
-class ResourceRegistryCoreServiceTest(IonTestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        yield self._start_container()
-        self.sup = yield self._start_core_services()
-        #logging.info('self.sup.proc_state'+str(self.sup.proc_state))
-        
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self._stop_container()
-
+        self.assertEqual(res3.manufacturer, "SeaBird Electronics")
 
