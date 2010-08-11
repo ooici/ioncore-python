@@ -100,6 +100,9 @@ class ProvisionerCore(object):
         if not (isinstance(nodes, dict) and len(nodes) > 0):
             raise ProvisioningError('Invalid request. nodes must be a non-empty dict')
 
+        # optional variables to sub into ctx document template
+        vars = request.get('vars')
+
         #validate nodes and build DTRS request
         dtrs_nodes = {}
         for node_name, node in nodes.iteritems():
@@ -117,7 +120,7 @@ class ProvisionerCore(object):
         state = states.REQUESTED
         state_description = None
         try:
-            dt = yield self.dtrs.lookup(deployable_type, dtrs_nodes)
+            dt = yield self.dtrs.lookup(deployable_type, dtrs_nodes, vars)
             document = dt['document']
             dtrs_nodes = dt['nodes']
             logging.debug('got dtrs nodes: ' + str(dtrs_nodes))
