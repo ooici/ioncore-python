@@ -28,16 +28,18 @@ class TypedAttribute(object):
         self.name = None
         self.type = type
         self.default = default if default else type()
-        self.cache = None
+        self.cache = self.default
 
     def __get__(self, inst, cls):
         value = getattr(inst, self.name, self.default)
+        #return self.cache
         return value
 
     def __set__(self, inst, value):
         if not isinstance(value, self.type):
             raise TypeError("Error setting typed attribute %s \n Attribute must be of class %s \n Received Value of Class: %s" % (self.name, self.type, value.__class__))
         setattr(inst, self.name, value)
+        #self.cache = value
 
 
     @classmethod
@@ -561,5 +563,278 @@ class StatefulResource(Resource):
     """
     @brief Base for all OOI Stateful resource objects
     """
-
+    
 DataObject._types['StatefulResource']=StatefulResource
+
+class TestResource(Resource):
+    a = TypedAttribute(list)
+    b = TypedAttribute(InformationResource)
+    i = TypedAttribute(int)
+    f = TypedAttribute(float)
+
+class SimpleTest(DataObject):
+    field = TypedAttribute(str)
+    name = TypedAttribute(str)
+
+class IEncoder(object):
+    """
+    @brief DataObject Encoder/Decoder interface definition.
+    @note This is a loose place-holder. IEncoder encapsulates both encoding
+    and decoding.
+    """
+
+    def encode(o):
+        """
+        @param o instance of subclass of DataObject (or object form allowed
+        TypedAttribute)
+        @retval data of serialized DataObject.
+        """
+
+    def decode(self, data):
+        """
+        @param data 'encoded' DataObject
+        @retval DataObject instance. 
+        """
+
+
+class AlphaEncoder(object):
+    """
+    This calls the encode/decode methods of the original prototype
+    DataObject. It provides the 'Encoder' interface and is used by the
+    uniform serialization mechanism.
+    """
+
+    def encode(self, o):
+        """
+        @param o instance of subclass of DataObject
+        """
+        assert issubclass(type(o), DataObject)
+        return o.encode()
+
+    def decode(self, data):
+        """
+        @param data 'encoded' DataObject
+        """
+        return Resource.decode(data)
+
+class DEncoder(object):
+    """Encode a DataObject into a JSON encodable dict structure.
+    """
+
+    class Resource(Resource):
+        def __init__(self):
+            """undo what DataObject.__init__ does
+            """
+
+    def __init__(self):
+        self._type_encoders = {
+                int:self.encode_python_type,
+                float:self.encode_python_type,
+                str:self.encode_python_type,
+                bool:self.encode_python_type,
+                list:self.encode_list,
+                #dict:self.encode_dict,
+                LCState:self.encode_lcstate,
+                DataObject:self.encode_dataobject
+                }
+
+        self._type_decoders = {
+                'int':self.decode_python_type,
+                'float':self.decode_python_type,
+                'str':self.decode_python_type,
+                'bool':self.decode_python_type,
+                'list':self.decode_list,
+                #'dict':self.decode_dict,
+                'LCState':self.decode_lcstate,
+                'DataObject':self.decode_dataobject
+                }
+
+
+    def encode_python_type(self, o):
+        """
+        int, float, str, bool
+        """
+        return {'type':type(o).__name__, 'value':o}
+
+    def encode_dataobject(self, o):
+        """
+        """
+        d = {}
+        d['type'] = 'DataObject'
+        d['class'] = o.__class__.__name__
+        d['fields'] = {}
+        for field in o.attributes:
+            d['fields'][field] = self.encode(getattr(o, field))
+        return d
+
+    def encode_lcstate(self, o):
+        """
+        """
+        return {'type':'LCState', 'value':str(o)}
+
+    def encode_list(self, o):
+        """
+        """
+        data = {'type':'list'}
+        data['value'] = {}
+        for ord, obj in enumerate(o):
+            data['value'][str(ord)] = self.encode(obj)
+        return data
+
+    def encode_dict(self, o):
+        """
+        """
+
+    def decode_python_type(self, odict):
+        """
+        @note using eval to get type!
+        """
+        t = eval(odict['type'])
+        return t(odict['value'])
+
+    def decode_dataobject(self, odict):
+        """
+        """
+        cls = odict['class']
+        fields = odict['fields']
+        __dict = {}
+        for name, vdict in fields.iteritems():
+            val = self.decode(vdict)
+            __dict[name] = TypedAttribute(type(val), val)
+        #o = type(cls, (DataObject,), __dict)()
+        #o = type(str(cls), (Resource,), __dict)()
+        o = type(str(cls), (self.Resource,), __dict)()
+        return o
+
+    def decode_lcstate(self, odict):
+        """
+        """
+        return LCStates[odict['value']]
+    
+    def decode_list(self, odict):
+        """
+        """
+        o = []
+        for i in range(len(odict['value'].keys())):
+            vdict = odict['value'][str(i)]
+            o.append(self.decode(vdict))
+        return o
+
+    def decode_dict(self, data):
+        """
+        """
+
+    def encode(self, o):
+        """
+        """
+        if issubclass(type(o), DataObject):
+            return self.encode_dataobject(o)
+        else:
+            return self._type_encoders.get(type(o))(o)
+
+    def decode(self, odict):
+        """
+        """
+        return self._type_decoders[odict['type']](odict)
+
+
+class JSONDEncoder(object):
+
+    def __init__(self):
+        self._dencoder = DEncoder()
+
+    def encode(self, o):
+        odict = self._dencoder.encode(o)
+        return json.dumps(odict)
+
+    def decode(self, data):
+        odict = json.loads(data)
+        return self._dencoder.decode(odict)
+
+class Serializer(object):
+    """
+    @brief Registry of DataObject Encoders and uniform interface for
+    encoding/decoding a DataObject.
+    @note Aug 3, 2010 - DataObjects still implement their own [partial]
+    encoding. We are incrementally moving towards a full serialization of a
+    DataObject that makes sense with both how data objects are stored and
+    how they are messaged and without making language specific
+    assumptions/implementation features.
+    """
+
+    def __init__(self):
+        self._encoders = {}
+        self._encoders_by_type = {}
+        self._decoders = {}
+        self._default_encode = None
+        self._default_content_type = None
+        self._default_content_encoding = None
+
+    def __repr__(self):
+        s = ["%s\t\t%s\n" % (k, v[0]) for k, v in self._encoders.items()]
+        return ''.join(s).expandtabs()
+
+    def register(self, name, encoder, decoder, content_type, content_encoding):
+        """
+        """
+        self._encoders[name] = (content_type, content_encoding, encoder)
+        self._encoders_by_type[content_type] = (content_type, content_encoding, encoder)
+        self._decoders[content_type] = decoder
+
+    def set_default(self, name):
+        (self._default_content_type, self._default_content_encoding,
+            self._default_encode) = self._encoders[name]
+
+    def encode(self, o, content_type=None, serializer=None):
+        """
+        Serialize data object
+        """
+        if serializer:
+            (content_type, content_encoding, encoder) = self._encoders[serializer]
+        elif content_type:
+            (content_type, content_encoding, encoder) = self._encoders_by_type[content_type]
+        else:
+            encoder = self._default_encode
+            content_type = self._default_content_type
+            content_encoding = self._default_content_encoding
+        data = encoder(o)
+        return content_type, content_encoding, data
+
+
+    def decode(self, data, content_type, content_encoding=None):
+        """
+        @note assume encoding is always binary, for now.
+        @todo See what we learn from java for content_encoding
+        """
+        try:
+            decoder = self._decoders[content_type]
+        except KeyError:
+            return data
+        return decoder(data)
+
+serializer = Serializer()
+
+def register_alpha():
+    alpha = AlphaEncoder()
+    serializer.register('alpha', alpha.encode, alpha.decode, 
+            content_type='application/ion-dataobject',
+            content_encoding='binary')
+
+def register_dencoder():
+    de = DEncoder()
+    serializer.register('dencoder', de.encode, de.decode,
+            content_type='application/ion-dencoder',
+            content_encoding='binary')
+
+def register_jsond():
+    jd = JSONDEncoder()
+    serializer.register('jsond', jd.encode, jd.decode,
+        content_type='application/ion-jsond',
+        content_encoding='utf-8')
+
+register_alpha()
+register_jsond()
+register_dencoder()
+serializer.set_default('alpha')
+
+
