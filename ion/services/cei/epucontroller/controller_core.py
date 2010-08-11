@@ -11,13 +11,20 @@ from forengine import Control
 from forengine import State
 from forengine import StateItem
 
+PROVISIONER_VARS_KEY = 'provisioner_vars'
+
 class ControllerCore(object):
     """Controller functionality that is not specific to the messaging layer.
     """
     
     def __init__(self, provisioner_client, engineclass, conf=None):
         self.state = ControllerCoreState()
-        self.control = ControllerCoreControl(provisioner_client, self.state)
+        prov_vars = None
+        if conf:
+            if conf.has_key(PROVISIONER_VARS_KEY):
+                prov_vars = conf[PROVISIONER_VARS_KEY]
+                
+        self.control = ControllerCoreControl(provisioner_client, self.state, prov_vars)
         self.engine = EngineLoader().load(engineclass)
         self.engine.initialize(self.control, self.state, conf)
         
@@ -167,11 +174,12 @@ class QueueLengthParser(object):
 
 class ControllerCoreControl(Control):
     
-    def __init__(self, provisioner_client, state):
+    def __init__(self, provisioner_client, state, prov_vars):
         super(ControllerCoreControl, self).__init__()
         self.sleep_seconds = 5.0
         self.provisioner = provisioner_client
         self.state = state
+        self.prov_vars = prov_vars # can be None
     
     def configure(self, parameters):
         """
@@ -215,7 +223,7 @@ class ControllerCoreControl(Control):
                 new_instance_id_list.append(new_instance_id)
                 
         self.provisioner.provision(launch_id, deployable_type_id, 
-                launch_description)
+                launch_description, vars=self.prov_vars)
         extradict = {"launch_id":launch_id,
                      "new_instance_ids":new_instance_id_list}
         cei_events.event("controller", "new_launch", 
