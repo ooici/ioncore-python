@@ -424,7 +424,7 @@ class ProvisionerCore(object):
                         updated_nodes.append(node)
                         break
             if updated_nodes:
-                yield self.store_and_notify(updated_nodes)
+                yield self.store_and_notify(updated_nodes, launch['subscribers'])
             
             if context_status.complete:
                 logging.info('Launch %s context is complete!', launch_id)
