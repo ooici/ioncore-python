@@ -427,6 +427,7 @@ class ProvisionerCore(object):
             logging.debug('Querying context ' + ctx_uri)
             context_status = yield self.context.query(ctx_uri)
             nodes = yield self.store.get_launch_nodes(launch_id)
+            logging.debug("Launch nodes: %s" % nodes)
             by_ip = group_records(nodes, 'public_ip')
             
             #TODO this matching could probably be more robust
