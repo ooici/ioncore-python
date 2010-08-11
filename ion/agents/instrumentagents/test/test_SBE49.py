@@ -159,16 +159,17 @@ class TestSBE49(IonTestCase):
 
         # === End to be replaces with Define_Consumer
 
-        cmd1 = {'start': ['now']}
-        cmd2 = {'stop':['now']}
+        cmd1 = {'ds': ['now']}
+        #cmd1 = {'start': ['now']}
+        #cmd2 = {'stop':['now']}
         #cmd2 = {'pumpoff':['3600', '1']}
         result = yield self.driver_client.execute(cmd1)
         self.assertEqual(result['status'], 'OK')
-        result = yield self.driver_client.execute(cmd2)
-        self.assertEqual(result['status'], 'OK')
-
         # DHE: wait a while...
-        yield pu.asleep(4)
+        yield pu.asleep(2)
+        #result = yield self.driver_client.execute(cmd2)
+        #self.assertEqual(result['status'], 'OK')
+
 
         # DHE: disconnecting; a connect would probably be good.
         result = yield self.driver_client.disconnect(['some arg'])

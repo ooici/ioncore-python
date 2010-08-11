@@ -9,14 +9,21 @@ import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer, reactor
 
+"""
+from ion.data.dataobject import LCStates as LCS
+from ion.services.base_service import BaseService
+"""
+
 from twisted.internet.protocol import Protocol, ClientFactory, ClientCreator
 
+from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource, DAPMessageObject
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient
 from ion.agents.instrumentagents.SBE49_constants import instrument_commands
 
+import ion.util.procutils as pu
 
 from ion.core.base_process import ProtocolFactory
 
@@ -29,8 +36,7 @@ class InstrumentClient(Protocol):
         self.parent = parent
         
     def connectionMade(self):
-        logging.debug("connectionMade.")
-        #self.factory.got_connection(self)
+        logging.debug("DHE: connectionMade, calling gotConnected().")
         self.parent.gotConnected(self)
         
     def dataReceived(self, data):
@@ -53,60 +59,26 @@ class InstrumentClient(Protocol):
             self.parent.gotData(data)
 
 
-"""
-This isn't use anymore
-"""
-class InstrumentClientFactory(ClientFactory):
-
-    protocol = InstrumentClient
-    
-    #def __init__(self, parent, deferred):
-    def __init__(self, parent):
-        self.parent = parent
-        #self.deferred = deferred
-    
-    def startedConnecting(self, connector):
-        print 'DHE: Started to connect.'
-        
-    def got_connection(self, instrument):
-        logging.debug("DHE: got_connection()!")
-        self.instrument = instrument
-        """
-        if self.deferred is not None:
-            #logging.debug("calling callback!")
-            d, self.deferred = self.deferred, None
-            d.callback(instrument)
-        """
-
-    def prompt_received(self, instrument):
-        logging.debug("DHE: prompt_received()!")
-        self.instrument = instrument
-        """
-        if self.deferred is not None:
-            #logging.debug("calling callback")
-            d, self.deferred = self.deferred, None
-            d.callback(instrument)
-        #else:
-            #logging.debug("no more deferred!")
-        """
-        self.parent.gotConnected(instrument)
-
-    def data_received(self, data):
-        logging.debug("DHE: data_received()!")
-        self.parent.gotData(data)
-            
-    def clientConnectionLost(self, connector, reason):
-        print 'DHE: Lost connection.  Reason:', reason
-
-    def clientConnectionFailed(self, connector, reason):
-        print 'DHE: Connection failed. Reason:', reason
-
 class SBE49InstrumentDriver(InstrumentDriver):
+
+    connected = False
+    instrument = None
+    command = None
+    TopicDefined = False
+
+    """    
+    lifecycleState = LCS['new']
+    declare = BaseService.service_declare(name = 'Instrument',
+                                          version = '0.0.1',
+                                          dependencies = [])
+    """                                          
+    
     """
     Maybe some day these values are looked up from a registry of common
         controlled vocabulary
     """
     def __init__(self, receiver=None, spawnArgs=None, **kwargs):
+
         self.__instrument_parameters = {
             "baudrate": 9600,
             "outputformat": 0,
@@ -149,11 +121,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
             "ptcb1": 0.0,
             "ptcb2": 0.0
         }
+
         InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
 
-    connected = False
-    instrument = None
-    
     def isConnected(self):
         return self.connected
     
@@ -192,9 +162,21 @@ class SBE49InstrumentDriver(InstrumentDriver):
         logging.info("DHE: calling connectTCP")
         self.proto = yield cc.connectTCP("localhost", 9000)
         logging.info("DHE: connectTCP returned")
-        
+
+        """        
+        # Instantiate a pubsubclient
+        dpsc = DataPubsubClient(self)
+
+        # Create and Register a topic
+        topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
+        topic = yield dpsc.define_topic(topic)
+        #topic = dpsc.define_topic(topic)
+        logging.debug('DHE: Defined Topic: '+str(topic))
+        """
+       
         #return self.d
     
+    @defer.inlineCallbacks
     def gotConnected(self, instrument):
         """
         @brief This method is called when a connection has been made to the
@@ -204,6 +186,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @param reference to instrument protocol object.
         @retval none
         """
+        logging.debug("DHE: gotConnected!!!")
+
         self.instrument = instrument
         self.setConnected(True)
 
@@ -211,9 +195,18 @@ class SBE49InstrumentDriver(InstrumentDriver):
         This is ad hoc right now.  Need a state machine or something to handle
         the possible cases (connected, not-connected)
         """
-        logging.debug("DHE: gotConnected!!!")
         #instrument.transport.write("ds")
+
+        # Instantiate a pubsubclient
+        dpsc = DataPubsubClient(self)
         
+        # Create and Register a topic
+        topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
+        topic = yield dpsc.define_topic(topic)
+        #topic = dpsc.define_topic(topic)
+        logging.debug('DHE: Defined Topic: '+str(topic))
+        self.topicDefined = True
+
     def gotData(self, data):
         """
         @brief The instrument protocol object has received data from the
@@ -230,7 +223,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         This needs to be the general receive routine for the instrument driver
         """
-        logging.debug("DHE: gotPrompt!")
+        logging.debug("DHE: gotPrompt()")
         self.instrument = instrument
         self.setConnected(True)
         
@@ -238,7 +231,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
         Need some sort of state machine so we'll know what data we're supposed to send...
         """
         #instrument.transport.write("ds")
-        #instrument.transport.write(self.command)
+        if self.command != None:
+            logging.debug("DHE: gotPrompt sending command: %s"  % (self.command))
+            instrument.transport.write(self.command)
+        else:
+            logging.debug("DHE gotPrompt NOT SENDING ANYTHING")
         
     def publish(self, data, topic):
         """
@@ -247,10 +244,14 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @param topic The topic to which to pubish
         @retval none
         """
-        logging.debug("DHE: publish(): %s" %str(self.__dict__))
+        #logging.debug("DHE: publish(): %s" %str(self.__dict__))
+        logging.debug("DHE: publish()")
         
-        self.dpsc = DataPubsubClient(self.sup)
-        
+        self.publisher = PublisherResource.create('Test Publisher', self, topic, 'DataObject')
+        self.publisher = yield dpsc.define_publisher(self.publisher)
+
+        logging.info('DHE: Defined Publisher: '+str(self.publisher))
+
 
     @defer.inlineCallbacks
     def op_disconnect(self, content, headers, msg):
@@ -314,7 +315,15 @@ class SBE49InstrumentDriver(InstrumentDriver):
             #d.addCallback(self.gotConnected);
             #d.addCallback(self.gotPrompt);
             #logging.debug("waiting to be connected...")
-                    
+        
+        """
+        DHE THERE IS A WEIRD PROBLEM WHERE getConnected() RETURNS BUT THE TOPIC ISNT DEFINED,
+        BECAUSE THAT CALL YIELDS (UP IN gotConnected)
+        """
+        
+        #while self.TopicDefined != True:
+        #    yield pu.asleep(1)
+            
         if (content == {}):
             yield self.reply_err(msg, "Empty command")
             return
@@ -324,9 +333,13 @@ class SBE49InstrumentDriver(InstrumentDriver):
             else:
                 logging.info("DHE: command: %s" % command)
                 self.command = command
-                if self.instrument != None:
-                    logging.debug("DHE: sending command: %s" % command)
-                    self.instrument.transport.write(self.command)
+                """
+                This isn't working; possibly because the connection has
+                not been totally set up yet.
+                """
+                #if self.instrument != None:
+                #    logging.debug("DHE: sending command: %s" % command)
+                #    self.instrument.transport.write(self.command)
         yield self.reply_ok(msg, content.keys())
 
     
@@ -363,6 +376,7 @@ class SBE49InstrumentDriverClient(InstrumentDriverClient):
     The client class for the instrument driver. This is the client that the
     instrument agent can use for communicating with the driver.
     """
+    
     
 # Spawn of the process using the module name
 factory = ProtocolFactory(SBE49InstrumentDriver)
