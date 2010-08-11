@@ -9,7 +9,11 @@
 import logging
 logging = logging.getLogger(__name__)
 
-import simplejson as json
+try:
+    import json
+except:
+    import simplejson as json
+
 
 from twisted.internet import defer, task
 from twisted.web import xmlrpc

@@ -23,15 +23,15 @@ class IngesterTester(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-        self.timeout = 60
+        self.timeout = 30
         services = [
             {'name': 'ingest', 'module': 'ion.services.dm.ingestion.ingest',
              'class':'IngestService'}
         ]
         sup = yield self._spawn_processes(services)
         self.ic = IngestClient(proc=sup)
-        self.fs = FetcherService()
-        self.mys = IngestService()
+        #self.fs = FetcherService()
+        #self.mys = IngestService()
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -46,7 +46,7 @@ class IngesterTester(IonTestCase):
         actual messaging.
         """
         raise unittest.SkipTest('Causes timeout on my workstation')
-        
+
         logging.debug('getting dataset')
         dset_url = 'http://ooici.net:8001/coads.nc'
         dset = self.fs._get_dataset_no_xmit(dset_url)

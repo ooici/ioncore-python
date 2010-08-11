@@ -19,10 +19,7 @@ from ion.services.dm.util.url_manipulation import generate_filename
 
 from ion.test.iontest import IonTestCase
 import base64
-try:
-    import json
-except:
-    import simplejson as json
+import simplejson as json
 
 TEST_DSET = 'http://ooici.net:8001/coads.nc'
 class TransportTester(IonTestCase):

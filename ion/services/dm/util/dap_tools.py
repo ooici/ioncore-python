@@ -47,9 +47,11 @@ def ds2dap_msg(pydap_dataset,headeronly=False):
     if not headeronly:
         
         # Catch depricated warnings!
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore",category=DeprecationWarning)
-            dods = dap_gen(pydap_dataset)
+        # Unfortunately, catch_warnings is new in python 2.6 
+        #with warnings.catch_warnings():
+        #    warnings.simplefilter("ignore",category=DeprecationWarning)
+        #    dods = dap_gen(pydap_dataset)
+        dods = dap_gen(pydap_dataset)
 
         msg.dods = base64.b64encode(dods)
         #msg.dods = dods    
