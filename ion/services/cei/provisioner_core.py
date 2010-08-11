@@ -424,6 +424,7 @@ class ProvisionerCore(object):
                         updated_nodes.append(node)
                         break
             if updated_nodes:
+                logging.debug("%d nodes need to be updated as a result of the context query" % len(updated_nodes))
                 yield self.store_and_notify(updated_nodes, launch['subscribers'])
             
             if context_status.complete:
@@ -431,7 +432,6 @@ class ProvisionerCore(object):
                 # update the launch record so this context won't be re-queried
                 launch['state'] = states.RUNNING
                 yield self.store.put_record(launch)
-                yield self.notifier.send_record(launch, launch['subscribers'])
             else:
                 logging.debug('Launch %s context is incomplete: %s of %s nodes',
                         launch_id, len(context_status.nodes), 
