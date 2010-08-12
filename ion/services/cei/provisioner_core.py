@@ -440,11 +440,20 @@ class ProvisionerCore(object):
                         len(updated_nodes))
                 yield self.store_and_notify(updated_nodes, launch['subscribers'])
             
-            if context_status.complete:
-                logging.info('Launch %s context is complete!', launch_id)
+            all_ok = True
+            for ctx_node in ctx_nodes:
+                if not ctx_node.ok_occurred:
+                    all_ok = False
+                    break
+                    
+            if all_ok:
+                logging.info('Launch %s context is "all-ok": done!', launch_id)
                 # update the launch record so this context won't be re-queried
                 launch['state'] = states.RUNNING
                 yield self.store.put_record(launch)
+            
+            if context_status.complete:
+                logging.info('Launch %s context is "complete" (all checked in, but not all-ok)', launch_id)
             else:
                 logging.debug('Launch %s context is incomplete: %s of %s nodes',
                         launch_id, len(context_status.nodes), 
@@ -548,7 +557,6 @@ def update_nodes_from_context(nodes, ctx_nodes):
 def _update_one_node_from_ctx(node, ctx_node, identity):
     node_done = ctx_node.ok_occurred or ctx_node.error_occurred
     if not node_done or node['state'] >= states.RUNNING:
-        logging.debug("No update, ctx node: iaas_id '%s', state '%s', ok? '%s', err? '%s'" % (node['iaas_id'], node['state'], ctx_node.ok_occurred, ctx_node.error_occurred))
         logging.debug('bail '+node['state'])
         return False
     if ctx_node.ok_occurred:
