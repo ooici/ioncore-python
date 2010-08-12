@@ -67,7 +67,6 @@ class DataPubsubService(BaseService):
         logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic: \n' + str(topic))
             
         #@todo call some process to update all the subscriptions? Or only on interval?
-        
         if topic:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
             yield self.reply_ok(msg, topic.encode())

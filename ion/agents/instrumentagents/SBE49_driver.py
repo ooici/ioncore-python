@@ -16,10 +16,11 @@ from ion.services.base_service import BaseService
 
 from twisted.internet.protocol import Protocol, ClientFactory, ClientCreator
 
+from ion.core.base_process import BaseProcess
 from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource, DAPMessageObject
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 
-from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
+from ion.agents.instrumentagents.instrument_agent import InstrumentDriver, InstrumentAgentClient
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient
 from ion.agents.instrumentagents.SBE49_constants import instrument_commands
 
@@ -125,28 +126,36 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
 
+    @defer.inlineCallbacks
     def plc_init(self):        
         self.instrument_id = self.spawn_args.get('instrument-id','123')
         logging.info("INIT DRIVER for instrument ID: %s" % (self.instrument_id))
+        
+        # We need a separte process (and process id/in queue) for the RPC
+        # because we cannot receive the RPC response message while still
+        # processing the init message (on the same queue).
+        rpcproc = BaseProcess()
+        rpcpid = yield rpcproc.spawn()
+        
+        self.iaclient = InstrumentAgentClient(proc=rpcproc, target=self.proc_supid)        
 
-        """
         # Instantiate a pubsubclient
-        dpsc = DataPubsubClient(self.get_instance())        
+        self.dpsc = DataPubsubClient(proc=rpcproc)
         
         # Create and Register a topic
-        #DHE: not sure the driver should be creating the topic; for right
-        #now I'll have the test case do it.
         self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
-        self.topic = yield dpsc.define_topic(self.topic)
+        self.topic = yield self.dpsc.define_topic(self.topic)
         logging.debug('DHE: Defined Topic')
+
+        self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
+        self.publisher = yield self.dpsc.define_publisher(self.publisher)
+
+        logging.info('DHE: Defined Publisher')
+
+        self.topicDefined = True
         
-        #self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
-        #self.publisher = yield dpsc.define_publisher(self.publisher)
+        logging.debug("Instrument driver has topic")
 
-        #logging.info('DHE: Defined Publisher')
-
-        #self.topicDefined = True
-        """
         
     def isConnected(self):
         return self.connected
@@ -200,7 +209,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
        
         #return self.d
     
-    @defer.inlineCallbacks
     def gotConnected(self, instrument):
         """
         @brief This method is called when a connection has been made to the
@@ -213,27 +221,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         logging.debug("DHE: gotConnected!!!")
 
         self.instrument = instrument
-        self.setConnected(True)
-
-        """
-        This is ad hoc right now.  Need a state machine or something to handle
-        the possible cases (connected, not-connected)
-        """
-    
-        # Instantiate a pubsubclient
-        self.dpsc = DataPubsubClient(self)
-        
-        # Create and Register a topic
-        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
-        self.topic = yield self.dpsc.define_topic(self.topic)
-        logging.debug('DHE: Defined Topic')
-        
-        self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
-        self.publisher = yield self.dpsc.define_publisher(self.publisher)
-
-        logging.info('DHE: Defined Publisher')
-
-        self.topicDefined = True
+        self.setConnected(True)    
         
     def gotData(self, data):
         """
