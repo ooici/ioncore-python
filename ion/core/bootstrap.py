@@ -19,7 +19,7 @@ from ion.data.store import Store
 from ion.core import ioninit, base_process
 from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core.cc.modloader import ModuleLoader
-
+from ion.resources import description_utility 
 from ion.services.coi import service_registry
 from ion.data.datastore import registry
 
@@ -78,6 +78,10 @@ def init_container():
         Container.interceptor_system = cls()
     # Collect all service declarations in local code modules
     ModuleLoader().load_modules()
+
+    #Load All Resource Descriptions for future decoding
+    description_utility.load_descriptions()
+
     #yield bs_register_services()
 
 def _set_container_args(contargs=None):

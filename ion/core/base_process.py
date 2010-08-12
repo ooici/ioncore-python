@@ -632,7 +632,7 @@ class BaseProcessClient(object):
 
     @defer.inlineCallbacks
     def attach(self):
-        self._check_init()
+        yield self._check_init()
 
     def rpc_send(self, *args):
         """

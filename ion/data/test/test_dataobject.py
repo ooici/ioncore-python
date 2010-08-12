@@ -758,3 +758,7 @@ class TestResource(unittest.TestCase):
         
         self.assertEqual(res.get_lifecyclestate(),dataobject.LCState('new'))
  
+
+class TestDEncoder(unittest.TestCase):
+    """
+    """

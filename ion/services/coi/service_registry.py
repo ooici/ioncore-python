@@ -148,11 +148,15 @@ class ServiceRegistryClient(registry.BaseRegistryClient):
         service_description.description = inspect.getdoc(service_class)      
         
         #@Note need to improve inspection of service!
+        #kind and name are accessors added in python 2.6
+        #they are taken out here, to be 2.5 compatible
         for attr in inspect.classify_class_attrs(service_class):
-            if attr.kind == 'method' and 'op_' in attr.name :
+            #if attr.kind == 'method' and 'op_' in attr.name :
+            if attr[1] == 'method' and 'op_' in attr[0] :
             
                 opdesc = coi_resource_descriptions.ServiceMethodInterface()
-                opdesc.name = attr.name
+                #opdesc.name = attr.name
+                opdesc.name = attr[0]
                 #print 'INSEPCT',inspect.getdoc(attr.object)
                 #opdesc.description = inspect.getdoc(attr.object)
                 #Can't seem to get the arguments in any meaningful way...

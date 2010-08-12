@@ -58,7 +58,10 @@ class IObjectChassis(interface.Interface):
 
 class IObjectStore(cas.ICAStore):
     """
-    A CAStore for data objects.
+    @brief Object Store that extends the ion.data.datastore.cas.ICAStore
+    interface. Objects stored in the Object Store have a specific defined
+    structure, decompose into cas.ICAStoreObject content objects, and are
+    derived from the generic Data Object of ion (ion.data.dataobject). 
     """
     objectChassis = interface.Attribute("""@param objectChassis a class
                     implementing IObjectChassis""")
@@ -70,12 +73,31 @@ class IObjectStore(cas.ICAStore):
         @param name Unique identifier of data object.
         @param baseClass Class that models structure of data object. This
         class is a container of typed attributes.
+        @retval defer.Deferred that succeeds with an instance of
+        objectChassis.
         """
 
     def clone(name):
         """
         @brief Retrieve data object.
         @param name Unique identifier of data object.
+        @retval defer.Deferred that succeeds with an instance of
+        objectChassis.
+        """
+
+    def update(obj):
+        """
+        @brief Update the reference/heads of an object
+        @param obj object store object.
+        @retval 
+        @note This is used to update the state of an object after a commit.
+        The reference object only needs to keep a record of the object
+        heads, which are the most recent commit id[s].
+        Ensure the last commit matches the parent of the new commit.
+        Any object should only be updated by one IObjectStore at a time.
+        How to make the commit concept distributed? Branching can be used
+        instead of dealing with race conditions. Define the atom of this
+        abstraction layer. 
         """
 
 class Element(cas.Element):
@@ -497,6 +519,8 @@ class ObjectStore(BaseObjectStore):
     def clone(self, name):
         """
         @param name uuid of object store object.
+        @retval defer.Deferred that succeeds with an instance of
+        objectChassis.
         @brief Clone an object from the object store. The semantic of
         'clone' as opposed to 'get' is very important. Objects in the
         object store represent [potentially mutable] models of immutable
