@@ -93,6 +93,7 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
     objectChassis = RegistryBackend
 
     def clear_registry(self):
+        logging.info(self.__class__.__name__ + '################################################################# clear_registry called ')
         return self.backend.clear_store()
 
 
@@ -132,6 +133,7 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
             resource.RegistryCommit = yield res_client.commit()
         else:
             resource = None
+        
         defer.returnValue(resource)
 
     @defer.inlineCallbacks
@@ -216,7 +218,7 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
             # Get the list of descriptions in this registry
             
             reslist = yield self._list_descriptions()
-
+            logging.info(self.__class__.__name__ + 'find_resource found ' + str(len(reslist)) + ' items in registry')
             for ref in refs:
                 res = yield self.get_resource(ref)
                 logging.info(res)
@@ -414,7 +416,7 @@ class BaseRegistryService(BaseService):
         results=coi_resource_descriptions.ResourceListContainer()
         results.resources = result_list
 
-        logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
+        logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success! ' + str(len(result_list)) + ' Matches Found')
         encoding, _, data = dataobject.serializer.encode(results, accept_encoding)
         headers = dict(encoding=encoding)
         yield self.reply_ok(msg, data, headers)
