@@ -3,7 +3,11 @@
 """
 @file res/scripts/pubsub.py
 @author David Stuebe
-@brief main module for bootstrapping dm pubsub services
+@brief main module for bootstrapping dm pubsub services test
+This test creates a configurable number of publisher processes using the
+nproducers argument from the command line. The default configuration of the
+script creates a subscription workflow which process the results and creates
+an aggregate statement in the log about the number of data events.
 """
 import random
 
@@ -117,15 +121,15 @@ def start():
             {'module':'ion.services.dm.distribution.consumers.example_consumer',
                 'consumerclass':'ExampleConsumer',\
                 'attach':'topic1'},
-        'consumer3':
+        'consumer2':
             {'module':'ion.services.dm.distribution.consumers.message_count_consumer',
                 'consumerclass':'MessageCountConsumer',\
                 'attach':[['consumer1','event_queue']],\
                 'delivery interval':10},
-        'consumer2':
+        'consumer3':
             {'module':'ion.services.dm.distribution.consumers.logging_consumer',
                 'consumerclass':'LoggingConsumer',\
-                'attach':[['consumer3','queue']]}
+                'attach':[['consumer2','queue']]}
             }
     
     

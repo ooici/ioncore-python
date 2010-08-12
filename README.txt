@@ -45,6 +45,8 @@ Alternatively (better) from UNIX shell executing a script:
 ::
     twistd -n magnet -h amoeba.ucsd.edu res/scripts/bootstrap.py
     twistd -n magnet -h amoeba.ucsd.edu res/scripts/newcc.py
+    twistd -n magnet -h amoeba.ucsd.edu -a nproducers=25 res/scripts/pubsub.py
+
 
 Run trial test cases (recursively)
 ::
