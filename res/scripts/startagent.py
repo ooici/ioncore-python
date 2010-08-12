@@ -8,6 +8,10 @@ from ion.core import ioninit
 from ion.core import bootstrap
 from ion.util.config import Config
 
+from subprocess import Popen, PIPE
+import ion.util.procutils as pu
+import os
+
 # Use the bootstrap configuration entries from the standard bootstrap
 CONF = ioninit.config('ion.core.bootstrap')
 
@@ -29,6 +33,24 @@ def main():
     Initializes container
     """
     logging.info("ION CONTAINER initializing... [Start an Instrument Agent]")
+
+    """
+    Construct the path to the instrument simulator, starting with the current
+    working directory
+    """
+    cwd = os.getcwd()
+    myPid = os.getpid()
+    logging.debug("DHE: myPid: %s" % (myPid))
+    
+    simDir = cwd + "/ion/agents/instrumentagents/test/"
+    simPath = simDir + "sim_SBE49.py"
+    logPath = simDir + "sim.log"
+    logging.info("cwd: %s, simPath: %s, logPath: %s" %(str(cwd), str(simPath), str(logPath)))
+    simLogObj = open(logPath, 'a')
+    simProc = Popen(simPath, stdout=simLogObj)
+
+    # Sleep for a while to allow simlator to get set up.
+    yield pu.asleep(2)
 
     processes = []
     processes.extend(agent_procs)
