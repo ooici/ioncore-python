@@ -125,9 +125,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
 
-    def plc_init(self):
-        
-        logging.debug('DHE: in SBE49_driver plc_init')
+    def plc_init(self):        
+        self.instrument_id = self.spawn_args.get('instrument-id','123')
+        logging.info("INIT DRIVER for instrument ID: %s" % (self.instrument_id))
 
         """
         # Instantiate a pubsubclient
