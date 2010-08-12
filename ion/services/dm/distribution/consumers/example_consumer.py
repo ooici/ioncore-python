@@ -21,14 +21,16 @@ from ion.services.dm.util import dap_tools
 
 class ExampleConsumer(base_consumer.BaseConsumer):
     """
-        This is an example data consumer process. It applies a process to the data
-        and sends the results to a 'qaqc' queue and an event queue. The send-to
-        location is a parameter specified in the consumer class spawn args,
-        'delivery queues' which is passed as **kwargs to ondata
-        """
+    This is an example data consumer process. It applies a process to the data
+    and sends the results to a 'qaqc' queue and an event queue. The send-to
+    location is a parameter specified in the consumer class spawn args,
+    'delivery queues' which is passed as **kwargs to ondata
+    """
     def ondata(self, data, notification, timestamp, event_queue='', processed_queue=''):
         
-            
+        
+        print 'DataKeys:',data.keys()
+        
         resdata = []
         tsdata = []
         # Process the array of data
@@ -38,9 +40,10 @@ class ExampleConsumer(base_consumer.BaseConsumer):
             samp = data.height[ind]
             if samp<0 or samp>100:
                 # Must convert pydap/numpy Int32 to int!
-                self.queue_result(event_queue,\
-                                  {'event':(int(ts),'out_of_range',int(samp))},\
-                                    'out_of_range')
+                if event_queue:
+                    self.queue_result(event_queue,\
+                                      {'event':(int(ts),'out_of_range',int(samp))},\
+                                        'out_of_range')
                 samp = 0
             qcsamp = samp
             # Must convert pydap/numpy Int32 to int!
@@ -55,7 +58,8 @@ class ExampleConsumer(base_consumer.BaseConsumer):
             {'time':tsdata, 'height':resdata})
         
         # Messages contains a new dap dataset to send to send 
-        self.queue_result(processed_queue,dset,'Example processed data')
+        if processed_queue:
+            self.queue_result(processed_queue,dset,'Example processed data')
         
 
 # Spawn of the process using the module name

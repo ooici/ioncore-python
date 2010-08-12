@@ -47,9 +47,15 @@ class BaseConsumer(BaseProcess):
 
     @defer.inlineCallbacks
     def plc_init(self):
-        self.params = self.spawn_args.get('process parameters',{})
-        self.deliver = self.spawn_args.get('delivery queues',{})
+        p = self.spawn_args.get('process parameters',{})
+        self.params = {}
+        for k,v in p.items():
+            self.params[str(k)] = v
         
+        d = self.spawn_args.get('delivery queues',{})
+        self.deliver = {}
+        for k,v in d.items():
+            self.deliver[str(k)] = v
         
         # Scheduled interval delivery - digest mode!
         self.delivery_interval = self.spawn_args.get('delivery interval',None)

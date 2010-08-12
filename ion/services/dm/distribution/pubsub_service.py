@@ -536,13 +536,13 @@ class DataPubsubClient(BaseServiceClient):
         
 
         (content, headers, msg) = yield self.rpc_send('define_subscription',
-                                            publisher.encode())
+                                            subscription.encode())
         logging.debug(self.__class__.__name__ + ': define_subscription; Result:' + str(headers))
         
         if content['status']=='OK':
             logging.info(self.__class__.__name__ + '; define_subscription: Success!')
-            publisher = dataobject.Resource.decode(content['value'])
-            defer.returnValue(publisher)
+            subscription = dataobject.Resource.decode(content['value'])
+            defer.returnValue(subscription)
         else:
             logging.info(self.__class__.__name__ + '; define_subscription: Failed!')
             defer.returnValue(None)
