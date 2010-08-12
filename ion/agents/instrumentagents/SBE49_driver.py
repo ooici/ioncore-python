@@ -200,7 +200,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
        
         #return self.d
     
-    #@defer.inlineCallbacks
+    @defer.inlineCallbacks
     def gotConnected(self, instrument):
         """
         @brief This method is called when a connection has been made to the
