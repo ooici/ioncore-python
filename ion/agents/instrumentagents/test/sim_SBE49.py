@@ -11,9 +11,13 @@ This program can be fleshed out as needed.
 @date 6/8/10
 """
 
+import sys
 from twisted.internet import protocol
 from twisted.internet import reactor
 from twisted.internet import task
+
+INSTRUMENT_ID = "123"
+SIM_PORT = 9000
 
 class Instrument(protocol.Protocol):
     """
@@ -180,6 +184,7 @@ class Instrument(protocol.Protocol):
         elif data in self.commands:
             # Any command that falls to this point gets handled with the general
             # command response that is in the commands dictionary. 
+            print "command received: %s" % (data)
             self.transport.write(self.commands[data])
         else:
             print "Invalid command received: %s" % (data)
@@ -246,8 +251,15 @@ def main():
     if an new client connects while another is connected, the client variable
     in the factory will be overwritten). 
     """
+    global INSTRUMENT_ID
+    global SIM_PORT
+    if len(sys.argv) >= 2:
+        INSTRUMENT_ID = sys.argv[1]
+    if len(sys.argv) >= 3:
+        SIM_PORT = sys.argv[2]
+    print "Starting SBE49 simulator for ID %s on port %d" % (INSTRUMENT_ID,SIM_PORT)
     f = InstrumentFactory()
-    reactor.listenTCP(9000, f)
+    reactor.listenTCP(SIM_PORT, f)
     reactor.run()
 
 if __name__ == '__main__':

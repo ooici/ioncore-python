@@ -25,6 +25,9 @@ logging = logging.getLogger(__name__)
 
 import time
 import sys
+import os
+import tempfile
+from pydap.handlers.nca import Handler as ncaHandler
 
 from twisted.internet import defer
 
@@ -77,7 +80,81 @@ class PersisterService(BaseService):
             defer.returnValue(None)
 
         yield self.reply_ok(msg)
-
+    
+    @defer.inlineCallbacks
+    def op_append_dap_dataset(self, content, headers, msg):
+        """
+        @brief routine to append to an existing dataset which is a netcdf file
+        @param content Message with dataset name, pattern, das, dds and dods keys
+        The dataset name is mapped to a file that will be used to persist the dataset
+        The pattern is used to match all of the files that will be appended
+        @param headers Ignored
+        @param msg Used to route the reply, otherwise ignored
+        @retval RPC message via reply_ok/reply_err
+        """
+        logging.info('called to append a dap dataset!')
+        
+        assert(isinstance(content, dict))
+        
+        try:
+            self.op_persist_dap_dataset(content, headers, msg)
+        except:
+            yield self.reply_err(msg, {'value': 'Problem with persisting new dataset'}, {})
+            defer.returnValue(None)
+        dataset = content["dataset"]    
+        dsname = generate_filename(dataset)
+        pattern = content["pattern"]
+        
+        logging.info('using netcdf file matching pattern: ' + pattern)
+        try:
+            logging.info("calling _append_no_xmit ")
+            rc = self._append_no_xmit(dsname, pattern)
+            logging.info("returned from _append_no_xmit with rc ", rc)
+        except:
+            yield self.reply_err(msg, {'value':'Problem appending the dataset'}, {})
+            defer.returnValue(None)
+            
+        yield self.reply_ok(msg)
+        
+        
+    def _append_no_xmit(self, dsname, pattern, local_dir=None):
+        """
+        @brief Appends netcdf files together. 
+        @param dsname, the name of the file that contains the 
+        @param pattern a pattern used to match netcdf files to append
+         
+        """
+        configfile = tempfile.NamedTemporaryFile()
+        configfile.write("[dataset]")
+        configfile.write(os.linesep)
+        configfile.write("name=append")
+        configfile.write(os.linesep)
+        configfile.write("match="+ pattern)
+        configfile.write(os.linesep)
+        configfile.write("axis=time")
+        configfile.write(os.linesep)
+        configfile.flush()    
+        logging.info("Initializing nca handler")
+        h = ncaHandler(configfile.name)
+        try:
+            ds = h.parse_constraints({'pydap.ce':(None,None)})
+        except:
+            logging.exception("problem using append handler")
+            return 2
+        
+        logging.info("Created new netcdf dataset")
+        try:
+            
+            logging.info("saving netcdf file")
+            #It needs to save the file to a new file name, I have arbitrarily chosen
+            #to make the file the same as the first file name with the suffix _append
+            netcdf.save(ds, dsname+ "_append")
+        except UnicodeDecodeError, ude:
+            logging.exception('save error: %s ' % ude)
+            return 1
+        
+        configfile.close()
+        
     def _save_no_xmit(self, content, local_dir=None):
         """
         @brief Parse message into decodable objects: DAS, DDS, data.
@@ -183,7 +260,26 @@ class PersisterClient(BaseServiceClient):
 
         (content, headers, msg) = yield self.rpc_send('persist_dap_dataset',
                                                       dap_message)
+        
         logging.debug('dap persist returns: ' + str(content))
         defer.returnValue(str(content))
-
+        
+    @defer.inlineCallbacks   
+    def append_dap_dataset(self, dataset, pattern, dap_message):
+        """
+        @brief Append to an existing dataset, new data from a dap message
+        @param dataset, a logical name of the dataset, this name is mapped to a file name
+        @param dap_message Message with das/dds/dods in das/dds/dods keys 
+        @retval ok or error via rpc mechanism
+        """
+        yield self._check_init()
+        dap_message.update({'dataset': dataset})
+        dap_message.update({'pattern': pattern})
+        (content, headers, meg) = yield self.rpc_send('append_dap_dataset', 
+                                                      dap_message)
+        
+        logging.debug('dap append returns: ' + str(content))
+        defer.returnValue(str(content))
+        
+        
 factory = ProtocolFactory(PersisterService)

@@ -32,13 +32,17 @@ class SBE49InstrumentAgent(InstrumentAgent):
         """
         Initialize instrument driver when this process is started.
         """
+        self.instrument_id = self.spawn_args.get('instrument-id','123')
+        logging.info("INIT agent for instrument ID: %s" % (self.instrument_id))
+        
+        
         pd = ProcessDesc(**{'name':'SBE49Driver',
                           'module':'ion.agents.instrumentagents.SBE49_driver',
-                          'class':'SBE49InstrumentDriver'})
-        self.sup = yield bootstrap.create_supervisor()
+                          'class':'SBE49InstrumentDriver',
+                          'spawnargs':{'instrument-id':self.instrument_id}})
                 
-        driver_id = yield self.sup.spawn_child(pd)
-        self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
+        driver_id = yield self.spawn_child(pd)
+        self.driver_client = SBE49InstrumentDriverClient(proc=self,
                                                          target=driver_id)
         
     @staticmethod

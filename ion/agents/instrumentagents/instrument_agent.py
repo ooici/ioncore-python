@@ -66,6 +66,11 @@ class InstrumentDriver(BaseProcess):
         @param content A dict with parameters for the driver 
         """
         
+    def op_disconnect(self, content, headers, msg):
+        """
+        Disconnect from the instrument
+        @param none
+        """
         
 class InstrumentDriverClient(BaseProcessClient):
     """
@@ -138,7 +143,33 @@ class InstrumentDriverClient(BaseProcessClient):
         (content, headers, message) = yield self.rpc_send('configure_driver',
                                                           config_vals)
         defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def initialize(self, arg):
+        """
+        Disconnect from the instrument
+        @param none
+        @retval Result code of some sort
+        """
+        #assert(isinstance(command, dict))
+        logging.debug("DHE: in initialize!")
+        (content, headers, message) = yield self.rpc_send('initialize',
+                                                          arg)
+        defer.returnValue(content)
         
+    @defer.inlineCallbacks
+    def disconnect(self, command):
+        """
+        Disconnect from the instrument
+        @param none
+        @retval Result code of some sort
+        """
+        #assert(isinstance(command, dict))
+        logging.debug("DHE: in disconnect!")
+        (content, headers, message) = yield self.rpc_send('disconnect',
+                                                          command)
+        defer.returnValue(content)
+    
     
 class InstrumentAgent(ResourceAgent):
     """
@@ -285,6 +316,27 @@ class InstrumentAgent(ResourceAgent):
         """
     
     @defer.inlineCallbacks
+    def op_disconnect(self, content, headers, msg):
+        """
+        Disconnect from the instrument.            
+        @param none
+        @return ACK message with response on success, ERR message with string
+            indicating code and response message on fail
+        """
+        assert(isinstance(content, list))
+        assert(self.driver != None)
+        execResult = self.driver.disconnect(content)
+        assert(len(execResult) == 2)
+        (errorCode, response) = execResult
+        assert(isinstance(errorCode, int))
+        if errorCode == 1:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg,
+                                 "Error code %s, response: %s" % (errorCode,
+                                                                  response))
+    
+    @defer.inlineCallbacks
     def op_execute_instrument(self, content, headers, msg):
         """
         Execute instrument commands relate to the instrument fronted by this
@@ -382,6 +434,17 @@ class InstrumentAgentClient(ResourceAgentClient):
         defer.returnValue(content)
 
     @defer.inlineCallbacks
+    def disconnect(self, argList):
+        """
+        Disconnect from the instrument
+        """
+        assert(isinstance(argList, list))
+        (content, headers, message) = yield self.rpc_send('disconnect',
+                                                              argList)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def execute_instrument(self, command):
         """
         Execute the instrument commands in the order of the list.
@@ -398,10 +461,7 @@ class InstrumentAgentClient(ResourceAgentClient):
         assert(isinstance(command, dict))
         (content, headers, message) = yield self.rpc_send('execute_instrument',
                                                           command)
-        assert(isinstance(content, dict))
-        defer.returnValue(content)
         
-    @defer.inlineCallbacks
     def execute_CI(self, command):
         """
         Execute the instrument commands in the order of the list.
