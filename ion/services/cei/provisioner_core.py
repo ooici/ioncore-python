@@ -402,6 +402,13 @@ class ProvisionerCore(object):
                     node['public_ip'] = public_ip
                     node['private_ip'] = private_ip
                     
+                    if nimboss_state == states.STARTED:
+                        extradict = {'node_id': nimboss_id, 
+                                     'public_ip': public_ip,
+                                     'private_ip': private_ip }
+                        cei_events.event("provisioner", "node_started", 
+                                         logging, extra=extradict)
+                    
                     launch = yield self.store.get_launch(node['launch_id'])
                     yield self.store_and_notify([node], launch['subscribers'])
         #TODO nimboss_nodes now contains any other running instances that
@@ -450,6 +457,12 @@ class ProvisionerCore(object):
                 logging.info('Launch %s context is "all-ok": done!', launch_id)
                 # update the launch record so this context won't be re-queried
                 launch['state'] = states.RUNNING
+                node_ids = []
+                for node in nodes:
+                    node_ids.append(node['node_id'])
+                extradict = {'launch_id': launch_id, 'node_ids': node_ids}
+                cei_events.event("provisioner", "launch_ctx_done", 
+                                 logging, extra=extradict)
                 yield self.store.put_record(launch)
             
             if context_status.complete:
