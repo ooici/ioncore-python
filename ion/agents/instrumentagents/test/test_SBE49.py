@@ -50,6 +50,9 @@ class TestSBE49(IonTestCase):
         working directory
         """
         cwd = os.getcwd()
+        self.myPid = os.getpid()
+        logging.debug("DHE: myPid: %s" % (self.myPid))
+        
         simDir = cwd.replace("_trial_temp", "ion/agents/instrumentagents/test/")
         #simPath = simDir("sim_SBE49.py")
         simPath = simDir + "sim_SBE49.py"
@@ -68,27 +71,60 @@ class TestSBE49(IonTestCase):
             {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'}
             ]
 
-        self.pubsubSuper = yield self._spawn_processes(services)
+        #self.pubsubSuper = yield self._spawn_processes(services)
+        self.sup = yield self._spawn_processes(services)
         
-        self.sup = yield bootstrap.create_supervisor()
+        #self.sup = yield bootstrap.create_supervisor()
 
+        child_id = yield self.sup.get_child_id('pubsub_service')
+        logging.debug("DHE: PubSub Test Service ID: " + str(child_id))
+        self.pubsub = self._get_procinstance(child_id)
+        logging.debug("DHE: got procinstance")
+        
         driverParms = {'name':'SBE49_Driver',
                  'module':'ion.agents.instrumentagents.SBE49_driver',
                  'procclass':'SBE49InstrumentDriver'
                 }
         driverEgg = ProcessDesc(**driverParms)
 
-        self.driver_pid = yield self.test_sup.spawn_child(driverEgg)
+        self.driver_pid = yield self.sup.spawn_child(driverEgg)
         print("pid %s" % (self.driver_pid))
 
         #self.driver = SBE49InstrumentDriver()
         #self.driver_pid = yield self.driver.spawn()
 
         #yield self.driver.init()
+        
         self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
                                                          target=self.driver_pid)
         #self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
         #                                                 target="SBE49_Driver")
+
+    @defer.inlineCallbacks
+    def test_create_topic(self):
+        #dpsc = DataPubsubClient(self.pubsubSuper)
+        
+        dpsc = DataPubsubClient(self.sup)
+        # Create and Register a topic
+        """
+        DHE: not sure the driver should be creating the topic; for right
+        now I'll have the test case do it.
+        """
+        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
+        self.topic = yield dpsc.define_topic(self.topic)
+
+
+        print 'TADA!'
+
+
+    @defer.inlineCallbacks
+    def test_initialize(self):
+        #dpsc = DataPubsubClient(self.pubsubSuper)
+        
+        result = yield self.driver_client.initialize('some arg')
+        yield pu.asleep(4)
+        print 'TADA!'
+
 
 
     @defer.inlineCallbacks
@@ -136,7 +172,7 @@ class TestSBE49(IonTestCase):
         result = yield self.driver_client.initialize('some arg')
         yield pu.asleep(4)
 
-        dpsc = DataPubsubClient(self.pubsubSuper)
+        dpsc = DataPubsubClient(self.sup)
 
         subscription = SubscriptionResource()
         subscription.topic1 = PubSubTopicResource.create('SBE49 Topic','')

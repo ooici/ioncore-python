@@ -125,6 +125,29 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
 
+    def plc_init(self):
+        
+        logging.debug('DHE: in SBE49_driver plc_init')
+
+        """
+        # Instantiate a pubsubclient
+        dpsc = DataPubsubClient(self.get_instance())        
+        
+        # Create and Register a topic
+        #DHE: not sure the driver should be creating the topic; for right
+        #now I'll have the test case do it.
+        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
+        self.topic = yield dpsc.define_topic(self.topic)
+        logging.debug('DHE: Defined Topic')
+        
+        #self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
+        #self.publisher = yield dpsc.define_publisher(self.publisher)
+
+        #logging.info('DHE: Defined Publisher')
+
+        #self.topicDefined = True
+        """
+        
     def isConnected(self):
         return self.connected
     
@@ -196,29 +219,22 @@ class SBE49InstrumentDriver(InstrumentDriver):
         This is ad hoc right now.  Need a state machine or something to handle
         the possible cases (connected, not-connected)
         """
-        #instrument.transport.write("ds")
-
-        """
+    
         # Instantiate a pubsubclient
-        dpsc = DataPubsubClient(self)
+        self.dpsc = DataPubsubClient(self)
         
         # Create and Register a topic
-        DHE: not sure the driver should be creating the topic; for right
-        now I'll have the test case do it.
         self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
-        self.topic = yield dpsc.define_topic(self.topic)
-        #logging.debug('DHE: Defined Topic: '+str(topic))
+        self.topic = yield self.dpsc.define_topic(self.topic)
         logging.debug('DHE: Defined Topic')
         
         self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
-        self.publisher = yield dpsc.define_publisher(self.publisher)
+        self.publisher = yield self.dpsc.define_publisher(self.publisher)
 
-        #logging.info('DHE: Defined Publisher: '+str(self.publisher))
         logging.info('DHE: Defined Publisher')
 
         self.topicDefined = True
-        """
-
+        
     def gotData(self, data):
         """
         @brief The instrument protocol object has received data from the
@@ -248,7 +264,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
             instrument.transport.write(self.command)
         else:
             logging.debug("DHE gotPrompt NOT SENDING ANYTHING")
-        
+
+    @defer.inlineCallbacks
     def publish(self, data, topic):
         """
         @Brief Publish the given data to the given topic.
@@ -257,13 +274,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
         topic as defined by pubsub.
         @retval none
         """
-        #logging.debug("DHE: publish(): %s" %str(self.__dict__))
         logging.debug("DHE: publish()")
         if self.topicDefined == True:
             logging.debug("DHE: publishing!")
 
             # Create and send a data message
-            result = yield dpsc.publish(self.sup, self.topic.reference(), data)
+            result = yield self.dpsc.publish(self, self.topic.reference(), data)
             if result:
                 logging.info('DHE: Published Message')
             else:
@@ -276,24 +292,25 @@ class SBE49InstrumentDriver(InstrumentDriver):
     def op_initialize(self, content, headers, msg):
         logging.debug('DHE: in driver initialize')
 
+        """
         # Instantiate a pubsubclient
-        dpsc = DataPubsubClient(self)
+        dpsc = DataPubsubClient(self.get_instance())        
         
         # Create and Register a topic
-        """
-        DHE: not sure the driver should be creating the topic; for right
-        now I'll have the test case do it.
-        """
+        #DHE: not sure the driver should be creating the topic; for right
+        #now I'll have the test case do it.
         self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
         self.topic = yield dpsc.define_topic(self.topic)
         logging.debug('DHE: Defined Topic')
         
-        self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
-        self.publisher = yield dpsc.define_publisher(self.publisher)
+        #self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
+        #self.publisher = yield dpsc.define_publisher(self.publisher)
 
-        logging.info('DHE: Defined Publisher')
+        #logging.info('DHE: Defined Publisher')
 
-        self.topicDefined = True
+        #self.topicDefined = True
+        """
+
         yield self.reply_ok(msg, content)
     
     @defer.inlineCallbacks
@@ -345,6 +362,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         assert(isinstance(content, dict))
 
         logging.info("DHE: in op_execute!!!")
+
         """
         This connection stuff could be abstracted into a communications object.
         """
