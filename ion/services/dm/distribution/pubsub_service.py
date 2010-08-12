@@ -248,6 +248,7 @@ class DataPubsubService(BaseService):
 
             spargs ={'attach':[],
                      'process parameters':args.get('process parameters',{}),
+                     'delivery interval':args.get('delivery interval',None),
                      'delivery queues':{}}
             
             cd = {}
@@ -332,10 +333,6 @@ class DataPubsubService(BaseService):
         subscription.consumer_args = consumers
         
         defer.returnValue(subscription)
-
-        # 3) spawn consumers
-        
-        #C add the queues, ConsumerDesc's and topics to the subscription definition
         
         
         

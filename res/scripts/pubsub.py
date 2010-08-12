@@ -77,7 +77,7 @@ def start():
     print 'ION_MESSAGING',ion_messaging
     print 'CONT_ARGS',ioninit.cont_args
     
-    nproducers = ioninit.cont_args.get('nproducers',5)
+    nproducers = int(ioninit.cont_args.get('nproducers',5))
     print 'NPRODUCERS',nproducers
     yield create_producers(sup, nproducers)
         
@@ -87,6 +87,7 @@ def start():
     subscription = SubscriptionResource()
     subscription.topic1 = PubSubTopicResource.create('topic','')
     
+    """
 
     # Use the example consumer to create events...
     subscription.workflow = {
@@ -100,15 +101,34 @@ def start():
                 'attach':[['consumer1','event_queue']]}
             }
     
-    """
-    # Just use the logging consumer
+        # Just use the logging consumer
     subscription.workflow = {
         'consumer1':
             {'module':'ion.services.dm.distribution.consumers.logging_consumer',
                 'consumerclass':'LoggingConsumer',\
                 'attach':'topic1'}
             }
+    
+    
     """
+    # Use the example consumer to create events... Only log the number of events
+    subscription.workflow = {
+        'consumer1':
+            {'module':'ion.services.dm.distribution.consumers.example_consumer',
+                'consumerclass':'ExampleConsumer',\
+                'attach':'topic1'},
+        'consumer3':
+            {'module':'ion.services.dm.distribution.consumers.message_count_consumer',
+                'consumerclass':'MessageCountConsumer',\
+                'attach':[['consumer1','event_queue']],\
+                'delivery interval':10},
+        'consumer2':
+            {'module':'ion.services.dm.distribution.consumers.logging_consumer',
+                'consumerclass':'LoggingConsumer',\
+                'attach':[['consumer3','queue']]}
+            }
+    
+    
     
     
     subscription = yield dpsc.define_subscription(subscription)

@@ -28,9 +28,6 @@ class ExampleConsumer(base_consumer.BaseConsumer):
     """
     def ondata(self, data, notification, timestamp, event_queue='', processed_queue=''):
         
-        
-        print 'DataKeys:',data.keys()
-        
         resdata = []
         tsdata = []
         # Process the array of data

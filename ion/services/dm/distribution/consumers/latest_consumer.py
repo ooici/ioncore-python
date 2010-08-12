@@ -28,7 +28,7 @@ class LatestConsumer(base_consumer.BaseConsumer):
         for queue in queues:
             self.queue_result(queue,data,notification)
 
-    def onschedule(self, intrval_cnt, **kwargs):
+    def onschedule(self, **kwargs):
         '''
         This method is called when it is time to actually send the results
         in this case it is not needed, but must be over-riden...

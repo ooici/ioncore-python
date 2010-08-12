@@ -133,6 +133,7 @@ class PubSubServiceMethodTest(IonTestCase):
              'module': 'path.to.module',
              'spawnargs': {
                 'attach': [topic.queue.name],
+                'delivery interval': None,
                 'delivery queues': {},
                 'process parameters': {'param1': 'my parameter'}}}}, subscription.consumer_args)
         
@@ -175,6 +176,7 @@ class PubSubServiceMethodTest(IonTestCase):
                'name': 'consumer1',
                'procclass': '<ConsumerClassName>',
                'spawnargs': {'attach': [topic.queue.name],
+                             'delivery interval': None,
                              'delivery queues': {'deliver_to': consume2_attach[0]},
                              'process parameters': {'param1': 'my parameter1'}}},
             subscription.consumer_args['consumer1'])
@@ -221,6 +223,7 @@ class PubSubServiceMethodTest(IonTestCase):
                'name': 'consumer1',
                'procclass': '<ConsumerClassName>',
                'spawnargs': {'attach': [topic.queue.name],
+                             'delivery interval': None,
                              'delivery queues': {'deliver_to': consume2_attach[0]},
                              'process parameters': {'param1': 'my parameter1'}}},
             subscription.consumer_args['consumer1'])
@@ -230,6 +233,7 @@ class PubSubServiceMethodTest(IonTestCase):
          'module': 'path.to.module3',
          'spawnargs': {
             'attach': [consume2_attach[0], topic.queue.name],
+            'delivery interval': None,
             'delivery queues': {},
             'process parameters': {}}},
             subscription.consumer_args['consumer3'])

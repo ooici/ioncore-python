@@ -62,7 +62,7 @@ class BaseConsumer(BaseProcess):
         if self.delivery_interval:
             assert isinstance(self.delivery_interval, (int,float)), 'delivery interval must be a float or a integer'        
         self.last_delivered = None
-        self.interval_cnt = 0
+        self.interval_cnt = {}
         self.loop = None
         #if self.delivery_interval:
         #    self.loop = LoopingCall(self.digest)
@@ -70,7 +70,7 @@ class BaseConsumer(BaseProcess):
 
         
         self.receive_cnt = {}
-        self.received_msg = []
+        #self.received_msg = []
         self.msgs_to_send = []
         self.send_cnt = {}
         self.dataReceivers = {}
@@ -227,7 +227,7 @@ class BaseConsumer(BaseProcess):
         #@Note this could get big! What todo?
                 
         self.receive_cnt[headers.get('receiver')] += 1
-        self.received_msg.append(content)
+        #self.received_msg.append(content) # Do not keep the messages!
 
         # Unpack the message and turn it into data
         datamessage = dataobject.DataObject.decode(content)
@@ -259,7 +259,11 @@ class BaseConsumer(BaseProcess):
             
         else: # Do the digets thing...
             
-            self.interval_cnt +=1
+            if self.interval_cnt.has_key(headers.get('receiver')):
+                self.interval_cnt[headers.get('receiver')] += 1
+            else:
+                self.interval_cnt[headers.get('receiver')] = 1
+            
             
             logging.debug(self.__class__.__name__ +"; op_data: digest state: \n" + \
                           "Last Delivered: " +str(self.last_delivered) +";\n" +\
@@ -306,10 +310,11 @@ class BaseConsumer(BaseProcess):
         args = dict(self.params)
         args.update(self.deliver)
         
-        yield defer.maybeDeferred(self.onschedule, self.interval_cnt, **args)
+        yield defer.maybeDeferred(self.onschedule, **args)
         
         yield self.deliver_messages()
         # Update last_delivered
+        self.interval_cnt={} # Reset the interval receive count
         self.last_delivered = pu.currenttime()
         logging.info(self.__class__.__name__ +"; digest: Finished sending results")
         
@@ -346,10 +351,9 @@ class BaseConsumer(BaseProcess):
         
     @defer.inlineCallbacks
     def deliver_messages(self):
-        
         # Send data only when the process is complete!
         if self.msgs_to_send:
-            for ind in range(len(self.msgs_to_send)):
+            while len(self.msgs_to_send) > 0:
                 queue, msg = self.msgs_to_send.pop(0)
                 yield self.send(queue, 'data', msg)
                 if self.send_cnt.has_key(queue):
