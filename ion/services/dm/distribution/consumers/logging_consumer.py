@@ -28,6 +28,8 @@ class LoggingConsumer(base_consumer.BaseConsumer):
             info = 'Dap Dataset Name:'+  data.name
         elif isinstance(data, dict):
             info = 'Dict Dataset Name:' + data.get('name','No name attribute in data dictionary?')
+        elif data == None:
+            info = 'Received empty Data Message'
         else:
             info = 'Unknown dataset type' + str(data)
 
