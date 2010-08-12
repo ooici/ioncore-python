@@ -55,23 +55,70 @@ class ProvisionerCoreTests(IonTestCase):
 
     @defer.inlineCallbacks
     def test_query_ctx(self):
+        node_count = 3
         launch_id = _new_id()
         launch_record = _one_fake_launch_record(launch_id, states.PENDING)
         node_records = [_one_fake_node_record(launch_id, states.STARTED) 
-                for i in range(3)]
+                for i in range(node_count)]
 
         yield self.store.put_record(launch_record)
         yield self.store.put_records(node_records)
 
-        self.ctx.nodes = [_one_fake_ctx_node_ok(node['public_ip'], _new_id(),  _new_id()) 
-                for node in node_records]
         self.ctx.expected_count = len(node_records)
-        self.complete = True
-        self.error = False
+        self.ctx.complete = False
+        self.ctx.error = False
+
+        #first query with no ctx nodes. zero records should be updated
+        yield self.core.query_contexts()
+        self.assertTrue(self.notifier.assure_record_count(0))
+        
+        # all but 1 node have reported ok
+        self.ctx.nodes = [_one_fake_ctx_node_ok(node_records[i]['public_ip'], 
+            _new_id(),  _new_id()) for i in range(node_count-1)]
 
         yield self.core.query_contexts()
-
         self.assertTrue(self.notifier.assure_state(states.RUNNING))
+        self.assertEqual(len(self.notifier.nodes), node_count-1)
+
+        #last node reports ok
+        self.ctx.nodes.append(_one_fake_ctx_node_ok(node_records[-1]['public_ip'],
+            _new_id(), _new_id()))
+
+        self.ctx.complete = True
+        yield self.core.query_contexts()
+        self.assertTrue(self.notifier.assure_state(states.RUNNING))
+        self.assertTrue(self.notifier.assure_record_count(1))
+    
+    @defer.inlineCallbacks
+    def test_query_ctx_error(self):
+        node_count = 3
+        launch_id = _new_id()
+        launch_record = _one_fake_launch_record(launch_id, states.PENDING)
+        node_records = [_one_fake_node_record(launch_id, states.STARTED) 
+                for i in range(node_count)]
+
+        yield self.store.put_record(launch_record)
+        yield self.store.put_records(node_records)
+
+        self.ctx.expected_count = len(node_records)
+        self.ctx.complete = False
+        self.ctx.error = False
+
+        # all but 1 node have reported ok
+        self.ctx.nodes = [_one_fake_ctx_node_ok(node_records[i]['public_ip'], 
+            _new_id(),  _new_id()) for i in range(node_count-1)]
+        self.ctx.nodes.append(_one_fake_ctx_node_error(node_records[-1]['public_ip'],
+            _new_id(), _new_id()))
+
+        ok_ids = [node_records[i]['node_id'] for i in range(node_count-1)]
+        error_ids = [node_records[-1]['node_id']]
+
+        self.ctx.complete = True
+        self.ctx.error = True
+
+        yield self.core.query_contexts()
+        self.assertTrue(self.notifier.assure_state(states.RUNNING, ok_ids))
+        self.assertTrue(self.notifier.assure_state(states.STARTED, error_ids))
 
     def test_update_nodes_from_ctx(self):
         launch_id = _new_id()
@@ -104,6 +151,11 @@ def _one_fake_node_record(launch_id, state):
 def _one_fake_ctx_node_ok(ip, hostname, pubkey):
     identity = Mock(ip=ip, hostname=hostname, pubkey=pubkey)
     return Mock(ok_occurred=True, error_occurred=False, identities=[identity])
+
+def _one_fake_ctx_node_error(ip, hostname, pubkey):
+    identity = Mock(ip=ip, hostname=hostname, pubkey=pubkey)
+    return Mock(ok_occurred=False, error_occurred=True, identities=[identity],
+            error_code=42, error_message="bad bad fake error")
 
 class FakeContextClient(object):
     def __init__(self):

@@ -113,15 +113,39 @@ class FakeProvisionerNotifier(object):
         for record in records:
             yield self.send_record(record, subscribers, operation)
 
-    def assure_state(self, state):
+    def assure_state(self, state, nodes=None):
         """Checks that all nodes have the same state.
         """
         if len(self.nodes) == 0:
             return False
+
+        if nodes:
+            for node in nodes:
+                if not (node in self.nodes and 
+                        self.nodes[node]['state'] == state):
+                    return False
+            return True
+
         for node in self.nodes.itervalues():
             if node['state'] != state:
                 return False
         return True
+
+    def assure_record_count(self, count, nodes=None):
+        if len(self.nodes) == 0:
+            return count == 0
+
+        if nodes:
+            for node in nodes:
+                if self.nodes_rec_count.get(node, 0) != count:
+                    return False
+            return True
+
+        for node_rec_count in self.nodes_rec_count.itervalues():
+            if node_rec_count != count:
+                return False
+        return True
+
 
     @defer.inlineCallbacks
     def wait_for_state(self, state, poll=5, timeout=30, runfirst=None):

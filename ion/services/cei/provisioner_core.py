@@ -447,13 +447,13 @@ class ProvisionerCore(object):
                         len(updated_nodes))
                 yield self.store_and_notify(updated_nodes, launch['subscribers'])
             
-            all_ok = True
+            all_done = True
             for ctx_node in ctx_nodes:
-                if not ctx_node.ok_occurred:
-                    all_ok = False
+                if not (ctx_node.ok_occurred or ctx_node.error_occurred):
+                    all_done = False
                     break
                     
-            if all_ok:
+            if context_status.complete and all_done:
                 logging.info('Launch %s context is "all-ok": done!', launch_id)
                 # update the launch record so this context won't be re-queried
                 launch['state'] = states.RUNNING
@@ -465,7 +465,7 @@ class ProvisionerCore(object):
                                  logging, extra=extradict)
                 yield self.store.put_record(launch)
             
-            if context_status.complete:
+            elif context_status.complete:
                 logging.info('Launch %s context is "complete" (all checked in, but not all-ok)', launch_id)
             else:
                 logging.debug('Launch %s context is incomplete: %s of %s nodes',
@@ -570,15 +570,15 @@ def update_nodes_from_context(nodes, ctx_nodes):
 def _update_one_node_from_ctx(node, ctx_node, identity):
     node_done = ctx_node.ok_occurred or ctx_node.error_occurred
     if not node_done or node['state'] >= states.RUNNING:
-        logging.debug('bail '+node['state'])
         return False
     if ctx_node.ok_occurred:
         node['state'] = states.RUNNING
         node['pubkey'] = identity.pubkey
     else:
-        node['state'] = states.FAILED
-        node['error_code'] = ctx_node.error_code
-        node['error_message'] = ctx_node.error_message
+        node['state'] = states.STARTED # should be a separate error state?
+        node['state_desc'] = "CTX_ERROR"
+        node['ctx_error_code'] = ctx_node.error_code
+        node['ctx_error_message'] = ctx_node.error_message
     return True
 
 class ProvisionerContextClient(object):
