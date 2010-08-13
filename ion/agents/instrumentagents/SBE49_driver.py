@@ -134,27 +134,27 @@ class SBE49InstrumentDriver(InstrumentDriver):
         # We need a separte process (and process id/in queue) for the RPC
         # because we cannot receive the RPC response message while still
         # processing the init message (on the same queue).
-        #rpcproc = BaseProcess()
-        #rpcpid = yield rpcproc.spawn()
-        #
-        #self.iaclient = InstrumentAgentClient(proc=rpcproc, target=self.proc_supid)
-        #
-        ## Instantiate a pubsubclient
-        #self.dpsc = DataPubsubClient(proc=rpcproc)
-        #
-        ## Create and Register a topic
-        #self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
-        #self.topic = yield self.dpsc.define_topic(self.topic)
-        #logging.debug('DHE: Defined Topic')
-        #
-        #self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
-        #self.publisher = yield self.dpsc.define_publisher(self.publisher)
-        #
-        #logging.info('DHE: Defined Publisher')
-        #
-        #self.topicDefined = True
-        #
-        #logging.debug("Instrument driver has topic")
+        rpcproc = BaseProcess()
+        rpcpid = yield rpcproc.spawn()
+
+        self.iaclient = InstrumentAgentClient(proc=rpcproc, target=self.proc_supid)
+
+        # Instantiate a pubsubclient
+        self.dpsc = DataPubsubClient(proc=rpcproc)
+
+        # Create and Register a topic
+        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
+        self.topic = yield self.dpsc.define_topic(self.topic)
+        logging.debug('DHE: Defined Topic')
+
+        self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
+        self.publisher = yield self.dpsc.define_publisher(self.publisher)
+
+        logging.info('DHE: Defined Publisher')
+
+        self.topicDefined = True
+
+        logging.debug("Instrument driver has topic")
 
     @defer.inlineCallbacks
     def plc_shutdown(self):
