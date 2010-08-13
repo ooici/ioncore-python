@@ -13,13 +13,18 @@ from ion.core.base_process import ProtocolFactory
 import logging
 logging = logging.getLogger(__name__)
 
+
 try:
     import twitter
 except:
+    
     class twitter():
-        def Api(username='', password=''):
-            pass
-        def PostUpdate(string):
+        """Bogus twitter class to prevent failures
+        """
+        @classmethod
+        def Api(cls, username='', password=''):
+            return cls()
+        def PostUpdate(self, string):
             pass
 
 class TwitterConsumer(base_consumer.BaseConsumer):
