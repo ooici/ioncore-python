@@ -47,13 +47,15 @@ class ProvisionerCore(object):
         self.notifier = notifier
         self.dtrs = dtrs
 
-        #TODO how about a config file
+        #TODO how about a config file (soon, soon...)
         nimbus_key = os.environ['NIMBUS_KEY']
         nimbus_secret = os.environ['NIMBUS_SECRET']
         nimbus_test_driver = NimbusNodeDriver(nimbus_key, secret=nimbus_secret,
                 host='nimbus.ci.uchicago.edu', port=8444)
         nimbus_uc_driver = NimbusNodeDriver(nimbus_key, secret=nimbus_secret,
                 host='tp-vm1.ci.uchicago.edu', port=8445)
+        nimbus_magellan_drv = NimbusNodeDriver(nimbus_key, secret=nimbus_secret,
+                host='user04', port=8444)
        
         ec2_key = os.environ['AWS_ACCESS_KEY_ID']
         ec2_secret = os.environ['AWS_SECRET_ACCESS_KEY']
@@ -63,6 +65,7 @@ class ProvisionerCore(object):
                 'nimbus-test' : nimbus_test_driver,
                 'nimbus-uc' : nimbus_uc_driver,
                 'ec2-east' : ec2_east_driver,
+                'magellan' : nimbus_magellan_drv,
                 }
         
         self.context = context or ProvisionerContextClient(
