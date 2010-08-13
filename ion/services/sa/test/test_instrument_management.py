@@ -39,7 +39,7 @@ class DataAcquisitionTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def xtest_management_service(self):
+    def test_create_instrument(self):
         """
         Accepts an dictionary containing updates to the instrument registry.
         Updates are made to the registries.
@@ -66,19 +66,14 @@ class DataAcquisitionTest(IonTestCase):
         dataProductInput = {'dataformat' : "binary",
                             'instrumentID' : instrument_id}
 
-        dataproduct = yield self.imc.register_data_product(dataProductInput)
+        dataproduct = yield self.imc.create_new_data_product(dataProductInput)
 
         self.assertEqual(dataproduct.dataformat, "binary")
-        self.assertEqual(dataproduct.instrumentID, instrument_id)
+        self.assertEqual(dataproduct.instrument_ref.RegistryIdentity, instrument_id)
 
 
-    @defer.inlineCallbacks
-    def xtest_direct_access(self):
-
+    #@defer.inlineCallbacks
+    def test_direct_access(self):
         """
         Switches direct_access mode to ON in the instrument registry.
         """
-
-        userUpdate = {'direct_access' : "on"}
-        self.instrument = yield self.imc.create_new_instrument(userUpdate)
-        self.assertEqual(self.instrument.direct_access, "on")

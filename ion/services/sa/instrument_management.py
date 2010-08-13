@@ -202,11 +202,11 @@ class InstrumentManagementClient(BaseServiceClient):
         defer.returnValue(DataObject.decode(content['value']))
 
     @defer.inlineCallbacks
-    def register_data_product(self, dataProductInput):
+    def create_new_data_product(self, dataProductInput):
         reqcont = {}
         reqcont['dataProductInput'] = dataProductInput
 
-        (content, headers, message) = yield self.rpc_send('register_data_product',
+        (content, headers, message) = yield self.rpc_send('create_new_data_product',
                                                           reqcont)
         defer.returnValue(DataObject.decode(content['value']))
 
