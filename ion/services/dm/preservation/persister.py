@@ -21,6 +21,7 @@ from pydap.xdr import DapUnpacker
 from pydap.lib import walk, fix_slice, parse_qs, fix_shn
 from pydap.responses import netcdf
 
+from ion.services.dm.util import dap_tools
 import logging
 logging = logging.getLogger(__name__)
 

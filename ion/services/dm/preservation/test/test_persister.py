@@ -89,7 +89,12 @@ class PersisterTest(IonTestCase):
     @defer.inlineCallbacks
     def test_persister_consumer_dap(self):
         
-        msg=dap_tools.ds2dap_msg(dap_tools.demo_dataset() )
+        msg=dap_tools.ds2dap_msg(dap_tools.simple_dataset(\
+            {'DataSet Name':'SimpleData','variables':\
+                {'time':{'long_name':'Data and Time','units':'seconds'},\
+                'height':{'long_name':'person height','units':'meters'}}}, \
+            {'time':(111,112,123,114,115,116,117,118,119,120), \
+            'height':(8,6,4,-2,-1,5,3,1,4,5)}) )
         yield self.test_sup.send(self.queue1,'data',msg.encode())
 
         msg_cnt = yield self.child1.get_msg_count()
