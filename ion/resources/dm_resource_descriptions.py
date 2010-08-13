@@ -143,82 +143,89 @@ class SubscriptionResource(StatefulResource):
     #consumer_procids = TypedAttribute(dict) # list of child consumer ids - need a process registry
     queues = TypedAttribute(list) # list of queue objects
     consumer_args = TypedAttribute(dict)
+
+
 """
-DM DataSet Resource Descriptions
-Preliminary!
+Archive Registry Resources
 """
-class PerservationServiceResource(StatefulResource): # Is it stateful or information?
+class ArchiveResource(StatefulResource): # Is it stateful or information?
     #Name (Logical IRODS Name) - inherited
     datatype = TypedAttribute(str)
-    archived_locations = TypedAttribute(list) # List of Preservation Location objects
+    locations = TypedAttribute(list) # List of Archive Location objects
 
-class PreservationLocation(DataObject):
+class ArchiveLocation(DataObject):
+    name = TypedAttribute(str)
     location = TypedAttribute(str)
 
-class TypedData(DataObject):
+"""
+DM Data Registry Resources
+Preliminary!
+"""
+
+class AttributeData(DataObject):
     """
     """
     
-class FloatData(TypedData):
+class FloatAttribute(AttributeData):
     """
     #@Todo convert to use numpy types
     """
     f = TypedAttribute(float)
     
-class IntegerData(TypedData):
+class IntegerAttribute(AttributeData):
     """
     #@Todo convert to use numpy types
     """
     i = TypedAttribute(int)
     
-class StringData(TypedData):
+class StringAttribute(AttributeData):
     """
     #@Todo convert to use numpy types
     """
     s = TypedAttribute(str)
     
 
-class CDMDatasetResource(InformationResource):
+class DMDataResource(InformationResource):
     '''
     @Note <class> must be a type which python can instantiate with eval!
     '''
     #Name - inherited
     groups = TypedAttribute(list)
-    preservation_archive = TypedAttribute(PerservationServiceResource)
+    archive = TypedAttribute(ArchiveResource)
     
-class CDMGroupResource(InformationResource):
+class DMGroupData(InformationResource):
     #Name - inherited
     attributes = TypedAttribute(list)
     dimensions = TypedAttribute(list)
     variables = TypedAttribute(list)
-    preservation_archive = TypedAttribute(PerservationServiceResource)
+    archive = TypedAttribute(ArchiveResource)
     
-class CDMAttributeResource(InformationResource):
+class DMAttributeData(InformationResource):
     #Name - inherited
-    value = TypedAttribute(TypedData)
-    preservation_archive = TypedAttribute(PerservationServiceResource)
+    value = TypedAttribute(AttributeData)
+    archive = TypedAttribute(ArchiveResource)
     archive_attid = TypedAttribute(int,0) # Varid or name?
     
-class CDMDimensionResource(InformationResource):
+class DMDimensionData(InformationResource):
     #Name - inherited
     dim = TypedAttribute(int,0)
     unlimited = TypedAttribute(bool,False)
     shared = TypedAttribute(bool,False)
     is_variable_length = TypedAttribute(bool,False)
-    preservation_archive = TypedAttribute(PerservationServiceResource)
+    archive = TypedAttribute(ArchiveResource)
     archive_dimid = TypedAttribute(int,0) # Varid or name?
     
-class CDMVariableResource(InformationResource):
+class DMVariableData(InformationResource):
     """
     """
     #Name - inherited
     attributes = TypedAttribute(list)
     dimensions = TypedAttribute(list)
     type = TypedAttribute(str)
-    preservation_archive = TypedAttribute(PerservationServiceResource)
+    archive = TypedAttribute(ArchiveResource)
     archive_varid = TypedAttribute(str) # Varid or name?
     
-class CDMStructureResource(InformationResource):
+class DMStructureData(InformationResource):
     """
     """
     #Name - inherited
@@ -226,9 +233,8 @@ class CDMStructureResource(InformationResource):
     
     
 
-class ArchiveResource(StatefulResource):
-    """
-    """
+
+
 
     
     
