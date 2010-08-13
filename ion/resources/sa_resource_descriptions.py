@@ -4,7 +4,7 @@
 """
 from ion.data.dataobject import TypedAttribute, ResourceReference, StatefulResource
 from ion.resources.coi_resource_descriptions import ResourceDescription
-    
+
 class InstrumentResource(StatefulResource):
     '''
     Intended for the "Instrument Registry," some basic instrument metadata to
@@ -12,9 +12,6 @@ class InstrumentResource(StatefulResource):
     for a more complete listing (or even subclassing as needed).
     @todo Flesh this out with much much much more comprehensive metadata
     '''
-    
-    instrumentID = TypedAttribute(str)
-    direct_access = TypedAttribute(str, default="off")
     manufacturer = TypedAttribute(str)
     model = TypedAttribute(str)
     serial_num = TypedAttribute(str)
@@ -25,7 +22,15 @@ class InstrumentResource(StatefulResource):
     '''
     agent_message_address = TypedAttribute(str)
     agent_event_address = TypedAttribute(str)
-    
+
+class DataProductResource(StatefulResource):
+    '''
+    Intended for the data product registry.
+    '''
+    instrument_ref = TypedAttribute(ResourceReference)
+    topic = TypedAttribute(ResourceReference)
+    dataformat = TypedAttribute(str)
+
 
 class SBE49InstrumentDescription(ResourceDescription):
     """
@@ -37,7 +42,7 @@ class SBE49InstrumentDescription(ResourceDescription):
     And eventually add things that characterize the class of instrument such as
     power_draw, precision, accuracy, etc.
     """
-    
+
 class SBE49InstrumentResource(InstrumentResource):
     """
     The stuff specific to SBE49s so that you can actually talk to it enough
@@ -46,11 +51,11 @@ class SBE49InstrumentResource(InstrumentResource):
     baudrate = TypedAttribute(int, default=9600)
     outputformat =TypedAttribute(int, default=0)
     description = TypedAttribute(ResourceReference) #reference the description
-    
+
     """
     This stuff is already in the instrument, so to keep it here opens the
     gotta-keep-it-in-sync can of worms that we will eventually get to.
-    
+
     outputsal = TypedAttribute(bool, default=True)
     outputsv = TypedAttribute(bool, default=True)
     navg = TypedAttribute(int, default=0)
@@ -69,7 +74,7 @@ class SBE49InstrumentResource(InstrumentResource):
     ccaldate = TypedAttribute(str, default="1/1/01")
     cg = TypedAttribute(float, default=0.0)
     ch = TypedAttribute(float, default=0.0)
-    ci = TypedAttribute(float, default=0.0)      
+    ci = TypedAttribute(float, default=0.0)
     cj = TypedAttribute(float, default=0.0)
     cpcor = TypedAttribute(float, default=0.0)
     ctcor = TypedAttribute(float, default=0.0)
@@ -90,11 +95,3 @@ class SBE49InstrumentResource(InstrumentResource):
     ptcb1 = TypedAttribute(float, default=0.0)
     ptcb2 = TypedAttribute(float, default=0.0)
     """
-    
-class DataProductResource(StatefulResource):
-    '''
-    Intended for the data product registry.  
-    '''
-    topic = TypedAttribute(ResourceReference)
-    dataformat = TypedAttribute(str)
-    
