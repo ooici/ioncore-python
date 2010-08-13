@@ -60,6 +60,7 @@ class PersisterService(BaseService):
                                           dependencies=[]) 
 
     """ Here is a start on implementing the persister consumer!
+
     @defer.inlineCallbacks
     def op_data(self, content, headers, msg):
 
@@ -77,16 +78,24 @@ class PersisterService(BaseService):
         datamessage = dataobject.DataObject.decode(content)
         if isinstance(datamessage, DAPMessageObject):
             data = dap_tools.dap_msg2ds(datamessage)
+            
+            # Call preserve DAP data
+            
         elif isinstance(datamessage, (StringMessageObject, DictionaryMessageObject)):
             data = datamessage.data
+            
+            #Call preserve dict or string 
+            
         else:
             data = None
+            # Error?
 
         notification = datamessage.notification
         timestamp = datamessage.timestamp
 
         # Build the keyword args for ondata
         args = dict(self.params)
+
     """
 
     # Must be called op_data
