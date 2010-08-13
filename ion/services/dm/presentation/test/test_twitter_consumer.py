@@ -27,14 +27,14 @@ class TestTwitterConsumer(IonTestCase):
         self.tc = twitter_consumer.TwitterConsumer()
         
     def test_password_fails(self):
-        #self.tc.ondata('junk data', 'note to tweet', 1.0, uname='ooidx',pword='wrong')
+        raise unittest.SkipTest('Not everyone has the twitter library')
         self.failUnlessRaises(HTTPError, self.tc.ondata, 'data','note', 1.0, uname='ooidx', pword='wrong')
 
     def test_uname_password_fails(self):
-        #self.tc.ondata('junk data', 'note to tweet', 1.0, uname='ooidx',pword='wrong')
+        raise unittest.SkipTest('Not everyone has the twitter library')
         self.failUnlessRaises(HTTPError, self.tc.ondata, 'data','note', 1.0, uname='ooidx_!@#$%', pword='wrong')
 
     def test_tweet(self):
         val = random.randint(10000,100000) # Need to change the message
         self.tc.ondata('junk data', 'another note to tweet'+str(val), 1.0, uname='ooidx',pword='yeahright')
-        #self.failUnlessRaises(HTTPError, self.tc.ondata, 'data','note', 1.0, uname='ooidx_!@#$%', pword='wrong')
+        
