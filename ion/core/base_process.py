@@ -309,7 +309,7 @@ class BaseProcess(object):
         """
         The method called if operation callback operation is not defined
         """
-        logging.info('Catch message')
+        logging.info('Catch message op=%s' % headers.get('op',None))
 
     def rpc_send(self, recv, operation, content, headers=None, **kwargs):
         """

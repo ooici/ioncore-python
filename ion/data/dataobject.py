@@ -563,7 +563,7 @@ class StatefulResource(Resource):
     """
     @brief Base for all OOI Stateful resource objects
     """
-    
+
 DataObject._types['StatefulResource']=StatefulResource
 
 class TestResource(Resource):
@@ -593,7 +593,7 @@ class IEncoder(object):
     def decode(self, data):
         """
         @param data 'encoded' DataObject
-        @retval DataObject instance. 
+        @retval DataObject instance.
         """
 
 
@@ -690,7 +690,8 @@ class DEncoder(object):
         @note using eval to get type!
         """
         t = eval(odict['type'])
-        return t(odict['value'])
+        v = t(odict['value'])
+        return v
 
     def decode_dataobject(self, odict):
         """
@@ -699,6 +700,7 @@ class DEncoder(object):
         fields = odict['fields']
         __dict = {}
         for name, vdict in fields.iteritems():
+            name = str(name)
             val = self.decode(vdict)
             __dict[name] = TypedAttribute(type(val), val)
         #o = type(cls, (DataObject,), __dict)()
@@ -710,7 +712,7 @@ class DEncoder(object):
         """
         """
         return LCStates[odict['value']]
-    
+
     def decode_list(self, odict):
         """
         """
@@ -816,7 +818,7 @@ serializer = Serializer()
 
 def register_alpha():
     alpha = AlphaEncoder()
-    serializer.register('alpha', alpha.encode, alpha.decode, 
+    serializer.register('alpha', alpha.encode, alpha.decode,
             content_type='application/ion-dataobject',
             content_encoding='binary')
 
@@ -836,5 +838,3 @@ register_alpha()
 register_jsond()
 register_dencoder()
 serializer.set_default('alpha')
-
-
