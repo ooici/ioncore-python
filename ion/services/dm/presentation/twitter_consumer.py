@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/presentation.py
+@file ion/services/dm/presentation/twitter_consumer.py
 @author David Stuebe
 @brief twitter the notification component of the data!
 """
@@ -53,14 +53,6 @@ class TwitterConsumer(base_consumer.BaseConsumer):
         api.PostUpdate(notification[:140])
         
         logging.info('Tweet sent')
-        
-        
-#        try:
-#            
-#        except:
-#           logging.exception('Twitter error!')
-#
-        
         
 
 # Spawn of the process using the module name
