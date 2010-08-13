@@ -19,12 +19,13 @@ from ion.services.dm.util.url_manipulation import generate_filename
 
 from ion.test.iontest import IonTestCase
 import base64
-try:
-    import json
-except:
-    import simplejson as json
+import simplejson as json
 
 TEST_DSET = 'http://ooici.net:8001/coads.nc'
+TEST_ADSET1 = 'http://ooici.net:8001/grid_surf_el1.nc'
+TEST_ADSET2 = 'http://ooici.net:8001/grid_surf_el2.nc'
+TEST_APATTERN = "/tmp/grid_surf_el*.nc"
+
 class TransportTester(IonTestCase):
     """
     Verify that we can transport binary (XDR) data.
@@ -89,7 +90,7 @@ class ServiceTester(unittest.TestCase):
         More complex than it might appear - reach in and use the methods
         to get and persist a full dataset from amoeba (5.2MB)
         """
-        raise unittest.SkipTest('Causes timeout on my workstation')
+        #raise unittest.SkipTest('Causes timeout on my workstation')
 
         # generate filename so we can look for it after saving
         local_dir = '/tmp/'
@@ -125,7 +126,7 @@ class PersisterTester(IonTestCase):
         persister client.
         """
         services = [
-            {'name': 'persister', 'module': 'ion.services.dm.persister',
+            {'name': 'persister', 'module': 'ion.services.dm.preservation.persister',
              'class': 'PersisterService'},
             ]
         boss = yield self._spawn_processes(services)
@@ -137,9 +138,9 @@ class PersisterTester(IonTestCase):
 
     @defer.inlineCallbacks
     def test_svcs_and_messaging(self):
-        raise unittest.SkipTest('Timing out on EC2')
+        #raise unittest.SkipTest('Timing out on EC2')
         services = [
-            {'name': 'persister', 'module': 'ion.services.dm.persister',
+            {'name': 'persister', 'module': 'ion.services.dm.preservation.persister',
              'class': 'PersisterService'},
             {'name': 'fetcher', 'module': 'ion.services.sa.fetcher',
              'class': 'FetcherService'},
@@ -156,3 +157,35 @@ class PersisterTester(IonTestCase):
         rc = yield pc.persist_dap_dataset(dset)
         #ps._save_no_xmit(dset)
         self.failUnlessSubstring('OK', rc)
+    
+    @defer.inlineCallbacks    
+    def test_append_operation(self):  
+           
+        services = [
+            {'name': 'persister', 'module': 'ion.services.dm.preservation.persister',
+             'class': 'PersisterService'},
+            {'name': 'fetcher', 'module': 'ion.services.sa.fetcher',
+             'class': 'FetcherService'},
+        ]
+        boss = yield self._spawn_processes(services)
+        
+        fc = FetcherClient(proc=boss)
+    
+        logging.debug('Grabbing dataset ' + TEST_ADSET1)
+        dset1 = yield fc.get_dap_dataset(TEST_ADSET1)
+        logging.debug('Grabbing dataset ' + TEST_ADSET2)
+        dset2 = yield fc.get_dap_dataset(TEST_ADSET2)
+        
+        pc = PersisterClient(proc=boss)
+        
+        logging.debug('Saving dataset...')
+        rc = yield pc.persist_dap_dataset(dset1)
+        
+    
+        self.failUnlessSubstring('OK', rc)
+        pattern = TEST_APATTERN
+        dataset = TEST_ADSET1
+        rc = yield pc.append_dap_dataset(dataset, pattern, dset2)
+        
+        self.failUnlessSubstring('OK', rc)
+        

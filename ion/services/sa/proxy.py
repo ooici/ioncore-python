@@ -11,7 +11,7 @@ import logging
 logging = logging.getLogger(__name__)
 
 from ion.core.base_process import ProtocolFactory
-from ion.services.dm.preservation.coordinator import CoordinatorClient
+from ion.services.dm.util.eoi_data_stream_producer import CoordinatorClient
 
 from ion.services.base_service import BaseService
 from twisted.internet import defer, protocol, reactor

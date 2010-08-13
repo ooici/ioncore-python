@@ -9,10 +9,7 @@
 """
 
 from urlparse import urlsplit, urlunsplit
-try:
-    import json
-except:
-    import simplejson as json
+import simplejson as json
 import base64
 
 from pydap.model import BaseType, SequenceType
@@ -28,6 +25,9 @@ logging = logging.getLogger(__name__)
 
 import time
 import sys
+import os
+import tempfile
+from pydap.handlers.nca import Handler as ncaHandler
 
 from twisted.internet import defer
 
@@ -35,7 +35,8 @@ from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.util.url_manipulation import generate_filename
 
-class PersisterService(BaseService):
+# Refactor to inherit from baseconsumer! No longer called 'service'
+class PersisterService(BaseService): 
     """
     The persister service is responsible for receiving a DAP dataset and
     writing to disk in netcdf format.
@@ -53,12 +54,44 @@ class PersisterService(BaseService):
     @todo Notifications of new fileset
     @todo Update fileset directory/registry
     """
+    # Does not exist in consumer
     declare = BaseService.service_declare(name='persister',
                                           version='0.1.0',
-                                          dependencies=[])
+                                          dependencies=[]) 
 
+    """ Here is a start on implementing the persister consumer!
     @defer.inlineCallbacks
-    def op_persist_dap_dataset(self, content, headers, msg):
+    def op_data(self, content, headers, msg):
+
+        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
+
+        logging.info(self.__class__.__name__ + '; Calling data process!')
+
+        # Keep a record of messages received
+        #@Note this could get big! What todo?
+                
+        self.receive_cnt[headers.get('receiver')] += 1
+        #self.received_msg.append(content) # Do not keep the messages!
+
+        # Unpack the message and turn it into data
+        datamessage = dataobject.DataObject.decode(content)
+        if isinstance(datamessage, DAPMessageObject):
+            data = dap_tools.dap_msg2ds(datamessage)
+        elif isinstance(datamessage, (StringMessageObject, DictionaryMessageObject)):
+            data = datamessage.data
+        else:
+            data = None
+
+        notification = datamessage.notification
+        timestamp = datamessage.timestamp
+
+        # Build the keyword args for ondata
+        args = dict(self.params)
+    """
+
+    # Must be called op_data
+    @defer.inlineCallbacks
+    def op_persist_dap_dataset(self, content, headers, msg): 
         """
         @brief top-level routine to persist a dataset.
         @param content Message with das, dds and dods keys
@@ -80,7 +113,82 @@ class PersisterService(BaseService):
             defer.returnValue(None)
 
         yield self.reply_ok(msg)
-
+    
+    # Must also be called op_data?
+    @defer.inlineCallbacks
+    def op_append_dap_dataset(self, content, headers, msg): 
+        """
+        @brief routine to append to an existing dataset which is a netcdf file
+        @param content Message with dataset name, pattern, das, dds and dods keys
+        The dataset name is mapped to a file that will be used to persist the dataset
+        The pattern is used to match all of the files that will be appended
+        @param headers Ignored
+        @param msg Used to route the reply, otherwise ignored
+        @retval RPC message via reply_ok/reply_err
+        """
+        logging.info('called to append a dap dataset!')
+        
+        assert(isinstance(content, dict))
+        
+        try:
+            self.op_persist_dap_dataset(content, headers, msg)
+        except:
+            yield self.reply_err(msg, {'value': 'Problem with persisting new dataset'}, {})
+            defer.returnValue(None)
+        dataset = content["dataset"]    
+        dsname = generate_filename(dataset)
+        pattern = content["pattern"]
+        
+        logging.info('using netcdf file matching pattern: ' + pattern)
+        try:
+            logging.info("calling _append_no_xmit ")
+            rc = self._append_no_xmit(dsname, pattern)
+            logging.info("returned from _append_no_xmit with rc ", rc)
+        except:
+            yield self.reply_err(msg, {'value':'Problem appending the dataset'}, {})
+            defer.returnValue(None)
+            
+        yield self.reply_ok(msg)
+        
+        
+    def _append_no_xmit(self, dsname, pattern, local_dir=None):
+        """
+        @brief Appends netcdf files together. 
+        @param dsname, the name of the file that contains the 
+        @param pattern a pattern used to match netcdf files to append
+         
+        """
+        configfile = tempfile.NamedTemporaryFile()
+        configfile.write("[dataset]")
+        configfile.write(os.linesep)
+        configfile.write("name=append")
+        configfile.write(os.linesep)
+        configfile.write("match="+ pattern)
+        configfile.write(os.linesep)
+        configfile.write("axis=time")
+        configfile.write(os.linesep)
+        configfile.flush()    
+        logging.info("Initializing nca handler")
+        h = ncaHandler(configfile.name)
+        try:
+            ds = h.parse_constraints({'pydap.ce':(None,None)})
+        except:
+            logging.exception("problem using append handler")
+            return 2
+        
+        logging.info("Created new netcdf dataset")
+        try:
+            
+            logging.info("saving netcdf file")
+            #It needs to save the file to a new file name, I have arbitrarily chosen
+            #to make the file the same as the first file name with the suffix _append
+            netcdf.save(ds, dsname+ "_append")
+        except UnicodeDecodeError, ude:
+            logging.exception('save error: %s ' % ude)
+            return 1
+        
+        configfile.close()
+        
     def _save_no_xmit(self, content, local_dir=None):
         """
         @brief Parse message into decodable objects: DAS, DDS, data.
@@ -169,7 +277,7 @@ class PersisterService(BaseService):
             logging.exception('save error: %s ' % ude)
             return 1
 
-class PersisterClient(BaseServiceClient):
+class PersisterClient(BaseServiceClient): # Not really needed - consumers don't have clients
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'persister'
@@ -186,7 +294,26 @@ class PersisterClient(BaseServiceClient):
 
         (content, headers, msg) = yield self.rpc_send('persist_dap_dataset',
                                                       dap_message)
+        
         logging.debug('dap persist returns: ' + str(content))
         defer.returnValue(str(content))
-
+        
+    @defer.inlineCallbacks   
+    def append_dap_dataset(self, dataset, pattern, dap_message):
+        """
+        @brief Append to an existing dataset, new data from a dap message
+        @param dataset, a logical name of the dataset, this name is mapped to a file name
+        @param dap_message Message with das/dds/dods in das/dds/dods keys 
+        @retval ok or error via rpc mechanism
+        """
+        yield self._check_init()
+        dap_message.update({'dataset': dataset})
+        dap_message.update({'pattern': pattern})
+        (content, headers, meg) = yield self.rpc_send('append_dap_dataset', 
+                                                      dap_message)
+        
+        logging.debug('dap append returns: ' + str(content))
+        defer.returnValue(str(content))
+        
+# Must change name after refactor
 factory = ProtocolFactory(PersisterService)

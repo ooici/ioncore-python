@@ -13,34 +13,46 @@ import SBE49_constants as const
 from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 
-from ion.core.base_process import ProtocolFactory, ProcessDesc
+from ion.core.base_process import BaseProcess, ProtocolFactory, ProcessDesc
 from ion.core import bootstrap
 
 
 
 # Gotta have this AFTER the "static" variables above
 from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriverClient
-    
+
 class SBE49InstrumentAgent(InstrumentAgent):
     """
     Sea-Bird 49 specific instrument driver
     Inherits basic get, set, getStatus, getCapabilities, etc. from parent
     """
-    
+
     @defer.inlineCallbacks
     def plc_init(self):
         """
         Initialize instrument driver when this process is started.
         """
-        pd = ProcessDesc(**{'name':'SBE49Driver',
+        self.instrument_id = self.spawn_args.get('instrument-id','123')
+        logging.info("INIT agent for instrument ID: %s" % (self.instrument_id))
+
+
+        self.pd = ProcessDesc(**{'name':'SBE49Driver',
                           'module':'ion.agents.instrumentagents.SBE49_driver',
-                          'class':'SBE49InstrumentDriver'})
-        self.sup = yield bootstrap.create_supervisor()
-                
-        driver_id = yield self.sup.spawn_child(pd)
-        self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
+                          'class':'SBE49InstrumentDriver',
+                          'spawnargs':{'instrument-id':self.instrument_id}})
+
+        rpcproc = BaseProcess()
+        rpcpid = yield rpcproc.spawn()
+
+        driver_id = yield rpcproc.spawn_child(self.pd)
+        self.driver_client = SBE49InstrumentDriverClient(proc=rpcproc,
                                                          target=driver_id)
-        
+
+    @defer.inlineCallbacks
+    def plc_shutdown(self):
+        yield self.pd.shutdown()
+
+
     @staticmethod
     def __translator(input):
         """

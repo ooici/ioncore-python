@@ -1,5 +1,15 @@
+#!/usr/bin/env python
+
+"""
+@file ion/services/dm/util/dap_tools.py
+@author Matt Rodriguez
+@author David Stuebe
+@brief Functions for working with dap data messages and dap datasets
+"""
+
 #This is for python2.5 compatibility    
 from __future__ import with_statement 
+
 
 from pydap.handlers.netcdf import Handler
 from pydap.responses.dds import DDSResponse
@@ -37,9 +47,11 @@ def ds2dap_msg(pydap_dataset,headeronly=False):
     if not headeronly:
         
         # Catch depricated warnings!
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore",category=DeprecationWarning)
-            dods = dap_gen(pydap_dataset)
+        # Unfortunately, catch_warnings is new in python 2.6 
+        #with warnings.catch_warnings():
+        #    warnings.simplefilter("ignore",category=DeprecationWarning)
+        #    dods = dap_gen(pydap_dataset)
+        dods = dap_gen(pydap_dataset)
 
         msg.dods = base64.b64encode(dods)
         #msg.dods = dods    

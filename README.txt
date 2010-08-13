@@ -45,6 +45,8 @@ Alternatively (better) from UNIX shell executing a script:
 ::
     twistd -n magnet -h amoeba.ucsd.edu res/scripts/bootstrap.py
     twistd -n magnet -h amoeba.ucsd.edu res/scripts/newcc.py
+    twistd -n magnet -h amoeba.ucsd.edu -a nproducers=25 res/scripts/pubsub.py
+
 
 Run trial test cases (recursively)
 ::
@@ -101,6 +103,7 @@ Other Dependencies
     easy_install pydap
     easy_install pydap.handlers.netcdf
     easy_install pydap.responses.netcdf
+    easy_install pydap.handlers.nca
     easy_install numpy
     easy_install httplib2
     easy_install -U --find-links http://ooici.net/packages pycassa

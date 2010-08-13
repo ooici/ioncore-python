@@ -16,8 +16,12 @@ from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.sa.fetcher import FetcherClient
 
-class CoordinatorService(BaseService):
+class CoordinatorService(BaseService): 
     """
+    Refactor this into a BaseService that provides dap data on a looping call
+    
+    Make the url a parameter of the process - one per url...
+    
     Brains behind preservation, and also the primary interface.
     """
     # Define ourselves for the CC

@@ -1,12 +1,17 @@
 #!/usr/bin/env python
 
-from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource, create_unique_identity
+"""
+@file ion/resources/dm_resource_descriptions.py
+@author David Stuebe
+@brief Resource descriptions for DM services and resources. Includes some
+container objects used in messaging.
+"""
 
+from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource, create_unique_identity
 
 """
 DM Pub Sub Registry Resource Descriptions
 """
-
 class PublisherResource(StatefulResource):
     """
     A registry object which contains information about publishers
@@ -43,7 +48,10 @@ class DataMessageObject(DataObject):
     """
     Base Class for Data PubSub Message Objects
     """
-
+    notification = TypedAttribute(str)
+    timestamp = TypedAttribute(float)
+    
+    
 class DAPMessageObject(DataMessageObject):
     """Container object for messaging DAP data"""
     das = TypedAttribute(str)
@@ -105,100 +113,126 @@ class PubSubTopicResource(InformationResource):
             inst.aoi = aoi
         return inst
 
-
 class SubscriptionResource(StatefulResource):
     """
     Informaiton about a subscriber
     """
     #Name - inherited
-    # Subscription is not to a topic but to the Exchange queue where the filtered
-    # messages arive from a topic!
-    topics = TypedAttribute(list) # List of Topic Resource References
-    period = TypedAttribute(list)
-    interval = TypedAttribute(int,0)
+
+    #owner = TypedAttribute(ResourceReference) # Don't worry about owner yet
+    
+    # hack for now to allow naming one-three more topic descriptions
+    topic1 = TypedAttribute(PubSubTopicResource)
+    topic2 = TypedAttribute(PubSubTopicResource) 
+    topic3 = TypedAttribute(PubSubTopicResource)
+    
+    workflow = TypedAttribute(dict)
+    '''
+    Only specify who you attach to - not who you produce to - consistent with pubsub model!
+    <consumer name>:{'module':'path.to.module','cosumeclass':'<ConsumerClassName>',\
+        'attach':<topicX> or <consumer name> or <list of consumers and topics>,\
+        'Process Parameters':{<conumser property keyword arg>: <property value>},\
+    '''
+
+    #Used internally
+    #current_topics = TypedAttribute(list) # List of Topic Resource References
+    #consumer_procids = TypedAttribute(dict) # list of child consumer ids - need a process registry
+    queues = TypedAttribute(list) # list of queue objects
+    consumer_args = TypedAttribute(dict)
+
 
 """
-DM DataSet Resource Descriptions
-Preliminary!
+Archive Registry Resources
 """
-class PerservationServiceResource(StatefulResource): # Is it stateful or information?
+class ArchiveResource(StatefulResource): # Is it stateful or information?
     #Name (Logical IRODS Name) - inherited
     datatype = TypedAttribute(str)
-    archived_locations = TypedAttribute(list) # List of Preservation Location objects
+    cache_policy = TypedAttribute(str)
+    backup_policy = TypedAttribute(str)
+    locations = TypedAttribute(list) # List of Archive Location objects
 
-class PreservationLocation(DataObject):
+class ArchiveLocation(DataObject):
+    name = TypedAttribute(str)
     location = TypedAttribute(str)
 
-class TypedData(DataObject):
+"""
+DM Data Registry Resources
+Preliminary!
+"""
+
+class AttributeData(DataObject):
     """
     """
     
-class FloatData(TypedData):
+class FloatAttribute(AttributeData):
     """
     #@Todo convert to use numpy types
     """
     f = TypedAttribute(float)
     
-class IntegerData(TypedData):
+class IntegerAttribute(AttributeData):
     """
     #@Todo convert to use numpy types
     """
     i = TypedAttribute(int)
     
-class StringData(TypedData):
+class StringAttribute(AttributeData):
     """
     #@Todo convert to use numpy types
     """
     s = TypedAttribute(str)
     
 
-class CDMDatasetResource(InformationResource):
+class DMDataResource(InformationResource):
     '''
     @Note <class> must be a type which python can instantiate with eval!
     '''
     #Name - inherited
     groups = TypedAttribute(list)
-    preservation_archive = TypedAttribute(PerservationServiceResource)
+    archive = TypedAttribute(ArchiveResource)
     
-class CDMGroupResource(InformationResource):
+class DMGroupData(InformationResource):
     #Name - inherited
     attributes = TypedAttribute(list)
     dimensions = TypedAttribute(list)
     variables = TypedAttribute(list)
-    preservation_archive = TypedAttribute(PerservationServiceResource)
+    archive = TypedAttribute(ArchiveResource)
     
-class CDMAttributeResource(InformationResource):
+class DMAttributeData(InformationResource):
     #Name - inherited
-    value = TypedAttribute(TypedData)
-    preservation_archive = TypedAttribute(PerservationServiceResource)
+    value = TypedAttribute(AttributeData)
+    archive = TypedAttribute(ArchiveResource)
     archive_attid = TypedAttribute(int,0) # Varid or name?
     
-class CDMDimensionResource(InformationResource):
+class DMDimensionData(InformationResource):
     #Name - inherited
     dim = TypedAttribute(int,0)
     unlimited = TypedAttribute(bool,False)
     shared = TypedAttribute(bool,False)
     is_variable_length = TypedAttribute(bool,False)
-    preservation_archive = TypedAttribute(PerservationServiceResource)
+    archive = TypedAttribute(ArchiveResource)
     archive_dimid = TypedAttribute(int,0) # Varid or name?
     
-class CDMVariableResource(InformationResource):
+class DMVariableData(InformationResource):
     """
     """
     #Name - inherited
     attributes = TypedAttribute(list)
     dimensions = TypedAttribute(list)
     type = TypedAttribute(str)
-    preservation_archive = TypedAttribute(PerservationServiceResource)
+    archive = TypedAttribute(ArchiveResource)
     archive_varid = TypedAttribute(str) # Varid or name?
     
-class CDMStructureResource(InformationResource):
+class DMStructureData(InformationResource):
     """
     """
     #Name - inherited
     members = TypedAttribute(list)
     
     
+
+
+
 
     
     

@@ -20,10 +20,7 @@ from twisted.internet import defer
 import httplib as http
 from socket import gaierror
 import urlparse
-try:
-    import json
-except:
-    import simplejson as json
+import simplejson as json
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
@@ -35,6 +32,7 @@ class FetcherService(BaseService):
 
     Service declaration - seems similar to the Zope methods
     @todo Dependencies - perhaps pub-sub?
+    @todo refactor to use dap_tools
     @note These are not class methods!
     """
     logging.info('Declaring fetcher...')
