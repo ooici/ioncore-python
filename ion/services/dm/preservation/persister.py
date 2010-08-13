@@ -35,7 +35,7 @@ from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.util.url_manipulation import generate_filename
 
-class PersisterService(BaseService):
+class PersisterService(BaseService): # Refactor to inherit from baseconsumer! No longer called 'service'
     """
     The persister service is responsible for receiving a DAP dataset and
     writing to disk in netcdf format.
@@ -55,10 +55,40 @@ class PersisterService(BaseService):
     """
     declare = BaseService.service_declare(name='persister',
                                           version='0.1.0',
-                                          dependencies=[])
+                                          dependencies=[]) # Does not exist in consumer
+
+    """ Here is a start on implementing the persister consumer!
+    @defer.inlineCallbacks
+    def op_data(self, content, headers, msg):
+
+        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
+
+        logging.info(self.__class__.__name__ + '; Calling data process!')
+
+        # Keep a record of messages received
+        #@Note this could get big! What todo?
+                
+        self.receive_cnt[headers.get('receiver')] += 1
+        #self.received_msg.append(content) # Do not keep the messages!
+
+        # Unpack the message and turn it into data
+        datamessage = dataobject.DataObject.decode(content)
+        if isinstance(datamessage, DAPMessageObject):
+            data = dap_tools.dap_msg2ds(datamessage)
+        elif isinstance(datamessage, (StringMessageObject, DictionaryMessageObject)):
+            data = datamessage.data
+        else:
+            data = None
+
+        notification = datamessage.notification
+        timestamp = datamessage.timestamp
+
+        # Build the keyword args for ondata
+        args = dict(self.params)
+    """
 
     @defer.inlineCallbacks
-    def op_persist_dap_dataset(self, content, headers, msg):
+    def op_persist_dap_dataset(self, content, headers, msg): # Must be called op_data
         """
         @brief top-level routine to persist a dataset.
         @param content Message with das, dds and dods keys
@@ -82,7 +112,7 @@ class PersisterService(BaseService):
         yield self.reply_ok(msg)
     
     @defer.inlineCallbacks
-    def op_append_dap_dataset(self, content, headers, msg):
+    def op_append_dap_dataset(self, content, headers, msg): # Must also be called op_data?
         """
         @brief routine to append to an existing dataset which is a netcdf file
         @param content Message with dataset name, pattern, das, dds and dods keys
@@ -243,7 +273,7 @@ class PersisterService(BaseService):
             logging.exception('save error: %s ' % ude)
             return 1
 
-class PersisterClient(BaseServiceClient):
+class PersisterClient(BaseServiceClient): # Not really needed - consumers don't have clients
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'persister'

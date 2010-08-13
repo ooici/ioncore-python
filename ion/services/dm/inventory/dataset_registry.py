@@ -23,7 +23,7 @@ from ion.core.base_process import ProtocolFactory, BaseProcess
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
 
-from ion.resources import coi_resource_descriptions
+from ion.resources import dm_resource_descriptions
 
 CONF = ioninit.config(__name__)
 

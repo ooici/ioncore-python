@@ -1,5 +1,10 @@
+#!/usr/bin/env python
+
+
 """
 @file ion/data/datastore/registry.py
+@author David Stuebe
+@brief base service for registering ooi resources
 """
 
 import logging

@@ -226,5 +226,9 @@ class CDMStructureResource(InformationResource):
     
     
 
+class ArchiveResource(StatefulResource):
+    """
+    """
+
     
     

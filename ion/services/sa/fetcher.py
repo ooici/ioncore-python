@@ -32,6 +32,7 @@ class FetcherService(BaseService):
 
     Service declaration - seems similar to the Zope methods
     @todo Dependencies - perhaps pub-sub?
+    @todo refactor to use dap_tools
     @note These are not class methods!
     """
     logging.info('Declaring fetcher...')
