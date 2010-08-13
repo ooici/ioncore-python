@@ -5,6 +5,8 @@
 @test ion.play.hello_service Example unit tests for sample code.
 @author Michael Meisinger
 """
+import logging
+logging = logging.getLogger(__name__)
 
 from twisted.internet import defer
 
@@ -42,16 +44,15 @@ class HelloTest(IonTestCase):
 
         sup2 = yield bootstrap.create_supervisor()
         
-        print''
         
-        print 'Calling hello there with hc(sup1)'
+        logging.info('Calling hello there with hc(sup1)')
         hc1 = HelloProcessClient(proc=sup1,target=proc1_id)
         yield hc1.hello("Hi there, hello1")
 
 
-        print 'Calling hello there with hc(sup2)'
+        logging.info('Calling hello there with hc(sup2)')
         hc2 = HelloProcessClient(proc=sup2,target=proc1_id)
         yield hc2.hello("Hi there, hello1")
 
 
-        print 'Tada!'
+        logging.info('Tada!')
