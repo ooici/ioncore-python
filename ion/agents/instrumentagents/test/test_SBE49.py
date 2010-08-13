@@ -35,6 +35,30 @@ import os
 
 from twisted.trial import unittest
 
+def start_SBE49_simulator():
+    """
+    Construct the path to the instrument simulator, starting with the current
+    working directory
+    """
+    cwd = os.getcwd()
+    myPid = os.getpid()
+    logging.debug("DHE: myPid: %s" % (myPid))
+
+    simDir = cwd.replace("_trial_temp", "ion/agents/instrumentagents/test/")
+    #simPath = simDir("sim_SBE49.py")
+    simPath = simDir + "sim_SBE49.py"
+    #logPath = simDir.append("sim.log")
+    logPath = simDir + "sim.log"
+    logging.info("cwd: %s, simPath: %s, logPath: %s" %(str(cwd), str(simPath), str(logPath)))
+    simLogObj = open(logPath, 'a')
+    #self.simProc = Popen(simPath, stdout=PIPE)
+    simProc = Popen(simPath, stdout=simLogObj)
+    return simProc
+
+def stop_SBE49_simulator(simproc):
+    simproc.terminate()
+
+
 class TestSBE49(IonTestCase):
 
 
@@ -45,26 +69,10 @@ class TestSBE49(IonTestCase):
         # Start the simulator
         logging.info("Starting instrument simulator.")
 
-        """
-        Construct the path to the instrument simulator, starting with the current
-        working directory
-        """
-        cwd = os.getcwd()
-        self.myPid = os.getpid()
-        logging.debug("DHE: myPid: %s" % (self.myPid))
-        
-        simDir = cwd.replace("_trial_temp", "ion/agents/instrumentagents/test/")
-        #simPath = simDir("sim_SBE49.py")
-        simPath = simDir + "sim_SBE49.py"
-        #logPath = simDir.append("sim.log")
-        logPath = simDir + "sim.log"
-        logging.info("cwd: %s, simPath: %s, logPath: %s" %(str(cwd), str(simPath), str(logPath)))
-        simLogObj = open(logPath, 'a')
-        #self.simProc = Popen(simPath, stdout=PIPE)
-        self.simProc = Popen(simPath, stdout=simLogObj)
+        self.simproc = start_SBE49_simulator()
 
         # Sleep for a while to allow simlator to get set up.
-        yield pu.asleep(2)
+        yield pu.asleep(1)
 
         services = [
             {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
@@ -73,14 +81,14 @@ class TestSBE49(IonTestCase):
 
         #self.pubsubSuper = yield self._spawn_processes(services)
         self.sup = yield self._spawn_processes(services)
-        
+
         #self.sup = yield bootstrap.create_supervisor()
 
         child_id = yield self.sup.get_child_id('pubsub_service')
         logging.debug("DHE: PubSub Test Service ID: " + str(child_id))
         self.pubsub = self._get_procinstance(child_id)
         logging.debug("DHE: got procinstance")
-        
+
         driverParms = {'name':'SBE49_Driver',
                  'module':'ion.agents.instrumentagents.SBE49_driver',
                  'procclass':'SBE49InstrumentDriver'
@@ -94,23 +102,29 @@ class TestSBE49(IonTestCase):
         #self.driver_pid = yield self.driver.spawn()
 
         #yield self.driver.init()
-        
+
         self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
                                                          target=self.driver_pid)
         #self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
         #                                                 target="SBE49_Driver")
 
     @defer.inlineCallbacks
+    def tearDown(self):
+        logging.info("Stopping instrument simulator.")
+        stop_SBE49_simulator(self.simproc)
+        yield self._stop_container()
+
+    @defer.inlineCallbacks
     def test_create_topic(self):
         #dpsc = DataPubsubClient(self.pubsubSuper)
-        
+
         dpsc = DataPubsubClient(self.sup)
         # Create and Register a topic
         """
         DHE: not sure the driver should be creating the topic; for right
         now I'll have the test case do it.
         """
-        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
+        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
         self.topic = yield dpsc.define_topic(self.topic)
 
 
@@ -120,18 +134,12 @@ class TestSBE49(IonTestCase):
     @defer.inlineCallbacks
     def test_initialize(self):
         #dpsc = DataPubsubClient(self.pubsubSuper)
-        
+
         result = yield self.driver_client.initialize('some arg')
         yield pu.asleep(4)
         print 'TADA!'
 
 
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        logging.info("Stopping instrument simulator.")
-        self.simProc.terminate()
-        yield self._stop_container()
 
     @defer.inlineCallbacks
     def test_driver_load(self):
@@ -160,9 +168,9 @@ class TestSBE49(IonTestCase):
         self.assertEqual(result['baudrate'], params['baudrate'])
         self.assertEqual(result['outputsal'], params['outputsal'])
         """
-        
+
         raise unittest.SkipTest('Temporarily skipping')
-        
+
 
     @defer.inlineCallbacks
     def test_execute(self):
@@ -177,7 +185,7 @@ class TestSBE49(IonTestCase):
         subscription = SubscriptionResource()
         subscription.topic1 = PubSubTopicResource.create('SBE49 Topic','')
         #subscription.topic2 = PubSubTopicResource.create('','oceans')
-        
+
         subscription.workflow = {
             'consumer1':
                 {'module':'ion.services.dm.distribution.consumers.logging_consumer',
@@ -192,21 +200,21 @@ class TestSBE49(IonTestCase):
         """
 
         # Create and Register a topic
-        topic = PubSubTopicResource.create('Daves Topic',"surfing, sailing, diving")        
+        topic = PubSubTopicResource.create('Daves Topic',"surfing, sailing, diving")
         topic = yield dpsc.define_topic(topic)
         logging.info('Defined Topic: '+str(topic))
 
         #Create and register self.sup as a publisher
         print 'SUP',self.pubsubSuper,self.test_sup
-        
+
         publisher = PublisherResource.create('Test Publisher', self.sup, topic, 'DataObject')
         publisher = yield dpsc.define_publisher(publisher)
 
         logging.info('Defined Publisher: '+str(publisher))
         """
-        
+
         # === Create a Consumer and queues - this will become part of define_subscription.
-        
+
         #Create two test queues - don't use topics to test the consumer
         # To be replaced when the subscription service is ready
         """
@@ -246,8 +254,8 @@ class TestSBE49(IonTestCase):
 
         # DHE: disconnecting; a connect would probably be good.
         result = yield self.driver_client.disconnect(['some arg'])
-        
-        
+
+
 class DataConsumer(BaseProcess):
     """
     A class for spawning as a separate process to consume the responses from
@@ -275,7 +283,3 @@ class DataConsumer(BaseProcess):
         """
         self.receive_cnt += 1
         self.received_msg.append(content)
-        
-
-
-        

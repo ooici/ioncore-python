@@ -35,11 +35,11 @@ class InstrumentClient(Protocol):
     """
     def __init__(self, parent):
         self.parent = parent
-        
+
     def connectionMade(self):
         logging.debug("DHE: connectionMade, calling gotConnected().")
         self.parent.gotConnected(self)
-        
+
     def dataReceived(self, data):
         """
         Filter the data; the instrument will send the
@@ -68,13 +68,13 @@ class SBE49InstrumentDriver(InstrumentDriver):
     topicDefined = False
 
 
-    """    
+    """
     lifecycleState = LCS['new']
     declare = BaseService.service_declare(name = 'Instrument',
                                           version = '0.0.1',
                                           dependencies = [])
-    """                                          
-    
+    """
+
     """
     Maybe some day these values are looked up from a registry of common
         controlled vocabulary
@@ -126,40 +126,43 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
 
-    @defer.inlineCallbacks
-    def plc_init(self):        
+    #@defer.inlineCallbacks
+    def plc_init(self):
         self.instrument_id = self.spawn_args.get('instrument-id','123')
         logging.info("INIT DRIVER for instrument ID: %s" % (self.instrument_id))
-        
+
         # We need a separte process (and process id/in queue) for the RPC
         # because we cannot receive the RPC response message while still
         # processing the init message (on the same queue).
-        rpcproc = BaseProcess()
-        rpcpid = yield rpcproc.spawn()
-        
-        self.iaclient = InstrumentAgentClient(proc=rpcproc, target=self.proc_supid)        
+        #rpcproc = BaseProcess()
+        #rpcpid = yield rpcproc.spawn()
+        #
+        #self.iaclient = InstrumentAgentClient(proc=rpcproc, target=self.proc_supid)
+        #
+        ## Instantiate a pubsubclient
+        #self.dpsc = DataPubsubClient(proc=rpcproc)
+        #
+        ## Create and Register a topic
+        #self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
+        #self.topic = yield self.dpsc.define_topic(self.topic)
+        #logging.debug('DHE: Defined Topic')
+        #
+        #self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
+        #self.publisher = yield self.dpsc.define_publisher(self.publisher)
+        #
+        #logging.info('DHE: Defined Publisher')
+        #
+        #self.topicDefined = True
+        #
+        #logging.debug("Instrument driver has topic")
 
-        # Instantiate a pubsubclient
-        self.dpsc = DataPubsubClient(proc=rpcproc)
-        
-        # Create and Register a topic
-        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
-        self.topic = yield self.dpsc.define_topic(self.topic)
-        logging.debug('DHE: Defined Topic')
+    @defer.inlineCallbacks
+    def plc_shutdown(self):
+        yield self.op_disconnect(None, None, None)
 
-        self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
-        self.publisher = yield self.dpsc.define_publisher(self.publisher)
-
-        logging.info('DHE: Defined Publisher')
-
-        self.topicDefined = True
-        
-        logging.debug("Instrument driver has topic")
-
-        
     def isConnected(self):
         return self.connected
-    
+
     def setConnected(self, value):
         self.connected = value;
 
@@ -174,18 +177,18 @@ class SBE49InstrumentDriver(InstrumentDriver):
         We probably need to come up with a more flexible way of doing this; like
         getting a connection object that abstracts the details of the protocol.
         Not sure how easy that would be with Twisted and Python.
-        
+
         Gets a deferred object passes it to the InstrumentClientFactory, which
         uses it to acess callbacks.  Was trying to use this to make the
         connection process more managable.  Not sure if that's the case or  not
         yet.
         @retval The deferred object.
         """
-        
-        # DHE Probably don't need to do it this way anymore 
+
+        # DHE Probably don't need to do it this way anymore
         #self.d = defer.Deferred()
         #factory = InstrumentClientFactory(self, self.d)
-        
+
         # Now thinking I might try clientcreator since this will only be a
         # single connection.
         #factory = InstrumentClientFactory(self)
@@ -196,19 +199,19 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.proto = yield cc.connectTCP("localhost", 9000)
         logging.info("DHE: connectTCP returned")
 
-        """        
+        """
         # Instantiate a pubsubclient
         dpsc = DataPubsubClient(self)
 
         # Create and Register a topic
-        topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
+        topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
         topic = yield dpsc.define_topic(topic)
         #topic = dpsc.define_topic(topic)
         logging.debug('DHE: Defined Topic: '+str(topic))
         """
-       
+
         #return self.d
-    
+
     def gotConnected(self, instrument):
         """
         @brief This method is called when a connection has been made to the
@@ -221,8 +224,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         logging.debug("DHE: gotConnected!!!")
 
         self.instrument = instrument
-        self.setConnected(True)    
-        
+        self.setConnected(True)
+
     def gotData(self, data):
         """
         @brief The instrument protocol object has received data from the
@@ -234,7 +237,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         # send this up to the agent to publish.
         logging.debug("gotData() %s Calling publish." % (data))
         self.publish(data, 'topic1')
-      
+
     def gotPrompt(self, instrument):
         """
         This needs to be the general receive routine for the instrument driver
@@ -242,7 +245,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         logging.debug("DHE: gotPrompt()")
         self.instrument = instrument
         self.setConnected(True)
-        
+
         """
         Need some sort of state machine so we'll know what data we're supposed to send...
         """
@@ -250,6 +253,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         if self.command != None:
             logging.debug("DHE: gotPrompt sending command: %s"  % (self.command))
             instrument.transport.write(self.command)
+            self.command = None
         else:
             logging.debug("DHE gotPrompt NOT SENDING ANYTHING")
 
@@ -274,7 +278,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 logging.info('DHE: Failed to Published Message')
         else:
             logging.debug("DHE: NOT READY TO PUBLISH")
-        
+
 
     @defer.inlineCallbacks
     def op_initialize(self, content, headers, msg):
@@ -282,15 +286,15 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         """
         # Instantiate a pubsubclient
-        dpsc = DataPubsubClient(self.get_instance())        
-        
+        dpsc = DataPubsubClient(self.get_instance())
+
         # Create and Register a topic
         #DHE: not sure the driver should be creating the topic; for right
         #now I'll have the test case do it.
-        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")        
+        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
         self.topic = yield dpsc.define_topic(self.topic)
         logging.debug('DHE: Defined Topic')
-        
+
         #self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
         #self.publisher = yield dpsc.define_publisher(self.publisher)
 
@@ -300,16 +304,18 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
 
         yield self.reply_ok(msg, content)
-    
+
     @defer.inlineCallbacks
     def op_disconnect(self, content, headers, msg):
         logging.debug("DHE: in Instrument Driver op_disconnect!")
-        if (self.isConnected() == True):
+        if (self.isConnected()):
             logging.debug("DHE: disconnecting from instrument")
             #self.connector.disconnect()
             self.proto.transport.loseConnection()
-        yield self.reply_ok(msg, content)
-        
+            self.setConnected(False)
+        if msg:
+            yield self.reply_ok(msg, content)
+
     @defer.inlineCallbacks
     def op_fetch_params(self, content, headers, msg):
         """
@@ -339,7 +345,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             else:
                 self.__instrument_parameters[param] = content[param]
         yield self.reply_ok(msg, content)
-            
+
     @defer.inlineCallbacks
     def op_execute(self, content, headers, msg):
         """
@@ -364,15 +370,15 @@ class SBE49InstrumentDriver(InstrumentDriver):
             #d.addCallback(self.gotConnected);
             #d.addCallback(self.gotPrompt);
             #logging.debug("waiting to be connected...")
-        
+
         """
         DHE THERE IS A WEIRD PROBLEM WHERE getConnected() RETURNS BUT THE TOPIC ISNT DEFINED,
         BECAUSE THAT CALL YIELDS (UP IN gotConnected)
         """
-        
+
         #while self.topicDefined != True:
         #    yield pu.asleep(1)
-            
+
         if (content == {}):
             yield self.reply_err(msg, "Empty command")
             return
@@ -391,7 +397,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 #    self.instrument.transport.write(self.command)
         yield self.reply_ok(msg, content.keys())
 
-    
+
     @defer.inlineCallbacks
     def op_get_status(self, content, headers, msg):
         """
@@ -404,7 +410,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @todo Remove this? Is it even used?
         """
         yield self.reply_ok(msg, "a-ok")
-        
+
     @defer.inlineCallbacks
     def op_configure_driver(self, content, headers, msg):
         """
@@ -418,14 +424,14 @@ class SBE49InstrumentDriver(InstrumentDriver):
         assert(isinstance(content, dict))
         # Do something here, then adjust test case
         yield self.reply_ok(msg, content)
-        
-        
+
+
 class SBE49InstrumentDriverClient(InstrumentDriverClient):
     """
     The client class for the instrument driver. This is the client that the
     instrument agent can use for communicating with the driver.
     """
-    
-    
+
+
 # Spawn of the process using the module name
 factory = ProtocolFactory(SBE49InstrumentDriver)
