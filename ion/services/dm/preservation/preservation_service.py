@@ -41,7 +41,7 @@ class PreservationService(BaseService):
     def op_deactivate_persister(self, content, headers, msg):
         """Service operation: kill data stream archive process
         """
-        # kill persister
+        # kill persister - Not before LCA
         
     def op_archive_data(self, content, headers, msg):
         """Service operation: archive an single dataset

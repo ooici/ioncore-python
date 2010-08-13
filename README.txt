@@ -103,6 +103,7 @@ Other Dependencies
     easy_install pydap
     easy_install pydap.handlers.netcdf
     easy_install pydap.responses.netcdf
+    easy_install pydap.handlers.nca
     easy_install numpy
     easy_install httplib2
     easy_install -U --find-links http://ooici.net/packages pycassa

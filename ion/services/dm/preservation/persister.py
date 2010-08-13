@@ -35,7 +35,8 @@ from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.util.url_manipulation import generate_filename
 
-class PersisterService(BaseService): # Refactor to inherit from baseconsumer! No longer called 'service'
+# Refactor to inherit from baseconsumer! No longer called 'service'
+class PersisterService(BaseService): 
     """
     The persister service is responsible for receiving a DAP dataset and
     writing to disk in netcdf format.
@@ -53,9 +54,10 @@ class PersisterService(BaseService): # Refactor to inherit from baseconsumer! No
     @todo Notifications of new fileset
     @todo Update fileset directory/registry
     """
+    # Does not exist in consumer
     declare = BaseService.service_declare(name='persister',
                                           version='0.1.0',
-                                          dependencies=[]) # Does not exist in consumer
+                                          dependencies=[]) 
 
     """ Here is a start on implementing the persister consumer!
     @defer.inlineCallbacks
@@ -87,8 +89,9 @@ class PersisterService(BaseService): # Refactor to inherit from baseconsumer! No
         args = dict(self.params)
     """
 
+    # Must be called op_data
     @defer.inlineCallbacks
-    def op_persist_dap_dataset(self, content, headers, msg): # Must be called op_data
+    def op_persist_dap_dataset(self, content, headers, msg): 
         """
         @brief top-level routine to persist a dataset.
         @param content Message with das, dds and dods keys
@@ -111,8 +114,9 @@ class PersisterService(BaseService): # Refactor to inherit from baseconsumer! No
 
         yield self.reply_ok(msg)
     
+    # Must also be called op_data?
     @defer.inlineCallbacks
-    def op_append_dap_dataset(self, content, headers, msg): # Must also be called op_data?
+    def op_append_dap_dataset(self, content, headers, msg): 
         """
         @brief routine to append to an existing dataset which is a netcdf file
         @param content Message with dataset name, pattern, das, dds and dods keys
@@ -311,5 +315,5 @@ class PersisterClient(BaseServiceClient): # Not really needed - consumers don't 
         logging.debug('dap append returns: ' + str(content))
         defer.returnValue(str(content))
         
-        
+# Must change name after refactor
 factory = ProtocolFactory(PersisterService)

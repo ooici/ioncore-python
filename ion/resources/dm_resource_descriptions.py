@@ -7,15 +7,11 @@
 container objects used in messaging.
 """
 
-
-
 from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource, create_unique_identity
-
 
 """
 DM Pub Sub Registry Resource Descriptions
 """
-
 class PublisherResource(StatefulResource):
     """
     A registry object which contains information about publishers
@@ -151,6 +147,8 @@ Archive Registry Resources
 class ArchiveResource(StatefulResource): # Is it stateful or information?
     #Name (Logical IRODS Name) - inherited
     datatype = TypedAttribute(str)
+    cache_policy = TypedAttribute(str)
+    backup_policy = TypedAttribute(str)
     locations = TypedAttribute(list) # List of Archive Location objects
 
 class ArchiveLocation(DataObject):
