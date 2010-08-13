@@ -95,4 +95,4 @@ class StripChartConsumer(base_consumer.BaseConsumer):
         
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(TwitterConsumer)
+factory = ProtocolFactory(StripChartConsumer)
