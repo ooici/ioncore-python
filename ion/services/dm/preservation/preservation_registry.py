@@ -31,7 +31,7 @@ class PreservationRegistryService(registry.BaseRegistryService):
     """
     @Brief Dataset registry service interface
     """
- 
+        
      # Declaration of service
     declare = BaseService.service_declare(name='preservation_registry', version='0.1.0', dependencies=[])
 
@@ -47,9 +47,7 @@ class PreservationRegistryService(registry.BaseRegistryService):
     """
     Service operation: Find an archive resource by characteristics
     """
-
-
-        
+    
 # Spawn of the process using the module name
 factory = ProtocolFactory(PreservationRegistryService)
 

@@ -168,6 +168,7 @@ class FetcherService(BaseService):
 
         logging.debug('Fetches completed OK, composing and returning message')
 
+        #@TODO replace the dictionary with the DM_DAP dataset object!
         dset_msg = {}
         dset_msg['quiet'] = True # Keep procutils from clogging the log
         dset_msg['source_url'] = base_url
@@ -185,6 +186,7 @@ class FetcherService(BaseService):
         """
         Pull a DAP dataset, encode into reply, send reply. Integrates
         everything else.
+        @TODO replace the dictionary with the DM_DAP dataset object!
         """
         try:
             # Do the fetches, carefully

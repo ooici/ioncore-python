@@ -3,6 +3,7 @@
 """
 @file ion/services/dm/preservation/persister.py
 @author Paul Hubbard
+@author David Stuebe
 @date 6/7/10
 @brief The persister writes DAP datasets to disk as netcdf files.
 @see DAP protocol spec: http://www.opendap.org/pdf/ESE-RFC-004v1.1.pdf
@@ -31,13 +32,20 @@ from pydap.handlers.nca import Handler as ncaHandler
 
 from twisted.internet import defer
 
+from ion.data import dataobject
+from ion.resources.dm_resource_descriptions import DAPMessageObject, DataMessageObject, StringMessageObject, DictionaryMessageObject
+
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.util.url_manipulation import generate_filename
 
-# Refactor to inherit from baseconsumer! No longer called 'service'
-class PersisterService(BaseService): 
+from ion.services.dm.distribution import base_consumer
+
+
+class PersisterConsumer(base_consumer.BaseConsumer):
     """
+    Please update the doc string...
+    
     The persister service is responsible for receiving a DAP dataset and
     writing to disk in netcdf format.
     Message protocol/encoding/format:
@@ -54,50 +62,47 @@ class PersisterService(BaseService):
     @todo Notifications of new fileset
     @todo Update fileset directory/registry
     """
-    # Does not exist in consumer
-    declare = BaseService.service_declare(name='persister',
-                                          version='0.1.0',
-                                          dependencies=[]) 
 
-    """ Here is a start on implementing the persister consumer!
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks # If you call a yeild inside you need to uncomment the inline callback
     def op_data(self, content, headers, msg):
 
         logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
-
         logging.info(self.__class__.__name__ + '; Calling data process!')
 
-        # Keep a record of messages received
-        #@Note this could get big! What todo?
-                
+        # Keep track of how many messages you got
         self.receive_cnt[headers.get('receiver')] += 1
-        #self.received_msg.append(content) # Do not keep the messages!
 
-        # Unpack the message and turn it into data
+        # Unpack the message and save it to disk!
         datamessage = dataobject.DataObject.decode(content)
         if isinstance(datamessage, DAPMessageObject):
-            data = dap_tools.dap_msg2ds(datamessage)
-            
+
+            data = dap_tools.dap_msg2ds(datamessage)            
             # Call preserve DAP data
+            #self.save_dap_dataset(data,fname=self.params['filename'])
             
-        elif isinstance(datamessage, (StringMessageObject, DictionaryMessageObject)):
-            data = datamessage.data
-            
+        elif isinstance(datamessage, DictionaryMessageObject):
+
+            data = datamessage.data            
             #Call preserve dict or string 
-            
+            #self.save_dictionary_dataset(data,fname=self.params['filename'])
+
+        elif isinstance(datamessage, StringMessageObject):
+
+            data = datamessage.data
+            #Call preserve dict or string 
+            #self.save_string_dataset(data,fname=self.params['filename'])
+
         else:
             data = None
             # Error?
 
+        # Later - these will be sent to a historical log for the dataset...
         notification = datamessage.notification
         timestamp = datamessage.timestamp
-
-        # Build the keyword args for ondata
-        args = dict(self.params)
-
-    """
-
+        
+        
+    '''
     # Must be called op_data
     @defer.inlineCallbacks
     def op_persist_dap_dataset(self, content, headers, msg): 
@@ -158,7 +163,7 @@ class PersisterService(BaseService):
             defer.returnValue(None)
             
         yield self.reply_ok(msg)
-        
+
         
     def _append_no_xmit(self, dsname, pattern, local_dir=None):
         """
@@ -285,7 +290,13 @@ class PersisterService(BaseService):
         except UnicodeDecodeError, ude:
             logging.exception('save error: %s ' % ude)
             return 1
+    '''
+# Must change name after refactor
+factory = ProtocolFactory(PersisterConsumer)
 
+
+'''
+There is no client for a consumer...
 class PersisterClient(BaseServiceClient): # Not really needed - consumers don't have clients
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
@@ -323,6 +334,7 @@ class PersisterClient(BaseServiceClient): # Not really needed - consumers don't 
         
         logging.debug('dap append returns: ' + str(content))
         defer.returnValue(str(content))
-        
-# Must change name after refactor
-factory = ProtocolFactory(PersisterService)
+'''
+
+
+#
