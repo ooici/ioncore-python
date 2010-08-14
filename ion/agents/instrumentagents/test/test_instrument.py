@@ -120,13 +120,14 @@ class TestInstrumentAgent(IonTestCase):
         Tests the ability of an instrument agent to successfully register
         ifself with the resource registry.
         """
-        reg_ref = yield self.IAClient.register_resource()
+        reg_ref = yield self.IAClient.register_resource("123")
 
         result = yield self.IAClient.get_resource_instance()
         self.assertNotEqual(result, None)
 
         self.assert_(isinstance(result, InstrumentAgentResourceInstance))
         self.assertNotEqual(result.driver_process_id, None)
+        self.assertEqual(result.instrument_ref.RegistryIdentity, "123")
 
         self.assertEqual(reg_ref.RegistryCommit, '')
         self.assertNotEqual(result.RegistryCommit, reg_ref.RegistryCommit)
@@ -142,7 +143,7 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test the resource lifecycle management
         """
-        yield self.IAClient.register_resource()
+        yield self.IAClient.register_resource("123")
 
         response = yield self.IAClient.set_lifecycle_state(LCS.inactive)
         self.assertEqual(response, LCS.inactive)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-@file ion/services/dm/preservation/coordinator.py
+@file ion/services/dm/util/eoi_data_stream_producer.py
 @author Paul Hubbard
 @date 5/25/10
 @package ion.services.dm.preservation.coordinator Preservation coordinator. The brains.

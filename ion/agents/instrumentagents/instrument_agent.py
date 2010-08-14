@@ -11,6 +11,7 @@ from twisted.internet import defer
 
 from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
+from ion.data.dataobject import ResourceReference
 from ion.core.base_process import BaseProcess, BaseProcessClient
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 
@@ -543,7 +544,7 @@ class InstrumentAgentClient(ResourceAgentClient):
         defer.returnValue(content)
 
     @defer.inlineCallbacks
-    def register_resource(self):
+    def register_resource(self, instrument_id):
         """
         Register the resource. Since this is a subclass, make the appropriate
         resource description for the registry and pass that into the
@@ -552,6 +553,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         ia_instance = InstrumentAgentResourceInstance()
         ci_params = yield self.get_from_CI([driver_address])
         ia_instance.driver_process_id = ci_params[driver_address]
+        ia_instance.instrument_ref = ResourceReference(
+            RegistryIdentity=instrument_id, RegistryBranch='master')
         result = yield ResourceAgentClient.register_resource(self,
                                                              ia_instance)
         defer.returnValue(result)

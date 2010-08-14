@@ -2,7 +2,7 @@
 
 
 """
-@file ion/services/dm/preservation_registry.py
+@file ion/services/dm/preservation/preservation_registry.py
 @author David Stuebe
 @brief registry for preservation service resources
 """
@@ -29,9 +29,9 @@ CONF = ioninit.config(__name__)
 
 class PreservationRegistryService(registry.BaseRegistryService):
     """
-    @Brief Dataset registry service interface
+    @Brief Preservation registry service interface
     """
- 
+        
      # Declaration of service
     declare = BaseService.service_declare(name='preservation_registry', version='0.1.0', dependencies=[])
 
@@ -47,20 +47,18 @@ class PreservationRegistryService(registry.BaseRegistryService):
     """
     Service operation: Find an archive resource by characteristics
     """
-
-
-        
+    
 # Spawn of the process using the module name
 factory = ProtocolFactory(PreservationRegistryService)
 
 
 class PreservationRegistryClient(registry.BaseRegistryClient):
     """
-    Class for the client accessing the archive registry.
+    Class for the client accessing the Preservation registry.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "archive_registry"
+            kwargs['targetname'] = 'preservation_registry'
         BaseServiceClient.__init__(self, proc, **kwargs)
 
     
@@ -72,16 +70,16 @@ class PreservationRegistryClient(registry.BaseRegistryClient):
         """
         @Brief Client method to Register an archive
         
-        @param dataset is an instance of a dataset resource
+        @param archive is an instance of a Archive Resource
         """
-        return  self.base_register_resource('define_dataset', dataset)    
+        return  self.base_register_resource('define_archive', archive)    
 
     
     def get_archive(self,archive_reference):
         """
         @Brief Get a archive by reference
         @param archive_reference is the unique reference object for a registered
-        dataset
+        archive
         """
         return self.base_get_resource('get_archive',archive_reference)
         

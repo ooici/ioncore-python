@@ -22,6 +22,7 @@ class InstrumentAgentResourceInstance(AgentInstance):
     instrument agent information.
     """
     driver_process_id = TypedAttribute(str)
+    instrument_ref = TypedAttribute(ResourceReference)
 
 class InstrumentDriverResource(StatefulResource):
     """
@@ -47,5 +48,3 @@ class InstrumentResourceDescription(ResourceDescription):
     """
     # The type of instrument we are registering
     instrument_type = TypedAttribute(str)
-
-    
