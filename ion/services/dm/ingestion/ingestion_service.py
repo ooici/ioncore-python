@@ -13,6 +13,10 @@ from twisted.internet import defer
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.ingestion import ingestion_registry
+from ion.services.dm.distribution import pubsub_service
+from ion.services.dm.preservation import preservation_service
+
+from ion.resources.dm_resource_descriptions import IngestionStreamResource
 
 class IngestionService(BaseService):
     """Ingestion service interface
@@ -28,11 +32,13 @@ class IngestionService(BaseService):
     @defer.inlineCallbacks
     def slc_init(self):
         self.reg = yield ingestion_registry.IngestionRegistryClient(proc=self)
+        self.pubsub = yield pubsub_service.DataPubsubClient(proc=self)
+        self.preserv = yield preservation_service.PreservationClient(proc=self)
         
     
     def op_create_ingestion_datastream(self, content, headers, msg):
         """Service operation: declare new named datastream for ingestion
-        
+            
         1) create inbound topic
         2) create ingested topic
         3) start preservation of inbound
@@ -43,10 +49,12 @@ class IngestionService(BaseService):
         
         return the ingestiondatastream resource
     
-    
-    
         """
 
+        isr = IngestionStreamResource.create_new_resource()
+        isr.name = content['name']
+        
+        
         
         
 
