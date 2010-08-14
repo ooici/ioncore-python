@@ -107,18 +107,17 @@ class InstrumentManagementService(BaseService):
         else:
             raise ValueError("Input for instrumentID not present")
 
+        command = []
         command_op = str(commandInput['command'])
+        command.append(command_op)
 
-        command_args = []
         arg_idx = 0
         while True:
             argname = 'cmdArg'+str(arg_idx)
             if argname in commandInput:
-                command_args.append(str(commandInput['argname']))
+                command.append(str(commandInput['argname']))
             else:
                 break
-
-        command = {command_op: command_args}
 
         # Step 2: Find the agent id for the given instrument id
         agent_pid  = yield get_agent_pid_for_instrument(inst_id)
