@@ -2,16 +2,16 @@
 # Starts an instrument agent/driver combination for one instrance of a sensor (simulator).
 
 import logging
+import os
+from subprocess import Popen, PIPE
 from twisted.internet import defer
 
+from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 from ion.core import ioninit
 from ion.core import bootstrap
-from ion.util.config import Config
-
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
-from subprocess import Popen, PIPE
+from ion.util.config import Config
 import ion.util.procutils as pu
-import os
 
 # Use the bootstrap configuration entries from the standard bootstrap
 CONF = ioninit.config('ion.core.bootstrap')
@@ -41,7 +41,7 @@ def start_simulator():
     cwd = os.getcwd()
     myPid = os.getpid()
     logging.debug("DHE: myPid: %s" % (myPid))
-    
+
     simDir = cwd + "/ion/agents/instrumentagents/test/"
     simPath = simDir + "sim_SBE49.py"
     logPath = cwd + "/logs/sim_%s.log" % (INSTRUMENT_ID)
@@ -68,11 +68,15 @@ def main():
     start_simulator()
 
     # Sleep for a while to allow simlator to get set up.
-    #yield pu.asleep(1)
+    yield pu.asleep(1)
 
     ia_procs = [
         {'name':'SBE49IA','module':'ion.agents.instrumentagents.SBE49_IA','class':'SBE49InstrumentAgent','spawnargs':{'instrument-id':INSTRUMENT_ID}},
-    ]    
+    ]
     yield bootstrap.spawn_processes(ia_procs, sup=sup)
+
+    ia_pid = sup.get_child_id('SBE49IA')
+    iaclient = InstrumentAgentClient(proc=sup,target=ia_pid)
+    yield iaclient.register_resource(INSTRUMENT_ID)
 
 main()

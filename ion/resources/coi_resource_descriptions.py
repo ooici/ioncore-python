@@ -198,7 +198,6 @@ class AgentInstance(StatefulResource):
     the subject of the agent.
     """
     description = TypedAttribute(ResourceReference)
-    instrument_ref = TypedAttribute(ResourceReference)
     #owner = TypedAttribute(ResourceReference)
     spawnargs = TypedAttribute(str)
     #process_id = TypedAttribute(str)
