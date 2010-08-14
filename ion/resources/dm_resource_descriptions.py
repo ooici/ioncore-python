@@ -121,7 +121,7 @@ class SubscriptionResource(StatefulResource):
 
     #owner = TypedAttribute(ResourceReference) # Don't worry about owner yet
     
-    # hack for now to allow naming one-three more topic descriptions
+    # hack for now to allow naming one-three more topic descriptions used to find topics that are subscribed to!
     topic1 = TypedAttribute(PubSubTopicResource)
     topic2 = TypedAttribute(PubSubTopicResource) 
     topic3 = TypedAttribute(PubSubTopicResource)
@@ -196,12 +196,12 @@ class DMGroupData(InformationResource):
     attributes = TypedAttribute(list)
     dimensions = TypedAttribute(list)
     variables = TypedAttribute(list)
-    archive = TypedAttribute(ArchiveResource)
+    archive = TypedAttribute(ResourceReference)
     
 class DMAttributeData(InformationResource):
     #Name - inherited
     value = TypedAttribute(AttributeData)
-    archive = TypedAttribute(ArchiveResource)
+    archive = TypedAttribute(ResourceReference)
     archive_attid = TypedAttribute(int,0) # Varid or name?
     
 class DMDimensionData(InformationResource):
@@ -210,7 +210,7 @@ class DMDimensionData(InformationResource):
     unlimited = TypedAttribute(bool,False)
     shared = TypedAttribute(bool,False)
     is_variable_length = TypedAttribute(bool,False)
-    archive = TypedAttribute(ArchiveResource)
+    archive = TypedAttribute(ResourceReference)
     archive_dimid = TypedAttribute(int,0) # Varid or name?
     
 class DMVariableData(InformationResource):
@@ -220,7 +220,7 @@ class DMVariableData(InformationResource):
     attributes = TypedAttribute(list)
     dimensions = TypedAttribute(list)
     type = TypedAttribute(str)
-    archive = TypedAttribute(ArchiveResource)
+    archive = TypedAttribute(ResourceReference)
     archive_varid = TypedAttribute(str) # Varid or name?
     
 class DMStructureData(InformationResource):
@@ -231,7 +231,17 @@ class DMStructureData(InformationResource):
     
     
 
-
+"""
+DM Ingestion data stream object
+"""
+class IngestionStreamResource(StatefulResource):
+    # name - inherited from StatefulResource
+    inbound_topic_ref = TypedAttribute(ResourceReference)
+    inbound_format = TypedAttribute(str)
+    ingested_topic_ref = TypedAttribute(ResourceReference)
+    ingested_format = TypedAttribute(str)
+    persisted = TypedAttribute(bool)
+    ingested = TypedAttribute(bool)
 
 
     

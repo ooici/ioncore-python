@@ -14,7 +14,7 @@ from twisted.trial import unittest
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
-from ion.services.dm.ingestion.ingest import IngestClient, IngestService
+from ion.services.dm.ingestion.ingestion_service import IngestionClient, IngestionService
 
 #from ion.services.dm.ingest import IngestClient, IngestService
 from ion.services.sa.fetcher import FetcherService
@@ -25,11 +25,15 @@ class IngesterTester(IonTestCase):
         yield self._start_container()
         self.timeout = 30
         services = [
-            {'name': 'ingest', 'module': 'ion.services.dm.ingestion.ingest',
-             'class':'IngestService'}
+            {'name': 'ingestion_registry',
+             'module': 'ion.services.dm.ingestion.ingestion_registry',
+             'class':'IngestionRegistryService'},
+            {'name': 'ingestion_service',
+             'module': 'ion.services.dm.ingestion.ingestion_service',
+             'class':'IngestionService'},           
         ]
         sup = yield self._spawn_processes(services)
-        self.ic = IngestClient(proc=sup)
+        self.ic = IngestionClient(proc=sup)
         #self.fs = FetcherService()
         #self.mys = IngestService()
 
@@ -45,16 +49,6 @@ class IngesterTester(IonTestCase):
         Use fetcher service to create dataset so we can test without
         actual messaging.
         """
-        raise unittest.SkipTest('Causes timeout on my workstation')
+        raise unittest.SkipTest('Not implemented')
 
-        logging.debug('getting dataset')
-        dset_url = 'http://ooici.net:8001/coads.nc'
-        dset = self.fs._get_dataset_no_xmit(dset_url)
-        logging.debug('Sending dataset to ingester!')
-
-        mdict = self.mys._do_ingest(dset)
-
-        self.failUnlessSubstring('TIME', mdict)
-        self.failUnlessSubstring('COADSX', mdict)
-        self.failUnlessSubstring('COADSY', mdict)
-        self.failUnlessSubstring('SST', mdict)
+        
