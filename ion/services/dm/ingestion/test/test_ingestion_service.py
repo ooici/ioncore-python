@@ -16,8 +16,8 @@ from ion.test.iontest import IonTestCase
 
 from ion.services.dm.ingestion.ingestion_service import IngestionClient, IngestionService
 
-#from ion.services.dm.ingest import IngestClient, IngestService
-from ion.services.sa.fetcher import FetcherService
+from ion.resources.dm_resource_descriptions import IngestionStreamResource
+
 
 class IngesterTester(IonTestCase):
     @defer.inlineCallbacks
@@ -49,6 +49,9 @@ class IngesterTester(IonTestCase):
         Use fetcher service to create dataset so we can test without
         actual messaging.
         """
+        isr = IngestionStreamResource.create_new_resource()
+        isr.name = 'sbe49_id_28461984'
+        
         raise unittest.SkipTest('Not implemented')
 
         

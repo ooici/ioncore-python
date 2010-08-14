@@ -15,15 +15,18 @@ from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.ingestion import ingestion_registry
 from ion.services.dm.distribution import pubsub_service
 from ion.services.dm.preservation import preservation_service
+from ion.services.dm.inventory import dataset_registry
 
-from ion.resources.dm_resource_descriptions import IngestionStreamResource
+from ion.data import dataobject
+
+from ion.resources.dm_resource_descriptions import IngestionStreamResource, PubSubTopicResource
 
 class IngestionService(BaseService):
     """Ingestion service interface
     @Note Needs work - Should create a subscription to ingest a data source
     What should the service interface look like for this?
     """
-
+        
     # Declaration of service
     declare = BaseService.service_declare(name='ingestion_service',
                                           version='0.1.0',
@@ -34,29 +37,42 @@ class IngestionService(BaseService):
         self.reg = yield ingestion_registry.IngestionRegistryClient(proc=self)
         self.pubsub = yield pubsub_service.DataPubsubClient(proc=self)
         self.preserv = yield preservation_service.PreservationClient(proc=self)
-        
+        self.datareg = yield dataset_registry
     
     def op_create_ingestion_datastream(self, content, headers, msg):
         """Service operation: declare new named datastream for ingestion
             
         1) create inbound topic
         2) create ingested topic
-        3) start preservation of inbound
-        4) start preservation of ingested
+        3) Register new data 
+        3) start preservation of ingested
+        4) start preservation of inbound
         5) start ingestion workflow
-        
+         
         Register progress and set lcstate along the way
         
         return the ingestiondatastream resource
-    
+            
         """
+        logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
+        irs = dataobject.DataObject.decode(content)
+        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Ingestion Stream: \n' + str(publisher))
 
-        isr = IngestionStreamResource.create_new_resource()
-        isr.name = content['name']
         
+        inbnd = irs.name + '.inbound'
+        topic = PubSubTopicResource.create(name=inbnd)
+        topic = yield self.pubsub.define_topic(topic)
+        isr.inbound_topic = topic.reference(heat=True)
         
+        ingested = irs.name + '.ingested'
+        topic = PubSubTopicResource.create(name=ingested)
+        topic = yield self.pubsub.define_topic(topic)
+        isr.ingested_topic = topic.reference(heat=True)
         
-        
+ 
+# Spawn of the process using the module name
+factory = ProtocolFactory(IngestionService)
+
 
 
 class IngestionClient(BaseServiceClient):
@@ -73,7 +89,3 @@ class IngestionClient(BaseServiceClient):
         '''
         
 
-
- 
-# Spawn of the process using the module name
-factory = ProtocolFactory(IngestionService)

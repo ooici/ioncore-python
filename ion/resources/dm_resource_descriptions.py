@@ -105,6 +105,9 @@ class PubSubTopicResource(InformationResource):
     @classmethod
     def create(cls,name, keywords,aoi=None):
         """
+        @Brief Create a topic resource and set parameters
+        @param name is the topic name
+        @param keywords are comma seperated key words for the topic
         """
         inst = cls()
         inst.name = name
@@ -150,6 +153,7 @@ class ArchiveResource(StatefulResource): # Is it stateful or information?
     cache_policy = TypedAttribute(str)
     backup_policy = TypedAttribute(str)
     locations = TypedAttribute(list) # List of Archive Location objects
+    dataregistry = TypedAttribute(ResourceReference)
 
 class ArchiveLocation(DataObject):
     name = TypedAttribute(str)
@@ -189,7 +193,8 @@ class DMDataResource(InformationResource):
     '''
     #Name - inherited
     groups = TypedAttribute(list)
-    archive = TypedAttribute(ArchiveResource)
+    archive = TypedAttribute(ResourceReference)
+    source_topic = TypedAttribute(ResourceReference)
     
 class DMGroupData(InformationResource):
     #Name - inherited
@@ -242,6 +247,7 @@ class IngestionStreamResource(StatefulResource):
     ingested_format = TypedAttribute(str)
     persisted = TypedAttribute(bool)
     ingested = TypedAttribute(bool)
+    dataregistry = TypedAttribute(ResourceReference)
 
 
     

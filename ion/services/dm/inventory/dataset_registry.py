@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/inventory/dataset_registry.py
+@file ion/services/dm/inventory/data_registry.py
 @author Michael Meisinger
 @author David Stuebe
-@brief service for registering datasets
+@brief service for registering datas
 """
 
 import logging
@@ -27,40 +27,40 @@ from ion.resources import dm_resource_descriptions
 
 CONF = ioninit.config(__name__)
 
-class DatasetRegistryService(registry.BaseRegistryService):
+class DataRegistryService(registry.BaseRegistryService):
     """
     @Brief Dataset registry service interface
     """
  
      # Declaration of service
-    declare = BaseService.service_declare(name='dataset_registry', version='0.1.0', dependencies=[])
+    declare = BaseService.service_declare(name='data_registry', version='0.1.0', dependencies=[])
 
-    op_define_dataset = registry.BaseRegistryService.base_register_resource
+    op_define_data = registry.BaseRegistryService.base_register_resource
     """
-    Service operation: Create or update a dataset resource.
+    Service operation: Create or update a data resource.
     """
-    op_get_dataset = registry.BaseRegistryService.base_get_resource
+    op_get_data = registry.BaseRegistryService.base_get_resource
     """
-    Service operation: Get dataset description
+    Service operation: Get data description
     """
-    op_find_dataset = registry.BaseRegistryService.base_find_resource
+    op_find_data = registry.BaseRegistryService.base_find_resource
     """
-    Service operation: Find dataset resource by characteristics
+    Service operation: Find data resource by characteristics
     """
 
 
         
 # Spawn of the process using the module name
-factory = ProtocolFactory(DatasetRegistryService)
+factory = ProtocolFactory(DataRegistryService)
 
 
-class DatasetRegistryClient(registry.BaseRegistryClient):
+class DataRegistryClient(registry.BaseRegistryClient):
     """
-    Class for the client accessing the dataset registry.
+    Class for the client accessing the data registry.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "dataset_registry"
+            kwargs['targetname'] = "data_registry"
         BaseServiceClient.__init__(self, proc, **kwargs)
 
     
@@ -68,29 +68,29 @@ class DatasetRegistryClient(registry.BaseRegistryClient):
         return self.base_clear_registry('clear_registry')
 
 
-    def define_dataset(self,dataset):
+    def define_data(self,data):
         """
         @Brief Client method to Register a Dataset
         
-        @param dataset is an instance of a dataset resource
+        @param data is an instance of a data resource
         """
-        return  self.base_register_resource('define_dataset', dataset)    
+        return  self.base_register_resource('define_data', data)    
 
     
-    def get_dataset(self,dataset_reference):
+    def get_data(self,data_reference):
         """
-        @Brief Get a dataset by reference
-        @param dataset_reference is the unique reference object for a registered
-        dataset
+        @Brief Get a data by reference
+        @param data_reference is the unique reference object for a registered
+        data
         """
-        return self.base_get_resource('get_dataset',dataset_reference)
+        return self.base_get_resource('get_data',data_reference)
         
-    def find_dataset(self, description,regex=True,ignore_defaults=True,attnames=[]):
+    def find_data(self, description,regex=True,ignore_defaults=True,attnames=[]):
         """
-        @Brief find all registered datasets which match the attributes of description
+        @Brief find all registered datas which match the attributes of description
         @param see the registry docs for params
         """
-        return self.base_find_resource('find_dataset',description,regex,ignore_defaults,attnames)
+        return self.base_find_resource('find_data',description,regex,ignore_defaults,attnames)
 
 
 
