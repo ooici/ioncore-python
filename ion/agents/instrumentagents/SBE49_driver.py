@@ -353,7 +353,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         of the elements are arguments)
         @todo actually do something
         """
-        assert(isinstance(content, dict))
+        assert(isinstance(content, (tuple, list)))
 
         logging.info("DHE: in op_execute!!!")
 
@@ -378,16 +378,18 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         #while self.topicDefined != True:
         #    yield pu.asleep(1)
-
-        if (content == {}):
+        if ((content == ()) or (content == [])):
             yield self.reply_err(msg, "Empty command")
             return
-        for command in content.keys():
+        commands = []
+        for command_set in content:
+            command = command_set[0]
             if command not in instrument_commands:
                 yield self.reply_err(msg, "Invalid Command")
             else:
                 logging.info("DHE: command: %s" % command)
                 self.command = command
+                commands.append(command)
                 """
                 This isn't working; possibly because the connection has
                 not been totally set up yet.
@@ -395,7 +397,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 #if self.instrument != None:
                 #    logging.debug("DHE: sending command: %s" % command)
                 #    self.instrument.transport.write(self.command)
-        yield self.reply_ok(msg, content.keys())
+        yield self.reply_ok(msg, commands)
 
 
     @defer.inlineCallbacks

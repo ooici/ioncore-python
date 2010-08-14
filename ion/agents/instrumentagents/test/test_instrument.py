@@ -170,8 +170,8 @@ class TestInstrumentAgent(IonTestCase):
 
         try:
 
-            response = yield self.IAClient.execute_instrument({'start':['now', 1],
-                                                               'stop':[]})
+            response = yield self.IAClient.execute_instrument([['start','now', 1],
+                                                               ['stop']])
             print "response ", response
             self.assert_(isinstance(response, dict))
             self.assert_('status' in response.keys())
@@ -180,12 +180,12 @@ class TestInstrumentAgent(IonTestCase):
             self.assert_('stop' in response['value'])
             self.assert_(response['status'] == 'OK')
 
-            response = yield self.IAClient.execute_instrument({'badcommand':['now',
-                                                                             '1']})
+            response = yield self.IAClient.execute_instrument([['badcommand',
+                                                                'now','1']])
             self.assert_(isinstance(response, dict))
             self.assertEqual(response['status'], 'ERROR')
 
-            response = yield self.IAClient.execute_instrument({})
+            response = yield self.IAClient.execute_instrument([])
             self.assert_(isinstance(response, dict))
             self.assertEqual(response['status'], 'ERROR')
 

@@ -14,8 +14,6 @@ from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 
 from ion.core.base_process import BaseProcess, ProtocolFactory, ProcessDesc
-from ion.core import bootstrap
-
 
 
 # Gotta have this AFTER the "static" variables above
@@ -42,7 +40,6 @@ class SBE49InstrumentAgent(InstrumentAgent):
                           'spawnargs':{'instrument-id':self.instrument_id}})
 
         rpcproc = BaseProcess()
-        rpcpid = yield rpcproc.spawn()
 
         driver_id = yield rpcproc.spawn_child(self.pd)
         self.driver_client = SBE49InstrumentDriverClient(proc=rpcproc,
