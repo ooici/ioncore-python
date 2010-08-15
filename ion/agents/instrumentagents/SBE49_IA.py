@@ -41,11 +41,8 @@ class SBE49InstrumentAgent(InstrumentAgent):
                           'class':'SBE49InstrumentDriver',
                           'spawnargs':{'instrument-id':self.instrument_id}})
 
-        rpcproc = BaseProcess()
-        rpcpid = yield rpcproc.spawn()
-
-        driver_id = yield rpcproc.spawn_child(self.pd)
-        self.driver_client = SBE49InstrumentDriverClient(proc=rpcproc,
+        driver_id = yield self.spawn_child(self.pd)
+        self.driver_client = SBE49InstrumentDriverClient(proc=self,
                                                          target=driver_id)
 
     @defer.inlineCallbacks

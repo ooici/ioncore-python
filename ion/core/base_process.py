@@ -77,6 +77,10 @@ class BaseProcess(object):
         # because only one message can be consumed before ACK.
         self.backend_receiver = Receiver(self.proc_name + "_back")
         self.backend_receiver.handle(self.receive)
+        if hasattr(self.receiver, 'group'):
+            self.backend_receiver.group = self.receiver.group
+        else:
+            self.backend_receiver.group = self.proc_name
         self.backend_id = None
 
         # Dict of all receivers of this process. Key is the name

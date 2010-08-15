@@ -131,16 +131,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.instrument_id = self.spawn_args.get('instrument-id','123')
         logging.info("INIT DRIVER for instrument ID: %s" % (self.instrument_id))
 
-        # We need a separte process (and process id/in queue) for the RPC
-        # because we cannot receive the RPC response message while still
-        # processing the init message (on the same queue).
-        rpcproc = BaseProcess()
-        rpcpid = yield rpcproc.spawn()
-
-        self.iaclient = InstrumentAgentClient(proc=rpcproc, target=self.proc_supid)
+        self.iaclient = InstrumentAgentClient(proc=self, target=self.proc_supid)
 
         # Instantiate a pubsubclient
-        self.dpsc = DataPubsubClient(proc=rpcproc)
+        self.dpsc = DataPubsubClient(proc=self)
 
         # Create and Register a topic
         self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
