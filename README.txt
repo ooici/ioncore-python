@@ -114,6 +114,13 @@ Other Dependencies
 Change log:
 ===========
 
+2010-08-14:
+- BaseProcess: added backend receiver, used for sending out any messages
+  from self.send and self.rpc_send. This keeps the message queue for the process
+  frontend separate from the process backend, e.g. for RPC during a message
+  processing.
+- Changed BaseProcess logging to make message send and receive easier to spot.
+
 2010-08-06:
 - BaseProcess.spawn() now calls init() automatically. No need to call init()
   on a process anymore manually. For testing only. Note: The correct way to
