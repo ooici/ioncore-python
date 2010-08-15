@@ -35,7 +35,7 @@ class PreservationService(BaseService):
     def op_create_archive(self, content, headers, msg):
         """Service operation: define a new archive object
         """
-        arc = dm_resource_descriptions.ArchiveResource.create_new_resource()
+        #arc = dm_resource_descriptions.ArchiveResource.create_new_resource()
         
         # Set stuff in arc...
         #Content is a topic + metadata
