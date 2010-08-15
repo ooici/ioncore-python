@@ -18,6 +18,7 @@ print "ION (Integrated Observatory Network) packages initializing (ion %s, magne
         (ic.VERSION, magnet.__version__)
 
 # Configure logging system (console, logfile, other loggers)
+# NOTE: Console logging is appended to Twisted log output prefix!!
 logging.config.fileConfig(ic.LOGCONF_FILENAME)
 
 # Load configuration properties for any module to access
@@ -94,3 +95,41 @@ def set_log_levels(levelfilekey=None):
             logging.getLogger(level[0]).setLevel(level[1])
 
 set_log_levels()
+
+#def augment_logging():
+#    """
+#    HACK: Replace the getLogger function in the logging module, such that it
+#    adds a Log
+#    """
+#    from ion.util import ionlogging
+#    getlogger = logging.getLogger
+#    def ion_getLogger(loggername, *args, **kwargs):
+#        logger = getlogger(loggername, *args, **kwargs)
+#        ladapter = ionlogging.LoggerAdapter(logger, ionlogging.ProcessInfo())
+#        return ladapter
+#    logging.getLogger = ion_getLogger
+#
+#augment_logging()
+
+# HACKHACK: Putz with Twisted's twisted.python.log facility
+# The goal is to get rid of the prefix in each line before the message
+def clean_twisted_logging():
+    from twisted.python import log, util
+    obs0 = log.theLogPublisher.observers[0]
+    ro = log.removeObserver
+    fdwrite = obs0.__self__.write
+    fdflush = obs0.__self__.flush
+    def log_emit(eventDict):
+        text = log.textFromEventDict(eventDict)
+        if text is None:
+            return
+        util.untilConcludes(fdwrite, text + "\n")
+        util.untilConcludes(fdflush)
+    def remove_nop(obs):
+        if obs != obs0:
+            ro(obs)
+    log.theLogPublisher.removeObserver(obs0)
+    log.theLogPublisher.addObserver(log_emit)
+    log.removeObserver = remove_nop
+
+#clean_twisted_logging()
