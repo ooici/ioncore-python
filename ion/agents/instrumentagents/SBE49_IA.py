@@ -30,6 +30,8 @@ class SBE49InstrumentAgent(InstrumentAgent):
         """
         Initialize instrument driver when this process is started.
         """
+        InstrumentAgent.plc_init(self)
+
         self.instrument_id = self.spawn_args.get('instrument-id','123')
         logging.info("INIT agent for instrument ID: %s" % (self.instrument_id))
 

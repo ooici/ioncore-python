@@ -56,12 +56,8 @@ class TestInstrumentAgent(IonTestCase):
                                                  target=self.svc_id)
 
         # Start an Agent Registry to test against
-        self.reg_client = AgentRegistryClient(proc=self.sup,
-                                              target=self.reg_id)
+        self.reg_client = AgentRegistryClient(proc=self.sup)
         yield self.reg_client.clear_registry()
-
-        yield self.IAClient.set_registry_client(str(self.reg_id))
-
 
     @defer.inlineCallbacks
     def tearDown(self):
