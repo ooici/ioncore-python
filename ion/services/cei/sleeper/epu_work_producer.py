@@ -35,19 +35,11 @@ class EPUWorkProducer(BaseService):
             while True:
                 job = self.web_resource.queue.get(block=False)
                 if job == None:
-                    if self.queue_length == self.last_quelen_send:
-                        return
-                    
-                    # simulates an increasing queue while we wait for fix
-                    content = {"queue_id": self.queue_name_work,
-                               "queuelen": self.queue_length}
-                    self.last_quelen_send = self.queue_length
-                    yield self.send(self.epu_controller, "sensor_info", content)
-                    return
-                
-                self.queue_length += 1
+                    raise Queue.Empty()
                 
                 yield self.send(self.queue_name_work, 'work', {"work_amount":job.length, "batchid":job.batchid, "jobid":job.jobid})
+                
+                self.queue_length += 1
                 
                 extradict = {"batchid":job.batchid, 
                              "jobid":job.jobid,
@@ -56,6 +48,14 @@ class EPUWorkProducer(BaseService):
                                  logging, extra=extradict)
                 
         except Queue.Empty:
+            if self.queue_length == self.last_quelen_send:
+                return
+            
+            # simulates an increasing queue while we wait for fix
+            content = {"queue_id": self.queue_name_work,
+                       "queuelen": self.queue_length}
+            self.last_quelen_send = self.queue_length
+            yield self.send(self.epu_controller, "sensor_info", content)
             return
 
 # Direct start of the service as a process with its default name
