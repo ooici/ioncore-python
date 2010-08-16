@@ -10,16 +10,17 @@ import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
-import ion.util.procutils as pu
+from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 from ion.core.base_process import ProtocolFactory
-from ion.data.dataobject import DataObject, ResourceReference
-from ion.services.base_service import BaseService, BaseServiceClient
-
+from ion.data.dataobject import DataObject, ResourceReference, LCStates
 from ion.resources.coi_resource_descriptions import AgentInstance
 from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
+from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
+from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.sa.instrument_registry import InstrumentRegistryClient
 from ion.services.sa.data_product_registry import DataProductRegistryClient
 from ion.services.coi.agent_registry import AgentRegistryClient
+import ion.util.procutils as pu
 
 class InstrumentManagementService(BaseService):
     """
@@ -50,8 +51,8 @@ class InstrumentManagementService(BaseService):
 
         newinstrument = InstrumentResource.create_new_resource()
 
-        if 'direct_access' in userInput:
-            newinstrument.direct_access = str(userInput['direct_access'])
+        if 'name' in userInput:
+            newinstrument.name = str(userInput['name'])
 
         if 'manufacturer' in userInput:
             newinstrument.manufacturer = str(userInput['manufacturer'])
@@ -120,7 +121,7 @@ class InstrumentManagementService(BaseService):
                 break
 
         # Step 2: Find the agent id for the given instrument id
-        agent_pid  = yield get_agent_pid_for_instrument(inst_id)
+        agent_pid  = yield self.get_agent_pid_for_instrument(inst_id)
 
         # Step 3: Interact with the agent to execute the command
         iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
@@ -142,11 +143,13 @@ class InstrumentManagementService(BaseService):
             yield reply_error(msg, "Input for instrumentID not present")
             return
 
-        agent_pid = yield get_agent_pid_for_instrument(inst_id)
+        agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
+        if not agent_pid:
+            yield self.reply_err(msg, "No agent found for instrument "+str(inst_id))
+        else:
+            iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
+            yield self.reply_ok(msg, {'state':'state1'})
 
-        iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
-
-        yield self.reply_ok(msg, "")
 
     @defer.inlineCallbacks
     def op_start_direct_access(self, content, headers, msg):
@@ -164,22 +167,26 @@ class InstrumentManagementService(BaseService):
 
     @defer.inlineCallbacks
     def get_agent_for_instrument(self, instrument_id):
+        logging.info("get_agent_for_instrument() instrumentID="+str(instrument_id))
         int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
-        agent_query = AgentInstance()
+        agent_query = InstrumentAgentResourceInstance()
         agent_query.instrument_ref = int_ref
-        res_list = yield self.arc.find_registered_agent_instance_from_description(agent_query)
-        agents = res_list.resources
-        logging.debug("Found %s agent instances for instrument id %s" % (len(agents), instrument_id))
+        # @todo Need to list the LC state here. WHY???
+        agent_query.lifecycle = LCStates.developed
+        agents = yield self.arc.find_registered_agent_instance_from_description(agent_query, regex=False)
+        logging.info("Found %s agent instances for instrument id %s" % (len(agents), instrument_id))
         agent_res = None
         if len(agents) > 0:
-            agents[0]
+            agent_res = agents[0]
         defer.returnValue(agent_res)
 
     @defer.inlineCallbacks
     def get_agent_pid_for_instrument(self, instrument_id):
-        agent_res = yield get_agent_for_instrument(instrument_id)
-        agent_pid = agent_res.process_name
-        logging.debug("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
+        agent_res = yield self.get_agent_for_instrument(instrument_id)
+        if not agent_res:
+            defer.returnValue(None)
+        agent_pid = agent_res.proc_id
+        logging.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
         defer.returnValue(agent_pid)
 
 class InstrumentManagementClient(BaseServiceClient):
@@ -208,6 +215,19 @@ class InstrumentManagementClient(BaseServiceClient):
         (content, headers, message) = yield self.rpc_send('create_new_data_product',
                                                           reqcont)
         defer.returnValue(DataObject.decode(content['value']))
+
+    @defer.inlineCallbacks
+    def get_instrument_state(self, instrumentID):
+        reqcont = {}
+        commandInput = {}
+        commandInput['instrumentID'] = instrumentID
+        reqcont['commandInput'] = commandInput
+
+        (cont, hdrs, msg) = yield self.rpc_send('get_instrument_state', reqcont)
+        if cont.get('status') == 'OK':
+            defer.returnValue(cont)
+        else:
+            defer.returnValue(None)
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(InstrumentManagementService)

@@ -79,7 +79,7 @@ def main():
     yield bootstrap.spawn_processes(ia_procs, sup=sup)
 
     ia_pid = sup.get_child_id('SBE49IA')
-    iaclient = InstrumentAgentClient(proc=sup,target=ia_pid)
+    iaclient = InstrumentAgentClient(proc=sup, target=ia_pid)
     yield iaclient.register_resource(INSTRUMENT_ID)
 
 main()

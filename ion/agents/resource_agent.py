@@ -262,6 +262,8 @@ class ResourceAgentClient(BaseProcessClient):
             (content, headers, msg) = yield self.rpc_send('register_resource', '')
         else:
             assert(isinstance(agent_instance, (AgentInstance, AgentDescription)))
+            # Add resource agent part of the information
+            agent_instance.proc_id = str(self.target)
             (content, headers, msg) = \
               yield self.rpc_send('register_resource', agent_instance.encode())
 
