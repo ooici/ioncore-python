@@ -29,7 +29,7 @@ def event(source, name, logger, extra=None):
     """
     if not logger:
         raise Exception("logger is required")
-    logger.debug(event_logtxt(source, name, extra=extra))
+    logger.warning(event_logtxt(source, name, extra=extra))
 
 def event_logtxt(source, name, extra=None):
     """Same as the 'event' function, but you control where text is recorded.
