@@ -7,6 +7,9 @@ from subprocess import Popen, PIPE
 from twisted.internet import defer
 
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
+# FIX: Not good to import a test
+from ion.agents.instrumentagents.test import test_SBE49
+
 from ion.core import ioninit
 from ion.core import bootstrap
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
