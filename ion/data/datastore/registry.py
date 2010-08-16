@@ -225,7 +225,7 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
             logging.info(self.__class__.__name__ + ': find_resource found ' + str(len(reslist)) + ' items in registry')
             for ref in refs:
                 res = yield self.get_resource(ref)
-                logging.info(res)
+                logging.debug(res)
 
                 if description.compared_to(res,
                                         regex=regex,
@@ -304,7 +304,8 @@ class BaseRegistryService(BaseService):
         #resource = dataobject.Resource.decode(content)
         accept_encoding = headers.get('accept-encoding', '')
         resource = dataobject.serializer.decode(content, headers['encoding'])
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Resource: \n' + str(resource))
+        logging.info(self.__class__.__name__ + ' received: op_'+ headers['op'] )
+        logging.debug('Resource: \n' + str(resource))
 
         resource = yield self.reg.register_resource(resource)
         logging.debug('%%%%%%%%%%%%')
@@ -329,7 +330,7 @@ class BaseRegistryService(BaseService):
         #resource_reference = dataobject.Resource.decode(content)
         accept_encoding = headers.get('accept-encoding', '')
         resource_reference = dataobject.serializer.decode(content, headers['encoding'])
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
+        logging.info(self.__class__.__name__ + ' received: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
 
         resource = yield self.reg.get_resource(resource_reference)
         #logging.info('Got Resource:\n'+str(resource))
