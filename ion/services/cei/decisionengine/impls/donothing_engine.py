@@ -34,7 +34,7 @@ class DoNothingEngine(Engine):
         
     def initialize(self, control, state, conf=None):
         """Engine API method"""
-        parameters = {"timed-pulse-irregular":800}
+        parameters = {"timed-pulse-irregular":2500}
         control.configure(parameters)
 
     def decide(self, control, state):
