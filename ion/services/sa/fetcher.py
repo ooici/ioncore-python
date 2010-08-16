@@ -35,7 +35,7 @@ class FetcherService(BaseService):
     @todo refactor to use dap_tools
     @note These are not class methods!
     """
-    logging.info('Declaring fetcher...')
+    #logging.info('Declaring fetcher...')
     declare = BaseService.service_declare(name='fetcher',
                                           version='0.1.2',
                                           dependencies=[])
