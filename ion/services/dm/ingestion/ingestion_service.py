@@ -135,7 +135,7 @@ class IngestionService(BaseService):
             'attach':'topic1',\
             'process parameters':{'param1':'my parameter'}}}
 
-        subscription = yield self.pubsub.create_consumer_args(subscription)
+        #subscription = yield self.pubsub.create_consumer_args(subscription)
         
         isr.ingesting = True
         
@@ -153,7 +153,7 @@ class IngestionClient(BaseServiceClient):
             kwargs['targetname'] = 'ingestion_service'
         BaseServiceClient.__init__(self, proc, **kwargs)
 
-    def create_ingestion_datastream(self,name):
+    def create_ingestion_datastream(self,isr):
         '''
         @Brief create a new ingestion datastream
         @param name a string naming the new ingestion stream
