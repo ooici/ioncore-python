@@ -109,23 +109,33 @@ class InstrumentManagementService(BaseService):
             raise ValueError("Input for instrumentID not present")
 
         command = []
-        command_op = str(commandInput['command'])
+        if 'command' in commandInput:
+            command_op = str(commandInput['command'])
+        else:
+            raise ValueError("Input for command not present")
+
         command.append(command_op)
 
         arg_idx = 0
         while True:
             argname = 'cmdArg'+str(arg_idx)
+            arg_idx += 1
             if argname in commandInput:
-                command.append(str(commandInput['argname']))
+                command.append(str(commandInput[argname]))
             else:
                 break
 
         # Step 2: Find the agent id for the given instrument id
         agent_pid  = yield self.get_agent_pid_for_instrument(inst_id)
+        if not agent_pid:
+            yield self.reply_err(msg, "No agent found for instrument "+str(inst_id))
+            defer.returnValue(None)
 
         # Step 3: Interact with the agent to execute the command
         iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
-        cmd_result = yield iaclient.execute_instrument(command)
+        commandlist = [command,]
+        logging.info("Sending command to IA: "+str(commandlist))
+        cmd_result = yield iaclient.execute_instrument(commandlist)
 
         yield self.reply_ok(msg, cmd_result)
 
@@ -146,9 +156,25 @@ class InstrumentManagementService(BaseService):
         agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
         if not agent_pid:
             yield self.reply_err(msg, "No agent found for instrument "+str(inst_id))
-        else:
-            iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
-            yield self.reply_ok(msg, {'state':'state1'})
+            defer.returnValue(None)
+
+        iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
+        inst_cap = yield iaclient.get_capabilities()
+        if not inst_cap:
+            yield self.reply_err(msg, "No capabilities available for instrument "+str(inst_id))
+            defer.returnValue(None)
+
+        ci_commands = inst_cap['ci_commands']
+        instrument_commands = inst_cap['instrument_commands']
+        instrument_parameters = inst_cap['instrument_parameters']
+        ci_parameters = inst_cap['ci_parameters']
+
+        values = yield iaclient.get_from_instrument(instrument_parameters)
+        resvalues = {}
+        if values:
+            resvalues = values
+
+        yield self.reply_ok(msg, resvalues)
 
 
     @defer.inlineCallbacks
@@ -224,6 +250,25 @@ class InstrumentManagementClient(BaseServiceClient):
         reqcont['commandInput'] = commandInput
 
         (cont, hdrs, msg) = yield self.rpc_send('get_instrument_state', reqcont)
+        if cont.get('status') == 'OK':
+            defer.returnValue(cont)
+        else:
+            defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def execute_command(self, instrumentID, command, arglist):
+        reqcont = {}
+        commandInput = {}
+        commandInput['instrumentID'] = instrumentID
+        commandInput['command'] = command
+        if arglist:
+            argnum = 0
+            for arg in arglist:
+                commandInput['cmdArg'+str(argnum)] = arg
+                argnum += 1
+        reqcont['commandInput'] = commandInput
+
+        (cont, hdrs, msg) = yield self.rpc_send('execute_command', reqcont)
         if cont.get('status') == 'OK':
             defer.returnValue(cont)
         else:

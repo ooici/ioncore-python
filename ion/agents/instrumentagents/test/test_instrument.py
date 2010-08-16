@@ -71,6 +71,7 @@ class TestInstrumentAgent(IonTestCase):
         capabilities
         """
         result = yield self.IAClient.get_capabilities()
+        #logging.info("getCapabilities result: "+ str(result))
         self.assert_(set(IACIParameters).issubset(set(result[IA.ci_parameters])))
         self.assert_(IA.driver_address in
                      result[IA.ci_parameters])
