@@ -14,8 +14,6 @@ from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 
 from ion.core.base_process import BaseProcess, ProtocolFactory, ProcessDesc
-from ion.core import bootstrap
-
 
 
 # Gotta have this AFTER the "static" variables above
@@ -32,6 +30,8 @@ class SBE49InstrumentAgent(InstrumentAgent):
         """
         Initialize instrument driver when this process is started.
         """
+        InstrumentAgent.plc_init(self)
+
         self.instrument_id = self.spawn_args.get('instrument-id','123')
         logging.info("INIT agent for instrument ID: %s" % (self.instrument_id))
 
@@ -41,11 +41,8 @@ class SBE49InstrumentAgent(InstrumentAgent):
                           'class':'SBE49InstrumentDriver',
                           'spawnargs':{'instrument-id':self.instrument_id}})
 
-        rpcproc = BaseProcess()
-        rpcpid = yield rpcproc.spawn()
-
-        driver_id = yield rpcproc.spawn_child(self.pd)
-        self.driver_client = SBE49InstrumentDriverClient(proc=rpcproc,
+        driver_id = yield self.spawn_child(self.pd)
+        self.driver_client = SBE49InstrumentDriverClient(proc=self,
                                                          target=driver_id)
 
     @defer.inlineCallbacks

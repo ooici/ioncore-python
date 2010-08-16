@@ -30,7 +30,7 @@ class ObjectStoreServiceTest(iontest.IonTestCase):
                 ]
         sup = yield self._spawn_processes(services)
         self.object_store = objstore.ObjectStoreClient(targetname='objstore')
-        self.object_store.attach()
+        yield self.object_store.attach()
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -49,11 +49,11 @@ class ObjectStoreServiceTest(iontest.IonTestCase):
 
         b_out = yield self.object_store.get(id)
         self.failUnlessEqual(b.encode(), b_out.encode())
-        
+
 
 class ObjectStoreICASTest(iontest.IonTestCase, test_cas.CAStoreTest):
     """
-    Test the cas.ICAStore implementation of ObjectStoreService and 
+    Test the cas.ICAStore implementation of ObjectStoreService and
     ObjectStoreClient using the cas module test suite.
     """
 
@@ -68,10 +68,8 @@ class ObjectStoreICASTest(iontest.IonTestCase, test_cas.CAStoreTest):
                 ]
         sup = yield self._spawn_processes(services)
         self.cas = objstore.ObjectStoreClient(targetname='objstore')
-        self.cas.attach()
+        yield self.cas.attach()
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self._stop_container()
-
-

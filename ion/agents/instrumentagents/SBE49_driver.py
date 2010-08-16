@@ -131,16 +131,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.instrument_id = self.spawn_args.get('instrument-id','123')
         logging.info("INIT DRIVER for instrument ID: %s" % (self.instrument_id))
 
-        # We need a separte process (and process id/in queue) for the RPC
-        # because we cannot receive the RPC response message while still
-        # processing the init message (on the same queue).
-        rpcproc = BaseProcess()
-        rpcpid = yield rpcproc.spawn()
-
-        self.iaclient = InstrumentAgentClient(proc=rpcproc, target=self.proc_supid)
+        self.iaclient = InstrumentAgentClient(proc=self, target=self.proc_supid)
 
         # Instantiate a pubsubclient
-        self.dpsc = DataPubsubClient(proc=rpcproc)
+        self.dpsc = DataPubsubClient(proc=self)
 
         # Create and Register a topic
         self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
@@ -353,7 +347,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         of the elements are arguments)
         @todo actually do something
         """
-        assert(isinstance(content, dict))
+        assert(isinstance(content, (tuple, list)))
 
         logging.info("DHE: in op_execute!!!")
 
@@ -378,16 +372,18 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         #while self.topicDefined != True:
         #    yield pu.asleep(1)
-
-        if (content == {}):
+        if ((content == ()) or (content == [])):
             yield self.reply_err(msg, "Empty command")
             return
-        for command in content.keys():
+        commands = []
+        for command_set in content:
+            command = command_set[0]
             if command not in instrument_commands:
                 yield self.reply_err(msg, "Invalid Command")
             else:
                 logging.info("DHE: command: %s" % command)
                 self.command = command
+                commands.append(command)
                 """
                 This isn't working; possibly because the connection has
                 not been totally set up yet.
@@ -395,7 +391,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 #if self.instrument != None:
                 #    logging.debug("DHE: sending command: %s" % command)
                 #    self.instrument.transport.write(self.command)
-        yield self.reply_ok(msg, content.keys())
+        yield self.reply_ok(msg, commands)
 
 
     @defer.inlineCallbacks

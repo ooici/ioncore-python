@@ -6,11 +6,12 @@
 @brief Instrument Agent, Driver, and Client class definitions
 """
 import logging
-logging = logging.getLogger(__name__)
+#logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
+from ion.data.dataobject import ResourceReference
 from ion.core.base_process import BaseProcess, BaseProcessClient
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 
@@ -51,9 +52,10 @@ class InstrumentDriver(BaseProcess):
     def op_execute(self, content, headers, msg):
         """
         Using the instrument protocol, execute the requested command
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval Result code of some sort
         """
 
@@ -110,12 +112,13 @@ class InstrumentDriverClient(BaseProcessClient):
     def execute(self, command):
         """
         Using the instrument protocol, execute the requested command
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval Result code of some sort
         """
-        assert(isinstance(command, dict))
+        assert(isinstance(command, (list, tuple)))
         (content, headers, message) = yield self.rpc_send('execute',
                                                           command)
         defer.returnValue(content)
@@ -295,9 +298,10 @@ class InstrumentAgent(ResourceAgent):
         message including output of command, or simple ACK that command
         was executed. For InstrumentAgent calls, execute maps to an execution
         to the CI set of commands.
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval ACK message with response on success, ERR message with string
             indicating code and response message on fail
         """
@@ -309,8 +313,10 @@ class InstrumentAgent(ResourceAgent):
         Execute infrastructure commands related to the Instrument Agent
         instance. This includes commands for messaging, resource management
         processes, etc.
-        @param content Should be a list where first element is the command,
-            the rest are the arguments
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval ACK message with response on success, ERR message with string
             indicating code and response message on fail
         """
@@ -342,13 +348,14 @@ class InstrumentAgent(ResourceAgent):
         Execute instrument commands relate to the instrument fronted by this
         Instrument Agent. These commands will likely be handled by the
         underlying driver.
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval ACK message with response on success, ERR message with string
             indicating code and response message on fail
         """
-        assert(isinstance(content, dict))
+        assert(isinstance(content, (list, tuple)))
         execResult = yield self.driver_client.execute(content)
         assert(isinstance(execResult, dict))
         if (execResult['status'] == 'OK'):
@@ -451,14 +458,15 @@ class InstrumentAgentClient(ResourceAgentClient):
         Processing will cease when a command fails, but will not roll back.
         For instrument calls, use executeInstrument()
         @see executeInstrument()
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval Dictionary of responses to each execute command
         @todo Alter semantics of this call as needed...maybe a list?
         @todo Add exceptions as needed
         """
-        assert(isinstance(command, dict))
+        assert(isinstance(command, list))
         (content, headers, message) = yield self.rpc_send('execute_instrument',
                                                           command)
         defer.returnValue(content)
@@ -469,9 +477,10 @@ class InstrumentAgentClient(ResourceAgentClient):
         Processing will cease when a command fails, but will not roll back.
         For instrument calls, use executeCI()
         @see executeInstrument()
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval Dictionary of responses to each execute command
         @todo Alter semantics of this call as needed...maybe a command list?
         @todo Add exceptions as needed
@@ -535,7 +544,7 @@ class InstrumentAgentClient(ResourceAgentClient):
         defer.returnValue(content)
 
     @defer.inlineCallbacks
-    def register_resource(self):
+    def register_resource(self, instrument_id):
         """
         Register the resource. Since this is a subclass, make the appropriate
         resource description for the registry and pass that into the
@@ -544,6 +553,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         ia_instance = InstrumentAgentResourceInstance()
         ci_params = yield self.get_from_CI([driver_address])
         ia_instance.driver_process_id = ci_params[driver_address]
+        ia_instance.instrument_ref = ResourceReference(
+            RegistryIdentity=instrument_id, RegistryBranch='master')
         result = yield ResourceAgentClient.register_resource(self,
                                                              ia_instance)
         defer.returnValue(result)

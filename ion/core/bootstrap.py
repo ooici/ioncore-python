@@ -19,7 +19,7 @@ from ion.data.store import Store
 from ion.core import ioninit, base_process
 from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core.cc.modloader import ModuleLoader
-from ion.resources import description_utility 
+from ion.resources import description_utility
 from ion.services.coi import service_registry
 from ion.data.datastore import registry
 
@@ -105,6 +105,8 @@ def _set_container_args(contargs=None):
                 ioninit.cont_args[k.strip()] = v.strip()
         else:
             ioninit.cont_args['args'] = contargs
+    if 'contid' in ioninit.cont_args:
+        Container.id = ioninit.cont_args['contid']
 
 @defer.inlineCallbacks
 def declare_messaging(messagingCfg, cgroup=None):
