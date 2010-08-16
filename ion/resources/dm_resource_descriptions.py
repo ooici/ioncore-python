@@ -203,7 +203,7 @@ class DMDataResource(InformationResource):
     ingested_topic = TypedAttribute(ResourceReference)
         
     
-class CDMResource(InformaitonResource):
+class CDMResource(InformationResource):
     '''
     A resource class to describe Unidata Common data model data
     '''
