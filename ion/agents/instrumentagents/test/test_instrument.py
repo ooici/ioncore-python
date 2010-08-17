@@ -87,7 +87,8 @@ class TestInstrumentAgent(IonTestCase):
         and other messages. Best called as RPC message pairs.
         """
 
-        self.simproc = test_SBE49.start_SBE49_simulator()
+        self.simulator = Simulator("123", 9000)
+        self.simulator.start()
 
         # Sleep for a while to allow simlator to get set up.
         yield pu.asleep(1)
@@ -119,11 +120,7 @@ class TestInstrumentAgent(IonTestCase):
             self.assert_('baudrate' not in response)
 
         finally:
-            try:
-                yield self._shutdown_processes(self._get_procinstance(self.svc_id))
-            finally:
-                test_SBE49.stop_SBE49_simulator(self.simproc)
-
+            yield self.simulator.stop()
 
     @defer.inlineCallbacks
     def test_registration(self):

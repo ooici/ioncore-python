@@ -78,10 +78,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.command = None
         self.topicDefined = False
         self.publish_to = None
-    	
-		self.sbeParmCommands = {
-        	"baudrate" : "Baud"
-    	}
+    
+        self.sbeParmCommands = {
+            "baudrate" : "Baud"
+        }
 
         self.__instrument_parameters = {
             "baudrate": 9600,
