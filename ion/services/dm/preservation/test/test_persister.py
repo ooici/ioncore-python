@@ -28,6 +28,9 @@ from ion.services.dm.util import dap_tools
 from ion.util import procutils as pu
 from ion.resources import dm_resource_descriptions
 
+import os
+
+TEST_ARCHIVE_FILE=os.path.join(os.path.sep, "tmp", "Junk.nc")
 
 class PersisterTest(IonTestCase):
     '''
@@ -47,12 +50,12 @@ class PersisterTest(IonTestCase):
         self.queue1 = queue1
         
         # Create a persister process
-        fname='Junk'
+        fname='/tmp/Junk'
         pd1={'name':'persister_number_1',
                  'module':'ion.services.dm.preservation.persister',
                  'procclass':'PersisterConsumer',
                  'spawnargs':{'attach':self.queue1,
-                              'process parameters':{'fname':fname}}}
+                              'process parameters':{'filename':fname}}}
         
         self.child1 = base_consumer.ConsumerDesc(**pd1)
         child1_id = yield self.test_sup.spawn_child(self.child1)
@@ -94,9 +97,10 @@ class PersisterTest(IonTestCase):
                 {'time':{'long_name':'Data and Time','units':'seconds'},\
                 'height':{'long_name':'person height','units':'meters'}}}, \
             {'time':(111,112,123,114,115,116,117,118,119,120), \
-            'height':(8,6,4,-2,-1,5,3,1,4,5)}) )
-        yield self.test_sup.send(self.queue1,'data',msg.encode())
-
+            'height':(8,6,4,-2,-1,5,3,1,4,5)})) 
+            
+        res = yield self.test_sup.send(self.queue1,'data',msg.encode())
+        self.assertEqual(res, "ERROR")
         msg_cnt = yield self.child1.get_msg_count()
         received = msg_cnt.get('received',{})
         sent = msg_cnt.get('sent',{})
@@ -104,7 +108,28 @@ class PersisterTest(IonTestCase):
         self.assertEqual(received.get(self.queue1),1)
         # Check that the file is there!
         
-    @defer.inlineCallbacks
+    defer.inlineCallbacks
+    def test_persister_consumer_dap_no_file(self):
+        try:
+            os.remove(TEST_ARCHIVE_FILE)
+        except OSError:
+            pass
+        msg=dap_tools.ds2dap_msg(dap_tools.simple_dataset(\
+            {'DataSet Name':'SimpleData','variables':\
+                {'time':{'long_name':'Data and Time','units':'seconds'},\
+                'height':{'long_name':'person height','units':'meters'}}}, \
+            {'time':(111,112,123,114,115,116,117,118,119,120), \
+            'height':(8,6,4,-2,-1,5,3,1,4,5)})) 
+            
+        yield self.test_sup.send(self.queue1,'data',msg.encode())
+        msg_cnt = yield self.child1.get_msg_count()
+        received = msg_cnt.get('received',{})
+        sent = msg_cnt.get('sent',{})
+        self.assertEqual(sent,{})
+        self.assertEqual(received.get(self.queue1),1)
+        
+        
+    defer.inlineCallbacks
     def test_persister_consumer_dictionary(self):
         
         msg = dm_resource_descriptions.DictionaryMessageObject()

@@ -122,7 +122,7 @@ def write_dap_files_from_msg(filename,msg):
     dods_file.close()    
     return 0
 
-def write_netcdf_from_dataset(filename, dataset):
+def write_netcdf_from_dataset(dataset, filename):
     netcdf.save(dataset, ".".join((filename, "nc")))
     return 0
 
