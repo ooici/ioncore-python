@@ -408,7 +408,8 @@ class DataPubsubService(BaseService):
         
         data.timestamp = pu.currenttime()
         
-        # Todo: impersonate message as from sender
+        # Todo: impersonate message as from sender -
+        #@Todo - Move the actual publish command back to the client side!
         yield self.send(topic.queue.name, 'data', data.encode(), {})
 
         logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
@@ -494,6 +495,9 @@ class DataPubsubClient(BaseServiceClient):
         @param publisher_proc - the publishing process passes self to the publish client
         @param topic_ref is a topic reference for which the publisher is registered for (checked before sending)
         @param data is a dataobject which is being published
+        
+        @Todo move the actual publish command back to this client! Don't send the data
+        to the service!
         """
         logging.info(self.__class__.__name__ + '; Calling: publish')
         
