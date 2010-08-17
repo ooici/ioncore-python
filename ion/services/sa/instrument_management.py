@@ -44,8 +44,8 @@ class InstrumentManagementService(BaseService):
     @defer.inlineCallbacks
     def op_create_new_instrument(self, content, headers, msg):
         """
-        Service operation: Accepts a dictionary containing user inputs and updates the instrument
-        registry.
+        Service operation: Accepts a dictionary containing user inputs.
+        Updates the instrument registry.
         """
         userInput = content['userInput']
 
@@ -73,8 +73,9 @@ class InstrumentManagementService(BaseService):
     @defer.inlineCallbacks
     def op_create_new_data_product(self, content, headers, msg):
         """
-        Service operation: Accepts a dictionary containing user inputs and
-        updates the data product registry.
+        Service operation: Accepts a dictionary containing user inputs.
+        Updates the data product registry. Also sets up an ingestion pipeline
+        for an instrument
         """
         dataProductInput = content['dataProductInput']
 
@@ -88,6 +89,17 @@ class InstrumentManagementService(BaseService):
             newdp.dataformat = str(dataProductInput['dataformat'])
 
         # Step: Create a data stream
+        ## Instantiate a pubsubclient
+        #self.dpsc = DataPubsubClient(proc=self)
+        #
+        ## Create and Register a topic
+        #self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
+        #self.topic = yield self.dpsc.define_topic(self.topic)
+        #logging.debug('DHE: Defined Topic')
+        #
+        #self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
+        #self.publisher = yield self.dpsc.define_publisher(self.publisher)
+
 
         res = yield self.dprc.register_data_product(newdp)
         ref = res.reference(head=True)
@@ -150,19 +162,16 @@ class InstrumentManagementService(BaseService):
         if 'instrumentID' in commandInput:
             inst_id = str(commandInput['instrumentID'])
         else:
-            yield reply_error(msg, "Input for instrumentID not present")
-            return
+            raise ValueError("Input for instrumentID not present")
 
         agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
         if not agent_pid:
-            yield self.reply_err(msg, "No agent found for instrument "+str(inst_id))
-            defer.returnValue(None)
+            raise StandardError("No agent found for instrument "+str(inst_id))
 
         iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
         inst_cap = yield iaclient.get_capabilities()
         if not inst_cap:
-            yield self.reply_err(msg, "No capabilities available for instrument "+str(inst_id))
-            defer.returnValue(None)
+            raise StandardError("No capabilities available for instrument "+str(inst_id))
 
         ci_commands = inst_cap['ci_commands']
         instrument_commands = inst_cap['instrument_commands']
@@ -175,6 +184,36 @@ class InstrumentManagementService(BaseService):
             resvalues = values
 
         yield self.reply_ok(msg, resvalues)
+
+    @defer.inlineCallbacks
+    def op_start_instrument_agent(self, content, headers, msg):
+        """
+        Service operation: Starts an instrument agent for a type of
+        instrument.
+        """
+        if 'instrumentID' in content:
+            inst_id = str(content['instrumentID'])
+        else:
+            raise ValueError("Input for instrumentID not present")
+
+        if 'model' in content:
+            model = str(content['model'])
+        else:
+            raise ValueError("Input for model not present")
+
+        agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
+        if agent_pid:
+            raise StandardError("Agent already started for instrument "+str(inst_id))
+
+
+        yield self.reply_ok(msg, "OK")
+
+    @defer.inlineCallbacks
+    def op_stop_instrument_agent(self, content, headers, msg):
+        """
+        Service operation: Starts direct access mode.
+        """
+        yield self.reply_err(msg, "Not yet implemented")
 
 
     @defer.inlineCallbacks
@@ -190,6 +229,20 @@ class InstrumentManagementService(BaseService):
         Service operation: Stops direct access mode.
         """
         yield self.reply_err(msg, "Not yet implemented")
+
+    @defer.inlineCallbacks
+    def get_agent_desc_for_instrument(self, instrument_id):
+        logging.info("get_agent_desc_for_instrument() instrumentID="+str(instrument_id))
+        int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
+        agent_query = InstrumentAgentResourceInstance()
+        agent_query.instrument_ref = int_ref
+
+
+        if not agent_res:
+            defer.returnValue(None)
+        agent_pid = agent_res.proc_id
+        logging.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
+        defer.returnValue(agent_pid)
 
     @defer.inlineCallbacks
     def get_agent_for_instrument(self, instrument_id):
@@ -229,18 +282,37 @@ class InstrumentManagementClient(BaseServiceClient):
         reqcont = {}
         reqcont['userInput'] = userInput
 
-        (content, headers, message) = yield self.rpc_send('create_new_instrument',
-                                                          reqcont)
-        defer.returnValue(DataObject.decode(content['value']))
+        (cont, hdrs, msg) = yield self.rpc_send('create_new_instrument', reqcont)
+        if cont.get('status') == 'OK':
+            defer.returnValue(DataObject.decode(cont['value']))
+        else:
+            defer.returnValue(None)
 
     @defer.inlineCallbacks
     def create_new_data_product(self, dataProductInput):
         reqcont = {}
         reqcont['dataProductInput'] = dataProductInput
 
-        (content, headers, message) = yield self.rpc_send('create_new_data_product',
-                                                          reqcont)
-        defer.returnValue(DataObject.decode(content['value']))
+        (cont, hdrs, msg) = yield self.rpc_send('create_new_data_product', reqcont)
+        if cont.get('status') == 'OK':
+            defer.returnValue(DataObject.decode(cont['value']))
+        else:
+            defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def start_instrument_agent(self, instrumentID):
+        reqcont = {}
+        reqcont['instrumentID'] = instrumentID
+        result = yield self._base_command('start_instrument_agent', reqcont)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def stop_instrument_agent(self, instrumentID):
+        reqcont = {}
+        reqcont['instrumentID'] = instrumentID
+        result = yield self._base_command('stop_instrument_agent', reqcont)
+        defer.returnValue(result)
+
 
     @defer.inlineCallbacks
     def get_instrument_state(self, instrumentID):
@@ -249,11 +321,8 @@ class InstrumentManagementClient(BaseServiceClient):
         commandInput['instrumentID'] = instrumentID
         reqcont['commandInput'] = commandInput
 
-        (cont, hdrs, msg) = yield self.rpc_send('get_instrument_state', reqcont)
-        if cont.get('status') == 'OK':
-            defer.returnValue(cont)
-        else:
-            defer.returnValue(None)
+        result = yield self._base_command('get_instrument_state', reqcont)
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def execute_command(self, instrumentID, command, arglist):
@@ -268,7 +337,12 @@ class InstrumentManagementClient(BaseServiceClient):
                 argnum += 1
         reqcont['commandInput'] = commandInput
 
-        (cont, hdrs, msg) = yield self.rpc_send('execute_command', reqcont)
+        result = yield self._base_command('execute_command', reqcont)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _base_command(self, op, content):
+        (cont, hdrs, msg) = yield self.rpc_send(op, content)
         if cont.get('status') == 'OK':
             defer.returnValue(cont)
         else:

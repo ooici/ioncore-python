@@ -2,17 +2,16 @@
 # Starts container with Java Services.
 
 import logging
-import os
-from subprocess import Popen, PIPE
 from twisted.internet import defer
 
+from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
+from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 from ion.core import ioninit
 from ion.core import bootstrap
 from ion.util.config import Config
 from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
 from ion.services.sa.instrument_registry import InstrumentRegistryClient
 from ion.services.sa.data_product_registry import DataProductRegistryClient
-from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
 
 # Use the bootstrap configuration entries from the standard bootstrap
 CONF = ioninit.config('ion.core.bootstrap')
@@ -35,22 +34,6 @@ demo_procs = [
 
 INSTRUMENT_ID  = "123"
 
-def start_simulator():
-    """
-    Construct the path to the instrument simulator, starting with the current
-    working directory
-    """
-    cwd = os.getcwd()
-    myPid = os.getpid()
-    logging.debug("DHE: myPid: %s" % (myPid))
-
-    simDir = cwd + "/ion/agents/instrumentagents/test/"
-    simPath = simDir + "sim_SBE49.py"
-    logPath = cwd + "/logs/sim_%s.log" % (INSTRUMENT_ID)
-    logging.info("cwd: %s, simPath: %s, logPath: %s" %(str(cwd), str(simPath), str(logPath)))
-    simLogObj = open(logPath, 'a')
-    simProc = Popen([simPath,INSTRUMENT_ID], stdout=simLogObj)
-
 
 @defer.inlineCallbacks
 def main():
@@ -66,7 +49,8 @@ def main():
     # Start the processes
     sup = yield bootstrap.bootstrap(None, processes)
 
-    start_simulator()
+    simulator = Simulator(INSTRUMENT_ID, 9000)
+    simulator.start()
 
     irc = InstrumentRegistryClient(proc=sup)
 
