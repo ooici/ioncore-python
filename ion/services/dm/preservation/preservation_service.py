@@ -48,7 +48,7 @@ class PreservationService(BaseService):
         arc = yield self.reg.define_archive(arc)
     
     @defer.inlineCallbacks
-    def op_activate_persister(self, content, headers, msg):
+    def op_activate_archive_persister(self, content, headers, msg):
         """Service operation: create process to archive a data stream
         """
         # Spawn persister to topic/file name
@@ -62,7 +62,7 @@ class PreservationService(BaseService):
         
         child1_id = yield self.test_sup.spawn_child(child1)
 
-    def op_deactivate_persister(self, content, headers, msg):
+    def op_deactivate_archive_persister(self, content, headers, msg):
         """Service operation: kill data stream archive process
         """
         # kill persister - Not before LCA
@@ -72,15 +72,15 @@ class PreservationService(BaseService):
         """
         # Spawn persister to topic/file name
 
-    def op_set_cache_policy(self, content, headers, msg):
+    def op_set_archive_cache_policy(self, content, headers, msg):
         """Service operation: set the cache policy for an archive
         """
 
-    def op_set_backup_policy(self, content, headers, msg):
+    def op_set_archive_backup_policy(self, content, headers, msg):
         """Service operation: set backup policy for an archive
         """
 
-    def op_set_long_term_policy(self, content, headers, msg):
+    def op_set_archive_long_term_policy(self, content, headers, msg):
         """Service operation: set the long term policy for an archive
         """
 
@@ -101,13 +101,13 @@ class PreservationClient(BaseServiceClient):
         @return IngestionDataStreamResource object
         '''
         
-    def activate_persister(self,archive):
+    def activate_archive_persister(self,archive):
         '''
         @Brief start the persister
         @param archive is a dm archive resource - the topic field must be valid
         '''
         
-    def deactivate_persister(self,archive):
+    def deactivate_archive_persister(self,archive):
         '''
         @brief stop the persister
         '''
@@ -118,17 +118,17 @@ class PreservationClient(BaseServiceClient):
         
         '''
     
-    def set_cache_policy(self,archive):
+    def set_archive_cache_policy(self,archive):
         '''
         @brief set the caching policy for an archive
         '''
         
-    def set_backup_policy(self,archive):
+    def set_archive_backup_policy(self,archive):
         '''
         @brief set the backup policy for an archive
         '''
 
-    def set_long_term_policy(self,archive):
+    def set_archive_long_term_policy(self,archive):
         '''
         @brief set the long term storage policy for an archive
         '''

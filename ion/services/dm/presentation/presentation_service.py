@@ -22,7 +22,7 @@ class PresentationService(BaseService):
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='presentation', version='0.1.0', dependencies=[])
+    declare = BaseService.service_declare(name='presentation_service', version='0.1.0', dependencies=[])
  
     def op_present_catalog(self, content, headers, msg):
         """Service operation: TBD
@@ -30,3 +30,16 @@ class PresentationService(BaseService):
         
 # Spawn of the process using the module name
 factory = ProtocolFactory(PresentationService)
+
+
+class PresentationClient(BaseServiceClient):
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = 'presentation_service'
+        BaseServiceClient.__init__(self, proc, **kwargs)
+
+    def present_catalog(self, resources):
+        '''
+        @Brief present a catalog of resources
+        @param what?
+        '''
