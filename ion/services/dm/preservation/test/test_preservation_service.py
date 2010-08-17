@@ -15,7 +15,7 @@ from ion.test.iontest import IonTestCase
 
 from ion.services.dm.preservation.preservation_service import PreservationClient, PreservationService
 
-class IngesterTester(IonTestCase):
+class PreservationTester(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
