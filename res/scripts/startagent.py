@@ -45,8 +45,8 @@ def start_simulator():
     simDir = cwd + "/ion/agents/instrumentagents/test/"
     simPath = simDir + "sim_SBE49.py"
     logPath = cwd + "/logs/sim_%s.log" % (INSTRUMENT_ID)
-    logging.info("cwd: %s, simPath: %s, logPath: %s" %(str(cwd), str(simPath), str(logPath)))
-    simLogObj = open(logPath, 'a')
+    logging.info("Starting instrument simulator for %s, logging to: %s" %(str(INSTRUMENT_ID), str(logPath)))
+    simLogObj = open(logPath, 'w')
     simProc = Popen([simPath,INSTRUMENT_ID], stdout=simLogObj)
 
 @defer.inlineCallbacks
@@ -66,9 +66,6 @@ def main():
     eval_start_arguments()
 
     start_simulator()
-
-    # Sleep for a while to allow simlator to get set up.
-    #yield pu.asleep(1)
 
     ia_procs = [
         {'name':'SBE49IA','module':'ion.agents.instrumentagents.SBE49_IA','class':'SBE49InstrumentAgent','spawnargs':{'instrument-id':INSTRUMENT_ID}},

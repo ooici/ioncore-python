@@ -90,29 +90,44 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability of the SBE49 driver to send and receive get, set,
         and other messages. Best called as RPC message pairs.
         """
-        response = yield self.IAClient.get_from_instrument(['baudrate',
-                                                            'outputformat'])
-        self.assert_(response['status'] == 'OK')
-        self.assertEqual(response['baudrate'], 9600)
-        self.assertEqual(response['outputformat'], 0)
 
-        response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
-                                            'outputformat': 1})
-        self.assert_(response['status'] == 'OK')
-        self.assertEqual(response['baudrate'], 19200)
-        self.assertEqual(response['outputformat'], 1)
+        self.simproc = test_SBE49.start_SBE49_simulator()
 
-        response = yield self.IAClient.get_from_instrument(['baudrate',
-                                                            'outputformat'])
-        self.assert_(response['status'] == 'OK')
-        self.assertEqual(response['baudrate'], 19200)
-        self.assertEqual(response['outputformat'], 1)
+        # Sleep for a while to allow simlator to get set up.
+        yield pu.asleep(1)
 
-        # Try setting something bad
-        response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
-                                            'badvalue': 1})
-        self.assert_(response['status'] == 'ERROR')
-        self.assert_('baudrate' not in response)
+        try:
+            
+            response = yield self.IAClient.get_from_instrument(['baudrate',
+                                                                'outputformat'])
+            self.assert_(response['status'] == 'OK')
+            self.assertEqual(response['baudrate'], 9600)
+            self.assertEqual(response['outputformat'], 0)
+    
+            response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
+                                                'outputformat': 1})
+            self.assert_(response['status'] == 'OK')
+            self.assertEqual(response['baudrate'], 19200)
+            self.assertEqual(response['outputformat'], 1)
+    
+            response = yield self.IAClient.get_from_instrument(['baudrate',
+                                                                'outputformat'])
+            self.assert_(response['status'] == 'OK')
+            self.assertEqual(response['baudrate'], 19200)
+            self.assertEqual(response['outputformat'], 1)
+    
+            # Try setting something bad
+            response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
+                                                'badvalue': 1})
+            self.assert_(response['status'] == 'ERROR')
+            self.assert_('baudrate' not in response)
+
+        finally:
+            try:
+                yield self._shutdown_processes(self._get_procinstance(self.svc_id))
+            finally:
+                test_SBE49.stop_SBE49_simulator(self.simproc)
+
 
     @defer.inlineCallbacks
     def test_registration(self):
