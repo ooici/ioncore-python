@@ -1,14 +1,16 @@
 ==================================================
+Ocean Observatories Initiative Cyberinfrastructure
 LCAarch - OOI Release 1 LCA architecture prototype
 ==================================================
 
-April 2010 - August 2010
+April 2010 - August 2010 (C) UCSD Regents
 
-This project provides a service framwork with auxilliary functions for running
+This project provides a service framework with auxilliary functions for running
 architecturally complete versions of all the services of the OOI release 1
-system with their full architectural dependencies.
-In "short" a data distribution network based on pub-sub messaging with underlying
-infrastructure services (security, persistence) and provisioning.
+system with their full architectural dependencies in Python.
+Functionally it provides a data distribution network based on pub-sub messaging
+as well as instrument integration, with underlying infrastructure services
+(security, persistence) and provisioning.
 
 The "core" part of LCAarch provides base classes and a framework for spawnable,
 message communicating processes, for services with defined names, for
@@ -18,21 +20,58 @@ is an early implementation of the OOI Python Capability Container.
 For more information, please see:
 http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project
 
-LCAarch is compatible with Python 2.5 and higher, but not Python 3.x
-This project has several dependencies on libraries and packages, see below.
-
 Get LCAarch with
 ::
     git clone git@amoeba.ucsd.edu:lcaarch.git
+    cd lcaarch
+
+
+Dependencies
+============
+
+LCAarch is compatible with Python 2.5 and higher, but not Python 3.x
+This project has several dependencies on libraries and packages. Most of these
+dependencies are resolved automatically using the provided setup script.
+
+Step 1: Virtual env
+   Create a Python virtual environment using virtualenv. This ensures that all
+   libraries and dependencies are installed separately from the Python
+    system libraries.
+::
+    mkvirtualenv lcaarch
+    workon lcaarch
+
+Step 2: Core libraries (you can skip this step)
+    Install some core libraries first. Sometimes the automatic installer
+    produces errors, if these libraries are not present beforehand.
+::
+    easy_install twisted numpy
+
+Step 3: Run the setup script
+::
+    python setup.py install
+
+This should download and install all the dependencies and will run for a while.
+Check the trace output that there are no substantial errors. You are now ready
+to run.
+
+Current dependencies include:
+    twisted, numpy, txamqp, msgpack-python, httplib2, pycassa, simplejson,
+    pydap, pydap.handlers.netcdf, pydap.responses.netcdf, pydap.handlers.nca
+
+NOTE: As the project evolves and new code is added, dependencies might change.
+Run the setup script once in a while and when you get errors
+
 
 Usage
 =====
 
-(all subsequent steps assume start from lcaarch/ dir)
+(all subsequent steps assume you are in the lcaarch/ root dir)
 
 Start empty CC ("Magnet" Python Capability Container) shell with:
 ::
     twistd -n magnet -h amoeba.ucsd.edu
+    twistd -n magnet   # to run with localhost
 
 (to end a magnet container shell, press Ctrl-D Ctrl-C)
 
@@ -47,6 +86,9 @@ Alternatively (better) from UNIX shell executing a script:
     twistd -n magnet -h amoeba.ucsd.edu res/scripts/newcc.py
     twistd -n magnet -h amoeba.ucsd.edu -a nproducers=25 res/scripts/pubsub.py
 
+
+Testing
+=======
 
 Run trial test cases (recursively)
 ::
@@ -69,45 +111,18 @@ Or in the CC shell:
     hc.hello()
 
 
-Install the dependencies: Magnet (see Magnet's Readme)
-======================================================
-Recommendation:
-    Create a virtualenv for installing Magnet and its dependencies.
+Build and Packaging using Ant
+=============================
 
-Twisted Framework
-::  easy_install twisted
+LCAarch provides ANT support (see http://ant.apache.org/).
+To check that ant is installed properly, run
+::  ant
 
-txAMQP
-::  easy_install txamqp
+To clean your working directories, run
+::  ant clean
 
-carrot (use txamqp branch)
---------------------------
-::
-    git clone git://amoeba.ucsd.edu/carrot.git
-    (cd carrot; git checkout -b txamqp origin/txamqp)
-    (cd carrot; python setup.py install)
-
-Magnet (NEED Magent 0.3.4 on master branch)
-------------------------------------------------------------------
-Get the latest version of the repository, if you haven't already.
-::
-    git clone git://amoeba.ucsd.edu/magnet.git # no ooi credential
-    # OR
-    git clone git@amoeba.ucsd.edu:magnet.git # need ooi credential
-    (cd magnet; python setup.py install)
-
-Other Dependencies
-----------------------------
-::
-    easy_install msgpack-python
-    easy_install pydap
-    easy_install pydap.handlers.netcdf
-    easy_install pydap.responses.netcdf
-    easy_install pydap.handlers.nca
-    easy_install numpy
-    easy_install httplib2
-    easy_install -U --find-links http://ooici.net/packages pycassa
-    easy_install simplejson
+To compile all code to see if there are Python compile errors anywhere:
+::  ant compile
 
 
 ---------------------------------------------------------------------------
@@ -151,17 +166,20 @@ Change log:
   for package hierarchy. See res/logging/loglevels.cfg for standard entries.
   Do not modify. Add file res/logging/loglevelslocal.cfg for local override.
   Default logging level for all ion code: WARNING
+
 2010-06-02:
 - BaseProcess self members renamed to conform to PEP8
 - Added process shutdown to BaseProcess
 - Added container UNIX shell argument -a processes=<path to filename> used
   by newcc.py script, with a list of processes to startup in standard format
+
 2010-05-25:
 - Made Cassandra backend parameterizable with keyspace/colfamily and added
   SuperColumn support.
 - Modified the IStore interface to support a create_store factory method. This
   method can yield and return a deferred. Modified and fixed IStore impls.
   Changed delete to remove to be more compliant with standard collections.
+
 2010-05-22:
 - Added timeout to BaseProcess.rpc_send. Use with kwarg timeout=<secs>
 - CC-Agent detects missing known containers and removes them from the list
@@ -169,6 +187,7 @@ Change log:
 - Added sequence numbers for messages
 - Added glue functions BaseProcess.reply_ok and reply_err and changes some
   RPC style service operations.
+
 2010-05-20:
 - The system now looks for a local config file ionlocal.config and if exists,
   overrides entries in ion.config.
@@ -177,6 +196,7 @@ Change log:
 - Added BaseProcessClient and changed BaseServiceClient and all clients and
   all test cases (again).
 - Added container shell helpers under 'cc', such as cc.spawn('hello')
+
 2010-05-16:
 - Removed support for BaseProcess.send_message and reply_message. Always use
   send, reply and rpc_send now.
@@ -198,10 +218,12 @@ Change log:
   trace output as well.
 - Changed BaseServiceClient and tests. Initializer arguments different.
 - Using master branch of magnet now
+
 2010-05-10:
 - Based on entries in config files, service process modules are sought and
   loaded in order to collect the service process declarations. This enables
   a registration of services with versions and dependencies on startup
+
 2010-05-06:
 - Refactored the BaseProcess class.
   - You can now do RPC directly from the process, via self.rpc_send without
