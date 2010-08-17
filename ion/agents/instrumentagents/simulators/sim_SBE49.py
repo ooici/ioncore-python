@@ -238,11 +238,12 @@ class Instrument(protocol.Protocol):
         self.lc_autoSampler.stop()
 
 INSTRUMENT_ID = "123"
-SIM_PORT = 9000
+SIM_PORT = 9100
 
 class Simulator(object):
 
     sim_count = 0
+    all_simulators = []
 
     def __init__(self, instrument_id=INSTRUMENT_ID, port=None):
         self.instrument_id = instrument_id
@@ -255,6 +256,7 @@ class Simulator(object):
         self.factory = protocol.Factory()
         self.factory.protocol = Instrument
         self.factory.connections = []
+        Simulator.all_simulators.append(self)
 
     def start(self):
         """
@@ -279,3 +281,10 @@ class Simulator(object):
         yield self.listenport.stopListening()
         logging.info("Stopped SBE49 simulator on port %d" % (self.port))
         self.state = "STOPPED"
+
+    @classmethod
+    @defer.inlineCallbacks
+    def stop_all_simulators(cls):
+        for sim in Simulator.all_simulators:
+            if sim.state == "STARTED":
+                yield sim.stop()

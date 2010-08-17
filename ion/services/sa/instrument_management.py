@@ -10,13 +10,16 @@ import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
+from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProtocolFactory, ProcessDesc
 from ion.data.dataobject import DataObject, ResourceReference, LCStates
 from ion.resources.coi_resource_descriptions import AgentInstance
+from ion.resources.dm_resource_descriptions import PubSubTopicResource
 from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 from ion.services.base_service import BaseService, BaseServiceClient
+from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.services.sa.instrument_registry import InstrumentRegistryClient
 from ion.services.sa.data_product_registry import DataProductRegistryClient
 from ion.services.coi.agent_registry import AgentRegistryClient
@@ -40,6 +43,7 @@ class InstrumentManagementService(BaseService):
         self.irc = InstrumentRegistryClient(proc=self)
         self.dprc = DataProductRegistryClient(proc=self)
         self.arc = AgentRegistryClient(proc=self)
+        self.dpsc = DataPubsubClient(proc=self)
 
     @defer.inlineCallbacks
     def op_create_new_instrument(self, content, headers, msg):
@@ -201,10 +205,37 @@ class InstrumentManagementService(BaseService):
         else:
             raise ValueError("Input for model not present")
 
+        if model != 'SBE49':
+            raise ValueError("Only SBE49 supported!")
+
         agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
         if agent_pid:
             raise StandardError("Agent already started for instrument "+str(inst_id))
 
+        simulator = Simulator(inst_id)
+        simulator.start()
+
+        topicname = "Inst/RAW/"+inst_id
+        topic = PubSubTopicResource.create(topicname,"")
+
+        # Use the service to create a queue and register the topic
+        topic = yield self.dpsc.define_topic(topic)
+
+        iagent_args = {}
+        iagent_args['instrument-id'] = inst_id
+        driver_args = {}
+        driver_args['port'] = simulator.port
+        driver_args['publish-to'] = topic.RegistryIdentity
+        iagent_args['driver-args'] = driver_args
+
+        iapd = ProcessDesc(**{'name':'SBE49IA',
+                  'module':'ion.agents.instrumentagents.SBE49_IA',
+                  'class':'SBE49InstrumentAgent',
+                  'spawnargs':iagent_args})
+
+        iagent_id = yield self.spawn_child(iapd)
+        iaclient = InstrumentAgentClient(proc=self, target=iagent_id)
+        yield iaclient.register_resource(inst_id)
 
         yield self.reply_ok(msg, "OK")
 
@@ -300,9 +331,10 @@ class InstrumentManagementClient(BaseServiceClient):
             defer.returnValue(None)
 
     @defer.inlineCallbacks
-    def start_instrument_agent(self, instrumentID):
+    def start_instrument_agent(self, instrumentID, model):
         reqcont = {}
         reqcont['instrumentID'] = instrumentID
+        reqcont['model'] = model
         result = yield self._base_command('start_instrument_agent', reqcont)
         defer.returnValue(result)
 

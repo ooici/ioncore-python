@@ -94,6 +94,8 @@ class TestInstMgmtRT(IonTestCase):
         services = [
             {'name':'instreg','module':'ion.services.coi.agent_registry','class':'AgentRegistryService'},
             {'name':'instreg','module':'ion.services.sa.instrument_registry','class':'InstrumentRegistryService'},
+            {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
+            {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
             {'name':'dprodreg','module':'ion.services.sa.data_product_registry','class':'DataProductRegistryService'},
             {'name':'instmgmt','module':'ion.services.sa.instrument_management','class':'InstrumentManagementService'},
 
@@ -128,6 +130,7 @@ class TestInstMgmtRT(IonTestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.simulator.stop()
+        yield Simulator.stop_all_simulators()
         yield self._stop_container()
 
     @defer.inlineCallbacks
@@ -144,7 +147,22 @@ class TestInstMgmtRT(IonTestCase):
         """
         Execute command through instrument agent associated with instrument id
         """
-        yield self.iaclient.register_resource(self.inst_id)
-
         res = yield self.imc.execute_command(self.inst_id, 'start', [1])
+        logging.info("Command result 1" +str(res))
+
+    @defer.inlineCallbacks
+    def test_start_agent(self):
+        """
+        Start the agent with all
+        """
+        newInstrument = {'manufacturer' : "SeaBird Electronics",
+                 'model' : "SBE49",
+                 'serial_num' : "99931",
+                 'fw_version' : "1"}
+
+        instrument = yield self.imc.create_new_instrument(newInstrument)
+        inst_id1 = instrument.RegistryIdentity
+        logging.info("*** Instrument 2 created with ID="+str(inst_id1))
+
+        res = yield self.imc.start_instrument_agent(inst_id1, 'SBE49')
         logging.info("Command result 1" +str(res))
