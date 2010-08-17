@@ -105,6 +105,9 @@ class PubSubTopicResource(InformationResource):
     @classmethod
     def create(cls,name, keywords,aoi=None):
         """
+        @Brief Create a topic resource and set parameters
+        @param name is the topic name
+        @param keywords are comma seperated key words for the topic
         """
         inst = cls()
         inst.name = name
@@ -121,7 +124,7 @@ class SubscriptionResource(StatefulResource):
 
     #owner = TypedAttribute(ResourceReference) # Don't worry about owner yet
     
-    # hack for now to allow naming one-three more topic descriptions
+    # hack for now to allow naming one-three more topic descriptions used to find topics that are subscribed to!
     topic1 = TypedAttribute(PubSubTopicResource)
     topic2 = TypedAttribute(PubSubTopicResource) 
     topic3 = TypedAttribute(PubSubTopicResource)
@@ -144,16 +147,20 @@ class SubscriptionResource(StatefulResource):
 """
 Archive Registry Resources
 """
+#class ArchiveLocation(DataObject):
+#    name = TypedAttribute(str,'')
+#    location = TypedAttribute(str)
+
 class ArchiveResource(StatefulResource): # Is it stateful or information?
     #Name (Logical IRODS Name) - inherited
-    datatype = TypedAttribute(str)
-    cache_policy = TypedAttribute(str)
-    backup_policy = TypedAttribute(str)
-    locations = TypedAttribute(list) # List of Archive Location objects
+    datatype = TypedAttribute(str,'dap')
+    cache_policy = TypedAttribute(str,'none')
+    backup_policy = TypedAttribute(str,'none')
+    topic = TypedAttribute(ResourceReference)
+    #locations = TypedAttribute(list,[]) # List of Archive Location objects
+    dmdataresource = TypedAttribute(ResourceReference)
 
-class ArchiveLocation(DataObject):
-    name = TypedAttribute(str)
-    location = TypedAttribute(str)
+
 
 """
 DM Data Registry Resources
@@ -188,50 +195,75 @@ class DMDataResource(InformationResource):
     @Note <class> must be a type which python can instantiate with eval!
     '''
     #Name - inherited
-    groups = TypedAttribute(list)
-    archive = TypedAttribute(ArchiveResource)
+    metadata = TypedAttribute(ResourceReference)
+    numberofpackets = TypedAttribute(int,0)
+    input_archive = TypedAttribute(ResourceReference)
+    input_topic = TypedAttribute(ResourceReference)
+    ingested_archive = TypedAttribute(ResourceReference)
+    ingested_topic = TypedAttribute(ResourceReference)
+        
     
-class DMGroupData(InformationResource):
+class CDMResource(InformationResource):
+    '''
+    A resource class to describe Unidata Common data model data
+    '''
+    groups = TypedAttribute(list)
+    
+    
+class DMGroupData(CDMResource):
     #Name - inherited
     attributes = TypedAttribute(list)
     dimensions = TypedAttribute(list)
     variables = TypedAttribute(list)
-    archive = TypedAttribute(ArchiveResource)
+    dmdataresource = TypedAttribute(ResourceReference)
+    archive_grpid = TypedAttribute(int,0)
     
-class DMAttributeData(InformationResource):
+class DMAttributeData(CDMResource):
     #Name - inherited
     value = TypedAttribute(AttributeData)
-    archive = TypedAttribute(ArchiveResource)
     archive_attid = TypedAttribute(int,0) # Varid or name?
-    
-class DMDimensionData(InformationResource):
+    dmdataresource = TypedAttribute(ResourceReference)
+
+class DMDimensionData(CDMResource):
     #Name - inherited
     dim = TypedAttribute(int,0)
     unlimited = TypedAttribute(bool,False)
     shared = TypedAttribute(bool,False)
     is_variable_length = TypedAttribute(bool,False)
-    archive = TypedAttribute(ArchiveResource)
+    dmdataresource = TypedAttribute(ResourceReference)
     archive_dimid = TypedAttribute(int,0) # Varid or name?
     
-class DMVariableData(InformationResource):
+class DMVariableData(CDMResource):
     """
     """
     #Name - inherited
     attributes = TypedAttribute(list)
     dimensions = TypedAttribute(list)
     type = TypedAttribute(str)
-    archive = TypedAttribute(ArchiveResource)
+    dmdataresource = TypedAttribute(ResourceReference)
     archive_varid = TypedAttribute(str) # Varid or name?
     
-class DMStructureData(InformationResource):
+class DMStructureData(CDMResource):
     """
     """
     #Name - inherited
     members = TypedAttribute(list)
-    
+    # What?
     
 
-
+"""
+DM Ingestion data stream object
+"""
+class IngestionStreamResource(StatefulResource):
+    # name - inherited from StatefulResource
+    input_topic_ref = TypedAttribute(ResourceReference)
+    #input_format = TypedAttribute(str)
+    ingested_topic_ref = TypedAttribute(ResourceReference)
+    #ingested_format = TypedAttribute(str)
+    persisting_input = TypedAttribute(bool)
+    persisteing_ingested = TypedAttribute(bool)
+    ingesting = TypedAttribute(bool)
+    dataregistry = TypedAttribute(ResourceReference)
 
 
     

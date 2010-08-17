@@ -36,7 +36,7 @@ class LCStateMixin(object):
 
     def set_resource_lcstate_active(self, resource_reference):
         return self.set_resource_lcstate(resource_reference, dataobject.LCStates.active)
-        
+
     def set_resource_lcstate_inactive(self, resource_reference):
         return self.set_resource_lcstate(resource_reference, dataobject.LCStates.inactive)
 
@@ -68,23 +68,23 @@ class IRegistry(object):
         @note Does the resource instance define its own name/uuid?
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
-    
+
     def get_resource(self,resource_reference):
         """
         @param uuid name of resource.
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
-    
+
     def set_resource_lcstate(self,resource_reference,lcstate):
         """
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
-    
+
     def find_resource(self,description,regex=True,ignore_defaults=True,attnames=[]):
         """
         """
         raise NotImplementedError, "Abstract Interface Not Implemented"
-    
+
 class RegistryBackend(objstore.ObjectChassis):
     """
     """
@@ -115,30 +115,30 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         #print 'Dataobject Register Removed',dataobject.DataObject._types.has_key('__builtins__')
 
         if isinstance(resource, self.objectChassis.objectClass):
-        
+
             id = resource.RegistryIdentity
             if not id:
                 raise RuntimeError('Can not register a resource which does not have an identity.')
 
             #print 'Dataobject Register Is Instance',dataobject.DataObject._types.has_key('__builtins__')
-        
-            
+
+
             try:
                 res_client = yield self.create(id, self.objectChassis.objectClass)
             except objstore.ObjectStoreError:
                 res_client = yield self.clone(id)
- 
+
             #print 'Dataobject Chasis',dataobject.DataObject._types.has_key('__builtins__')
-            
+
             yield res_client.checkout()
-            
+
             #print 'Dataobject checkout',dataobject.DataObject._types.has_key('__builtins__')
-            
+
             res_client.index = resource
             resource.RegistryCommit = yield res_client.commit()
         else:
             resource = None
-        
+
         defer.returnValue(resource)
 
     @defer.inlineCallbacks
@@ -148,7 +148,7 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         """
         resource=None
         if isinstance(resource_reference, dataobject.ResourceReference):
-        
+
             branch = resource_reference.RegistryBranch
             resource_client = yield self.clone(resource_reference.RegistryIdentity)
             if resource_client:
@@ -159,7 +159,7 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
                 resource = yield resource_client.checkout(commit_id=pc)
                 resource.RegistryBranch = branch
                 resource.RegistryCommit = pc
-            
+
         defer.returnValue(resource)
 
     @defer.inlineCallbacks
@@ -176,11 +176,11 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         Service operation: set the life cycle state of resource
         """
         resource = yield self.get_resource(resource_reference)
-        
+
         if resource:
             resource.set_lifecyclestate(lcstate)
             resource = yield self.register_resource(resource)
-           
+
             defer.returnValue(resource.reference())
         else:
             defer.returnValue(None)
@@ -204,38 +204,39 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         """
         refs = yield self._list()
         defer.returnValue([(yield self.get_resource(ref)) for ref in refs])
-        
-        
+
+
     @defer.inlineCallbacks
     def find_resource(self,description,regex=True,ignore_defaults=True,attnames=[]):
         """
         @brief Find resource descriptions in the registry meeting the criteria
-        in the FindResourceContainer 
+        in the FindResourceContainer
         """
-        
+
         # container for the return arguments
         results=[]
         if isinstance(description,dataobject.DataObject):
             refs = yield self._list()
-            logging.info('!!!!!!!!!@@@@@@@@!!!!')
-            logging.info(description)
+            logging.debug(description)
 
             # Get the list of descriptions in this registry
-            
+
             reslist = yield self._list_descriptions()
-            logging.info(self.__class__.__name__ + 'find_resource found ' + str(len(reslist)) + ' items in registry')
+            logging.info(self.__class__.__name__ + ': find_resource found ' + str(len(reslist)) + ' items in registry')
+            num_match = 1
             for ref in refs:
                 res = yield self.get_resource(ref)
-                logging.info(res)
-                
-                if description.compared_to(res,
+                logging.debug("Found #"+str(num_match)+":"+str(res))
+                num_match += 1
+                matches_desc = description.compared_to(res,
                                         regex=regex,
                                         ignore_defaults=ignore_defaults,
-                                        attnames=attnames):
+                                        attnames=attnames)
+                if matches_desc:
                     results.append(res)
-                    
+
         defer.returnValue(results)
-            
+
 
 
 @defer.inlineCallbacks
@@ -262,14 +263,14 @@ class BaseRegistryService(BaseService):
     names as in the RegistryService class example bellow.
     """
 
-    
+
     # For now, keep registration in local memory store. override with spawn args to use cassandra
     @defer.inlineCallbacks
     def slc_init(self):
         # use spawn args to determine backend class, second config file
         backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', None))
         backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', {}))
-        
+
         # self.backend holds the class which is instantiated to provide the Store for the registry
         if backendcls:
             self.backend = pu.get_class(backendcls)
@@ -279,15 +280,12 @@ class BaseRegistryService(BaseService):
 
         # Provide rest of the spawnArgs to init the store
         s = yield self.backend.create_store(**backendargs)
-        
+
         # Now pass the instance of store to create an instance of the registry
         self.reg = Registry(s)
-        
-        name = self.__class__.__name__
-        logging.info(name + " initialized")
-        logging.info(name + " backend:"+str(backendcls))
-        logging.info(name + " backend args:"+str(backendargs))
 
+        name = self.__class__.__name__
+        logging.info(name + " initialized; backend:%s; backend args:%s" % (backendcls, backendargs))
 
     @defer.inlineCallbacks
     def base_clear_registry(self, content, headers, msg):
@@ -305,8 +303,9 @@ class BaseRegistryService(BaseService):
         #resource = dataobject.Resource.decode(content)
         accept_encoding = headers.get('accept-encoding', '')
         resource = dataobject.serializer.decode(content, headers['encoding'])
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Resource: \n' + str(resource))
-  
+        logging.info(self.__class__.__name__ + ' received: op_'+ headers['op'] )
+        logging.debug('Resource: \n' + str(resource))
+
         resource = yield self.reg.register_resource(resource)
         logging.debug('%%%%%%%%%%%%')
         logging.debug(resource)
@@ -330,7 +329,7 @@ class BaseRegistryService(BaseService):
         #resource_reference = dataobject.Resource.decode(content)
         accept_encoding = headers.get('accept-encoding', '')
         resource_reference = dataobject.serializer.decode(content, headers['encoding'])
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
+        logging.info(self.__class__.__name__ + ' received: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
 
         resource = yield self.reg.get_resource(resource_reference)
         #logging.info('Got Resource:\n'+str(resource))
@@ -357,7 +356,7 @@ class BaseRegistryService(BaseService):
         else:
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
-        
+
     @defer.inlineCallbacks
     def base_set_resource_lcstate(self, content, headers, msg):
         """
@@ -376,7 +375,7 @@ class BaseRegistryService(BaseService):
             lcstate = container.lcstate
 
             resource = yield self.reg.set_resource_lcstate(resource_reference, lcstate)
-        
+
             if resource:
                 logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
                 encoding, _, data = dataobject.serializer.encode(resource.reference(), accept_encoding)
@@ -392,19 +391,19 @@ class BaseRegistryService(BaseService):
     def base_find_resource(self, content, headers, msg):
         """
         @brief Find resource descriptions in the registry meeting the criteria
-        listed in the properties dictionary 
+        listed in the properties dictionary
         """
         description = None
         regex = None
         ignore_defaults = None
-        attnames=[]
-                
+        attnames = []
+
         logging.debug('Registry Service MSG:'+ str(headers))
         #container = dataobject.Resource.decode(content)
         #This container object is expected to have certain functionality
         accept_encoding = headers.get('accept-encoding', '')
         container = dataobject.serializer.decode(content, headers['encoding'])
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', container: \n' + str(container))
+        logging.debug(self.__class__.__name__ + ' received: op_'+ headers['op'] +', container: \n' + str(container))
 
         result_list = []
         #This makes things difficult; shouldn't use python class resolution
@@ -415,10 +414,10 @@ class BaseRegistryService(BaseService):
             regex = container.regex
             ignore_defaults = container.ignore_defaults
             attnames = container.attnames
-            
+
             result_list = yield self.reg.find_resource(description,regex,ignore_defaults, attnames)
-        
-        results=coi_resource_descriptions.ResourceListContainer()
+
+        results = coi_resource_descriptions.ResourceListContainer()
         results.resources = result_list
 
         logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success! ' + str(len(result_list)) + ' Matches Found')
@@ -448,19 +447,19 @@ factory = ProtocolFactory(RegistryService)
 
 class BaseRegistryClient(BaseServiceClient):
     """
-    @Brief Base Registry Client is the base class used to simplify implementation
+    @brief BaseRegistryClient is the base class used to simplify implementation
     of Registry Service Clients. The client for a particular registry should
     inherit from this base class and use the base methods to communicate with
     the service. The client can do what ever business logic is neccissary before
     calling the base client methods.
     """
-            
+
     @defer.inlineCallbacks
     def base_clear_registry(self,op_name):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send(op_name,None)
-        if content['status']=='OK':
+        if content['status'] == 'OK':
             defer.returnValue(None)
 
 
@@ -472,20 +471,20 @@ class BaseRegistryClient(BaseServiceClient):
         @param op_name The operation name to call in the service
         @param resource is an instance of a Resource object which has been
         created using the create_new_resource method. Specific registries may
-        over ride this behavior to create the resource inside the register method
+        override this behavior to create the resource inside the register method
         """
         yield self._check_init()
-        logging.info(self.__class__.__name__ + '; Calling:'+ op_name)
-        
+        logging.info(self.__class__.__name__ + '; Calling: '+ op_name)
+
         assert isinstance(resource, dataobject.Resource), 'Invalid argument to base_register_resource'
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
 
         encoding, _, data = dataobject.serializer.encode(resource)
         headers = {'encoding':encoding, 'accept-encoding':encoding}
         (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
-        
+
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
-        
+
         if content['status']=='OK':
             #resource = dataobject.Resource.decode(content['value'])
             resource = dataobject.serializer.decode(content['value'], headers['encoding'])
@@ -505,14 +504,14 @@ class BaseRegistryClient(BaseServiceClient):
         """
         yield self._check_init()
         logging.info(self.__class__.__name__ + '; Calling:'+ op_name)
-        
+
         assert isinstance(resource_reference, dataobject.ResourceReference), 'Invalid argument to base_register_resource'
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
-        
+
         encoding, _, data = dataobject.serializer.encode(resource_reference)
         headers = {'encoding':encoding, 'accept-encoding':encoding}
         (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
-        
+
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
         if content['status']=='OK':
@@ -551,16 +550,16 @@ class BaseRegistryClient(BaseServiceClient):
         @param resource_reference is the registry identifier for a particular
         version of an object in the registry.
         @parm lcstate is a life cycle state object which provides an enum like
-        behavior. 
+        behavior.
         """
         yield self._check_init()
         logging.info(self.__class__.__name__ + '; Calling:'+ op_name)
-        
+
         assert isinstance(resource_reference, dataobject.ResourceReference), 'Invalid argument to base_register_resource'
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
         assert isinstance(lcstate, dataobject.LCState), 'Invalid argument to base_register_resource'
 
-        
+
         container = coi_resource_descriptions.SetResourceLCStateContainer()
         container.lcstate = lcstate
         container.reference = resource_reference
@@ -570,7 +569,7 @@ class BaseRegistryClient(BaseServiceClient):
         (content, headers, msg) = yield self.rpc_send(op_name, data, headers)
 
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
-        
+
         if content['status'] == 'OK':
             #resource_reference = dataobject.ResourceReference.decode(content['value'])
             resource_reference = dataobject.serializer.decode(content['value'], headers['encoding'])
@@ -596,7 +595,7 @@ class BaseRegistryClient(BaseServiceClient):
         """
         yield self._check_init()
         logging.info(self.__class__.__name__ + '; Calling:'+ op_name)
-    
+
         assert isinstance(description, dataobject.DataObject), 'Invalid argument to base_register_resource'
         assert isinstance(op_name, str), 'Invalid argument to base_register_resource'
         assert isinstance(regex, bool), 'Invalid argument to base_register_resource'
@@ -609,15 +608,15 @@ class BaseRegistryClient(BaseServiceClient):
         container.ignore_defaults = ignore_defaults
         container.regex = regex
         container.attnames = attnames
-        
+
         encoding, _, data = dataobject.serializer.encode(container)
         headers = {'encoding':encoding, 'accept-encoding':encoding}
         content, headers, msg = yield self.rpc_send(op_name, data, headers)
 
         logging.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
-        
+
         # Return a list of resources
-        if content['status'] == 'OK':            
+        if content['status'] == 'OK':
             #results = dataobject.DataObject.decode(content['value'])
             results = dataobject.serializer.decode(content['value'], headers['encoding'])
             logging.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
@@ -632,7 +631,7 @@ class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
     #@TODO How can we make it so that the client infact uses a local registry
     for testing rather than using the registry service? Can we switch it in init?
     """
-    
+
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "registry_service"
@@ -647,7 +646,7 @@ class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
 
     def get_resource(self,resource_reference):
         return self.base_get_resource('get_resource', resource_reference)
-        
+
     def set_resource_lcstate(self, resource_reference, lcstate):
         return self.base_set_resource_lcstate('set_resource_lcstate',resource_reference, lcstate)
 

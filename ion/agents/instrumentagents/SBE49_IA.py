@@ -14,8 +14,6 @@ from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 
 from ion.core.base_process import BaseProcess, ProtocolFactory, ProcessDesc
-from ion.core import bootstrap
-
 
 
 # Gotta have this AFTER the "static" variables above
@@ -32,25 +30,25 @@ class SBE49InstrumentAgent(InstrumentAgent):
         """
         Initialize instrument driver when this process is started.
         """
-        self.instrument_id = self.spawn_args.get('instrument-id','123')
+        InstrumentAgent.plc_init(self)
+
+        self.instrument_id = self.spawn_args.get('instrument-id', '123')
+        self.driver_args = self.spawn_args.get('driver-args', {})
         logging.info("INIT agent for instrument ID: %s" % (self.instrument_id))
 
-
+        self.driver_args['instrument-id'] = self.instrument_id
         self.pd = ProcessDesc(**{'name':'SBE49Driver',
                           'module':'ion.agents.instrumentagents.SBE49_driver',
                           'class':'SBE49InstrumentDriver',
-                          'spawnargs':{'instrument-id':self.instrument_id}})
+                          'spawnargs':self.driver_args})
 
-        rpcproc = BaseProcess()
-        rpcpid = yield rpcproc.spawn()
-
-        driver_id = yield rpcproc.spawn_child(self.pd)
-        self.driver_client = SBE49InstrumentDriverClient(proc=rpcproc,
+        driver_id = yield self.spawn_child(self.pd)
+        self.driver_client = SBE49InstrumentDriverClient(proc=self,
                                                          target=driver_id)
 
-    @defer.inlineCallbacks
-    def plc_shutdown(self):
-        yield self.pd.shutdown()
+    #@defer.inlineCallbacks
+    #def plc_shutdown(self):
+    #    yield self.pd.shutdown()
 
 
     @staticmethod

@@ -45,7 +45,7 @@ class AgentRegistryService(registry.BaseRegistryService):
     """
     Service operation: Get a agent definition.
     """
-    
+
     op_register_agent_instance = registry.BaseRegistryService.base_register_resource
     """
     Service operation: Register a agent instance with the registry.
@@ -54,12 +54,12 @@ class AgentRegistryService(registry.BaseRegistryService):
     """
     Service operation: Get a agent instance.
     """
-    
+
     op_set_agent_lcstate = registry.BaseRegistryService.base_set_resource_lcstate
     """
     Service operation: Set a agent life cycle state
     """
-    
+
     op_find_registered_agent_definition_from_agent = registry.BaseRegistryService.base_find_resource
     """
     Service operation: Find the definition of a agent
@@ -68,7 +68,7 @@ class AgentRegistryService(registry.BaseRegistryService):
     """
     Service operation: Find agent definitions which meet a description
     """
-    
+
     op_find_registered_agent_instance_from_agent = registry.BaseRegistryService.base_find_resource
     """
     Service operation: Find the registered instance that matches the agent instance
@@ -115,9 +115,9 @@ class AgentRegistryClient(registry.BaseRegistryClient):
             agent_class = agent
             # Build a new description of the agent
             agent_description = self.describe_agent(agent_class)
-            
+
             found_sd = yield self.find_registered_agent_definition_from_description(agent_description)
-            
+
             if found_sd:
                 assert len(found_sd) == 1
                 defer.returnValue(found_sd[0])
@@ -127,9 +127,9 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         agent_description = yield self.base_register_resource('register_agent_definition', agent_description)
         defer.returnValue(agent_description)
 
-     
+
     def describe_agent(self,agent_class):
-        
+
         assert issubclass(agent_class, BaseProcess)
 
         # Do not make a new resource idenity - this is a generic method which
@@ -138,17 +138,17 @@ class AgentRegistryClient(registry.BaseRegistryClient):
 
         #agent_description.name = agent_class.declare['name']
         #agent_description.version = agent_class.declare['version']
-        
+
         agent_description.class_name = agent_class.__name__
         agent_description.module = agent_class.__module__
-                
-        agent_description.description = inspect.getdoc(agent_class)      
-        
+
+        agent_description.description = inspect.getdoc(agent_class)
+
         #@Note need to improve inspection of agent!
         for attr in inspect.classify_class_attrs(agent_class):
             #if attr.kind == 'method' and 'op_' in attr.name :
             if attr[1] == 'method' and 'op_' in attr[0] :
-            
+
                 opdesc = coi_resource_descriptions.AgentMethodInterface()
                 #opdesc.name = attr.name
                 opdesc.name = attr[0]
@@ -156,7 +156,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
                 #opdesc.description = inspect.getdoc(attr.object)
                 #Can't seem to get the arguments in any meaningful way...
                 #opdesc.arguments = inspect.getargspec(attr.object)
-                
+
                 agent_description.interface.append(opdesc)
         return agent_description
 
@@ -174,19 +174,18 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         @param descriptor The empty, partial or full storage area for additial,
             subclass-specific values.
         """
-        assert((descriptor == None) or
-               (isinstance(descriptor,
-                           coi_resource_descriptions.AgentInstance)))
-        
+        assert ((descriptor == None) or
+               (isinstance(descriptor, coi_resource_descriptions.AgentInstance)))
+
         if isinstance(agent, coi_resource_descriptions.AgentInstance):
             agent_resource = agent
-            assert agent_resource.RegistryIdentity, 'Agent Resource must have a registry Identity'            
-            
+            assert agent_resource.RegistryIdentity, 'Agent Resource must have a registry Identity'
+
         else:
             agent_instance = agent
             # Build a new description of this agent instance
             agent_resource = yield self.describe_instance(agent_instance, descriptor)
-    
+
             found_sir = yield self.find_registered_agent_instance_from_description(agent_resource)
             if found_sir:
                 assert len(found_sir) == 1
@@ -211,37 +210,37 @@ class AgentRegistryClient(registry.BaseRegistryClient):
         assert((descriptor == None) or
                (isinstance(descriptor,
                            coi_resource_descriptions.AgentInstance)))
-        
+
         # Do not make a new resource idenity - this is a generic method which
         # is also used to look for an existing description
         if (descriptor == None):
-            agent_resource = coi_resource_descriptions.AgentInstance()    
+            agent_resource = coi_resource_descriptions.AgentInstance()
         else:
             agent_resource = descriptor
-        
+
         agent_class = agent_instance.__class__
-        
+
         sd = yield self.register_agent_definition(agent_class)
         agent_resource.description = sd.reference(head=True)
-        
+
         #if agent_instance.id:
         #    agent_resource.process_id = agent_instance.id
         if agent_instance.proc_name:
             agent_resource.proc_name = agent_instance.proc_name
         if agent_instance.spawn_args:
             agent_resource.spawn_args = agent_instance.spawn_args
-        if agent_instance.proc_state:    
+        if agent_instance.proc_state:
             agent_resource.process_state = agent_instance.proc_state
-       
+
         # add a reference to the supervisor - can't base process does not have the same fields as ProcessDesc
         #if agent_resource.sup_process:
         #    print agent_instance.sup_process.__dict__
         #    sr = yield self.register_agent_instance(agent_instance.sup_process)
         #    agent_resource.sup_process = sr.reference(head=True)
- 
+
         if agent_instance.name:
             agent_resource.name = agent_instance.name
-        
+
         defer.returnValue(agent_resource)
 
     def get_agent_instance(self, agent_reference):
@@ -258,7 +257,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
 
     def set_agent_lcstate_active(self, agent_reference):
         return self.set_agent_lcstate(agent_reference, dataobject.LCStates.active)
-        
+
     def set_agent_lcstate_inactive(self, agent_reference):
         return self.set_agent_lcstate(agent_reference, dataobject.LCStates.inactive)
 
@@ -277,10 +276,10 @@ class AgentRegistryClient(registry.BaseRegistryClient):
     @defer.inlineCallbacks
     def find_registered_agent_definition_from_agent(self, agent_class):
         """
-        Find the definition of a agent 
+        Find the definition of a agent
         """
         agent_description = self.describe_agent(agent_class)
-        
+
         alist = yield self.base_find_resource('find_registered_agent_definition_from_agent', agent_description,regex=False,ignore_defaults=True)
         # Find returns a list but only one agent should match!
         if alist:
@@ -288,13 +287,13 @@ class AgentRegistryClient(registry.BaseRegistryClient):
             defer.returnValue(alist[0])
         else:
             defer.returnValue(None)
-            
+
     def find_registered_agent_definition_from_description(self, agent_description,regex=True,ignore_defaults=True):
-        """ 
+        """
         Find agent definitions which meet a description
         """
         return self.base_find_resource('find_registered_agent_definition_from_description', agent_description,regex,ignore_defaults)
-        
+
 
     @defer.inlineCallbacks
     def find_registered_agent_instance_from_agent(self, agent_instance):
@@ -309,19 +308,9 @@ class AgentRegistryClient(registry.BaseRegistryClient):
             defer.returnValue(alist[0])
         else:
             defer.returnValue(None)
-            
+
     def find_registered_agent_instance_from_description(self, agent_instance_description,regex=True,ignore_defaults=True):
-        """ 
+        """
         Find agent instances which meet a description
         """
         return self.base_find_resource('find_registered_agent_instance_from_description', agent_instance_description,regex,ignore_defaults)
-
-
-
-
-
-
-
-
-
-

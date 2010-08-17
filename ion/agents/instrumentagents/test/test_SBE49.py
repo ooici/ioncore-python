@@ -8,11 +8,14 @@
 @see ion.agents.instrumentagents.test.test_instrument
 """
 import logging
+logging = logging.getLogger(__name__)
 from twisted.internet import defer
+
 from ion.test.iontest import IonTestCase
 
 from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriverClient
 from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriver
+from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.core import bootstrap
 
 from magnet.spawnable import Receiver
@@ -28,35 +31,9 @@ from ion.services.dm.distribution.consumers import example_consumer
 
 import ion.util.procutils as pu
 from ion.data import dataobject
-#from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource, DAPMessageObject
 from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource
-from subprocess import Popen, PIPE
-import os
 
 from twisted.trial import unittest
-
-def start_SBE49_simulator():
-    """
-    Construct the path to the instrument simulator, starting with the current
-    working directory
-    """
-    cwd = os.getcwd()
-    myPid = os.getpid()
-    logging.debug("DHE: myPid: %s" % (myPid))
-
-    simDir = cwd.replace("_trial_temp", "ion/agents/instrumentagents/test/")
-    #simPath = simDir("sim_SBE49.py")
-    simPath = simDir + "sim_SBE49.py"
-    #logPath = simDir.append("sim.log")
-    logPath = simDir + "sim.log"
-    logging.info("cwd: %s, simPath: %s, logPath: %s" %(str(cwd), str(simPath), str(logPath)))
-    simLogObj = open(logPath, 'a')
-    #self.simProc = Popen(simPath, stdout=PIPE)
-    simProc = Popen(simPath, stdout=simLogObj)
-    return simProc
-
-def stop_SBE49_simulator(simproc):
-    simproc.terminate()
 
 
 class TestSBE49(IonTestCase):
@@ -66,52 +43,29 @@ class TestSBE49(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
-        # Start the simulator
-        logging.info("Starting instrument simulator.")
-
-        self.simproc = start_SBE49_simulator()
-
-        # Sleep for a while to allow simlator to get set up.
-        yield pu.asleep(1)
+        self.simulator = Simulator("123", 9000)
+        self.simulator.start()
 
         services = [
             {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
-            {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'}
+            {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
+
+            {'name':'SBE49_Driver','module':'ion.agents.instrumentagents.SBE49_driver','class':'SBE49InstrumentDriver'}
             ]
 
-        #self.pubsubSuper = yield self._spawn_processes(services)
         self.sup = yield self._spawn_processes(services)
 
-        #self.sup = yield bootstrap.create_supervisor()
-
-        child_id = yield self.sup.get_child_id('pubsub_service')
-        logging.debug("DHE: PubSub Test Service ID: " + str(child_id))
-        self.pubsub = self._get_procinstance(child_id)
-        logging.debug("DHE: got procinstance")
-
-        driverParms = {'name':'SBE49_Driver',
-                 'module':'ion.agents.instrumentagents.SBE49_driver',
-                 'procclass':'SBE49InstrumentDriver'
-                }
-        driverEgg = ProcessDesc(**driverParms)
-
-        self.driver_pid = yield self.sup.spawn_child(driverEgg)
-        print("pid %s" % (self.driver_pid))
-
-        #self.driver = SBE49InstrumentDriver()
-        #self.driver_pid = yield self.driver.spawn()
-
-        #yield self.driver.init()
+        self.driver_pid = yield self.sup.get_child_id('SBE49_Driver')
+        logging.debug("Driver pid %s" % (self.driver_pid))
 
         self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
                                                          target=self.driver_pid)
-        #self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
-        #                                                 target="SBE49_Driver")
 
     @defer.inlineCallbacks
     def tearDown(self):
-        logging.info("Stopping instrument simulator.")
-        stop_SBE49_simulator(self.simproc)
+        yield self.simulator.stop()
+
+        # stop_SBE49_simulator(self.simproc)
         yield self._stop_container()
 
     @defer.inlineCallbacks
@@ -133,13 +87,8 @@ class TestSBE49(IonTestCase):
 
     @defer.inlineCallbacks
     def test_initialize(self):
-        #dpsc = DataPubsubClient(self.pubsubSuper)
-
         result = yield self.driver_client.initialize('some arg')
-        yield pu.asleep(4)
         print 'TADA!'
-
-
 
     @defer.inlineCallbacks
     def test_driver_load(self):
@@ -178,7 +127,7 @@ class TestSBE49(IonTestCase):
         Lame test since this doesnt do much
         """
         result = yield self.driver_client.initialize('some arg')
-        yield pu.asleep(4)
+        #yield pu.asleep(4)
 
         dpsc = DataPubsubClient(self.sup)
 
@@ -193,7 +142,7 @@ class TestSBE49(IonTestCase):
                  'attach':'topic1'}
                 }
 
-        subscription = yield self.pubsub.create_subscription(subscription)
+        subscription = yield dpsc.define_subscription(subscription)
 
         logging.info('Defined subscription: '+str(subscription))
 
@@ -240,14 +189,14 @@ class TestSBE49(IonTestCase):
         # === End to be replaces with Define_Consumer
         """
 
-        cmd1 = {'ds': ['now']}
-        #cmd1 = {'start': ['now']}
-        #cmd2 = {'stop':['now']}
-        #cmd2 = {'pumpoff':['3600', '1']}
+        cmd1 = [['ds', 'now']]
+        #cmd1 = [['start', 'now']]
+        #cmd2 = [['stop', 'now']]
+        #cmd2 = [['pumpoff', '3600', '1']]
         result = yield self.driver_client.execute(cmd1)
         self.assertEqual(result['status'], 'OK')
         # DHE: wait a while...
-        yield pu.asleep(5)
+        yield pu.asleep(1)
         #result = yield self.driver_client.execute(cmd2)
         #self.assertEqual(result['status'], 'OK')
 
@@ -255,6 +204,43 @@ class TestSBE49(IonTestCase):
         # DHE: disconnecting; a connect would probably be good.
         result = yield self.driver_client.disconnect(['some arg'])
 
+
+    @defer.inlineCallbacks
+    def test_sample(self):
+        result = yield self.driver_client.initialize('some arg')
+
+        dpsc = DataPubsubClient(self.sup)
+        topicname = 'SBE49 Topic'
+        topic = PubSubTopicResource.create(topicname,"")
+
+        # Use the service to create a queue and register the topic
+        topic = yield dpsc.define_topic(topic)
+
+        subscription = SubscriptionResource()
+        subscription.topic1 = PubSubTopicResource.create(topicname,'')
+
+        subscription.workflow = {
+            'consumer1':
+                {'module':'ion.services.dm.distribution.consumers.logging_consumer',
+                 'consumerclass':'LoggingConsumer',\
+                 'attach':'topic1'}
+                }
+
+        subscription = yield dpsc.define_subscription(subscription)
+
+        logging.info('Defined subscription: '+str(subscription))
+
+        params = {}
+        params['publish-to'] = topic.RegistryIdentity
+        yield self.driver_client.configure_driver(params)
+
+        cmd1 = [['ds', 'now']]
+        result = yield self.driver_client.execute(cmd1)
+        self.assertEqual(result['status'], 'OK')
+
+        yield pu.asleep(1)
+
+        result = yield self.driver_client.disconnect(['some arg'])
 
 class DataConsumer(BaseProcess):
     """

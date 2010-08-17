@@ -159,7 +159,7 @@ class DataObject(object):
         atts = atts1.union(atts2)
         try:
             m = [getattr(self, a) == getattr(other, a) for a in atts]
-            return reduce(lambda a, b: a and b, m)
+            return all(m)
         except:
             return False
 
@@ -180,7 +180,7 @@ class DataObject(object):
         #print 'OTHER',other.get_attributes()
         try:
             m = [getattr(self, a) == getattr(other, a) for a in atts]
-            return reduce(lambda a, b: a and b, m)
+            return all(m)
         except:
             return False
 
@@ -223,7 +223,7 @@ class DataObject(object):
                     else:
                         m.append(getattr(self, a) == getattr(other, a))
 
-                return reduce(lambda a, b: a and b, m)
+                return all(m)
             except:
                 return False
         else:
@@ -242,7 +242,7 @@ class DataObject(object):
                     else:
                         m.append(False)
 
-                return reduce(lambda a, b: a and b, m)
+                return all(m)
             except:
                 return False
 

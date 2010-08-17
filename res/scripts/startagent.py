@@ -4,14 +4,14 @@
 import logging
 from twisted.internet import defer
 
+from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
+from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
+
 from ion.core import ioninit
 from ion.core import bootstrap
-from ion.util.config import Config
-
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
-from subprocess import Popen, PIPE
+from ion.util.config import Config
 import ion.util.procutils as pu
-import os
 
 # Use the bootstrap configuration entries from the standard bootstrap
 CONF = ioninit.config('ion.core.bootstrap')
@@ -33,22 +33,6 @@ def eval_start_arguments():
     INSTRUMENT_ID = ioninit.cont_args.get('instid','123')
     print "##### Use instrument ID: " + str(INSTRUMENT_ID)
 
-def start_simulator():
-    """
-    Construct the path to the instrument simulator, starting with the current
-    working directory
-    """
-    cwd = os.getcwd()
-    myPid = os.getpid()
-    logging.debug("DHE: myPid: %s" % (myPid))
-    
-    simDir = cwd + "/ion/agents/instrumentagents/test/"
-    simPath = simDir + "sim_SBE49.py"
-    logPath = cwd + "/logs/sim_%s.log" % (INSTRUMENT_ID)
-    logging.info("Starting instrument simulator for %s, logging to: %s" %(str(INSTRUMENT_ID), str(logPath)))
-    simLogObj = open(logPath, 'w')
-    simProc = Popen([simPath,INSTRUMENT_ID], stdout=simLogObj)
-
 @defer.inlineCallbacks
 def main():
     """
@@ -65,11 +49,16 @@ def main():
 
     eval_start_arguments()
 
-    start_simulator()
+    simulator = Simulator(INSTRUMENT_ID, 9000)
+    simulator.start()
 
     ia_procs = [
         {'name':'SBE49IA','module':'ion.agents.instrumentagents.SBE49_IA','class':'SBE49InstrumentAgent','spawnargs':{'instrument-id':INSTRUMENT_ID}},
-    ]    
+    ]
     yield bootstrap.spawn_processes(ia_procs, sup=sup)
+
+    ia_pid = sup.get_child_id('SBE49IA')
+    iaclient = InstrumentAgentClient(proc=sup, target=ia_pid)
+    yield iaclient.register_resource(INSTRUMENT_ID)
 
 main()

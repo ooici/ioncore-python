@@ -3,7 +3,6 @@
 """
 @file ion/core/base_process.py
 @author Michael Meisinger
-@author Stephen Pasco
 @brief base class for all processes within Magnet
 """
 
@@ -25,11 +24,7 @@ import ion.util.procutils as pu
 CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
 
-# Define the exported public names of this module
-__all__ = ['BaseProcess','ProcessDesc','ProtocolFactory','Message','processes','procRegistry']
-
-# Static store (kvs) to register process instances with names
-# @todo CHANGE
+# @todo CHANGE: Static store (kvs) to register process instances with names
 procRegistry = Store()
 
 # @todo HACK: Dict of process "alias" to process declaration
@@ -47,7 +42,7 @@ class BaseProcess(object):
     calls, spawning and terminating child processes. Subclasses may use the
     plc-* process life cycle events.
     """
-    # Conversation ID counter
+    # @todo CHANGE: Conversation ID counter
     convIdCnt = 0
 
     def __init__(self, receiver=None, spawnArgs=None, **kwargs):
@@ -57,7 +52,6 @@ class BaseProcess(object):
         @param spawnArgs  standard and additional spawn arguments
         """
         self.proc_state = "NEW"
-        self.id = None
         spawnArgs = spawnArgs.copy() if spawnArgs else {}
         self.spawn_args = spawnArgs
         self.proc_init_time = pu.currenttime_ms()
@@ -76,6 +70,18 @@ class BaseProcess(object):
             receiver = Receiver(self.proc_name)
         self.receiver = receiver
         receiver.handle(self.receive)
+        self.id = None
+
+        # We need a second receiver (i.e. messaging queue) for backend
+        # interactions, while processing incoming messages. Otherwise deadlock
+        # because only one message can be consumed before ACK.
+        self.backend_receiver = Receiver(self.proc_name + "_back")
+        self.backend_receiver.handle(self.receive)
+        if hasattr(self.receiver, 'group'):
+            self.backend_receiver.group = self.receiver.group
+        else:
+            self.backend_receiver.group = self.proc_name
+        self.backend_id = None
 
         # Dict of all receivers of this process. Key is the name
         self.receivers = {}
@@ -90,7 +96,7 @@ class BaseProcess(object):
         # List of ProcessDesc instances of defined and spawned child processes
         self.child_procs = []
 
-        logging.info("Process init'd: proc-name=%s, sup-id=%s, sys-name=%s" % (
+        logging.debug("NEW Process [%s], sup-id=%s, sys-name=%s" % (
                 self.proc_name, self.proc_supid, self.sys_name))
 
     def add_receiver(self, receiver):
@@ -107,7 +113,7 @@ class BaseProcess(object):
         """
         assert not self.receiver.spawned, "Process already spawned"
         self.id = yield spawn(self.receiver)
-        logging.debug('spawn()=' + str(self.id))
+        logging.debug('Process spawn(): pid=%s' % (self.id))
         yield defer.maybeDeferred(self.plc_spawn)
 
         # Call init right away. This is what you would expect anyways in a
@@ -153,6 +159,8 @@ class BaseProcess(object):
             self.proc_state = "INIT"
 
             try:
+                self.id = self.receiver.spawned.id
+                self.backend_id = yield spawn(self.backend_receiver)
                 yield defer.maybeDeferred(self.plc_init)
                 self.proc_state = "ACTIVE"
                 logging.info('----- Process %s INIT OK -----' % (self.proc_name))
@@ -173,7 +181,6 @@ class BaseProcess(object):
         """
         Process life cycle event: on initialization of process (once)
         """
-        logging.info('BaseProcess.plc_init()')
 
     @defer.inlineCallbacks
     def op_shutdown(self, content, headers, msg):
@@ -200,7 +207,6 @@ class BaseProcess(object):
         """
         Process life cycle event: on shutdown of process (once)
         """
-        logging.info('BaseProcess.plc_shutdown()')
 
     def receive(self, payload, msg):
         """
@@ -227,14 +233,17 @@ class BaseProcess(object):
         Handling of RPC reply messages.
         @TODO: Handle the error case
         """
-        logging.info('>>> BaseProcess.receive(): Message received, RPC reply. <<<')
+        fromname = payload['sender']
+        if 'sender-name' in payload:
+            fromname = payload['sender-name']
+        logging.info('>>> [%s] receive(): RPC reply from [%s] <<<' % (self.proc_name, fromname))
         d = self.rpc_conv.pop(payload['conv-id'])
         content = payload.get('content', None)
         res = (content, payload, msg)
         if type(content) is dict and content.get('status',None) == 'OK':
             pass
         elif type(content) is dict and content.get('status',None) == 'ERROR':
-            logging.warn('RPC reply is an ERROR')
+            logging.warn('RPC reply is an ERROR: '+str(content.get('value',None)))
         else:
             logging.error('RPC reply is not well formed. Use reply_ok or reply_err')
         # @todo is it OK to ack the response at this point already?
@@ -253,7 +262,10 @@ class BaseProcess(object):
         Handling of non-RPC messages. Messages are dispatched according to
         message attributes.
         """
-        logging.info('>>> BaseProcess.receive(): Message received, dispatching... >>>')
+        fromname = payload['sender']
+        if 'sender-name' in payload:
+            fromname = payload['sender-name']
+        logging.info('#####>>> [%s] receive(): Message from [%s], dispatching... >>>' % (self.proc_name, fromname))
         convid = payload.get('conv-id', None)
         conv = self.conversations.get(convid, None) if convid else None
         # Perform a dispatch of message by operation
@@ -265,7 +277,7 @@ class BaseProcess(object):
                 logging.debug("<<< ACK msg")
                 d1 = msg.ack()
         def _err(res):
-            logging.error("Error in message processing: "+str(res))
+            logging.error("*****Error in message processing: "+str(res)+"*****")
             if msg._state == "RECEIVED":
                 # Only if msg has not been ack/reject/requeued before
                 logging.debug("<<< ACK msg")
@@ -342,12 +354,13 @@ class BaseProcess(object):
         Starts a new conversation.
         @retval Deferred for send of message
         """
-        send = self.receiver.spawned.id.full
+        send = self.backend_id
         msgheaders = self._prepare_message(headers)
-        return pu.send(self.receiver, send, recv, operation, content, msgheaders)
+        return pu.send(self.backend_receiver, send, recv, operation, content, msgheaders)
 
     def _prepare_message(self, headers):
         msgheaders = {}
+        msgheaders['sender-name'] = self.proc_name
         if headers:
             msgheaders.update(headers)
         if not 'conv-id' in msgheaders:

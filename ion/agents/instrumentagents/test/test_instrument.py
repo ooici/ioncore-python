@@ -26,7 +26,7 @@ from ion.agents.instrumentagents.SBE49_constants import ci_commands as IACIComma
 from ion.agents.instrumentagents.SBE49_constants import ci_parameters as IACIParameters
 from ion.agents.instrumentagents.SBE49_constants import instrument_commands as IAInstCommands
 from ion.agents.instrumentagents.SBE49_constants import instrument_parameters as IAInstParameters
-from ion.agents.instrumentagents.test import test_SBE49
+from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 import ion.util.procutils as pu
 
 
@@ -56,16 +56,11 @@ class TestInstrumentAgent(IonTestCase):
                                                  target=self.svc_id)
 
         # Start an Agent Registry to test against
-        self.reg_client = AgentRegistryClient(proc=self.sup,
-                                              target=self.reg_id)
+        self.reg_client = AgentRegistryClient(proc=self.sup)
         yield self.reg_client.clear_registry()
-
-        yield self.IAClient.set_registry_client(str(self.reg_id))
-
 
     @defer.inlineCallbacks
     def tearDown(self):
-        #yield self._shutdown_processes()
         yield self._stop_container()
 
     @defer.inlineCallbacks
@@ -75,6 +70,7 @@ class TestInstrumentAgent(IonTestCase):
         capabilities
         """
         result = yield self.IAClient.get_capabilities()
+        #logging.info("getCapabilities result: "+ str(result))
         self.assert_(set(IACIParameters).issubset(set(result[IA.ci_parameters])))
         self.assert_(IA.driver_address in
                      result[IA.ci_parameters])
@@ -135,13 +131,14 @@ class TestInstrumentAgent(IonTestCase):
         Tests the ability of an instrument agent to successfully register
         ifself with the resource registry.
         """
-        reg_ref = yield self.IAClient.register_resource()
+        reg_ref = yield self.IAClient.register_resource("123")
 
         result = yield self.IAClient.get_resource_instance()
         self.assertNotEqual(result, None)
 
         self.assert_(isinstance(result, InstrumentAgentResourceInstance))
         self.assertNotEqual(result.driver_process_id, None)
+        self.assertEqual(result.instrument_ref.RegistryIdentity, "123")
 
         self.assertEqual(reg_ref.RegistryCommit, '')
         self.assertNotEqual(result.RegistryCommit, reg_ref.RegistryCommit)
@@ -157,7 +154,7 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test the resource lifecycle management
         """
-        yield self.IAClient.register_resource()
+        yield self.IAClient.register_resource("123")
 
         response = yield self.IAClient.set_lifecycle_state(LCS.inactive)
         self.assertEqual(response, LCS.inactive)
@@ -178,15 +175,13 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability of the SBE49 driver to execute commands through the
         InstrumentAgentClient class
         """
-        self.simproc = test_SBE49.start_SBE49_simulator()
-
-        # Sleep for a while to allow simlator to get set up.
-        yield pu.asleep(1)
+        self.simulator = Simulator("123", 9000)
+        self.simulator.start()
 
         try:
 
-            response = yield self.IAClient.execute_instrument({'start':['now', 1],
-                                                               'stop':[]})
+            response = yield self.IAClient.execute_instrument([['start','now', 1],
+                                                               ['stop']])
             print "response ", response
             self.assert_(isinstance(response, dict))
             self.assert_('status' in response.keys())
@@ -195,20 +190,17 @@ class TestInstrumentAgent(IonTestCase):
             self.assert_('stop' in response['value'])
             self.assert_(response['status'] == 'OK')
 
-            response = yield self.IAClient.execute_instrument({'badcommand':['now',
-                                                                             '1']})
+            response = yield self.IAClient.execute_instrument([['badcommand',
+                                                                'now','1']])
             self.assert_(isinstance(response, dict))
             self.assertEqual(response['status'], 'ERROR')
 
-            response = yield self.IAClient.execute_instrument({})
+            response = yield self.IAClient.execute_instrument([])
             self.assert_(isinstance(response, dict))
             self.assertEqual(response['status'], 'ERROR')
 
         finally:
-            try:
-                yield self._shutdown_processes(self._get_procinstance(self.svc_id))
-            finally:
-                test_SBE49.stop_SBE49_simulator(self.simproc)
+            yield self.simulator.stop()
 
     @defer.inlineCallbacks
     def test_get_driver_proc(self):
