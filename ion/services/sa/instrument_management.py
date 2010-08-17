@@ -10,16 +10,20 @@ import logging
 logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
-import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
-from ion.data.dataobject import DataObject, ResourceReference
-from ion.services.base_service import BaseService, BaseServiceClient
-
+from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
+from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
+from ion.core.base_process import ProtocolFactory, ProcessDesc
+from ion.data.dataobject import DataObject, ResourceReference, LCStates
 from ion.resources.coi_resource_descriptions import AgentInstance
+from ion.resources.dm_resource_descriptions import PubSubTopicResource
 from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
+from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
+from ion.services.base_service import BaseService, BaseServiceClient
+from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.services.sa.instrument_registry import InstrumentRegistryClient
 from ion.services.sa.data_product_registry import DataProductRegistryClient
 from ion.services.coi.agent_registry import AgentRegistryClient
+import ion.util.procutils as pu
 
 class InstrumentManagementService(BaseService):
     """
@@ -39,19 +43,20 @@ class InstrumentManagementService(BaseService):
         self.irc = InstrumentRegistryClient(proc=self)
         self.dprc = DataProductRegistryClient(proc=self)
         self.arc = AgentRegistryClient(proc=self)
+        self.dpsc = DataPubsubClient(proc=self)
 
     @defer.inlineCallbacks
     def op_create_new_instrument(self, content, headers, msg):
         """
-        Service operation: Accepts a dictionary containing user inputs and updates the instrument
-        registry.
+        Service operation: Accepts a dictionary containing user inputs.
+        Updates the instrument registry.
         """
         userInput = content['userInput']
 
         newinstrument = InstrumentResource.create_new_resource()
 
-        if 'direct_access' in userInput:
-            newinstrument.direct_access = str(userInput['direct_access'])
+        if 'name' in userInput:
+            newinstrument.name = str(userInput['name'])
 
         if 'manufacturer' in userInput:
             newinstrument.manufacturer = str(userInput['manufacturer'])
@@ -72,8 +77,9 @@ class InstrumentManagementService(BaseService):
     @defer.inlineCallbacks
     def op_create_new_data_product(self, content, headers, msg):
         """
-        Service operation: Accepts a dictionary containing user inputs and
-        updates the data product registry.
+        Service operation: Accepts a dictionary containing user inputs.
+        Updates the data product registry. Also sets up an ingestion pipeline
+        for an instrument
         """
         dataProductInput = content['dataProductInput']
 
@@ -87,6 +93,17 @@ class InstrumentManagementService(BaseService):
             newdp.dataformat = str(dataProductInput['dataformat'])
 
         # Step: Create a data stream
+        ## Instantiate a pubsubclient
+        #self.dpsc = DataPubsubClient(proc=self)
+        #
+        ## Create and Register a topic
+        #self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
+        #self.topic = yield self.dpsc.define_topic(self.topic)
+        #logging.debug('DHE: Defined Topic')
+        #
+        #self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
+        #self.publisher = yield self.dpsc.define_publisher(self.publisher)
+
 
         res = yield self.dprc.register_data_product(newdp)
         ref = res.reference(head=True)
@@ -108,23 +125,33 @@ class InstrumentManagementService(BaseService):
             raise ValueError("Input for instrumentID not present")
 
         command = []
-        command_op = str(commandInput['command'])
+        if 'command' in commandInput:
+            command_op = str(commandInput['command'])
+        else:
+            raise ValueError("Input for command not present")
+
         command.append(command_op)
 
         arg_idx = 0
         while True:
             argname = 'cmdArg'+str(arg_idx)
+            arg_idx += 1
             if argname in commandInput:
-                command.append(str(commandInput['argname']))
+                command.append(str(commandInput[argname]))
             else:
                 break
 
         # Step 2: Find the agent id for the given instrument id
-        agent_pid  = yield get_agent_pid_for_instrument(inst_id)
+        agent_pid  = yield self.get_agent_pid_for_instrument(inst_id)
+        if not agent_pid:
+            yield self.reply_err(msg, "No agent found for instrument "+str(inst_id))
+            defer.returnValue(None)
 
         # Step 3: Interact with the agent to execute the command
         iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
-        cmd_result = yield iaclient.execute_instrument(command)
+        commandlist = [command,]
+        logging.info("Sending command to IA: "+str(commandlist))
+        cmd_result = yield iaclient.execute_instrument(commandlist)
 
         yield self.reply_ok(msg, cmd_result)
 
@@ -139,14 +166,86 @@ class InstrumentManagementService(BaseService):
         if 'instrumentID' in commandInput:
             inst_id = str(commandInput['instrumentID'])
         else:
-            yield reply_error(msg, "Input for instrumentID not present")
-            return
+            raise ValueError("Input for instrumentID not present")
 
-        agent_pid = yield get_agent_pid_for_instrument(inst_id)
+        agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
+        if not agent_pid:
+            raise StandardError("No agent found for instrument "+str(inst_id))
 
         iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
+        inst_cap = yield iaclient.get_capabilities()
+        if not inst_cap:
+            raise StandardError("No capabilities available for instrument "+str(inst_id))
 
-        yield self.reply_ok(msg, "")
+        ci_commands = inst_cap['ci_commands']
+        instrument_commands = inst_cap['instrument_commands']
+        instrument_parameters = inst_cap['instrument_parameters']
+        ci_parameters = inst_cap['ci_parameters']
+
+        values = yield iaclient.get_from_instrument(instrument_parameters)
+        resvalues = {}
+        if values:
+            resvalues = values
+
+        yield self.reply_ok(msg, resvalues)
+
+    @defer.inlineCallbacks
+    def op_start_instrument_agent(self, content, headers, msg):
+        """
+        Service operation: Starts an instrument agent for a type of
+        instrument.
+        """
+        if 'instrumentID' in content:
+            inst_id = str(content['instrumentID'])
+        else:
+            raise ValueError("Input for instrumentID not present")
+
+        if 'model' in content:
+            model = str(content['model'])
+        else:
+            raise ValueError("Input for model not present")
+
+        if model != 'SBE49':
+            raise ValueError("Only SBE49 supported!")
+
+        agent_pid = yield self.get_agent_pid_for_instrument(inst_id)
+        if agent_pid:
+            raise StandardError("Agent already started for instrument "+str(inst_id))
+
+        simulator = Simulator(inst_id)
+        simulator.start()
+
+        topicname = "Inst/RAW/"+inst_id
+        topic = PubSubTopicResource.create(topicname,"")
+
+        # Use the service to create a queue and register the topic
+        topic = yield self.dpsc.define_topic(topic)
+
+        iagent_args = {}
+        iagent_args['instrument-id'] = inst_id
+        driver_args = {}
+        driver_args['port'] = simulator.port
+        driver_args['publish-to'] = topic.RegistryIdentity
+        iagent_args['driver-args'] = driver_args
+
+        iapd = ProcessDesc(**{'name':'SBE49IA',
+                  'module':'ion.agents.instrumentagents.SBE49_IA',
+                  'class':'SBE49InstrumentAgent',
+                  'spawnargs':iagent_args})
+
+        iagent_id = yield self.spawn_child(iapd)
+        iaclient = InstrumentAgentClient(proc=self, target=iagent_id)
+        yield iaclient.register_resource(inst_id)
+
+        yield self.reply_ok(msg, "OK")
+
+    @defer.inlineCallbacks
+    def op_stop_instrument_agent(self, content, headers, msg):
+        """
+        Service operation: Starts direct access mode.
+        """
+        yield self.reply_err(msg, "Not yet implemented")
+
 
     @defer.inlineCallbacks
     def op_start_direct_access(self, content, headers, msg):
@@ -163,23 +262,41 @@ class InstrumentManagementService(BaseService):
         yield self.reply_err(msg, "Not yet implemented")
 
     @defer.inlineCallbacks
-    def get_agent_for_instrument(self, instrument_id):
+    def get_agent_desc_for_instrument(self, instrument_id):
+        logging.info("get_agent_desc_for_instrument() instrumentID="+str(instrument_id))
         int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
-        agent_query = AgentInstance()
+        agent_query = InstrumentAgentResourceInstance()
         agent_query.instrument_ref = int_ref
-        res_list = yield self.arc.find_registered_agent_instance_from_description(agent_query)
-        agents = res_list.resources
-        logging.debug("Found %s agent instances for instrument id %s" % (len(agents), instrument_id))
+
+
+        if not agent_res:
+            defer.returnValue(None)
+        agent_pid = agent_res.proc_id
+        logging.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
+        defer.returnValue(agent_pid)
+
+    @defer.inlineCallbacks
+    def get_agent_for_instrument(self, instrument_id):
+        logging.info("get_agent_for_instrument() instrumentID="+str(instrument_id))
+        int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
+        agent_query = InstrumentAgentResourceInstance()
+        agent_query.instrument_ref = int_ref
+        # @todo Need to list the LC state here. WHY???
+        agent_query.lifecycle = LCStates.developed
+        agents = yield self.arc.find_registered_agent_instance_from_description(agent_query, regex=False)
+        logging.info("Found %s agent instances for instrument id %s" % (len(agents), instrument_id))
         agent_res = None
         if len(agents) > 0:
-            agents[0]
+            agent_res = agents[0]
         defer.returnValue(agent_res)
 
     @defer.inlineCallbacks
     def get_agent_pid_for_instrument(self, instrument_id):
-        agent_res = yield get_agent_for_instrument(instrument_id)
-        agent_pid = agent_res.process_name
-        logging.debug("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
+        agent_res = yield self.get_agent_for_instrument(instrument_id)
+        if not agent_res:
+            defer.returnValue(None)
+        agent_pid = agent_res.proc_id
+        logging.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
         defer.returnValue(agent_pid)
 
 class InstrumentManagementClient(BaseServiceClient):
@@ -196,18 +313,72 @@ class InstrumentManagementClient(BaseServiceClient):
         reqcont = {}
         reqcont['userInput'] = userInput
 
-        (content, headers, message) = yield self.rpc_send('create_new_instrument',
-                                                          reqcont)
-        defer.returnValue(DataObject.decode(content['value']))
+        (cont, hdrs, msg) = yield self.rpc_send('create_new_instrument', reqcont)
+        if cont.get('status') == 'OK':
+            defer.returnValue(DataObject.decode(cont['value']))
+        else:
+            defer.returnValue(None)
 
     @defer.inlineCallbacks
     def create_new_data_product(self, dataProductInput):
         reqcont = {}
         reqcont['dataProductInput'] = dataProductInput
 
-        (content, headers, message) = yield self.rpc_send('create_new_data_product',
-                                                          reqcont)
-        defer.returnValue(DataObject.decode(content['value']))
+        (cont, hdrs, msg) = yield self.rpc_send('create_new_data_product', reqcont)
+        if cont.get('status') == 'OK':
+            defer.returnValue(DataObject.decode(cont['value']))
+        else:
+            defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def start_instrument_agent(self, instrumentID, model):
+        reqcont = {}
+        reqcont['instrumentID'] = instrumentID
+        reqcont['model'] = model
+        result = yield self._base_command('start_instrument_agent', reqcont)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def stop_instrument_agent(self, instrumentID):
+        reqcont = {}
+        reqcont['instrumentID'] = instrumentID
+        result = yield self._base_command('stop_instrument_agent', reqcont)
+        defer.returnValue(result)
+
+
+    @defer.inlineCallbacks
+    def get_instrument_state(self, instrumentID):
+        reqcont = {}
+        commandInput = {}
+        commandInput['instrumentID'] = instrumentID
+        reqcont['commandInput'] = commandInput
+
+        result = yield self._base_command('get_instrument_state', reqcont)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def execute_command(self, instrumentID, command, arglist):
+        reqcont = {}
+        commandInput = {}
+        commandInput['instrumentID'] = instrumentID
+        commandInput['command'] = command
+        if arglist:
+            argnum = 0
+            for arg in arglist:
+                commandInput['cmdArg'+str(argnum)] = arg
+                argnum += 1
+        reqcont['commandInput'] = commandInput
+
+        result = yield self._base_command('execute_command', reqcont)
+        defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def _base_command(self, op, content):
+        (cont, hdrs, msg) = yield self.rpc_send(op, content)
+        if cont.get('status') == 'OK':
+            defer.returnValue(cont)
+        else:
+            defer.returnValue(None)
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(InstrumentManagementService)

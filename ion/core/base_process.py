@@ -96,7 +96,7 @@ class BaseProcess(object):
         # List of ProcessDesc instances of defined and spawned child processes
         self.child_procs = []
 
-        logging.info("NEW Process [%s], sup-id=%s, sys-name=%s" % (
+        logging.debug("NEW Process [%s], sup-id=%s, sys-name=%s" % (
                 self.proc_name, self.proc_supid, self.sys_name))
 
     def add_receiver(self, receiver):

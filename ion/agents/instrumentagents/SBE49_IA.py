@@ -32,22 +32,23 @@ class SBE49InstrumentAgent(InstrumentAgent):
         """
         InstrumentAgent.plc_init(self)
 
-        self.instrument_id = self.spawn_args.get('instrument-id','123')
+        self.instrument_id = self.spawn_args.get('instrument-id', '123')
+        self.driver_args = self.spawn_args.get('driver-args', {})
         logging.info("INIT agent for instrument ID: %s" % (self.instrument_id))
 
-
+        self.driver_args['instrument-id'] = self.instrument_id
         self.pd = ProcessDesc(**{'name':'SBE49Driver',
                           'module':'ion.agents.instrumentagents.SBE49_driver',
                           'class':'SBE49InstrumentDriver',
-                          'spawnargs':{'instrument-id':self.instrument_id}})
+                          'spawnargs':self.driver_args})
 
         driver_id = yield self.spawn_child(self.pd)
         self.driver_client = SBE49InstrumentDriverClient(proc=self,
                                                          target=driver_id)
 
-    @defer.inlineCallbacks
-    def plc_shutdown(self):
-        yield self.pd.shutdown()
+    #@defer.inlineCallbacks
+    #def plc_shutdown(self):
+    #    yield self.pd.shutdown()
 
 
     @staticmethod

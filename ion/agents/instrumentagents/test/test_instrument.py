@@ -26,7 +26,7 @@ from ion.agents.instrumentagents.SBE49_constants import ci_commands as IACIComma
 from ion.agents.instrumentagents.SBE49_constants import ci_parameters as IACIParameters
 from ion.agents.instrumentagents.SBE49_constants import instrument_commands as IAInstCommands
 from ion.agents.instrumentagents.SBE49_constants import instrument_parameters as IAInstParameters
-from ion.agents.instrumentagents.test import test_SBE49
+from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 import ion.util.procutils as pu
 
 
@@ -61,7 +61,6 @@ class TestInstrumentAgent(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        #yield self._shutdown_processes()
         yield self._stop_container()
 
     @defer.inlineCallbacks
@@ -71,6 +70,7 @@ class TestInstrumentAgent(IonTestCase):
         capabilities
         """
         result = yield self.IAClient.get_capabilities()
+        #logging.info("getCapabilities result: "+ str(result))
         self.assert_(set(IACIParameters).issubset(set(result[IA.ci_parameters])))
         self.assert_(IA.driver_address in
                      result[IA.ci_parameters])
@@ -160,10 +160,8 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability of the SBE49 driver to execute commands through the
         InstrumentAgentClient class
         """
-        self.simproc = test_SBE49.start_SBE49_simulator()
-
-        # Sleep for a while to allow simlator to get set up.
-        yield pu.asleep(1)
+        self.simulator = Simulator("123", 9000)
+        self.simulator.start()
 
         try:
 
@@ -187,10 +185,7 @@ class TestInstrumentAgent(IonTestCase):
             self.assertEqual(response['status'], 'ERROR')
 
         finally:
-            try:
-                yield self._shutdown_processes(self._get_procinstance(self.svc_id))
-            finally:
-                test_SBE49.stop_SBE49_simulator(self.simproc)
+            yield self.simulator.stop()
 
     @defer.inlineCallbacks
     def test_get_driver_proc(self):

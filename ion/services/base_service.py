@@ -133,7 +133,7 @@ class BaseService(BaseProcess):
         @param kwargs keyword attributes for service. Common ones must be present.
         @retval a dict with service attributes
         """
-        logging.info("Service-declare: "+str(kwargs))
+        logging.debug("Service-declare: "+str(kwargs))
         decl = {}
         decl.update(kwargs)
         return decl

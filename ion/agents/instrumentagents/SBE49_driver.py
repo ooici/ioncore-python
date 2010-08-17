@@ -17,6 +17,7 @@ from ion.services.base_service import BaseService
 from twisted.internet.protocol import Protocol, ClientFactory, ClientCreator
 
 from ion.core.base_process import BaseProcess
+from ion.data.dataobject import ResourceReference
 from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource, DAPMessageObject
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 
@@ -61,25 +62,17 @@ class InstrumentClient(Protocol):
 
 
 class SBE49InstrumentDriver(InstrumentDriver):
-
-    connected = False
-    instrument = None
-    command = None
-    topicDefined = False
-
-
-    """
-    lifecycleState = LCS['new']
-    declare = BaseService.service_declare(name = 'Instrument',
-                                          version = '0.0.1',
-                                          dependencies = [])
-    """
-
     """
     Maybe some day these values are looked up from a registry of common
         controlled vocabulary
     """
+
     def __init__(self, receiver=None, spawnArgs=None, **kwargs):
+        self.connected = False
+        self.instrument = None
+        self.command = None
+        self.topicDefined = False
+        self.publish_to = None
 
         self.__instrument_parameters = {
             "baudrate": 9600,
@@ -126,29 +119,19 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
 
-    #@defer.inlineCallbacks
+    @defer.inlineCallbacks
     def plc_init(self):
-        self.instrument_id = self.spawn_args.get('instrument-id','123')
-        logging.info("INIT DRIVER for instrument ID: %s" % (self.instrument_id))
+        self.instrument_id = self.spawn_args.get('instrument-id', '123')
+        self.instrument_port = self.spawn_args.get('port', 9000)
+
+        yield self._configure_driver(self.spawn_args)
+
+        logging.info("INIT DRIVER for instrument ID=%s, port=%s, publish-to=%s" % (
+            self.instrument_id, self.instrument_port, self.publish_to))
 
         self.iaclient = InstrumentAgentClient(proc=self, target=self.proc_supid)
 
-        # Instantiate a pubsubclient
-        self.dpsc = DataPubsubClient(proc=self)
-
-        # Create and Register a topic
-        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
-        self.topic = yield self.dpsc.define_topic(self.topic)
-        logging.debug('DHE: Defined Topic')
-
-        self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
-        self.publisher = yield self.dpsc.define_publisher(self.publisher)
-
-        logging.info('DHE: Defined Publisher')
-
-        self.topicDefined = True
-
-        logging.debug("Instrument driver has topic")
+        logging.debug("Instrument driver initialized")
 
     @defer.inlineCallbacks
     def plc_shutdown(self):
@@ -179,32 +162,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @retval The deferred object.
         """
 
-        # DHE Probably don't need to do it this way anymore
-        #self.d = defer.Deferred()
-        #factory = InstrumentClientFactory(self, self.d)
-
         # Now thinking I might try clientcreator since this will only be a
         # single connection.
-        #factory = InstrumentClientFactory(self)
-        #self.connector = reactor.connectTCP("localhost", 9000, factory)
-        logging.info("DHE: calling ClientCreator")
         cc = ClientCreator(reactor, InstrumentClient, self)
-        logging.info("DHE: calling connectTCP")
-        self.proto = yield cc.connectTCP("localhost", 9000)
-        logging.info("DHE: connectTCP returned")
-
-        """
-        # Instantiate a pubsubclient
-        dpsc = DataPubsubClient(self)
-
-        # Create and Register a topic
-        topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
-        topic = yield dpsc.define_topic(topic)
-        #topic = dpsc.define_topic(topic)
-        logging.debug('DHE: Defined Topic: '+str(topic))
-        """
-
-        #return self.d
+        self.proto = yield cc.connectTCP("localhost", self.instrument_port)
+        logging.info("Driver connected to instrument")
 
     def gotConnected(self, instrument):
         """
@@ -230,7 +192,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         # send this up to the agent to publish.
         logging.debug("gotData() %s Calling publish." % (data))
-        self.publish(data, 'topic1')
+        self.publish(data, self.publish_to)
 
     def gotPrompt(self, instrument):
         """
@@ -262,7 +224,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         logging.debug("DHE: publish()")
         if self.topicDefined == True:
-            logging.debug("DHE: publishing!")
 
             # Create and send a data message
             result = yield self.dpsc.publish(self, self.topic.reference(), data)
@@ -418,9 +379,23 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @todo Actually make this stub do something
         """
         assert(isinstance(content, dict))
+        yield self._configure_driver(content)
         # Do something here, then adjust test case
         yield self.reply_ok(msg, content)
 
+    @defer.inlineCallbacks
+    def _configure_driver(self, params):
+        """
+        Configures driver params either on startup or on command
+        """
+        if 'publish-to' in params:
+            self.publish_to = params['publish-to']
+            logging.debug("Configured publish-to=" + self.publish_to)
+            self.topicDefined = True
+            self.dpsc = DataPubsubClient(proc=self)
+            self.topic = ResourceReference(RegistryIdentity=self.publish_to, RegistryBranch='master')
+            self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
+            self.publisher = yield self.dpsc.define_publisher(self.publisher)
 
 class SBE49InstrumentDriverClient(InstrumentDriverClient):
     """

@@ -76,7 +76,7 @@ def log_message(msg):
         else:
             lstr += repr(content)
         lstr += "\n============="
-    logging.info(lstr)
+    logging.debug(lstr)
 
 def create_guid():
     """

@@ -223,14 +223,16 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
 
             reslist = yield self._list_descriptions()
             logging.info(self.__class__.__name__ + ': find_resource found ' + str(len(reslist)) + ' items in registry')
+            num_match = 1
             for ref in refs:
                 res = yield self.get_resource(ref)
-                logging.info(res)
-
-                if description.compared_to(res,
+                logging.debug("Found #"+str(num_match)+":"+str(res))
+                num_match += 1
+                matches_desc = description.compared_to(res,
                                         regex=regex,
                                         ignore_defaults=ignore_defaults,
-                                        attnames=attnames):
+                                        attnames=attnames)
+                if matches_desc:
                     results.append(res)
 
         defer.returnValue(results)
@@ -283,10 +285,7 @@ class BaseRegistryService(BaseService):
         self.reg = Registry(s)
 
         name = self.__class__.__name__
-        logging.info(name + " initialized")
-        logging.info(name + " backend:"+str(backendcls))
-        logging.info(name + " backend args:"+str(backendargs))
-
+        logging.info(name + " initialized; backend:%s; backend args:%s" % (backendcls, backendargs))
 
     @defer.inlineCallbacks
     def base_clear_registry(self, content, headers, msg):
@@ -304,7 +303,8 @@ class BaseRegistryService(BaseService):
         #resource = dataobject.Resource.decode(content)
         accept_encoding = headers.get('accept-encoding', '')
         resource = dataobject.serializer.decode(content, headers['encoding'])
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Resource: \n' + str(resource))
+        logging.info(self.__class__.__name__ + ' received: op_'+ headers['op'] )
+        logging.debug('Resource: \n' + str(resource))
 
         resource = yield self.reg.register_resource(resource)
         logging.debug('%%%%%%%%%%%%')
@@ -329,7 +329,7 @@ class BaseRegistryService(BaseService):
         #resource_reference = dataobject.Resource.decode(content)
         accept_encoding = headers.get('accept-encoding', '')
         resource_reference = dataobject.serializer.decode(content, headers['encoding'])
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
+        logging.info(self.__class__.__name__ + ' received: op_'+ headers['op'] +', Reference: \n' + str(resource_reference))
 
         resource = yield self.reg.get_resource(resource_reference)
         #logging.info('Got Resource:\n'+str(resource))
