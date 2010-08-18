@@ -57,7 +57,8 @@ to run.
 
 Current dependencies include:
     twisted, numpy, txamqp, msgpack-python, httplib2, pycassa, simplejson,
-    pydap, pydap.handlers.netcdf, pydap.responses.netcdf, pydap.handlers.nca
+    pydap, pydap.handlers.netcdf, pydap.responses.netcdf, pydap.handlers.nca,
+    gviz_api.py
 
 NOTE: As the project evolves and new code is added, dependencies might change.
 Run the setup script once in a while and when you get errors
