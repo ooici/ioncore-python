@@ -135,7 +135,12 @@ def start():
     
     
     subscription = yield dpsc.define_subscription(subscription)
-    
+    linfo = '\n================================================\n'
+    linfo+= 'Open your web browser and look at: http://127.0.0.1:8080/ \n'
+    linfo+= '================================================\n'
+    logging.info(linfo)    
+
+
 
 start()
 
