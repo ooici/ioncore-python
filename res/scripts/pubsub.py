@@ -114,7 +114,7 @@ def start():
             }
     
     
-    """
+
     # Use the example consumer to create events... Only log the number of events
     subscription.workflow = {
         'consumer1':
@@ -131,8 +131,14 @@ def start():
                 'consumerclass':'LoggingConsumer',\
                 'attach':[['consumer2','queue']]}
             }
-    
-    
+    """
+    # Use the example consumer to create events... Only log the number of events
+    subscription.workflow = {
+        'consumer1':
+            {'module':'ion.services.dm.presentation.google_chart_consumer',
+                'consumerclass':'GoogleChartConsumer',\
+                'attach':'topic1'}
+            }
     
     
     subscription = yield dpsc.define_subscription(subscription)

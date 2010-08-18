@@ -87,7 +87,20 @@ class BaseConsumer(BaseProcess):
             if not res:
                 #@Todo - raise an error here?
                 logging.info('Failed to attach process to Queue %s in plc_init' % queuename)
+                
+                
+        # Run any custom initialization provided by this consumer
+        logging.debug(self.__class__.__name__ + ' running customize_consumer')
+        yield defer.maybeDeferred(self.customize_consumer)
+        logging.debug(self.__class__.__name__ + ' customize_consumer complete!')
+        
+                
 
+    def customize_consumer(self):
+        '''
+        Use this method to customize the initialization of the consumer
+        '''
+        
 
 
     @defer.inlineCallbacks
