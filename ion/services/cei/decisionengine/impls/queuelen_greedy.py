@@ -27,7 +27,7 @@ class QueueLengthGreedyEngine(Engine):
     def initialize(self, control, state, conf=None):
         """Engine API method"""
         # todo: need central constants for these key strings
-        parameters = {"timed-pulse-irregular":2500}
+        parameters = {"timed-pulse-irregular":5000}
         if conf and conf.has_key("force_site"):
             self.available_sites = [conf["force_site"]]
         control.configure(parameters)
@@ -46,10 +46,10 @@ class QueueLengthGreedyEngine(Engine):
             if ok:
                 valid_count += 1
         
-        logging.debug("Before: %s" % self._aware_txt(valid_count))
+        #logging.debug("Before: %s" % self._aware_txt(valid_count))
         
         qlen = self._getqlen(state)
-        logging.debug("most recent qlen reading is %d" % qlen)
+        #logging.debug("most recent qlen reading is %d" % qlen)
         while valid_count < qlen:
             self._launch_one(control)
             valid_count += 1
