@@ -126,7 +126,7 @@ def start():
                 'attach':[['consumer1','event_queue']],\
                 'delivery interval':5},
         'consumer3':
-            {'module':'ion.services.dm.presentation.google_viz_consumer',
+            {'module':'ion.services.dm.presentation.web_viz_consumer',
                 'consumerclass':'GoogleVizConsumer',\
                 'attach':[['consumer2','queue']]}
             }

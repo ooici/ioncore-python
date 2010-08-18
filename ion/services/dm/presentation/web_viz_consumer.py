@@ -23,14 +23,14 @@ class DMUI(resource.Resource):
 
     def render_GET(self, request):
         if not self.print_string:
-            return 'LCA Arch Google Viz Web page!\n No data yet...'
+            return 'LCA Arch Web Viz page!\n No data yet...'
         else:
             return str(self.print_string)
 
 
-class GoogleVizConsumer(base_consumer.BaseConsumer):
+class WebVizConsumer(base_consumer.BaseConsumer):
     """
-    Publish data to a google vis page!
+    Publish data to a web vis page!
     """
     #@defer.inlineCallbacks
     def customize_consumer(self):
@@ -69,4 +69,4 @@ class GoogleVizConsumer(base_consumer.BaseConsumer):
         logging.info('Update complete!')
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(GoogleVizConsumer)
+factory = ProtocolFactory(WebVizConsumer)
