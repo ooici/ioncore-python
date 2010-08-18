@@ -16,6 +16,7 @@ class InstrumentResource(StatefulResource):
     model = TypedAttribute(str)
     serial_num = TypedAttribute(str)
     fw_version= TypedAttribute(str)
+    description = TypedAttribute(str)
 
     '''
     These are things that can be used to talk to an instrument in the CI
@@ -30,6 +31,7 @@ class DataProductResource(StatefulResource):
     instrument_ref = TypedAttribute(ResourceReference)
     topic = TypedAttribute(ResourceReference)
     dataformat = TypedAttribute(str)
+    description = TypedAttribute(str)
 
 
 class SBE49InstrumentDescription(ResourceDescription):

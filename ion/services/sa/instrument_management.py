@@ -58,6 +58,9 @@ class InstrumentManagementService(BaseService):
         if 'name' in userInput:
             newinstrument.name = str(userInput['name'])
 
+        if 'description' in userInput:
+            newinstrument.description = str(userInput['description'])
+
         if 'manufacturer' in userInput:
             newinstrument.manufacturer = str(userInput['manufacturer'])
 
@@ -88,6 +91,12 @@ class InstrumentManagementService(BaseService):
             inst_id = str(dataProductInput['instrumentID'])
             int_ref = ResourceReference(RegistryIdentity=inst_id, RegistryBranch='master')
             newdp.instrument_ref = int_ref
+
+        if 'name' in dataProductInput:
+            newdp.name = str(dataProductInput['name'])
+
+        if 'description' in dataProductInput:
+            newdp.description = str(dataProductInput['description'])
 
         if 'dataformat' in dataProductInput:
             newdp.dataformat = str(dataProductInput['dataformat'])
