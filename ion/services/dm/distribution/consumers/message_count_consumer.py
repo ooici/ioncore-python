@@ -4,6 +4,8 @@
 @file ion/services/dm/distribution/consumers/message_count_consumer.py
 @author David Stuebe
 @brief Counts the number of messages received on its queue and forwards the result
+Intended to work with the WebVizConsumer to publish a google chart!
+http://code.google.com/apis/visualization/documentation/index.html
 """
 
 from ion.services.dm.distribution import base_consumer
