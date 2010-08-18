@@ -118,7 +118,9 @@ class Instrument(protocol.Protocol):
         """
         self.factory.clientConnectionMade(self)
 
-        # Print prompt
+        print("connectionMade")
+        
+        # Send prompt
         self.transport.write(self.prompt)
  
     def dataReceived(self, data):
@@ -181,6 +183,9 @@ class Instrument(protocol.Protocol):
 
             # Print prompt whether we stopped or not
             self.transport.write(self.prompt)
+            """
+            DHE: Need to check for the set commands, i.e., baud=19200.
+            """
         elif data in self.commands:
             # Any command that falls to this point gets handled with the general
             # command response that is in the commands dictionary. 

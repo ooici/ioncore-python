@@ -74,7 +74,7 @@ class DataPubsubService(BaseService):
             logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
 
-    #@defer.inlineCallback
+    #@defer.inlineCallback # call back not needed
     def update_topic_registration(self,topic):
         #topic = yield self.reg.register(topic)
         return self.reg.register(topic)
@@ -248,7 +248,14 @@ class DataPubsubService(BaseService):
             spargs ={'attach':[],
                      'process parameters':args.get('process parameters',{}),
                      'delivery interval':args.get('delivery interval',None),
-                     'delivery queues':{}}
+                     'delivery queues':args.get('delivery queues',{})}
+            
+            for k,v in spargs['delivery queues']:
+                topic = topics.get(v,None)
+                if not topic:
+                    raise RuntimeError('Invalid delivery queue specified ')
+                spargs['delivery queues'][k]=topic.queue.name
+            
             
             cd = {}
             cd['name'] = consumer
@@ -343,7 +350,9 @@ class DataPubsubService(BaseService):
         # Determine the difference between the current and existing subscription
         
         # act accordingly - but very difficult to figure out what to do!
-        pass   
+        raise RuntimeError('Update Subscription is not yet implemented')
+        pass
+    
         
         
         
@@ -399,7 +408,8 @@ class DataPubsubService(BaseService):
         
         data.timestamp = pu.currenttime()
         
-        # Todo: impersonate message as from sender
+        # Todo: impersonate message as from sender -
+        #@Todo - Move the actual publish command back to the client side!
         yield self.send(topic.queue.name, 'data', data.encode(), {})
 
         logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
@@ -485,6 +495,9 @@ class DataPubsubClient(BaseServiceClient):
         @param publisher_proc - the publishing process passes self to the publish client
         @param topic_ref is a topic reference for which the publisher is registered for (checked before sending)
         @param data is a dataobject which is being published
+        
+        @Todo move the actual publish command back to this client! Don't send the data
+        to the service!
         """
         logging.info(self.__class__.__name__ + '; Calling: publish')
         

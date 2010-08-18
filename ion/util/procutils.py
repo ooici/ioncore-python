@@ -47,7 +47,7 @@ def log_message(msg):
     body = msg.payload
     lstr = ""
     procname = str(body.get('receiver',None))
-    lstr += "===Message=== receiver=%s op=%s" % (procname, body.get('op', None))
+    lstr += "===Message=== receiver=%s op=%s===" % (procname, body.get('op', None))
     if body.get('quiet', False):
         lstr += " (Q)"
     else:
@@ -76,7 +76,7 @@ def log_message(msg):
         else:
             lstr += repr(content)
         lstr += "\n============="
-    logging.info(lstr)
+    logging.debug(lstr)
 
 def create_guid():
     """
