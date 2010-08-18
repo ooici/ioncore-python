@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/web_service.py
-@package ion.play.web_service Test integration between twisted and LCA.
+@file ion/services/dm/presentation/web_service.py
 @author Paul Hubbard
-@brief See if we can have an LCA service that runs a http server
-@see https://www.oceanobservatories.org/tasks/secure/QuickSearch.jspa?searchString=CIDEVDM-164
+@brief HTTP Server for DM presentation services
 """
 
 import logging

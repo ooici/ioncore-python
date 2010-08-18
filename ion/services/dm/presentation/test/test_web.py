@@ -30,7 +30,7 @@ class HelloTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_hello(self):
-        raise unittest.SkipTest('Port causes error on buildbot...') 
+        #raise unittest.SkipTest('Port causes error on buildbot...') 
 
 
         services = [

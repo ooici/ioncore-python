@@ -13,7 +13,7 @@ from ion.core.base_process import ProtocolFactory
 import logging
 logging = logging.getLogger(__name__)
 
-
+'''
 import gobject
 import matplotlib
 matplotlib.use('GTKAgg')
@@ -96,3 +96,4 @@ class StripChartConsumer(base_consumer.BaseConsumer):
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(StripChartConsumer)
+'''
