@@ -127,8 +127,10 @@ def start():
                 'delivery interval':5},
         'consumer3':
             {'module':'ion.services.dm.presentation.web_viz_consumer',
-                'consumerclass':'GoogleVizConsumer',\
-                'attach':[['consumer2','queue']]}
+                'consumerclass':'WebVizConsumer',\
+                'attach':[['consumer2','queue']],
+                'process parameters':{'port':8080}}
+                
             }
     
     
