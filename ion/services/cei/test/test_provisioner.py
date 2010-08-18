@@ -56,25 +56,36 @@ class ProvisionerServiceTest(IonTestCase):
 
         client, notifier = yield self._set_it_up()
         
+        worker_node_count = 3
         deployable_type = 'base-cluster'
         nodes = {'head-node' : FakeLaunchItem(1, 'nimbus-test', 'small', None),
-                'worker-node' : FakeLaunchItem(3, 'nimbus-test', 'small', None)}
+                'worker-node' : FakeLaunchItem(worker_node_count, 
+                    'nimbus-test', 'small', None)}
         
         launch_id = _new_id()
 
+        node_ids = [node_id for node in nodes.itervalues() 
+                for node_id in node.instance_ids]
+        self.assertEqual(len(node_ids), worker_node_count + 1)
+
         yield client.provision(launch_id, deployable_type, nodes)
 
-        ok = yield notifier.wait_for_state(states.PENDING)
+        ok = yield notifier.wait_for_state(states.PENDING, node_ids)
         self.assertTrue(ok)
+        self.assertTrue(notifier.assure_record_count(2))
         
-        ok = yield notifier.wait_for_state(states.STARTED, runfirst=client.query)
+        ok = yield notifier.wait_for_state(states.STARTED, node_ids, runfirst=client.query)
         self.assertTrue(ok)
+        self.assertTrue(notifier.assure_record_count(3))
 
         yield client.terminate_launches(launch_id)
         
-        ok = yield notifier.wait_for_state(states.TERMINATED, 
+        ok = yield notifier.wait_for_state(states.TERMINATED, node_ids,
                 runfirst=client.query)
         self.assertTrue(ok)
+        self.assertTrue(notifier.assure_record_count(5))
+
+        self.assertEqual(len(notifier.nodes), len(node_ids))
 
 class FakeProvisionerNotifier(object):
 
@@ -148,16 +159,16 @@ class FakeProvisionerNotifier(object):
 
 
     @defer.inlineCallbacks
-    def wait_for_state(self, state, poll=5, timeout=30, runfirst=None):
+    def wait_for_state(self, state, nodes=None, poll=5, timeout=30, runfirst=None):
         elapsed = 0
         if runfirst:
             yield runfirst()
-        while not self.assure_state(state) and elapsed < timeout:
+        while not self.assure_state(state, nodes) and elapsed < timeout:
             yield pu.asleep(poll)
             elapsed += poll
             if runfirst:
                 yield runfirst()
-        win = self.assure_state(state)
+        win = self.assure_state(state, nodes)
         if win:
             logging.debug('All nodes in %s state', state)
         else:
