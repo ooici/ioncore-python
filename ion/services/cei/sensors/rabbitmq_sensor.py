@@ -57,9 +57,9 @@ class RabbitMQSensor(SensorProcess):
         for q in allqueues["result"]:
             if q[0] == self.queue_name_work:
                 queuelen = q[1]["messages"]
-                logging.info("Would have sent: in queue '%s' there are '%s' messages"% (self.queue_name_work, queuelen))
+                #logging.info("Would have sent: in queue '%s' there are '%s' messages"% (self.queue_name_work, queuelen))
                 extradict = {"queuelen": queuelen, "queue_name": self.queue_name_work}
-                cei_events.event("queue_sensor", "queuelen", logging, extra=extradict)
+                #cei_events.event("queue_sensor", "queuelen", logging, extra=extradict)
                 #content = {"queue_id":self.queue_name_work, "queuelen":queuelen}
                 #yield self.send(self.epu_controller, "sensor_info", content)
 
