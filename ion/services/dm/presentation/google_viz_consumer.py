@@ -14,14 +14,8 @@ from ion.core.base_process import ProtocolFactory
 from twisted.internet import defer, reactor
 from twisted.web import server, resource
 
-import gviz_api
-
 import logging
 logging = logging.getLogger(__name__)
-
-from pydap.model import BaseType,  DatasetType, Float32, Float64, \
-    GridType, Int32
-import numpy
 
 
 class DMUI(resource.Resource):
@@ -45,17 +39,21 @@ class GoogleVizConsumer(base_consumer.BaseConsumer):
         
         port = self.params.get('port',2100)
         
+        self.port = None
         self.root = DMUI()
         self.site = server.Site(self.root)
         self.port = reactor.listenTCP(port, self.site)
         self.root.print_string = None
+        
+        self.values=[]
         logging.info('Website started')
 
 
     @defer.inlineCallbacks
     def plc_shutdown(self):
         logging.info('Shutdown triggered')
-        yield self.port.stopListening()
+        if self.port:
+            yield self.port.stopListening()
 
     #@defer.inlineCallbacks
     def ondata(self, data, notification, timestamp, **args):
@@ -63,55 +61,12 @@ class GoogleVizConsumer(base_consumer.BaseConsumer):
         """
         logging.info('Updating google viz chart data!')
         
-        
-        if isinstance(data,DatasetType):
-            page = self.viz_dap(data,notification,timestamp)
-        elif isinstance(data,dict):
-            page = self.viz_dict(data,notification,timestamp)
-        elif isinstance(data,str):
-            page = self.viz_string(data,notification,timestamp)
-        elif not data:
-            page = self.viz_none(data,notification,timestamp)
+        if isinstance(data,str):
+            self.root.print_string = data
         else:
-            raise RuntimeError('Invalid data passed to GoogleVizConsumer ondata method!')
-    
-        self.root.print_string=page
-        
+            raise RuntimeError('Invalid data (Not a String) passed to WebVizConsumer ondata method!')
+            
         logging.info('Update complete!')
-        
-        
-    def viz_dap(data,notification,timestamp):
-        pass
-    
-    def viz_dict(data,notification,timestamp):
-        pass
-    
-    def viz_string(data,notification,timestamp):
-        total = 0
-        for k,v in self.receive_cnt.items():
-            total += v
-        page = 'String Message: %s \n' % data
-        page += 'Notification: %s \n' % notification
-        page += 'Timestamp: %s \n' % timestamp
-        page += 'Number of messages received so far: %s ' % total
-        return page
-    
-    
-    def viz_none(data,notification,timestamp):
-        '''
-        Print number of messages received + any notifcation and time stamp
-        '''
-        total = 0
-        for k,v in self.receive_cnt.items():
-            total += v
-        page = 'Notification: %s \n' % notification
-        page += 'Timestamp: %s \n' % timestamp
-        page += 'Number of messages received so far: %s ' % total
-        return page
-        
-    
-        
-        
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(GoogleChartConsumer)
+factory = ProtocolFactory(GoogleVizConsumer)

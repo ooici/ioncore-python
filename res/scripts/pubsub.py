@@ -93,7 +93,7 @@ def start():
     
     """
 
-    # Use the example consumer to create events...
+    # Use the example consumer to create events... log the events
     subscription.workflow = {
         'consumer1':
             {'module':'ion.services.dm.distribution.consumers.example_consumer',
@@ -105,7 +105,7 @@ def start():
                 'attach':[['consumer1','event_queue']]}
             }
     
-        # Just use the logging consumer
+    # Log all the messages created
     subscription.workflow = {
         'consumer1':
             {'module':'ion.services.dm.distribution.consumers.logging_consumer',
@@ -113,9 +113,8 @@ def start():
                 'attach':'topic1'}
             }
     
-    
-
-    # Use the example consumer to create events... Only log the number of events
+    """
+    # Use the example consumer to create events... graph the number of events
     subscription.workflow = {
         'consumer1':
             {'module':'ion.services.dm.distribution.consumers.example_consumer',
@@ -125,19 +124,11 @@ def start():
             {'module':'ion.services.dm.distribution.consumers.message_count_consumer',
                 'consumerclass':'MessageCountConsumer',\
                 'attach':[['consumer1','event_queue']],\
-                'delivery interval':10},
+                'delivery interval':5},
         'consumer3':
-            {'module':'ion.services.dm.distribution.consumers.logging_consumer',
-                'consumerclass':'LoggingConsumer',\
+            {'module':'ion.services.dm.presentation.google_viz_consumer',
+                'consumerclass':'GoogleVizConsumer',\
                 'attach':[['consumer2','queue']]}
-            }
-    """
-    # Use the example consumer to create events... Only log the number of events
-    subscription.workflow = {
-        'consumer1':
-            {'module':'ion.services.dm.presentation.google_chart_consumer',
-                'consumerclass':'GoogleChartConsumer',\
-                'attach':'topic1'}
             }
     
     
