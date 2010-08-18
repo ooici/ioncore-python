@@ -3,6 +3,7 @@
 """
 @file ion/agents/instrumentagents/SBE49_instrument_driver.py
 @author Steve Foley
+@author Dave Everett
 @brief Driver code for SeaBird SBE-49 CTD
 """
 import logging
@@ -40,6 +41,10 @@ class InstrumentClient(Protocol):
     def connectionMade(self):
         logging.debug("DHE: connectionMade, calling gotConnected().")
         self.parent.gotConnected(self)
+        
+    def connectionLost(self, reason):
+        logging.debug("DHE: connectionLost, calling gotDisconnected()")
+        self.parent.gotDisconnected(self)
 
     def dataReceived(self, data):
         """
@@ -73,6 +78,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.command = None
         self.topicDefined = False
         self.publish_to = None
+    
+        self.sbeParmCommands = {
+            "baudrate" : "Baud"
+        }
 
         self.__instrument_parameters = {
             "baudrate": 9600,
@@ -182,6 +191,19 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.instrument = instrument
         self.setConnected(True)
 
+    def gotDisconnected(self, instrument):
+        """
+        @brief This method is called when a connection to the instrument 
+        device server has been lost.  The instrument protocol object is passed
+        as a parameter.  Call setConnected with False argument.
+        @param reference to instrument protocol object.
+        @retval none
+        """
+        logging.debug("DHE: gotDisconnected!!!")
+
+        self.instrument = instrument
+        self.setConnected(False)
+
     def gotData(self, data):
         """
         @brief The instrument protocol object has received data from the
@@ -206,12 +228,14 @@ class SBE49InstrumentDriver(InstrumentDriver):
         Need some sort of state machine so we'll know what data we're supposed to send...
         """
         #instrument.transport.write("ds")
+        """
         if self.command != None:
             logging.debug("DHE: gotPrompt sending command: %s"  % (self.command))
             instrument.transport.write(self.command)
             self.command = None
         else:
             logging.debug("DHE gotPrompt NOT SENDING ANYTHING")
+        """            
 
     @defer.inlineCallbacks
     def publish(self, data, topic):
@@ -293,12 +317,34 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @todo Make this an all-or-nothing and/or rollback-able transaction
             list?
         """
+        logging.info("DHE: in op_set_params!!!")
+
+        """
+        This connection stuff could be abstracted into a communications object.
+        """
+        if self.isConnected() == False:
+            #d = self.getConnected()
+            logging.info("DHE: yielding for connect")
+            yield self.getConnected()
+            logging.info("DHE: connect returned")
+
         assert(isinstance(content, dict))
+        logging.info("DHE: content: %s, keys: %s" %(str(content), str(content.keys)))
+        
         for param in content.keys():
             if (param not in self.__instrument_parameters):
                 yield self.reply_err(msg, "Could not set %s" % param)
             else:
                 self.__instrument_parameters[param] = content[param]
+                if param in self.sbeParmCommands:
+                    if self.isConnected():
+                        logging.info("DHE: current param is: %s" %str(param))
+                        command = self.sbeParmCommands[param] + "=" + str(content[param])
+                        #command = self.sbeParmCommands[param]
+                        #command += "="
+                        #logging.info("DHE: content[param] = %s" %str(content[param]))
+                        logging.info("DHE: op_set_params sending %s"  %str(command))
+                        self.instrument.transport.write(command)
         yield self.reply_ok(msg, content)
 
     @defer.inlineCallbacks
@@ -309,9 +355,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @todo actually do something
         """
         assert(isinstance(content, (tuple, list)))
-
         logging.info("DHE: in op_execute!!!")
 
+
+        logging.info("DHE: content: %s" %str(content))
         """
         This connection stuff could be abstracted into a communications object.
         """
@@ -340,10 +387,14 @@ class SBE49InstrumentDriver(InstrumentDriver):
         for command_set in content:
             command = command_set[0]
             if command not in instrument_commands:
+                logging.info("DHE: Invalid Command")
                 yield self.reply_err(msg, "Invalid Command")
             else:
                 logging.info("DHE: command: %s" % command)
                 self.command = command
+                
+                if self.isConnected():
+                    self.instrument.transport.write(self.command)
                 commands.append(command)
                 """
                 This isn't working; possibly because the connection has
