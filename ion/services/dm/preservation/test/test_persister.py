@@ -72,7 +72,53 @@ class PersisterTest(IonTestCase):
         yield self._stop_container()
         # Kill the queues?
 
-    
+
+    @defer.inlineCallbacks
+    def test_persister_consumer_dap(self):
+        
+        msg=dap_tools.ds2dap_msg(dap_tools.simple_dataset2(\
+            {'DataSet Name':'SimpleData','variables':\
+                {'time':{'long_name':'Data and Time','units':'seconds'},\
+                'height':{'long_name':'person height','units':'meters'}}}, \
+            {'time':(111,112,123,114,115,116,117,118,119,120), \
+            'height':(8,6,4,-2,-1,5,3,1,4,5)})) 
+        open("/tmp/Junk.nc", "w").close()
+        logging.info(dir(self.test_sup))
+        yield self.test_sup.send(self.queue1,'data',msg.encode())
+
+        
+        msg_cnt = yield self.child1.get_msg_count()
+        received = msg_cnt.get('received',{})
+        sent = msg_cnt.get('sent',{})
+        self.assertEqual(sent,{})
+        self.assertEqual(received.get(self.queue1),1)
+        # Check that the file is there!
+    '''    
+    @defer.inlineCallbacks
+    def test_persister_consumer_dap_no_file(self):
+        try:
+            os.remove(TEST_ARCHIVE_FILE)
+        except OSError:
+            pass
+        msg=dap_tools.ds2dap_msg(dap_tools.simple_dataset(\
+            {'DataSet Name':'SimpleData','variables':\
+                {'time':{'long_name':'Data and Time','units':'seconds'},\
+                'height':{'long_name':'person height','units':'meters'}}}, \
+            {'time':(111,112,123,114,115,116,117,118,119,120), \
+            'height':(8,6,4,-2,-1,5,3,1,4,5)})) 
+           
+        try:    
+            yield self.test_sup.send(self.queue1,'data',msg.encode())
+        except RuntimeError:
+            logging.info("Caught expected RuntimeError")
+            pass
+        msg_cnt = yield self.child1.get_msg_count()
+        received = msg_cnt.get('received',{})
+        sent = msg_cnt.get('sent',{})
+        self.assertEqual(sent,{})
+        self.assertEqual(received.get(self.queue1),1)
+        
+       
     @defer.inlineCallbacks
     def test_persister_consumer_string(self):
             
@@ -88,48 +134,8 @@ class PersisterTest(IonTestCase):
         self.assertEqual(sent,{})
         self.assertEqual(received.get(self.queue1),1)
         # Check that the file is there!
-
+         
     @defer.inlineCallbacks
-    def test_persister_consumer_dap(self):
-        
-        msg=dap_tools.ds2dap_msg(dap_tools.simple_dataset(\
-            {'DataSet Name':'SimpleData','variables':\
-                {'time':{'long_name':'Data and Time','units':'seconds'},\
-                'height':{'long_name':'person height','units':'meters'}}}, \
-            {'time':(111,112,123,114,115,116,117,118,119,120), \
-            'height':(8,6,4,-2,-1,5,3,1,4,5)})) 
-            
-        res = yield self.test_sup.send(self.queue1,'data',msg.encode())
-        self.assertEqual(res, "ERROR")
-        msg_cnt = yield self.child1.get_msg_count()
-        received = msg_cnt.get('received',{})
-        sent = msg_cnt.get('sent',{})
-        self.assertEqual(sent,{})
-        self.assertEqual(received.get(self.queue1),1)
-        # Check that the file is there!
-        
-    defer.inlineCallbacks
-    def test_persister_consumer_dap_no_file(self):
-        try:
-            os.remove(TEST_ARCHIVE_FILE)
-        except OSError:
-            pass
-        msg=dap_tools.ds2dap_msg(dap_tools.simple_dataset(\
-            {'DataSet Name':'SimpleData','variables':\
-                {'time':{'long_name':'Data and Time','units':'seconds'},\
-                'height':{'long_name':'person height','units':'meters'}}}, \
-            {'time':(111,112,123,114,115,116,117,118,119,120), \
-            'height':(8,6,4,-2,-1,5,3,1,4,5)})) 
-            
-        yield self.test_sup.send(self.queue1,'data',msg.encode())
-        msg_cnt = yield self.child1.get_msg_count()
-        received = msg_cnt.get('received',{})
-        sent = msg_cnt.get('sent',{})
-        self.assertEqual(sent,{})
-        self.assertEqual(received.get(self.queue1),1)
-        
-        
-    defer.inlineCallbacks
     def test_persister_consumer_dictionary(self):
         
         msg = dm_resource_descriptions.DictionaryMessageObject()
@@ -147,7 +153,7 @@ class PersisterTest(IonTestCase):
         
 
 
-    ''' Wait till we have the unit test working!
+     Wait till we have the unit test working!
     @defer.inlineCallbacks
     def test_fetcher_svc_persister_client(self):
         raise unittest.SkipTest('Timing out on EC2')

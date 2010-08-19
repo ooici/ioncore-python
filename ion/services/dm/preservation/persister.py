@@ -31,6 +31,7 @@ import sys
 import os
 import tempfile
 import shutil
+from exceptions import RuntimeError
 from pydap.handlers.nca import Handler as ncaHandler
 
 from twisted.internet import defer
@@ -67,7 +68,7 @@ class PersisterConsumer(base_consumer.BaseConsumer):
     """
 
 
-    @defer.inlineCallbacks # If you call a yield inside you need to uncomment the inline callback
+    #@defer.inlineCallbacks # If you call a yield inside you need to uncomment the inline callback
     def op_data(self, content, headers, msg):
 
         logging.info(self.__class__.__name__ +', MSG Received: ' + str(headers))
@@ -83,14 +84,13 @@ class PersisterConsumer(base_consumer.BaseConsumer):
             dataset = dap_tools.dap_msg2ds(datamessage)            
             # Call preserve DAP data
             retval = self._save_dap_dataset(dataset,fname=self.params['filename'])
-            if retval == 0:
-                yield self.reply_ok("Data saved")
-            elif retval == 1:
-                yield self.reply_err(msg, {'value': "Archive file does not exist"})
-            elif retval == 2:
-                yield self.reply_err(msg, {'value': "Problem with NCA handler"})
-            else:
-                yield self.reply_err(msg, {'value': "Unintended error"})
+            logging.info("retval from _save_dap_dataset is:"+ str(retval))
+            if retval == 1:
+                raise RuntimeError("Archive file does not exist")
+                
+            if retval == 2:
+                raise RuntimeError("Problem with NCA handler")
+                
                 
         elif isinstance(datamessage, (DictionaryMessageObject, StringMessageObject)):
 
@@ -138,6 +138,7 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         
         #Check to see if the file exists but is empty. 
         if os.path.getsize(archive_fname) == 0:
+            logging.info("Archive file exists, but is empty")
             dap_tools.write_netcdf_from_dataset(dataset, fname)
             return 0
         

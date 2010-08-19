@@ -24,7 +24,7 @@ import base64
 import StringIO
 
 from pydap.model import BaseType,  DatasetType, Float32, Float64, \
-    GridType, Int32
+    GridType, SequenceType, Int32
 
 import numpy
 
@@ -166,6 +166,29 @@ def demo_dataset():
     ds[g.name]=g
 
     return ds
+
+def simple_dataset2(metadata, data):
+    '''
+    Create a simple dap dataset object from dictionary content
+    '''
+    # Convert metadata and data to a dap dataset
+    ds = DatasetType(name=metadata['DataSet Name'])
+    sequence = SequenceType(name='s')
+    for varname,atts in metadata['variables'].items():
+
+        var = BaseType(name=varname, \
+                data=data[varname], \
+                shape=(len(data[varname]),), \
+                dimensions=(varname,), \
+                type=Int32, \
+                attributes=atts)
+
+
+        sequence[varname] = var
+    ds[sequence.name] = sequence    
+    return ds
+    
+
 
 def simple_dataset(metadata, data):
     '''
