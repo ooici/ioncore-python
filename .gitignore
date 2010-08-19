@@ -9,3 +9,6 @@ _trial*
 docs
 res/config/ionlocal.config
 res/logging/loglevelslocal.cfg
+build
+dist
+lcaarch.egg-info
