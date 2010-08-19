@@ -124,19 +124,22 @@ def start():
             {'module':'ion.services.dm.distribution.consumers.message_count_consumer',
                 'consumerclass':'MessageCountConsumer',\
                 'attach':[['consumer1','event_queue']],\
-                'delivery interval':5},
+                'delivery interval':5,
+                'process parameters':{'max_points':5}
+                },
         'consumer3':
             {'module':'ion.services.dm.presentation.web_viz_consumer',
                 'consumerclass':'WebVizConsumer',\
                 'attach':[['consumer2','queue']],
-                'process parameters':{'port':8080}}
-                
+                'process parameters':{'port':8180}
             }
+                
+        }
     
     
     subscription = yield dpsc.define_subscription(subscription)
     linfo = '\n================================================\n'
-    linfo+= 'Open your web browser and look at: http://127.0.0.1:8080/ \n'
+    linfo+= 'Open your web browser and look at: http://127.0.0.1:8180/ \n'
     linfo+= '================================================\n'
     logging.info(linfo)    
 

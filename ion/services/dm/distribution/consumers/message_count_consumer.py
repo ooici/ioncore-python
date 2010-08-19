@@ -122,12 +122,12 @@ class MessageCountConsumer(base_consumer.BaseConsumer):
         self.data=[]
         self.interval_number=0
     
-    def ondata(self, data, notification, timestamp, queue=''):
+    def ondata(self, data, notification, timestamp, **kwargs):
         if not self.delivery_interval:
             raise RuntimeError('MessageCountConsumer must be called with a delivery interval')
         
     
-    def onschedule(self, queue='', **kwargs):
+    def onschedule(self, queue='', max_points=50, **kwargs):
         '''
         This method is called when it is time to actually send the results
         in this case it is not needed, but must be over-riden...
@@ -154,7 +154,10 @@ class MessageCountConsumer(base_consumer.BaseConsumer):
         self.interval_number +=1
         
         self.data.append([str(self.interval_number),interval,total])
-                
+        
+        dlen = len(self.data)
+        if dlen > max_points:
+            self.data = self.data[dlen-max_points : ]
         
         data_table = gviz_api.DataTable(description)
         data_table.LoadData(self.data)
