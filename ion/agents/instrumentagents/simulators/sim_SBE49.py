@@ -151,55 +151,72 @@ class Instrument(protocol.Protocol):
             on return key: just return the prompt (just as SBE59 would).
             """
             self.transport.write("S>")
-        elif data in self.testCommands:
-            """
-            @note If a "testing" command is received, and the instrument is
-            not already running a test, start sending samples
-            at the configured test interval until the configured maximum
-            number of test samples have been sent.
-            """
-            if self.testRunning == 'false':
-                logging.debug("Starting test samples")
-                self.startTestSamples()
-                self.testRunning = 'true'
-        elif data == "start":
-            """
-            @note If start command is received, and the SBE49 is in autonomous
-            mode, and the instrument is not already running a test, start
-            sending samples at the configured interval.
-            """
-            if self.mode == 'auto' and self.autoRunning == 'false':
-                logging.debug("Starting auto samples")
-                self.autoRunning = 'true'
-                # The factory handles the sending at intervals.
-                self.startAutoSamples()
-            else:
-                # Currently we don't simulate auto/polled: we just handle the
-                # start/stop as if we're in auto mode (mode defaults to auto
-                # and doesn't change). But, in the future we might want to
-                # simulate the modes: wouldn't be hard.
-                self.transport.write(self.commands[data])
-        elif data == "stop":
-            """
-            @note If stop command is received, and the SBE49 is in autonomous
-            mode,  and the instrument is running a test, stop sending samples
-            at the configured interval.
-            """
-            if self.mode == 'auto' and self.autoRunning == 'true':
-                logging.debug("Stopping auto samples")
-                self.stopAutoSamples()
-                self.autoRunning = 'false'
-
-            # Print prompt whether we stopped or not
-            self.transport.write(self.prompt)
-        elif data in self.commands:
-            # Any command that falls to this point gets handled with the general
-            # command response that is in the commands dictionary.
-            logging.debug("command received: %s" % (data))
-            self.transport.write(self.commands[data])
+            
         else:
-            logging.debug("Invalid command received: %s" % (data))
-            self.transport.write("?CMD")
+            """
+            @brief Partition the data into three parts (command, '=', value)
+            """
+            parts = data.partition('=')
+            command = parts[0]
+            value = parts[2]
+            logging.debug("received command: %s, value: %s" %(command, value))
+        
+            if command in self.testCommands:
+                """
+                @note If a "testing" command is received, and the instrument is
+                not already running a test, start sending samples
+                at the configured test interval until the configured maximum
+                number of test samples have been sent.
+                """
+                logging.debug("Received test command: %s" %command)
+                if self.testRunning == 'false':
+                    logging.debug("Starting test samples")
+                    self.startTestSamples()
+                    self.testRunning = 'true'
+            elif command == "start":
+                """
+                @note If start command is received, and the SBE49 is in autonomous
+                mode, and the instrument is not already running a test, start
+                sending samples at the configured interval.
+                """
+                if self.mode == 'auto' and self.autoRunning == 'false':
+                    logging.debug("Starting auto samples")
+                    self.autoRunning = 'true'
+                    # The factory handles the sending at intervals.
+                    self.startAutoSamples()
+                else:
+                    # Currently we don't simulate auto/polled: we just handle the
+                    # start/stop as if we're in auto mode (mode defaults to auto
+                    # and doesn't change). But, in the future we might want to
+                    # simulate the modes: wouldn't be hard.
+                    self.transport.write(self.commands[command])
+            elif command == "stop":
+                """
+                @note If stop command is received, and the SBE49 is in autonomous
+                mode,  and the instrument is running a test, stop sending samples
+                at the configured interval.
+                """
+                if self.mode == 'auto' and self.autoRunning == 'true':
+                    logging.debug("Stopping auto samples")
+                    self.stopAutoSamples()
+                    self.autoRunning = 'false'
+    
+                # Print prompt whether we stopped or not
+                self.transport.write(self.prompt)
+            elif command == "outputformat":
+                logging.debug("Setting outputformat to %s" %(value))
+                simBaud = value
+            elif command == "baud":
+                logging.debug("Setting baud to %s" %(value))
+                simBaud = value
+            elif command in self.commands:
+                # Any command that falls to this point gets handled with the general
+                # command response that is in the commands dictionary.
+                logging.debug("command received: %s" % (command))
+                self.transport.write(self.commands[command])
+            else:
+                logging.debug("Invalid command received: %s" % (command))
+                self.transport.write("?CMD")
 
     def connectionLost(self, reason):
         logging.debug("Simmulator connection now closed")

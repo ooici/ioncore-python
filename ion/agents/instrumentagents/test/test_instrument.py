@@ -106,13 +106,17 @@ class TestInstrumentAgent(IonTestCase):
             self.assert_(response['status'] == 'OK')
             self.assertEqual(response['baudrate'], 19200)
             self.assertEqual(response['outputformat'], 1)
-    
+            
             response = yield self.IAClient.get_from_instrument(['baudrate',
                                                                 'outputformat'])
             self.assert_(response['status'] == 'OK')
             self.assertEqual(response['baudrate'], 19200)
             self.assertEqual(response['outputformat'], 1)
     
+            response = yield self.IAClient.set_to_instrument({'outputformat': 2})
+            self.assert_(response['status'] == 'OK')
+            self.assertEqual(response['outputformat'], 2)
+            
             # Try setting something bad
             response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
                                                 'badvalue': 1})
