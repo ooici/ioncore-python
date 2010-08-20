@@ -178,9 +178,12 @@ class TestSimpleDataset(DapToolsBaseTest):
         self.ds2 = dap_tools.dap_msg2ds(self.msg1)
         # Convert back to a message
         self.msg2 = dap_tools.ds2dap_msg(self.ds2)
-        # Convert back to a dataste
+        # Convert back to a dataset
         self.ds3 = dap_tools.dap_msg2ds(self.msg2)
+        
     
+    
+        
     
     def test_simple(self):
         
@@ -193,6 +196,51 @@ class TestSimpleDataset(DapToolsBaseTest):
         self.assertEqual(self.ds1.name,'SimpleData')
         
         self.assertEqual(self.ds1.height.attributes['long_name'],'person height')
+        
+
+
+class TestSimpleSequenceDataset(DapToolsBaseTest):
+    
+    def setUp(self):
+        # create a dataset
+        self.ds1 = dap_tools.simple_sequence_dataset(\
+            {'DataSet Name':'SimpleData','variables':\
+                {'time':{'long_name':'Data and Time','units':'seconds'},\
+                'height':{'long_name':'person height','units':'meters'}}}, \
+            {'time':(111,112,123,114,115,116,117,118,119,120), \
+            'height':(8,6,4,-2,-1,5,3,1,4,5)})
+        
+        # Convert to a message 
+        self.msg1 = dap_tools.ds2dap_msg(self.ds1)
+        # Convert back to a dataset
+        self.ds2 = dap_tools.dap_msg2ds(self.msg1)
+        # Convert back to a message
+        self.msg2 = dap_tools.ds2dap_msg(self.ds2)
+        # Convert back to a dataset
+        self.ds3 = dap_tools.dap_msg2ds(self.msg2)
+        
+    
+    
+        
+    
+    def test_simple(self):
+        
+        self.assertEqual(self.ds1.time.data[0],111)
+        self.assertEqual(self.ds1.time.data[9],120)
+        
+        self.assertEqual(self.ds1.height.data[9],5)
+        self.assertEqual(self.ds1.height.data[3],-2)
+        
+        self.assertEqual(self.ds1.name,'SimpleData')
+        
+        self.assertEqual(self.ds1.height.attributes['long_name'],'person height')        
+        
+        
+        
+        
+        
+
+            
 
         
     

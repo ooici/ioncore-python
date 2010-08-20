@@ -167,7 +167,7 @@ def demo_dataset():
 
     return ds
 
-def simple_dataset2(metadata, data):
+def simple_sequence_dataset(metadata, data):
     '''
     Create a simple dap dataset object from dictionary content
     '''
