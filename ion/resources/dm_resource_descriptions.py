@@ -196,7 +196,8 @@ class DMDataResource(InformationResource):
     '''
     #Name - inherited
     metadata = TypedAttribute(ResourceReference)
-    numberofpackets = TypedAttribute(int,0)
+    packetsreceived = TypedAttribute(int,0)
+    packetspersisted = TypedAttribute(int,0)
     input_archive = TypedAttribute(ResourceReference)
     input_topic = TypedAttribute(ResourceReference)
     ingested_archive = TypedAttribute(ResourceReference)
