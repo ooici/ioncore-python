@@ -23,7 +23,10 @@ def main():
     logging.info("ION CONTAINER initializing...")
 
     processes = []
-    processes.extend(agent_procs)
+    
+    # Disabling ccagent
+    #processes.extend(agent_procs)
+    
     processes.extend(svc_procs)
 
     # Start the cc-agent and processes from config file
