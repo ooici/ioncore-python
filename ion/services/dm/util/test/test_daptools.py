@@ -153,10 +153,10 @@ class DapToolsTest_StationBaro(DapToolsBaseTest):
 class DapToolsTest_StationWdir(DapToolsBaseTest):
     fname ='../ion/services/dm/util/test/test_files/station_wdir.nc'
 
-    def test_variables_ds1_ds2(self):
-        # Running comparison between the object loaded from netcdf
-        # and object loaded from dap fails. Not sure why?
-        raise unittest.SkipTest('Problem with Pydap implementation')
+    #def test_variables_ds1_ds2(self):
+    #    # Running comparison between the object loaded from netcdf
+    #    # and object loaded from dap fails. Not sure why?
+    #    raise unittest.SkipTest('Problem with Pydap implementation')
 
 
 

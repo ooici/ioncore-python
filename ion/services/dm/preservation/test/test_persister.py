@@ -76,7 +76,7 @@ class PersisterTest(IonTestCase):
     @defer.inlineCallbacks
     def test_persister_consumer_dap(self):
         
-        msg=dap_tools.ds2dap_msg(dap_tools.simple_dataset2(\
+        msg=dap_tools.ds2dap_msg(dap_tools.simple_sequence_dataset(\
             {'DataSet Name':'SimpleData','variables':\
                 {'time':{'long_name':'Data and Time','units':'seconds'},\
                 'height':{'long_name':'person height','units':'meters'}}}, \
