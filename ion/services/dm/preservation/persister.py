@@ -43,6 +43,7 @@ from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.util.url_manipulation import generate_filename
 
+import uuid
 from ion.services.dm.distribution import base_consumer
 
 
@@ -83,7 +84,17 @@ class PersisterConsumer(base_consumer.BaseConsumer):
 
             dataset = dap_tools.dap_msg2ds(datamessage)            
             # Call preserve DAP data
-            retval = self._save_dap_dataset(dataset,fname=self.params['filename'])
+            fname = self.params['filename']
+            
+            name = os.path.basename(fname)
+            dataset.name = name
+            path = fname.replace(name,'')
+            
+            print 'name:',name
+            print 'fname:',fname
+            print 'path:',path
+
+            retval = self._save_dap_dataset(dataset,path)
             logging.info("retval from _save_dap_dataset is:"+ str(retval))
             if retval == 1:
                 raise RuntimeError("Archive file does not exist")
@@ -94,7 +105,9 @@ class PersisterConsumer(base_consumer.BaseConsumer):
                 
         elif isinstance(datamessage, (DictionaryMessageObject, StringMessageObject)):
 
-            data = datamessage.data            
+            data = datamessage.data
+            raise unittest.SkipTest('Persitence of Dictionary and String not implemented yet!')
+
             #Call preserve dict or string 
             #self._save_string_dataset(data,fname=self.params['filename'])
 
@@ -107,57 +120,87 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         timestamp = datamessage.timestamp
         
 
-    def _create_nca_configfile(self):
+    def _create_nca_configfile(self,base_name):
         configfile = tempfile.NamedTemporaryFile()
         configfile.write("[dataset]")
         configfile.write(os.linesep)
         configfile.write("name=append")
         configfile.write(os.linesep)
-        configfile.write("match=" + "/tmp/tmpname*.nc")
+        configfile.write("match=" + base_name + "_*.nc")
         configfile.write(os.linesep)
         configfile.write("axis=time")
         configfile.write(os.linesep)
         configfile.flush()
         return configfile
 
-    def _save_dap_dataset(self, dataset, fname):
+    def _save_dap_dataset(self, dataset, path):
         """
         @brief save the dataset as a netcdf file or append to an existing file
         @param dataset a pydap dataset
         @param fname the name of the file to write the pydap dataset,
         fname must use an absolute path
         """
-        logging.info("running _save_dap_dataset")
+        
+        fname = dataset.name
+        fname = os.path.join(path, fname)
+        
+        if '%2Enc' in fname:
+            fname = fname.replace('%2Enc','.nc')
+        
+        elif not '.nc' in fname:
+            fname = ".".join((fname, "nc"))
+        
+        
+        logging.info("running _save_dap_dataset, fname=%s" % fname)
         try:
-            archive_fname = os.path.join(os.path.sep, "tmp", ".".join((fname, "nc")))
-            logging.info("archive file name is " + archive_fname)
-            os.stat(archive_fname)
+            os.stat(fname)
         except OSError:
             logging.info("Archive file does not exist")
+            # Use return value - or throw an exception?
             return 1
         
         #Check to see if the file exists but is empty. 
-        if os.path.getsize(archive_fname) == 0:
+        if os.path.getsize(fname) == 0:
+            # Write the data to a new file
             logging.info("Archive file exists, but is empty")
             dap_tools.write_netcdf_from_dataset(dataset, fname)
             return 0
+        else:
+            #The file exists and is not empty, append the contents
+            
+            tmp_file_base = os.path.join(path, str(uuid.uuid4())[:8])
+            
+            tmp_file_0 = tmp_file_base + '_0.nc'
+            
+            shutil.copy(fname, tmp_file_0)
+            
+            tmp_file_1 = tmp_file_base + '_1.nc'
+            dap_tools.write_netcdf_from_dataset(dataset, tmp_file_1)
+            
+            logging.info("Write new dataset to the file")
+            configfile = self._create_nca_configfile(tmp_file_base)    
+            logging.info("Initializing nca handler")
+            h = ncaHandler(configfile.name)
+            try:
+                ds = h.parse_constraints({'pydap.ce':(None,None)})
+            except:
+                logging.exception("problem using append handler")
+                # Use return value or exception?
+                os.remove(tmp_file_1)
+                os.remove(tmp_file_0)
+                return 2
         
-        #The file exists and is not empty, append the contents
-        shutil.move(archive_fname, "/tmp/tmpname0.nc")
-        dap_tools.write_netcdf_from_dataset(dataset, "/tmp/tmpname1.nc")
-        logging.info("Write new dataset to the file")
-        configfile = self._create_nca_configfile()    
-        logging.info("Initializing nca handler")
-        h = ncaHandler(configfile.name)
-        try:
-            ds = h.parse_constraints({'pydap.ce':(None,None)})
-        except:
-            logging.exception("problem using append handler")
-            return 2
+            logging.info("Created new netcdf dataset")
+            dap_tools.write_netcdf_from_dataset(ds, tmp_file_base + 'agg.nc')
+            shutil.move(tmp_file_base + 'agg.nc', fname)
+
+            configfile.close()
+            os.remove(tmp_file_1)
+            os.remove(tmp_file_0)
         
-        logging.info("Created new netcdf dataset")
-        dap_tools.write_netcdf_from_dataset(dataset, fname)
-        configfile.close()   
+            return 0
+        
+        
     '''
     # Must be called op_data
     @defer.inlineCallbacks
