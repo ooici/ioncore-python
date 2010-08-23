@@ -113,9 +113,9 @@ line_template = '''
 
 
 
-class MessageCountConsumer(base_consumer.BaseConsumer):
+class TimeseriesConsumer(base_consumer.BaseConsumer):
     """
-    Count the messages received
+    Plot a Dap GridType timeseries
     """
     def customize_consumer(self):
         self.pdata=[]
@@ -123,7 +123,8 @@ class MessageCountConsumer(base_consumer.BaseConsumer):
     def ondata(self, data, notification, timestamp, queue='', max_points=50, **kwargs):
         
         
-        grid = data.grid
+        gname = data.keys()
+        grid = data[gname[0]]
         for name in grid.keys():
             if not name == 'time':
                 vname = name
@@ -134,12 +135,8 @@ class MessageCountConsumer(base_consumer.BaseConsumer):
         if not len(grid.keys()) == 2:
             raise RuntimeError('Only time series are allowed in this consumer!')
             
-        
-        
         description = [('time','string', 'time (Seconds)'),
                     (vname,'number', vname)]
-        
-        
         
         vals = zip(grid['time'], grid[vname])
         for val in vals:
@@ -155,8 +152,7 @@ class MessageCountConsumer(base_consumer.BaseConsumer):
         json = data_table.ToJSon()
             
         # Make message for the screen below
-        msg = '<p>Number of messages received so far by Web Viz Consumer: %s </p>\n' % total
-        msg += '<p>Timestamp: %s </p>\n' % pu.currenttime()
+        msg = '<p>Timestamp: %s </p>\n' % pu.currenttime()
         
         page = line_template % {'msg':msg,'json':json}
             
@@ -165,4 +161,4 @@ class MessageCountConsumer(base_consumer.BaseConsumer):
         
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(MessageCountConsumer)
+factory = ProtocolFactory(TimeseriesConsumer)

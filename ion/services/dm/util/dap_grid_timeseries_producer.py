@@ -38,7 +38,7 @@ import random
 from ion.services.dm.util import dap_tools
 
 
-class DataStreamProducer(BaseProcess):
+class DapGridDataStreamProducer(BaseProcess):
     '''
     @Brief a data stream producer process - it spits out dap messages
     '''
@@ -66,14 +66,7 @@ class DataStreamProducer(BaseProcess):
 
     @defer.inlineCallbacks
     def stream(self):
-    
-    
-        sz=10
-        
-        metadata = {'DataSet Name':'SimpleData','variables':\
-                {'time':{'long_name':'Data and Time','units':'seconds'},\
-                'height':{'long_name':'person height','units':'meters'}}}
-        
+        sz=10    
         
         time = numpy.arange(float(self.index),float(self.index+sz))
         self.index += sz
@@ -98,6 +91,6 @@ class DataStreamProducer(BaseProcess):
         
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(DataStreamProducer)
+factory = ProtocolFactory(DapGridDataStreamProducer)
 
         
