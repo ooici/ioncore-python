@@ -4,42 +4,30 @@
 @file ion/services/dm/preservation/persister.py
 @author Paul Hubbard
 @author David Stuebe
+@author Matt Rodriguez
 @date 6/7/10
 @brief The persister writes DAP datasets to disk as netcdf files.
 @see DAP protocol spec: http://www.opendap.org/pdf/ESE-RFC-004v1.1.pdf
 """
 
-from urlparse import urlsplit, urlunsplit
-import simplejson as json
-import base64
-
-from pydap.model import BaseType, SequenceType
-from pydap.proxy import ArrayProxy, SequenceProxy, VariableProxy
-from pydap.parsers.dds import DDSParser
-from pydap.parsers.das import DASParser
-from pydap.xdr import DapUnpacker
-from pydap.lib import walk, fix_slice, parse_qs, fix_shn
-from pydap.responses import netcdf
 
 from ion.services.dm.util import dap_tools
 import logging
 logging = logging.getLogger(__name__)
 
-import time
-import sys
+
 import os
 import tempfile
+import shutil
+from exceptions import RuntimeError
 from pydap.handlers.nca import Handler as ncaHandler
 
-from twisted.internet import defer
-
 from ion.data import dataobject
-from ion.resources.dm_resource_descriptions import DAPMessageObject, DataMessageObject, StringMessageObject, DictionaryMessageObject
+from ion.resources.dm_resource_descriptions import DAPMessageObject, StringMessageObject, DictionaryMessageObject
 
 from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
-from ion.services.dm.util.url_manipulation import generate_filename
 
+import uuid
 from ion.services.dm.distribution import base_consumer
 
 
@@ -65,10 +53,10 @@ class PersisterConsumer(base_consumer.BaseConsumer):
     """
 
 
-    #@defer.inlineCallbacks # If you call a yeild inside you need to uncomment the inline callback
+    #@defer.inlineCallbacks # If you call a yield inside you need to uncomment the inline callback
     def op_data(self, content, headers, msg):
 
-        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
+        logging.info(self.__class__.__name__ +', MSG Received: ' + str(headers))
         logging.info(self.__class__.__name__ + '; Calling data process!')
 
         # Keep track of how many messages you got
@@ -78,29 +66,127 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         datamessage = dataobject.DataObject.decode(content)
         if isinstance(datamessage, DAPMessageObject):
 
-            data = dap_tools.dap_msg2ds(datamessage)            
+            dataset = dap_tools.dap_msg2ds(datamessage)            
             # Call preserve DAP data
-            #self.save_dap_dataset(data,fname=self.params['filename'])
+            fname = self.params['filename']
             
-        elif isinstance(datamessage, DictionaryMessageObject):
+            name = os.path.basename(fname)
+            dataset.name = name
+            path = fname.replace(name,'')
+            
+            logging.info( 'name: ' + name)
+            logging.info('fname:' + fname)
+            logging.info('path:' + path)
 
-            data = datamessage.data            
-            #Call preserve dict or string 
-            #self.save_dictionary_dataset(data,fname=self.params['filename'])
-
-        elif isinstance(datamessage, StringMessageObject):
-
+            retval = self._save_dap_dataset(dataset,path)
+            logging.info("retval from _save_dap_dataset is:"+ str(retval))
+            if retval == 1:
+                raise RuntimeError("Archive file does not exist")
+                
+            if retval == 2:
+                raise RuntimeError("Problem with NCA handler")
+                
+                
+        elif isinstance(datamessage, (DictionaryMessageObject, StringMessageObject)):
+            
             data = datamessage.data
+            fname = self.params['filename']
+            logging.info("Writing Dictionary or String to " + fname)
+            f = open(fname, "w")
+            f.write(data)
+            f.close()
+
             #Call preserve dict or string 
-            #self.save_string_dataset(data,fname=self.params['filename'])
+            #self._save_string_dataset(data,fname=self.params['filename'])
 
         else:
-            data = None
+            raise RuntimeError("Persister Service received an incompatible message.")
             # Error?
 
         # Later - these will be sent to a historical log for the dataset...
         notification = datamessage.notification
         timestamp = datamessage.timestamp
+        
+
+    def _create_nca_configfile(self,base_name):
+        configfile = tempfile.NamedTemporaryFile()
+        configfile.write("[dataset]")
+        configfile.write(os.linesep)
+        configfile.write("name=append")
+        configfile.write(os.linesep)
+        configfile.write("match=" + base_name + "_*.nc")
+        configfile.write(os.linesep)
+        configfile.write("axis=time")
+        configfile.write(os.linesep)
+        configfile.flush()
+        return configfile
+
+    def _save_dap_dataset(self, dataset, path):
+        """
+        @brief save the dataset as a netcdf file or append to an existing file
+        @param dataset a pydap dataset
+        @param fname the name of the file to write the pydap dataset,
+        fname must use an absolute path
+        """
+        
+        fname = dataset.name
+        fname = os.path.join(path, fname)
+        
+        if '%2Enc' in fname:
+            fname = fname.replace('%2Enc','.nc')
+        
+        elif not '.nc' in fname:
+            fname = ".".join((fname, "nc"))
+        
+        
+        logging.info("running _save_dap_dataset, fname=%s" % fname)
+        try:
+            os.stat(fname)
+        except OSError:
+            logging.info("Archive file does not exist")
+            # Use return value - or throw an exception?
+            return 1
+        
+        #Check to see if the file exists but is empty. 
+        if os.path.getsize(fname) == 0:
+            # Write the data to a new file
+            logging.info("Archive file exists, but is empty")
+            dap_tools.write_netcdf_from_dataset(dataset, fname)
+            return 0
+        else:
+            #The file exists and is not empty, append the contents
+            
+            tmp_file_base = os.path.join(path, str(uuid.uuid4())[:8])
+            
+            tmp_file_0 = tmp_file_base + '_0.nc'
+            
+            shutil.copy(fname, tmp_file_0)
+            
+            tmp_file_1 = tmp_file_base + '_1.nc'
+            dap_tools.write_netcdf_from_dataset(dataset, tmp_file_1)
+            
+            logging.info("Write new dataset to the file")
+            configfile = self._create_nca_configfile(tmp_file_base)    
+            logging.info("Initializing nca handler")
+            h = ncaHandler(configfile.name)
+            try:
+                ds = h.parse_constraints({'pydap.ce':(None,None)})
+            except:
+                logging.exception("problem using append handler")
+                # Use return value or exception?
+                os.remove(tmp_file_1)
+                os.remove(tmp_file_0)
+                return 2
+        
+            logging.info("Created new netcdf dataset")
+            dap_tools.write_netcdf_from_dataset(ds, tmp_file_base + 'agg.nc')
+            shutil.move(tmp_file_base + 'agg.nc', fname)
+
+            configfile.close()
+            os.remove(tmp_file_1)
+            os.remove(tmp_file_0)
+        
+            return 0
         
         
     '''
@@ -204,6 +290,7 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         
         configfile.close()
         
+    
     def _save_no_xmit(self, content, local_dir=None):
         """
         @brief Parse message into decodable objects: DAS, DDS, data.
@@ -291,7 +378,7 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         except UnicodeDecodeError, ude:
             logging.exception('save error: %s ' % ude)
             return 1
-    '''
+ '''   
 # Must change name after refactor
 factory = ProtocolFactory(PersisterConsumer)
 

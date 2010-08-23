@@ -23,8 +23,10 @@ from pydap.responses import netcdf
 import base64
 import StringIO
 
-from pydap.model import BaseType,  DatasetType, Float32, Float64, \
-    GridType, Int32
+# Import value types
+from pydap.model import Float32, Float64, Int32, Int16, Byte, String
+# Import pydap data types
+from pydap.model import BaseType, DapType, DatasetType, GridType, SequenceData, SequenceType, StructureType
 
 import numpy
 
@@ -122,13 +124,23 @@ def write_dap_files_from_msg(filename,msg):
     dods_file.close()    
     return 0
 
-def write_netcdf_from_dataset(filename, dataset):
-    netcdf.save(dataset, ".".join((filename, "nc")))
+def write_netcdf_from_dataset(dataset, filename):
+    if not '.nc' in filename:
+        filename = ".".join((filename, "nc"))
+    netcdf.save(dataset, filename)
+
+    # How do you close it?
+    #del netcdf
     return 0
 
-def read_netcdf_from_file(filename): 
+def read_netcdf_from_file(filename):
+    if not '.nc' in filename:
+        filename = ".".join((filename, "nc"))
     h = Handler(filename)
     ds = h.parse_constraints({'pydap.ce':(None,None)})
+
+    # How do you close it?
+    del h
     return ds
 
 
@@ -167,9 +179,78 @@ def demo_dataset():
 
     return ds
 
+def simple_sequence_dataset(metadata, data):
+    '''
+    Create a simple dap dataset object from dictionary content
+    See test_daptools to see the input structure
+    '''
+    # Convert metadata and data to a dap dataset
+    ds = DatasetType(name=metadata['DataSet Name'])
+    sequence = SequenceType(name='sequence')
+    for varname,atts in metadata['variables'].items():
+
+        var = BaseType(name=varname, \
+                data=data[varname], \
+                shape=(len(data[varname]),), \
+                #dimensions=(varname,), \
+                type=Int32, \
+                attributes=atts)
+
+
+        sequence[varname] = var
+    ds[sequence.name] = sequence    
+    return ds
+
+def simple_structure_dataset(metadata, data):
+    '''
+    Create a simple dap dataset object from dictionary content
+    See test_daptools to see the input structure
+    '''
+    # Convert metadata and data to a dap dataset
+    ds = DatasetType(name=metadata['DataSet Name'])
+    structure = StructureType(name='structure')
+    for varname,atts in metadata['variables'].items():
+
+        var = BaseType(name=varname, \
+                data=data[varname], \
+                shape=(len(data[varname]),), \
+                #dimensions=(varname,), \
+                type=Int32, \
+                attributes=atts)
+
+
+        structure[varname] = var
+    ds[structure.name] = structure    
+    return ds
+    
+
+def simple_grid_dataset():
+    '''
+    Create a simple dap grid dataset
+    Just use the pydap interface - passing dicts does not make sense here.
+    '''
+    # Convert metadata and data to a dap dataset
+    ds = DatasetType(name='SimpleGridData')
+    
+    g = GridType(name='grid')
+    data = numpy.arange(24.)
+    data.shape = (4, 2, 3)
+    # The name in the dictionary must match the name in the basetype
+    g['a'] = BaseType(name='a', data=data, shape=data.shape, type=Float32, dimensions=('time', 'x', 'y'))
+    g['time'] = BaseType(name='time', data=numpy.arange(4.), shape=(4,), type=Float64)
+    g['x'] = BaseType(name='x', data=numpy.arange(2.), shape=(2,), type=Float64)
+    g['y'] = BaseType(name='y', data=numpy.arange(3.), shape=(3,), type=Float64)
+
+    ds[g.name]=g
+    return ds
+
+
+
+
 def simple_dataset(metadata, data):
     '''
     Create a simple dap dataset object from dictionary content
+    See test_daptools to see the input structure
     '''
     # Convert metadata and data to a dap dataset
     ds = DatasetType(name=metadata['DataSet Name'])
@@ -185,7 +266,7 @@ def simple_dataset(metadata, data):
         ds[varname] = var
     return ds
     
-def simple_datamessage(metadata, data):
-    ds = simple_dataset(metadata, data)
-    return ds2dap_msg(ds)
+#def simple_datamessage(metadata, data):
+#    ds = simple_dataset(metadata, data)
+#    return ds2dap_msg(ds)
 
