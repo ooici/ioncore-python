@@ -7,6 +7,7 @@
 """
 
 import logging
+import gc
 logging = logging.getLogger(__name__)
 
 from twisted.trial import unittest
@@ -49,6 +50,7 @@ class DapToolsBaseTest(IonTestCase):
             os.remove(self.testname)
         except exceptions.OSError:
             pass
+        gc.collect()
     
     def test_values(self):
         '''
