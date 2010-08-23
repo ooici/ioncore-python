@@ -266,7 +266,7 @@ def simple_dataset(metadata, data):
         ds[varname] = var
     return ds
     
-#def simple_datamessage(metadata, data):
-#    ds = simple_dataset(metadata, data)
-#    return ds2dap_msg(ds)
+def simple_datamessage(metadata, data):
+    ds = simple_dataset(metadata, data)
+    return ds2dap_msg(ds)
 
