@@ -119,6 +119,8 @@ class PersisterDirectTest(unittest.TestCase):
         self.assert_(barray.all())
         
 
+        
+
 class PersisterTest(IonTestCase):
     '''
     Test cases for the persister methods
@@ -177,7 +179,7 @@ class PersisterTest(IonTestCase):
         yield self._stop_container()
         # Kill the queues?
 
-
+    
     @defer.inlineCallbacks
     def test_persister_consumer_dap(self):
         
@@ -213,9 +215,14 @@ class PersisterTest(IonTestCase):
         #self.assert_(barray.all())
         #barray = self.ds.grid.time[0:3] == ds_r.grid.time[4:7]
         #self.assert_(barray.all())
+    
         
-        
-        
+    @defer.inlineCallbacks
+    def test_persister_consumer_string(self):
+        msg = dm_resource_descriptions.StringMessageObject()
+        msg.data = "I am a string"
+        yield self.test_sup.send(self.queue1, 'data', msg.encode())
+        msg_cnt = yield self.child1.get_msg_count()
         # Check that the file is there!
     '''    
     @defer.inlineCallbacks

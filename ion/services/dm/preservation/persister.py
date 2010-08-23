@@ -10,38 +10,22 @@
 @see DAP protocol spec: http://www.opendap.org/pdf/ESE-RFC-004v1.1.pdf
 """
 
-from urlparse import urlsplit, urlunsplit
-import simplejson as json
-import base64
-
-from pydap.model import BaseType, SequenceType
-from pydap.proxy import ArrayProxy, SequenceProxy, VariableProxy
-from pydap.parsers.dds import DDSParser
-from pydap.parsers.das import DASParser
-from pydap.xdr import DapUnpacker
-from pydap.lib import walk, fix_slice, parse_qs, fix_shn
-from pydap.responses import netcdf
 
 from ion.services.dm.util import dap_tools
 import logging
 logging = logging.getLogger(__name__)
 
-import time
-import sys
+
 import os
 import tempfile
 import shutil
 from exceptions import RuntimeError
 from pydap.handlers.nca import Handler as ncaHandler
 
-from twisted.internet import defer
-
 from ion.data import dataobject
-from ion.resources.dm_resource_descriptions import DAPMessageObject, DataMessageObject, StringMessageObject, DictionaryMessageObject
+from ion.resources.dm_resource_descriptions import DAPMessageObject, StringMessageObject, DictionaryMessageObject
 
 from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
-from ion.services.dm.util.url_manipulation import generate_filename
 
 import uuid
 from ion.services.dm.distribution import base_consumer
@@ -90,9 +74,9 @@ class PersisterConsumer(base_consumer.BaseConsumer):
             dataset.name = name
             path = fname.replace(name,'')
             
-            print 'name:',name
-            print 'fname:',fname
-            print 'path:',path
+            logging.info( 'name: ' + name)
+            logging.info('fname:' + fname)
+            logging.info('path:' + path)
 
             retval = self._save_dap_dataset(dataset,path)
             logging.info("retval from _save_dap_dataset is:"+ str(retval))
@@ -104,15 +88,19 @@ class PersisterConsumer(base_consumer.BaseConsumer):
                 
                 
         elif isinstance(datamessage, (DictionaryMessageObject, StringMessageObject)):
-
+            
             data = datamessage.data
-            raise unittest.SkipTest('Persitence of Dictionary and String not implemented yet!')
+            fname = self.params['filename']
+            logging.info("Writing Dictionary or String to " + fname)
+            f = open(fname, "w")
+            f.write(data)
+            f.close()
 
             #Call preserve dict or string 
             #self._save_string_dataset(data,fname=self.params['filename'])
 
         else:
-            data = None
+            raise RuntimeError("Persister Service received an incompatible message.")
             # Error?
 
         # Later - these will be sent to a historical log for the dataset...
