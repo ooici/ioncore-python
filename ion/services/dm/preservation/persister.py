@@ -116,7 +116,7 @@ class PersisterConsumer(base_consumer.BaseConsumer):
     def _create_nca_configfile(self,base_name):
         """
         @brief: routine that creates a temporary file used by the pydap nca handler.
-        @basename: This is prefix of the filenames that will be appended by 
+        @param basename: This is prefix of the filenames that will be appended by 
         the nca handler
         """
         configfile = tempfile.NamedTemporaryFile()

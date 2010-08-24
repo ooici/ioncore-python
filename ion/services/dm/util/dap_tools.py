@@ -61,7 +61,7 @@ def ds2dap_msg(pydap_dataset,headeronly=False):
 
 def dap_gen(ds):
     """ 
-    The dods_output object is a generator with the dds preceding the
+    @brief: The dods_output object is a generator with the dds preceding the
     xdr encoded DODS data. If you just want the xdr encoded then you
     need to do use the DapPacker
     """    
@@ -94,6 +94,11 @@ def dap_msg2ds(msg):
 
 
 def read_msg_from_dap_files(filename):
+    """
+    @brief: Takes three DAP files and returns a message object
+    @param A filename that has the same filestem of the three 
+    DAP files.
+    """
     filestem, ext = os.path.splitext(filename)
     dds_file = open(".".join((filestem, "dds"))) 
     dds = dds_file.read() 
@@ -110,6 +115,11 @@ def read_msg_from_dap_files(filename):
     return msg
 
 def write_dap_files_from_msg(filename,msg):
+    """
+    @brief: Takes a message writes out three DAP files
+    @param: The filestem of the three files
+    @param: The ion message that has the DAP content
+    """
     filestem, ext = os.path.splitext(filename)
     dds_file = open(".".join((filestem, "dds")), "w")
     das_file = open(".".join((filestem, "das")), "w")
@@ -125,15 +135,24 @@ def write_dap_files_from_msg(filename,msg):
     return 0
 
 def write_netcdf_from_dataset(dataset, filename):
+    """
+    @brief write the pydap object out as a netcdf file
+    @param dataset is the pydap object, which must contain 
+    Gridded or Sequence data
+    @param filename the name of the netcdf file to be written
+    """
     if not '.nc' in filename:
         filename = ".".join((filename, "nc"))
     netcdf.save(dataset, filename)
 
-    # How do you close it?
-    #del netcdf
+    
     return 0
 
 def read_netcdf_from_file(filename):
+    """
+    @brief: Creates a pydap object from a netcdf file
+    @param filename, the name of the netcdf file.
+    """
     if not '.nc' in filename:
         filename = ".".join((filename, "nc"))
     h = Handler(filename)
@@ -145,10 +164,10 @@ def read_netcdf_from_file(filename):
 
 
 def demo_dataset():
-    '''
+    """
     @Brief Example methods for creating a dataset
     http://pydap.org/developer.html#the-dap-data-model
-    '''
+    """
     
     #Create a dataset object
     ds = DatasetType(name='Mine')
@@ -180,10 +199,10 @@ def demo_dataset():
     return ds
 
 def simple_sequence_dataset(metadata, data):
-    '''
-    Create a simple dap dataset object from dictionary content
+    """
+    @brief Create a simple dap dataset object from dictionary content
     See test_daptools to see the input structure
-    '''
+    """
     # Convert metadata and data to a dap dataset
     ds = DatasetType(name=metadata['DataSet Name'])
     sequence = SequenceType(name='sequence')
@@ -202,10 +221,10 @@ def simple_sequence_dataset(metadata, data):
     return ds
 
 def simple_structure_dataset(metadata, data):
-    '''
-    Create a simple dap dataset object from dictionary content
+    """
+    @brief Create a simple dap dataset object from dictionary content
     See test_daptools to see the input structure
-    '''
+    """
     # Convert metadata and data to a dap dataset
     ds = DatasetType(name=metadata['DataSet Name'])
     structure = StructureType(name='structure')
@@ -225,10 +244,10 @@ def simple_structure_dataset(metadata, data):
     
 
 def simple_grid_dataset():
-    '''
-    Create a simple dap grid dataset
+    """
+    @brief Create a simple dap grid dataset
     Just use the pydap interface - passing dicts does not make sense here.
-    '''
+    """
     # Convert metadata and data to a dap dataset
     ds = DatasetType(name='SimpleGridData')
     
@@ -248,10 +267,10 @@ def simple_grid_dataset():
 
 
 def simple_dataset(metadata, data):
-    '''
-    Create a simple dap dataset object from dictionary content
+    """
+    @brief Create a simple dap dataset object from dictionary content
     See test_daptools to see the input structure
-    '''
+    """
     # Convert metadata and data to a dap dataset
     ds = DatasetType(name=metadata['DataSet Name'])
     
@@ -267,6 +286,9 @@ def simple_dataset(metadata, data):
     return ds
     
 def simple_datamessage(metadata, data):
+    """
+    @brief Create a data message from a simple dataset.
+    """
     ds = simple_dataset(metadata, data)
     return ds2dap_msg(ds)
 
