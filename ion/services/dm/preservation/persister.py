@@ -55,7 +55,12 @@ class PersisterConsumer(base_consumer.BaseConsumer):
 
     #@defer.inlineCallbacks # If you call a yield inside you need to uncomment the inline callback
     def op_data(self, content, headers, msg):
-
+        """
+        @brief: this method is invoked when data arrives off an AMQP Queue
+        @param content Message object which could be DAP, Dictionary or String
+        @param headers Ignored
+        @param msg Used to route the reply, otherwise ignored
+        """
         logging.info(self.__class__.__name__ +', MSG Received: ' + str(headers))
         logging.info(self.__class__.__name__ + '; Calling data process!')
 
@@ -101,7 +106,7 @@ class PersisterConsumer(base_consumer.BaseConsumer):
 
         else:
             raise RuntimeError("Persister Service received an incompatible message.")
-            # Error?
+            
 
         # Later - these will be sent to a historical log for the dataset...
         notification = datamessage.notification
@@ -109,6 +114,11 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         
 
     def _create_nca_configfile(self,base_name):
+        """
+        @brief: routine that creates a temporary file used by the pydap nca handler.
+        @basename: This is prefix of the filenames that will be appended by 
+        the nca handler
+        """
         configfile = tempfile.NamedTemporaryFile()
         configfile.write("[dataset]")
         configfile.write(os.linesep)
