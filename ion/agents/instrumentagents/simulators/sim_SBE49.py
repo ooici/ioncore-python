@@ -11,6 +11,9 @@ This program can be fleshed out as needed.
 @date 6/8/10
 """
 import logging
+import random
+import math
+import time
 logging = logging.getLogger(__name__)
 
 from twisted.internet import protocol
@@ -120,6 +123,7 @@ class Instrument(protocol.Protocol):
         self.testRunning = 'false'
         self.autoRunning = 'false'
         self.mode = 'auto'
+        self.sample_cnt = 0
 
     def connectionMade(self):
         """
@@ -151,7 +155,7 @@ class Instrument(protocol.Protocol):
             on return key: just return the prompt (just as SBE59 would).
             """
             self.transport.write("S>")
-            
+
         else:
             """
             @brief Partition the data into three parts (command, '=', value)
@@ -160,7 +164,7 @@ class Instrument(protocol.Protocol):
             command = parts[0]
             value = parts[2]
             logging.debug("received command: %s, value: %s" %(command, value))
-        
+
             if command in self.testCommands:
                 """
                 @note If a "testing" command is received, and the instrument is
@@ -200,7 +204,7 @@ class Instrument(protocol.Protocol):
                     logging.debug("Stopping auto samples")
                     self.stopAutoSamples()
                     self.autoRunning = 'false'
-    
+
                 # Print prompt whether we stopped or not
                 self.transport.write(self.prompt)
             elif command == "outputformat":
@@ -228,7 +232,7 @@ class Instrument(protocol.Protocol):
         # stop the timer, reset the number of samples to 0, and send the
         # to the client.
         self.numTestSamples += 1
-        self.transport.write(self.sampleData)
+        self.transport.write(self.get_next_sample())
         if self.numTestSamples == self.maxTestSamples:
             logging.debug("Stopping test samples")
             self.numTestSamples = 0
@@ -240,7 +244,19 @@ class Instrument(protocol.Protocol):
     def autoSampler(self):
         # Send a sample to the client.  This happens until the client sends a
         # stop command.
-        self.transport.write(self.sampleData)
+        self.transport.write(self.get_next_sample())
+
+    def get_next_sample(self):
+        sampleData = '21.9028,  1.00012,    1.139,   1.0103\n'
+        self.sample_cnt += 1
+        cnt = self.sample_cnt
+        value1 = 10.0 + 5.0 * math.sin(float(cnt) / 30.0)
+        value2 = 7.00012 * random.random()
+        value3 = 3.139 + random.random()
+        value4 = 1.0103 + random.random()
+        valstr = "%1.4f,  %1.5f,   %1.3f,   %1.3f\n" % (value1,value2,value3,value4)
+        #return self.sampleData
+        return valstr
 
     def startTestSamples(self):
         # start the test sample timer
