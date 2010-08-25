@@ -9,8 +9,14 @@
 the data registry with that content.
 """
 
+import logging
+logging = logging.getLogger(__name__)
+
+from twisted.internet import defer
+
 from ion.services.dm.distribution import base_consumer
 from ion.core.base_process import ProtocolFactory
+from ion.services.dm.inventory import data_registry
 from ion.data import dataobject
 try:
     import json
@@ -32,7 +38,7 @@ class IngestionConsumer(base_consumer.BaseConsumer):
         self.params['data_resource_ref'] = dataobject.DataObject.decode(enc_ref)
         self.datareg = yield data_registry.DataRegistryClient(proc=self)
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def ondata(self, data, notification, timestamp, data_resource_ref):
         '''
         examine data
