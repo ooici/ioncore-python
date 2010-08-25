@@ -277,6 +277,8 @@ class BaseConsumerTest(IonTestCase):
         # Send to queue1
         yield self.test_sup.send(self.queue1, 'data', dmsg)
         
+        yield pu.asleep(1)
+        
         msg_cnt = yield child1.get_msg_count()
         received = msg_cnt.get('received',{})
         sent = msg_cnt.get('sent',{})
@@ -285,6 +287,8 @@ class BaseConsumerTest(IonTestCase):
         
         # Send to queue2
         yield self.test_sup.send(self.queue2, 'data', dmsg)
+        
+        yield pu.asleep(1)
         
         msg_cnt = yield child1.get_msg_count()
         received = msg_cnt.get('received',{})
