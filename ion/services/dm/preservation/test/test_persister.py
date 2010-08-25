@@ -15,7 +15,6 @@ from twisted.trial import unittest
 
 #from ion.services.dm.preservation.persister import PersisterService
 #from ion.services.sa.fetcher import FetcherService, FetcherClient
-from ion.services.dm.util.url_manipulation import generate_filename
 from ion.core import bootstrap
 from ion.services.dm.distribution import base_consumer
 
@@ -23,8 +22,6 @@ from ion.services.dm.preservation import persister
 
 from ion.data import dataobject
 from ion.test.iontest import IonTestCase
-import base64
-import simplejson as json
 from ion.services.dm.util import dap_tools
 
 from ion.util import procutils as pu
