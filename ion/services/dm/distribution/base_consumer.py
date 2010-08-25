@@ -109,7 +109,7 @@ class BaseConsumer(BaseProcess):
         
         # Check and make sure it is not already attached?
         
-        dataReceiver = Receiver(__name__, queue)
+        dataReceiver = Receiver(__name__, str(queue))
         dataReceiver.handle(self.receive)
         dr_id = yield spawn(dataReceiver)
         

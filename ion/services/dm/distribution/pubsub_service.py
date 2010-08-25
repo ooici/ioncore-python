@@ -258,9 +258,9 @@ class DataPubsubService(BaseService):
             
             
             cd = {}
-            cd['name'] = consumer
-            cd['module'] = args.get('module')
-            cd['procclass'] = args.get('consumerclass')
+            cd['name'] = str(consumer)
+            cd['module'] = str(args.get('module'))
+            cd['procclass'] = str(args.get('consumerclass'))
             cd['spawnargs'] = spargs
             
             consumers[consumer]=cd
@@ -325,7 +325,7 @@ class DataPubsubService(BaseService):
                         subscription_queues.append(queue)
                         
                         # Add to the delivery list for the producer...
-                        consumers[name]['spawnargs']['delivery queues'][keyword]=queue.name
+                        consumers[name]['spawnargs']['delivery queues'][keyword]=str(queue.name)
                         logging.info('''Consumer '%s' attaches to new queue for producer/keyword: '%s'/'%s' ''' % (consumer, name, keyword))
                 else:
                     raise RuntimeError('''Can not determine how to attach consumer '%s' \
@@ -448,6 +448,7 @@ class DataPubsubClient(BaseServiceClient):
         existing properties.
         @Note All business logic associated with defining a topic has been moved to the service
         """
+        yield self._check_init()
         
         logging.info(self.__class__.__name__ + '; Calling: define_topic')
         assert isinstance(topic, dataobject.Resource), 'Invalid argument to define_topic'
@@ -470,6 +471,7 @@ class DataPubsubClient(BaseServiceClient):
         """
         @Brief define and register a publisher, or update existing
         """
+        yield self._check_init()
 
         logging.info(self.__class__.__name__ + '; Calling: define_publisher')
         assert isinstance(publisher, dm_resource_descriptions.PublisherResource), 'Invalid argument to define_publisher'
@@ -499,6 +501,8 @@ class DataPubsubClient(BaseServiceClient):
         @Todo move the actual publish command back to this client! Don't send the data
         to the service!
         """
+        yield self._check_init()
+
         logging.info(self.__class__.__name__ + '; Calling: publish')
         
         publication = dm_resource_descriptions.Publication()
@@ -539,6 +543,7 @@ class DataPubsubClient(BaseServiceClient):
         """
         @Brief define and register a subscription, or update existing
         """
+        yield self._check_init()
 
         logging.info(self.__class__.__name__ + '; Calling: define_subscription')
         assert isinstance(subscription, dm_resource_descriptions.SubscriptionResource), 'Invalid argument to define_subscription'
