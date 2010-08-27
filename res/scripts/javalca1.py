@@ -27,9 +27,9 @@ demo_procs = [
     {'name':'data_product_registry','module':'ion.services.sa.data_product_registry','class':''},
     {'name':'instrument_management','module':'ion.services.sa.instrument_management','class':''},
     {'name':'service_registry','module':'ion.services.coi.service_registry','class':''},
-    {'name':'registry','module':'ion.data.datastore.registry','class':'RegistryService', 'spawnargs':{'servicename':'registry'}},
+#    {'name':'registry','module':'ion.data.datastore.registry','class':'RegistryService', 'spawnargs':{'servicename':'registry'}},
 
-    {'name':'javaint','module':'ion.demo.lca.javaint_service','class':'JavaIntegrationService'},
+#    {'name':'javaint','module':'ion.demo.lca.javaint_service','class':'JavaIntegrationService'},
 ]
 
 INSTRUMENT_ID  = "123"
@@ -49,8 +49,8 @@ def main():
     # Start the processes
     sup = yield bootstrap.bootstrap(None, processes)
 
-    simulator = Simulator(INSTRUMENT_ID, 9000)
-    simulator.start()
+#    simulator = Simulator(INSTRUMENT_ID, 9000)
+#    simulator.start()
 
     irc = InstrumentRegistryClient(proc=sup)
 
@@ -82,11 +82,11 @@ def main():
     ia_procs = [
         {'name':'SBE49IA','module':'ion.agents.instrumentagents.SBE49_IA','class':'SBE49InstrumentAgent','spawnargs':{'instrument-id':INSTRUMENT_ID}},
     ]
-    yield bootstrap.spawn_processes(ia_procs, sup=sup)
+#    yield bootstrap.spawn_processes(ia_procs, sup=sup)
 
-    ia_pid = sup.get_child_id('SBE49IA')
-    iaclient = InstrumentAgentClient(proc=sup,target=ia_pid)
-    yield iaclient.register_resource(INSTRUMENT_ID)
+#    ia_pid = sup.get_child_id('SBE49IA')
+#    iaclient = InstrumentAgentClient(proc=sup,target=ia_pid)
+#    yield iaclient.register_resource(INSTRUMENT_ID)
 
 
 main()

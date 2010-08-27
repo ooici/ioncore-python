@@ -19,8 +19,8 @@ CONF = ioninit.config('ion.core.bootstrap')
 # Config files with lists of processes to start
 agent_procs = ioninit.get_config('ccagent_cfg', CONF)
 demo_procs = [
-#    {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
-#    {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
+    {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
+    {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
     {'name':'agent_registry','module':'ion.services.coi.agent_registry','class':'ResourceRegistryService'},
 
     {'name':'instrument_registry','module':'ion.services.sa.instrument_registry','class':''},
