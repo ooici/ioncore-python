@@ -250,7 +250,7 @@ class Instrument(protocol.Protocol):
         sampleData = '21.9028,  1.00012,    1.139,   1.0103\n'
         self.sample_cnt += 1
         cnt = self.sample_cnt
-        value1 = 10.0 + 5.0 * math.sin(float(cnt) / 30.0)
+        value1 = 10.0 + 5.0 * math.sin(float(cnt) / 5.0)
         value2 = 7.00012 * random.random()
         value3 = 3.139 + random.random()
         value4 = 1.0103 + random.random()

@@ -19,17 +19,12 @@ CONF = ioninit.config('ion.core.bootstrap')
 # Config files with lists of processes to start
 agent_procs = ioninit.get_config('ccagent_cfg', CONF)
 demo_procs = [
-#    {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
-#    {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
     {'name':'agent_registry','module':'ion.services.coi.agent_registry','class':'ResourceRegistryService'},
 
     {'name':'instrument_registry','module':'ion.services.sa.instrument_registry','class':''},
     {'name':'data_product_registry','module':'ion.services.sa.data_product_registry','class':''},
     {'name':'instrument_management','module':'ion.services.sa.instrument_management','class':''},
     {'name':'service_registry','module':'ion.services.coi.service_registry','class':''},
-#    {'name':'registry','module':'ion.data.datastore.registry','class':'RegistryService', 'spawnargs':{'servicename':'registry'}},
-
-#    {'name':'javaint','module':'ion.demo.lca.javaint_service','class':'JavaIntegrationService'},
 ]
 
 INSTRUMENT_ID  = "123"
@@ -48,9 +43,6 @@ def main():
 
     # Start the processes
     sup = yield bootstrap.bootstrap(None, processes)
-
-#    simulator = Simulator(INSTRUMENT_ID, 9000)
-#    simulator.start()
 
     irc = InstrumentRegistryClient(proc=sup)
 
@@ -78,15 +70,6 @@ def main():
     dp1.name = "Demo_Data_Product_1"
     dp1.dataformat = "binary"
     dp1 = yield dprc.register_data_product(dp1)
-
-    ia_procs = [
-        {'name':'SBE49IA','module':'ion.agents.instrumentagents.SBE49_IA','class':'SBE49InstrumentAgent','spawnargs':{'instrument-id':INSTRUMENT_ID}},
-    ]
-#    yield bootstrap.spawn_processes(ia_procs, sup=sup)
-
-#    ia_pid = sup.get_child_id('SBE49IA')
-#    iaclient = InstrumentAgentClient(proc=sup,target=ia_pid)
-#    yield iaclient.register_resource(INSTRUMENT_ID)
 
 
 main()
