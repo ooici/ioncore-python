@@ -10,7 +10,7 @@
 from twisted.trial import unittest
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from ion.test.iontest import IonTestCase
 
 from ion.services.dm.distribution.consumers import logging_consumer

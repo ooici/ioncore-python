@@ -10,7 +10,7 @@ the data registry with that content.
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from twisted.internet import defer
 
@@ -30,7 +30,7 @@ class IngestionConsumer(base_consumer.BaseConsumer):
     """
     @defer.inlineCallbacks
     def customize_consumer(self):
-        logging.info('Setting up Ingestion Consumer')
+        log.info('Setting up Ingestion Consumer')
         
         ref_str = self.params.get('data_resource_ref')
         enc_ref = json.loads(ref_str)

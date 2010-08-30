@@ -8,7 +8,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit
@@ -36,7 +36,7 @@ class AttributeStoreService(store_service.StoreService):
         self.spawn_args['backend_class'] = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.data.store.Store'))
         self.spawn_args['backend_args'] = self.spawn_args.get('backend_args', CONF.getValue('backend_args', default={}))
 
-        logging.info('AttributeStoreService.__init__()')
+        log.info('AttributeStoreService.__init__()')
 
 
 

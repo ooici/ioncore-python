@@ -8,7 +8,7 @@
 
 import logging
 import gc
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from twisted.trial import unittest
 from ion.test.iontest import IonTestCase
@@ -200,7 +200,7 @@ class DapToolsBaseTest(IonTestCase):
         # Test for equality of the attributes
         for key, value in ds1.attributes.items():
             
-            logging.debug('Global Attribute: %s, types %s, %s' % (key, type(value), type(ds2.attributes[key])) ) 
+            log.debug('Global Attribute: %s, types %s, %s' % (key, type(value), type(ds2.attributes[key])) ) 
             
             if isinstance(value,numpy.ndarray):
                 barray = value == ds2.attributes[key]
@@ -212,7 +212,7 @@ class DapToolsBaseTest(IonTestCase):
         # Test for equality of the variables
         for key,value in ds1.items():
 
-            logging.debug('Variable: %s, types %s, %s' % (key, type(value), type(ds2[key])) )           
+            log.debug('Variable: %s, types %s, %s' % (key, type(value), type(ds2[key])) )           
             
             if isinstance(value, pydap.model.BaseType):
                 barray =  value.data == ds2[key].data         
@@ -244,11 +244,11 @@ class DapToolsBaseTest(IonTestCase):
         # Test for equality of the variables
         for key,value in ds1.items():
 
-            logging.debug('Variable: %s, types %s, %s' % (key, type(value), type(ds2[key])) )           
+            log.debug('Variable: %s, types %s, %s' % (key, type(value), type(ds2[key])) )           
             
             for attkey, attvalue in ds1[key].attributes.items():
                 
-                    logging.debug('Variable Att: %s, types %s, %s' % (attkey, type(attvalue), type(ds2[key].attributes[attkey])) )
+                    log.debug('Variable Att: %s, types %s, %s' % (attkey, type(attvalue), type(ds2[key].attributes[attkey])) )
 
                     if isinstance(attvalue,(numpy.ndarray, list)):
                         barray = attvalue == ds2[key].attributes[attkey]

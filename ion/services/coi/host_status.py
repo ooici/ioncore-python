@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 try:
     import json
@@ -51,13 +51,13 @@ class HostStatusService(BaseService):
     def report(self):
         self.count -= 1
         if self.count < 0:
-            logging.debug('Shutting down host status looping call')
+            log.debug('Shutting down host status looping call')
             self.lc.stop()
             return
             
-        logging.debug('Starting report query')
+        log.debug('Starting report query')
         status = yield self.client.callRemote("getStatusString","all")
-        logging.debug('Received report')
+        log.debug('Received report')
         print status
     
     def isRunning(self):

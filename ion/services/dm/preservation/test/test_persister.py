@@ -8,7 +8,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -238,7 +238,7 @@ class PersisterTest(IonTestCase):
         try:    
             yield self.test_sup.send(self.queue1,'data',msg.encode())
         except RuntimeError:
-            logging.info("Caught expected RuntimeError")
+            log.info("Caught expected RuntimeError")
             pass
         msg_cnt = yield self.child1.get_msg_count()
         received = msg_cnt.get('received',{})
@@ -314,12 +314,12 @@ class PersisterTest(IonTestCase):
         boss = yield self._spawn_processes(services)
 
         fc = FetcherClient(proc=boss)
-        logging.debug('Grabbing dataset ' + TEST_DSET)
+        log.debug('Grabbing dataset ' + TEST_DSET)
         dset = yield fc.get_dap_dataset(TEST_DSET)
 
         pc = PersisterClient(proc=boss)
         #ps = PersisterService()
-        logging.debug('Saving dataset...')
+        log.debug('Saving dataset...')
         rc = yield pc.persist_dap_dataset(dset)
         #ps._save_no_xmit(dset)
         self.failUnlessSubstring('OK', rc)
@@ -339,14 +339,14 @@ class PersisterTest(IonTestCase):
         
         fc = FetcherClient(proc=boss)
     
-        logging.debug('Grabbing dataset ' + TEST_ADSET1)
+        log.debug('Grabbing dataset ' + TEST_ADSET1)
         dset1 = yield fc.get_dap_dataset(TEST_ADSET1)
-        logging.debug('Grabbing dataset ' + TEST_ADSET2)
+        log.debug('Grabbing dataset ' + TEST_ADSET2)
         dset2 = yield fc.get_dap_dataset(TEST_ADSET2)
         
         pc = PersisterClient(proc=boss)
         
-        logging.debug('Saving dataset...')
+        log.debug('Saving dataset...')
         rc = yield pc.persist_dap_dataset(dset1)
         
     

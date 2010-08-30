@@ -7,7 +7,7 @@
 @brief Driver code for SeaBird SBE-49 CTD
 """
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer, reactor
 
 """
@@ -39,11 +39,11 @@ class InstrumentClient(Protocol):
         self.parent = parent
 
     def connectionMade(self):
-        logging.debug("connectionMade, calling gotConnected().")
+        log.debug("connectionMade, calling gotConnected().")
         self.parent.gotConnected(self)
         
     def connectionLost(self, reason):
-        logging.debug("connectionLost, calling gotDisconnected()")
+        log.debug("connectionLost, calling gotDisconnected()")
         self.parent.gotDisconnected(self)
 
     def dataReceived(self, data):
@@ -53,15 +53,15 @@ class InstrumentClient(Protocol):
         of state machine or something; for instance, the agent sends a getStatus
         command, we need to know that we're expecting a status message.
         """
-        logging.debug("dataReceived!")
+        log.debug("dataReceived!")
         if data == 'S>':
-            logging.debug("received Seabird prompt.")
+            log.debug("received Seabird prompt.")
             #self.factory.prompt_received(self)
             self.parent.gotPrompt(self)
         elif data == '?CMD':
-            logging.info("Seabird doesn't understand command.")
+            log.info("Seabird doesn't understand command.")
         else:
-            logging.debug("dataReceived()!")
+            log.debug("dataReceived()!")
             #self.factory.data_received(data)
             self.parent.gotData(data)
 
@@ -140,12 +140,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         yield self._configure_driver(self.spawn_args)
 
-        logging.info("INIT DRIVER for instrument ID=%s, port=%s, publish-to=%s" % (
+        log.info("INIT DRIVER for instrument ID=%s, port=%s, publish-to=%s" % (
             self.instrument_id, self.instrument_port, self.publish_to))
 
         self.iaclient = InstrumentAgentClient(proc=self, target=self.proc_supid)
 
-        logging.debug("Instrument driver initialized")
+        log.debug("Instrument driver initialized")
 
     @defer.inlineCallbacks
     def plc_shutdown(self):
@@ -180,7 +180,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         # single connection.
         cc = ClientCreator(reactor, InstrumentClient, self)
         self.proto = yield cc.connectTCP("localhost", self.instrument_port)
-        logging.info("Driver connected to instrument")
+        log.info("Driver connected to instrument")
 
     def gotConnected(self, instrument):
         """
@@ -191,7 +191,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @param reference to instrument protocol object.
         @retval none
         """
-        logging.debug("gotConnected!!!")
+        log.debug("gotConnected!!!")
 
         self.instrument = instrument
         self.setConnected(True)
@@ -204,7 +204,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @param reference to instrument protocol object.
         @retval none
         """
-        logging.debug("gotDisconnected!!!")
+        log.debug("gotDisconnected!!!")
 
         self.instrument = instrument
         self.setConnected(False)
@@ -218,14 +218,14 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @retval none
         """
         # send this up to the agent to publish.
-        logging.debug("gotData() %s Calling publish." % (data))
+        log.debug("gotData() %s Calling publish." % (data))
         self.publish(data, self.publish_to)
 
     def gotPrompt(self, instrument):
         """
         This needs to be the general receive routine for the instrument driver
         """
-        logging.debug("gotPrompt()")
+        log.debug("gotPrompt()")
         #self.instrument = instrument
         #self.setConnected(True)
 
@@ -243,30 +243,30 @@ class SBE49InstrumentDriver(InstrumentDriver):
         topic as defined by pubsub.
         @retval none
         """
-        logging.debug("publish()")
+        log.debug("publish()")
         if self.topicDefined == True:
 
             # Create and send a data message
             result = yield self.dpsc.publish(self, self.topic.reference(), data)
             if result:
-                logging.info('Published Message')
+                log.info('Published Message')
             else:
-                logging.info('Failed to Published Message')
+                log.info('Failed to Published Message')
         else:
-            logging.info("NOT READY TO PUBLISH")
+            log.info("NOT READY TO PUBLISH")
 
 
     @defer.inlineCallbacks
     def op_initialize(self, content, headers, msg):
-        logging.debug('In driver initialize')
+        log.debug('In driver initialize')
 
         yield self.reply_ok(msg, content)
 
     @defer.inlineCallbacks
     def op_disconnect(self, content, headers, msg):
-        logging.debug("in Instrument Driver op_disconnect!")
+        log.debug("in Instrument Driver op_disconnect!")
         if (self.isConnected()):
-            logging.debug("disconnecting from instrument")
+            log.debug("disconnecting from instrument")
             #self.connector.disconnect()
             self.proto.transport.loseConnection()
             self.setConnected(False)
@@ -300,12 +300,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
         This connection stuff could be abstracted into a communications object.
         """
         if self.isConnected() == False:
-            logging.debug("yielding for connect")
+            log.debug("yielding for connect")
             yield self.getConnected()
-            logging.debug("connect returned")
+            log.debug("connect returned")
 
         assert(isinstance(content, dict))
-        logging.debug("op_set_params content: %s, keys: %s" %(str(content), str(content.keys)))
+        log.debug("op_set_params content: %s, keys: %s" %(str(content), str(content.keys)))
         
         for param in content.keys():
             if (param not in self.__instrument_parameters):
@@ -314,12 +314,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 self.__instrument_parameters[param] = content[param]
                 if param in self.sbeParmCommands:
                     if self.isConnected():
-                        logging.info("current param is: %s" %str(param))
+                        log.info("current param is: %s" %str(param))
                         command = self.sbeParmCommands[param] + "=" + str(content[param])
-                        logging.debug("op_set_params sending %s to instrument"  %str(command))
+                        log.debug("op_set_params sending %s to instrument"  %str(command))
                         self.instrument.transport.write(command)
                 else:
-                    logging.error("%s is not a settable parameter" % str(param))
+                    log.error("%s is not a settable parameter" % str(param))
         yield self.reply_ok(msg, content)
 
     @defer.inlineCallbacks
@@ -331,14 +331,14 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         assert(isinstance(content, (tuple, list)))
 
-        logging.debug("op_execute content: %s" %str(content))
+        log.debug("op_execute content: %s" %str(content))
         """
         This connection stuff could be abstracted into a communications object.
         """
         if self.isConnected() == False:
-            logging.info("yielding for connect")
+            log.info("yielding for connect")
             yield self.getConnected()
-            logging.info("connect returned")
+            log.info("connect returned")
             # DHE NOTE TO SELF: not using the addCallback anymore, but it might 
             # be a good way to implement a state machine.
             #d.addCallback(self.gotConnected);
@@ -351,10 +351,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
         for command_set in content:
             command = command_set[0]
             if command not in instrument_commands:
-                logging.error("Invalid Command")
+                log.error("Invalid Command")
                 yield self.reply_err(msg, "Invalid Command")
             else:
-                logging.debug("op_execute sending command: %s to instrument" % command)
+                log.debug("op_execute sending command: %s to instrument" % command)
                 self.command = command
 
                 """
@@ -364,7 +364,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 if self.isConnected():
                     self.instrument.transport.write(self.command)
                 else:
-                    logging.error("op_execute: instrument not connected.")
+                    log.error("op_execute: instrument not connected.")
                 commands.append(command)
         yield self.reply_ok(msg, commands)
 
@@ -404,7 +404,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         if 'publish-to' in params:
             self.publish_to = params['publish-to']
-            logging.debug("Configured publish-to=" + self.publish_to)
+            log.debug("Configured publish-to=" + self.publish_to)
             self.topicDefined = True
             self.dpsc = DataPubsubClient(proc=self)
             self.topic = ResourceReference(RegistryIdentity=self.publish_to, RegistryBranch='master')

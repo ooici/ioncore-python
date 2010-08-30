@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 import os.path
 
 from ion.core import ioninit
@@ -46,14 +46,14 @@ class ModuleLoader(object):
                 self._load_module(mod)
 
     def _load_module(self, mod):
-        #logging.info('Loading Module %s' % (mod))
+        #log.info('Loading Module %s' % (mod))
         try:
             modo = pu.get_module(mod)
         except Exception, ie:
-            logging.error("Error importing module: "+str(mod))
+            log.error("Error importing module: "+str(mod))
 
     def _load_package(self, pack, recurse=False):
-        #logging.info('Loading Package %s' % (pack))
+        #log.info('Loading Package %s' % (pack))
         try:
             packo = pu.get_module(pack)
             ppath = packo.__path__
@@ -65,4 +65,4 @@ class ModuleLoader(object):
                     elif os.path.isdir(os.path.join(path1,fname)) and recurse:
                         self._load_package(pack+'.'+fname)
         except Exception, ie:
-            logging.error("Error importing package: "+str(pack))
+            log.error("Error importing package: "+str(pack))

@@ -2,7 +2,7 @@
 
 import inspect
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource
 
 from magnet.container import Id

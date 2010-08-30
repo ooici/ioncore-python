@@ -52,7 +52,7 @@ def check_magnet_version():
     mv = magnet.__version__.split('.')
     mv[2] = mv[2].partition('+')[0]
     if mv[0]<minmv[0] or mv[1]<minmv[1] or mv[2]<minmv[2]:
-        logging.error("*********** ATTENTION! Magnet %s required. Is %s ***********" %
+        log.error("*********** ATTENTION! Magnet %s required. Is %s ***********" %
                       (ic.MIN_MAGNET, magnet.__version__))
 
 check_magnet_version()

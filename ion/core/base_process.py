@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from twisted.internet import defer
 from magnet.container import Container
@@ -96,7 +96,7 @@ class BaseProcess(object):
         # List of ProcessDesc instances of defined and spawned child processes
         self.child_procs = []
 
-        logging.debug("NEW Process [%s], sup-id=%s, sys-name=%s" % (
+        log.debug("NEW Process [%s], sup-id=%s, sys-name=%s" % (
                 self.proc_name, self.proc_supid, self.sys_name))
 
     def add_receiver(self, receiver):
@@ -113,7 +113,7 @@ class BaseProcess(object):
         """
         assert not self.receiver.spawned, "Process already spawned"
         self.id = yield spawn(self.receiver)
-        logging.debug('Process spawn(): pid=%s' % (self.id))
+        log.debug('Process spawn(): pid=%s' % (self.id))
         yield defer.maybeDeferred(self.plc_spawn)
 
         # Call init right away. This is what you would expect anyways in a
@@ -163,19 +163,19 @@ class BaseProcess(object):
                 self.backend_id = yield spawn(self.backend_receiver)
                 yield defer.maybeDeferred(self.plc_init)
                 self.proc_state = "ACTIVE"
-                logging.info('----- Process %s INIT OK -----' % (self.proc_name))
+                log.info('----- Process %s INIT OK -----' % (self.proc_name))
                 if msg != None:
                     # msg is None only if called from local process self.init()
                     yield self.reply_ok(msg)
             except Exception, ex:
                 self.proc_state = "ERROR"
-                logging.exception('----- Process %s INIT ERROR -----' % (self.proc_name))
+                log.exception('----- Process %s INIT ERROR -----' % (self.proc_name))
                 if msg != None:
                     # msg is None only if called from local process self.init()
                     yield self.reply_err(msg, "Process %s INIT ERROR" % (self.proc_name) + str(ex))
         else:
             self.proc_state = "ERROR"
-            logging.error('Process %s in wrong state %s for op_init' % (self.proc_name, self.proc_state))
+            log.error('Process %s in wrong state %s for op_init' % (self.proc_name, self.proc_state))
 
     def plc_init(self):
         """
@@ -190,13 +190,13 @@ class BaseProcess(object):
         assert self.proc_state == "ACTIVE", "Process not initalized"
 
         if len(self.child_procs) > 0:
-            logging.info("Shutting down child processes")
+            log.info("Shutting down child processes")
         while len(self.child_procs) > 0:
             child = self.child_procs.pop()
             res = yield self.shutdown_child(child)
 
         yield defer.maybeDeferred(self.plc_shutdown)
-        logging.info('----- Process %s TERMINATED -----' % (self.proc_name))
+        log.info('----- Process %s TERMINATED -----' % (self.proc_name))
 
         if msg != None:
                 # msg is None only if called from local process self.shutdown()
@@ -223,7 +223,7 @@ class BaseProcess(object):
         except Exception, ex:
             # Unexpected error condition in message processing (only before
             # any callback is called)
-            logging.exception('Error in process %s receive ' % self.proc_name)
+            log.exception('Error in process %s receive ' % self.proc_name)
             # @TODO: There was an error and now what??
             if msg and msg.payload['reply-to']:
                 d = self.reply_err(msg, 'ERROR in process receive(): '+str(ex))
@@ -236,16 +236,16 @@ class BaseProcess(object):
         fromname = payload['sender']
         if 'sender-name' in payload:
             fromname = payload['sender-name']
-        logging.info('>>> [%s] receive(): RPC reply from [%s] <<<' % (self.proc_name, fromname))
+        log.info('>>> [%s] receive(): RPC reply from [%s] <<<' % (self.proc_name, fromname))
         d = self.rpc_conv.pop(payload['conv-id'])
         content = payload.get('content', None)
         res = (content, payload, msg)
         if type(content) is dict and content.get('status',None) == 'OK':
             pass
         elif type(content) is dict and content.get('status',None) == 'ERROR':
-            logging.warn('RPC reply is an ERROR: '+str(content.get('value',None)))
+            log.warn('RPC reply is an ERROR: '+str(content.get('value',None)))
         else:
-            logging.error('RPC reply is not well formed. Use reply_ok or reply_err')
+            log.error('RPC reply is not well formed. Use reply_ok or reply_err')
         # @todo is it OK to ack the response at this point already?
         d1 = msg.ack()
         if d1:
@@ -265,7 +265,7 @@ class BaseProcess(object):
         fromname = payload['sender']
         if 'sender-name' in payload:
             fromname = payload['sender-name']
-        logging.info('#####>>> [%s] receive(): Message from [%s], dispatching... >>>' % (self.proc_name, fromname))
+        log.info('#####>>> [%s] receive(): Message from [%s], dispatching... >>>' % (self.proc_name, fromname))
         convid = payload.get('conv-id', None)
         conv = self.conversations.get(convid, None) if convid else None
         # Perform a dispatch of message by operation
@@ -274,13 +274,13 @@ class BaseProcess(object):
         def _cb(res):
             if msg._state == "RECEIVED":
                 # Only if msg has not been ack/reject/requeued before
-                logging.debug("<<< ACK msg")
+                log.debug("<<< ACK msg")
                 d1 = msg.ack()
         def _err(res):
-            logging.error("*****Error in message processing: "+str(res)+"*****")
+            log.error("*****Error in message processing: "+str(res)+"*****")
             if msg._state == "RECEIVED":
                 # Only if msg has not been ack/reject/requeued before
-                logging.debug("<<< ACK msg")
+                log.debug("<<< ACK msg")
                 d1 = msg.ack()
             # @todo Should we send an err or rather reject the msg?
             if msg and msg.payload['reply-to']:
@@ -301,13 +301,13 @@ class BaseProcess(object):
                 (payload['op'] == 'identify' and payload['content']=='started'):
             # Regular message handling in expected state
             if payload['op'] != 'init' and self.proc_state == "INIT":
-                logging.warn('Process %s received message before completed init' % (self.proc_name))
+                log.warn('Process %s received message before completed init' % (self.proc_name))
 
             d = pu.dispatch_message(payload, msg, target, conv)
             return d
         else:
             text = "Process %s in invalid state %s." % (self.proc_name, self.proc_state)
-            logging.error(text)
+            log.error(text)
 
             # @todo: Requeue would be ok, but does not work (Rabbit limitation)
             #d = msg.requeue()
@@ -321,7 +321,7 @@ class BaseProcess(object):
         """
         The method called if operation callback operation is not defined
         """
-        logging.info('Catch message op=%s' % headers.get('op',None))
+        log.info('Catch message op=%s' % headers.get('op',None))
 
     def rpc_send(self, recv, operation, content, headers=None, **kwargs):
         """
@@ -335,7 +335,7 @@ class BaseProcess(object):
         # Timeout handling
         timeout = float(kwargs.get('timeout',0))
         def _timeoutf(d, convid, *args, **kwargs):
-            logging.info("RPC on conversation %s timed out! "%(convid))
+            log.info("RPC on conversation %s timed out! "%(convid))
             # Remove RPC. Delayed result will go to catch operation
             d = self.rpc_conv.pop(convid)
             d.errback(defer.TimeoutError())
@@ -388,7 +388,7 @@ class BaseProcess(object):
         if not headers:
             headers = {}
         if recv == None:
-            logging.error('No reply-to given for message '+str(msg))
+            log.error('No reply-to given for message '+str(msg))
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
             headers['conv-seq'] = int(ionMsg.get('conv-seq',0)) + 1
@@ -525,7 +525,7 @@ class ProcessDesc(object):
         assert self.proc_state == 'DEFINED', "Cannot spawn process twice"
         self.sup_process = supProc
         if self.proc_node == None:
-            logging.info('Spawning name=%s node=%s' %
+            log.info('Spawning name=%s node=%s' %
                          (self.proc_name, self.proc_node))
 
             # Importing service module
@@ -540,14 +540,14 @@ class ProcessDesc(object):
                          'sys-name':self.sup_process.sys_name}
             if self.spawn_args:
                 spawnargs.update(self.spawn_args)
-            #logging.debug("spawn(%s, args=%s)" % (self.proc_module, spawnargs))
+            #log.debug("spawn(%s, args=%s)" % (self.proc_module, spawnargs))
             proc_id = yield spawn(proc_mod, None, spawnargs)
             self.proc_id = proc_id
             self.proc_state = 'SPAWNED'
 
-            logging.info("Process "+str(self.proc_class)+" ID: "+str(proc_id))
+            log.info("Process "+str(self.proc_class)+" ID: "+str(proc_id))
         else:
-            logging.error('Cannot spawn '+self.proc_class+' on node='+str(self.proc_node))
+            log.error('Cannot spawn '+self.proc_class+' on node='+str(self.proc_node))
         defer.returnValue(self.proc_id)
 
     @defer.inlineCallbacks
@@ -601,7 +601,7 @@ class ProtocolFactory(ProtocolFactory):
         """
         if not spawnArgs:
             spawnArgs = {}
-        #logging.debug("ProtocolFactory.build(name=%s, args=%s)" % (self.name,spawnArgs))
+        #log.debug("ProtocolFactory.build(name=%s, args=%s)" % (self.name,spawnArgs))
         receiver = self.receiver(spawnArgs.get('proc-name', self.name))
         receiver.group = self.name
         instance = self.processClass(receiver, spawnArgs)

@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from twisted.internet import defer
 from magnet.spawnable import Receiver
@@ -33,10 +33,10 @@ class ProcessProtocolFactory(ProtocolFactory):
         """Factory method return a new receiver for a new process. At the same
         time instantiate class.
         """
-        logging.info("ProcessProtocolFactory.build() with args="+str(spawnArgs))
+        log.info("ProcessProtocolFactory.build() with args="+str(spawnArgs))
         svcmodule = spawnArgs.get('svcmodule',None)
         if not svcmodule:
-            logging.error("No spawn argument svcmodule given. Cannot spawn")
+            log.error("No spawn argument svcmodule given. Cannot spawn")
             return None
         
         svcclass = spawnArgs.get('svcclass',None)
@@ -44,16 +44,16 @@ class ProcessProtocolFactory(ProtocolFactory):
         svc_mod = pu.get_module(svcmodule)
         
         if hasattr(svc_mod,'factory'):
-            logging.info("Found module factory. Using factory to get service receiver")
+            log.info("Found module factory. Using factory to get service receiver")
             return svc_mod.factory.build()
         elif hasattr(svc_mod,'receiver'):
-            logging.info("Found module receiver")
+            log.info("Found module receiver")
             return svc_mod.receiver
         elif svcclass:
-            logging.info("Service process module instantiate from class:"+svcclass)
+            log.info("Service process module instantiate from class:"+svcclass)
             return self.create_process_instance(svc_mod,'name')
         else:
-            logging.error("Service process module cannot be spawned")
+            log.error("Service process module cannot be spawned")
     
     def create_process_instance(self, svc_mod, className):
         """Given a class name and a loaded module, instantiate the class
@@ -65,7 +65,7 @@ class ProcessProtocolFactory(ProtocolFactory):
         
         receiver = Receiver(svc_mod.__name__)
         serviceInstance = svc_class(receiver)
-        logging.info('create_process_instance: created service instance '+str(serviceInstance))
+        log.info('create_process_instance: created service instance '+str(serviceInstance))
         return receiver
 
 # Spawn of the process using the module name

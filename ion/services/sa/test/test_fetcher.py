@@ -8,7 +8,7 @@
 
 import base64
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 from socket import gaierror
 from twisted.trial import unittest
@@ -39,10 +39,10 @@ class FetcherServiceTester(IonTestCase):
         try:
             self.mf.get_page('http://foo.bar.baz/')
         except gaierror, ge:
-            logging.debug('got err as expected! %s' % str(ge))
+            log.debug('got err as expected! %s' % str(ge))
             pass
         except ValueError, ve:
-            logging.debug('got err as expected: %s' % str(ve))
+            log.debug('got err as expected: %s' % str(ve))
             pass
         else:
             self.fail('Should have raised an exception!')
@@ -66,7 +66,7 @@ class FetcherTest(IonTestCase):
 
     @defer.inlineCallbacks
     def _get_page(self, src_url):
-        logging.debug('sending GET request for "%s"...' % src_url)
+        log.debug('sending GET request for "%s"...' % src_url)
         res = yield self.fc.get_url(src_url)
         if res['status'] == 'ERROR':
             raise ValueError('Error on fetch')
@@ -75,7 +75,7 @@ class FetcherTest(IonTestCase):
 
     @defer.inlineCallbacks
     def _get_phead(self, src_url):
-        logging.debug('sending HEAD request for "%s"...' % src_url)
+        log.debug('sending HEAD request for "%s"...' % src_url)
         res = yield self.fc.get_head(src_url)
         if res['status'] == 'ERROR':
             raise ValueError('Error on fetch')

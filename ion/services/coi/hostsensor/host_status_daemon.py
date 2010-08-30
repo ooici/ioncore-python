@@ -44,7 +44,7 @@ class HostStatusDaemon(Daemon):
                                  )
         self.rpcPort = rpcPort
         self.rpcHost = rpcHost
-        logging.debug('host_status_daemon intialized')
+        log.debug('host_status_daemon intialized')
 
 
     def run(self):

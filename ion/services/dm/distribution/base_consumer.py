@@ -8,7 +8,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 import time
 
@@ -86,13 +86,13 @@ class BaseConsumer(BaseProcess):
         
             if not res:
                 #@Todo - raise an error here?
-                logging.info('Failed to attach process to Queue %s in plc_init' % queuename)
+                log.info('Failed to attach process to Queue %s in plc_init' % queuename)
                 
                 
         # Run any custom initialization provided by this consumer
-        logging.debug(self.__class__.__name__ + ' running customize_consumer')
+        log.debug(self.__class__.__name__ + ' running customize_consumer')
         yield defer.maybeDeferred(self.customize_consumer)
-        logging.debug(self.__class__.__name__ + ' customize_consumer complete!')
+        log.debug(self.__class__.__name__ + ' customize_consumer complete!')
         
                 
 
@@ -118,7 +118,7 @@ class BaseConsumer(BaseProcess):
         self.dataReceivers[dataReceiver.name] = dataReceiver
         
         self.receive_cnt[queue]=0
-        logging.info("DataConsumer.attach "+str(dr_id)+" to topic "+str(queue))
+        log.info("DataConsumer.attach "+str(dr_id)+" to topic "+str(queue))
         defer.returnValue(dr_id)
         
     @defer.inlineCallbacks
@@ -126,7 +126,7 @@ class BaseConsumer(BaseProcess):
         '''
         Message interface to attach to another queue
         '''
-        logging.info(self.__class__.__name__ +'; Calling Attach; Queues:' + str(content))
+        log.info(self.__class__.__name__ +'; Calling Attach; Queues:' + str(content))
         queues = content.get('queues',None)
         if not queues:
             yield self.reply_err(msg)
@@ -150,7 +150,7 @@ class BaseConsumer(BaseProcess):
         
         # Check and make sure it is not already attached?
         del self.dataReceivers[queue]
-        logging.info("DataConsumer.deattach; Deattached Queue:"+str(queue))
+        log.info("DataConsumer.deattach; Deattached Queue:"+str(queue))
         return defer.returnValued('OK')
 
         
@@ -159,7 +159,7 @@ class BaseConsumer(BaseProcess):
         """
         Message interface to attach to another queue
         """
-        logging.info(self.__class__.__name__ +'; Calling Deattach; Queues:' + str(content))
+        log.info(self.__class__.__name__ +'; Calling Deattach; Queues:' + str(content))
         queues = content.get('queues',None)
         if not queues:
             yield self.reply_err(msg)
@@ -183,7 +183,7 @@ class BaseConsumer(BaseProcess):
         '''
         Message interface to set parameters
         '''
-        logging.info(self.__class__.__name__ +'; Calling Set Process Parameters; Prameters:' + str(content))
+        log.info(self.__class__.__name__ +'; Calling Set Process Parameters; Prameters:' + str(content))
         if not content:
             yield self.reply_err(msg)
             return
@@ -195,7 +195,7 @@ class BaseConsumer(BaseProcess):
         '''
         Message interface to get parameters
         '''
-        logging.info(self.__class__.__name__ +'; Calling Get Process Parameters;')
+        log.info(self.__class__.__name__ +'; Calling Get Process Parameters;')
         
         yield self.reply_ok(msg,self.params)
         
@@ -204,7 +204,7 @@ class BaseConsumer(BaseProcess):
         '''
         Message interface to set parameters
         '''
-        logging.info(self.__class__.__name__ +'; Calling Set Delivery Queues; Queues:' + str(content))
+        log.info(self.__class__.__name__ +'; Calling Set Delivery Queues; Queues:' + str(content))
         if not content:
             yield self.reply_err(msg)
             return
@@ -216,7 +216,7 @@ class BaseConsumer(BaseProcess):
         '''
         Message interface to get parameters
         '''
-        logging.info(self.__class__.__name__ +'; Calling Get Delivery Queues;')
+        log.info(self.__class__.__name__ +'; Calling Get Delivery Queues;')
         
         yield self.reply_ok(msg,self.deliver)
         
@@ -225,16 +225,16 @@ class BaseConsumer(BaseProcess):
         '''
         Message interface to get the message count
         '''
-        logging.info(self.__class__.__name__ +'; Calling Get Msg Count;')
+        log.info(self.__class__.__name__ +'; Calling Get Msg Count;')
                 
         yield self.reply_ok(msg,{'received':self.receive_cnt,'sent':self.send_cnt})
 
     @defer.inlineCallbacks
     def op_data(self, content, headers, msg):
 
-        logging.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
+        log.debug(self.__class__.__name__ +', MSG Received: ' + str(headers))
 
-        logging.info(self.__class__.__name__ + '; Calling data process!')
+        log.info(self.__class__.__name__ + '; Calling data process!')
 
         # Keep a record of messages received
         #@Note this could get big! What todo?
@@ -258,17 +258,17 @@ class BaseConsumer(BaseProcess):
         args = dict(self.params)
         args.update(self.deliver)
 
-        logging.debug('**ARGS to ondata:'+str(args))
+        log.debug('**ARGS to ondata:'+str(args))
         yield defer.maybeDeferred(self.ondata, data, notification, timestamp, **args)
 
-        logging.info(self.__class__.__name__ +"; op_data: Finished data processing")
+        log.info(self.__class__.__name__ +"; op_data: Finished data processing")
 
 
         # Is this a consumer with digest delivery?
         if not self.delivery_interval:
             # if not send the messages from ondata...
             yield self.deliver_messages()
-            logging.info(self.__class__.__name__ +"; op_data: Finished sending results")
+            log.info(self.__class__.__name__ +"; op_data: Finished sending results")
             
         else: # Do the digets thing...
             
@@ -278,7 +278,7 @@ class BaseConsumer(BaseProcess):
                 self.interval_cnt[headers.get('receiver')] = 1
             
             
-            logging.debug(self.__class__.__name__ +"; op_data: digest state: \n" + \
+            log.debug(self.__class__.__name__ +"; op_data: digest state: \n" + \
                           "Last Delivered: " +str(self.last_delivered) +";\n" +\
                           "Loop Running: " +str(self.loop_running))
             
@@ -296,7 +296,7 @@ class BaseConsumer(BaseProcess):
                 else:
                     self.loop_running = True
                     delta_t = self.last_delivered + self.delivery_interval - pu.currenttime()
-                    logging.debug('Scheduling a call back in %s seconds' % delta_t)
+                    log.debug('Scheduling a call back in %s seconds' % delta_t)
                     #self.loop.start(delta_t)
                     reactor.callLater(delta_t, self.digest)
 
@@ -313,7 +313,7 @@ class BaseConsumer(BaseProcess):
     @defer.inlineCallbacks
     def digest(self):
         
-        logging.info(self.__class__.__name__ +"; Digesting results!")
+        log.info(self.__class__.__name__ +"; Digesting results!")
         
         # Stop the loop if it is running - start again when next data is received
         if self.loop_running:
@@ -329,7 +329,7 @@ class BaseConsumer(BaseProcess):
         # Update last_delivered
         self.interval_cnt={} # Reset the interval receive count
         self.last_delivered = pu.currenttime()
-        logging.info(self.__class__.__name__ +"; digest: Finished sending results")
+        log.info(self.__class__.__name__ +"; digest: Finished sending results")
         
     def onschedule(self, intrval_cnt, **kwargs):
         """

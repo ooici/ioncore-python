@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.container import Container
 from magnet.spawnable import Receiver
@@ -77,7 +77,7 @@ class BaseService(BaseProcess):
     def plc_init(self):
         yield self._declare_service_name()
         svcid = yield spawn(self.svc_receiver)
-        logging.info('Service process bound to name=%s as pid=%s' % (self.svc_receiver.name, svcid))
+        log.info('Service process bound to name=%s as pid=%s' % (self.svc_receiver.name, svcid))
         yield defer.maybeDeferred(self.slc_init)
         yield defer.maybeDeferred(self.slc_start)
 
@@ -99,7 +99,7 @@ class BaseService(BaseProcess):
         called once after the receipt of the process init message. Use this to
         perform complex, potentially deferred initializations.
         """
-        #logging.debug('slc_init()')
+        #log.debug('slc_init()')
 
     def slc_start(self):
         """
@@ -107,7 +107,7 @@ class BaseService(BaseProcess):
         or many times after the slc_init of a service process. At this point,
         all service dependencies must be present.
         """
-        #logging.info('slc_start()')
+        #log.info('slc_start()')
 
     def slc_stop(self):
         """
@@ -115,7 +115,7 @@ class BaseService(BaseProcess):
         stop a started service process, and before shutdown. A stopped service
         can be restarted again.
         """
-        #logging.info('slc_stop()')
+        #log.info('slc_stop()')
 
     def slc_shutdown(self):
         """
@@ -124,7 +124,7 @@ class BaseService(BaseProcess):
         No further asyncronous activities are allowed by the process after
         reply from this function.
         """
-        #logging.info('slc_shutdown()')
+        #log.info('slc_shutdown()')
 
     @classmethod
     def service_declare(cls, **kwargs):
@@ -133,7 +133,7 @@ class BaseService(BaseProcess):
         @param kwargs keyword attributes for service. Common ones must be present.
         @retval a dict with service attributes
         """
-        logging.debug("Service-declare: "+str(kwargs))
+        log.debug("Service-declare: "+str(kwargs))
         decl = {}
         decl.update(kwargs)
         return decl

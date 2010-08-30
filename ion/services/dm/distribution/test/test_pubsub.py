@@ -8,7 +8,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 #import time
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -54,7 +54,7 @@ class PubSubServiceMethodTest(IonTestCase):
 
         # This is only allowed in a test case - that way we can directly test the service methods!
         child_id = yield self.sup.get_child_id('pubsub_service')
-        logging.debug('PubSub Test Service ID:' + str(child_id))
+        log.debug('PubSub Test Service ID:' + str(child_id))
         self.pubsub = self._get_procinstance(child_id)
         
 
@@ -126,7 +126,7 @@ class PubSubServiceMethodTest(IonTestCase):
 
         subscription = yield self.pubsub.create_consumer_args(subscription)
 
-        logging.debug('Defined subscription consumers: '+str(subscription.consumer_args))
+        log.debug('Defined subscription consumers: '+str(subscription.consumer_args))
         self.assertEqual({'consumer1':
             {'procclass': '<ConsumerClassName>',
              'name': 'consumer1',
@@ -169,7 +169,7 @@ class PubSubServiceMethodTest(IonTestCase):
 
         subscription = yield self.pubsub.create_consumer_args(subscription)
 
-        logging.debug('Defined subscription consumers: '+str(subscription.consumer_args))
+        log.debug('Defined subscription consumers: '+str(subscription.consumer_args))
         
         consume2_attach = subscription.consumer_args['consumer2']['spawnargs']['attach']
         self.assertEqual({'module': 'path.to.module',
@@ -216,7 +216,7 @@ class PubSubServiceMethodTest(IonTestCase):
 
         subscription = yield self.pubsub.create_consumer_args(subscription)
 
-        logging.debug('Defined subscription consumers: '+str(subscription.consumer_args))
+        log.debug('Defined subscription consumers: '+str(subscription.consumer_args))
         
         consume2_attach = subscription.consumer_args['consumer2']['spawnargs']['attach']
         self.assertEqual({'module': 'path.to.module',
@@ -266,7 +266,7 @@ class PubSubServiceMethodTest(IonTestCase):
 
         subscription = yield self.pubsub.create_subscription(subscription)
 
-        logging.info('Defined subscription: '+str(subscription))
+        log.info('Defined subscription: '+str(subscription))
 
         msg=DataMessageObject()
         self.sup.send(topic.queue.name,'data',msg.encode())
@@ -310,7 +310,7 @@ class PubSubServiceMethodTest(IonTestCase):
 
         subscription = yield self.pubsub.create_subscription(subscription)
 
-        logging.info('Defined subscription: '+str(subscription))
+        log.info('Defined subscription: '+str(subscription))
 
         msg=DataMessageObject()
         self.sup.send(topic1.queue.name,'data',msg.encode())
@@ -353,10 +353,10 @@ class PubSubTest(IonTestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         
-        logging.info('Tearing Down PubSub Test')
+        log.info('Tearing Down PubSub Test')
         # Clear the registry on the way out!
         child_id = yield self.sup.get_child_id('pubsub_service')
-        logging.debug('PubSub Test Service ID:' + str(child_id))
+        log.debug('PubSub Test Service ID:' + str(child_id))
         # This is only allowed in a test case - that way we can directly use the service methods!
         pubsub = self._get_procinstance(child_id)
         pubsub.reg.clear_registry()
@@ -377,13 +377,13 @@ class PubSubTest(IonTestCase):
         # Create and Register a topic
         topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")        
         topic = yield dpsc.define_topic(topic)
-        logging.info('Defined Topic: '+str(topic))
+        log.info('Defined Topic: '+str(topic))
 
         #Create and register self.sup as a publisher
         publisher = PublisherResource.create('Test Publisher', self.sup, topic, 'DataObject')
         publisher = yield dpsc.define_publisher(publisher)
 
-        logging.info('Defined Publisher: '+str(publisher))
+        log.info('Defined Publisher: '+str(publisher))
         
 
         
@@ -417,9 +417,9 @@ class PubSubTest(IonTestCase):
         data = {'Data':'in a dictionary'}
         result = yield dpsc.publish(self.sup, topic.reference(), data)
         if result:
-            logging.info('Published Message')
+            log.info('Published Message')
         else:
-            logging.info('Failed to Published Message')
+            log.info('Failed to Published Message')
 
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
@@ -488,7 +488,7 @@ class PubSubTest(IonTestCase):
         publisher = PublisherResource.create('Test Publisher', self.sup, topic_raw, 'DataObject')
         publisher = yield dpsc.define_publisher(publisher)
 
-        logging.info('Defined Publisher: '+str(publisher))
+        log.info('Defined Publisher: '+str(publisher))
 
         # === Create a Consumer and queues - this will become part of define_subscription.
         
@@ -550,9 +550,9 @@ class PubSubTest(IonTestCase):
         
         result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
         if result:
-            logging.info('Published Message')
+            log.info('Published Message')
         else:
-            logging.info('Failed to Published Message')
+            log.info('Failed to Published Message')
 
 
         # Need to await the delivery of data messages into the consumers

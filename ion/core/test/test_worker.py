@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.container import Container
 from magnet.spawnable import spawn
@@ -41,7 +41,7 @@ class WorkerTest(IonTestCase):
         yield self._spawn_processes(workers)
 
         sup = yield self._get_procid("bootstrap")
-        logging.info("Supervisor: "+repr(sup))
+        log.info("Supervisor: "+repr(sup))
 
         wc = WorkerClient()
         wcId = yield wc.spawn()
@@ -51,8 +51,8 @@ class WorkerTest(IonTestCase):
             yield wc.submit_work(wq_name, i, 0.5)
 
         yield pu.asleep(7)
-        logging.info("Work results: "+str(wc.workresult))
-        logging.info("Worker results: "+str(wc.worker))
+        log.info("Work results: "+str(wc.workresult))
+        log.info("Worker results: "+str(wc.worker))
 
         sum = 0
         for w,v in wc.worker.items():
@@ -72,7 +72,7 @@ class WorkerTest(IonTestCase):
         yield self._spawn_processes(workers)
 
         sup = yield self._get_procid("bootstrap")
-        logging.info("Supervisor: "+repr(sup))
+        log.info("Supervisor: "+repr(sup))
 
         wc = WorkerClient()
         wcId = yield wc.spawn()
@@ -82,8 +82,8 @@ class WorkerTest(IonTestCase):
             yield wc.submit_work(wq_name, i, 0.5)
 
         yield pu.asleep(5)
-        logging.info("Work results: "+str(wc.workresult))
-        logging.info("Worker results: "+str(wc.worker))
+        log.info("Work results: "+str(wc.workresult))
+        log.info("Worker results: "+str(wc.worker))
 
         sum = 0
         for w,v in wc.worker.items():

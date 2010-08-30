@@ -17,7 +17,7 @@ from twisted.internet import defer, reactor
 from twisted.web import server, resource
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 class DMUI(resource.Resource):
@@ -37,7 +37,7 @@ class WebVizConsumer(base_consumer.BaseConsumer):
     #@defer.inlineCallbacks
     def customize_consumer(self):
 
-        logging.info('Setting up webserver...')
+        log.info('Setting up webserver...')
         
         port = self.params.get('port',2100)
         
@@ -48,12 +48,12 @@ class WebVizConsumer(base_consumer.BaseConsumer):
         self.root.print_string = None
         
         self.values=[]
-        logging.info('Website started')
+        log.info('Website started')
 
 
     @defer.inlineCallbacks
     def plc_shutdown(self):
-        logging.info('Shutdown triggered')
+        log.info('Shutdown triggered')
         if self.port:
             yield self.port.stopListening()
 
@@ -61,14 +61,14 @@ class WebVizConsumer(base_consumer.BaseConsumer):
     def ondata(self, data, notification, timestamp, **args):
         """
         """
-        logging.info('Updating google viz chart data!')
+        log.info('Updating google viz chart data!')
         
         if isinstance(data,str):
             self.root.print_string = data
         else:
             raise RuntimeError('Invalid data (Not a String) passed to WebVizConsumer ondata method!')
             
-        logging.info('Update complete!')
+        log.info('Update complete!')
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(WebVizConsumer)

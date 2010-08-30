@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory
@@ -59,9 +59,9 @@ class IngestionService(BaseService):
         return the ingestiondatastream resource
             
         """
-        logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
+        log.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
         isr = dataobject.DataObject.decode(content)
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Ingestion Stream: \n' + str(publisher))
+        log.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', Ingestion Stream: \n' + str(publisher))
             
         # Register the intended feed...
         isr = yield self.reg.define_ingestion_stream(isr)

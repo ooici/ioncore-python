@@ -9,7 +9,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit
@@ -49,9 +49,9 @@ class StoreService(BaseService):
         self.store = yield self.backend.create_store(**backendargs)
         
         name = self.__class__.__name__
-        logging.info(name + " initialized")
-        logging.info(name + " backend:"+str(backendcls))
-        logging.info(name + " backend args:"+str(backendargs))
+        log.info(name + " initialized")
+        log.info(name + " backend:"+str(backendcls))
+        log.info(name + " backend args:"+str(backendargs))
 
     @defer.inlineCallbacks
     def op_put(self, content, headers, msg):
@@ -59,7 +59,7 @@ class StoreService(BaseService):
         Service operation: Puts a value into the store identified by key.
         Replies with a result of this operation
         """
-        logging.info("op_put: "+str(content))
+        log.info("op_put: "+str(content))
         key = str(content['key'])
         val = content['value']
         res = yield self.store.put(key, val)
@@ -70,7 +70,7 @@ class StoreService(BaseService):
         """
         Service operation: Gets a value from the store identified by key.
         """
-        logging.info("op_get: "+str(content))
+        log.info("op_get: "+str(content))
         key = str(content['key'])
         val = yield self.store.get(key)
         yield self.reply_ok(msg, {'value':val})
@@ -115,32 +115,32 @@ class StoreServiceClient(BaseServiceClient, IStore):
     def get(self, key):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('get', {'key':str(key)})
-        logging.info('Service get reply: '+str(content))
+        log.info('Service get reply: '+str(content))
         defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
     def put(self, key, value):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('put', {'key':str(key), 'value':value})
-        logging.info('Service put reply: '+str(content))
+        log.info('Service put reply: '+str(content))
         defer.returnValue(str(content))
 
     @defer.inlineCallbacks
     def query(self, regex):
         (content, headers, msg) = yield self.rpc_send('query', {'regex':regex})
-        logging.info('Service query reply: '+str(content))
+        log.info('Service query reply: '+str(content))
         defer.returnValue(content['result'])
 
     @defer.inlineCallbacks
     def remove(self, key):
         (content, headers, msg) = yield self.rpc_send('remove', {'key':str(key)})
-        logging.info('Service remove reply: '+str(content))
+        log.info('Service remove reply: '+str(content))
         defer.returnValue(content['result'])
 
     @defer.inlineCallbacks
     def clear_store(self):
         (content, headers, msg) = yield self.rpc_send('clear_store', {})
-        logging.info('Service clear_store reply: '+str(content))
+        log.info('Service clear_store reply: '+str(content))
         defer.returnValue(content['result'])
 
 

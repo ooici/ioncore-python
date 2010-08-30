@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
@@ -27,7 +27,7 @@ class HelloService(BaseService):
     def __init__(self, receiver, spawnArgs=None):
         # Service class initializer. Basic config, but no yields allowed.
         BaseService.__init__(self, receiver, spawnArgs)
-        logging.info('HelloService.__init__()')
+        log.info('HelloService.__init__()')
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
@@ -35,7 +35,7 @@ class HelloService(BaseService):
 
     @defer.inlineCallbacks
     def op_hello(self, content, headers, msg):
-        logging.info('op_hello: '+str(content))
+        log.info('op_hello: '+str(content))
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
@@ -55,7 +55,7 @@ class HelloServiceClient(BaseServiceClient):
     def hello(self, text='Hi there'):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('hello', text)
-        logging.info('Service reply: '+str(content))
+        log.info('Service reply: '+str(content))
         defer.returnValue(str(content))
 
 # Spawn of the process using the module name

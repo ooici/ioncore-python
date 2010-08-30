@@ -10,7 +10,7 @@ and defining subscriptions.
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from twisted.internet import defer
 
@@ -55,7 +55,7 @@ class DataPubsubService(BaseService):
         AMQP topic notion. A topic is basically a data stream.
         """
         
-        logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' + str(headers))
+        log.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' + str(headers))
         topic = dataobject.Resource.decode(content)
   
         if topic.RegistryIdentity:
@@ -64,14 +64,14 @@ class DataPubsubService(BaseService):
             # it is a new topic and must be declared
             topic = yield self.create_and_register_topic(topic)
     
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic: \n' + str(topic))
+        log.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic: \n' + str(topic))
             
         #@todo call some process to update all the subscriptions? Or only on interval?
         if topic:
-            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
+            log.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
             yield self.reply_ok(msg, topic.encode())
         else:
-            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
+            log.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
 
     #@defer.inlineCallback # call back not needed
@@ -86,7 +86,7 @@ class DataPubsubService(BaseService):
         Create a messaging name and set the queue properties to create it.
         @TODO fix the hack - This should come from the exchange registry!
         """
-        logging.info(self.__class__.__name__ + '; Declaring new Topic & Creating Queue.')
+        log.info(self.__class__.__name__ + '; Declaring new Topic & Creating Queue.')
         # Give the topic anidentity
         topic.create_new_reference()
         
@@ -125,16 +125,16 @@ class DataPubsubService(BaseService):
         """Service operation: Register a publisher that subsequently is
         authorized to publish on a topic.
         """
-        logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
+        log.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
         publisher = dataobject.Resource.decode(content)
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publisher: \n' + str(publisher))
+        log.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publisher: \n' + str(publisher))
     
         publisher = yield self.reg.register(publisher)
         if publisher:
-            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
+            log.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
             yield self.reply_ok(msg, publisher.encode())
         else:
-            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
+            log.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
         
         
@@ -148,9 +148,9 @@ class DataPubsubService(BaseService):
         # and the subscription exchange point where a process receives it.
         # That allows for an intermediary process to filter it.
         
-        logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
+        log.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
         subscription = dataobject.Resource.decode(content)
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', subscription: \n' + str(subscription))
+        log.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', subscription: \n' + str(subscription))
     
         
         if subscription.RegistryIdentity:
@@ -161,10 +161,10 @@ class DataPubsubService(BaseService):
     
         subscription = yield self.reg.register(subscription)
         if subscription:
-            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
+            log.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
             yield self.reply_ok(msg, subscription.encode())
         else:
-            logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
+            log.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Failed!')
             yield self.reply_err(msg, None)
 
     """
@@ -213,7 +213,7 @@ class DataPubsubService(BaseService):
         methods where possible.
         '''
         
-        logging.info('Processing Subscription Workflow:'+str(subscription.workflow))
+        log.info('Processing Subscription Workflow:'+str(subscription.workflow))
         
         #A for each topic1, topic2, topic3 get the list of queues
             
@@ -265,7 +265,7 @@ class DataPubsubService(BaseService):
             
             consumers[consumer]=cd
         
-        #logging.info('CONSUMERS:' + str(consumers))
+        #log.info('CONSUMERS:' + str(consumers))
         
         # for each consumer and add its attachements and create delivery queues
         for consumer, args in subscription.workflow.items():
@@ -304,7 +304,7 @@ class DataPubsubService(BaseService):
                         attach.append(topic.queue.name)
                         # Add it to the list for this subscription
                         subscription_queues.append(topic.queue)
-                        logging.info('''Consumer '%s' attaches to topic name '%s' ''' % (consumer, topic.name))
+                        log.info('''Consumer '%s' attaches to topic name '%s' ''' % (consumer, topic.name))
                     
                 # See if it is consuming another resultant
                 elif name in consumer_names: # Could fail badly!
@@ -314,7 +314,7 @@ class DataPubsubService(BaseService):
                     q = consumers[name]['spawnargs']['delivery queues'].get(keyword,None)
                     if q:
                         attach.append(q)
-                        logging.info('''Consumer '%s' attaches to existing queue for producer/keyword: '%s'/'%s' ''' % (consumer, name, keyword))
+                        log.info('''Consumer '%s' attaches to existing queue for producer/keyword: '%s'/'%s' ''' % (consumer, name, keyword))
                     else: 
                         # Create the queue!
                         #@TODO - replace with call to exchange registry service
@@ -326,14 +326,14 @@ class DataPubsubService(BaseService):
                         
                         # Add to the delivery list for the producer...
                         consumers[name]['spawnargs']['delivery queues'][keyword]=str(queue.name)
-                        logging.info('''Consumer '%s' attaches to new queue for producer/keyword: '%s'/'%s' ''' % (consumer, name, keyword))
+                        log.info('''Consumer '%s' attaches to new queue for producer/keyword: '%s'/'%s' ''' % (consumer, name, keyword))
                 else:
                     raise RuntimeError('''Can not determine how to attach consumer '%s' \
                                        to topic or consumer '%s' ''' % (consumer, item))
                     
             consumers[consumer]['spawnargs']['attach'].extend(attach)        
         
-        logging.info('CONSUMERS:' + str(consumers))
+        log.info('CONSUMERS:' + str(consumers))
         
         subscription.queues = subscription_queues
         subscription.consumer_args = consumers
@@ -367,10 +367,10 @@ class DataPubsubService(BaseService):
     def op_publish(self, content, headers, msg):
         """Service operation: Publish data message on a topic
         """
-        logging.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
+        log.debug(self.__class__.__name__ +', op_'+ headers['op'] +' Received: ' +  str(headers))
         publication = dataobject.Resource.decode(content)
-        logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publication')
-        #logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publication: \n' + str(publication))
+        log.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publication')
+        #log.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publication: \n' + str(publication))
         
         #Get the data
         data = publication.data
@@ -379,7 +379,7 @@ class DataPubsubService(BaseService):
         topic_ref = publication.topic_ref
         topic = yield self.reg.get(topic_ref.reference(head=True))
         if not topic:
-            logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic invalid!')
+            log.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', topic invalid!')
             yield self.reply_err(msg, 'Topic does not exist')
             return
         
@@ -395,11 +395,11 @@ class DataPubsubService(BaseService):
             
             if topic.reference(head=True) in pub.topics:
                 valid = True
-                logging.debug(self.__class__.__name__ + '; Publishing to topic: \n' + str(topic))
+                log.debug(self.__class__.__name__ + '; Publishing to topic: \n' + str(topic))
                 break
         
         if not valid:
-            logging.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publisher not registered for topic!')
+            log.info(self.__class__.__name__ + ' recieved: op_'+ headers['op'] +', publisher not registered for topic!')
             yield self.reply_err(msg, 'Publisher not registered for topic!')
             return
         
@@ -412,7 +412,7 @@ class DataPubsubService(BaseService):
         #@Todo - Move the actual publish command back to the client side!
         yield self.send(topic.queue.name, 'data', data.encode(), {})
 
-        logging.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
+        log.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
         yield self.reply_ok(msg, '')
         
     #@defer.inlineCallbacks
@@ -450,19 +450,19 @@ class DataPubsubClient(BaseServiceClient):
         """
         yield self._check_init()
         
-        logging.info(self.__class__.__name__ + '; Calling: define_topic')
+        log.info(self.__class__.__name__ + '; Calling: define_topic')
         assert isinstance(topic, dataobject.Resource), 'Invalid argument to define_topic'
         
         (content, headers, msg) = yield self.rpc_send('define_topic',
                                             topic.encode())
-        logging.debug(self.__class__.__name__ + ': define_topic; Result:' + str(headers))
+        log.debug(self.__class__.__name__ + ': define_topic; Result:' + str(headers))
         
         if content['status']=='OK':
             topic = dataobject.Resource.decode(content['value'])
-            logging.info(self.__class__.__name__ + '; define_topic: Success!')
+            log.info(self.__class__.__name__ + '; define_topic: Success!')
             defer.returnValue(topic)
         else:
-            logging.info(self.__class__.__name__ + '; define_topic: Failed!')
+            log.info(self.__class__.__name__ + '; define_topic: Failed!')
             defer.returnValue(None)
 
 
@@ -473,20 +473,20 @@ class DataPubsubClient(BaseServiceClient):
         """
         yield self._check_init()
 
-        logging.info(self.__class__.__name__ + '; Calling: define_publisher')
+        log.info(self.__class__.__name__ + '; Calling: define_publisher')
         assert isinstance(publisher, dm_resource_descriptions.PublisherResource), 'Invalid argument to define_publisher'
         
 
         (content, headers, msg) = yield self.rpc_send('define_publisher',
                                             publisher.encode())
-        logging.debug(self.__class__.__name__ + ': define_publisher; Result:' + str(headers))
+        log.debug(self.__class__.__name__ + ': define_publisher; Result:' + str(headers))
         
         if content['status']=='OK':
-            logging.info(self.__class__.__name__ + '; define_publisher: Success!')
+            log.info(self.__class__.__name__ + '; define_publisher: Success!')
             publisher = dataobject.Resource.decode(content['value'])
             defer.returnValue(publisher)
         else:
-            logging.info(self.__class__.__name__ + '; define_publisher: Failed!')
+            log.info(self.__class__.__name__ + '; define_publisher: Failed!')
             defer.returnValue(None)
 
     
@@ -503,7 +503,7 @@ class DataPubsubClient(BaseServiceClient):
         """
         yield self._check_init()
 
-        logging.info(self.__class__.__name__ + '; Calling: publish')
+        log.info(self.__class__.__name__ + '; Calling: publish')
         
         publication = dm_resource_descriptions.Publication()
         
@@ -519,7 +519,7 @@ class DataPubsubClient(BaseServiceClient):
             do = dm_resource_descriptions.StringMessageObject()
             do.data=data
         else:
-            logging.info('%s; publish: Failed! Invalid DataType: %s' % (self.__class__.__name__, type(data)))
+            log.info('%s; publish: Failed! Invalid DataType: %s' % (self.__class__.__name__, type(data)))
             raise RuntimeError('%s; publish: Invalid DataType: %s' % (self.__class__.__name__, type(data)))
         
         publication.data = do
@@ -528,13 +528,13 @@ class DataPubsubClient(BaseServiceClient):
         
         (content, headers, msg) = yield self.rpc_send('publish',
                                             publication.encode())
-        logging.debug(self.__class__.__name__ + ': publish; Result:' + str(headers))
+        log.debug(self.__class__.__name__ + ': publish; Result:' + str(headers))
         
         if content['status']=='OK':
-            logging.info(self.__class__.__name__ + '; publish: Success!')
+            log.info(self.__class__.__name__ + '; publish: Success!')
             defer.returnValue('sent')
         else:
-            logging.info(self.__class__.__name__ + '; publish: Failed!')
+            log.info(self.__class__.__name__ + '; publish: Failed!')
             defer.returnValue('error sending message!')
 
 
@@ -545,19 +545,19 @@ class DataPubsubClient(BaseServiceClient):
         """
         yield self._check_init()
 
-        logging.info(self.__class__.__name__ + '; Calling: define_subscription')
+        log.info(self.__class__.__name__ + '; Calling: define_subscription')
         assert isinstance(subscription, dm_resource_descriptions.SubscriptionResource), 'Invalid argument to define_subscription'
         
 
         (content, headers, msg) = yield self.rpc_send('define_subscription',
                                             subscription.encode())
-        logging.debug(self.__class__.__name__ + ': define_subscription; Result:' + str(headers))
+        log.debug(self.__class__.__name__ + ': define_subscription; Result:' + str(headers))
         
         if content['status']=='OK':
-            logging.info(self.__class__.__name__ + '; define_subscription: Success!')
+            log.info(self.__class__.__name__ + '; define_subscription: Success!')
             subscription = dataobject.Resource.decode(content['value'])
             defer.returnValue(subscription)
         else:
-            logging.info(self.__class__.__name__ + '; define_subscription: Failed!')
+            log.info(self.__class__.__name__ + '; define_subscription: Failed!')
             defer.returnValue(None)
 

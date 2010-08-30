@@ -8,7 +8,7 @@
 import ast
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
@@ -28,7 +28,7 @@ class JavaIntegrationService(BaseService):
     def __init__(self, receiver, spawnArgs=None):
         # Service class initializer. Basic config, but no yields allowed.
         BaseService.__init__(self, receiver, spawnArgs)
-        logging.info('JavaIntegrationService.__init__()')
+        log.info('JavaIntegrationService.__init__()')
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
@@ -41,21 +41,21 @@ class JavaIntegrationService(BaseService):
 
     @defer.inlineCallbacks
     def op_hello(self, content, headers, msg):
-        logging.info('op_hello: '+str(content))
+        log.info('op_hello: '+str(content))
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
 
     @defer.inlineCallbacks
     def op_list_all_instruments(self, content, headers, msg):
-        logging.info('op_list_all_instruments: '+str(content))
+        log.info('op_list_all_instruments: '+str(content))
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, {'value':self.instruments})
 
     @defer.inlineCallbacks
     def op_register_instrument(self, content, headers, msg):
-        logging.info('op_register_instrument: '+ str(content))
+        log.info('op_register_instrument: '+ str(content))
 
         newInstrument = ast.literal_eval(str(content))
 
@@ -67,14 +67,14 @@ class JavaIntegrationService(BaseService):
 
     @defer.inlineCallbacks
     def op_list_all_datasets(self, content, headers, msg):
-        logging.info('op_list_all_datasets: '+str(content))
+        log.info('op_list_all_datasets: '+str(content))
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, {'value':self.datasets}    )
 
     @defer.inlineCallbacks
     def op_register_dataset(self, content, headers, msg):
-        logging.info('op_register_dataset: '+ str(content))
+        log.info('op_register_dataset: '+ str(content))
 
         newDataset = ast.literal_eval(str(content))
 
@@ -85,14 +85,14 @@ class JavaIntegrationService(BaseService):
 
     @defer.inlineCallbacks
     def op_list_all_services(self, content, headers, msg):
-        logging.info('op_list_all_services: '+str(content))
+        log.info('op_list_all_services: '+str(content))
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, {'value':self.services})
         
     @defer.inlineCallbacks
     def op_register_service(self, content, headers, msg):
-        logging.info('op_register_service: '+ str(content))
+        log.info('op_register_service: '+ str(content))
 
         newService = ast.literal_eval(str(content))
 

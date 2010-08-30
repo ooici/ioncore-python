@@ -9,7 +9,7 @@
 
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
@@ -45,7 +45,7 @@ class DataAcquisitionService(BaseService):
         Service operation: Acquire an entire, fully described version of a
         data set.
         """
-        logging.info('op_acquire_block: '+str(content))
+        log.info('op_acquire_block: '+str(content))
         yield self.reply_ok(msg, {'value':'op_acquire_block_respond,'+str(content)}, {})
 
 
@@ -54,7 +54,7 @@ class DataAcquisitionService(BaseService):
         """
         Service operation: Acquire an increment of a data set.
         """
-        logging.info('op_acquire_message: '+str(content))
+        log.info('op_acquire_message: '+str(content))
         yield self.reply_ok(msg, {'value':'op_acquire_message_respond, '+str(content)}, {})
 
 
@@ -73,14 +73,14 @@ class DataAcquisitionServiceClient(BaseServiceClient):
    def acquire_block(self, text='Hi there'):
        yield self._check_init()
        (content, headers, msg) = yield self.rpc_send('acquire_block', text)
-       logging.info('Acquire block Service reply: '+str(content))
+       log.info('Acquire block Service reply: '+str(content))
        defer.returnValue(str(content))
 
    @defer.inlineCallbacks
    def acquire_message(self, text='Hi there'):
        yield self._check_init()
        (content, headers, msg) = yield self.rpc_send('acquire_message', text)
-       logging.info('Acquire message Service reply: '+str(content))
+       log.info('Acquire message Service reply: '+str(content))
        defer.returnValue(str(content))
 
 # Spawn of the process using the module name

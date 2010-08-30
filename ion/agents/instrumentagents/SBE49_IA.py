@@ -6,7 +6,7 @@
 @brief CI interface for SeaBird SBE-49 CTD
 """
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 
 import SBE49_constants as const
@@ -34,7 +34,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
 
         self.instrument_id = self.spawn_args.get('instrument-id', '123')
         self.driver_args = self.spawn_args.get('driver-args', {})
-        logging.info("INIT agent for instrument ID: %s" % (self.instrument_id))
+        log.info("INIT agent for instrument ID: %s" % (self.instrument_id))
 
         self.driver_args['instrument-id'] = self.instrument_id
         self.pd = ProcessDesc(**{'name':'SBE49Driver',

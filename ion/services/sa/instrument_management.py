@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
@@ -108,7 +108,7 @@ class InstrumentManagementService(BaseService):
         ## Create and Register a topic
         #self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
         #self.topic = yield self.dpsc.define_topic(self.topic)
-        #logging.debug('DHE: Defined Topic')
+        #log.debug('DHE: Defined Topic')
         #
         #self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
         #self.publisher = yield self.dpsc.define_publisher(self.publisher)
@@ -159,7 +159,7 @@ class InstrumentManagementService(BaseService):
         # Step 3: Interact with the agent to execute the command
         iaclient = InstrumentAgentClient(proc=self, target=agent_pid)
         commandlist = [command,]
-        logging.info("Sending command to IA: "+str(commandlist))
+        log.info("Sending command to IA: "+str(commandlist))
         cmd_result = yield iaclient.execute_instrument(commandlist)
 
         yield self.reply_ok(msg, cmd_result)
@@ -272,7 +272,7 @@ class InstrumentManagementService(BaseService):
 
     @defer.inlineCallbacks
     def get_agent_desc_for_instrument(self, instrument_id):
-        logging.info("get_agent_desc_for_instrument() instrumentID="+str(instrument_id))
+        log.info("get_agent_desc_for_instrument() instrumentID="+str(instrument_id))
         int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
         agent_query = InstrumentAgentResourceInstance()
         agent_query.instrument_ref = int_ref
@@ -281,19 +281,19 @@ class InstrumentManagementService(BaseService):
         if not agent_res:
             defer.returnValue(None)
         agent_pid = agent_res.proc_id
-        logging.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
+        log.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
         defer.returnValue(agent_pid)
 
     @defer.inlineCallbacks
     def get_agent_for_instrument(self, instrument_id):
-        logging.info("get_agent_for_instrument() instrumentID="+str(instrument_id))
+        log.info("get_agent_for_instrument() instrumentID="+str(instrument_id))
         int_ref = ResourceReference(RegistryIdentity=instrument_id, RegistryBranch='master')
         agent_query = InstrumentAgentResourceInstance()
         agent_query.instrument_ref = int_ref
         # @todo Need to list the LC state here. WHY???
         agent_query.lifecycle = LCStates.developed
         agents = yield self.arc.find_registered_agent_instance_from_description(agent_query, regex=False)
-        logging.info("Found %s agent instances for instrument id %s" % (len(agents), instrument_id))
+        log.info("Found %s agent instances for instrument id %s" % (len(agents), instrument_id))
         agent_res = None
         if len(agents) > 0:
             agent_res = agents[0]
@@ -305,7 +305,7 @@ class InstrumentManagementService(BaseService):
         if not agent_res:
             defer.returnValue(None)
         agent_pid = agent_res.proc_id
-        logging.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
+        log.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
         defer.returnValue(agent_pid)
 
 class InstrumentManagementClient(BaseServiceClient):

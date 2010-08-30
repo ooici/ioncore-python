@@ -12,7 +12,7 @@ method for badly written DAP clients.
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 import base64
 
@@ -35,7 +35,7 @@ class FetcherService(BaseService):
     @todo refactor to use dap_tools
     @note These are not class methods!
     """
-    #logging.info('Declaring fetcher...')
+    #log.info('Declaring fetcher...')
     declare = BaseService.service_declare(name='fetcher',
                                           version='0.1.2',
                                           dependencies=[])
@@ -69,7 +69,7 @@ class FetcherService(BaseService):
         """
         assert(operation in ['GET', 'HEAD'])
 
-        logging.debug('Fetcher: %s %s' % (operation, src_url))
+        log.debug('Fetcher: %s %s' % (operation, src_url))
 
         src = urlparse.urlsplit(src_url)
         try:
@@ -78,7 +78,7 @@ class FetcherService(BaseService):
             conn.request(operation, src.path)
             res = conn.getresponse()
         except gaierror, ge:
-            logging.exception()
+            log.exception()
             yield self.reply_err(msg, content=str(ge))
 
         hstr = self._reassemble_headers(res)
@@ -88,15 +88,15 @@ class FetcherService(BaseService):
             # @note read on HEAD returns no data
             hstr = hstr + '\n' + res.read()
             # Uncomment this to see the completed result
-            # logging.debug(hstr)
+            # log.debug(hstr)
             # @note base64-encoded page returned!
             yield self.reply_ok(msg, content=base64.b64encode(hstr))
         else:
-            logging.info('fetch error %s %s %s %s' %
+            log.info('fetch error %s %s %s %s' %
                          (operation, src_url, res.status, res.reason))
             yield self.reply_err(msg, content=hstr)
 
-        logging.debug('fetch completed %s' % res.status)
+        log.debug('fetch completed %s' % res.status)
     def get_page(self, url, get_headers=False):
         """
         Inner routine to grab a page, with or without http headers.
@@ -113,7 +113,7 @@ class FetcherService(BaseService):
             conn.request('GET', src.path)
             res = conn.getresponse()
         except gaierror, ge:
-            logging.error('Socket error fetching page')
+            log.error('Socket error fetching page')
             raise ge
 
         if res.status == 200:
@@ -154,19 +154,19 @@ class FetcherService(BaseService):
         dds_url = base_url + '.dds'
         dods_url = base_url + '.dods'
 
-        logging.debug('Starting fetch of "%s"' % base_url)
+        log.debug('Starting fetch of "%s"' % base_url)
         try:
             das = self.get_page(das_url)
             dds = self.get_page(dds_url)
             dods = self.get_page(dods_url)
         except ValueError, ve:
-            logging.exception('Error on fetch of ' + base_url)
+            log.exception('Error on fetch of ' + base_url)
             raise ve
         except gaierror, ge:
-            logging.exception('Error on fetch of ' + base_url)
+            log.exception('Error on fetch of ' + base_url)
             raise ge
 
-        logging.debug('Fetches completed OK, composing and returning message')
+        log.debug('Fetches completed OK, composing and returning message')
 
         #@TODO replace the dictionary with the DM_DAP dataset object!
         dset_msg = {}
@@ -200,9 +200,9 @@ class FetcherService(BaseService):
                                  {'value':'Error on fetch: %s' % str(ge)}, {})
             defer.returnValue(None)
 
-        logging.info('Returning dataset via reply_ok...')
+        log.info('Returning dataset via reply_ok...')
         yield self.reply_ok(msg, dmesg)
-        logging.debug('Send complete')
+        log.debug('Send complete')
 
 class FetcherClient(BaseServiceClient):
     """
@@ -221,7 +221,7 @@ class FetcherClient(BaseServiceClient):
         """
         yield self._check_init()
 
-        logging.info('Sending HEAD request to fetcher...')
+        log.info('Sending HEAD request to fetcher...')
         (content, headers, msg) = yield self.rpc_send('get_head', requested_url)
         if 'ERROR' in content:
             raise ValueError('Error on URL: ' + content['failure'])
@@ -237,7 +237,7 @@ class FetcherClient(BaseServiceClient):
         """
         yield self._check_init()
 
-        logging.info('Sending request')
+        log.info('Sending request')
         (content, headers, msg) = yield self.rpc_send('get_url', requested_url)
         if 'ERROR' in content:
             raise ValueError('Error on URL: ' + content['failure'])
@@ -265,7 +265,7 @@ class FetcherClient(BaseServiceClient):
             new_headers['reply-to'] = old_headers['reply-to']
             new_headers['conv-id'] = old_headers['conv-id']
         except KeyError, ke:
-            logging.exception('missing header!')
+            log.exception('missing header!')
             raise ke
 
         return new_headers
@@ -279,7 +279,7 @@ class FetcherClient(BaseServiceClient):
         coordinator.
         """
         yield self._check_init()
-        logging.debug('Fetcher forwarding URL')
+        log.debug('Fetcher forwarding URL')
         yield self.send('get_url', content, self._rewrite_headers(headers))
 
     @defer.inlineCallbacks

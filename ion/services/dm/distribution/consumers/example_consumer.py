@@ -13,7 +13,7 @@ from ion.services.dm.distribution import base_consumer
 from ion.core.base_process import ProtocolFactory
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from pydap.model import DatasetType
 

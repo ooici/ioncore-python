@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from ion.test.iontest import IonTestCase
 from ion.services.coi.hostsensor.readers import HostReader

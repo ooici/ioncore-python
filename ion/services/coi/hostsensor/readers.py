@@ -298,7 +298,7 @@ class SnmpReader:
         self.timeout = timeout
         self.retries = 3
         self._supportsSNMP = True
-        logging.debug('Supports Pysnmp - ' + str(PysnmpImported))
+        log.debug('Supports Pysnmp - ' + str(PysnmpImported))
         if not PysnmpImported:
             self._supportsPysnmp = False
             self._supportsRfc2790 = False

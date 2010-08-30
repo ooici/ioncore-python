@@ -9,7 +9,7 @@ Rewrite from LCO version; refactor/rewrite for new LCA arch.
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory
@@ -34,7 +34,7 @@ class CoordinatorService(BaseService):
         Service life cycle state. Initialize service here. Can use yields.
         @todo Create instances of clients here for later - fetcher, attr store, etc
         """
-        logging.debug('Preservation coordinator SLC init')
+        log.debug('Preservation coordinator SLC init')
         self.fc = FetcherClient(proc=self)
 
     @defer.inlineCallbacks
@@ -46,7 +46,7 @@ class CoordinatorService(BaseService):
         @param msg Not used
         @todo Cache logic - right now just trapdoors all reqs to fetcher
         """
-        logging.debug('Coordinator forwarding URL request to fetcher')
+        log.debug('Coordinator forwarding URL request to fetcher')
         yield self.fc.forward_get_url(content, headers)
 
     @defer.inlineCallbacks
@@ -82,7 +82,7 @@ class CoordinatorClient(BaseServiceClient):
     def get_head(self, url):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('get_head', url)
-        #logging.info('Reply from service: '+ content['value'])
+        #log.info('Reply from service: '+ content['value'])
         defer.returnValue(content)
 
 factory = ProtocolFactory(CoordinatorService)

@@ -8,7 +8,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from magnet import spawnable
@@ -40,7 +40,7 @@ def start():
     """
     Starts ION system with static config of core messaging names and services.
     """
-    logging.info("ION SYSTEM bootstrapping now...")
+    log.info("ION SYSTEM bootstrapping now...")
     startsvcs = []
     startsvcs.extend(ion_core_services)
     sup = yield bootstrap(ion_messaging, startsvcs)
@@ -54,7 +54,7 @@ def bootstrap(messaging=None, services=None):
     @param services list of services (as svc description dict) to start up
     @retval supervisor BaseProcess instance
     """
-    logging.info("Init container, configuring messaging and starting services...")
+    log.info("Init container, configuring messaging and starting services...")
     init_container()
     sup = None
     if messaging:
@@ -73,7 +73,7 @@ def init_container():
     _set_container_args(Container.args)
     interceptorsys = CONF.getValue('interceptor_system',None)
     if interceptorsys:
-        logging.info("Setting capability container interceptor system")
+        log.info("Setting capability container interceptor system")
         cls = pu.get_class(interceptorsys)
         Container.interceptor_system = cls()
     # Collect all service declarations in local code modules
@@ -87,7 +87,7 @@ def init_container():
 def _set_container_args(contargs=None):
     ioninit.cont_args['_args'] = contargs
     if contargs:
-        logging.info('Evaluating and setting container args: '+str(contargs))
+        log.info('Evaluating and setting container args: '+str(contargs))
         if contargs.startswith('{'):
             try:
                 # Evaluate args and expect they are dict as str
@@ -95,10 +95,10 @@ def _set_container_args(contargs=None):
                 if type(evargs) is dict:
                     ioninit.cont_args.update(evargs)
             except Exception, e:
-                logging.error('Invalid argument format: ', e)
+                log.error('Invalid argument format: ', e)
         elif contargs.find('=') > 0:
             # Key=value arguments separated by comma
-            logging.info("Parsing KV")
+            log.info("Parsing KV")
             args = contargs.split(',')
             for a in args:
                 k,s,v = a.partition('=')
@@ -125,7 +125,7 @@ def declare_messaging(messagingCfg, cgroup=None):
             msgName = Container.id + "." + msgName
 
         # declare queues, bindings as needed
-        logging.info("Messaging name config: name="+msgName+', '+str(msgResource))
+        log.info("Messaging name config: name="+msgName+', '+str(msgResource))
         yield Container.configure_messaging(msgName, msgResource)
 
 # Sequence number of supervisors
@@ -147,11 +147,11 @@ def spawn_processes(procs, sup=None):
     if sup == None:
         sup = yield create_supervisor()
 
-    logging.info("Spawning child processes")
+    log.info("Spawning child processes")
     for child in children:
         child_id = yield sup.spawn_child(child)
 
-    logging.debug("process_ids: "+ str(base_process.procRegistry.kvs))
+    log.debug("process_ids: "+ str(base_process.procRegistry.kvs))
 
     defer.returnValue(sup)
 
@@ -163,7 +163,7 @@ def create_supervisor():
     """
     global sup_seq
     # Makes the boostrap a process
-    logging.info("Spawning supervisor")
+    log.info("Spawning supervisor")
     if sup_seq == 0:
         supname = "bootstrap"
     else:

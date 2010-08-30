@@ -8,7 +8,7 @@
 @see ion.agents.instrumentagents.test.test_instrument
 """
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.test.iontest import IonTestCase
@@ -56,7 +56,7 @@ class TestSBE49(IonTestCase):
         self.sup = yield self._spawn_processes(services)
 
         self.driver_pid = yield self.sup.get_child_id('SBE49_Driver')
-        logging.debug("Driver pid %s" % (self.driver_pid))
+        log.debug("Driver pid %s" % (self.driver_pid))
 
         self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
                                                          target=self.driver_pid)
@@ -151,7 +151,7 @@ class TestSBE49(IonTestCase):
 
         subscription = yield dpsc.define_subscription(subscription)
 
-        logging.info('Defined subscription: '+str(subscription))
+        log.info('Defined subscription: '+str(subscription))
 
         cmd1 = [['ds', 'now']]
         #cmd1 = [['start', 'now']]
@@ -192,7 +192,7 @@ class TestSBE49(IonTestCase):
 
         subscription = yield dpsc.define_subscription(subscription)
 
-        logging.info('Defined subscription: '+str(subscription))
+        log.info('Defined subscription: '+str(subscription))
 
         params = {}
         params['publish-to'] = topic.RegistryIdentity

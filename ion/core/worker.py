@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 from magnet.spawnable import spawn
@@ -26,16 +26,16 @@ class WorkerProcess(BaseService):
     def slc_init(self):
         msg_name = self.spawn_args['service-name']
         scope = self.spawn_args['scope']
-        logging.info("slc_init name received:"+msg_name)
+        log.info("slc_init name received:"+msg_name)
         msg_name1 = self.get_scoped_name(scope, msg_name)
-        logging.info("slc_init name used:"+msg_name1)
+        log.info("slc_init name used:"+msg_name1)
         workReceiver = Receiver(__name__, msg_name1)
         self.workReceiver = workReceiver
         self.workReceiver.handle(self.receive)
 
-        logging.info("slc_init worker receiver spawning")
+        log.info("slc_init worker receiver spawning")
         id = yield spawn(workReceiver)
-        logging.info("slc_init worker receiver spawned:"+str(id))
+        log.info("slc_init worker receiver spawned:"+str(id))
 
     @defer.inlineCallbacks
     def op_work(self, content, headers, msg):
@@ -47,9 +47,9 @@ class WorkerProcess(BaseService):
         myid = self.proc_name + ":" + self.receiver.spawned.id.local
         workid = str(content['work-id'])
         waittime = float(content['work'])
-        logging.info("worker="+myid+" job="+workid+" work="+str(waittime))
+        log.info("worker="+myid+" job="+workid+" work="+str(waittime))
         yield pu.asleep(waittime)
-        logging.info("worker="+myid+" job="+workid+" done at="+str(pu.currenttime_ms()))
+        log.info("worker="+myid+" job="+workid+" done at="+str(pu.currenttime_ms()))
 
 class WorkerClient(BaseProcess):
     """Class for the client accessing the object store.
@@ -61,7 +61,7 @@ class WorkerClient(BaseProcess):
 
     def op_result(self, content, headers, msg):
         ts = pu.currenttime_ms()
-        logging.info("Work result received "+str(content)+" at "+str(ts))
+        log.info("Work result received "+str(content)+" at "+str(ts))
         workid = content['work-id']
         worker = headers['sender']
         self.workresult[workid] = ts

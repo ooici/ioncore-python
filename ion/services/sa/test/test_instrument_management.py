@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
@@ -49,7 +49,7 @@ class InstrumentManagementTest(IonTestCase):
         Updates are made to the registries.
         """
 
-        logging.info("******* Now testing: Create instrument from UI")
+        log.info("******* Now testing: Create instrument from UI")
         userUpdate = {'manufacturer' : "SeaBird Electronics",
                  'model' : "unknown model",
                  'serial_num' : "1234",
@@ -66,7 +66,7 @@ class InstrumentManagementTest(IonTestCase):
         instrument_id = instrument_ref.RegistryIdentity
         self.assertTrue(instrument_id)
 
-        logging.info("******* Now testing: Create data product from UI")
+        log.info("******* Now testing: Create data product from UI")
         dataProductInput = {'dataformat' : "binary",
                             'instrumentID' : instrument_id}
 
@@ -119,7 +119,7 @@ class TestInstMgmtRT(IonTestCase):
 
         instrument = yield self.imc.create_new_instrument(self.newInstrument)
         self.inst_id = instrument.RegistryIdentity
-        logging.info("*** Instrument created with ID="+str(self.inst_id))
+        log.info("*** Instrument created with ID="+str(self.inst_id))
 
         self.simulator = Simulator(self.inst_id, 9000)
         self.simulator.start()
@@ -140,7 +140,7 @@ class TestInstMgmtRT(IonTestCase):
         """
         res = yield self.imc.get_instrument_state(self.inst_id)
         self.assertNotEqual(res, None)
-        logging.info("Instrument status: " +str(res))
+        log.info("Instrument status: " +str(res))
 
     @defer.inlineCallbacks
     def test_execute_command(self):
@@ -148,7 +148,7 @@ class TestInstMgmtRT(IonTestCase):
         Execute command through instrument agent associated with instrument id
         """
         res = yield self.imc.execute_command(self.inst_id, 'start', [1])
-        logging.info("Command result 1" +str(res))
+        log.info("Command result 1" +str(res))
 
     @defer.inlineCallbacks
     def test_start_agent(self):
@@ -162,7 +162,7 @@ class TestInstMgmtRT(IonTestCase):
 
         instrument = yield self.imc.create_new_instrument(newInstrument)
         inst_id1 = instrument.RegistryIdentity
-        logging.info("*** Instrument 2 created with ID="+str(inst_id1))
+        log.info("*** Instrument 2 created with ID="+str(inst_id1))
 
         res = yield self.imc.start_instrument_agent(inst_id1, 'SBE49')
-        logging.info("Command result 1" +str(res))
+        log.info("Command result 1" +str(res))

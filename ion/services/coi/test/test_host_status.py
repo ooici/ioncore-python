@@ -7,7 +7,7 @@
 """
 
 import logging, subprocess, sys, os
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -37,7 +37,7 @@ class HostStatusTest(IonTestCase):
         daemon serves SNMP and other host data.
         """    
         
-        logging.debug('Starting host status daemon')
+        log.debug('Starting host status daemon')
         p = subprocess.Popen(
                      [sys.executable, self.HOST_STATUS_DAEMON, 'start'], 
                      stdout=subprocess.PIPE, 
@@ -46,16 +46,16 @@ class HostStatusTest(IonTestCase):
         # wait 10 seconds for the daemon to power up
         retries = 20
         while p.poll() is None and retries > 0:
-            logging.debug('Waiting for server to start.  Poll status: %s  Retries Left: %s'%(p.poll(),retries))
+            log.debug('Waiting for server to start.  Poll status: %s  Retries Left: %s'%(p.poll(),retries))
             yield pu.asleep(0.5)
             retries -= 1
-        logging.debug('XMLRPC daemon started with return code %s'%str(p.returncode))
+        log.debug('XMLRPC daemon started with return code %s'%str(p.returncode))
         if p.returncode != 0:
-            logging.warn("XMLRPC daemon started uncleanly.")
+            log.warn("XMLRPC daemon started uncleanly.")
             out = p.stdout.read()
-            logging.warn("STDOUT: " + str(out))
+            log.warn("STDOUT: " + str(out))
             out = p.stderr.read()
-            logging.warn("STDERR: " + str(out))
+            log.warn("STDERR: " + str(out))
 
     @defer.inlineCallbacks
     def _stop_xmlrpc_daemon(self):
@@ -70,12 +70,12 @@ class HostStatusTest(IonTestCase):
         # wait 10 seconds for the daemon to shutdown
         retries = 20
         while p.poll() is None and retries > 0:
-            logging.debug('Waiting for server to stop.  Poll status: %s  Retries Left: %s'%(p.poll(),retries))
+            log.debug('Waiting for server to stop.  Poll status: %s  Retries Left: %s'%(p.poll(),retries))
             yield pu.asleep(0.5)
             retries -= 1
-        logging.debug('XMLRPC daemon stopped with return code %s'%str(p.returncode))
+        log.debug('XMLRPC daemon stopped with return code %s'%str(p.returncode))
         if p.returncode != 0:
-            logging.debug('XMLRPC daemon stopped uncleanly.')
+            log.debug('XMLRPC daemon stopped uncleanly.')
 
 
     @defer.inlineCallbacks

@@ -15,7 +15,7 @@ from ion.data.datastore import cas
 from ion.data.datastore.test import test_cas
 
 
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 class ObjectStoreServiceTest(iontest.IonTestCase):
 

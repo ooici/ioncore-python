@@ -6,7 +6,7 @@
 @brief Instrument Agent, Driver, and Client class definitions
 """
 import logging
-#logging = logging.getLogger(__name__)
+#log = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.agents.resource_agent import ResourceAgent
@@ -155,7 +155,7 @@ class InstrumentDriverClient(BaseProcessClient):
         @retval Result code of some sort
         """
         #assert(isinstance(command, dict))
-        logging.debug("DHE: in initialize!")
+        log.debug("DHE: in initialize!")
         (content, headers, message) = yield self.rpc_send('initialize',
                                                           arg)
         defer.returnValue(content)
@@ -168,7 +168,7 @@ class InstrumentDriverClient(BaseProcessClient):
         @retval Result code of some sort
         """
         #assert(isinstance(command, dict))
-        logging.debug("DHE: in disconnect!")
+        log.debug("DHE: in disconnect!")
         (content, headers, message) = yield self.rpc_send('disconnect',
                                                           command)
         defer.returnValue(content)

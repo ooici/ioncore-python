@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 import os
 
 from twisted.internet import defer, reactor
@@ -41,7 +41,7 @@ class CCAgent(ResourceAgent):
         # Declare CC announcement name
         messaging = {'name_type':'fanout', 'args':{'scope':'system'}}
         yield Container.configure_messaging(self.ann_name, messaging)
-        logging.info("Declared CC anounce name: "+str(self.ann_name))
+        log.info("Declared CC anounce name: "+str(self.ann_name))
 
         # Attach to CC announcement name
         annReceiver = Receiver(annName+'.'+self.receiver.label, self.ann_name)
@@ -50,7 +50,7 @@ class CCAgent(ResourceAgent):
         self.ann_receiver.handle(self.receive)
         self.add_receiver(self.ann_receiver)
         annid = yield spawn(self.ann_receiver)
-        logging.info("Listening to CC anouncements: "+str(annid))
+        log.info("Listening to CC anouncements: "+str(annid))
 
         # Start with an identify request. Will lead to an announce by myself
         #@TODO - Can not send a message to a base process which is not initialized!
@@ -78,7 +78,7 @@ class CCAgent(ResourceAgent):
         """
         Service operation: announce a capability container
         """
-        logging.info("op_announce(): Received CC announcement: " + repr(content))
+        log.info("op_announce(): Received CC announcement: " + repr(content))
         contid = content['container-id']
         event = content['event']
         if event == 'started' or event == 'identify':
@@ -88,14 +88,14 @@ class CCAgent(ResourceAgent):
             del self.containers[contid]
             del self.contalive[contid]
 
-        logging.info("op_announce(): Know about %s containers!" % (len(self.containers)))
+        log.info("op_announce(): Know about %s containers!" % (len(self.containers)))
 
     @defer.inlineCallbacks
     def op_identify(self, content, headers, msg):
         """
         Service operation: ask for identification; respond with announcement
         """
-        logging.info("op_identify(). Sending announcement")
+        log.info("op_identify(). Sending announcement")
         self._check_alive()
 
         # Set the new reference. All alive containers will respond afterwards
@@ -112,7 +112,7 @@ class CCAgent(ResourceAgent):
         """
         for cid,cal in self.contalive.copy().iteritems():
             if cal<self.last_identify:
-                logging.info("Container %s missing. Deemed down, remove." % (cid))
+                log.info("Container %s missing. Deemed down, remove." % (cid))
                 del self.containers[cid]
                 del self.contalive[cid]
 
@@ -169,7 +169,7 @@ class CCAgent(ResourceAgent):
         from magnet.shell import control
         if not hasattr(control, 'cc'):
             return
-        logging.info("Augmenting Container Shell...")
+        log.info("Augmenting Container Shell...")
         control.cc.agent = self
         control.cc.config = ion_config
         control.cc.pids = procRegistry.kvs

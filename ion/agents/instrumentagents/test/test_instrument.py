@@ -13,7 +13,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
@@ -70,7 +70,7 @@ class TestInstrumentAgent(IonTestCase):
         capabilities
         """
         result = yield self.IAClient.get_capabilities()
-        #logging.info("getCapabilities result: "+ str(result))
+        #log.info("getCapabilities result: "+ str(result))
         self.assert_(set(IACIParameters).issubset(set(result[IA.ci_parameters])))
         self.assert_(IA.driver_address in
                      result[IA.ci_parameters])

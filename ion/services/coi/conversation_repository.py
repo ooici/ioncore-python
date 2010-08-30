@@ -15,7 +15,7 @@ from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 logserv = logging.getLogger('convRepos')
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 class ConversationRepositoryService(BaseService):
     """Conversation repository service interface

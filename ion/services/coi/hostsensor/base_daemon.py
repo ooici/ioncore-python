@@ -40,7 +40,7 @@ class Daemon:
         http://www.erlenstar.demon.co.uk/unix/faq_2.html#SEC16
         """
 
-        logging.debug('Daemonizing process.')
+        log.debug('Daemonizing process.')
         pid = str(os.getpid())
         f = file(self.pidfile,'w+')
         f.write("%s\n" % pid)
@@ -50,9 +50,9 @@ class Daemon:
             if pid > 0:
                 # exit first parent
                 sys.exit(0) 
-                logging.debug("fork #1 succeeded.\n")
+                log.debug("fork #1 succeeded.\n")
         except OSError, e: 
-            logging.error("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
+            log.error("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
 
@@ -68,9 +68,9 @@ class Daemon:
             if pid > 0:
                 # exit from second parent
                 sys.exit(0) 
-                logging.debug("fork #2 succeeded.")
+                log.debug("fork #2 succeeded.")
         except OSError, e: 
-            logging.error("fork #2 failed: %d (%s)" % (e.errno, e.strerror))
+            log.error("fork #2 failed: %d (%s)" % (e.errno, e.strerror))
             sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1) 
 
@@ -84,25 +84,25 @@ class Daemon:
         os.dup2(si.fileno(), sys.stdin.fileno())
         os.dup2(so.fileno(), sys.stdout.fileno())
         os.dup2(se.fileno(), sys.stderr.fileno())
-        logging.debug("Detached stdout, stdin, and stderr")
+        log.debug("Detached stdout, stdin, and stderr")
     
         # write pidfile
         pid = str(os.getpid())
         atexit.register(self.delpid)
         file(self.pidfile,'w+').write("%s\n" % pid)
-        logging.debug("Writing pid file: %s = %s" % (self.pidfile, str(pid)))
+        log.debug("Writing pid file: %s = %s" % (self.pidfile, str(pid)))
 
         
     def delpid(self):
         os.remove(self.pidfile)
-        logging.debug("Deleted pid file")
+        log.debug("Deleted pid file")
 
 
     def start(self):
         """
         Start the daemon
         """
-        logging.info("--- Starting daemon ---")
+        log.info("--- Starting daemon ---")
         # Check for a pidfile to see if the daemon already runs
         try:
             pf = file(self.pidfile,'r')
@@ -112,7 +112,7 @@ class Daemon:
             pid = None
     
         if pid:
-            logging.error("Pidfile already exists. pid file: %s = %s" % (self.pidfile, str(pid)))
+            log.error("Pidfile already exists. pid file: %s = %s" % (self.pidfile, str(pid)))
             sys.stderr.write("Pidfile already exists. pid file: %s = %s\n" % (self.pidfile, str(pid)))
             sys.exit(1)
         
@@ -125,7 +125,7 @@ class Daemon:
         """
         Stop the daemon
         """
-        logging.info("--- Stopping daemon ---")
+        log.info("--- Stopping daemon ---")
         # Get the pid from the pidfile
         try:
             pf = file(self.pidfile,'r')
@@ -158,13 +158,13 @@ class Daemon:
         """
         Restart the daemon
         """
-        logging.info("--- Restarting daemon ---")
+        log.info("--- Restarting daemon ---")
         self.stop()
         self.start()
 
 
     def status(self, clean=False):
-        logging.info("--- Status ---")
+        log.info("--- Status ---")
         try:
             pf = file(self.pidfile,'r')
             pid = int(pf.read().strip())

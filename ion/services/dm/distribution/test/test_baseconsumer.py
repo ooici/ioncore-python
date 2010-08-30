@@ -7,7 +7,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 #import time
 from twisted.internet import defer
 from twisted.trial import unittest

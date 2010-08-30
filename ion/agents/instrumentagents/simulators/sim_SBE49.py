@@ -14,7 +14,7 @@ import logging
 import random
 import math
 import time
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from twisted.internet import protocol
 from twisted.internet import reactor
@@ -163,7 +163,7 @@ class Instrument(protocol.Protocol):
             parts = data.partition('=')
             command = parts[0]
             value = parts[2]
-            logging.debug("received command: %s, value: %s" %(command, value))
+            log.debug("received command: %s, value: %s" %(command, value))
 
             if command in self.testCommands:
                 """
@@ -172,9 +172,9 @@ class Instrument(protocol.Protocol):
                 at the configured test interval until the configured maximum
                 number of test samples have been sent.
                 """
-                logging.debug("Received test command: %s" %command)
+                log.debug("Received test command: %s" %command)
                 if self.testRunning == 'false':
-                    logging.debug("Starting test samples")
+                    log.debug("Starting test samples")
                     self.startTestSamples()
                     self.testRunning = 'true'
             elif command == "start":
@@ -184,7 +184,7 @@ class Instrument(protocol.Protocol):
                 sending samples at the configured interval.
                 """
                 if self.mode == 'auto' and self.autoRunning == 'false':
-                    logging.debug("Starting auto samples")
+                    log.debug("Starting auto samples")
                     self.autoRunning = 'true'
                     # The factory handles the sending at intervals.
                     self.startAutoSamples()
@@ -201,29 +201,29 @@ class Instrument(protocol.Protocol):
                 at the configured interval.
                 """
                 if self.mode == 'auto' and self.autoRunning == 'true':
-                    logging.debug("Stopping auto samples")
+                    log.debug("Stopping auto samples")
                     self.stopAutoSamples()
                     self.autoRunning = 'false'
 
                 # Print prompt whether we stopped or not
                 self.transport.write(self.prompt)
             elif command == "outputformat":
-                logging.debug("Setting outputformat to %s" %(value))
+                log.debug("Setting outputformat to %s" %(value))
                 simBaud = value
             elif command == "baud":
-                logging.debug("Setting baud to %s" %(value))
+                log.debug("Setting baud to %s" %(value))
                 simBaud = value
             elif command in self.commands:
                 # Any command that falls to this point gets handled with the general
                 # command response that is in the commands dictionary.
-                logging.debug("command received: %s" % (command))
+                log.debug("command received: %s" % (command))
                 self.transport.write(self.commands[command])
             else:
-                logging.debug("Invalid command received: %s" % (command))
+                log.debug("Invalid command received: %s" % (command))
                 self.transport.write("?CMD")
 
     def connectionLost(self, reason):
-        logging.debug("Simmulator connection now closed")
+        log.debug("Simmulator connection now closed")
         self.factory.connections.remove(self)
 
     def testSampler(self):
@@ -234,7 +234,7 @@ class Instrument(protocol.Protocol):
         self.numTestSamples += 1
         self.transport.write(self.get_next_sample())
         if self.numTestSamples == self.maxTestSamples:
-            logging.debug("Stopping test samples")
+            log.debug("Stopping test samples")
             self.numTestSamples = 0
             self.testRunning = 'false'
             self.lc_testSampler.stop()
@@ -301,7 +301,7 @@ class Simulator(object):
         in the factory will be overwritten).
         """
         assert (self.state == "NEW" or self.state == "STOPPED")
-        logging.info("Starting SBE49 simulator for ID %s on port %d" % (self.instrument_id, self.port))
+        log.info("Starting SBE49 simulator for ID %s on port %d" % (self.instrument_id, self.port))
 
         self.state = "STARTED"
         self.listenport = reactor.listenTCP(self.port, self.factory)
@@ -312,7 +312,7 @@ class Simulator(object):
         for conn in self.factory.connections:
             yield conn.transport.loseConnection()
         yield self.listenport.stopListening()
-        logging.info("Stopped SBE49 simulator on port %d" % (self.port))
+        log.info("Stopped SBE49 simulator on port %d" % (self.port))
         self.state = "STOPPED"
 
     @classmethod

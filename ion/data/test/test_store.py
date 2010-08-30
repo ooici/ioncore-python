@@ -9,7 +9,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 from uuid import uuid4
 
 from twisted.trial import unittest
@@ -48,7 +48,7 @@ class IStoreTest(unittest.TestCase):
         yield self.ds.put(self.key, self.value)
         rc = yield self.ds.clear_store()
         if rc == None:
-            logging.info("Success clearing store!")
+            log.info("Success clearing store!")
         rc = yield self.ds.get(self.key)
         self.failUnlessEqual(rc, None)
 

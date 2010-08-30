@@ -9,7 +9,7 @@
 """
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 from twisted.internet import defer
 
@@ -45,7 +45,7 @@ class RetrieverService(FetcherService):
         src_url = content
         new_url = rewrite_url(src_url)
 
-        logging.debug('Old url: %s New url: %s' % (src_url, new_url))
+        log.debug('Old url: %s New url: %s' % (src_url, new_url))
         # Note that _http_op is inherited fetcher code...
         return self._http_op('GET', new_url, msg)
 

@@ -13,7 +13,7 @@ from ion.services.dm.distribution import base_consumer
 from ion.core.base_process import ProtocolFactory
 
 import logging
-logging = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 import gviz_api
 from ion.util import procutils as pu
 
