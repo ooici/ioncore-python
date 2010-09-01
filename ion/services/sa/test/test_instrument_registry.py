@@ -32,7 +32,7 @@ class InstrumentRegistryTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self.irc.clear_registry
+        yield self.irc.clear_registry()
         yield self._stop_container()
 
     @defer.inlineCallbacks
