@@ -130,6 +130,9 @@ To compile all code to see if there are Python compile errors anywhere:
 Change log:
 ===========
 
+2010-08-29:
+- Changed all logging instances for loggers to log, to avoid name clashes.
+
 2010-08-14:
 - BaseProcess: added backend receiver, used for sending out any messages
   from self.send and self.rpc_send. This keeps the message queue for the process
