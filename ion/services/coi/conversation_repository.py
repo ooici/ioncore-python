@@ -5,14 +5,10 @@
 @author Michael Meisinger
 @brief Service that receives all sent messages in the system
 """
-
+import logging
 import ion.util.ionlog
-from twisted.internet import defer
-from magnet.spawnable import Receiver
-
-import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.services.base_service import BaseService
 
 logserv = logging.getLogger('convRepos')
 log = ion.util.ionlog.getLogger(__name__)
