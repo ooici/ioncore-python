@@ -175,7 +175,7 @@ class RegistryCassandraTest(RegistryTest):
 
     @defer.inlineCallbacks
     def _setup_backend(self):
-        clist = ['amoeba.ucsd.edu:9160']
+        clist = ['localhost:9160']
         s = yield cassandra.CassandraStore.create_store(
             cass_host_list=clist,
             cf_super=True,            

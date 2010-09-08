@@ -2,7 +2,7 @@
 """
 @file res/scripts/agentreg.py
 @author Matt Rodriguez
-@brief main module for bootstrapping dm pubsub services test
+@brief main module for bootstrapping agent registry services test
 This script tests using the agent registry service with a Cassandra
 backend in EC2.
 """
@@ -48,6 +48,8 @@ def start():
     logging.info("resc_desc: " + str(res_desc))
     registered_agent_desc = yield agent_reg_client.register_agent_definition(res_desc)
     logging.info("registered_agent_desc: " +  str(registered_agent_desc))
+    
+    agent_reg_client.clear_registry()
 
 
 

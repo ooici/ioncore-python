@@ -14,11 +14,12 @@ import logging
 logging = logging.getLogger(__name__)
 from uuid import uuid4
 from ion.data.backends.setdatastore import SetCassandraStore
+from twisted.internet import defer
 
 
 class SetDataStoreInterfaceTest(unittest.TestCase):
     def setUp(self):
-        clist = ['amoeba.ucsd.edu:9160']
+        clist = ['localhost:9160']
         self.ds = SetCassandraStore(cass_host_list=clist)
         self.key = self._mkey()
         self.value = self._mkey()

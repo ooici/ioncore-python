@@ -40,11 +40,14 @@ def start():
     logging.info('CONT_ARGS' + str(ioninit.cont_args))
     
     product_reg_client = data_product_registry.DataProductRegistryClient(proc=sup)
-    
-    
-    res = sa_resource_descriptions.DataProductResource.create_new_resource()
-    res = yield product_reg_client.register_data_product(res)
-
+    i = 0
+    logging.info("Starting registry test")
+    while i < 1:
+        res = sa_resource_descriptions.DataProductResource.create_new_resource()
+        res = yield product_reg_client.register_data_product(res)
+        i = i + 1
+        logging.info(str(i))
+    logging.info("Ending registry test")    
     yield product_reg_client.clear_registry()
 
 

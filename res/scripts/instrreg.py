@@ -2,7 +2,7 @@
 """
 @file res/scripts/instrreg.py
 @author Matt Rodriguez
-@brief main module for bootstrapping dm pubsub services test
+@brief main module for bootstrapping instrument registry services test
 This script tests using the agent registry service with a Cassandra
 backend in EC2.
 """

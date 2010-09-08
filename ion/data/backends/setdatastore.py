@@ -11,7 +11,9 @@
 
 import logging
 logging = logging.getLogger(__name__)
-import pycassa
+#import pycassa
+from telephus.client import CassandraClient
+from telephus.protocol import ManagedCassandraClientFactory
 
 
 class SetCassandraStore():
@@ -31,8 +33,13 @@ class SetCassandraStore():
         else:
             hosts = str(cass_host_list)
             logging.info('Connecting to Cassandra at "%s"...' % hosts)
-        client = pycassa.connect(cass_host_list)
-        self._kvs = pycassa.ColumnFamily(client, 'Datasets', 'Catalog')
+        self._manager = ManagedCassandraClientFactory()
+        #keyspace and colfamily needs to be passed into the constructor
+        self._keyspace = 'Datasets'
+        self._colfamily = 'Catalog'
+        self._client = CassandraClient(self._manager, self._keyspace)
+        #self._client = pycassa.connect(cass_host_list)
+        #self._kvs = pycassa.ColumnFamily(client, 'Datasets', 'Catalog')
         logging.info('connected OK.')
 
     def smembers(self, key):
@@ -44,7 +51,7 @@ class SetCassandraStore():
         an integer, float or string.
         """
         try:
-            val = self._kvs.get(key)
+            val = self._client.get(key)
             logging.info('Read Key:Val "%s":"%s"' % (key, val))
             return set(val)
         except:
@@ -66,7 +73,7 @@ class SetCassandraStore():
         """
         logging.info('writing key %s value %s' % (key, value))
         col = {value: value}
-        self._kvs.insert(key, col)
+        self._client.insert(key, self._colfamily, col)
         logging.info('write complete')
 
     def sremove(self, key, value):
@@ -77,7 +84,7 @@ class SetCassandraStore():
         @retval None
         """
         try:
-            self._kvs.remove(key, [value])
+            self._client.remove(key, self._colfamily, [value])
         except:
             logging.warn("Error removing key")
 
@@ -88,7 +95,7 @@ class SetCassandraStore():
         @retval card an int representing the the cardinality of the set
         """
         try:
-            vals = self._kvs.get(key)
+            vals = self._client.get(key, self._colfamily)
             return len(vals)
         except:
             logging.warn("Error calculating cardinality")
@@ -99,6 +106,6 @@ class SetCassandraStore():
         @param key which is mapped to the set
         """
         try:
-            self._kvs.remove(key)
+            self._client.remove(key, self._colfamily)
         except:
             logging.warn("Error removing set")
