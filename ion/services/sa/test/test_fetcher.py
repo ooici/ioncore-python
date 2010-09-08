@@ -11,7 +11,6 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from socket import gaierror
-from twisted.trial import unittest
 
 from ion.services.sa.fetcher import FetcherClient, FetcherService
 from ion.test.iontest import IonTestCase
@@ -140,29 +139,3 @@ class TransportTester(IonTestCase):
 
     def test_updown(self):
         pass
-
-    @defer.inlineCallbacks
-    def broken_test_fetcher_service_only(self):
-        raise unittest.SkipTest('Timing out on EC2')
-
-        """
-        Use fetcher service to get a complete dataset, try to decode the message
-        fields once we get it.
-        """
-        services = [
-             {'name': 'fetcher', 'module': 'ion.services.sa.fetcher',
-             'class': 'FetcherService'},
-            ]
-
-        sup = yield self._spawn_processes(services)
-
-        fc = FetcherClient(proc=sup)
-        dset = yield fc.get_dap_dataset(TEST_DSET)
-
-        # decode fields as an integrity test
-        dset['das'] = json.loads(dset['das'])
-        dset['dds'] = json.loads(dset['dds'])
-        dset['dods'] = base64.b64decode(dset['dods'])
-        self.failUnlessEqual(dset['source_url'], TEST_DSET)
-        self.failUnlessSubstring('COADSX', dset['das'])
-        self.failUnlessSubstring('COADSY', dset['das'])
