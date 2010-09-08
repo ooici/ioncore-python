@@ -67,6 +67,7 @@ class IonTestCase(unittest.TestCase):
         log.info("============Core ION services started============")
         defer.returnValue(sup)
 
+    @defer.inlineCallbacks
     def _stop_container(self):
         """
         Taking down the container's connection to the broker an preparing for
@@ -77,8 +78,9 @@ class IonTestCase(unittest.TestCase):
         dcs = reactor.getDelayedCalls()
         log.info("Cancelling %s delayed reactor calls!" % len(dcs))
         for dc in dcs:
+            # Cancel the registered delayed call (this is non-async)
             dc.cancel()
-        self.cont_conn.transport.loseConnection()
+        yield self.cont_conn.transport.loseConnection()
         container.Container._started = False
         container.Container.store = Store()
         bootstrap.reset_container()
