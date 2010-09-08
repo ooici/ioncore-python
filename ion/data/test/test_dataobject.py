@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 from twisted.trial import unittest
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.python import reflect
 

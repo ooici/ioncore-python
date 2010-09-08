@@ -12,8 +12,8 @@
 
 
 from ion.services.dm.util import dap_tools
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 import os
 import tempfile

@@ -3,7 +3,7 @@
 @author Dorian Raymer
 """
 
-import logging
+import ion.util.ionlog
 
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -15,7 +15,7 @@ from ion.data.datastore import cas
 from ion.data.datastore.test import test_cas
 
 
-log = logging.getLogger(__name__)
+log = ion.util.ionlog.getLogger(__name__)
 
 class ObjectStoreServiceTest(iontest.IonTestCase):
 

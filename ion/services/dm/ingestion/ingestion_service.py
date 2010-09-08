@@ -6,8 +6,8 @@
 @brief service for ingesting information into DM
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory

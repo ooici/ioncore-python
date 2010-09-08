@@ -8,8 +8,8 @@
 @test Service test of IStore Implementation
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from uuid import uuid4
 
 from twisted.trial import unittest

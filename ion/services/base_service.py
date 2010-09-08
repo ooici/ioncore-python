@@ -6,8 +6,8 @@
 @brief base classes for all service processes and clients.
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from magnet.container import Container
 from magnet.spawnable import Receiver

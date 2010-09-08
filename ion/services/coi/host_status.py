@@ -6,8 +6,8 @@
 @brief service for messaging local host status at intervals
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 try:
     import json

@@ -3,8 +3,8 @@
 @author Dorian Raymer
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from zope import interface
 

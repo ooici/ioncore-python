@@ -16,8 +16,8 @@ from ion.core.base_process import ProtocolFactory
 from twisted.internet import defer, reactor
 from twisted.web import server, resource
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 
 class DMUI(resource.Resource):

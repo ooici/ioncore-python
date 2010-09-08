@@ -8,8 +8,8 @@ dataobject dictionary as possible types for decoding. This is a temporary
 requirement until we have a proper self describing datatype.
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 import inspect

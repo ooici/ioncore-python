@@ -6,8 +6,8 @@
 @author Dave Everett
 @brief Driver code for SeaBird SBE-49 CTD
 """
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 
 """

@@ -6,8 +6,8 @@
 @brief test service for sending host_ tatus messages
 """
 
-import logging, subprocess, sys, os
-log = logging.getLogger(__name__)
+import ion.util.ionlog, subprocess, sys, os
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 from twisted.trial import unittest

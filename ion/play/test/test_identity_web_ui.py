@@ -7,8 +7,8 @@
 run this from lcaarch like this:
     twistd -n --pidfile=m2 magnet -h amoeba.ucsd.edu ion/play/identclient.py
 """
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 from ion.test.iontest import IonTestCase

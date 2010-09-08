@@ -6,9 +6,9 @@
 @date 7/30/2010
 """
 
-import logging
+import ion.util.ionlog
 import gc
-log = logging.getLogger(__name__)
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.trial import unittest
 from ion.test.iontest import IonTestCase

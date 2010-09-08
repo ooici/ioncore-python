@@ -7,8 +7,9 @@
 ### This module requires pyasn1 and pysnmp
 
 
-import os,datetime    
-import logging
+import os,datetime
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 try:
     from pysnmp.entity.rfc3413.oneliner import cmdgen
@@ -32,47 +33,47 @@ class HostReader:
     """
 
     def __init__(
-                 self, 
-                 host, 
-                 port, 
-                 agentName, 
-                 communityName, 
-                 timeout=1.5, 
-                 retries=3 
+                 self,
+                 host,
+                 port,
+                 agentName,
+                 communityName,
+                 timeout=1.5,
+                 retries=3
                  ):
         self.timeout = timeout
         self.retries = retries
         self.reader = SnmpReader(
-                                 host, 
-                                 port, 
-                                 agentName, 
-                                 communityName, 
-                                 timeout, 
+                                 host,
+                                 port,
+                                 agentName,
+                                 communityName,
+                                 timeout,
                                  retries
                                  )
 
-       
+
     def get(self, subsystem):
         """
         Produces a dictionary for the specified subsystem.  Valid subsystems
-        may be a string ('all','base','network','storage','cpu','python','java') 
+        may be a string ('all','base','network','storage','cpu','python','java')
         or a list of said strings.
         """
         ret = {}
- 
-        if (subsystem in ['base','all']):       
+
+        if (subsystem in ['base','all']):
             ret['base'] = self._getBase()
-        if (subsystem in ['network','all']):       
+        if (subsystem in ['network','all']):
             ret['network'] = self._getNetworkInterfaces()
-        if (subsystem in ['storage','all']):       
+        if (subsystem in ['storage','all']):
             ret['storage'] = self._getStorage()
-        if (subsystem in ['cpu','all']):       
+        if (subsystem in ['cpu','all']):
             ret['cpu'] = self._getProcesses()
-            
+
         return ret
 
-    
-    
+
+
     def _getBase(self):
         """
         Gets basic machine information.
@@ -83,7 +84,7 @@ class HostReader:
         ret['SupportsRFC2790']   = self.reader.supportsRFC2790()
         ret['LocalTime']         = datetime.datetime.today().isoformat()
 
-    
+
         ret['rfc1213_SystemDescr']    = self.reader.get(Rfc1213Mib.system_sysDescr)
         ret['rfc1213_SystemContact']  = self.reader.get(Rfc1213Mib.system_sysContact)
         ret['rfc1213_SystemName']     = self.reader.get(Rfc1213Mib.system_sysName)
@@ -110,13 +111,13 @@ class HostReader:
         Gets information about the host's network interfaces.
         """
         source = 'rfc1213_mib'
-        fields = [                
+        fields = [
                     Rfc1213Mib.interfaces_ifTable_ifDescr,
                     Rfc1213Mib.interfaces_ifTable_ifSpeed,
                     Rfc1213Mib.interfaces_ifTable_ifInOctets,
                     Rfc1213Mib.interfaces_ifTable_ifInErrors,
-                    Rfc1213Mib.interfaces_ifTable_ifOutOctets, 
-                    Rfc1213Mib.interfaces_ifTable_ifOutErrors                 
+                    Rfc1213Mib.interfaces_ifTable_ifOutOctets,
+                    Rfc1213Mib.interfaces_ifTable_ifOutErrors
                  ]
         cols = []
         for f in fields:
@@ -128,20 +129,20 @@ class HostReader:
                 'cols' : cols,
                 'rows' : rows
                 }
-                
 
-    
+
+
     def _getStorage(self):
         """
         Gets information about the host's storage, including disk drives and memory.
         """
         source = 'rfc2790_mib'
-        fields = [                
-                    Rfc2790Mib.hrStorageDescr,                   
+        fields = [
+                    Rfc2790Mib.hrStorageDescr,
                     Rfc2790Mib.hrStorageAllocationUnits,
                     Rfc2790Mib.hrStorageSize,
                     Rfc2790Mib.hrStorageUsed,
-                    Rfc2790Mib.hrStorageAllocationFailures          
+                    Rfc2790Mib.hrStorageAllocationFailures
                 ]
         cols = []
         for f in fields:
@@ -159,13 +160,13 @@ class HostReader:
         """
         Gets information about processes currently running on the host.
         """
-        
+
         # This is really a two-part table that needs to be assembled.
         # We'll be pulling data from two distinct snmp tables.
 
         source = 'rfc1213_mib'
         oid1 = Rfc2790Mib.hrSWRunTable
-        fields1 = [                
+        fields1 = [
                     Rfc2790Mib.hrSWRunIndex,
                     Rfc2790Mib.hrSWRunName,
                     Rfc2790Mib.hrSWRunID,
@@ -175,7 +176,7 @@ class HostReader:
                     Rfc2790Mib.hrSWRunStatus
                  ]
         oid2 =     Rfc2790Mib.hrSWRunPerfTable
-        fields2 = [                
+        fields2 = [
                     Rfc2790Mib.hrSWRunPerfCPU,
                     Rfc2790Mib.hrSWRunPerfMem
                  ]
@@ -185,7 +186,7 @@ class HostReader:
             cols.append(f[1])
         for f in fields2:
             cols.append(f[1])
-            
+
         rows = self.reader.stitchTables([oid1,oid2], [fields1,fields2])
 
         return {
@@ -199,15 +200,15 @@ class HostReader:
         return \
             isinstance(object,dict) \
             and object.has_key('cols') \
-            and object.has_key('rows') 
+            and object.has_key('rows')
 
 
     @staticmethod
     def pprint(report):
         """
         Prints a pretty string representation of get(subsystem)
-        """ 
-        print(HostReader.pformat(report)) 
+        """
+        print(HostReader.pformat(report))
 
     @staticmethod
     def pformat(report):
@@ -220,7 +221,7 @@ class HostReader:
             val = report[key]
             if HostReader._isTable(val):
                 ret += str(HostReader._pftable(key,val))
-            else: 
+            else:
                 ret += str(HostReader._pfother(key,val))
         return ret
 
@@ -253,11 +254,11 @@ class HostReader:
         ret += colsep + '\n'
         for row in table['rows']:
             ret += rowformat%tuple(row) + '\n'
-        ret += '\n'    
-        return ret    
+        ret += '\n'
+        return ret
 
 
-            
+
     @staticmethod
     def _pfother(name,val):
         if (isinstance(val,dict)):
@@ -272,23 +273,23 @@ class HostReader:
             formatstr = '%-' + str(keylen + 1) + 's   %-' + str(vallen) + 's\n'
             skeys.sort()
             for key in skeys:
-                ret += formatstr%(key + ':',val[key]) 
+                ret += formatstr%(key + ':',val[key])
             ret += '\n\n'
         if (isinstance(val,list)):
             ret = 'LIST: %s\n\n'%name
             ret += str(val) + '\n'
-        return ret    
- 
+        return ret
+
 
 
 
 class SnmpReader:
     """
     Reads common SNMP data from the specified host.  RFC1213 and Rfc2790
-    MIBs are specifically targeted, more information available here 
+    MIBs are specifically targeted, more information available here
     http://www.ietf.org/rfc/rfc1213.txt and also here
-    http://portal.acm.org/citation.cfm?id=Rfc2790Mib  
-    """            
+    http://portal.acm.org/citation.cfm?id=Rfc2790Mib
+    """
 
     def __init__(self, host, port, agentName, communityName, timeout=1.5, retries=3):
         self.agentName = agentName
@@ -303,38 +304,38 @@ class SnmpReader:
             self._supportsPysnmp = False
             self._supportsRfc2790 = False
             self._supportsRfc1213 = False
-        else:    
+        else:
             self._supportsRfc2790 = self.get(Rfc2790Mib.hrSystemNumUsers) != None
             self._supportsRfc1213 = self.get(Rfc1213Mib.system_sysDescr) != None
             self._supportsPysnmp = True
-        self._supportsSNMP = PysnmpImported and (self._supportsRfc1213 or self._supportsRfc2790)  
- 
+        self._supportsSNMP = PysnmpImported and (self._supportsRfc1213 or self._supportsRfc2790)
+
 
     def supportsSNMP(self):
         return self._supportsSNMP
 
     def supportsRFC2790(self):
         return self._supportsRfc2790
-    
+
     def supportsRFC1213(self):
         return self._supportsRfc1213
-    
-    
+
+
     def _toTuple(self, oid):
         array = []
         for dec in oid[1:].split("."):
             array.append(int(dec))
         return tuple(array)
-            
-            
+
+
     def get(self, oid):
-        """ 
+        """
         Gets an SNMP single value and converts it into a more mainstream
         value (i.e. gets rid of ASN.1).
         """
         if not self._supportsSNMP:
             return None
-        
+
         tupleoid = self._toTuple(oid[0])
         shot = self._get(tupleoid)
         try:
@@ -342,7 +343,7 @@ class SnmpReader:
         except:
             return None
 
-    
+
     def stitchTables(self, tableOidList, fieldsList):
         """
         Stitches multiple tables together joined by table ids
@@ -355,7 +356,7 @@ class SnmpReader:
         # Weird errors?  Look here first.
 
 
-        # query all the tables        
+        # query all the tables
         tables = []
         for i in range(0,len(tableOidList)):
             next = self.getTable(tableOidList[i],fieldsList[i],includeId=True)
@@ -381,39 +382,39 @@ class SnmpReader:
                         newrow.append(None)
                     work[id] = newrow
 
-                # Populate data now that a row is guaranteed to exist    
+                # Populate data now that a row is guaranteed to exist
                 for j in range(0,len(tables[i][id])):
                     work[id][j + currentField] = tables[i][id][j]
-                
+
             currentField += len(fieldsList[i])
 
-        # Strip off the ids, they're no longer necessary            
+        # Strip off the ids, they're no longer necessary
         final = []
         for key in work:
             final.append(work[key])
 
         return final
-        
-        
-        
+
+
+
     def getTable(self, tableOid, fields, includeId = False):
         """
         Gets an SNMP table and converts it into a more mainstream
         value (i.e. gets rid of ASN.1 and converts key-value pairs into
         a list of dictionaries.  Result should be JSON ready.)
-        """        
+        """
         if not self._supportsSNMP:
             return []
 
-        # MIB OID manipulation.  
+        # MIB OID manipulation.
         tupleoid = self._toTuple(tableOid[0])
         tuplefields = []
         for field in fields:
-            tuplefields.append(self._toTuple(field[0])) 
-        
+            tuplefields.append(self._toTuple(field[0]))
+
         table = self._getNext(tupleoid)
-        
-        
+
+
         # SNMP can return non-sequential row numbers.  So we check which
         # rows are available explicitly.
         ids = set()
@@ -422,15 +423,15 @@ class SnmpReader:
                 ids.add(row[-1])
         ids = list(ids)
         ids.sort()
-        
-        
+
+
         # Assemble the table in a more user-friendly format than the
-        # oid.row = value model that snmp uses. 
+        # oid.row = value model that snmp uses.
         if includeId:
             ret = {}
         else:
             ret = []
-        
+
         for i in ids:
             row = []
             for field in tuplefields:
@@ -439,16 +440,16 @@ class SnmpReader:
                 key =  list(field)
                 key.append(i)
                 key = tuple(key)
-                
+
                 if table.has_key(key):
                     row.append(table[key]._value)
                 else:
-                    # place holder   
+                    # place holder
                     row.append(None)
 
             if includeId:
                 ret[i] = row
-            else:    
+            else:
                 ret.append(row)
 
         return ret
@@ -456,18 +457,18 @@ class SnmpReader:
 
 
     def _get(self, object):
-        """ 
+        """
         Implements SNMP's get function.
         """
-        
+
         errorIndication,    \
         errorStatus,        \
         errorIndex,         \
         varBinds = cmdgen.CommandGenerator().getCmd(
             cmdgen.CommunityData(self.agentName, self.communityName, 1),
             cmdgen.UdpTransportTarget(
-                                      (self.host, self.port), 
-                                      timeout=self.timeout, 
+                                      (self.host, self.port),
+                                      timeout=self.timeout,
                                       retries=self.retries ),
             object
         )
@@ -496,31 +497,31 @@ class SnmpReader:
 
 # A note about OIDS
 # -----------------
-# The MIB OIDs quickly become a headache.  Should they be represented 
+# The MIB OIDs quickly become a headache.  Should they be represented
 # as a list, a string, or a tuple?
-#  
+#
 # list -   most versatile and easiest to manipulate in python
-# string - most common representation for the world of snmp 
+# string - most common representation for the world of snmp
 # tuple -  pysnmp's preferred format, required
 #
 # This will be a constant struggle.  In the end, we're going to use the
-# string representation.  Manipulations will involve a conversion to 
+# string representation.  Manipulations will involve a conversion to
 # list (for appending) and ultimately to tuple (because pysnmp said so).
-# The processor hit should be very manageable but if not, it can be 
+# The processor hit should be very manageable but if not, it can be
 # addressed later.
 
 class Rfc2790Mib:
     """
     RFC 2790 MIB OIDs which of are interest to the OOICI project.
     """
-    
+
     hrSystemUptime    = ('.1.3.6.1.2.1.25.1.1.0', 'SystemUptime')
     hrSystemDate      = ('.1.3.6.1.2.1.25.1.2.0', 'SystemDate')
     hrSystemNumUsers  = ('.1.3.6.1.2.1.25.1.5.0', 'SystemNumUsers')
     hrSystemProcesses = ('.1.3.6.1.2.1.25.1.6.0', 'SystemProcesses')
 
     hrStorageTable              = ('.1.3.6.1.2.1.25.2.3', 'StorageTable')
-    hrStorageDescr              = ('.1.3.6.1.2.1.25.2.3.1.3', 'StorageDesc')                            
+    hrStorageDescr              = ('.1.3.6.1.2.1.25.2.3.1.3', 'StorageDesc')
     hrStorageAllocationUnits    = ('.1.3.6.1.2.1.25.2.3.1.4', 'StorageAllocationUnits')
     hrStorageSize               = ('.1.3.6.1.2.1.25.2.3.1.5', 'StorageSize')
     hrStorageUsed               = ('.1.3.6.1.2.1.25.2.3.1.6', 'StorageUsed')
@@ -529,7 +530,7 @@ class Rfc2790Mib:
     hrSWRunPerfTable = ('.1.3.6.1.2.1.25.5.1', 'SWRunPerfTable')
     hrSWRunPerfCPU   = ('.1.3.6.1.2.1.25.5.1.1.2', 'SWRunPerfCPU')
     hrSWRunPerfMem   = ('.1.3.6.1.2.1.25.5.1.1.1', 'SWRunPerfMem')
-                        
+
     hrSWRunTable =      ('.1.3.6.1.2.1.25.4.2.1',   'SWRunTable')
     hrSWRunIndex =      ('.1.3.6.1.2.1.25.4.2.1.1', 'SWRunIndex')
     hrSWRunName =       ('.1.3.6.1.2.1.25.4.2.1.2', 'SWRunName')
@@ -539,7 +540,7 @@ class Rfc2790Mib:
     hrSWRunType =       ('.1.3.6.1.2.1.25.4.2.1.6', 'SWRunType')
     hrSWRunStatus =     ('.1.3.6.1.2.1.25.4.2.1.7', 'SWRunStatus')
 
-    
+
 class Rfc1213Mib:
     """
     RFC 1213 MIB OIDs which of are interest to the OOICI project.

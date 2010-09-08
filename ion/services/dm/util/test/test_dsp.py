@@ -6,8 +6,8 @@
 @brief test cases for the base consumer process
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 #import time
 from twisted.internet import defer
 from twisted.trial import unittest

@@ -6,8 +6,8 @@
 @brief test logger service
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.services.coi.logger import LoggerClient

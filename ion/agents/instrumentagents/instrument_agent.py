@@ -5,8 +5,9 @@
 @author Steve Foley
 @brief Instrument Agent, Driver, and Client class definitions
 """
-import logging
-#log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from twisted.internet import defer
 
 from ion.agents.resource_agent import ResourceAgent

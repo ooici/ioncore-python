@@ -6,8 +6,8 @@
 @brief Python Capability Container
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.util.config import Config

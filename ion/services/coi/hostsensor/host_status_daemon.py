@@ -3,7 +3,7 @@
 @author Brian Fox
 @brief Simple XMLRPC server for serving host status
 """
-import logging, sys
+import ion.util.ionlog, sys
 import encoders
 from optparse import OptionParser
 from SimpleXMLRPCServer import SimpleXMLRPCServer

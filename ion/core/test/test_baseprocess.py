@@ -8,8 +8,8 @@
 
 import os
 import sha
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.trial import unittest
 from twisted.internet import defer

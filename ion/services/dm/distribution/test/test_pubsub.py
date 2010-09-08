@@ -7,8 +7,8 @@
 @brief test service for registering topics for data publication & subscription
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 #import time
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -27,7 +27,7 @@ from ion.data import dataobject
 from ion.resources.dm_resource_descriptions import Publication, PublisherResource,\
     PubSubTopicResource, SubscriptionResource, DAPMessageObject,DataMessageObject,\
     StringMessageObject, DictionaryMessageObject
-    
+
 
 from ion.services.dm.util import dap_tools
 
@@ -41,7 +41,7 @@ from ion.services.dm.distribution.consumers import example_consumer
 from ion.services.dm.util import dap_tools
 
 class PubSubServiceMethodTest(IonTestCase):
-    
+
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -49,57 +49,57 @@ class PubSubServiceMethodTest(IonTestCase):
             {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
             {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'}
             ]
-        
+
         self.sup = yield self._spawn_processes(services)
 
         # This is only allowed in a test case - that way we can directly test the service methods!
         child_id = yield self.sup.get_child_id('pubsub_service')
         log.debug('PubSub Test Service ID:' + str(child_id))
         self.pubsub = self._get_procinstance(child_id)
-        
+
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.pubsub.reg.clear_registry()
         yield self._stop_container()
-    
+
 
 
     @defer.inlineCallbacks
     def test_create_topic(self):
         # Create and Register a topic
         topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")
-        
+
         # Make sure the topic starts out with blank stuff here...
         self.assertEqual(topic.RegistryBranch,'master')
         self.assertEqual(topic.RegistryIdentity,'')
         self.assertEqual(topic.queue.type,'')
-        
+
         # Use the service to create a queue and register the topic
         topic = yield self.pubsub.create_and_register_topic(topic)
-        
+
         # Make sure the queue properties were set.
         self.assertEqual(topic.queue.type,'fanout')
-        
+
         #Spawn an baseconsumer and make sure a message is received on the new queue
         pd1={'name':'consumer_number_1',
                  'module':'ion.services.dm.distribution.consumers.logging_consumer',
                  'procclass':'LoggingConsumer',
                  'spawnargs':{'attach':[topic.queue.name]}}
         child1 = base_consumer.ConsumerDesc(**pd1)
-        
+
         child1_id = yield self.test_sup.spawn_child(child1)
-        
+
         msg=DataMessageObject()
         self.sup.send(topic.queue.name,'data',msg.encode())
-        
+
         yield pu.asleep(1)
 
         dc1 = self._get_procinstance(child1_id)
         #print 'DC1',dc1.receive_cnt
         rec = dc1.receive_cnt[topic.queue.name]
         self.assertEqual(rec,1)
-        
+
     @defer.inlineCallbacks
     def test_create_consumer_args1(self):
         '''
@@ -107,19 +107,19 @@ class PubSubServiceMethodTest(IonTestCase):
         Make sure teh basics of the workflow processing work to create consumer
         args.
         '''
-        
+
         # Create and Register a topic
-        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")        
+        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")
         # Use the service to create a queue and register the topic
         topic = yield self.pubsub.create_and_register_topic(topic)
 
 
         # A condition to search for the topic
         t_search = PubSubTopicResource.create('Davids Topic','')
-        
+
         subscription = SubscriptionResource()
         subscription.topic1 = t_search
-        
+
         subscription.workflow = {'consumer1':{'module':'path.to.module','consumerclass':'<ConsumerClassName>',\
             'attach':'topic1',\
             'process parameters':{'param1':'my parameter'}}}
@@ -136,7 +136,7 @@ class PubSubServiceMethodTest(IonTestCase):
                 'delivery interval': None,
                 'delivery queues': {},
                 'process parameters': {'param1': 'my parameter'}}}}, subscription.consumer_args)
-        
+
     @defer.inlineCallbacks
     def test_create_consumer_args2(self):
         '''
@@ -144,24 +144,24 @@ class PubSubServiceMethodTest(IonTestCase):
         In this test there is a second consumer a real workflow - test shows that
         they correctly delivery/attach to the same queue
         '''
-        
+
         # Create and Register a topic
-        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")        
+        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")
         # Use the service to create a queue and register the topic
         topic = yield self.pubsub.create_and_register_topic(topic)
 
 
         # A condition to search for the topic
         t_search = PubSubTopicResource.create('Davids Topic','')
-        
+
         subscription = SubscriptionResource()
         subscription.topic1 = t_search
-        
+
         subscription.workflow = {
             'consumer1':{'module':'path.to.module','consumerclass':'<ConsumerClassName>',\
             'attach':'topic1',\
             'process parameters':{'param1':'my parameter1'}},
-                
+
             'consumer2':{'module':'path.to.module2','consumerclass':'<ConsumerClassName2>',\
             'attach':[['consumer1','deliver_to']],\
             'Process Parameters':{'param2':'my parameter2'}}
@@ -170,7 +170,7 @@ class PubSubServiceMethodTest(IonTestCase):
         subscription = yield self.pubsub.create_consumer_args(subscription)
 
         log.debug('Defined subscription consumers: '+str(subscription.consumer_args))
-        
+
         consume2_attach = subscription.consumer_args['consumer2']['spawnargs']['attach']
         self.assertEqual({'module': 'path.to.module',
                'name': 'consumer1',
@@ -180,36 +180,36 @@ class PubSubServiceMethodTest(IonTestCase):
                              'delivery queues': {'deliver_to': consume2_attach[0]},
                              'process parameters': {'param1': 'my parameter1'}}},
             subscription.consumer_args['consumer1'])
-        
-        
+
+
     @defer.inlineCallbacks
     def test_create_consumer_args3(self):
         '''
         @Brief Test business logic to create consumer args from a workflow
         In this test two consumers attach to the same queue created by the workflow
         '''
-        
+
         # Create and Register a topic
-        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")        
+        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")
         # Use the service to create a queue and register the topic
         topic = yield self.pubsub.create_and_register_topic(topic)
 
 
         # A condition to search for the topic
         t_search = PubSubTopicResource.create('Davids Topic','')
-        
+
         subscription = SubscriptionResource()
         subscription.topic1 = t_search
-        
+
         subscription.workflow = {
             'consumer1':{'module':'path.to.module','consumerclass':'<ConsumerClassName>',\
             'attach':'topic1',\
             'process parameters':{'param1':'my parameter1'}},
-                
+
             'consumer2':{'module':'path.to.module2','consumerclass':'<ConsumerClassName2>',\
             'attach':[['consumer1','deliver_to']],\
             'Process Parameters':{'param2':'my parameter2'}},
-            
+
             'consumer3':{'module':'path.to.module3','consumerclass':'<ConsumerClassName3>',\
             'attach':[['consumer1','deliver_to'],'topic1']}
                 }
@@ -217,7 +217,7 @@ class PubSubServiceMethodTest(IonTestCase):
         subscription = yield self.pubsub.create_consumer_args(subscription)
 
         log.debug('Defined subscription consumers: '+str(subscription.consumer_args))
-        
+
         consume2_attach = subscription.consumer_args['consumer2']['spawnargs']['attach']
         self.assertEqual({'module': 'path.to.module',
                'name': 'consumer1',
@@ -227,7 +227,7 @@ class PubSubServiceMethodTest(IonTestCase):
                              'delivery queues': {'deliver_to': consume2_attach[0]},
                              'process parameters': {'param1': 'my parameter1'}}},
             subscription.consumer_args['consumer1'])
-        
+
         self.assertEqual({'procclass': '<ConsumerClassName3>',
          'name': 'consumer3',
          'module': 'path.to.module3',
@@ -237,9 +237,9 @@ class PubSubServiceMethodTest(IonTestCase):
             'delivery queues': {},
             'process parameters': {}}},
             subscription.consumer_args['consumer3'])
-        
-        
-    
+
+
+
     @defer.inlineCallbacks
     def test_create_subscription1(self):
         '''
@@ -247,17 +247,17 @@ class PubSubServiceMethodTest(IonTestCase):
         '''
 
         # Create and Register a topic
-        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")        
+        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")
         # Use the service to create a queue and register the topic
         topic = yield self.pubsub.create_and_register_topic(topic)
 
 
         # A condition to search for the topic
         t_search = PubSubTopicResource.create('Davids Topic','')
-        
+
         subscription = SubscriptionResource()
         subscription.topic1 = t_search
-        
+
         subscription.workflow = {
             'consumer1':
                 {'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
@@ -270,7 +270,7 @@ class PubSubServiceMethodTest(IonTestCase):
 
         msg=DataMessageObject()
         self.sup.send(topic.queue.name,'data',msg.encode())
-        
+
         # Wait for message to be received
         yield pu.asleep(1)
         child_id = self.pubsub.get_child_id('consumer1')
@@ -285,18 +285,18 @@ class PubSubServiceMethodTest(IonTestCase):
         '''
 
         # Create and Register a topic
-        topic1 = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")        
+        topic1 = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")
         # Use the service to create a queue and register the topic
         topic1 = yield self.pubsub.create_and_register_topic(topic1)
-        
-        topic2 = PubSubTopicResource.create('Johns Topic',"oceans, mbari, working really hard")        
+
+        topic2 = PubSubTopicResource.create('Johns Topic',"oceans, mbari, working really hard")
         # Use the service to create a queue and register the topic
         topic2 = yield self.pubsub.create_and_register_topic(topic2)
-        
+
         subscription = SubscriptionResource()
         subscription.topic1 = PubSubTopicResource.create('Davids Topic','')
         subscription.topic2 = PubSubTopicResource.create('','oceans')
-        
+
         subscription.workflow = {
             'consumer1':
                 {'module':'ion.services.dm.distribution.consumers.forwarding_consumer',
@@ -314,17 +314,17 @@ class PubSubServiceMethodTest(IonTestCase):
 
         msg=DataMessageObject()
         self.sup.send(topic1.queue.name,'data',msg.encode())
-        
+
         # Wait for message to be received
         yield pu.asleep(1)
         child1_id = self.pubsub.get_child_id('consumer1')
         dc1 = self._get_procinstance(child1_id)
         rec = dc1.receive_cnt[topic1.queue.name]
         self.assertEqual(rec,1)
-                
+
         child2_id = self.pubsub.get_child_id('consumer2')
         dc2 = self._get_procinstance(child2_id)
-        
+
         q = subscription.consumer_args['consumer2']['spawnargs']['attach']
         rec = dc2.receive_cnt[q[0]]
         self.assertEqual(rec,1)
@@ -336,7 +336,7 @@ class PubSubServiceMethodTest(IonTestCase):
 class PubSubTest(IonTestCase):
     """
     Testing PubSub service methods to define topics, define publishers, define
-    subscriptions and publish data. 
+    subscriptions and publish data.
     """
 
     @defer.inlineCallbacks
@@ -352,7 +352,7 @@ class PubSubTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        
+
         log.info('Tearing Down PubSub Test')
         # Clear the registry on the way out!
         child_id = yield self.sup.get_child_id('pubsub_service')
@@ -360,9 +360,9 @@ class PubSubTest(IonTestCase):
         # This is only allowed in a test case - that way we can directly use the service methods!
         pubsub = self._get_procinstance(child_id)
         pubsub.reg.clear_registry()
-        
+
         yield pu.asleep(1)
-        
+
         yield self._stop_container()
 
     def test_setup_teardown(self):
@@ -373,9 +373,9 @@ class PubSubTest(IonTestCase):
     def test_pubsub(self):
 
         dpsc = DataPubsubClient(self.sup)
-        
+
         # Create and Register a topic
-        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")        
+        topic = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")
         topic = yield dpsc.define_topic(topic)
         log.info('Defined Topic: '+str(topic))
 
@@ -384,11 +384,11 @@ class PubSubTest(IonTestCase):
         publisher = yield dpsc.define_publisher(publisher)
 
         log.info('Defined Publisher: '+str(publisher))
-        
 
-        
+
+
         # === Create a Consumer and queues - this will become part of define_subscription.
-        
+
         #Create two test queues - don't use topics to test the consumer
         # To be replaced when the subscription service is ready
         queue1=dataobject.create_unique_identity()
@@ -433,7 +433,7 @@ class PubSubTest(IonTestCase):
 
 
         # === Create a Consumer - this will become part of define_subscription.
-        
+
         pd2={'name':'example_consumer_2',
                  'module':'ion.services.dm.distribution.consumers.logging_consumer',
                  'procclass':'LoggingConsumer',
@@ -449,7 +449,7 @@ class PubSubTest(IonTestCase):
 
         # Send the simple message again
         result = yield dpsc.publish(self.sup, topic.reference(), data)
-        
+
         # Need to await the delivery of data messages into the (separate) consumers
         yield pu.asleep(1)
 
@@ -460,7 +460,7 @@ class PubSubTest(IonTestCase):
         self.assertEqual(sent.get(queue1),2)
         self.assertEqual(sent.get(queue2),2)
         self.assertEqual(received.get(topic.queue.name),2)
-        
+
         msg_cnt = yield child2.get_msg_count()
         received = msg_cnt.get('received',{})
         sent = msg_cnt.get('sent',{})
@@ -478,9 +478,9 @@ class PubSubTest(IonTestCase):
         seperate queues.
         '''
         dpsc = DataPubsubClient(self.sup)
-        
+
         #Create and register 3 topics!
-        topic_raw = PubSubTopicResource.create("topic_raw","oceans, oil spill, fun things to do") 
+        topic_raw = PubSubTopicResource.create("topic_raw","oceans, oil spill, fun things to do")
         topic_raw = yield dpsc.define_topic(topic_raw)
 
 
@@ -491,7 +491,7 @@ class PubSubTest(IonTestCase):
         log.info('Defined Publisher: '+str(publisher))
 
         # === Create a Consumer and queues - this will become part of define_subscription.
-        
+
         #Create two test queues - don't use topics to test the consumer
         # To be replaced when the subscription service is ready
         evt_queue=dataobject.create_unique_identity()
@@ -547,7 +547,7 @@ class PubSubTest(IonTestCase):
                 'height':{'long_name':'person height','units':'meters'}}}, \
             {'time':(101,102,103,104,105,106,107,108,109,110), \
             'height':(5,2,4,5,-1,9,3,888,3,4)})
-        
+
         result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
         if result:
             log.info('Published Message')
@@ -564,19 +564,19 @@ class PubSubTest(IonTestCase):
         self.assertEqual(sent.get(evt_queue),2)
         self.assertEqual(sent.get(pr_queue),1)
         self.assertEqual(received.get(topic_raw.queue.name),1)
-        
+
         msg_cnt = yield child2.get_msg_count()
         received = msg_cnt.get('received',{})
         sent = msg_cnt.get('sent',{})
         self.assertEqual(sent,{})
         self.assertEqual(received.get(evt_queue),2)
-        
+
         msg_cnt = yield child3.get_msg_count()
         received = msg_cnt.get('received',{})
         sent = msg_cnt.get('sent',{})
         self.assertEqual(sent,{})
         self.assertEqual(received.get(pr_queue),1)
-        
+
 
         # Publish a second message with different data
         dmsg = dap_tools.simple_datamessage(\
@@ -585,7 +585,7 @@ class PubSubTest(IonTestCase):
                 'height':{'long_name':'person height','units':'meters'}}}, \
             {'time':(111,112,123,114,115,116,117,118,119,120), \
             'height':(8,986,4,-2,-1,5,3,1,4,5)})
-        
+
         result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
 
         # Need to await the delivery of data messages into the consumers
@@ -597,21 +597,15 @@ class PubSubTest(IonTestCase):
         self.assertEqual(sent.get(evt_queue),5)
         self.assertEqual(sent.get(pr_queue),2)
         self.assertEqual(received.get(topic_raw.queue.name),2)
-        
+
         msg_cnt = yield child2.get_msg_count()
         received = msg_cnt.get('received',{})
         sent = msg_cnt.get('sent',{})
         self.assertEqual(sent,{})
         self.assertEqual(received.get(evt_queue),5)
-        
+
         msg_cnt = yield child3.get_msg_count()
         received = msg_cnt.get('received',{})
         sent = msg_cnt.get('sent',{})
         self.assertEqual(sent,{})
         self.assertEqual(received.get(pr_queue),2)
-
-
-
-        
-
-

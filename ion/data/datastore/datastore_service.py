@@ -9,8 +9,8 @@ the rdf workspace composed of associations and objects.
 The associations can be walked to find content.
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 

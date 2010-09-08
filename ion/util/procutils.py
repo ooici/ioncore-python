@@ -11,8 +11,8 @@ import traceback
 import re
 from datetime import datetime
 import time
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 import uuid
 from twisted.internet import defer, reactor
 from magnet.container import Id

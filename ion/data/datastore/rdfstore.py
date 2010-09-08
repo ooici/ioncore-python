@@ -8,7 +8,7 @@
 Trees & Commits should include the the repo blob! 
 """
 
-import logging
+import ion.util.ionlog
 
 from twisted.internet import defer
 from twisted.python import reflect

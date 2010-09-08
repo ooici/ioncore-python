@@ -8,8 +8,8 @@
 @brief Retriever - front end to local DAP server that sends DAP data out over OOI.
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 

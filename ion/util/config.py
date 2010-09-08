@@ -6,8 +6,9 @@
 @brief  supports work with config files
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import os.path
 
 class Config(object):

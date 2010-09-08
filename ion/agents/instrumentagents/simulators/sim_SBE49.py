@@ -10,11 +10,11 @@ This program can be fleshed out as needed.
 @author Dave Everett
 @date 6/8/10
 """
-import logging
+import ion.util.ionlog
 import random
 import math
 import time
-log = logging.getLogger(__name__)
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import protocol
 from twisted.internet import reactor

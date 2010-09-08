@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 
 """
-@file ion/util/logging.py
+@file ion/util/ionlog.py
 @author Michael Meisinger
 @brief Abstracts from any form of logging in ION
 """
 
-import logging
-
 def getLogger(loggername=__name__):
+    import logging
     return logging.getLogger(loggername)
 
 def IonLogger(object):
+    import logging
     def __init__(self, loggername):
         self.logger = logging.getLogger(loggername)
 

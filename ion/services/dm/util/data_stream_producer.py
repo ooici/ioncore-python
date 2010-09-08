@@ -6,8 +6,8 @@
 @brief a data stream producer process - it spits out dap messages
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 import time
 

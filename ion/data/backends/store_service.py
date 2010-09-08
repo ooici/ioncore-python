@@ -8,8 +8,8 @@
 @Note Test cases for the store service backend are now in ion.data.test.test_store
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit

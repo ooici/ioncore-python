@@ -11,8 +11,8 @@ method for badly written DAP clients.
 @see http://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 import base64
 

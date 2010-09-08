@@ -9,8 +9,8 @@
 @note Depends on pycassa being installed and the instance on amoeba being up.
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 import pycassa
 
 

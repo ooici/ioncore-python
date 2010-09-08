@@ -7,7 +7,7 @@
 @brief test rdf store
 """
 
-import logging
+import ion.util.ionlog
 
 from twisted.internet import defer
 from twisted.trial import unittest

@@ -5,8 +5,8 @@
 @author Steve Foley
 @brief CI interface for SeaBird SBE-49 CTD
 """
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 import SBE49_constants as const

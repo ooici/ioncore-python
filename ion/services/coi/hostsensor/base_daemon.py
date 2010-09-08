@@ -7,7 +7,7 @@
 """
 
 import sys, os, time, atexit
-import logging
+import ion.util.ionlog
 from signal import SIGTERM 
 
 class Daemon:

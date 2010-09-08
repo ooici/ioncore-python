@@ -6,8 +6,8 @@
 @brief capability container control process (agent)
 """
 
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 import os
 
 from twisted.internet import defer, reactor

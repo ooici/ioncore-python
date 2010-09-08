@@ -7,7 +7,7 @@
 @brief base class for all resource agent processes
 """
 
-import logging
+import ion.util.ionlog
 from twisted.internet import defer
 
 from ion.services.coi.agent_registry import AgentRegistryClient

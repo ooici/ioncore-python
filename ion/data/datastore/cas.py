@@ -15,7 +15,7 @@ twisted.internet.defer.Deferred objects.
 import re
 import hashlib
 import struct
-import logging
+import ion.util.ionlog
 
 from zope.interface import Interface
 from zope.interface import implements

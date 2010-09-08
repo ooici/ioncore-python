@@ -11,9 +11,10 @@ from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 logserv = logging.getLogger('logServer')
-log = logging.getLogger(__name__)
 
 class LoggerService(BaseService):
     """Logger service interface

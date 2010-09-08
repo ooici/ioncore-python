@@ -4,8 +4,8 @@
 @file ion/agents/test/test_resource_agent.py
 @author Steve Foley
 """
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from ion.data.dataobject import LCState
 

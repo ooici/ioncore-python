@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import inspect
-import logging
-log = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource
 
 from magnet.container import Id
