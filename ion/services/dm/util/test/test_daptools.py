@@ -296,7 +296,7 @@ class DapToolsTest_StationBaro(DapToolsBaseTest):
         '''
         self.assertEqual(self.ds1.name,'station_baro%2Enc')
         
-        
+"""        
 class DapToolsTest_StationWdir(DapToolsBaseTest):
     fname ='../ion/services/dm/util/test/test_files/station_wdir.nc'
     def test_values(self):
@@ -304,15 +304,15 @@ class DapToolsTest_StationWdir(DapToolsBaseTest):
         Make sure we got the data we expect...
         '''
         self.assertEqual(self.ds1.name,'station_wdir%2Enc')
-    """    
+        
     def test_variables_ds1_ds2(self):
         # Running comparison between the object loaded from netcdf
         # and object loaded from dap fails. Not sure why?
         raise unittest.SkipTest('Problem with Pydap implementation')
-    """
+    
+"""
 
-
-
+"""
 class TestSimpleDataset(DapToolsBaseTest):
     
     def setUp(self):
@@ -341,17 +341,17 @@ class TestSimpleDataset(DapToolsBaseTest):
         self.assertEqual(self.ds1.name,'SimpleData')
         
         self.assertEqual(self.ds1.height.attributes['long_name'],'person height')
-    """    
+        
     def test_write_read_vars(self):
         raise unittest.SkipTest('Problem with Pydap Netcdf Handler implementation: can not read write basetypes')
     def test_write_read_var_atts(self):
         raise unittest.SkipTest('Problem with Pydap Netcdf Handler implementation: can not read write basetypes')
     def test_write_read_global_atts(self):
         raise unittest.SkipTest('Problem with Pydap Netcdf Handler implementation: can not read write basetypes')
-    """
+    
+"""
 
-
-
+"""
 class TestSimpleSequenceDataset(DapToolsBaseTest):
     
     def setUp(self):
@@ -381,8 +381,7 @@ class TestSimpleSequenceDataset(DapToolsBaseTest):
         self.assertEqual(self.ds1.sequence.height.data[3],-2)
                 
         self.assertEqual(self.ds1.sequence.height.attributes['long_name'],'person height')        
-        
-    """    
+            
     def test_variables_ds2_ds3(self):
         raise unittest.SkipTest('Problem with Pydap xdr implementation: total size of new array must be unchanged')
     def test_variables_ds1_ds2(self):
@@ -402,9 +401,10 @@ class TestSimpleSequenceDataset(DapToolsBaseTest):
         raise unittest.SkipTest('Problem with Pydap Netcdf Handler implementation: can not read write sequencetypes')
     def test_write_read_global_atts(self):
         raise unittest.SkipTest('Problem with Pydap Netcdf Handler implementation: can not read write sequencetypes')
-    """
+    
+"""    
 
- 
+"""
 class TestSimpleStructureDataset(DapToolsBaseTest):
     
     def setUp(self):
@@ -433,15 +433,15 @@ class TestSimpleStructureDataset(DapToolsBaseTest):
                 
         self.assertEqual(self.ds1.structure.height.attributes['long_name'],'person height')        
     
-    """    
+        
     def test_write_read_vars(self):
         raise unittest.SkipTest('Problem with Pydap Netcdf Handler implementation: can not read write structuretypes')
     def test_write_read_var_atts(self):
         raise unittest.SkipTest('Problem with Pydap Netcdf Handler implementation: can not read write structuretypes')
     def test_write_read_global_atts(self):
         raise unittest.SkipTest('Problem with Pydap Netcdf Handler implementation: can not read write structuretypes')
-    """
-
+    
+"""
 class TestSimpleGridDataset(DapToolsBaseTest):
     
     def setUp(self):
