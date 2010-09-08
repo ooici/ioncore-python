@@ -15,7 +15,6 @@ from ion.services.dm.util import dap_tools
 import logging
 log = logging.getLogger(__name__)
 
-
 import os
 import tempfile
 import shutil
@@ -34,7 +33,7 @@ from ion.services.dm.distribution import base_consumer
 class PersisterConsumer(base_consumer.BaseConsumer):
     """
     Please update the doc string...
-    
+
     The persister service is responsible for receiving a DAP dataset and
     writing to disk in netcdf format.
     Message protocol/encoding/format:
@@ -71,14 +70,14 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         datamessage = dataobject.DataObject.decode(content)
         if isinstance(datamessage, DAPMessageObject):
 
-            dataset = dap_tools.dap_msg2ds(datamessage)            
+            dataset = dap_tools.dap_msg2ds(datamessage)
             # Call preserve DAP data
             fname = self.params['filename']
-            
+
             name = os.path.basename(fname)
             dataset.name = name
             path = fname.replace(name,'')
-            
+
             log.info( 'name: ' + name)
             log.info('fname:' + fname)
             log.info('path:' + path)
@@ -87,13 +86,13 @@ class PersisterConsumer(base_consumer.BaseConsumer):
             log.info("retval from _save_dap_dataset is:"+ str(retval))
             if retval == 1:
                 raise RuntimeError("Archive file does not exist")
-                
+
             if retval == 2:
                 raise RuntimeError("Problem with NCA handler")
-                
-                
+
+
         elif isinstance(datamessage, (DictionaryMessageObject, StringMessageObject)):
-            
+
             data = datamessage.data
             fname = self.params['filename']
             log.info("Writing Dictionary or String to " + fname)
@@ -101,22 +100,22 @@ class PersisterConsumer(base_consumer.BaseConsumer):
             f.write(data)
             f.close()
 
-            #Call preserve dict or string 
+            #Call preserve dict or string
             #self._save_string_dataset(data,fname=self.params['filename'])
 
         else:
             raise RuntimeError("Persister Service received an incompatible message.")
-            
+
 
         # Later - these will be sent to a historical log for the dataset...
         notification = datamessage.notification
         timestamp = datamessage.timestamp
-        
+
 
     def _create_nca_configfile(self,base_name):
         """
         @brief: routine that creates a temporary file used by the pydap nca handler.
-        @param basename: This is prefix of the filenames that will be appended by 
+        @param basename: This is prefix of the filenames that will be appended by
         the nca handler
         """
         configfile = tempfile.NamedTemporaryFile()
@@ -138,17 +137,15 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         @param fname the name of the file to write the pydap dataset,
         fname must use an absolute path
         """
-        
+
         fname = dataset.name
         fname = os.path.join(path, fname)
-        
+
         if '%2Enc' in fname:
             fname = fname.replace('%2Enc','.nc')
-        
+
         elif not '.nc' in fname:
             fname = ".".join((fname, "nc"))
-        
-        
         log.info("running _save_dap_dataset, fname=%s" % fname)
         try:
             os.stat(fname)
@@ -156,8 +153,8 @@ class PersisterConsumer(base_consumer.BaseConsumer):
             log.info("Archive file does not exist")
             # Use return value - or throw an exception?
             return 1
-        
-        #Check to see if the file exists but is empty. 
+
+        #Check to see if the file exists but is empty.
         if os.path.getsize(fname) == 0:
             # Write the data to a new file
             log.info("Archive file exists, but is empty")
@@ -165,18 +162,18 @@ class PersisterConsumer(base_consumer.BaseConsumer):
             return 0
         else:
             #The file exists and is not empty, append the contents
-            
+
             tmp_file_base = os.path.join(path, str(uuid.uuid4())[:8])
-            
+
             tmp_file_0 = tmp_file_base + '_0.nc'
-            
+
             shutil.copy(fname, tmp_file_0)
-            
+
             tmp_file_1 = tmp_file_base + '_1.nc'
             dap_tools.write_netcdf_from_dataset(dataset, tmp_file_1)
-            
+
             log.info("Write new dataset to the file")
-            configfile = self._create_nca_configfile(tmp_file_base)    
+            configfile = self._create_nca_configfile(tmp_file_base)
             log.info("Initializing nca handler")
             h = ncaHandler(configfile.name)
             try:
@@ -187,7 +184,7 @@ class PersisterConsumer(base_consumer.BaseConsumer):
                 os.remove(tmp_file_1)
                 os.remove(tmp_file_0)
                 return 2
-        
+
             log.info("Created new netcdf dataset")
             dap_tools.write_netcdf_from_dataset(ds, tmp_file_base + 'agg.nc')
             shutil.move(tmp_file_base + 'agg.nc', fname)
@@ -195,14 +192,14 @@ class PersisterConsumer(base_consumer.BaseConsumer):
             configfile.close()
             os.remove(tmp_file_1)
             os.remove(tmp_file_0)
-        
+
             return 0
-        
-        
+
+
     '''
     # Must be called op_data
     @defer.inlineCallbacks
-    def op_persist_dap_dataset(self, content, headers, msg): 
+    def op_persist_dap_dataset(self, content, headers, msg):
         """
         @brief top-level routine to persist a dataset.
         @param content Message with das, dds and dods keys
@@ -224,10 +221,10 @@ class PersisterConsumer(base_consumer.BaseConsumer):
             defer.returnValue(None)
 
         yield self.reply_ok(msg)
-    
+
     # Must also be called op_data?
     @defer.inlineCallbacks
-    def op_append_dap_dataset(self, content, headers, msg): 
+    def op_append_dap_dataset(self, content, headers, msg):
         """
         @brief routine to append to an existing dataset which is a netcdf file
         @param content Message with dataset name, pattern, das, dds and dods keys
@@ -238,18 +235,18 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         @retval RPC message via reply_ok/reply_err
         """
         log.info('called to append a dap dataset!')
-        
+
         assert(isinstance(content, dict))
-        
+
         try:
             self.op_persist_dap_dataset(content, headers, msg)
         except:
             yield self.reply_err(msg, {'value': 'Problem with persisting new dataset'}, {})
             defer.returnValue(None)
-        dataset = content["dataset"]    
+        dataset = content["dataset"]
         dsname = generate_filename(dataset)
         pattern = content["pattern"]
-        
+
         log.info('using netcdf file matching pattern: ' + pattern)
         try:
             log.info("calling _append_no_xmit ")
@@ -258,16 +255,16 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         except:
             yield self.reply_err(msg, {'value':'Problem appending the dataset'}, {})
             defer.returnValue(None)
-            
+
         yield self.reply_ok(msg)
 
-        
+
     def _append_no_xmit(self, dsname, pattern, local_dir=None):
         """
-        @brief Appends netcdf files together. 
-        @param dsname, the name of the file that contains the 
+        @brief Appends netcdf files together.
+        @param dsname, the name of the file that contains the
         @param pattern a pattern used to match netcdf files to append
-         
+
         """
         configfile = tempfile.NamedTemporaryFile()
         configfile.write("[dataset]")
@@ -278,18 +275,18 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         configfile.write(os.linesep)
         configfile.write("axis=time")
         configfile.write(os.linesep)
-        configfile.flush()    
+        configfile.flush()
         log.info("Initializing nca handler")
+
         h = ncaHandler(configfile.name)
         try:
             ds = h.parse_constraints({'pydap.ce':(None,None)})
         except:
             log.exception("problem using append handler")
             return 2
-        
+
         log.info("Created new netcdf dataset")
         try:
-            
             log.info("saving netcdf file")
             #It needs to save the file to a new file name, I have arbitrarily chosen
             #to make the file the same as the first file name with the suffix _append
@@ -297,10 +294,10 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         except UnicodeDecodeError, ude:
             log.exception('save error: %s ' % ude)
             return 1
-        
+
         configfile.close()
-        
-    
+
+
     def _save_no_xmit(self, content, local_dir=None):
         """
         @brief Parse message into decodable objects: DAS, DDS, data.
@@ -388,7 +385,7 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         except UnicodeDecodeError, ude:
             log.exception('save error: %s ' % ude)
             return 1
- '''   
+'''
 # Must change name after refactor
 factory = ProtocolFactory(PersisterConsumer)
 
@@ -412,24 +409,24 @@ class PersisterClient(BaseServiceClient): # Not really needed - consumers don't 
 
         (content, headers, msg) = yield self.rpc_send('persist_dap_dataset',
                                                       dap_message)
-        
+
         log.debug('dap persist returns: ' + str(content))
         defer.returnValue(str(content))
-        
-    @defer.inlineCallbacks   
+
+    @defer.inlineCallbacks
     def append_dap_dataset(self, dataset, pattern, dap_message):
         """
         @brief Append to an existing dataset, new data from a dap message
         @param dataset, a logical name of the dataset, this name is mapped to a file name
-        @param dap_message Message with das/dds/dods in das/dds/dods keys 
+        @param dap_message Message with das/dds/dods in das/dds/dods keys
         @retval ok or error via rpc mechanism
         """
         yield self._check_init()
         dap_message.update({'dataset': dataset})
         dap_message.update({'pattern': pattern})
-        (content, headers, meg) = yield self.rpc_send('append_dap_dataset', 
+        (content, headers, meg) = yield self.rpc_send('append_dap_dataset',
                                                       dap_message)
-        
+
         log.debug('dap append returns: ' + str(content))
         defer.returnValue(str(content))
 '''
