@@ -58,6 +58,7 @@ class CassandraStore(IStore):
         @param cass_host_list List of hostname:ports for cassandra host or cluster
         @retval Deferred, for IStore instance.
         """
+        logging.info('In create_store method')
         inst = cls(**kwargs)
         inst.kwargs = kwargs
         inst.cass_host_list = kwargs.get('cass_host_list', None)
@@ -97,8 +98,9 @@ class CassandraStore(IStore):
         logging.info('namespace: '+str(inst.namespace))
         client_creator = ClientCreator(reactor, ManagedThriftClientProtocol)
         port = 9160
-        host = 'amoeba.ucsd.edu'
-        d = client_creator.connectTCP(host, port)
+        host = 'localhost'
+        factory = ManagedCassandraClientFactory()
+        d = client_creator.connectTCP(host, port, factory)
         d.addCallback(cls)
         return d
         
