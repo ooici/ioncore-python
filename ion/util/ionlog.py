@@ -7,6 +7,10 @@
 """
 
 def getLogger(loggername=__name__):
+    """
+    This function is used to assign every module in the code base a separate
+    logger instance. Currently it just delegates to Python logging.
+    """
     import logging
     return logging.getLogger(loggername)
 
@@ -35,6 +39,7 @@ def IonLogger(object):
 
     warning = warn
 
+"""
 class LoggerAdapter:
     def __init__(self, logger, args):
         self.logger = logger
@@ -65,6 +70,7 @@ class LoggerAdapter:
         for k in self.args:
             extra[k] = self.args[k]
         return extra
+"""
 
 class ProcessInfo:
     """
