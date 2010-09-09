@@ -37,7 +37,7 @@ class SetCassandraStore():
         #keyspace and colfamily needs to be passed into the constructor
         self._keyspace = 'Datasets'
         self._colfamily = 'Catalog'
-        self._client = CassandraClient(self._manager, self._keyspace)
+        self._client = CassandraClient.create_store()
         #self._client = pycassa.connect(cass_host_list)
         #self._kvs = pycassa.ColumnFamily(client, 'Datasets', 'Catalog')
         logging.info('connected OK.')
