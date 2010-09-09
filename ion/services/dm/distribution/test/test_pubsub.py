@@ -4,6 +4,7 @@
 @file ion/services/dm/distribution/test/test_pubsub.py
 @author Michael Meisinger
 @author David Stuebe
+@author Matt Rodriguez
 @brief test service for registering topics for data publication & subscription
 """
 
@@ -11,35 +12,59 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 #import time
 from twisted.internet import defer
-from twisted.trial import unittest
-#from magnet.container import Container
-from magnet.spawnable import Receiver
-from magnet.spawnable import spawn
 
-#from ion.core.base_process import ProtocolFactory
+
+
 from ion.core import bootstrap
-#from ion.core.base_process import BaseProcess
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
 from ion.data import dataobject
-from ion.resources.dm_resource_descriptions import Publication, PublisherResource,\
-    PubSubTopicResource, SubscriptionResource, DAPMessageObject,DataMessageObject,\
-    StringMessageObject, DictionaryMessageObject
+from ion.resources.dm_resource_descriptions import PublisherResource,\
+    PubSubTopicResource, SubscriptionResource,DataMessageObject
 
 
-from ion.services.dm.util import dap_tools
 
 from ion.services.dm.distribution import base_consumer
-from ion.services.dm.distribution.consumers import forwarding_consumer
-from ion.services.dm.distribution.consumers import logging_consumer
-from ion.services.dm.distribution.consumers import example_consumer
 
-#import numpy
 
 from ion.services.dm.util import dap_tools
 
+class PubSubEndToEndTest(IonTestCase):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+        services = [
+            {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
+            {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'}
+            ]
+
+        self.sup = yield self._spawn_processes(services)
+        self.pubsub_client = DataPubsubClient(self.sup)
+        
+        child_id = yield self.sup.get_child_id('pubsub_service')
+        log.debug('PubSub Test Service ID:' + str(child_id))
+        self.pubsub = self._get_procinstance(child_id)
+        
+       
+        self.topic1 = PubSubTopicResource.create('Test1 Topic',"Grids")
+        self.topic2 = PubSubTopicResource.create('Test2 Topic',"Points")
+        
+    @defer.inlineCallbacks
+    def tearDown(self):
+        #yield self.pubsub.reg.clear_registry()
+        yield self._stop_container()        
+        
+    @defer.inlineCallbacks    
+    def test_publisher(self):
+        self.topic1 = yield self.pubsub_client.define_topic(self.topic1)
+        self.pub1 = PublisherResource.create("Grids", self.sup, [self.topic1], "content")
+        yield self.pubsub_client.define_publisher(self.pub1)
+        yield self.pubsub_client.publish(self.sup, self.topic1, "Gridded data")
+        
+        
 class PubSubServiceMethodTest(IonTestCase):
 
     @defer.inlineCallbacks
