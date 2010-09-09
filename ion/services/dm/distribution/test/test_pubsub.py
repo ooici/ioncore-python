@@ -54,16 +54,32 @@ class PubSubEndToEndTest(IonTestCase):
         
     @defer.inlineCallbacks
     def tearDown(self):
-        #yield self.pubsub.reg.clear_registry()
+        yield self.pubsub.reg.clear_registry()
         yield self._stop_container()        
+    
         
     @defer.inlineCallbacks    
     def test_publisher(self):
+        """
+        Publish to a topic that has been registered with a publisher.
+        """
         self.topic1 = yield self.pubsub_client.define_topic(self.topic1)
         self.pub1 = PublisherResource.create("Grids", self.sup, [self.topic1], "content")
         yield self.pubsub_client.define_publisher(self.pub1)
-        yield self.pubsub_client.publish(self.sup, self.topic1, "Gridded data")
-        
+        res = yield self.pubsub_client.publish(self.sup, self.topic1, "Gridded data")
+        self.assertEqual(res, 'sent')
+    @defer.inlineCallbacks    
+    def test_publisher_fail(self):
+        """
+        Try to publish to a topic that has not been registered to a publisher.
+        @Note: This test registers topic1 to a publisher, then tries to publish
+        to topic2.
+        """
+        self.topic2 = yield self.pubsub_client.define_topic(self.topic2)
+        self.pub1 = PublisherResource.create("Grids", self.sup, [self.topic1], "content")
+        yield self.pubsub_client.define_publisher(self.pub1)
+        res = yield self.pubsub_client.publish(self.sup, self.topic2, "Point data")  
+        self.assertEqual(res,'error sending message!')
         
 class PubSubServiceMethodTest(IonTestCase):
 
