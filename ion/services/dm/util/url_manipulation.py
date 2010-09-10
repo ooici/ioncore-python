@@ -9,8 +9,8 @@
 import re
 import string
 import urlparse
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 import os.path
 from ion.core import ioninit
 
@@ -87,16 +87,16 @@ def base_dap_url(src_url):
         # This regex works on just plain DAP URLs - dds/das/dods optional
         mset = re.search('(http|https)://([^/]+)(.+)(\.dds|\.das|\.dods|\.asc(i)*)*(\?.+)*', src_url)
         if mset == None:
-            logging.info('No URL match in "%s" % src_url')
+            log.info('No URL match in "%s" % src_url')
             return None
         try:
             return mset.group(1) + '://' + mset.group(2) + mset.group(3)
         except IndexError, ie:
-            logging.exception('DAP URL does not match expected pattern!')
+            log.exception('DAP URL does not match expected pattern!')
             raise ie
 
     try:
         return mset.group(1) + '://' + mset.group(2) + mset.group(3)
     except IndexError, ie:
-        logging.exception('DAP URL does not match expected pattern!')
+        log.exception('DAP URL does not match expected pattern!')
         raise ie

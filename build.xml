@@ -49,6 +49,7 @@
     <echo message="Starting empty ION PyCC with sysname=${user.name}"/>
     <exec executable="twistd">
       <arg value="-n"/>
+      <arg value="--logfile=-"/>
       <arg value="magnet"/>
       <arg value="-h"/>
       <arg value="amoeba.ucsd.edu"/>
@@ -65,6 +66,7 @@
     <echo message="Starting ION PyCC with sysname=${user.name}"/>
     <exec executable="twistd">
       <arg value="-n"/>
+      <arg value="--logfile=-"/>
       <arg value="magnet"/>
       <arg value="-h"/>
       <arg value="amoeba.ucsd.edu"/>

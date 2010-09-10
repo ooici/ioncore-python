@@ -7,8 +7,8 @@
 """
 
 import os
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.application.service import ServiceMaker
 
@@ -35,7 +35,7 @@ class BootstrapTest1(IonTestCase):
     def test_start_container(self):
         yield self._start_container()
 
-        logging.info("Started magnet container")
+        log.info("Started magnet container")
 
         yield self._stop_container()
 
@@ -44,7 +44,7 @@ class BootstrapTest1(IonTestCase):
         yield self._start_container()
         yield self._start_core_services()
 
-        logging.info("Started magnet and core services")
+        log.info("Started magnet and core services")
 
         yield self._stop_container()
 

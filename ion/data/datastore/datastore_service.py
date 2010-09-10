@@ -9,8 +9,8 @@ the rdf workspace composed of associations and objects.
 The associations can be walked to find content.
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 
@@ -35,7 +35,7 @@ class DataStoreService(BaseService):
         # Service class initializer. Basic config, but no yields allowed.
         self.frontend = spawnArgs['MyFrontend']
         BaseService.__init__(self, receiver, spawnArgs)
-        logging.info('DataStoreService.__init__()')
+        log.info('DataStoreService.__init__()')
 
 #    @defer.inlineCallbacks
     def slc_init(self):
@@ -43,7 +43,7 @@ class DataStoreService(BaseService):
 
     @defer.inlineCallbacks
     def op_push(self, content, headers, msg):
-        logging.info('op_push: '+str(content)+ ', Remote Frontend:'+self.frontend)
+        log.info('op_push: '+str(content)+ ', Remote Frontend:'+self.frontend)
 
 
 
@@ -52,7 +52,7 @@ class DataStoreService(BaseService):
 
     @defer.inlineCallbacks
     def op_pull(self, content, headers, msg):
-        logging.info('op_pull: '+str(content) + ', Remote Frontend:'+self.frontend)
+        log.info('op_pull: '+str(content) + ', Remote Frontend:'+self.frontend)
 
 
         # The following line shows how to reply to a message
@@ -60,7 +60,7 @@ class DataStoreService(BaseService):
 
     @defer.inlineCallbacks
     def op_clone(self, content, headers, msg):
-        logging.info('op_clone: '+str(content)+ ', Remote Frontend:'+self.frontend)
+        log.info('op_clone: '+str(content)+ ', Remote Frontend:'+self.frontend)
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg)
@@ -81,7 +81,7 @@ class DataStoreServiceClient(BaseServiceClient):
             kwargs['targetname'] = "DataStoreService"
         BaseServiceClient.__init__(self, proc, **kwargs)
         self.frontend=frontend
-        logging.info('DataStoreServiceClient.__init__()')
+        log.info('DataStoreServiceClient.__init__()')
 
 
 #    @defer.inlineCallbacks
@@ -96,7 +96,7 @@ class DataStoreServiceClient(BaseServiceClient):
         @param repository_name - the name (key) of a repository in the local datastore
         """
         yield self._check_init()
-        logging.info('pushing: '+repository_name+ ', Local Frontend:'+self.frontend)
+        log.info('pushing: '+repository_name+ ', Local Frontend:'+self.frontend)
         (content, headers, msg) = yield self.rpc_send('push', repository_name)
 
         """
@@ -107,7 +107,7 @@ class DataStoreServiceClient(BaseServiceClient):
         Receive OK
         """
 
-        logging.info('Service reply: '+str(content))
+        log.info('Service reply: '+str(content))
         defer.returnValue(str(content))
 
     @defer.inlineCallbacks
@@ -117,7 +117,7 @@ class DataStoreServiceClient(BaseServiceClient):
         @param repository_name - the name (key) of a repository in the remote datastore
         """
         yield self._check_init()
-        logging.info('pulling: '+repository_name+ ', Local Frontend:'+self.frontend)
+        log.info('pulling: '+repository_name+ ', Local Frontend:'+self.frontend)
         """
         Steps:
         Send the current commit DAG to the service
@@ -125,7 +125,7 @@ class DataStoreServiceClient(BaseServiceClient):
         """
 
         (content, headers, msg) = yield self.rpc_send('pull', repository_name)
-        logging.info('Service reply: '+str(content))
+        log.info('Service reply: '+str(content))
         defer.returnValue(str(content))
 
 
@@ -136,14 +136,14 @@ class DataStoreServiceClient(BaseServiceClient):
         @param repository_name - the name (key) of a repository in the remote datastore
         """
         yield self._check_init()
-        logging.info('cloning: '+repository_name+ ', Local Frontend:'+self.frontend)
+        log.info('cloning: '+repository_name+ ', Local Frontend:'+self.frontend)
         """
         Steps:
         Send the repo name
         Receive the Commits which need to be pulled
         """
         (content, headers, msg) = yield self.rpc_send('clone', repository_name)
-        logging.info('Service reply: '+str(content))
+        log.info('Service reply: '+str(content))
         defer.returnValue(str(content))
 
 

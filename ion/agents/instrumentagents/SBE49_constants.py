@@ -8,6 +8,7 @@
 
 instrument_commands = (
     "setdefaults",
+    "ds",
     "start",
     "stop",
     "pumpon",

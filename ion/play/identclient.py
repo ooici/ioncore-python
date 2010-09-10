@@ -21,7 +21,7 @@ from ion.services.coi.identity_registry import IdentityRegistryClient
 
 from ion.resources import coi_resource_descriptions
 
-from ion.services.coi.identity_registry import IdentityRegistryService, IdentityRegistryClient
+#from ion.services.coi.identity_registry import IdentityRegistryService, IdentityRegistryClient
 from ion.resources.coi_resource_descriptions import IdentityResource
 
 from ion.data import dataobject
@@ -29,7 +29,10 @@ from ion.resources import coi_resource_descriptions
 dataobject.DataObject._types['IdentityResource'] = coi_resource_descriptions.IdentityResource
 
 
-import simplejson as json
+try:
+   import json
+except:
+   import simplejson as json
 
 class IdentityWebResource(resource.Resource):
 
@@ -95,11 +98,6 @@ def give_form(user):
             if (field_name  in ("certificate", "rsa_private_key")):
                 page += '<tr><td>' + field_name + '</td><td><textarea rows="2" cols="20" name="' + field_name + '"/>' + field_value + '</textarea></td></tr>\n'
 
-
-
-
-
-
     page += '</table>\n'
         
     return page
@@ -121,7 +119,7 @@ class AddUser(resource.Resource):
             request.write('</body></html>')
             request.finish()
             
-            
+        print str(request)
             
         if (len(request.args) > 0):
             new_user = coi_resource_descriptions.IdentityResource.create_new_resource()
@@ -148,6 +146,7 @@ class EraseAllUsers(resource.Resource):
         
         def _cb(result):
             request.write('<html><body>')
+            request.write("Registry cleared.<br/>")
             user = IdentityResource.create_new_resource()
             request.write(wrap_form(give_form(user) + '<INPUT TYPE="submit" NAME="add" VALUE="Add User" /><p/>\n', "/erase_registry"))
             request.write(give_links())
@@ -173,7 +172,7 @@ class FindUser(resource.Resource):
         def show_array_cb(result):
             request.write('<html><body>')
             if ((len(result) == 0) or (result == None)):
-                request.write("no matches<br\>")
+                request.write("no matches (2)" + str(result) + "<br\>")
                 user = IdentityResource.create_new_resource()
                 request.write(wrap_form(give_form(user) + '<INPUT TYPE="submit" NAME="search" VALUE="Search" /><p/>\n' + give_links(), "/find_user"))
             else:
@@ -192,7 +191,7 @@ class FindUser(resource.Resource):
         def show_single_cb(result):
             request.write('<html><body>')
             if (result == None):
-                request.write("no matches<br\>")
+                request.write("no matches (1)<br\>")
                 user = IdentityResource.create_new_resource()
                 request.write(wrap_form(give_form(user) + '<INPUT TYPE="submit" NAME="search" VALUE="Search" /><INPUT TYPE="submit" NAME="update" VALUE="Update" /><input type="submit" name="clear" value="Clear"><p/>\n', "/find_user"))
                 request.write(give_links())
@@ -228,18 +227,21 @@ class FindUser(resource.Resource):
                     user_description = coi_resource_descriptions.IdentityResource()
 
                     attnames = []
+                    print "************ " + str(request.args)
                     for field_name in user_description.attributes:
                         if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle")):
-                            if (len(request.args[field_name]) > 0):
+                            if (len(request.args[field_name]) > 0) and (len(request.args[field_name][0]) > 0) :
                                 setattr(user_description, field_name, request.args[field_name][0])
                                 attnames.append(field_name)
-     
+                                print "************************* " + field_name + " = '" + request.args[field_name][0] + "'"
+                    print "lifecycle = " + request.args["lifecycle"][0]
                     if (request.args["lifecycle"][0] != '*'):
                         attnames.append('lifecycle')
                         foo = dataobject.LCState(state=request.args["lifecycle"][0].lower())
                         user_description.set_lifecyclestate(foo)
-
-                    d = self.client.find_users(user_description, regex=True,attnames=attnames) #, ignore_defaults=True) # ,attnames=['name',]
+                    print "************ LOOKING FOR..... " + str(user_description)
+                    print "************ attnames ......... " + str(attnames)
+                    d = self.client.find_users(user_description, regex=True, attnames=attnames) #, ignore_defaults=True) 
                     d.addCallback(show_array_cb)
             return server.NOT_DONE_YET
         else:
@@ -251,7 +253,7 @@ class FindUser(resource.Resource):
         
 
 def main(ns={}):
-    
+    print "STARTING...."
     from ion.services.coi import identity_registry
     from ion.data import dataobject
     from ion.resources import coi_resource_descriptions as coi
@@ -266,8 +268,9 @@ def main(ns={}):
     webservice = IdentityWebResource(client)
     site = server.Site(webservice)
     reactor.listenTCP(8999, site)
+ 
+    
     ns.update(locals())
 
-#if __name__ == '__main__':
-main()
-
+if __name__ == '__main__':
+    main()

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 from twisted.trial import unittest
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.python import reflect
 
@@ -61,10 +61,10 @@ class TestInheritedObject(unittest.TestCase):
         i1 = Inherit1()
         i2 = Inherit2()
         i3 = Inherit3()
-        logging.info(i0)
-        logging.info(i1)
-        logging.info(i2)
-        logging.info(i3)
+        log.info(i0)
+        log.info(i1)
+        log.info(i2)
+        log.info(i3)
         self.assertIsInstance(i3,Inherit0)
         self.assertIsInstance(i2,Inherit0)
         self.assertIsInstance(i1,Inherit0)
@@ -91,14 +91,14 @@ class TestInheritedObject(unittest.TestCase):
 
     def test_Inherit210(self):
         i210 = Inherit210()
-        logging.info(i210)
+        log.info(i210)
         self.assertEqual(i210.inherit2, '2')
         self.assertEqual(i210.inherit1, '1')
         self.assertEqual(i210.inherit0, '0')
 
     def test_InheritOver(self):
         io = InheritOver()
-        logging.info(io)
+        log.info(io)
         self.assertEqual(io.inherit2, 'over')
         self.assertEqual(io.inherit1, '1')
         self.assertEqual(io.inherit0, 'over')
@@ -108,7 +108,7 @@ class TestInheritedObject(unittest.TestCase):
     def test_InheritOverOver(self):
         raise unittest.SkipTest('This is not a legal inheritance pattern!')
         #ioo = InheritOverOver()
-        #logging.info(io)
+        #log.info(io)
         #self.assertEqual(ioo.inherit2, 'over')
         #self.assertEqual(ioo.inherit1, '1')
         #self.assertEqual(ioo.inherit0, 'over')
@@ -117,7 +117,7 @@ class TestInheritedObject(unittest.TestCase):
 
     def test_InheritOverUnder(self):
         iou = InheritOverUnder()
-        logging.info(iou)
+        log.info(iou)
         self.assertEqual(iou.inherit2, 'over')
         self.assertEqual(iou.inherit1, '1')
         self.assertEqual(iou.inherit0, 'over')
@@ -304,7 +304,7 @@ class TestSimpleObject(unittest.TestCase):
      
     def testPrintObject(self):
                 
-        logging.info(self.obj)
+        log.info(self.obj)
         
     def testEncode(self):
         """
@@ -316,7 +316,7 @@ class TestSimpleObject(unittest.TestCase):
         dec = dataobject.DataObject.decode(self.encoded)
         #print 'dec',dec
         #print 'self.obj',self.obj
-        self.assertEqual(self.obj,dec)
+        self.assertEqual(self.obj,dec,'Original: %s \n Decoded: %s' % (str(self.obj), str(dec)))
         self.assertEqual(type(self.obj).__name__,type(dec).__name__)
 
         
@@ -486,7 +486,7 @@ class TestDictObject(TestSimpleObject):
     def setUp(self):
         obj = DictObject()
         obj.name = 'David'
-        obj.rdict = {'a':'a','b':5,'data':3.14159}
+        obj.rdict = {'a':'a','b':5,'data':3.14159} # Must be 'Jasonable'
         self.obj = obj
         self.encoded=[('Object_Type', 'DictObject'),
                     ('rdict', 'dict\x00{"a": "a", "b": 5, "data": 3.1415899999999999}'),
@@ -496,14 +496,23 @@ class TestDictObject2(TestSimpleObject):
     def setUp(self):
         obj = DictObject()
         obj.name = 'David'
-        obj.rdict = {'a':'a','b':5,'data':3.14159,'tuple':(1,2,3)}
+        obj.rdict = {'a':'a','b':5,'data':3.14159,'list':[1,2,3]} # Must be 'Jasonable'
         self.obj = obj
         self.encoded=[('Object_Type', 'DictObject'),
-                    ('rdict', 'dict\x00{"a": "a", "b": 5, "data": 3.1415899999999999, "tuple": [1, 2, 3]}'),
-                    ('name', 'str\x00David')]
+                     ('rdict',
+                      'dict\x00{"a": "a", "list": [1, 2, 3], "b": 5, "data": 3.1415899999999999}'),
+                     ('name', 'str\x00David')]
      
-    def testDecode(self):
-        raise unittest.SkipTest('This kind of data inside a dictionary does not work!')
+
+class TestDictObject3(TestSimpleObject):
+    def setUp(self):
+        obj = DictObject()
+        obj.name = 'David'
+        obj.rdict = {'a':'a','b':5,'data':3.14159,'d3':{'1':2,'3':4}} # Must be 'Jasonable'
+        self.obj = obj
+        self.encoded=[('Object_Type', 'DictObject'),
+                    ('rdict', 'dict\x00{"a": "a", "b": 5, "data": 3.1415899999999999, "d3": {"1": 2, "3": 4}}'),
+                    ('name', 'str\x00David')]
 
      
 class NestedObject(dataobject.DataObject):
@@ -584,15 +593,15 @@ class ResponseService(BaseService):
 
     @defer.inlineCallbacks
     def op_respond(self, content, headers, msg):
-        logging.info('op_respond: '+str(content))
+        log.info('op_respond: '+str(content))
         
         
         obj = dataobject.DataObject.decode(content)
-        logging.info(obj)
+        log.info(obj)
         response = obj.encode()
 
         # The following line shows how to reply to a message
-        yield self.reply(msg, 'reply', response, {})
+        yield self.reply_ok(msg, response)
 
 class ResponseServiceClient(BaseServiceClient):
     """
@@ -609,10 +618,10 @@ class ResponseServiceClient(BaseServiceClient):
         yield self._check_init()
         #print obj
         msg=obj.encode()
-        logging.info('Sending Encoded resource:'+str(msg))
+        log.info('Sending Encoded resource:'+str(msg))
         (content, headers, msg) = yield self.rpc_send('respond', msg, {})
-        logging.info('Responder replied: '+str(content))
-        response = dataobject.DataObject.decode(content)
+        log.info('Responder replied: '+str(content))
+        response = dataobject.DataObject.decode(content['value'])
         defer.returnValue(response)
 
 # Spawn of the process using the module name
@@ -728,18 +737,18 @@ class TestResource(unittest.TestCase):
     
     def test_set_lcstate(self):
         
-        #logging.info(registry.LCStates)
+        #log.info(registry.LCStates)
         res = dataobject.StatefulResource.create_new_resource()
-        #logging.info(res.get_lifecyclestate())
+        #log.info(res.get_lifecyclestate())
         self.assertEqual(res.lifecycle, dataobject.LCStates.new)
 
         res.set_lifecyclestate(dataobject.LCStates.active)
         self.assertEqual(res.lifecycle, dataobject.LCStates.active)
-        #logging.info(res.get_lifecyclestate())
+        #log.info(res.get_lifecyclestate())
         
         res.set_lifecyclestate(dataobject.LCStates['retired'])
         self.assertEqual(res.lifecycle, dataobject.LCStates.retired)
-        #logging.info(res.get_lifecyclestate())
+        #log.info(res.get_lifecyclestate())
 
         self.failUnlessRaises(TypeError,res.set_lifecyclestate,'new')
 
@@ -749,3 +758,7 @@ class TestResource(unittest.TestCase):
         
         self.assertEqual(res.get_lifecyclestate(),dataobject.LCState('new'))
  
+
+class TestDEncoder(unittest.TestCase):
+    """
+    """

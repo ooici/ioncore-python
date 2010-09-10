@@ -7,8 +7,8 @@
 @brief test service for registering resources and client classes
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
@@ -100,7 +100,7 @@ class ResourceRegistryCoreServiceTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
         self.sup = yield self._start_core_services()
-        #logging.info('self.sup.proc_state'+str(self.sup.proc_state))
+        #log.info('self.sup.proc_state'+str(self.sup.proc_state))
         
 
     @defer.inlineCallbacks

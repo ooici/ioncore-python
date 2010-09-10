@@ -6,8 +6,8 @@
 @brief classes for managing messages in the standard ION format
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 class Message(object):
     """

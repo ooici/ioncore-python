@@ -34,9 +34,9 @@ try:
     setupdict['test_suite'] = 'lcaarch.test'
     setupdict['install_requires'] = ['Twisted', 'magnet', 'pycassa', 'numpy',
                                      'Paste', 'Pydap', 'simplejson', 'httplib2',
-                                     'pydap.handlers.netcdf',
+                                     'pydap.handlers.netcdf','pydap.handlers.nca',
                                      'pydap.responses.netcdf',
-                                     'msgpack-python']
+                                     'msgpack-python','gviz_api.py']
     setupdict['include_package_data'] = True
     setup(**setupdict)
 

@@ -11,8 +11,8 @@ import traceback
 import re
 from datetime import datetime
 import time
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 import uuid
 from twisted.internet import defer, reactor
 from magnet.container import Id
@@ -24,9 +24,9 @@ def log_exception(msg=None, e=None):
     Logs a recently caught exception and prints traceback
     """
     if msg and e:
-        logging.error("%s %r" % (msg, e))
+        log.error("%s %r" % (msg, e))
     elif msg:
-        logging.error(msg)
+        log.error(msg)
     (etype, value, trace) = sys.exc_info()
     traceback.print_tb(trace)
 
@@ -37,7 +37,7 @@ def log_attributes(obj):
     lstr = ""
     for attr, value in obj.__dict__.iteritems():
         lstr = lstr + str(attr) + ": " +str(value) + ", "
-    logging.info(lstr)
+    log.info(lstr)
 
 def log_message(msg):
     """
@@ -47,7 +47,7 @@ def log_message(msg):
     body = msg.payload
     lstr = ""
     procname = str(body.get('receiver',None))
-    lstr += "===Message=== receiver=%s op=%s" % (procname, body.get('op', None))
+    lstr += "===Message=== receiver=%s op=%s===" % (procname, body.get('op', None))
     if body.get('quiet', False):
         lstr += " (Q)"
     else:
@@ -76,7 +76,7 @@ def log_message(msg):
         else:
             lstr += repr(content)
         lstr += "\n============="
-    logging.info(lstr)
+    log.debug(lstr)
 
 def create_guid():
     """
@@ -113,8 +113,10 @@ def send(receiver, send, recv, operation, content, headers=None):
     msg['receiver'] = str(recv)
     # Exchange name for message replies
     msg['reply-to'] = str(send)
-    # Wire form encoding, such as 'json', 'fudge', 'XDR', 'XML'
-    msg['encoding'] = 'msgpack'
+    # Wire form encoding, such as 'json', 'fudge', 'XDR', 'XML', 'custom'
+    msg['encoding'] = 'json'
+    # See ion.data.dataobject Serializers for choices
+    msg['accept-encoding'] = ''
     # Language of the format specification
     msg['language'] = 'ion1'
     # Identifier of a registered format specification (i.e. message schema)
@@ -138,13 +140,13 @@ def send(receiver, send, recv, operation, content, headers=None):
     msg['op'] = operation
     # The actual content
     msg['content'] = content
-    #logging.debug("Send message op="+operation+" to="+str(recv))
+    #log.debug("Send message op="+operation+" to="+str(recv))
     try:
         yield receiver.send(recv, msg)
     except Exception, ex:
         log_exception("Send error: ", ex)
     else:
-        logging.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
+        log.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
 
 def dispatch_message(payload, msg, dispatchIn, conv=None):
     """
@@ -170,9 +172,9 @@ def dispatch_message(payload, msg, dispatchIn, conv=None):
             elif hasattr(dispatchIn,'op_none'):
                 return defer.maybeDeferred(dispatchIn.op_none, content, payload, msg)
             else:
-                logging.error("Receive() failed. Cannot dispatch to catch")
+                log.error("Receive() failed. Cannot dispatch to catch")
         else:
-            logging.error("Invalid message. No 'op' in header", payload)
+            log.error("Invalid message. No 'op' in header", payload)
     except Exception, ex:
         log_exception('Exception while dispatching: ',ex)
 
@@ -206,7 +208,7 @@ def get_class(qualclassname, mod=None):
         mod = get_module(qualmodname)
 
     cls = getattr(mod, clsname)
-    #logging.debug('Class: '+str(cls))
+    #log.debug('Class: '+str(cls))
     return cls
 
 get_modattr = get_class
@@ -218,9 +220,9 @@ def get_module(qualmodname):
     """
     package = qualmodname.rpartition('.')[0]
     modname = qualmodname.rpartition('.')[2]
-    #logging.info('get_module: from '+package+' import '+modname)
+    #log.info('get_module: from '+package+' import '+modname)
     mod = __import__(qualmodname, globals(), locals(), [modname])
-    #logging.debug('Module: '+str(mod))
+    #log.debug('Module: '+str(mod))
     return mod
 
 def asleep(secs):

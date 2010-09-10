@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import inspect
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource
 
 from magnet.container import Id
@@ -11,7 +11,7 @@ Container object are used as self describing sendable objects
 """
 class SetResourceLCStateContainer(DataObject):
     """
-    @ Brief a message object used to set state and 
+    @ Brief a message object used to set state and
     """
     # Beware of using a class object as a typed attribute!
     lcstate = TypedAttribute(LCState, default=None)
@@ -34,15 +34,15 @@ class FindResourceContainer(DataObject):
     regex = TypedAttribute(bool, default=True)
     ignore_defaults = TypedAttribute(bool, default=True)
     attnames = TypedAttribute(list)
-    
-    
+
+
 """
 Resource Description object are used in the OOICI Registries
 """
 
 """
 Define properties of resource types
-@Note What is the intent with Resource Types? 
+@Note What is the intent with Resource Types?
 """
 ResourceTypes = ['generic',
                 'unassigned',
@@ -99,8 +99,8 @@ class ResourceDescription(InformationResource):
 class AttributeDescription(DataObject):
     name = TypedAttribute(str)
     type = TypedAttribute(str)
-    default = TypedAttribute(str) 
-    
+    default = TypedAttribute(str)
+
 class ResourceInstance(StatefulResource):
     """
     Resource Instances are stored in the resource registry.
@@ -109,7 +109,7 @@ class ResourceInstance(StatefulResource):
     description = TypedAttribute(ResourceReference)
     owner = TypedAttribute(ResourceReference)
     resource = TypedAttribute(ResourceReference)
-    
+
 class IdentityResource(StatefulResource):
     """
     Identity Resources are stored in the identity registry
@@ -147,15 +147,15 @@ class ServiceDescription(InformationResource):
     #spawnargs = TypedAttribute(dict,{})
     description = TypedAttribute(str)
     class_name = TypedAttribute(str)
-    
+
 
 class ServiceMethodInterface(DataObject):
     name = TypedAttribute(str)
     description = TypedAttribute(str)
     arguments = TypedAttribute(str)
 
-   
-    
+
+
 class ServiceInstance(StatefulResource):
     """
     Resource Instances are stored in the resource registry.
@@ -186,11 +186,11 @@ class AgentDescription(InformationResource):
     #spawnargs = TypedAttribute(dict,{})
     description = TypedAttribute(str)
     class_name = TypedAttribute(str)
-    
+
 class AgentMethodInterface(StatefulResource):
     description = TypedAttribute(str)
     arguments = TypedAttribute(str)
-    
+
 class AgentInstance(StatefulResource):
     """
     Agent Instances are stored in the agent registry.
@@ -200,9 +200,7 @@ class AgentInstance(StatefulResource):
     description = TypedAttribute(ResourceReference)
     #owner = TypedAttribute(ResourceReference)
     spawnargs = TypedAttribute(str)
-    #process_id = TypedAttribute(str)
-    process_name = TypedAttribute(str)
-    process_state = TypedAttribute(str)
+    proc_id = TypedAttribute(str)
+    proc_name = TypedAttribute(str)
+    proc_state = TypedAttribute(str)
     subject = TypedAttribute(ResourceReference)
-
-

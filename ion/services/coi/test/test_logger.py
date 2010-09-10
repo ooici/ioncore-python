@@ -6,8 +6,8 @@
 @brief test logger service
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.services.coi.logger import LoggerClient
@@ -42,21 +42,21 @@ class LoggerServiceTest(IonTestCase):
         logc = LoggerClient(proc=sup)
         run = yield logc.logmsg('info', 'INFO log message 1', 'X', 'Y')
         results.append(run)
-        logging.info('INFO logging: '+str(run))
+        log.info('INFO logging: '+str(run))
 
         run = yield logc.logmsg('info', 'DEBUG log message 2', 'X', 'Y')
         results.append(run)
-        logging.info('DEBUG logging: '+str(run))
+        log.info('DEBUG logging: '+str(run))
 
         run = yield logc.logmsg('info', 'WARN log message 3', 'X', 'Y')
         results.append(run)
-        logging.info('WARN logging: '+str(run))
+        log.info('WARN logging: '+str(run))
 
         run = yield logc.logmsg('info', 'ERROR log message 4', 'X', 'Y')
         results.append(run)
-        logging.info('ERROR logging: '+str(run))
+        log.info('ERROR logging: '+str(run))
 
         run = yield logc.logmsg('info', 'CRITICAL log message 5', 'X', 'Y')
         results.append(run)
-        logging.info('CRITICAL logging: '+str(run))
+        log.info('CRITICAL logging: '+str(run))
 

@@ -6,8 +6,8 @@
 @brief Working with scribble as a conversation type spec language
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from ion.interact.conversation import ConversationTypeSpec
 

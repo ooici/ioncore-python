@@ -7,7 +7,7 @@
 @brief base class for all resource agent processes
 """
 
-import logging
+import ion.util.ionlog
 from twisted.internet import defer
 
 from ion.services.coi.agent_registry import AgentRegistryClient
@@ -24,44 +24,24 @@ class ResourceAgent(BaseProcess):
     If you are going to write a new agent process, subclass this one and
     setup a ResourceRegistryClient
     """
-    """
-    The Agent Registry client class to hang onto for all registry manipulations
-    """
-    reg_client = None
-    
-    """
-    Our reference object in the Agent Registry
-    """
-    resource_ref = None
-    
-    """
-    This is what makes us unique for now. When we register, this is our
-    handle
-    """
-    name = None
-    
-    @defer.inlineCallbacks
-    def op_set_registry_client(self, content, headers, msg):
+
+    def plc_init(self):
         """
-        Adds a agent registry client for the resource agent to use. This
-        should be done before the resource attempts to interact with the
-        agent registry.
-        @param content Should contain a string with the process id for the
-            agent registry that will be used
+        The Agent Registry client class to hang onto for all registry manipulations
         """
-        assert(isinstance(content, basestring))
-        destination = content
-        #logging.info("Setting agent registry client target in Resource Agent to %s, %s",
-        #             destination, self.get_scoped_name('global', destination))
-        logging.info("Setting agent registry client target in Resource Agent to %s",
-                     destination)
-        self.reg_client \
-            = AgentRegistryClient(target=self.get_scoped_name('global',
-                                                              destination))
-        if (self.reg_client == False):
-            yield self.reply_err(msg, "agent registry client not set!")
-        else:
-            yield self.reply_ok(msg, True)
+        self.reg_client = AgentRegistryClient(proc=self)
+
+        """
+        Our reference object in the Agent Registry
+        """
+        self.resource_ref = None
+
+        """
+        This is what makes us unique for now. When we register, this is our
+        handle
+        """
+        self.name = None
+
 
     @defer.inlineCallbacks
     def op_get_lifecycle_state(self, content, headers, msg):
@@ -70,15 +50,12 @@ class ResourceAgent(BaseProcess):
         @retval LCState string
         @todo handle errors better
         """
-        if (self.reg_client == None):
-            yield self.reply_err(msg,
-                                 "No agent registry client has been set!")
         if (self.resource_ref != None):
             result = \
                 yield self.reg_client.get_agent_instance(self.resource_ref)
             assert(isinstance(result, AgentInstance))
             state = result.get_lifecyclestate()
-            yield self.reply_ok(msg, str(state))   
+            yield self.reply_ok(msg, str(state))
         else:
             yield self.reply_err(msg, "Resource not registered!")
 
@@ -89,9 +66,6 @@ class ResourceAgent(BaseProcess):
         @param content Should be a list with a resource id and a string that
             can be turned into an LCState object
         """
-        if (self.reg_client == None):
-            yield self.reply_err(msg,
-                                 "No agent registry client has been set!")
         assert(isinstance(content, basestring))
         state = str(content)
         assert(state in LCStateNames)
@@ -102,15 +76,17 @@ class ResourceAgent(BaseProcess):
             self.resource_ref = result.reference(head=True)
             if (result):
                 yield self.reply_ok(msg, str(state))
+                return
             else:
                 yield self.reply_err(msg, \
                     "Could not set lifecycle state for %s" \
-                        % self.resource_ref.name) 
+                        % self.resource_ref.name)
+                return
         else:
             yield self.reply_err(msg, \
               "Could not set lifecycle state. Resource %s does not exist." \
               % self.resource_ref.name)
-    
+
     @defer.inlineCallbacks
     def op_register_resource(self, content, headers, msg):
         """
@@ -126,7 +102,6 @@ class ResourceAgent(BaseProcess):
 	 User, InstrumentAgentClient, InstrumentAgentResourceInstance, InstrumentAgent, ResourceAgent, ResourceAgentClient, AgentRegistryClient, AgentRegistry;
          User -> InstrumentAgent [label="instantiate and spawn IA subclass"];
          User -> InstrumentAgentClient[label="instantiate IAClient subclass"];
-         User => InstrumentAgentClient [label="set_registry_client()"];
          AgentRegistryClient -> InstrumentAgent [label="reference stored in IA"];
          --- [label="All setup now, registry must already have a client on hand"];
          User => InstrumentAgentClient [label="register_resource()"];
@@ -142,13 +117,10 @@ class ResourceAgent(BaseProcess):
          AgentRegistryClient =>> AgentRegistry [label="register_resource() via base class AMQP"];
          AgentRegistryClient <<= AgentRegistry [label="return via AMQP"];
          InstrumentAgent << AgentRegistryClient [label="Success/failure"];
-         InstrumentAgentClient <<= ResourceAgent [label="Success/failure via InstrumentAgent via AMQP"]; 
+         InstrumentAgentClient <<= ResourceAgent [label="Success/failure via InstrumentAgent via AMQP"];
          User << InstrumentAgentClient [label="return"];
         @endmsc
         """
-        if (self.reg_client == None):
-            yield self.reply_err(msg,
-                                 "No agent registry client has been set!")
         if (content == ""):
             descriptor = None
         elif (content != None):
@@ -162,8 +134,8 @@ class ResourceAgent(BaseProcess):
         if (self.resource_ref == None) or (self.resource_ref == False):
             yield self.reply_err(msg, "Could not register instance!")
         else:
-            yield self.reply_ok(msg, self.resource_ref.encode())                
-                
+            yield self.reply_ok(msg, self.resource_ref.encode())
+
     @defer.inlineCallbacks
     def op_get_resource_instance(self, content, headers, msg):
         """
@@ -178,7 +150,7 @@ class ResourceAgent(BaseProcess):
             yield self.reply_ok(msg, result.encode())
         else:
             yield self.reply_err(msg, None)
-        
+
     @defer.inlineCallbacks
     def op_get_resource_ref(self, content, headers, msg):
         """
@@ -201,7 +173,7 @@ class ResourceAgent(BaseProcess):
         """
         Abstract method for the Resource Agent interface
         """
-        
+
     def op_execute(self, content, headers, msg):
         """
         Abstract method for the Resource Agent interface
@@ -216,31 +188,13 @@ class ResourceAgent(BaseProcess):
         """
         Abstract method for the Resource Agent interface
         """
-        
+
 class ResourceAgentClient(BaseProcessClient):
     """
     A parent class to handle common resource agent requests. Consider
     subclassing this one when creating a new agent client
     """
-    
-    @defer.inlineCallbacks
-    def set_registry_client(self, reg_id):
-        """
-        Set the agent registry client for this resource agent. This should
-        be created to point to the correct process handle so that the resource
-        agent can look into the registry properly.
-        @param reg_id A globally scoped string with the process id for the
-            agent registry
-        @todo handle errors better
-        """
-        (content, headers, msg) = \
-            yield self.rpc_send('set_registry_client', reg_id)
-        if content['status'] == 'OK':
-            defer.returnValue(True)
-        else:
-            defer.returnValue(False)        
 
-        
     @defer.inlineCallbacks
     def set_lifecycle_state(self, value):
         """
@@ -255,8 +209,8 @@ class ResourceAgentClient(BaseProcessClient):
         if content['status'] == 'OK':
             defer.returnValue(value)
         else:
-            defer.returnValue(False)        
-   
+            defer.returnValue(False)
+
     @defer.inlineCallbacks
     def get_lifecycle_state(self):
         """
@@ -268,8 +222,8 @@ class ResourceAgentClient(BaseProcessClient):
         if content['status'] == 'OK':
             defer.returnValue(LCState(content['value']))
         else:
-            defer.returnValue(False)        
-    
+            defer.returnValue(False)
+
     @defer.inlineCallbacks
     def get_resource_ref(self):
         """
@@ -279,8 +233,8 @@ class ResourceAgentClient(BaseProcessClient):
         if content['status'] == 'OK':
             defer.returnValue(AgentInstance.decode(content['value']))
         else:
-            defer.returnValue(None)        
-    
+            defer.returnValue(None)
+
     @defer.inlineCallbacks
     def get_resource_instance(self):
         """
@@ -294,8 +248,8 @@ class ResourceAgentClient(BaseProcessClient):
             assert(isinstance(content_decode, AgentInstance))
             defer.returnValue(content_decode)
         else:
-            defer.returnValue(None)  
-          
+            defer.returnValue(None)
+
     @defer.inlineCallbacks
     def register_resource(self, agent_instance=None, descriptor=None):
         """
@@ -305,15 +259,15 @@ class ResourceAgentClient(BaseProcessClient):
         @param resource_inst The instance object to register
         """
         if (agent_instance == None):
-            (content, headers, msg) = \
-                yield self.rpc_send('register_resource', '')
+            (content, headers, msg) = yield self.rpc_send('register_resource', '')
         else:
-            assert(isinstance(agent_instance,
-                              (AgentInstance, AgentDescription)))
+            assert(isinstance(agent_instance, (AgentInstance, AgentDescription)))
+            # Add resource agent part of the information
+            agent_instance.proc_id = str(self.target)
             (content, headers, msg) = \
               yield self.rpc_send('register_resource', agent_instance.encode())
-        
+
         if (content['status'] == 'OK'):
             defer.returnValue(AgentInstance.decode(content['value']))
         else:
-            defer.returnValue(None)        
+            defer.returnValue(None)

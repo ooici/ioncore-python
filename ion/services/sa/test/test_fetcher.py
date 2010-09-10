@@ -7,8 +7,8 @@
 """
 
 import base64
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from socket import gaierror
 
@@ -38,10 +38,10 @@ class FetcherServiceTester(IonTestCase):
         try:
             self.mf.get_page('http://foo.bar.baz/')
         except gaierror, ge:
-            logging.debug('got err as expected! %s' % str(ge))
+            log.debug('got err as expected! %s' % str(ge))
             pass
         except ValueError, ve:
-            logging.debug('got err as expected: %s' % str(ve))
+            log.debug('got err as expected: %s' % str(ve))
             pass
         else:
             self.fail('Should have raised an exception!')
@@ -65,7 +65,7 @@ class FetcherTest(IonTestCase):
 
     @defer.inlineCallbacks
     def _get_page(self, src_url):
-        logging.debug('sending GET request for "%s"...' % src_url)
+        log.debug('sending GET request for "%s"...' % src_url)
         res = yield self.fc.get_url(src_url)
         if res['status'] == 'ERROR':
             raise ValueError('Error on fetch')
@@ -74,7 +74,7 @@ class FetcherTest(IonTestCase):
 
     @defer.inlineCallbacks
     def _get_phead(self, src_url):
-        logging.debug('sending HEAD request for "%s"...' % src_url)
+        log.debug('sending HEAD request for "%s"...' % src_url)
         res = yield self.fc.get_head(src_url)
         if res['status'] == 'ERROR':
             raise ValueError('Error on fetch')
@@ -118,3 +118,24 @@ class FetcherTest(IonTestCase):
             self.fail('Should have gotten an exception for 404 error!')
         except ValueError:
             pass
+
+TEST_DSET = 'http://ooici.net:8001/coads.nc'
+TEST_ADSET1 = 'http://ooici.net:8001/grid_surf_el1.nc'
+TEST_ADSET2 = 'http://ooici.net:8001/grid_surf_el2.nc'
+TEST_APATTERN = "/tmp/grid_surf_el*.nc"
+
+class TransportTester(IonTestCase):
+    """
+    Verify that we can transport binary (XDR) data.
+    """
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+        self.timeout = 120
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
+
+    def test_updown(self):
+        pass

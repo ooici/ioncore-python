@@ -6,8 +6,8 @@
 @brief test datastore service
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
@@ -59,10 +59,10 @@ class AttrStoreServiceTest(IonTestCase):
         asc1 = AttributeStoreClient(proc=sup, targetname='as1')
 
         res1 = yield asc1.put('key1','value1')
-        logging.info('Result1 put: '+str(res1))
+        log.info('Result1 put: '+str(res1))
 
         res2 = yield asc1.get('key1')
-        logging.info('Result2 get: '+str(res2))
+        log.info('Result2 get: '+str(res2))
         self.assertEqual(res2, 'value1')
 
         res3 = yield asc1.put('key1','value2')
@@ -118,10 +118,10 @@ class AttrStoreServiceTest(IonTestCase):
         asc1 = AttributeStoreClient(proc=sup, targetname='as1')
 
         res1 = yield asc1.put('key1','value1')
-        logging.info('Result1 put: '+str(res1))
+        log.info('Result1 put: '+str(res1))
 
         res2 = yield asc1.get('key1')
-        logging.info('Result2 get: '+str(res2))
+        log.info('Result2 get: '+str(res2))
         self.assertEqual(res2, 'value1')
 
         res3 = yield asc1.put('key1','value2')
@@ -135,10 +135,10 @@ class AttrStoreServiceTest(IonTestCase):
         asc2 = AttributeStoreClient(proc=sup, targetname='as2')
 
         tres1 = yield asc2.put('tkey1','tvalue1')
-        logging.info('tResult1 put: '+str(tres1))
+        log.info('tResult1 put: '+str(tres1))
 
         tres2 = yield asc2.get('tkey1')
-        logging.info('tResult2 get: '+str(tres2))
+        log.info('tResult2 get: '+str(tres2))
         self.assertEqual(tres2, 'tvalue1')
 
         # Let cassandra register the new entry

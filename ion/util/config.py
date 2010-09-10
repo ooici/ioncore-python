@@ -6,8 +6,9 @@
 @brief  supports work with config files
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import os.path
 
 class Config(object):
@@ -55,7 +56,7 @@ class Config(object):
 
     def update_from_file(self, filename):
         if os.path.isfile(filename):
-            logging.info("Updating config from local file: "+filename)
+            log.info("Updating config from local file: "+filename)
             # Load config override from filename
             filecontent = open(filename,).read()
             updates = eval(filecontent)

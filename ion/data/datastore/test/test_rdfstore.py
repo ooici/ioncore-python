@@ -7,7 +7,7 @@
 @brief test rdf store
 """
 
-import logging
+import ion.util.ionlog
 
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -51,7 +51,7 @@ sha1 = cas.sha1
 #    def test_put_get(self):
 #        s = yield store.Store.create_store()
 #        castore = cas.CAStore(s)
-#        logging.info(str(self.association))
+#        log.info(str(self.association))
 #
 #        castore.TYPES[rdfstore.Association.type]=rdfstore.Association
 #        
@@ -59,7 +59,7 @@ sha1 = cas.sha1
 #        
 #        assoc = yield castore.get(a_id)
 #        
-#        logging.info(str(assoc))
+#        log.info(str(assoc))
 #        
 #        self.assertEqual(self.association.value,assoc.value)
 #        

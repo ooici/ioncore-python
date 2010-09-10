@@ -11,9 +11,10 @@ from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 logserv = logging.getLogger('logServer')
-logging = logging.getLogger(__name__)
 
 class LoggerService(BaseService):
     """Logger service interface
@@ -27,7 +28,7 @@ class LoggerService(BaseService):
     )
 
     def slc_init(self):
-        logging.info("LoggingService initialized")
+        log.info("LoggingService initialized")
 
     def op_config(self, content, headers, msg):
         pass
@@ -52,7 +53,7 @@ class LoggerService(BaseService):
         elif level == 'critical':
             logserv.critical(logmsg)
         else:
-            logging.error('Invalid log level: '+str(level))
+            log.error('Invalid log level: '+str(level))
         yield self.reply_ok(msg)
 
 
@@ -79,7 +80,7 @@ class LoggerClient(BaseServiceClient):
             'logtime':logtime
         }
         (content, headers, msg) = yield self.rpc_send('logmsg', cont)
-        logging.info('Service reply: '+str(content))
+        log.info('Service reply: '+str(content))
 
         defer.returnValue(str(content))
 

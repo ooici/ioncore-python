@@ -5,12 +5,14 @@
 @author Steve Foley
 @brief Instrument Agent, Driver, and Client class definitions
 """
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from twisted.internet import defer
 
 from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
+from ion.data.dataobject import ResourceReference
 from ion.core.base_process import BaseProcess, BaseProcessClient
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 
@@ -39,7 +41,7 @@ class InstrumentDriver(BaseProcess):
         @retval A dictionary with the parameter and value of the requested
             parameter
         """
-        
+
     def op_set_params(self, content, headers, msg):
         """
         Using the instrument protocol, set a parameter on the instrument
@@ -47,32 +49,38 @@ class InstrumentDriver(BaseProcess):
         @retval A small dict of parameter and value on success, empty dict on
             failure
         """
-        
+
     def op_execute(self, content, headers, msg):
         """
         Using the instrument protocol, execute the requested command
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval Result code of some sort
         """
-    
+
     def op_configure_driver(self, content, headers, msg):
         """
         This method takes a dict of settings that the driver understands as
         configuration of the driver itself (ie 'target_ip', 'port', etc.). This
         is the bootstrap information for the driver and includes enough
         information for the driver to start communicating with the instrument.
-        @param content A dict with parameters for the driver 
+        @param content A dict with parameters for the driver
         """
-        
-        
+
+    def op_disconnect(self, content, headers, msg):
+        """
+        Disconnect from the instrument
+        @param none
+        """
+
 class InstrumentDriverClient(BaseProcessClient):
     """
     The base class for the instrument driver client interface. This interface
     is designed to be used by the instrument agent to work with the driver.
     """
-        
+
     @defer.inlineCallbacks
     def fetch_params(self, param_list):
         """
@@ -86,7 +94,7 @@ class InstrumentDriverClient(BaseProcessClient):
                                                           param_list)
         assert(isinstance(content, dict))
         defer.returnValue(content)
-        
+
     @defer.inlineCallbacks
     def set_params(self, param_dict):
         """
@@ -100,21 +108,22 @@ class InstrumentDriverClient(BaseProcessClient):
                                                           param_dict)
         assert(isinstance(content, dict))
         defer.returnValue(content)
-        
+
     @defer.inlineCallbacks
     def execute(self, command):
         """
         Using the instrument protocol, execute the requested command
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval Result code of some sort
         """
-        assert(isinstance(command, dict))
+        assert(isinstance(command, (list, tuple)))
         (content, headers, message) = yield self.rpc_send('execute',
                                                           command)
         defer.returnValue(content)
-    
+
     @defer.inlineCallbacks
     def get_status(self, arg):
         """
@@ -124,22 +133,48 @@ class InstrumentDriverClient(BaseProcessClient):
         """
         (content, headers, message) = yield self.rpc_send('get_status', arg)
         defer.returnValue(content)
-        
-    @defer.inlineCallbacks    
+
+    @defer.inlineCallbacks
     def configure_driver(self, config_vals):
         """
         This method takes a dict of settings that the driver understands as
         configuration of the driver itself (ie 'target_ip', 'port', etc.). This
         is the bootstrap information for the driver and includes enough
         information for the driver to start communicating with the instrument.
-        @param config_vals A dict with parameters for the driver 
+        @param config_vals A dict with parameters for the driver
         """
         assert(isinstance(config_vals, dict))
         (content, headers, message) = yield self.rpc_send('configure_driver',
                                                           config_vals)
         defer.returnValue(content)
-        
-    
+
+    @defer.inlineCallbacks
+    def initialize(self, arg):
+        """
+        Disconnect from the instrument
+        @param none
+        @retval Result code of some sort
+        """
+        #assert(isinstance(command, dict))
+        log.debug("DHE: in initialize!")
+        (content, headers, message) = yield self.rpc_send('initialize',
+                                                          arg)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def disconnect(self, command):
+        """
+        Disconnect from the instrument
+        @param none
+        @retval Result code of some sort
+        """
+        #assert(isinstance(command, dict))
+        log.debug("DHE: in disconnect!")
+        (content, headers, message) = yield self.rpc_send('disconnect',
+                                                          command)
+        defer.returnValue(content)
+
+
 class InstrumentAgent(ResourceAgent):
     """
     The base class for developing Instrument Agents. This defines
@@ -148,9 +183,9 @@ class InstrumentAgent(ResourceAgent):
     Child instrument agents should supply instrument-specific getTranslator
     and getCapabilities routines.
     """
-    
+
     driver_client = None
-    
+
     @defer.inlineCallbacks
     def op_get_translator(self, content, headers, msg):
         """
@@ -160,7 +195,7 @@ class InstrumentAgent(ResourceAgent):
         even the driver.
         """
         yield self.reply_ok(msg, lambda s: s)
-        
+
     @defer.inlineCallbacks
     def op_get(self, content, headers, msg):
         """
@@ -172,7 +207,7 @@ class InstrumentAgent(ResourceAgent):
         @retval A reply message containing a dictionary of name/value pairs
         """
         yield self.op_get_from_CI(content, headers, msg)
-    
+
     @defer.inlineCallbacks
     def op_get_from_instrument(self, content, headers, msg):
         """
@@ -189,7 +224,7 @@ class InstrumentAgent(ResourceAgent):
             yield self.reply_ok(msg, response)
         else:
             yield self.reply_err(msg, 'No values found')
-    
+
     @defer.inlineCallbacks
     def op_get_from_CI(self, content, headers, msg):
         """
@@ -201,17 +236,17 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(content, (list, tuple)))
         assert(self.driver_client != None)
         response = {}
-        
+
         # get data somewhere, or just punt this lower in the class hierarchy
         if ("driver_address" in content):
             response['driver_address'] = str(self.driver_client.target)
-            
+
         if response != {}:
             yield self.reply_ok(msg, response)
         else:
             yield self.reply_err(msg, 'No values found')
-            
-    @defer.inlineCallbacks    
+
+    @defer.inlineCallbacks
     def op_set(self, content, headers, msg):
         """
         Set parameters to the infrastructure side of the agent. For
@@ -223,7 +258,7 @@ class InstrumentAgent(ResourceAgent):
             On failure, return the bad key, but previous keys were already set
         """
         yield self.op_set_to_CI(content, headers, msg)
-    
+
     @defer.inlineCallbacks
     def op_set_to_instrument(self, content, headers, msg):
         """
@@ -239,11 +274,12 @@ class InstrumentAgent(ResourceAgent):
         result = yield self.driver_client.set_params(content)
         if result == {}:
             yield self.reply_err(msg, "Could not set %s" % content)
+            return
         else:
             response.update(result)
         assert(response != {})
         yield self.reply_ok(msg, response)
-    
+
     @defer.inlineCallbacks
     def op_set_to_CI(self, content, headers, msg):
         """
@@ -255,7 +291,7 @@ class InstrumentAgent(ResourceAgent):
         @todo Write this or pass through to a subclass
         """
         pass
-    
+
     @defer.inlineCallbacks
     def op_execute(self, content, headers, msg):
         """
@@ -263,39 +299,64 @@ class InstrumentAgent(ResourceAgent):
         message including output of command, or simple ACK that command
         was executed. For InstrumentAgent calls, execute maps to an execution
         to the CI set of commands.
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval ACK message with response on success, ERR message with string
             indicating code and response message on fail
         """
         yield self.op_execute_CI(content, headers, msg)
-        
+
     @defer.inlineCallbacks
     def op_execute_CI(self, content, headers, msg):
         """
         Execute infrastructure commands related to the Instrument Agent
         instance. This includes commands for messaging, resource management
         processes, etc.
-        @param content Should be a list where first element is the command,
-            the rest are the arguments
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval ACK message with response on success, ERR message with string
             indicating code and response message on fail
         """
-    
+
+    @defer.inlineCallbacks
+    def op_disconnect(self, content, headers, msg):
+        """
+        Disconnect from the instrument.
+        @param none
+        @return ACK message with response on success, ERR message with string
+            indicating code and response message on fail
+        """
+        assert(isinstance(content, list))
+        assert(self.driver != None)
+        execResult = self.driver.disconnect(content)
+        assert(len(execResult) == 2)
+        (errorCode, response) = execResult
+        assert(isinstance(errorCode, int))
+        if errorCode == 1:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg,
+                                 "Error code %s, response: %s" % (errorCode,
+                                                                  response))
+
     @defer.inlineCallbacks
     def op_execute_instrument(self, content, headers, msg):
         """
         Execute instrument commands relate to the instrument fronted by this
         Instrument Agent. These commands will likely be handled by the
         underlying driver.
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval ACK message with response on success, ERR message with string
             indicating code and response message on fail
         """
-        assert(isinstance(content, dict))
+        assert(isinstance(content, (list, tuple)))
         execResult = yield self.driver_client.execute(content)
         assert(isinstance(execResult, dict))
         if (execResult['status'] == 'OK'):
@@ -317,14 +378,14 @@ class InstrumentAgent(ResourceAgent):
             yield self.reply_ok(msg, response['value'])
         else:
             yield self.reply_err(msg, response['value'])
-                    
+
 class InstrumentAgentClient(ResourceAgentClient):
     """
     The base class for an Instrument Agent Client. It is a service
     that allows for RPC messaging
     """
 
-    @defer.inlineCallbacks    
+    @defer.inlineCallbacks
     def get_from_instrument(self, paramList):
         """
         Obtain a list of parameter names from the instrument
@@ -336,8 +397,8 @@ class InstrumentAgentClient(ResourceAgentClient):
                                                           paramList)
         assert(isinstance(content, dict))
         defer.returnValue(content)
-    
-    @defer.inlineCallbacks    
+
+    @defer.inlineCallbacks
     def get_from_CI(self, paramList):
         """
         Obtain a list of parameter names from the instrument
@@ -349,7 +410,7 @@ class InstrumentAgentClient(ResourceAgentClient):
                                                           paramList)
         assert(isinstance(content, dict))
         defer.returnValue(content)
-    
+
     @defer.inlineCallbacks
     def set_to_instrument(self, paramDict):
         """
@@ -381,35 +442,46 @@ class InstrumentAgentClient(ResourceAgentClient):
         defer.returnValue(content)
 
     @defer.inlineCallbacks
+    def disconnect(self, argList):
+        """
+        Disconnect from the instrument
+        """
+        assert(isinstance(argList, list))
+        (content, headers, message) = yield self.rpc_send('disconnect',
+                                                              argList)
+        assert(isinstance(content, dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def execute_instrument(self, command):
         """
         Execute the instrument commands in the order of the list.
         Processing will cease when a command fails, but will not roll back.
         For instrument calls, use executeInstrument()
         @see executeInstrument()
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval Dictionary of responses to each execute command
         @todo Alter semantics of this call as needed...maybe a list?
         @todo Add exceptions as needed
         """
-        assert(isinstance(command, dict))
+        assert(isinstance(command, list))
         (content, headers, message) = yield self.rpc_send('execute_instrument',
                                                           command)
-        assert(isinstance(content, dict))
         defer.returnValue(content)
-        
-    @defer.inlineCallbacks
+
     def execute_CI(self, command):
         """
         Execute the instrument commands in the order of the list.
         Processing will cease when a command fails, but will not roll back.
         For instrument calls, use executeCI()
         @see executeInstrument()
-        @param command A dictionary where the command name is the key and the
-            arguments are the value as a (possibly empty) list. For example:
-            {'command1':['arg1', 'arg2'], 'command2':[]}
+        @param command An ordered list of lists where the command name is the
+            first item in the sub-list, and the arguments are the rest of
+            the items in the sublists. For example:
+            [['command1', 'arg1', 'arg2'], ['command2']]
         @retval Dictionary of responses to each execute command
         @todo Alter semantics of this call as needed...maybe a command list?
         @todo Add exceptions as needed
@@ -419,7 +491,7 @@ class InstrumentAgentClient(ResourceAgentClient):
                                                           command)
         assert(isinstance(content, dict))
         defer.returnValue(content)
-        
+
     @defer.inlineCallbacks
     def get_status(self, argList):
         """
@@ -430,8 +502,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         (content, headers, message) = yield self.rpc_send('get_status',
                                                               argList)
         defer.returnValue(content)
-        
-    @defer.inlineCallbacks    
+
+    @defer.inlineCallbacks
     def get_capabilities(self):
         """
         Obtain a list of capabilities from the instrument
@@ -457,9 +529,9 @@ class InstrumentAgentClient(ResourceAgentClient):
 
         # Add in the special stuff that all instruments know
         listified[ci_parameters].append(driver_address)
-                                         
+
         defer.returnValue(listified)
-        
+
     @defer.inlineCallbacks
     def get_translator(self):
         """
@@ -471,17 +543,19 @@ class InstrumentAgentClient(ResourceAgentClient):
         (content, headers, message) = yield self.rpc_send('get_translator', ())
         #assert(inspect.isroutine(content))
         defer.returnValue(content)
-        
+
     @defer.inlineCallbacks
-    def register_resource(self):
+    def register_resource(self, instrument_id):
         """
         Register the resource. Since this is a subclass, make the appropriate
         resource description for the registry and pass that into the
         registration call.
         """
         ia_instance = InstrumentAgentResourceInstance()
-        ci_params = yield self.get_from_CI([driver_address])   
+        ci_params = yield self.get_from_CI([driver_address])
         ia_instance.driver_process_id = ci_params[driver_address]
+        ia_instance.instrument_ref = ResourceReference(
+            RegistryIdentity=instrument_id, RegistryBranch='master')
         result = yield ResourceAgentClient.register_resource(self,
                                                              ia_instance)
         defer.returnValue(result)

@@ -5,42 +5,52 @@
 @author Steve Foley
 @brief CI interface for SeaBird SBE-49 CTD
 """
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 import SBE49_constants as const
 from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 
-from ion.core.base_process import ProtocolFactory, ProcessDesc
-from ion.core import bootstrap
-
+from ion.core.base_process import BaseProcess, ProtocolFactory, ProcessDesc
 
 
 # Gotta have this AFTER the "static" variables above
 from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriverClient
-    
+
 class SBE49InstrumentAgent(InstrumentAgent):
     """
     Sea-Bird 49 specific instrument driver
     Inherits basic get, set, getStatus, getCapabilities, etc. from parent
     """
-    
+
     @defer.inlineCallbacks
     def plc_init(self):
         """
         Initialize instrument driver when this process is started.
         """
-        pd = ProcessDesc(**{'name':'SBE49Driver',
+        InstrumentAgent.plc_init(self)
+
+        self.instrument_id = self.spawn_args.get('instrument-id', '123')
+        self.driver_args = self.spawn_args.get('driver-args', {})
+        log.info("INIT agent for instrument ID: %s" % (self.instrument_id))
+
+        self.driver_args['instrument-id'] = self.instrument_id
+        self.pd = ProcessDesc(**{'name':'SBE49Driver',
                           'module':'ion.agents.instrumentagents.SBE49_driver',
-                          'class':'SBE49InstrumentDriver'})
-        self.sup = yield bootstrap.create_supervisor()
-                
-        driver_id = yield self.sup.spawn_child(pd)
-        self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
+                          'class':'SBE49InstrumentDriver',
+                          'spawnargs':self.driver_args})
+
+        driver_id = yield self.spawn_child(self.pd)
+        self.driver_client = SBE49InstrumentDriverClient(proc=self,
                                                          target=driver_id)
-        
+
+    #@defer.inlineCallbacks
+    #def plc_shutdown(self):
+    #    yield self.pd.shutdown()
+
+
     @staticmethod
     def __translator(input):
         """

@@ -6,8 +6,8 @@
 @brief capability container interceptor system (security, governance)
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 import hashlib
 try:
     import json
@@ -65,18 +65,18 @@ class IdmInterceptor(Interceptor):
 
     @classmethod
     def message_validator(cls, msg):
-        #logging.info('IdM interceptor IN')
+        #log.info('IdM interceptor IN')
         cont = msg.payload.copy()
         hashrec = cont.pop('signature')
         blob = json.dumps(cont, sort_keys=True)
         hash = hashlib.sha1(blob).hexdigest()
         if hash != hashrec:
-            logging.info("*********message signature wrong***********")
+            log.info("*********message signature wrong***********")
         return msg
 
     @classmethod
     def message_signer(cls, msg):
-        #logging.info('IdM interceptor OUT')
+        #log.info('IdM interceptor OUT')
         blob = json.dumps(msg, sort_keys=True)
         hash = hashlib.sha1(blob).hexdigest()
         msg['signature'] = hash
@@ -85,13 +85,13 @@ class IdmInterceptor(Interceptor):
 class MessageEncrypter(object):
     @classmethod
     def encrypt_message(cls, msg):
-        #logging.info("Encrypting message: "+str(msg))
+        #log.info("Encrypting message: "+str(msg))
         blob = json.dumps(msg, sort_keys=True)
         padding = int(((len(blob) + encrypt_pad) // encrypt_pad) * encrypt_pad)
         padmsg = blob.ljust(padding)
-        #logging.info("Padded message json: '"+str(padmsg)+"'")
+        #log.info("Padded message json: '"+str(padmsg)+"'")
         encmsg = encrypter.encrypt(padmsg)
-        logging.info("Encrypted message len="+str(len(encmsg)))
+        log.info("Encrypted message len="+str(len(encmsg)))
         # HACK1: Returning the encrypted message in a mutable dict so that
         # we can replace dict content when decoding
         # HACK2: Need to repr the binary encmsg because otherwise failure        
@@ -102,13 +102,13 @@ class MessageEncrypter(object):
         # Note: modifying the dict in the msg.payload does not work
         encmsc = msg.payload.pop('msg')
         msgblob = encrypter.decrypt(eval(encmsc))
-        #logging.info("Message decrypted: "+str(msgblob))
+        #log.info("Message decrypted: "+str(msgblob))
         msgobj = json.loads(msgblob)
-        #logging.info("Message recreated: "+str(msgobj))
+        #log.info("Message recreated: "+str(msgobj))
         msg.payload.update(msgobj)
         msg._decoded_cache = msgobj
         assert msgobj is msg.payload
-        #logging.info("Message payload recreated: "+str(msg.payload))
+        #log.info("Message payload recreated: "+str(msg.payload))
         return msg
          
 class PolicyInterceptor(Interceptor):
@@ -119,10 +119,10 @@ class PolicyInterceptor(Interceptor):
         if master_off: return msg
         if isinstance(msg, BaseMessage):
             ""
-            #logging.info('Policy interceptor IN')
+            #log.info('Policy interceptor IN')
         else:
             ""
-            #logging.info('Policy interceptor OUT')
+            #log.info('Policy interceptor OUT')
         return msg
     
 class GovernanceInterceptor(Interceptor):
@@ -133,10 +133,10 @@ class GovernanceInterceptor(Interceptor):
         if master_off: return msg
         if isinstance(msg, BaseMessage):
             ""
-            #logging.info('Governance interceptor IN')
+            #log.info('Governance interceptor IN')
         else:
             ""
-            #logging.info('Governance interceptor OUT')
+            #log.info('Governance interceptor OUT')
         return msg
 
 
@@ -152,4 +152,4 @@ class BaseInterceptorSystem(InterceptorSystem):
         self.registerIdmInterceptor(IdmInterceptor.transform)
         self.registerPolicyInterceptor(PolicyInterceptor.transform)
         self.registerGovernanceInterceptor(GovernanceInterceptor.transform)
-        logging.info("Initialized ION BaseInterceptorSystem")
+        log.info("Initialized ION BaseInterceptorSystem")

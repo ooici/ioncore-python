@@ -7,8 +7,8 @@
     interaction patterns)
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from ion.data.dataobject import DataObject
 

@@ -1,7 +1,15 @@
 #!/usr/bin/env python
 
-import logging
-logging = logging.getLogger(__name__)
+"""
+@file ion/resources/description_utility.py
+@author David Stuebe
+@brief This is a method required to load all resource descriptions into the
+dataobject dictionary as possible types for decoding. This is a temporary
+requirement until we have a proper self describing datatype.
+"""
+
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 import inspect
@@ -16,13 +24,13 @@ def load_descriptions():
     '''
     Not sure why this barfs?
     '''
-    logging.info('*********RUNNIG LOAD DESCRIPTIONS')
+    log.info('*********RUNNIG LOAD DESCRIPTIONS')
     modules=CONF.getObject()
     if not modules:
-        logging.warning('Found no Resource Description modules to load!')
+        log.warning('Found no Resource Description modules to load!')
 
     for module in modules:
-        logging.info('Loading Module DataObjects: %s' % module)
+        log.info('Loading Module DataObjects: %s' % module)
 
         mod = __import__(module)
         print 'mod',mod

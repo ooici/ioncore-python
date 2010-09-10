@@ -1,8 +1,9 @@
 #!/usr/bin/env python
+
 import logging
 logging = logging.getLogger(__name__)
-from twisted.internet import defer #, reactor
 
+from twisted.internet import defer #, reactor
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.core.base_process import ProtocolFactory
 from ion.services.cei.provisioner_store import ProvisionerStore

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """
+@file ion/services/dm/preservation/test/test_retriever.py
 @test ion.services.dm.retriever.test.test_retriever.py
 @author Paul Hubbard
 @date 6/11/10
@@ -8,8 +9,8 @@
 
 from ion.services.dm.preservation.retriever import RetrieverClient
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 from twisted.trial import unittest

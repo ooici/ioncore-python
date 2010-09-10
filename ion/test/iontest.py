@@ -6,8 +6,8 @@
 @brief test case for ION integration and system test cases (and some unit tests)
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
@@ -58,31 +58,33 @@ class IonTestCase(unittest.TestCase):
         #Load All Resource Descriptions for future decoding
         description_utility.load_descriptions()
 
-        logging.info("============Magnet container started, "+repr(self.cont_conn))
+        log.info("============Magnet container started, "+repr(self.cont_conn))
 
     @defer.inlineCallbacks
     def _start_core_services(self):
         sup = yield bootstrap.spawn_processes(bootstrap.ion_core_services,
                                               self.test_sup)
-        logging.info("============Core ION services started============")
+        log.info("============Core ION services started============")
         defer.returnValue(sup)
 
+    @defer.inlineCallbacks
     def _stop_container(self):
         """
         Taking down the container's connection to the broker an preparing for
         reinitialization.
         """
-        logging.info("Closing ION container")
+        log.info("Closing ION container")
         self.test_sup = None
         dcs = reactor.getDelayedCalls()
-        logging.info("Cancelling %s delayed reactor calls!" % len(dcs))
+        log.info("Cancelling %s delayed reactor calls!" % len(dcs))
         for dc in dcs:
+            # Cancel the registered delayed call (this is non-async)
             dc.cancel()
-        self.cont_conn.transport.loseConnection()
+        yield self.cont_conn.transport.loseConnection()
         container.Container._started = False
         container.Container.store = Store()
         bootstrap.reset_container()
-        logging.info("============ION container closed============")
+        log.info("============ION container closed============")
 
     def _shutdown_processes(self, proc=None):
         """
@@ -133,7 +135,7 @@ class ReceiverProcess(BaseProcess):
         'op' message attribute.
         @retval deferred
         """
-        logging.info('ReceiverProcess: Received message op=%s from sender=%s' %
+        log.info('ReceiverProcess: Received message op=%s from sender=%s' %
                      (msg.payload['op'], msg.payload['sender']))
         self.inbox.put(msg)
         return defer.succeed(True)

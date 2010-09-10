@@ -15,7 +15,7 @@ twisted.internet.defer.Deferred objects.
 import re
 import hashlib
 import struct
-import logging
+import ion.util.ionlog
 
 from zope.interface import Interface
 from zope.interface import implements
@@ -132,6 +132,7 @@ class BaseObject(object):
 
     type = None
     _value_cache = None
+    _encoded_cache = None
 
     @classmethod
     def get_type(cls):
@@ -153,11 +154,14 @@ class BaseObject(object):
     def encode(self):
         """
         @brief Encode this instance.
+        @note This is where a cache should be. BaseObject.value is DEPRECATED.
+        @todo Use cStringIO buffer instead of python str.
         """
-        body = self._encode_body()
-        header = self._encode_header(body)
-        encoded = "%s%s" % (header, body,)
-        return encoded
+        if not self._encoded_cache:
+            body = self._encode_body()
+            header = self._encode_header(body)
+            self._encoded_cache = "%s%s" % (header, body,)
+        return self._encoded_cache
 
     @staticmethod
     def decode(value, types):
@@ -485,26 +489,29 @@ class Commit(BaseObject):
 
 class ICAStore(Interface):
     """
-    Content addressable value store.
-
-    @brief Uses an instance of a backend key/value store class -- an object
-    providing ion.data.store.IStore
+    @brief Content addressable value store. Stores ICAStoreObject instances
+    in a persistent storage via an object providing ion.data.store.IStore. 
+    @todo Add a delete/remove method to interface?
     """
 
     TYPES = Attribute("""@param TYPES Dict providing map of ICAStoreObject
-        type names to ICAStoreObject implementation class.""")
+        type names to ICAStoreObject content object implementation class.""")
 
     def get(id):
         """
-        @param id of content object
-        @retval A Deferred that fires with an object that provides
+        @param id key of content object.
+        @retval defer.Deferred that fires with an object that provides
         ICAStoreObject.
         """
 
     def put(obj):
         """
+        @brief The key the object is stored at is determined by taking the
+        hash of the content. This ensures the immutability of all content as
+        the keys cannot be directly specified for writing (assuming sha1
+        hash algorithm is used and treating it as collision free.) 
         @param obj instance of object providing ICAStoreObject
-        @retval A Deferred that fires with the obj id.
+        @retval defer.Deferred that fires with the obj id.
         """
 
 class StoreContextWrapper(object):
@@ -588,10 +595,10 @@ class CAStore(object):
         can always be assumed that a hash corresponds to an object in the
         store.
         """
-        value = obj.value #compress arg
-        hash = sha1(value)
+        data = obj.encode() #compress arg
+        hash = sha1(data)
         id = sha1_to_hex(hash)
-        d = self.objs.put(id, value)
+        d = self.objs.put(id, data)
         d.addCallback(lambda _: id)
         return d
 
@@ -604,10 +611,14 @@ class CAStore(object):
         if len(id) == 20:
             id = sha1_to_hex(id)
         d = self.objs.get(id)
-        def _decode_cb(raw):
-            if not raw:
+        def _decode_cb(data):
+            if not data:
                 raise CAStoreError("Object with id: %s not found" % id)
-            return self.decode(raw)
+            obj = self.decode(data)
+            # assure integrity 
+            if not id == sha1(obj, bin=False):
+                raise CAStoreError("Object Integrity Error!")
+            return obj
         d.addCallback(_decode_cb)
         # d.addErrback
         return d

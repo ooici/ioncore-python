@@ -8,8 +8,8 @@
 
 import os
 import sha
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.trial import unittest
 from twisted.internet import defer
@@ -85,11 +85,11 @@ class BaseProcessTest(IonTestCase):
         proc = self._get_procinstance(pid1)
         self.assertEquals(str(proc.__class__),"<class 'ion.core.test.test_baseprocess.EchoProcess'>")
         self.assertEquals(pid1, proc.receiver.spawned.id)
-        logging.info('Process 1 spawned and initd correctly')
+        log.info('Process 1 spawned and initd correctly')
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo','content123')
         self.assertEquals(cont['value'], 'content123')
-        logging.info('Process 1 responsive correctly')
+        log.info('Process 1 responsive correctly')
 
         # The following tests the process attaching a second receiver
         msgName = self.test_sup.get_scoped_name('global', pu.create_guid())
@@ -98,11 +98,11 @@ class BaseProcessTest(IonTestCase):
         extraRec = Receiver(proc.proc_name, msgName)
         extraRec.handle(proc.receive)
         extraid = yield spawn(extraRec)
-        logging.info('Created new receiver %s with pid %s' % (msgName, extraid))
+        log.info('Created new receiver %s with pid %s' % (msgName, extraid))
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(msgName,'echo','content456')
         self.assertEquals(cont['value'], 'content456')
-        logging.info('Process 1 responsive correctly on second receiver')
+        log.info('Process 1 responsive correctly on second receiver')
 
 
     @defer.inlineCallbacks
@@ -120,10 +120,10 @@ class BaseProcessTest(IonTestCase):
         pid2 = p1.get_child_id('echo')
 
         yield p1.send(pid2, 'echo','content123')
-        logging.info('Sent echo message')
+        log.info('Sent echo message')
 
         msg = yield p1.await_message()
-        logging.info('Received echo message')
+        log.info('Received echo message')
 
         self.assertEquals(msg.payload['op'], 'result')
         self.assertEquals(msg.payload['content']['value'], 'content123')
@@ -139,15 +139,15 @@ class BaseProcessTest(IonTestCase):
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid2,'echo','content123')
         self.assertEquals(cont['status'], 'ERROR')
-        logging.info('Process 1 rejected first message correctly')
+        log.info('Process 1 rejected first message correctly')
 
         yield child2.init()
         self.assertEquals(child2.proc_state, 'INIT_OK')
-        logging.info('Process 1 rejected initialized OK')
+        log.info('Process 1 rejected initialized OK')
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid2,'echo','content123')
         self.assertEquals(cont['value'], 'content123')
-        logging.info('Process 1 responsive correctly after init')
+        log.info('Process 1 responsive correctly after init')
 
     @defer.inlineCallbacks
     def test_message_during_init(self):
@@ -163,24 +163,24 @@ class BaseProcessTest(IonTestCase):
         extraRec = Receiver(proc2.proc_name, msgName)
         extraRec.handle(proc2.receive)
         extraid = yield spawn(extraRec)
-        logging.info('Created new receiver %s with pid %s' % (msgName, extraid))
+        log.info('Created new receiver %s with pid %s' % (msgName, extraid))
 
         yield self.test_sup.send(pid2, 'init',{},{'quiet':True})
-        logging.info('Sent init to process 1')
+        log.info('Sent init to process 1')
 
         yield pu.asleep(0.5)
         self.assertEquals(proc2.proc_state, 'INIT')
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(msgName,'echo','content123')
         self.assertEquals(cont['value'], 'content123')
-        logging.info('Process 1 responsive correctly after init')
+        log.info('Process 1 responsive correctly after init')
 
         yield pu.asleep(2)
         self.assertEquals(proc2.proc_state, 'ACTIVE')
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(msgName,'echo','content123')
         self.assertEquals(cont['value'], 'content123')
-        logging.info('Process 1 responsive correctly after init')
+        log.info('Process 1 responsive correctly after init')
 
     @defer.inlineCallbacks
     def test_error_in_op(self):
@@ -189,7 +189,7 @@ class BaseProcessTest(IonTestCase):
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echofail2','content123')
         self.assertEquals(cont['status'], 'ERROR')
-        logging.info('Process 1 responded to error correctly')
+        log.info('Process 1 responded to error correctly')
 
     @defer.inlineCallbacks
     def test_send_byte_string(self):
@@ -210,10 +210,10 @@ class BaseProcessTest(IonTestCase):
         byte_string = sha.sha('test').digest()
 
         yield p1.send(pid2, 'echo', byte_string)
-        logging.info('Sent byte-string')
+        log.info('Sent byte-string')
 
         msg = yield p1.await_message()
-        logging.info('Received byte-string')
+        log.info('Received byte-string')
         self.assertEquals(msg.payload['content']['value'], byte_string)
 
         yield sup.shutdown()
@@ -234,24 +234,24 @@ class EchoProcess(BaseProcess):
 
     @defer.inlineCallbacks
     def plc_noinit(self):
-        logging.info("In init: "+self.proc_state)
+        log.info("In init: "+self.proc_state)
         yield pu.asleep(1)
-        logging.info("Leaving init: "+self.proc_state)
+        log.info("Leaving init: "+self.proc_state)
 
     @defer.inlineCallbacks
     def op_echo(self, content, headers, msg):
-        logging.info("Message received: "+str(content))
+        log.info("Message received: "+str(content))
         yield self.reply_ok(msg, content)
 
     @defer.inlineCallbacks
     def op_echofail1(self, content, headers, msg):
-        logging.info("Message received: "+str(content))
+        log.info("Message received: "+str(content))
         ex = RuntimeError("I'm supposed to fail")
         yield self.reply_err(msg, ex)
 
     @defer.inlineCallbacks
     def op_echofail2(self, content, headers, msg):
-        logging.info("Message received: "+str(content))
+        log.info("Message received: "+str(content))
         raise RuntimeError("I'm supposed to fail")
         yield self.reply_ok(msg, content)
 

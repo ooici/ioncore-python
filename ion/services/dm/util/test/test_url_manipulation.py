@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/test/test_url_manipulation.py
-@test Tests for ion.services.dm.url_manipulation
+@file ion/services/dm/util/test/test_url_manipulation.py
+@test Tests for ion.services.dm.util/url_manipulation
 @author Paul Hubbard
 @date 6/4/10
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.trial import unittest
 
@@ -93,14 +93,6 @@ class BaseUrlTester(unittest.TestCase):
         b = base_dap_url('http://foo.example.com/ds.nc')
         self.assertEqual(b, 'http://foo.example.com/ds.nc')
 
-    def test_exceptional_urls(self):
-        """
-        these should raise a valueerror exception. Pun!
-        """
-        raise unittest.SkipTest("Can't find a URL to trigger this!")
-
-        self.failUnlessRaises(ValueError, base_dap_url,
-                              'http://foo.bar.com/')
 class RewriteTester(unittest.TestCase):
     """
     Test url rewriter, no communications required.

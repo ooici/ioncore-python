@@ -7,11 +7,11 @@
 Porting from LCO implementation to new LCA arch - complete rewrite.
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.base_process import ProtocolFactory
-from ion.services.dm.preservation.coordinator import CoordinatorClient
+from ion.services.dm.util.eoi_data_stream_producer import CoordinatorClient
 
 from ion.services.base_service import BaseService
 from twisted.internet import defer, protocol, reactor
@@ -43,14 +43,14 @@ class DAPProxyProtocol(LineReceiver):
         self.hostname = None
 
     def connectionMade(self):
-        logging.debug('connected!')
+        log.debug('connected!')
         self.reset()
 
     def lineReceived(self, line):
-        logging.debug('got a line: %s' % line)
+        log.debug('got a line: %s' % line)
         self.buf.append(line)
         if len(line) == 0:
-            logging.info('Ready to send request off!')
+            log.info('Ready to send request off!')
             self.send_receive()
 
     @defer.inlineCallbacks
@@ -64,7 +64,7 @@ class DAPProxyProtocol(LineReceiver):
         try:
             cmd, url, method = self.buf[0].split(' ')
         except ValueError:
-            logging.warn('Unable to parse command "%s"' % self.buf[0])
+            log.warn('Unable to parse command "%s"' % self.buf[0])
             self.transport.write('400 Command not understood\r\n')
             self.transport.loseConnection()
             self.reset()
@@ -72,20 +72,20 @@ class DAPProxyProtocol(LineReceiver):
 
         if 'Connection: close' in self.buf:
             # @todo Handle 1.1 persisten connections correctly
-            logging.debug('disconnect request found')
+            log.debug('disconnect request found')
 
         if self.http_connected:
-            logging.debug('rewriting url...')
+            log.debug('rewriting url...')
             url = 'http://%s%s' % (self.hostname, url)
-            logging.debug('new ' + url)
+            log.debug('new ' + url)
 
 
         if cmd == 'CONNECT':
             self.http_connected = True
             self.hostname = url
-            logging.debug('hostname is ' + self.hostname)
+            log.debug('hostname is ' + self.hostname)
 
-            logging.debug('Ackowledging connect with fake response')
+            log.debug('Ackowledging connect with fake response')
             self.transport.write('HTTP/1.1 200 Did get connection\r\n')
             self.transport.write('Content-Type: text/plain; charset=UTF-8\r\n')
             self.transport.write('\r\n')
@@ -93,7 +93,7 @@ class DAPProxyProtocol(LineReceiver):
             defer.returnValue(None)
 
         if cmd not in ['GET', 'HEAD']:
-            logging.error('Unknown command "%s"' % self.buf[0])
+            log.error('Unknown command "%s"' % self.buf[0])
             yield self.transport.write(generic_err)
             yield self.transport.loseConnection()
             self.reset()
@@ -103,28 +103,28 @@ class DAPProxyProtocol(LineReceiver):
         if cmd == 'HEAD':
             resp = yield cc.get_head(url)
         elif cmd == 'GET':
-            logging.debug('pulling url...')
+            log.debug('pulling url...')
             resp = yield cc.get_url(url)
 
         # Did the command succeed?
         if resp['status'] != 'OK':
-            logging.warn('Bad result on %s %s' % (cmd, url))
+            log.warn('Bad result on %s %s' % (cmd, url))
             rs = resp['value']
-            logging.warn(rs)
+            log.warn(rs)
             yield self.transport.write(rs)
             yield self.transport.loseConnection()
             self.reset()
-            logging.debug('done with error handler')
+            log.debug('done with error handler')
             return
 
-        logging.debug('cmd %s returned OK' % cmd)
+        log.debug('cmd %s returned OK' % cmd)
 
         # OK, response OK, decode page and return it
         self.transport.write(base64.b64decode(resp['value']))
 
         yield self.transport.loseConnection()
         self.reset()
-        logging.debug('send_receive completed')
+        log.debug('send_receive completed')
 
 
 class DAPProxyFactory(protocol.ServerFactory):
@@ -144,16 +144,16 @@ class ProxyService(BaseService):
         """
         Use this hook to bind to listener TCP port.
         """
-        logging.info('starting proxy on port %d' % PROXY_PORT)
+        log.info('starting proxy on port %d' % PROXY_PORT)
         self.proxy_port = yield reactor.listenTCP(PROXY_PORT, DAPProxyFactory())
-        logging.info('Proxy listener running.')
+        log.info('Proxy listener running.')
 
     @defer.inlineCallbacks
     def slc_shutdown(self):
         """
         Close TCP listener
         """
-        logging.info('Shutting down proxy')
+        log.info('Shutting down proxy')
         yield self.proxy_port.stopListening()
 
 factory = ProtocolFactory(ProxyService)
