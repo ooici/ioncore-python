@@ -56,7 +56,6 @@ class PubSubEndToEndTest(IonTestCase):
     def tearDown(self):
         yield self.pubsub.reg.clear_registry()
         yield self._stop_container()        
-    
         
     @defer.inlineCallbacks    
     def test_publisher(self):
@@ -68,6 +67,7 @@ class PubSubEndToEndTest(IonTestCase):
         yield self.pubsub_client.define_publisher(self.pub1)
         res = yield self.pubsub_client.publish(self.sup, self.topic1, "Gridded data")
         self.assertEqual(res, 'sent')
+    
     @defer.inlineCallbacks    
     def test_publisher_fail(self):
         """
