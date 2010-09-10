@@ -36,7 +36,8 @@ try:
                                      'Paste', 'Pydap', 'simplejson', 'httplib2',
                                      'pydap.handlers.netcdf','pydap.handlers.nca',
                                      'pydap.responses.netcdf',
-                                     'msgpack-python','gviz_api.py']
+                                     'msgpack-python','gviz_api.py',
+                                     'nimboss','txrabbitmq']
     setupdict['include_package_data'] = True
     setup(**setupdict)
 
