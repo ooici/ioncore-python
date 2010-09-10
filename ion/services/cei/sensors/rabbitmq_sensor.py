@@ -48,10 +48,6 @@ class RabbitMQSensor(SensorProcess):
 
     @inlineCallbacks
     def messages_in_queue(self):
-        """
-        Returns the number of existing messages in queue 'queue_name'.
-        Returns -1 if 'queue_name' does not exist.
-        """
         allqueues = yield self.sensor_client.list_queues()
         logging.info("=== messages_in_queue ===")
         for q in allqueues["result"]:
