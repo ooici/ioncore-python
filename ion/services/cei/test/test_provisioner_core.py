@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
 import logging
+import os
 import uuid
 import time
 
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
+from twisted.trial import unittest
 
 from ion.services.cei.provisioner_core import ProvisionerCore, update_nodes_from_context
 from ion.services.cei.provisioner_store import ProvisionerStore
@@ -16,6 +18,11 @@ class ProvisionerCoreTests(IonTestCase):
     """Testing the provisioner core functionality
     """
     def setUp(self):
+        # skip this test if IaaS credentials are unavailable
+        for key in ['NIMBUS_KEY', 'NIMBUS_SECRET', 
+                'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY']:
+            if not os.environ.get(key):
+                raise unittest.SkipTest('Test requires IaaS credentials, skipping')
         self.notifier = FakeProvisionerNotifier()
         self.store = ProvisionerStore()
         self.ctx = FakeContextClient()
@@ -25,7 +32,7 @@ class ProvisionerCoreTests(IonTestCase):
         self.notifier = None
         self.store = None
         self.core = None
-
+        
     @defer.inlineCallbacks
     def test_query_missing_node_within_window(self):
         launch_id = _new_id()
