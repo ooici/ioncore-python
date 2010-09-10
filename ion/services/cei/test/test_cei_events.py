@@ -70,7 +70,7 @@ class CEIEventsTestCase(unittest.TestCase):
         
     def test_manual_event_write(self):
         cruft = "some cruft %s" % cei_events.event_logtxt("unittest", "TRIAL1")
-        logger.debug(cruft)
+        logger.warning(cruft)
         events = cei_events.events_from_file(self.logfilepath)
         assert len(events) == 1
         
@@ -79,8 +79,7 @@ class CEIEventsTestCase(unittest.TestCase):
         assert len(events) == 2
         
         cruft = "cruft2 %s" % cei_events.event_logtxt("unittest", "TRIAL3")
-        # log level shouldn't matter either:
-        logger.error(cruft)
+        logger.warning(cruft)
         
         events = cei_events.events_from_file(self.logfilepath)
         assert len(events) == 3
