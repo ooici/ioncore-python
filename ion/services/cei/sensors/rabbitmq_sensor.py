@@ -1,4 +1,5 @@
 import logging
+import os
 
 from ion.services.cei.sensors.sensor import SensorProcess
 
