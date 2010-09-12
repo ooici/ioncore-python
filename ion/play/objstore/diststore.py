@@ -17,6 +17,9 @@ from twisted.internet import defer, reactor
 from ion.data.store import Store
 import ion.util.procutils as pu
 
+# In a DS such as Cassandra, nodes and number of replicas are different. Load
+# is partitioned. We just distribute all keys over #replicas nodes.
+
 CONSISTENCY_ONE = 1
 CONSISTENCY_QUORUM = 2
 CONSISTENCY_ALL = 3
@@ -208,7 +211,7 @@ def do_sequences(dds, num):
             reactor.callWhenRunning(do_sequence, dds, i)
 
 if __name__ == '__main__':
-    dds = DDSSimulator("mycluster", 5)
+    dds = DDSSimulator("mycluster", numnodes=5)
     reactor.callWhenRunning(do_sequences, dds, 200)
     print "Starting reactor"
     reactor.run( )
