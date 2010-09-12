@@ -36,6 +36,23 @@ class DDSSimulator(object):
             self.nodekvs.append(nodekvs)
 
     @defer.inlineCallbacks
+    def lock(self, key, node):
+        lockkey = -1 * key
+        yield self.write(lockkey, node, CONSISTENCY_QUORUM, node)
+        lv = yield self.read(lockkey, clevel=CONSISTENCY_QUORUM, repair=READ_REPAIR_RECENT, node=node)
+        has_lock = (lv == node)
+        defer.returnValue(has_lock)
+
+    @defer.inlineCallbacks
+    def unlock(self, key, node):
+        lockkey = -1 * key
+        lv = yield self.read(lockkey, clevel=CONSISTENCY_QUORUM, repair=READ_REPAIR_RECENT, node=node)
+        if lv == node:
+            yield self.write(lockkey, None, CONSISTENCY_QUORUM, node)
+        else:
+            raise RuntimeError("Node %s does not have lock=%s" % (node, lv))
+
+    @defer.inlineCallbacks
     def read(self, key, clevel=CONSISTENCY_ALL, repair=READ_REPAIR_RECENT, node=-1):
         #print "[%s] Read key=%s starting" % (node,key)
         if (clevel == CONSISTENCY_ONE):
@@ -154,7 +171,6 @@ def exit_node(node):
     print "Node %s done" % node
     if (all(all_done)):
         reactor.stop()
-
 
 @defer.inlineCallbacks
 def do_sequence(dds, node):
