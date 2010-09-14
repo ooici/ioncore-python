@@ -31,7 +31,7 @@ class SetCassandraStore():
         else:
             hosts = str(cass_host_list)
             log.info('Connecting to Cassandra at "%s"...' % hosts)
-        client = pycassa.connect(cass_host_list)
+        client = pycassa.connect(cass_host_list, framed_transport=True)
         self._kvs = pycassa.ColumnFamily(client, 'Datasets', 'Catalog')
         log.info('connected OK.')
 

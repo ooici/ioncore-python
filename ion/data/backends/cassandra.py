@@ -79,7 +79,7 @@ class CassandraStore(IStore):
         else:
             log.info('Connecting to Cassandra ks:cf=%s:%s at %s ...' %
                          (inst.keyspace, inst.colfamily, inst.cass_host_list))
-        inst.client = pycassa.connect(inst.cass_host_list)
+        inst.client = pycassa.connect(inst.cass_host_list, framed_transport=True)
         inst.kvs = pycassa.ColumnFamily(inst.client, inst.keyspace,
                                         inst.colfamily, super=inst.cf_super)
         log.info('connected to Cassandra... OK.')
