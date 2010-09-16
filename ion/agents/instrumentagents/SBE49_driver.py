@@ -97,11 +97,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.hsm.addState ( "stateDisconnected",  self.stateDisconnected,     self.stateConfigured)
         self.hsm.addState ( "stateConnecting",  self.stateConnecting,     self.stateConfigured)
         self.hsm.addState ( "stateConnected",  self.stateConnected,     self.stateConfigured)
-        self.hsm.addState ( "handleCommand",  self.handleCommand,     self.idle)
-        #self.hsm.addState ( "d11",           d11,               d1)
-        #elf.hsm.addState ( "d2",            d2,                top)
-        #self.hsm.addState ( "d21",           d21,               d2)
-        #self.hsm.addState ( "d211",          d211,              d21)
     
         """
         A translation dictionary to translate from the commands being sent
@@ -158,174 +153,125 @@ class SBE49InstrumentDriver(InstrumentDriver):
         InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
 
     def top(self, caller):
-        logging.debug("!!!!!!!!!!!!!!! In top state")
-        #if self.tEvt['sType'] == "init":
+        log.debug("!!!!!!!!!!!!!!! In top state")
         if caller.tEvt['sType'] == "init":
             # display event
-            logging.debug("idle-%s;" %(caller.tEvt['sType']))
-            # transition to state d2.
+            log.debug("idle-%s;" %(caller.tEvt['sType']))
+            # transition to state idle
             caller.stateStart(self.idle)
             # returning a 0 indicates event was handled
             return 0
-        #elif self.tEvt['sType'] == "entry":
         elif caller.tEvt['sType'] == "entry":
             # display event, do nothing 
-            # else except indicate it was handled
-            logging.debug("idle-%s;" %(caller.tEvt['sType']))
+            log.debug("idle-%s;" %(caller.tEvt['sType']))
             return 0
-        #elif self.tEvt['sType'] == "exit":
         elif caller.tEvt['sType'] == "exit":
-            #printf("idle-%s;", self.tEvt['sType'])
+            log.debug("idle-%s;" %(caller.tEvt['sType']))
             self.tEvt['nFoo'] = 0
             return 0
-        #elif self.tEvt['sType'] == "eventCommandReceived":
-        elif caller.tEvt['sType'] == "eventCommandReceived":
-            #printf("idle-%s;", self.tEvt['sType'])
-            self.stateTran(handleCommand)
-            return 0
-        #return self.tEvt['sType']
         return caller.tEvt['sType']
 
     def idle(self, caller):
-        logging.debug("!!!!!!!!!!!!!!!  In idle state")
-        #if self.tEvt['sType'] == "init":
+        log.debug("!!!!!!!!!!!!!!!  In idle state")
         if caller.tEvt['sType'] == "init":
             # display event
-            logging.debug("idle-%s;" %(caller.tEvt['sType']))
-            # transition to state d2.
-            #DHE: do not need this.
-            #caller.stateStart(d2)
-            # returning a 0 indicates event was handled
+            log.debug("idle-%s;" %(caller.tEvt['sType']))
             return 0
-        #elif self.tEvt['sType'] == "entry":
         elif caller.tEvt['sType'] == "entry":
             # display event, do nothing 
-            # else except indicate it was handled
-            logging.debug("idle-%s;" %(caller.tEvt['sType']))
+            log.debug("idle-%s;" %(caller.tEvt['sType']))
             return 0
-        #elif self.tEvt['sType'] == "exit":
         elif caller.tEvt['sType'] == "exit":
-            #printf("idle-%s;", self.tEvt['sType'])
+            log.debug("idle-%s;" %(caller.tEvt['sType']))
             self.tEvt['nFoo'] = 0
             return 0
-        #elif self.tEvt['sType'] == "eventCommandReceived":
         elif caller.tEvt['sType'] == "configured":
-            #printf("idle-%s;", self.tEvt['sType'])
-            logging.info("!!!!!! transitioning to stateConfigured! idle-%s;" %(caller.tEvt['sType']))
+            log.debug("idle-%s;" %(caller.tEvt['sType']))
+            log.info("!!!!!! transitioning to stateConfigured! idle-%s;" %(caller.tEvt['sType']))
             self.hsm.stateTran(self.stateConfigured)
             return 0
-        elif caller.tEvt['sType'] == "eventCommandReceived":
-            #printf("idle-%s;", self.tEvt['sType'])
-            self.stateTran(handleCommand)
-            return 0
-        #return self.tEvt['sType']
         return caller.tEvt['sType']
 
     def stateConfigured(self, caller):
-        logging.debug("!!!!!!!!!!!!!!!  In stateConfigured state")
+        log.debug("!!!!!!!!!!!!!!!  In stateConfigured state")
         if caller.tEvt['sType'] == "init":
-            logging.info("stateConfigured-%s;" %(caller.tEvt['sType']))
+            log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
             caller.stateStart(self.stateDisconnected)
             return 0
         elif caller.tEvt['sType'] == "entry":
-            logging.info("stateConfigured-%s;" %(caller.tEvt['sType']))
+            log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            logging.info("stateConfigured-%s;" %(caller.tEvt['sType']))
-            return 0
-        elif caller.tEvt['sType'] == "eventCommandReceived":
-            logging.info("stateConfigured-%s;" %(caller.tEvt['sType']))
-            # I think we should ignore this command; we're already in
-            # a command handler.
-            #self.stateTran(d1)
+            log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
             return 0
         return caller.tEvt['sType']
 
     def stateDisconnected(self, caller):
-        logging.debug("!!!!!!!!!!!!!!!  In stateDisconnected state")
+        log.debug("!!!!!!!!!!!!!!!  In stateDisconnected state")
         if caller.tEvt['sType'] == "init":
-            logging.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
+            log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "entry":
-            logging.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
+            log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            logging.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
+            log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
-            logging.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
-            # I think we should ignore this command; we're already in
-            # a command handler.
+            log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
+            #
+            # Transition to the stateConnecting state
+            #
             caller.stateTran(self.stateConnecting)
             return 0
         return caller.tEvt['sType']
 
     def stateConnecting(self, caller):
-        logging.debug("!!!!!!!!!!!!!!!  In stateConnecting state")
+        log.debug("!!!!!!!!!!!!!!!  In stateConnecting state")
         if caller.tEvt['sType'] == "init":
-            logging.info("stateConnecting-%s;" %(caller.tEvt['sType']))
+            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
             self.getConnected()
             return 0
         elif caller.tEvt['sType'] == "entry":
-            logging.info("stateConnecting-%s;" %(caller.tEvt['sType']))
+            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            logging.info("stateConnecting-%s;" %(caller.tEvt['sType']))
+            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
             return 0
-        elif caller.tEvt['sType'] == "eventCommandReceived":
-            logging.info("stateConnecting-%s;" %(caller.tEvt['sType']))
-            # I think we should ignore this command; we're already in
-            # a command handler.
-            #self.stateTran(d1)
             return 0
         elif caller.tEvt['sType'] == "eventConnectionComplete":
-            logging.info("stateConnecting-%s;" %(caller.tEvt['sType']))
-            # I think we should ignore this command; we're already in
-            # a command handler.
+            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
+            #
+            # Transition to the stateConnected state
+            #
             caller.stateTran(self.stateConnected)
             return 0
         return caller.tEvt['sType']
 
     def stateConnected(self, caller):
-        logging.debug("!!!!!!!!!!!!!!!  In stateConnected state")
+        log.debug("!!!!!!!!!!!!!!!  In stateConnected state")
         if caller.tEvt['sType'] == "init":
-            logging.info("stateConnected-%s;" %(caller.tEvt['sType']))
+            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
+            """
+            @todo Need a queue of commands from which to pull commands
+            """
             # if command pending
             if self.command:
                self.instrument.transport.write(self.command)
             return 0
         elif caller.tEvt['sType'] == "entry":
-            logging.info("stateConnected-%s;" %(caller.tEvt['sType']))
+            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            logging.info("stateConnected-%s;" %(caller.tEvt['sType']))
+            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
-            logging.info("stateConnected-%s;" %(caller.tEvt['sType']))
-            # I think we should ignore this command; we're already in
-            # a command handler.
-            #self.stateTran(d1)
+            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
+            # if command pending
+            if self.command:
+               self.instrument.transport.write(self.command)
             return 0
         return caller.tEvt['sType']
-
-    def handleCommand(self):
-        if self.tEvt['sType'] == "init":
-            printf("handleCommand-%s;", self.tEvt['sType'])
-            self.stateStart(d11)
-            return 0
-        elif self.tEvt['sType'] == "entry":
-            printf("handleCommand-%s;", self.tEvt['sType'])
-            return 0
-        elif self.tEvt['sType'] == "exit":
-            printf("handleCommand-%s;", self.tEvt['sType'])
-            return 0
-        elif self.tEvt['sType'] == "eventCommandReceived":
-            printf("handleCommand-%s;", self.tEvt['sType'])
-            # I think we should ignore this command; we're already in
-            # a command handler.
-            #self.stateTran(d1)
-            return 0
-        return self.tEvt['sType']
 
     @defer.inlineCallbacks
     def plc_init(self):
@@ -333,7 +279,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.instrument_port = self.spawn_args.get('port', 9000)
 
         # DHE Testing HSM
-        logging.debug("!!!!!!!!!!!!!!!!!! Calling onStart!")
+        log.debug("!!!!!!!!!!!!!!!!!! Calling onStart!")
         self.hsm.onStart(self.idle)
 
         yield self._configure_driver(self.spawn_args)
@@ -362,7 +308,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         return self.topicDefined
 
     def setTopicDefined(self, value):
-        logging.info("*******setting topicDefined to %s:" %str(value))
+        log.info("*******setting topicDefined to %s:" %str(value))
         self.topicDefined = value;
 
     def setAgentService(self, agent):
@@ -549,7 +495,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         if self.isConnected() == False:
             log.info("would be trying to connect this is a test")
-            #logging.info("yielding for connect")
+            #log.info("yielding for connect")
             #yield self.getConnected()
             log.info("connect returned")
             # DHE NOTE TO SELF: not using the addCallback anymore, but it might 
@@ -635,7 +581,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
             self.publisher = yield self.dpsc.define_publisher(self.publisher)
         else:
-            logging.debug("%%%%%%%% No publish-to in params")
+            log.debug("%%%%%%%% No publish-to in params")
 
 class SBE49InstrumentDriverClient(InstrumentDriverClient):
     """
