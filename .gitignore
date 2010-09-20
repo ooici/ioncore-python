@@ -5,6 +5,7 @@
 .*.*.swo
 *.log
 *.pid
+*.komodo*
 _trial*
 docs
 res/config/ionlocal.config
