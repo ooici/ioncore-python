@@ -4,7 +4,7 @@
 @file ion/play/rdf_store/test/test_rdf_service.py
 @test ion.play.rdf_store/rdf_service 
 @author David Stuebe
-@Brief Test code for the Rdf Service
+@brief Test code for the Rdf Service
 """
 
 from twisted.internet import defer

@@ -42,7 +42,7 @@ Resource Description object are used in the OOICI Registries
 
 """
 Define properties of resource types
-@Note What is the intent with Resource Types?
+@note What is the intent with Resource Types?
 """
 ResourceTypes = ['generic',
                 'unassigned',
@@ -54,7 +54,7 @@ ResourceTypes = ['generic',
 
 class ResourceType(object):
     """
-    @Brief Class to control the possible states based on the LCStateNames list
+    @brief Class to control the possible states based on the LCStateNames list
     """
 
     def __init__(self, type='unassigned'):

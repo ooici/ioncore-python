@@ -285,7 +285,7 @@ class TestDataObjectComparison(unittest.TestCase):
 
 class SimpleObject(dataobject.DataObject):
     """
-    @Brief A simple data object to use as a base class
+    @brief A simple data object to use as a base class
     """
     name = dataobject.TypedAttribute(str, 'blank')
     key = dataobject.TypedAttribute(str, 'xxx')
@@ -322,7 +322,7 @@ class TestSimpleObject(unittest.TestCase):
         
 class PrimaryTypesObject(SimpleObject):
     """
-    @Brief PrimaryTypesObject inherits attributes from Simple Object
+    @brief PrimaryTypesObject inherits attributes from Simple Object
     """
     integer = dataobject.TypedAttribute(int,5)
     floating = dataobject.TypedAttribute(float,5.0)

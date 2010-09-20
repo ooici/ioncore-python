@@ -237,7 +237,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
     @defer.inlineCallbacks
     def publish(self, data, topic):
         """
-        @Brief Publish the given data to the given topic.
+        @brief Publish the given data to the given topic.
         @param data The data to publish
         @param topic The topic to which to publish.  Currently this is not the
         topic as defined by pubsub.

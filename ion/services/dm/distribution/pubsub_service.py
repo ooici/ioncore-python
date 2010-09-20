@@ -34,7 +34,7 @@ from ion.services.dm.distribution import base_consumer
 
 class DataPubsubService(BaseService):
     """
-    @Brief Service for Publicaiton and Subscription to topics
+    @brief Service for Publicaiton and Subscription to topics
     """
 
     # Declaration of service
@@ -84,7 +84,7 @@ class DataPubsubService(BaseService):
     def create_and_register_topic(self,topic):
         """
         Create a messaging name and set the queue properties to create it.
-        @TODO fix the hack - This should come from the exchange registry!
+        @todo fix the hack - This should come from the exchange registry!
         """
         log.info(self.__class__.__name__ + '; Declaring new Topic & Creating Queue.')
         # Give the topic anidentity
@@ -104,7 +104,7 @@ class DataPubsubService(BaseService):
     def create_queue(self):
         """
         Create a queue
-        @TODO fix the hack - This should come from the exchange registry!
+        @todo fix the hack - This should come from the exchange registry!
         """
         
         queue = dm_resource_descriptions.Queue()
@@ -206,10 +206,10 @@ class DataPubsubService(BaseService):
     @defer.inlineCallbacks        
     def create_consumer_args(self,subscription):
         '''
-        @Brief Turn the workflow argument into the arguments used to create a
+        @brief Turn the workflow argument into the arguments used to create a
         new consumer. This includes spawning the queues needed to deliver the
         product of one consumer to the attachment point of another!
-        @Note This is probably too complex - it should be refactored into seperate
+        @note This is probably too complex - it should be refactored into seperate
         methods where possible.
         '''
         
@@ -317,7 +317,7 @@ class DataPubsubService(BaseService):
                         log.info('''Consumer '%s' attaches to existing queue for producer/keyword: '%s'/'%s' ''' % (consumer, name, keyword))
                     else: 
                         # Create the queue!
-                        #@TODO - replace with call to exchange registry service
+                        #@todo - replace with call to exchange registry service
                         queue = yield self.create_queue()
                         # Add it to the list for this consumer
                         attach.append(queue.name)
@@ -409,7 +409,7 @@ class DataPubsubService(BaseService):
         data.timestamp = pu.currenttime()
         
         # Todo: impersonate message as from sender -
-        #@Todo - Move the actual publish command back to the client side!
+        #@todo - Move the actual publish command back to the client side!
         yield self.send(topic.queue.name, 'data', data.encode(), {})
 
         log.info(self.__class__.__name__ + ': op_'+ headers['op'] + ' Success!')
@@ -419,7 +419,7 @@ class DataPubsubService(BaseService):
     def find_topics(self, topic_description):
         """Service operation: For a given resource, find the topic that contains
         updates to the resource or resource description.
-        @Notes - should this create a topic if none yet exist?
+        @note - should this create a topic if none yet exist?
         """
         
         #Note - AOI does not do anything yet and keyword needs to be improved...
@@ -434,7 +434,7 @@ factory = ProtocolFactory(DataPubsubService)
 
 class DataPubsubClient(BaseServiceClient):
     """
-    @Brief Client class for accessing the data pubsub service.
+    @brief Client class for accessing the data pubsub service.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
@@ -444,9 +444,9 @@ class DataPubsubClient(BaseServiceClient):
     @defer.inlineCallbacks
     def define_topic(self, topic):
         """
-        @Brief Define and register a topic, creating the exchange queue, or update
+        @brief Define and register a topic, creating the exchange queue, or update
         existing properties.
-        @Note All business logic associated with defining a topic has been moved to the service
+        @note All business logic associated with defining a topic has been moved to the service
         """
         yield self._check_init()
         
@@ -469,7 +469,7 @@ class DataPubsubClient(BaseServiceClient):
     @defer.inlineCallbacks
     def define_publisher(self, publisher):
         """
-        @Brief define and register a publisher, or update existing
+        @brief define and register a publisher, or update existing
         """
         yield self._check_init()
 
@@ -493,12 +493,12 @@ class DataPubsubClient(BaseServiceClient):
     @defer.inlineCallbacks
     def publish(self, publisher_proc, topic_ref, data):
         """
-        @Brief Publish something...
+        @brief Publish something...
         @param publisher_proc - the publishing process passes self to the publish client
         @param topic_ref is a topic reference for which the publisher is registered for (checked before sending)
         @param data is a dataobject which is being published
         
-        @Todo move the actual publish command back to this client! Don't send the data
+        @todo move the actual publish command back to this client! Don't send the data
         to the service!
         """
         yield self._check_init()
@@ -541,7 +541,7 @@ class DataPubsubClient(BaseServiceClient):
     @defer.inlineCallbacks
     def define_subscription(self, subscription):
         """
-        @Brief define and register a subscription, or update existing
+        @brief define and register a subscription, or update existing
         """
         yield self._check_init()
 

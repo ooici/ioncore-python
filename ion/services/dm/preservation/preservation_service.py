@@ -96,14 +96,14 @@ class PreservationClient(BaseServiceClient):
 
     def create_archive(self, data_reg_resource):
         '''
-        @Brief create a new archive
+        @brief create a new archive
         @param dataresource is a DM Data Resource which is registered 
         @return IngestionDataStreamResource object
         '''
         
     def activate_archive_persister(self,archive):
         '''
-        @Brief start the persister
+        @brief start the persister
         @param archive is a dm archive resource - the topic field must be valid
         '''
         
@@ -114,7 +114,7 @@ class PreservationClient(BaseServiceClient):
     
     def archive_data(self, archive, data):
         '''
-        @Brief RPC interface to store a single block of data in an archive
+        @brief RPC interface to store a single block of data in an archive
         
         '''
     

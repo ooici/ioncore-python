@@ -37,7 +37,7 @@ from ion.resources import dm_resource_descriptions
 
 def ds2dap_msg(pydap_dataset,headeronly=False): 
     """
-    @Brief Convert a pydap dataset object to a dap encoded message content (a dictionary)
+    @brief Convert a pydap dataset object to a dap encoded message content (a dictionary)
     """
     dds_output = DDSResponse.serialize(pydap_dataset) 
     das_output = DASResponse.serialize(pydap_dataset)
@@ -79,7 +79,7 @@ def dap_gen(ds):
 
 def dap_msg2ds(msg):
     """
-    @Brief Convert dap encoded message content in a dictionary to a pydap dataset object.
+    @brief Convert dap encoded message content in a dictionary to a pydap dataset object.
     """
     dataset = DDSParser(msg.dds).parse()
     
@@ -165,7 +165,7 @@ def read_netcdf_from_file(filename):
 
 def demo_dataset():
     """
-    @Brief Example methods for creating a dataset
+    @brief Example methods for creating a dataset
     http://pydap.org/developer.html#the-dap-data-model
     """
     

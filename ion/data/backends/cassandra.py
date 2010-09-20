@@ -7,7 +7,7 @@
 @author Dorian Raymer
 @brief Implementation of ion.data.store.IStore using pycassa to interface a
         Cassandra datastore backend
-@Note Test cases for the cassandra backend are now in ion.data.test.test_store
+@note Test cases for the cassandra backend are now in ion.data.test.test_store
 """
 
 import re
@@ -34,7 +34,7 @@ class CassandraStore(IStore):
     """
     Store interface for interacting with the Cassandra key/value store
     @see http://github.com/vomjom/pycassa
-    @Note Default behavior is to use a random super column name space!
+    @note Default behavior is to use a random super column name space!
     """
     def __init__(self, **kwargs):
         self.kvs = None

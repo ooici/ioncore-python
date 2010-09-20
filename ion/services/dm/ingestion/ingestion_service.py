@@ -26,7 +26,7 @@ from ion.resources.dm_resource_descriptions import ArchiveResource
 
 class IngestionService(BaseService):
     """Ingestion service interface
-    @Note Needs work - Should create a subscription to ingest a data source
+    @note Needs work - Should create a subscription to ingest a data source
     What should the service interface look like for this?
     """
         
@@ -155,7 +155,7 @@ class IngestionClient(BaseServiceClient):
 
     def create_ingestion_datastream(self,isr):
         '''
-        @Brief create a new ingestion datastream
+        @brief create a new ingestion datastream
         @param name a string naming the new ingestion stream
         @return IngestionDataStreamResource object
         '''

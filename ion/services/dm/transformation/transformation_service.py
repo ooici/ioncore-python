@@ -37,6 +37,6 @@ class TransformationClient(BaseServiceClient):
 
     def transform(self, object):
         '''
-        @Brief transform an object to a different type
+        @brief transform an object to a different type
         @param what?
         '''

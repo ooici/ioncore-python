@@ -40,6 +40,6 @@ class PresentationClient(BaseServiceClient):
 
     def present_catalog(self, resources):
         '''
-        @Brief present a catalog of resources
+        @brief present a catalog of resources
         @param what?
         '''

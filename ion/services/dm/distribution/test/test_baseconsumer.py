@@ -117,7 +117,7 @@ class BaseConsumerTest(IonTestCase):
         dc1 = self._get_procinstance(child1_id)
 
         res = yield dc1.attach(self.queue1)
-        #@Todo Assert what?
+        #@todo Assert what?
         self.assert_(res)
         #self.assertEqual(child.proc_attached,self.queue1)
 
