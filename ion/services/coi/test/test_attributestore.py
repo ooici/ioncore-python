@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/test/test_datastore.py
+@file ion/services/coi/test/test_attributestore.py
 @author Michael Meisinger
-@brief test datastore service
+@brief test attribute store service
 """
 
 import ion.util.ionlog
@@ -78,11 +78,11 @@ class AttrStoreServiceTest(IonTestCase):
         # With separate backends this should return none
         resx1 = yield asc2.get('key1')
         self.assertEqual(resx1, None)
-        
+
         yield asc1.clear_store()
         yield asc2.clear_store()
-        
-        
+
+
     @defer.inlineCallbacks
     def test_put_common_backend(self):
         # Test with cassandra store backend where both services can access common values!
@@ -147,7 +147,6 @@ class AttrStoreServiceTest(IonTestCase):
         # With common backends the value should be found.
         resx1 = yield asc2.get('key1')
         self.assertEqual(resx1, 'value2',msg='Failed to pull value from second service instance')
-        
+
         yield asc1.clear_store()
         yield asc2.clear_store()
-        

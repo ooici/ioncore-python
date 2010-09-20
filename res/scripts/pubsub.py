@@ -2,6 +2,7 @@
 
 """
 @file res/scripts/pubsub.py
+@package res.scripts.pubsub
 @author David Stuebe
 @brief main module for bootstrapping dm pubsub services test
 This test creates a configurable number of publisher processes using the
@@ -39,15 +40,15 @@ dm_services = ioninit.get_config('services_cfg', CONF)
 
 @defer.inlineCallbacks
 def create_producers(proc,n=1):
-    
+
     dpsc = pubsub_service.DataPubsubClient(proc=proc)
-    
+
     for i in range(n):
-         
+
         tname = 'topic name '+str(i)
         ka = 'keyword a'
         kb = 'keyword b'
-    
+
         if (i/2)*2 == i:
             keyword = ka
         else:
@@ -55,7 +56,7 @@ def create_producers(proc,n=1):
         topic = PubSubTopicResource.create(tname,keyword)
         topic = yield dpsc.define_topic(topic)
 
-            
+
         dspname = 'data_stream_producer_'+str(i)
         interval = random.randint(1,10)
         dsp={'name':dspname,
@@ -63,7 +64,7 @@ def create_producers(proc,n=1):
                     'procclass':'DataStreamProducer',
                     'spawnargs':{'delivery queue':topic.queue.name,
                                  'delivery interval':interval}}
-        
+
         child = ProcessDesc(**dsp)
         child_id = yield proc.spawn_child(child)
 
@@ -76,21 +77,21 @@ def start():
     startsvcs = []
     startsvcs.extend(dm_services)
     sup = yield bootstrap.bootstrap(ion_messaging, startsvcs)
-        
+
     print 'STARTSVCS',startsvcs
     print 'ION_MESSAGING',ion_messaging
     print 'CONT_ARGS',ioninit.cont_args
-    
+
     nproducers = int(ioninit.cont_args.get('nproducers',5))
     print 'NPRODUCERS',nproducers
     yield create_producers(sup, nproducers)
-        
+
     dpsc = pubsub_service.DataPubsubClient(proc=sup)
-    
-        
+
+
     subscription = SubscriptionResource()
     subscription.topic1 = PubSubTopicResource.create('topic','')
-    
+
     """
 
     # Use the example consumer to create events... log the events
@@ -104,7 +105,7 @@ def start():
                 'consumerclass':'LoggingConsumer',\
                 'attach':[['consumer1','event_queue']]}
             }
-    
+
     # Log all the messages created
     subscription.workflow = {
         'consumer1':
@@ -112,7 +113,7 @@ def start():
                 'consumerclass':'LoggingConsumer',\
                 'attach':'topic1'}
             }
-    
+
     """
     # Use the example consumer to create events... graph the number of events
     subscription.workflow = {
@@ -133,17 +134,16 @@ def start():
                 'attach':[['consumer2','queue']],
                 'process parameters':{'port':8180}
             }
-                
+
         }
-    
-    
+
+
     subscription = yield dpsc.define_subscription(subscription)
     linfo = '\n================================================\n'
     linfo+= 'Open your web browser and look at: http://127.0.0.1:8180/ \n'
     linfo+= '================================================\n'
-    logging.info(linfo)    
+    logging.info(linfo)
 
 
 
 start()
-

@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/rdf_store/rdf_service.py
-@package ion.play.rdf_store.rdf_service
+@file ion/data/datastore/datastore_service.py
 @author David Stuebe
 @brief A service that provides git symantics for push pull commit and diff to
 the rdf workspace composed of associations and objects.

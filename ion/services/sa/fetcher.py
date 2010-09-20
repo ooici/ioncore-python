@@ -48,7 +48,7 @@ class FetcherService(BaseService):
         @param result HTTP result
         @retval Multiline string with trailing empty line
         @todo check for library routine to do this.
-        @note output has an blank line at the end (\r\n)
+        @note output has an blank line at the end (CRLF)
         """
         hstr = 'HTTP/1.0 %d %s\r\n' % (result.status, result.reason)
         for x in result.getheaders():

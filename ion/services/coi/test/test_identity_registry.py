@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/test/test_registration.py
+@file ion/services/coi/test/test_identity_registry.py
 @author Roger Unwin
 @brief test service for registering users
 """
@@ -20,35 +20,35 @@ class UserRegistrationClientTest(IonTestCase):
     """
     Testing client classes of User Registration
     """
-    
+
     @defer.inlineCallbacks
     def setUp(self):
         """
         """
         yield self._start_container()
-        
+
         services = [{'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}]
         supervisor = yield self._spawn_processes(services)
-        
+
         self.identity_registry_client = IdentityRegistryClient(proc=supervisor)
-        
-        
+
+
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.identity_registry_client.clear_identity_registry()
         yield self._stop_container()
-        
+
     @defer.inlineCallbacks
     def test_register_user(self):
         """
         """
-        
-        
+
+
         user = coi_resource_descriptions.IdentityResource.create_new_resource()
 
         # initialize the user
         user.common_name = "Roger Unwin A13"
-        user.country = "US" 
+        user.country = "US"
         user.trust_provider = "ProtectNetwork"
         user.domain_component = "cilogon"
         user.certificate =  "MIIEMjCCAxqgAwIBAgIBZDANBgkqhkiG9w0BAQUFADBqMRMwEQYKCZImiZPyLGQB\n" + \
@@ -109,51 +109,50 @@ class UserRegistrationClientTest(IonTestCase):
         user.organization = "University of California San Diego"
         user.department = "San Diego Supercomputing Center"
         user.title = "Deep Sea Submarine Captain"
-        
-        
-    
+
+
+
         user = yield self.identity_registry_client.register_user(user)
 
         ooi_id = user.reference()
         print str(ooi_id.RegistryIdentity) + "******************************************************"
         # load the user back
         user0 = yield self.identity_registry_client.get_user(ooi_id)
-        
+
         # Test that we got a Person back
         self.assertNotEqual(user0, None)
         self.assertEqual(user0.common_name, "Roger Unwin A13")
-        
+
         # Test the ooi_id was properly set within the Person object
         self.assertEqual(user0.reference(), ooi_id)
-        
+
         # Test that updates work
         user0.common_name = "Roger Unwin CHANGED"
         user0 = yield self.identity_registry_client.update_user(user0)
         ooi_id = user0.reference()
-        
-        
+
+
         user1 = yield self.identity_registry_client.get_user(ooi_id)
         self.assertEqual("Roger Unwin CHANGED", user1.common_name)
-        
+
         # Test for user not found handled properly.
         ooi_id.RegistryIdentity = "bogus-ooi_id"
         result = yield self.identity_registry_client.get_user(ooi_id)
         self.assertEqual(result, None)
-        
+
         # Test if we can find the user we have stuffed in.
         user_description = coi_resource_descriptions.IdentityResource()
         user_description.first_name = 'oger'
-        
+
         users1 = yield self.identity_registry_client.find_users(user_description,regex=True)
         self.assertEqual(len(users1), 1) # should only return 1 match
         self.assertEqual("Roger Unwin CHANGED", users1[0].common_name)
-        
+
         # Test if we can set the life cycle state
         self.assertEqual(str(user1.lifecycle), 'new') # Should start as new
-        
+
         ooi_id = user0.reference(head=True)
-        
+
         result = yield self.identity_registry_client.set_identity_lcstate_retired(ooi_id) # Wishful thinking Roger!
         user2 = yield self.identity_registry_client.get_user(ooi_id)
         self.assertEqual(str(user2.lifecycle), 'retired') # Should be retired now
-

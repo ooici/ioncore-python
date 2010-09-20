@@ -1,5 +1,5 @@
 """
-@file ion/data/backend/redis.py
+@file ion/data/backends/redis.py
 @author Dorian Raymer
 """
 

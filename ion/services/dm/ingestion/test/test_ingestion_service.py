@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/ingestion/test/test_ingester.py
+@file ion/services/dm/ingestion/test/test_ingestion_service.py
 @author Paul Hubbard
 @date 6/11/10
 """
@@ -69,9 +69,5 @@ class IngesterTester(IonTestCase):
 
         # isr = yield self.ic.create_ingestion_datastream(isr)
         # Will return a complete ingestion stream resource with topics for input and ingested data
-        
+
         raise unittest.SkipTest('Not implemented')
-
-
-
-        

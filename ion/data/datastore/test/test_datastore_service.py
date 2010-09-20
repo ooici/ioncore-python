@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/rdf_store/test/test_rdf_service.py
-@test ion.play.rdf_store/rdf_service 
+@file ion/data/datastore/test/test_datastore_service.py
+@test ion.data.datastore
 @author David Stuebe
-@brief Test code for the Rdf Service
+@brief Test code for the datastore Service
 """
 
 from twisted.internet import defer
@@ -38,7 +38,7 @@ class DataStoreServiceTest(IonTestCase):
 
         rsc = DataStoreServiceClient('localFrontend',proc=sup)
         yield rsc.push("LongKeyForRepo")
-        
+
         yield rsc.pull("OtherLongKeyForRepo")
 
         yield rsc.clone("OtherLongKeyForRepo")
