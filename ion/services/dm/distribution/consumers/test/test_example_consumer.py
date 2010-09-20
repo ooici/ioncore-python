@@ -22,7 +22,7 @@ from twisted.internet import defer
 
 class TestExampleConsumer(IonTestCase):
     '''
-    @Brief Test case for a simple Example consumer. The test is a unit test for
+    @brief Test case for a simple Example consumer. The test is a unit test for
     the business logic of the consumer only - the ondata method.
     '''
     

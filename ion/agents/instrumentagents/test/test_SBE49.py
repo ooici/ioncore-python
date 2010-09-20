@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-@file ion/agents/test/test_SBE49.py
+@file ion/agents/instrumentagents/test/test_SBE49.py
 @brief This module has test cases to test out SeaBird SBE49 instrument software
     including the driver. This assumes that generic InstrumentAgent code has
     been tested by another test case

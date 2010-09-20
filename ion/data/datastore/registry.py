@@ -29,7 +29,7 @@ CONF = ioninit.config(__name__)
 
 class LCStateMixin(object):
     """
-    @Brief This mixin class is used to add life cycle state convience methods
+    @brief This mixin class is used to add life cycle state convience methods
     """
     def set_resource_lcstate_new(self, resource_reference):
         return self.set_resource_lcstate(resource_reference, dataobject.LCStates.new)
@@ -55,7 +55,7 @@ class LCStateMixin(object):
 class IRegistry(object):
     """
     @brief General API of any registry
-    @TOD change to use zope interface!
+    @todo change to use zope interface!
     """
     def clear_registry(self):
         raise NotImplementedError, "Abstract Interface Not Implemented"
@@ -92,7 +92,7 @@ class RegistryBackend(objstore.ObjectChassis):
 
 class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
     """
-    @Brief Registry is the backend implementation used by all registry services
+    @brief Registry is the backend implementation used by all registry services
     """
 
     objectChassis = RegistryBackend
@@ -258,7 +258,7 @@ def test(ns):
 
 class BaseRegistryService(BaseService):
     """
-    @Brief Base Registry Service Clase
+    @brief Base Registry Service Clase
     To create a Registry Service inherit this class and over ride the method
     names as in the RegistryService class example bellow.
     """
@@ -428,7 +428,7 @@ class BaseRegistryService(BaseService):
 
 class RegistryService(BaseRegistryService):
     """
-    @Brief Example Registry Service implementation using the base class
+    @brief Example Registry Service implementation using the base class
     """
      # Declaration of service
     declare = BaseService.service_declare(name='registry_service', version='0.1.0', dependencies=[])
@@ -628,7 +628,7 @@ class BaseRegistryClient(BaseServiceClient):
 
 class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
     """
-    #@TODO How can we make it so that the client infact uses a local registry
+    #@todo How can we make it so that the client infact uses a local registry
     for testing rather than using the registry service? Can we switch it in init?
     """
 

@@ -21,7 +21,7 @@ import random
 
 class TestTwitterConsumer(IonTestCase):
     '''
-    @Brief Test case for Twitter.
+    @brief Test case for Twitter.
     '''
     def setUp(self):
         self.tc = twitter_consumer.TwitterConsumer()

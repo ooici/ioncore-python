@@ -29,7 +29,7 @@ CONF = ioninit.config(__name__)
 
 class IngestionRegistryService(registry.BaseRegistryService):
     """
-    @Brief Ingestion registry service interface
+    @brief Ingestion registry service interface
     """
         
      # Declaration of service
@@ -68,7 +68,7 @@ class IngestionRegistryClient(registry.BaseRegistryClient):
 
     def define_ingestion_stream(self,ingestion_stream):
         """
-        @Brief Client method to Register an ingestion_stream
+        @brief Client method to Register an ingestion_stream
         
         @param ingestion_stream is an instance of a Ingestion Stream Resource
         """
@@ -77,7 +77,7 @@ class IngestionRegistryClient(registry.BaseRegistryClient):
     
     def get_ingestion_stream(self,ingestion_stream_reference):
         """
-        @Brief Get a ingestion_stream by reference
+        @brief Get a ingestion_stream by reference
         @param ingestion_stream_reference is the unique reference object for a registered
         ingestion_stream
         """
@@ -85,7 +85,7 @@ class IngestionRegistryClient(registry.BaseRegistryClient):
         
     def find_ingestion_stream(self, description,regex=True,ignore_defaults=True,attnames=[]):
         """
-        @Brief find all registered ingestion streams which match the attributes of description
+        @brief find all registered ingestion streams which match the attributes of description
         @param see the registry docs for params
         """
         return self.base_find_resource('find_ingestion_stream',description,regex,ignore_defaults,attnames)

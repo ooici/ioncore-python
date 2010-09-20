@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/demo/javaint_service.py
+@file ion/demo/lca/javaint_service.py
 @author Michael Meisinger
 @brief Java service integration service for R1 LCA.
 """
@@ -61,7 +61,7 @@ class JavaIntegrationService(BaseService):
 
         # get instrument name
         self.instruments.append(newInstrument)
-        
+
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, {'value':self.instruments})
 
@@ -89,7 +89,7 @@ class JavaIntegrationService(BaseService):
 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, {'value':self.services})
-        
+
     @defer.inlineCallbacks
     def op_register_service(self, content, headers, msg):
         log.info('op_register_service: '+ str(content))
@@ -99,7 +99,7 @@ class JavaIntegrationService(BaseService):
         self.services.append(newService)
 
         # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':self.services})    
+        yield self.reply_ok(msg, {'value':self.services})
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(JavaIntegrationService)

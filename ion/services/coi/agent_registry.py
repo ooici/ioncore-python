@@ -144,7 +144,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
 
         agent_description.description = inspect.getdoc(agent_class)
 
-        #@Note need to improve inspection of agent!
+        #@note need to improve inspection of agent!
         for attr in inspect.classify_class_attrs(agent_class):
             #if attr.kind == 'method' and 'op_' in attr.name :
             if attr[1] == 'method' and 'op_' in attr[0] :

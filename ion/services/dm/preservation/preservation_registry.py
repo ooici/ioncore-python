@@ -29,7 +29,7 @@ CONF = ioninit.config(__name__)
 
 class PreservationRegistryService(registry.BaseRegistryService):
     """
-    @Brief Preservation registry service interface
+    @brief Preservation registry service interface
     """
         
      # Declaration of service
@@ -68,7 +68,7 @@ class PreservationRegistryClient(registry.BaseRegistryClient):
 
     def define_archive(self,archive):
         """
-        @Brief Client method to Register an archive
+        @brief Client method to Register an archive
         
         @param archive is an instance of a Archive Resource
         """
@@ -77,7 +77,7 @@ class PreservationRegistryClient(registry.BaseRegistryClient):
     
     def get_archive(self,archive_reference):
         """
-        @Brief Get a archive by reference
+        @brief Get a archive by reference
         @param archive_reference is the unique reference object for a registered
         archive
         """
@@ -85,7 +85,7 @@ class PreservationRegistryClient(registry.BaseRegistryClient):
         
     def find_archive(self, description,regex=True,ignore_defaults=True,attnames=[]):
         """
-        @Brief find all registered archive which match the attributes of description
+        @brief find all registered archive which match the attributes of description
         @param see the registry docs for params
         """
         return self.base_find_resource('find_archive',description,regex,ignore_defaults,attnames)

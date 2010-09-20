@@ -40,7 +40,7 @@ from ion.services.dm.util import dap_tools
 
 class DapGridDataStreamProducer(BaseProcess):
     '''
-    @Brief a data stream producer process - it spits out dap messages
+    @brief a data stream producer process - it spits out dap messages
     '''
     
 

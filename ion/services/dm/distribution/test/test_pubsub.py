@@ -72,7 +72,7 @@ class PubSubEndToEndTest(IonTestCase):
     def test_publisher_fail(self):
         """
         Try to publish to a topic that has not been registered to a publisher.
-        @Note: This test registers topic1 to a publisher, then tries to publish
+        @note: This test registers topic1 to a publisher, then tries to publish
         to topic2.
         """
         self.topic2 = yield self.pubsub_client.define_topic(self.topic2)
@@ -144,7 +144,7 @@ class PubSubServiceMethodTest(IonTestCase):
     @defer.inlineCallbacks
     def test_create_consumer_args1(self):
         '''
-        @Brief Test business logic to create consumer args from a workflow
+        @brief Test business logic to create consumer args from a workflow
         Make sure teh basics of the workflow processing work to create consumer
         args.
         '''
@@ -181,7 +181,7 @@ class PubSubServiceMethodTest(IonTestCase):
     @defer.inlineCallbacks
     def test_create_consumer_args2(self):
         '''
-        @Brief Test business logic to create consumer args from a workflow
+        @brief Test business logic to create consumer args from a workflow
         In this test there is a second consumer a real workflow - test shows that
         they correctly delivery/attach to the same queue
         '''
@@ -226,7 +226,7 @@ class PubSubServiceMethodTest(IonTestCase):
     @defer.inlineCallbacks
     def test_create_consumer_args3(self):
         '''
-        @Brief Test business logic to create consumer args from a workflow
+        @brief Test business logic to create consumer args from a workflow
         In this test two consumers attach to the same queue created by the workflow
         '''
 
@@ -284,7 +284,7 @@ class PubSubServiceMethodTest(IonTestCase):
     @defer.inlineCallbacks
     def test_create_subscription1(self):
         '''
-        @Brief Create a subscription!
+        @brief Create a subscription!
         '''
 
         # Create and Register a topic
@@ -322,7 +322,7 @@ class PubSubServiceMethodTest(IonTestCase):
     @defer.inlineCallbacks
     def test_create_subscription2(self):
         '''
-        @Brief Create a subscription!
+        @brief Create a subscription!
         '''
 
         # Create and Register a topic
@@ -514,7 +514,7 @@ class PubSubTest(IonTestCase):
     @defer.inlineCallbacks
     def test_exampleconsumer(self):
         '''
-        @Brief Example Consumer is a demonstration of a more complex data consumer.
+        @brief Example Consumer is a demonstration of a more complex data consumer.
         It uses DAP data messages and provides qaqc and event results on two
         seperate queues.
         '''

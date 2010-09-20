@@ -147,7 +147,7 @@ class ServiceRegistryClient(registry.BaseRegistryClient):
                 
         service_description.description = inspect.getdoc(service_class)      
         
-        #@Note need to improve inspection of service!
+        #@note need to improve inspection of service!
         #kind and name are accessors added in python 2.6
         #they are taken out here, to be 2.5 compatible
         for attr in inspect.classify_class_attrs(service_class):

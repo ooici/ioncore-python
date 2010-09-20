@@ -46,7 +46,7 @@ class RegistryTest(unittest.TestCase):
         
         #print 'Dataobject Created',dataobject.DataObject._types.has_key('__builtins__')
         
-        #@Note - always over-write the old argument value!
+        #@note - always over-write the old argument value!
         res = yield self.reg.register_resource(res)
         
         #print 'Dataobject Registerd!',dataobject.DataObject._types.has_key('__builtins__')

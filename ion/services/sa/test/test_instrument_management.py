@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/test/test_data_acquisition.py
+@file ion/services/sa/test/test_instrument_management.py
 @test ion.services.sa.data_acquisition Example unit tests for sample code.
 @author Michael Meisinger
 """

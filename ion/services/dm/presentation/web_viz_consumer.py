@@ -6,7 +6,7 @@
 @author David Stuebe
 @brief Web Visualization for PubSub Data - see here to make a google viz chart
 http://code.google.com/apis/visualization/documentation/index.html
-@Note Example in the message_count_consumer.py
+@note Example in the message_count_consumer.py
 """
 
 from ion.services.dm.distribution import base_consumer

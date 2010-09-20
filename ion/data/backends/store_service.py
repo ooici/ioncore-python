@@ -5,7 +5,7 @@
 @author Michael Meisinger
 @author David Stuebe
 @brief service for storing and retrieving key/value pairs.
-@Note Test cases for the store service backend are now in ion.data.test.test_store
+@note Test cases for the store service backend are now in ion.data.test.test_store
 """
 
 import ion.util.ionlog

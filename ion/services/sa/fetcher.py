@@ -48,7 +48,7 @@ class FetcherService(BaseService):
         @param result HTTP result
         @retval Multiline string with trailing empty line
         @todo check for library routine to do this.
-        @note output has an blank line at the end (\r\n)
+        @note output has an blank line at the end (CRLF)
         """
         hstr = 'HTTP/1.0 %d %s\r\n' % (result.status, result.reason)
         for x in result.getheaders():
@@ -168,7 +168,7 @@ class FetcherService(BaseService):
 
         log.debug('Fetches completed OK, composing and returning message')
 
-        #@TODO replace the dictionary with the DM_DAP dataset object!
+        #@todo replace the dictionary with the DM_DAP dataset object!
         dset_msg = {}
         dset_msg['quiet'] = True # Keep procutils from clogging the log
         dset_msg['source_url'] = base_url
@@ -186,7 +186,7 @@ class FetcherService(BaseService):
         """
         Pull a DAP dataset, encode into reply, send reply. Integrates
         everything else.
-        @TODO replace the dictionary with the DM_DAP dataset object!
+        @todo replace the dictionary with the DM_DAP dataset object!
         """
         try:
             # Do the fetches, carefully

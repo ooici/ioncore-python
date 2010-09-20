@@ -22,10 +22,10 @@ from twisted.internet import defer
 
 class TestForwardingConsumer(IonTestCase):
     '''
-    @Brief Test case for a consumer which provides a forwarding service only.
+    @brief Test case for a consumer which provides a forwarding service only.
     This test case examines only the business logic of the ondata method which
     distributes the message to all of the keywork queues list.
-    @Note this is note the most efficient way to do this but it expediante to the
+    @note this is note the most efficient way to do this but it expediante to the
     mehtod available.
     '''
     @defer.inlineCallbacks
