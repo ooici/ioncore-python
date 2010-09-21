@@ -1,0 +1,53 @@
+
+message Short {
+    required sint32 value = 1;
+}
+
+message Int {
+    required int32 value = 1;
+}
+
+message Long {
+    required sint64 value = 1;
+}
+
+message Float {
+    required float value = 1;
+}
+
+message Double {
+    required double value = 1;
+}
+
+message String {
+    required string value = 1;
+}
+
+message Boolean {
+    required bool value = 1;
+}
+
+message Bytes {
+    required bytes value = 1;
+}
+
+
+message Structure {
+    message StructureElement {
+        required string key = 1;
+        required string type = 2;
+        required bytes value = 3;
+    }
+    repeated StructureElement items = 1;
+}
+    
+
+message Container {
+    repeated bytes items = 1;
+}
+
+message DataObject {
+    required string name = 1;
+    repeated string keys = 2;
+    repeated bytes values = 3;
+}
