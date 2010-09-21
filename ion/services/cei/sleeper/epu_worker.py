@@ -5,7 +5,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer, reactor
-from magnet.spawnable import spawn, Receiver
+from ion.core.cc.spawnable import spawn, Receiver
 from ion.core import bootstrap
 from ion.services.base_service import BaseService
 from ion.core.base_process import ProtocolFactory

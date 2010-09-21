@@ -4,7 +4,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from magnet.spawnable import Receiver, spawn
+from ion.core.cc.spawnable import Receiver, spawn
 from ion.test.iontest import IonTestCase
 from ion.core.base_process import BaseProcess
 

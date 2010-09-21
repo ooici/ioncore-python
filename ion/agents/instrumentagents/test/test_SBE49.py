@@ -18,8 +18,8 @@ from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriver
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.core import bootstrap
 
-from magnet.spawnable import Receiver
-from magnet.spawnable import spawn
+from ion.core.cc.spawnable import Receiver
+from ion.core.cc.spawnable import spawn
 from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.services.base_service import BaseServiceClient
