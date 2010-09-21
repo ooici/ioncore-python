@@ -25,7 +25,7 @@ from twisted.python import log
 
 from carrot import connection
 
-from ion.core.messaging import messaging
+from ion.core.cc import messaging
 from ion.core.cc.store import Store
 
 DEFAULT_EXCHANGE_SPACE = 'magnet.topic'
