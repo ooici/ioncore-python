@@ -14,7 +14,7 @@ try:
 except:
     import simplejson as json
     
-from magnet.container import InterceptorSystem, Interceptor
+from ion.core.cc.container import InterceptorSystem, Interceptor
 from carrot.backends.base import BaseMessage
 from ion.core import ioninit
 import ion.util.procutils as pu

@@ -17,9 +17,9 @@ from twisted.internet.task import LoopingCall
 from twisted.internet import reactor
 
 
-#from magnet.container import Container
-from magnet.spawnable import Receiver
-from magnet.spawnable import spawn
+#from ion.core.cc.container import Container
+from ion.core.cc.spawnable import Receiver
+from ion.core.cc.spawnable import spawn
 
 from ion.core.base_process import BaseProcess, ProcessDesc
 import ion.util.procutils as pu
@@ -104,7 +104,7 @@ class BaseConsumer(BaseProcess):
 
     @defer.inlineCallbacks
     def attach(self, queue):
-        #@note - I tried to put a try/except here, but it did not catch the error from magnet
+        #@note - I tried to put a try/except here, but it did not catch the error from CC
 
         # Check and make sure it is not already attached?
 
@@ -145,7 +145,7 @@ class BaseConsumer(BaseProcess):
     Magnet does not yet support Deattach
     @defer.inlineCallbacks
     def deattach(self, queue):
-        #@note - I tried to put a try/except here, but it did not catch the error from magnet
+        #@note - I tried to put a try/except here, but it did not catch the error from CC
 
         # Check and make sure it is not already attached?
         del self.dataReceivers[queue]

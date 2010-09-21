@@ -16,8 +16,5 @@ ION_CONF_FILENAME = 'res/config/ion.config'
 ION_LOCAL_CONF_FILENAME = 'res/config/ionlocal.config'
 
 # ION master version
-# @todo use magnet version system
-VERSION = "0.2.1"
-
-# Minimum version of Magnet required
-MIN_MAGNET = "0.3.5"
+from ion.core._version import version
+VERSION = version.base()

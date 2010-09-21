@@ -14,10 +14,10 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from magnet.container import Container
-from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
+from ion.core.cc.container import Container
+from ion.core.cc.spawnable import Receiver
+from ion.core.cc.spawnable import send
+from ion.core.cc.spawnable import spawn
 
 from ion.core import ioninit
 from ion.core.base_process import BaseProcess, ProcessDesc, ProtocolFactory
@@ -195,7 +195,7 @@ class BaseProcessTest(IonTestCase):
     def test_send_byte_string(self):
         """
         @brief Test that any arbitrary byte string can be sent through the
-        ion + magnet stack. Use a 20 byte sha1 digest as test string.
+        ion CC stack. Use a 20 byte sha1 digest as test string.
         """
         p1 = ReceiverProcess()
         pid1 = yield p1.spawn()

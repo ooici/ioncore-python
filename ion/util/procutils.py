@@ -15,7 +15,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 import uuid
 from twisted.internet import defer, reactor
-from magnet.container import Id
+from ion.core.cc.container import Id
 
 from ion.data.store import Store
 
@@ -266,7 +266,7 @@ class FakeSpawnable(object):
 
 class FakeReceiver(object):
     """Instances of this object are given to send/spawn functions
-    by test cases, in lieu of magnet Receiver instances. Production code
+    by test cases, in lieu of ion.core.spawnable.Receiver instances. Production code
     detects these and no send is done.
     """
     def __init__(self, id=None):

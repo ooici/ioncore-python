@@ -1,9 +1,10 @@
 ==================================================
 Ocean Observatories Initiative Cyberinfrastructure
-LCAarch - OOI Release 1 LCA architecture prototype
+Integrated Observatory Network (ION)
+ioncore-python - Capability Container and Core Modules
 ==================================================
 
-April 2010 - August 2010 (C) UCSD Regents
+April 2010 - September 2010 (C) UCSD Regents
 
 This project provides a service framework with auxilliary functions for running
 architecturally complete versions of all the services of the OOI release 1
@@ -56,7 +57,7 @@ Check the trace output that there are no substantial errors. You are now ready
 to run.
 
 Current dependencies include:
-    twisted, numpy, txamqp, msgpack-python, httplib2, pycassa, simplejson,
+    twisted, carrot, numpy, txamqp, msgpack-python, httplib2, pycassa, simplejson,
     pydap, pydap.handlers.netcdf, pydap.responses.netcdf, pydap.handlers.nca,
     gviz_api.py, nimboss, txrabbitmq
 
@@ -69,12 +70,12 @@ Usage
 
 (all subsequent steps assume you are in the lcaarch/ root dir)
 
-Start empty CC ("Magnet" Python Capability Container) shell with:
+Start empty Python Capability Container shell with:
 ::
-    twistd -n magnet -h amoeba.ucsd.edu
-    twistd -n magnet   # to run with localhost
+    twistd -n cc -h amoeba.ucsd.edu
+    twistd -n cc   # to run with localhost
 
-(to end a magnet container shell, press Ctrl-D Ctrl-C)
+(to end a capability container shell, press Ctrl-D Ctrl-C)
 
 Start system by executing within the CC shell:
 ><>
@@ -83,9 +84,9 @@ Start system by executing within the CC shell:
 
 Alternatively (better) from UNIX shell executing a script:
 ::
-    twistd -n magnet -h amoeba.ucsd.edu res/scripts/bootstrap.py
-    twistd -n magnet -h amoeba.ucsd.edu res/scripts/newcc.py
-    twistd -n magnet -h amoeba.ucsd.edu -a nproducers=25 res/scripts/pubsub.py
+    twistd -n cc -h amoeba.ucsd.edu res/scripts/bootstrap.py
+    twistd -n cc -h amoeba.ucsd.edu res/scripts/newcc.py
+    twistd -n cc -h amoeba.ucsd.edu -a nproducers=25 res/scripts/pubsub.py
 
 
 Testing
@@ -129,6 +130,12 @@ To compile all code to see if there are Python compile errors anywhere:
 ---------------------------------------------------------------------------
 Change log:
 ===========
+
+2010-09-20:
+- Removed dependency on magnet. Included all relevant magnet code in ion.core
+  packages cc and messaging.
+  Start with: twistd -n cc
+- Included all CEI services and base classes in code base
 
 2010-08-29:
 - Changed all logging instances for loggers to log, to avoid name clashes.

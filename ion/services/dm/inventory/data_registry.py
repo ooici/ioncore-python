@@ -11,7 +11,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.python import reflect
-from magnet.spawnable import Receiver
+from ion.core.cc.spawnable import Receiver
 
 from ion.data import dataobject
 from ion.data.datastore import registry

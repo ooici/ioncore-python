@@ -10,10 +10,10 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
-from magnet.container import Container
-from magnet.spawnable import Receiver
-from magnet.spawnable import ProtocolFactory
-from magnet.spawnable import spawn
+from ion.core.cc.container import Container
+from ion.core.cc.spawnable import Receiver
+from ion.core.cc.spawnable import ProtocolFactory
+from ion.core.cc.spawnable import spawn
 from ion.data.store import Store
 
 from ion.core import ioninit
@@ -108,7 +108,7 @@ class BaseProcess(object):
         """
         Spawns this process using the process' receiver and initializes it in
         the same call. Self spawn can only be called once per instance.
-        @note this method is not called when spawned through magnet. This makes
+        @note this method is not called when spawned through CC. This makes
         it tricky to do consistent initialization on spawn.
         """
         assert not self.receiver.spawned, "Process already spawned"

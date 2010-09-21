@@ -6,7 +6,7 @@
 
 
 run this from lcaarch like this:
-    twistd -n magnet -n -h amoeba.ucsd.edu  ion/play/identservice.py
+    twistd -n cc -n -h amoeba.ucsd.edu  ion/play/identservice.py
 """
 
 from twisted.internet import defer
@@ -27,7 +27,7 @@ def main():
     yield bootstrap.declare_messaging(messaging)
     services = [
             {
-                'name':'identity', 
+                'name':'identity',
                 'module':'ion.services.coi.identity_registry',
                 'class':'IdentityRegistryService',
                 'spawnargs':{

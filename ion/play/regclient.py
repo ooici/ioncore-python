@@ -2,7 +2,7 @@
 from twisted.internet import defer
 from twisted.python import log
 
-from magnet.container import Container
+from ion.core.cc.container import Container
 
 from ion.resources import description_utility
 description_utility.load_descriptions()
