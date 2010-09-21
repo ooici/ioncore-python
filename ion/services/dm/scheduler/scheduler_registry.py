@@ -7,4 +7,5 @@
 @package ion.services.dm.scheduler.registry Persistent registry of scheduled messages (crontab)
 """
 
-pass
+class SchedulerRegistry():
+    pass
