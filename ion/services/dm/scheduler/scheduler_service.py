@@ -13,6 +13,7 @@ from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
+from ion.services.dm.scheduler.scheduler_registry import SchedulerRegistry
 
 class SchedulerService(BaseService):
     """
