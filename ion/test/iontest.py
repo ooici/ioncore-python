@@ -11,8 +11,8 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
-from magnet import container
-from magnet.container import Id
+from ion.core.cc import container
+from ion.core.cc.container import Id
 
 from ion.core import base_process, bootstrap, ioninit
 from ion.core import ioninit

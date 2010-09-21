@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/agents/instrumentagents/SBE49_instrument_driver.py
+@file ion/agents/instrumentagents/SBE49_driver.py
 @author Steve Foley
 @author Dave Everett
 @brief Driver code for SeaBird SBE-49 CTD
@@ -44,7 +44,7 @@ class InstrumentClient(Protocol):
     def connectionMade(self):
         log.debug("connectionMade, calling gotConnected().")
         self.parent.gotConnected(self)
-        
+
     def connectionLost(self, reason):
         log.debug("connectionLost, calling gotDisconnected()")
         self.parent.gotDisconnected(self)
@@ -82,6 +82,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.setTopicDefined(False)
         self.publish_to = None
 
+    
         #
         # DHE: Testing miros FSM.
         #
@@ -356,7 +357,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
     def gotDisconnected(self, instrument):
         """
-        @brief This method is called when a connection to the instrument 
+        @brief This method is called when a connection to the instrument
         device server has been lost.  The instrument protocol object is passed
         as a parameter.  Call setConnected with False argument.
         @param reference to instrument protocol object.
@@ -395,7 +396,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
     @defer.inlineCallbacks
     def publish(self, data, topic):
         """
-        @Brief Publish the given data to the given topic.
+        @brief Publish the given data to the given topic.
         @param data The data to publish
         @param topic The topic to which to publish.  Currently this is not the
         topic as defined by pubsub.
@@ -464,7 +465,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         assert(isinstance(content, dict))
         log.debug("op_set_params content: %s, keys: %s" %(str(content), str(content.keys)))
-        
+
         for param in content.keys():
             if (param not in self.__instrument_parameters):
                 yield self.reply_err(msg, "Could not set %s" % param)
@@ -498,7 +499,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             #log.info("yielding for connect")
             #yield self.getConnected()
             log.info("connect returned")
-            # DHE NOTE TO SELF: not using the addCallback anymore, but it might 
+            # DHE NOTE TO SELF: not using the addCallback anymore, but it might
             # be a good way to implement a state machine.
             #d.addCallback(self.gotConnected);
             #d.addCallback(self.gotPrompt);

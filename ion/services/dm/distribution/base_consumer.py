@@ -17,9 +17,9 @@ from twisted.internet.task import LoopingCall
 from twisted.internet import reactor
 
 
-#from magnet.container import Container
-from magnet.spawnable import Receiver
-from magnet.spawnable import spawn
+#from ion.core.cc.container import Container
+from ion.core.cc.spawnable import Receiver
+from ion.core.cc.spawnable import spawn
 
 from ion.core.base_process import BaseProcess, ProcessDesc
 import ion.util.procutils as pu
@@ -39,7 +39,7 @@ from ion.services.dm.util import dap_tools
 
 class BaseConsumer(BaseProcess):
     '''
-    @Brief This is the base class from which all consumer processes should inherit.
+    @brief This is the base class from which all consumer processes should inherit.
     All tranformaitons and data presentation methods should inherit for this
     and implement the ondata method to perform the desired task.
     '''
@@ -84,7 +84,7 @@ class BaseConsumer(BaseProcess):
             for queue in queuenames:
                 res = yield self.attach(queue)
                 if not res:
-                    #@Todo - raise an error here?
+                    #@todo - raise an error here?
                     log.info('Failed to attach process to Queue %s in plc_init' % queuename)
 
 
@@ -104,7 +104,7 @@ class BaseConsumer(BaseProcess):
 
     @defer.inlineCallbacks
     def attach(self, queue):
-        #@Note - I tried to put a try/except here, but it did not catch the error from magnet
+        #@note - I tried to put a try/except here, but it did not catch the error from CC
 
         # Check and make sure it is not already attached?
 
@@ -145,7 +145,7 @@ class BaseConsumer(BaseProcess):
     Magnet does not yet support Deattach
     @defer.inlineCallbacks
     def deattach(self, queue):
-        #@Note - I tried to put a try/except here, but it did not catch the error from magnet
+        #@note - I tried to put a try/except here, but it did not catch the error from CC
 
         # Check and make sure it is not already attached?
         del self.dataReceivers[queue]
@@ -236,7 +236,7 @@ class BaseConsumer(BaseProcess):
         log.info(self.__class__.__name__ + '; Calling data process!')
 
         # Keep a record of messages received
-        #@Note this could get big! What todo?
+        #@note this could get big! What todo?
 
         self.receive_cnt[headers.get('receiver')] += 1
         #self.received_msg.append(content) # Do not keep the messages!
@@ -375,7 +375,7 @@ class BaseConsumer(BaseProcess):
 
 class ConsumerDesc(ProcessDesc):
     '''
-    @Brief The ConsumerDesc class inherits from the ProcessDesc class and is used
+    @brief The ConsumerDesc class inherits from the ProcessDesc class and is used
     to create and control consumer processes.
     '''
 

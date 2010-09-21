@@ -4,20 +4,21 @@
 @file setup.py
 @author Paul Hubbard
 @author Michael Meisinger
-@date 5/2/10
-@brief setup file for OOI LCA architecture prototype project.
+@brief setup file for OOI ION Capability Container and Core Modules
 """
 
+from ion.core.ionconst import VERSION
+
 setupdict = {
-    'name' : 'lcaarch',
-    'version' : '0.2.0',
-    'description' : 'OOI LCA architecture prototype',
+    'name' : 'ioncore',
+    'version' : VERSION,
+    'description' : 'OOI ION Python Capability Container and Core Modules',
     'url': 'http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project',
     'download_url' : 'http://ooici.net/packages',
     'license' : 'Apache 2.0',
     'author' : 'Michael Meisinger',
     'author_email' : 'mmeisinger@ucsd.edu',
-    'keywords': ['ooci','lcar1'],
+    'keywords': ['ooici','ioncore'],
     'classifiers' : [
     'Development Status :: 3 - Alpha',
     'Environment :: Console',
@@ -31,12 +32,14 @@ setupdict = {
 try:
     from setuptools import setup, find_packages
     setupdict['packages'] = find_packages()
+    setupdict['packages'].extend(['twisted/plugins'])
     setupdict['test_suite'] = 'lcaarch.test'
-    setupdict['install_requires'] = ['Twisted', 'magnet', 'pycassa', 'numpy',
+    setupdict['install_requires'] = ['Twisted', 'carrot', 'txamqp', 'pycassa', 'numpy',
                                      'Paste', 'Pydap', 'simplejson', 'httplib2',
                                      'pydap.handlers.netcdf','pydap.handlers.nca',
                                      'pydap.responses.netcdf',
-                                     'msgpack-python','gviz_api.py']
+                                     'msgpack-python','gviz_api.py',
+                                     'nimboss','txrabbitmq']
     setupdict['include_package_data'] = True
     setup(**setupdict)
 

@@ -10,10 +10,10 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
-from magnet.container import Container
-from magnet.spawnable import Receiver
-from magnet.spawnable import ProtocolFactory
-from magnet.spawnable import spawn
+from ion.core.cc.container import Container
+from ion.core.cc.spawnable import Receiver
+from ion.core.cc.spawnable import ProtocolFactory
+from ion.core.cc.spawnable import spawn
 from ion.data.store import Store
 
 from ion.core import ioninit
@@ -108,7 +108,7 @@ class BaseProcess(object):
         """
         Spawns this process using the process' receiver and initializes it in
         the same call. Self spawn can only be called once per instance.
-        @note this method is not called when spawned through magnet. This makes
+        @note this method is not called when spawned through CC. This makes
         it tricky to do consistent initialization on spawn.
         """
         assert not self.receiver.spawned, "Process already spawned"
@@ -150,7 +150,7 @@ class BaseProcess(object):
         Init operation, on receive of the init message
         """
         if self.proc_state == "NEW":
-            # @TODO: Right after giving control to the process specific init,
+            # @todo: Right after giving control to the process specific init,
             # the process can enable message consumption and messages can be
             # received. How to deal with the situation that the process is not
             # fully initialized yet???? Stop message floodgate until init'd?
@@ -224,14 +224,14 @@ class BaseProcess(object):
             # Unexpected error condition in message processing (only before
             # any callback is called)
             log.exception('Error in process %s receive ' % self.proc_name)
-            # @TODO: There was an error and now what??
+            # @todo: There was an error and now what??
             if msg and msg.payload['reply-to']:
                 d = self.reply_err(msg, 'ERROR in process receive(): '+str(ex))
 
     def _receive_rpc(self, payload, msg):
         """
         Handling of RPC reply messages.
-        @TODO: Handle the error case
+        @todo: Handle the error case
         """
         fromname = payload['sender']
         if 'sender-name' in payload:

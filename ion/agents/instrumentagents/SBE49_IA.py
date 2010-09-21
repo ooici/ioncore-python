@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/agents/instrumentagents/SBE49.py
+@file ion/agents/instrumentagents/SBE49_IA.py
 @author Steve Foley
 @brief CI interface for SeaBird SBE-49 CTD
 """

@@ -12,9 +12,9 @@ log = ion.util.ionlog.getLogger(__name__)
 #import time
 from twisted.internet import defer
 from twisted.trial import unittest
-#from magnet.container import Container
-from magnet.spawnable import Receiver
-from magnet.spawnable import spawn
+#from ion.core.cc.container import Container
+from ion.core.cc.spawnable import Receiver
+from ion.core.cc.spawnable import spawn
 
 from ion.core.base_process import ProtocolFactory
 from ion.core import bootstrap
@@ -117,7 +117,7 @@ class BaseConsumerTest(IonTestCase):
         dc1 = self._get_procinstance(child1_id)
 
         res = yield dc1.attach(self.queue1)
-        #@Todo Assert what?
+        #@todo Assert what?
         self.assert_(res)
         #self.assertEqual(child.proc_attached,self.queue1)
 

@@ -83,8 +83,8 @@ class AOI(DataObject):
     
 class Queue(DataObject):
     '''
-    @Brief The exchange message Queue is really an exchange registry object
-    @TODO move to the exchange registry and use it properly!
+    @brief The exchange message Queue is really an exchange registry object
+    @todo move to the exchange registry and use it properly!
     '''
     type = TypedAttribute(str)
     name = TypedAttribute(str)
@@ -105,7 +105,7 @@ class PubSubTopicResource(InformationResource):
     @classmethod
     def create(cls,name, keywords,aoi=None):
         """
-        @Brief Create a topic resource and set parameters
+        @brief Create a topic resource and set parameters
         @param name is the topic name
         @param keywords are comma seperated key words for the topic
         """
@@ -173,26 +173,26 @@ class AttributeData(DataObject):
     
 class FloatAttribute(AttributeData):
     """
-    #@Todo convert to use numpy types
+    #@todo convert to use numpy types
     """
     f = TypedAttribute(float)
     
 class IntegerAttribute(AttributeData):
     """
-    #@Todo convert to use numpy types
+    #@todo convert to use numpy types
     """
     i = TypedAttribute(int)
     
 class StringAttribute(AttributeData):
     """
-    #@Todo convert to use numpy types
+    #@todo convert to use numpy types
     """
     s = TypedAttribute(str)
     
 
 class DMDataResource(InformationResource):
     '''
-    @Note <class> must be a type which python can instantiate with eval!
+    @note <class> must be a type which python can instantiate with eval!
     '''
     #Name - inherited
     metadata = TypedAttribute(ResourceReference)

@@ -41,6 +41,18 @@
     </delete>
     <delete dir="${build}"/>
     <delete dir="${dist}"/>
+    <delete dir="ioncore.egg-info"/>
+    <delete dir="_trial_temp"/>
+  </target>
+
+  <target name="install" depends="clean"
+        description="Install dependencies" >
+    <!-- Run new empty capability container without shell -->
+    <echo message="Installing dependencies"/>
+    <exec executable="python">
+      <arg value="setup.py"/>
+      <arg value="install"/>
+    </exec>
   </target>
 
   <target name="newcc" depends=""

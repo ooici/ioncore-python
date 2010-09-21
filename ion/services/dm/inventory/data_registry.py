@@ -11,7 +11,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.python import reflect
-from magnet.spawnable import Receiver
+from ion.core.cc.spawnable import Receiver
 
 from ion.data import dataobject
 from ion.data.datastore import registry
@@ -29,7 +29,7 @@ CONF = ioninit.config(__name__)
 
 class DataRegistryService(registry.BaseRegistryService):
     """
-    @Brief Dataset registry service interface
+    @brief Dataset registry service interface
     """
  
      # Declaration of service
@@ -70,7 +70,7 @@ class DataRegistryClient(registry.BaseRegistryClient):
 
     def define_data(self,data):
         """
-        @Brief Client method to Register a Dataset
+        @brief Client method to Register a Dataset
         
         @param data is an instance of a data resource
         """
@@ -79,7 +79,7 @@ class DataRegistryClient(registry.BaseRegistryClient):
     
     def get_data(self,data_reference):
         """
-        @Brief Get a data by reference
+        @brief Get a data by reference
         @param data_reference is the unique reference object for a registered
         data
         """
@@ -87,7 +87,7 @@ class DataRegistryClient(registry.BaseRegistryClient):
         
     def find_data(self, description,regex=True,ignore_defaults=True,attnames=[]):
         """
-        @Brief find all registered datas which match the attributes of description
+        @brief find all registered datas which match the attributes of description
         @param see the registry docs for params
         """
         return self.base_find_resource('find_data',description,regex,ignore_defaults,attnames)

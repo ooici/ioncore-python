@@ -17,9 +17,9 @@ from twisted.internet import reactor
 from ion.core.base_process import ProtocolFactory
 
 
-#from magnet.container import Container
-from magnet.spawnable import Receiver
-from magnet.spawnable import spawn
+#from ion.core.cc.container import Container
+from ion.core.cc.spawnable import Receiver
+from ion.core.cc.spawnable import spawn
 
 from ion.core.base_process import BaseProcess, ProcessDesc
 import ion.util.procutils as pu
@@ -39,7 +39,7 @@ from ion.services.dm.util import dap_tools
 
 class DataStreamProducer(BaseProcess):
     '''
-    @Brief a data stream producer process - it spits out dap messages
+    @brief a data stream producer process - it spits out dap messages
     '''
     
 

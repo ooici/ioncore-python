@@ -31,12 +31,12 @@ import numpy
 
 class DapToolsBaseTest(IonTestCase):
     """
-    @Brief Test the message read and write for a DAP data Object.
-    @Note The conversion of all value types should be tested, and any edge cases
+    @brief Test the message read and write for a DAP data Object.
+    @note The conversion of all value types should be tested, and any edge cases
     that come to mind. (Single values, arrays of values? Max and min IEEE
     numbers for all value types.)  It isn't minimal but it is probably necessary
     for everyone to be convinced it is OK.
-    @TODO Flesh out the test cases with more data types!
+    @todo Flesh out the test cases with more data types!
     """
     fname ='../ion/services/dm/util/test/test_files/grid_surf_el.nc'
     testname = '../ion/services/dm/util/test/test_files/test_out.nc'
@@ -45,7 +45,7 @@ class DapToolsBaseTest(IonTestCase):
         self.ds1 = dap_tools.read_netcdf_from_file(self.fname)
         
     def tearDown(self):
-        #@TODO robustify this to use better exception handling
+        #@todo robustify this to use better exception handling
         try:
             os.remove(self.testname)
         except exceptions.OSError:
@@ -65,7 +65,7 @@ class DapToolsBaseTest(IonTestCase):
         self.assertEqual(self.ds1.name,'grid_surf_el%2Enc')
         
         
-        # @TODO - interface to netcdf handler objects seems broken - it does not match the methods for pydap.client?
+        # @todo - interface to netcdf handler objects seems broken - it does not match the methods for pydap.client?
         self.assertEqual(self.ds1.lat.data.var[0],1.)
         self.assertEqual(self.ds1.lat.data.var[6],1.75)
         
@@ -84,7 +84,7 @@ class DapToolsBaseTest(IonTestCase):
         self.assertEqual(self.ds1.surf_el.data[0].var[0][0][0],-30000)
         #self.assertEqual(self.ds1.surf_el.data.var[3],-2)
         
-        #@TODO - check on the attributes in the data...
+        #@todo - check on the attributes in the data...
         #self.assertEqual(self.ds1.height.attributes['long_name'],'person height')
         
 

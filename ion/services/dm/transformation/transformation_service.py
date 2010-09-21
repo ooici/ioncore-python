@@ -9,7 +9,7 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from magnet.spawnable import Receiver
+from ion.core.cc.spawnable import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory
@@ -37,6 +37,6 @@ class TransformationClient(BaseServiceClient):
 
     def transform(self, object):
         '''
-        @Brief transform an object to a different type
+        @brief transform an object to a different type
         @param what?
         '''

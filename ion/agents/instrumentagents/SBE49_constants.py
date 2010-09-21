@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-@file ion/agents/instrumentagents/SBE49_constants
+@file ion/agents/instrumentagents/SBE49_constants.py
 @author Steve Foley
 @brief Constants associated with SBE49 instruments. These are to be shared
     between the instrument driver and instrument agent.
@@ -78,5 +78,5 @@ instrument_parameters = (
 Some generalized instrument items added by instrument_agent module
 """
 ci_parameters = (
-    
+
 )

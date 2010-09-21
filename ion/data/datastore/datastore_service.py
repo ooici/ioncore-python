@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/rdf_store/rdf_service.py
-@package ion.play.rdf_store.rdf_service
+@file ion/data/datastore/datastore_service.py
 @author David Stuebe
 @brief A service that provides git symantics for push pull commit and diff to
 the rdf workspace composed of associations and objects.
@@ -12,7 +11,7 @@ The associations can be walked to find content.
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from magnet.spawnable import Receiver
+from ion.core.cc.spawnable import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import ProtocolFactory

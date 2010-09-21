@@ -16,7 +16,7 @@ from ion.data import dataobject
 from ion.test.iontest import IonTestCase
 from twisted.internet import defer
 
-from magnet.spawnable import Receiver
+from ion.core.cc.spawnable import Receiver
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
@@ -46,7 +46,7 @@ class RegistryTest(unittest.TestCase):
         
         #print 'Dataobject Created',dataobject.DataObject._types.has_key('__builtins__')
         
-        #@Note - always over-write the old argument value!
+        #@note - always over-write the old argument value!
         res = yield self.reg.register_resource(res)
         
         #print 'Dataobject Registerd!',dataobject.DataObject._types.has_key('__builtins__')

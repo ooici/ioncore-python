@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/data/backends/test/test_cassandra.py
+@file ion/data/test/test_store.py
 @author Paul Hubbard
 @author Dorian Raymer
 @author David Stuebe
@@ -40,7 +40,7 @@ class IStoreTest(unittest.TestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.ds.clear_store()
-        
+
 
     @defer.inlineCallbacks
     def test_clear_store(self):
@@ -156,16 +156,14 @@ class StoreServiceTest(IonTestCase, IStoreTest):
 
         sup = yield self._spawn_processes(services)
         ds = yield StoreServiceClient.create_store(proc=sup)
-        
+
         defer.returnValue(ds)
-        
+
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.ds.clear_store()
         yield self._stop_container()
-    
+
 #    def test_clear_store(self):
 #        raise unittest.SkipTest('Not implemented yet')
-
-

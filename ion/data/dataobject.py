@@ -297,8 +297,8 @@ class DataObject(object):
     @classmethod
     def get_typedattributes(cls):
         """
-        @Brief Get the typed attributes of the class
-        @Note What about typed attributes that are over ridden?
+        @brief Get the typed attributes of the class
+        @note What about typed attributes that are over ridden?
         """
         d={}
         ayb = reflect.allYourBase(cls)
@@ -329,7 +329,7 @@ class DataObject(object):
 
     def get_attributes(self):
         atts={}
-        #@Note Not sure why dict does not work any more - returns default not value?
+        #@note Not sure why dict does not work any more - returns default not value?
         #for key,value in self.__dict__.items():
         #    atts[key[1:]]=value
         for key in self.attributes:
@@ -418,18 +418,18 @@ Add some important proprieties for OOICI Resource Descriptions
 
 def create_unique_identity():
     """
-    @Brief Method to create global unique identity for any new resource
+    @brief Method to create global unique identity for any new resource
     """
     return str(uuid.uuid4())
 
 class ResourceReference(DataObject):
     """
-    @Brief The ResourceReference class is the base class for all resources.
+    @brief The ResourceReference class is the base class for all resources.
     It contains the context of the resource from the repository where it is stored.
     """
 
     RegistryIdentity = TypedAttribute(str,None)
-    #@TODO Make the commit ref a list so that an object can be a merge
+    #@todo Make the commit ref a list so that an object can be a merge
     RegistryCommit = TypedAttribute(str,None)
     RegistryBranch = TypedAttribute(str,'master')
 
@@ -445,7 +445,7 @@ class ResourceReference(DataObject):
     @classmethod
     def create_new_resource(cls, id='', branch='master'):
         """
-        @Brief Use this method to instantiate any new resource with a unique id!
+        @brief Use this method to instantiate any new resource with a unique id!
         """
         inst = cls()
 
@@ -460,7 +460,7 @@ class ResourceReference(DataObject):
 
     def create_new_reference(self, id='', branch='master', commit=''):
         """
-        @Brief Create or overwrite the reference identity for this resource
+        @brief Create or overwrite the reference identity for this resource
         """
         if id:
             self.RegistryIdentity = id
@@ -474,7 +474,7 @@ class ResourceReference(DataObject):
 
     def reference(self,head=False):
         """
-        @Brief Use this method to make a reference to any resource
+        @brief Use this method to make a reference to any resource
         """
         inst = ResourceReference()
         if self.RegistryIdentity:
@@ -500,7 +500,7 @@ LCStateNames = ['new',
 
 class LCState(object):
     """
-    @Brief Class to control the possible states based on the LCStateNames list
+    @brief Class to control the possible states based on the LCStateNames list
     """
 
     def __init__(self, state='new'):

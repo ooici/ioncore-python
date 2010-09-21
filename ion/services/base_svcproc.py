@@ -10,8 +10,8 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
-from magnet.spawnable import Receiver
-from magnet.spawnable import ProtocolFactory
+from ion.core.cc.spawnable import Receiver
+from ion.core.cc.spawnable import ProtocolFactory
 
 from ion.core.base_process import BaseProcess
 import ion.util.procutils as pu

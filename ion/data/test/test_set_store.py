@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/data/backends/test/test_set_store.py
+@file ion/data/test/test_set_store.py
 """
 
 import ion.util.ionlog
@@ -18,7 +18,7 @@ class ISetStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        
+
         self.ds = yield SetStore.create_store()
         self.key = str(uuid4())
         self.value1 = str(uuid4())
@@ -57,7 +57,7 @@ class ISetStoreTest(unittest.TestCase):
         elm = yield self.ds.srandmember(key1)
         self.failUnlessIn(elm, s1)
 
-        res = yield self.ds.sismember(key1, elm) 
+        res = yield self.ds.sismember(key1, elm)
         self.failUnless(res)
 
         yield self.ds.remove(key1)
@@ -333,5 +333,3 @@ class ISetStoreTest(unittest.TestCase):
 #        self.ds = yield cassandra.CassandraStore.create_store(cass_host_list=clist)
 #        self.key = str(uuid4())
 #        self.value = str(uuid4())
-
-

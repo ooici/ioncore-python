@@ -8,14 +8,12 @@
 
 import logging
 import logging.config
-import magnet
 import re
 
 from ion.core import ionconst as ic
 from ion.util.config import Config
 
-print "ION (Integrated Observatory Network) packages initializing (ion %s, magnet %s)" % \
-        (ic.VERSION, magnet.__version__)
+print "ION (Integrated Observatory Network) core packages initializing (ver. %s)" % (ic.VERSION)
 
 # Configure logging system (console, logfile, other loggers)
 # NOTE: Console logging is appended to Twisted log output prefix!!
@@ -46,16 +44,6 @@ def get_config(confname, conf=None):
     if conf == None:
         conf = ion_config
     return Config(conf.getValue(confname)).getObject()
-
-def check_magnet_version():
-    minmv = ic.MIN_MAGNET.split('.')
-    mv = magnet.__version__.split('.')
-    mv[2] = mv[2].partition('+')[0]
-    if mv[0]<minmv[0] or mv[1]<minmv[1] or mv[2]<minmv[2]:
-        log.error("*********** ATTENTION! Magnet %s required. Is %s ***********" %
-                      (ic.MIN_MAGNET, magnet.__version__))
-
-check_magnet_version()
 
 def install_msgpacker():
     from carrot.serialization import registry
