@@ -81,6 +81,6 @@ class DataPubsubRegistryClient(registry.BaseRegistryClient):
     def find(self, description,regex=True,ignore_defaults=True,attnames=[]):
         """
         @brief find all registered datasets which match the attributes of description
-        @param see the registry docs for params
+        @see the registry docs for params
         """
         return self.base_find_resource('find',description,regex,ignore_defaults,attnames)
