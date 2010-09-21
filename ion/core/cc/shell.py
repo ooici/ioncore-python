@@ -1,3 +1,9 @@
+"""
+@author Dorian Raymer
+@author Michael Meisinger
+@brief Python Capability Container shell
+"""
+
 import os, sys, tty, termios
 
 from twisted.internet import stdio
@@ -27,18 +33,15 @@ class ConsoleManhole(manhole.ColoredManhole):
          - dependencies
           o versions
           o install path
-          o
          - virtualenv (if used)
 
         @todo Dependency info will be listed in the setup file
         """
         # self.terminal.reset()
         self.terminal.write('\r\n')
-        self.terminal.write('OOI CI COI Capability Container Prototype \r\n')
-        self.terminal.write('AyP ><> (Asynchronous Python Shell)\r\n')
-        self.terminal.write('%s \r\n' % ionconst.VERSION)
+        self.terminal.write('ION Python Capability Container (version %s)\r\n' % (ionconst.VERSION))
         self.terminal.write('%s \r\n' % get_virtualenv())
-        self.terminal.write('[container: %s@%s.%d] \r\n' % (os.getlogin(), os.uname()[1], os.getpid()))
+        self.terminal.write('[container id: %s@%s.%d] \r\n' % (os.getlogin(), os.uname()[1], os.getpid()))
         self.terminal.write('\r\n')
         self.terminal.write(self.ps[self.pn])
         self.setInsertMode()
@@ -70,11 +73,10 @@ class ConsoleManhole(manhole.ColoredManhole):
     def connectionLost(self, reason):
         self.factory.stop()
 
-
-
 def makeNamespace():
     from ion.core.cc.spawnable import send, ps, ms, spawn, kill
     from ion.core.cc.container import Container, Id
+
     namespace = locals()
     return namespace
 
@@ -88,7 +90,6 @@ class Control(object):
     cc = cc() # Extension slot for shell functions
 
     def start(self, ccService):
-
         print 'Shell Start'
         fd = sys.__stdin__.fileno()
         fdout = sys.__stdout__.fileno()
@@ -96,7 +97,6 @@ class Control(object):
         self.oldSettings = termios.tcgetattr(fd)
         # tty.setraw(fd)
         tty.setraw(fd, termios.TCSANOW) # when=now
-
         self.fd = fd
 
         # stdout fd
@@ -107,17 +107,14 @@ class Control(object):
         namespace = makeNamespace()
 
         serverProtocol = insults.ServerProtocol(ConsoleManhole, namespace)
-
         serverProtocol.factory = self
-        namespace.update({'ccService':ccService,
-                            'tsp':serverProtocol})
+
+        namespace['ccService'] = ccService
+        namespace['tsp'] = serverProtocol
         namespace['cc'] = self.cc
 
         self.serverProtocol = serverProtocol
-
         stdio.StandardIO(serverProtocol)
-
-
 
     def stop(self):
         termios.tcsetattr(self.fd, termios.TCSANOW, self.oldSettings)
