@@ -19,7 +19,7 @@ bootstrapping the system, for managing logging and configuration etc. This
 is an early implementation of the OOI Python Capability Container.
 
 For more information, please see:
-http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project
+http://www.oceanobservatories.org/spaces/display/syseng/CIAD+COI+SV+Python+Capability+Container
 
 Get LCAarch with
 ::
@@ -50,7 +50,7 @@ Step 2: Core libraries (you can skip this step)
 
 Step 3: Run the setup script
 ::
-    python setup.py install
+    ant install    # This is equivalent to python setup.py install
 
 This should download and install all the dependencies and will run for a while.
 Check the trace output that there are no substantial errors. You are now ready
@@ -72,8 +72,8 @@ Usage
 
 Start empty Python Capability Container shell with:
 ::
-    twistd -n cc -h amoeba.ucsd.edu
-    twistd -n cc   # to run with localhost
+    bin/start-cc -h amoeba.ucsd.edu
+    bin/start-cc   # to run with localhost
 
 (to end a capability container shell, press Ctrl-D Ctrl-C)
 
@@ -84,9 +84,9 @@ Start system by executing within the CC shell:
 
 Alternatively (better) from UNIX shell executing a script:
 ::
-    twistd -n cc -h amoeba.ucsd.edu res/scripts/bootstrap.py
-    twistd -n cc -h amoeba.ucsd.edu res/scripts/newcc.py
-    twistd -n cc -h amoeba.ucsd.edu -a nproducers=25 res/scripts/pubsub.py
+    bin/start-cc -h amoeba.ucsd.edu res/scripts/bootstrap.py
+    bin/start-cc -h amoeba.ucsd.edu res/scripts/newcc.py
+    bin/start-cc -h amoeba.ucsd.edu -a nproducers=25 res/scripts/pubsub.py
 
 
 Testing
@@ -123,6 +123,9 @@ To check that ant is installed properly, run
 To clean your working directories, run
 ::  ant clean
 
+To install all Python dependencies, run
+::  ant install
+
 To compile all code to see if there are Python compile errors anywhere:
 ::  ant compile
 
@@ -132,6 +135,7 @@ Change log:
 ===========
 
 2010-09-20:
+- Added start scripts in bin/
 - Use ant install to install Python dependencies (calls python setup.py install)
 - Removed dependency on magnet. Included all relevant magnet code in ion.core
   packages cc and messaging.
