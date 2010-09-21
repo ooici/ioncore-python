@@ -11,7 +11,7 @@ class Encoder(object):
 
     def __init__(self):
         self._encoders = {
-                datatype.Byte:pb.Byte,
+                #datatype.Byte:pb.Byte,
                 datatype.Short:pb.Short,
                 datatype.Int:pb.Int,
                 datatype.Long:pb.Long,
@@ -20,7 +20,7 @@ class Encoder(object):
                 datatype.String:pb.String,
                 }
         self._decoders = {
-                'byte':pb.Byte,
+                #'byte':pb.Byte,
                 'short':pb.Short,
                 'int':pb.Int,
                 'long':pb.Long,
@@ -54,15 +54,15 @@ class Encoder(object):
         """
         """
         dataobj = pb.DataObject()
-        for n, v in o.iteritems():
+        for k, v in o.iteritems():
             att = dataobj.atts.add()
-            att.name = n
+            att.key = k
             encoded = self.encode(v)
             att.value = encoded
         header = pb.TypedValue()
         header.type = 'DataObject'
         header.value = dataobj.SerializeToString()
-        return header
+        return header.SerializeToString()
 
     def encode_type(self, o):
         header = pb.TypedValue()
@@ -70,15 +70,16 @@ class Encoder(object):
         encoder.value = o._value
         header.type = type(o).__name__.lower() #cleaner way 
         header.value = encoder.SerializeToString()
-        return header
+        return header.SerializeToString()
 
     def decode_dataobject(self, data):
         """
         """
         dataobj_buf = pb.DataObject().FromString(data)
-        o = datatype.DataObject()
-        for att in dataobj.atts:
-            o.set(att.key, self.decode(att.value))
+        temp_dict = {}
+        for att in dataobj_buf.atts:
+            temp_dict[att.key] = self.decode(att.value)
+        o = datatype.DataObject(temp_dict)
         return o
 
     def decode_type(self, data):
