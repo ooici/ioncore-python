@@ -10,7 +10,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = descriptor.FileDescriptor(
   name='ooi_types.proto',
   package='',
-  serialized_pb='\n\x0fooi_types.proto\"\x16\n\x05Short\x12\r\n\x05value\x18\x01 \x02(\x11\"\x14\n\x03Int\x12\r\n\x05value\x18\x01 \x02(\x05\"\x15\n\x04Long\x12\r\n\x05value\x18\x01 \x02(\x12\"\x16\n\x05\x46loat\x12\r\n\x05value\x18\x01 \x02(\x02\"\x17\n\x06\x44ouble\x12\r\n\x05value\x18\x01 \x02(\x01\"\x17\n\x06String\x12\r\n\x05value\x18\x01 \x02(\t\"\x18\n\x07\x42oolean\x12\r\n\x05value\x18\x01 \x02(\x08\"\x16\n\x05\x42ytes\x12\r\n\x05value\x18\x01 \x02(\x0c\"g\n\tStructure\x12*\n\x05items\x18\x01 \x03(\x0b\x32\x1b.Structure.StructureElement\x1a.\n\x10StructureElement\x12\x0b\n\x03key\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\x0c\"\x1a\n\tContainer\x12\r\n\x05items\x18\x01 \x03(\x0c\"8\n\nDataObject\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x0c\n\x04keys\x18\x02 \x03(\t\x12\x0e\n\x06values\x18\x03 \x03(\x0c')
+  serialized_pb='\n\x0fooi_types.proto\"\x16\n\x05Short\x12\r\n\x05value\x18\x01 \x02(\x11\"\x14\n\x03Int\x12\r\n\x05value\x18\x01 \x02(\x05\"\x15\n\x04Long\x12\r\n\x05value\x18\x01 \x02(\x12\"\x16\n\x05\x46loat\x12\r\n\x05value\x18\x01 \x02(\x02\"\x17\n\x06\x44ouble\x12\r\n\x05value\x18\x01 \x02(\x01\"\x17\n\x06String\x12\r\n\x05value\x18\x01 \x02(\t\"\x18\n\x07\x42oolean\x12\r\n\x05value\x18\x01 \x02(\x08\"\x16\n\x05\x42ytes\x12\r\n\x05value\x18\x01 \x02(\x0c\"u\n\tStructure\x12*\n\x05items\x18\x01 \x03(\x0b\x32\x1b.Structure.StructureElement\x1a<\n\x10StructureElement\x12\x0b\n\x03key\x18\x01 \x02(\t\x12\x0c\n\x04type\x18\x02 \x02(\t\x12\r\n\x05value\x18\x03 \x02(\x0c\")\n\nTypedValue\x12\x0c\n\x04type\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\x0c\"\x1a\n\tContainer\x12\r\n\x05items\x18\x01 \x03(\x0c\"Z\n\nDataObject\x12#\n\x04\x61tts\x18\x01 \x03(\x0b\x32\x15.DataObject.Attribute\x1a\'\n\tAttribute\x12\x0b\n\x03key\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\x0c\"-\n\rDataObjectRef\x12\n\n\x02id\x18\x01 \x02(\t\x12\x10\n\x08\x63pointer\x18\x02 \x02(\x0c')
 
 
 
@@ -254,8 +254,15 @@ _STRUCTURE_STRUCTUREELEMENT = descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='value', full_name='Structure.StructureElement.value', index=1,
-      number=2, type=12, cpp_type=9, label=2,
+      name='type', full_name='Structure.StructureElement.type', index=1,
+      number=2, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    descriptor.FieldDescriptor(
+      name='value', full_name='Structure.StructureElement.value', index=2,
+      number=3, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -270,7 +277,7 @@ _STRUCTURE_STRUCTUREELEMENT = descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=269,
-  serialized_end=315,
+  serialized_end=329,
 )
 
 _STRUCTURE = descriptor.Descriptor(
@@ -297,7 +304,42 @@ _STRUCTURE = descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=212,
-  serialized_end=315,
+  serialized_end=329,
+)
+
+
+_TYPEDVALUE = descriptor.Descriptor(
+  name='TypedValue',
+  full_name='TypedValue',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    descriptor.FieldDescriptor(
+      name='type', full_name='TypedValue.type', index=0,
+      number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    descriptor.FieldDescriptor(
+      name='value', full_name='TypedValue.value', index=1,
+      number=2, type=12, cpp_type=9, label=2,
+      has_default_value=False, default_value="",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=331,
+  serialized_end=372,
 )
 
 
@@ -324,36 +366,29 @@ _CONTAINER = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=317,
-  serialized_end=343,
+  serialized_start=374,
+  serialized_end=400,
 )
 
 
-_DATAOBJECT = descriptor.Descriptor(
-  name='DataObject',
-  full_name='DataObject',
+_DATAOBJECT_ATTRIBUTE = descriptor.Descriptor(
+  name='Attribute',
+  full_name='DataObject.Attribute',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='name', full_name='DataObject.name', index=0,
+      name='key', full_name='DataObject.Attribute.key', index=0,
       number=1, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='keys', full_name='DataObject.keys', index=1,
-      number=2, type=9, cpp_type=9, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    descriptor.FieldDescriptor(
-      name='values', full_name='DataObject.values', index=2,
-      number=3, type=12, cpp_type=9, label=3,
-      has_default_value=False, default_value=[],
+      name='value', full_name='DataObject.Attribute.value', index=1,
+      number=2, type=12, cpp_type=9, label=2,
+      has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -366,13 +401,77 @@ _DATAOBJECT = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=345,
-  serialized_end=401,
+  serialized_start=453,
+  serialized_end=492,
+)
+
+_DATAOBJECT = descriptor.Descriptor(
+  name='DataObject',
+  full_name='DataObject',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    descriptor.FieldDescriptor(
+      name='atts', full_name='DataObject.atts', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[_DATAOBJECT_ATTRIBUTE, ],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=402,
+  serialized_end=492,
+)
+
+
+_DATAOBJECTREF = descriptor.Descriptor(
+  name='DataObjectRef',
+  full_name='DataObjectRef',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    descriptor.FieldDescriptor(
+      name='id', full_name='DataObjectRef.id', index=0,
+      number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    descriptor.FieldDescriptor(
+      name='cpointer', full_name='DataObjectRef.cpointer', index=1,
+      number=2, type=12, cpp_type=9, label=2,
+      has_default_value=False, default_value="",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=494,
+  serialized_end=539,
 )
 
 
 _STRUCTURE_STRUCTUREELEMENT.containing_type = _STRUCTURE;
 _STRUCTURE.fields_by_name['items'].message_type = _STRUCTURE_STRUCTUREELEMENT
+_DATAOBJECT_ATTRIBUTE.containing_type = _DATAOBJECT;
+_DATAOBJECT.fields_by_name['atts'].message_type = _DATAOBJECT_ATTRIBUTE
 
 class Short(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
@@ -434,6 +533,12 @@ class Structure(message.Message):
   
   # @@protoc_insertion_point(class_scope:Structure)
 
+class TypedValue(message.Message):
+  __metaclass__ = reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _TYPEDVALUE
+  
+  # @@protoc_insertion_point(class_scope:TypedValue)
+
 class Container(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
   DESCRIPTOR = _CONTAINER
@@ -442,8 +547,20 @@ class Container(message.Message):
 
 class DataObject(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
+  
+  class Attribute(message.Message):
+    __metaclass__ = reflection.GeneratedProtocolMessageType
+    DESCRIPTOR = _DATAOBJECT_ATTRIBUTE
+    
+    # @@protoc_insertion_point(class_scope:DataObject.Attribute)
   DESCRIPTOR = _DATAOBJECT
   
   # @@protoc_insertion_point(class_scope:DataObject)
+
+class DataObjectRef(message.Message):
+  __metaclass__ = reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _DATAOBJECTREF
+  
+  # @@protoc_insertion_point(class_scope:DataObjectRef)
 
 # @@protoc_insertion_point(module_scope)

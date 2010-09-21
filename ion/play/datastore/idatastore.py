@@ -19,6 +19,7 @@ class IDataObject(Interface):
 
     def get_keys():
         """
+        @retval Deferred that returns list of keys.
         """
 
 class IEncoder(Interface):
@@ -30,10 +31,17 @@ class IEncoder(Interface):
 
     def encode(obj):
         """
+        @param obj DataObject instance or datastore type
+        @retval encoded/serialized version of object
+        @note Could return list of messages, or packed set of content
         """
 
     def decode(data):
         """
+        @param data encoded/serialized data object
+        @retval DataObject instance.
+        @note Could accept list of encoded content, or one
+        packed/serialized thing...
         """
 
 class ISerializer(Interface):

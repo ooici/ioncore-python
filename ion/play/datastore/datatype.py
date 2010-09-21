@@ -59,6 +59,9 @@ class Double(PrimitiveType):
 class String(PrimitiveType):
     """
     """
+    
+    def __init__(self, value=u''):
+        self._value = value #has to be unicode
 
 class Structure:
     """
@@ -79,6 +82,15 @@ class Bytes:
     The common data model names this "Opaque"
     """
 
+typemap = {
+        'byte':Byte,
+        'short':Short,
+        'int':Int,
+        'long':Long,
+        'float':Float,
+        'double':Double,
+        'string':String,
+        }
 
 class DataObject(dict):
     """
@@ -86,7 +98,6 @@ class DataObject(dict):
     value.
     @note how is the structure defined in a static way?
     """
-
 
     def set(self, key, value):
         """
