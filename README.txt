@@ -132,6 +132,7 @@ Change log:
 ===========
 
 2010-09-20:
+- Use ant install to install Python dependencies (calls python setup.py install)
 - Removed dependency on magnet. Included all relevant magnet code in ion.core
   packages cc and messaging.
   Start with: twistd -n cc
