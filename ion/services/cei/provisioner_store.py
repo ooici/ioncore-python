@@ -6,14 +6,14 @@
 @brief Provisioner storage abstraction
 """
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 import uuid
 import time
 from itertools import groupby
 from twisted.internet import defer
 
-try: 
+try:
     import json
 except ImportError:
     import simplejson as json
@@ -32,7 +32,7 @@ class ProvisionerStore(object):
         """
         if newstate:
             record['state'] = newstate
-        
+
         #these two are expected to be on every record
         launch_id = record['launch_id']
         state = record['state']
@@ -46,14 +46,14 @@ class ProvisionerStore(object):
         record['state_timestamp'] = ts
         key = '|'.join([launch_id, node_id, state, ts, newid])
         self.data[key] = json.dumps(record)
-        logging.debug('Added provisioner state: "%s"', key)
+        log.debug('Added provisioner state: "%s"', key)
         return defer.succeed(key)
 
     def put_records(self, records, newstate=None, timestamp=None):
         """Stores a list of records, optionally first updating state.
         """
         ts = str(timestamp or int(time.time() * 1e6))
-        return [self.put_record(r, newstate=newstate, timestamp=ts) 
+        return [self.put_record(r, newstate=newstate, timestamp=ts)
                 for r in records]
 
     @defer.inlineCallbacks
@@ -131,10 +131,10 @@ class ProvisionerStore(object):
             prefix = '%s|' % launch
             if node:
                 prefix += '%s|' % node
-        #TODO uhhh. regex..? don't know what matching functionality we 
+        #TODO uhhh. regex..? don't know what matching functionality we
         # actually need here yet.
 
-        matches = [(s[0], json.loads(s[1])) for s in self.data.iteritems() 
+        matches = [(s[0], json.loads(s[1])) for s in self.data.iteritems()
                 if s[0].startswith(prefix)]
         matches.sort(reverse=True)
         records = [r[1] for r in matches]
@@ -163,4 +163,3 @@ def calc_record_age(record):
     """
     now = time.time()
     return now - (long(record['state_timestamp']) / 1e6)
-    

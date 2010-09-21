@@ -1,4 +1,6 @@
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import random
 
 from ion.services.cei.decisionengine import Engine
@@ -52,7 +54,7 @@ class QueueLengthBoundedEngine(Engine):
         else:
             self.min_instances = 0
         
-        logging.info("Bounded queue length engine initialized, high water mark is %d, low water %d" % (self.high_water, self.low_water))
+        log.info("Bounded queue length engine initialized, high water mark is %d, low water %d" % (self.high_water, self.low_water))
         
         control.configure(parameters)
 
@@ -73,7 +75,7 @@ class QueueLengthBoundedEngine(Engine):
         
         # If there is an explicit minimum, always respect that.
         if valid_count < self.min_instances:
-            logging.info("Bringing instance count up to the explicit minimum")
+            log.info("Bringing instance count up to the explicit minimum")
             while valid_count < self.min_instances:
                 self._launch_one(control)
                 valid_count += 1
@@ -94,7 +96,7 @@ class QueueLengthBoundedEngine(Engine):
                 any_pending = True
         
         if any_pending:
-            logging.debug("Will not analyze with pending instances")
+            log.debug("Will not analyze with pending instances")
             return
         
         heading = self._heading(state, valid_count)
@@ -104,7 +106,7 @@ class QueueLengthBoundedEngine(Engine):
         elif heading < 0:
             instanceid = self._pick_instance_to_die(all_instance_lists)
             if not instanceid:
-                logging.error("There are no valid instances to terminate")
+                log.error("There are no valid instances to terminate")
             else:
                 self._destroy_one(control, instanceid)
                 valid_count -= 1
@@ -112,13 +114,13 @@ class QueueLengthBoundedEngine(Engine):
         txt = "instance"
         if valid_count != 1:
             txt += "s"
-        logging.debug("Aware of %d running/starting %s" % (valid_count, txt))
+        log.debug("Aware of %d running/starting %s" % (valid_count, txt))
             
     def _heading(self, state, valid_count):
         all_qlens = state.get_all("queue-length")
         # should only be one queue reading for now:
         if len(all_qlens) == 0:
-            logging.debug("no queuelen readings to analyze")
+            log.debug("no queuelen readings to analyze")
             return 0
         
         if len(all_qlens) != 1:
@@ -127,43 +129,43 @@ class QueueLengthBoundedEngine(Engine):
         qlens = all_qlens[0]
         
         if len(qlens) == 0:
-            logging.debug("no queuelen readings to analyze")
+            log.debug("no queuelen readings to analyze")
             return 0
             
         recent = qlens[-1].value
         msg = "most recent qlen reading is %d" % recent
         
         if recent == 0 and valid_count == 0:
-            logging.debug(msg + " (empty queue and no instances)")
+            log.debug(msg + " (empty queue and no instances)")
             return 0
         
         # If there are zero started already and a non-zero qlen, start one
         # even if it is below the low water mark.  Work still needs to be
         # drained by one instance.
         if recent != 0 and valid_count == 0:
-            logging.debug(msg + " (non-empty queue and no instances yet)")
+            log.debug(msg + " (non-empty queue and no instances yet)")
             return 1
         
         if recent > self.high_water:
-            logging.debug(msg + " (above high water)")
+            log.debug(msg + " (above high water)")
             return 1
         elif recent < self.low_water:
-            logging.debug(msg + " (below low water)")
+            log.debug(msg + " (below low water)")
             if valid_count == self.min_instances:
                 if self.min_instances == 1:
                     txt = "1 instance"
                 else:
                     txt = "%d instances" % self.min_instances
-                logging.info("Down to %s, cannot reduce" % txt)
+                log.info("Down to %s, cannot reduce" % txt)
                 return 0
             else:
                 return -1
         else:
-            logging.debug(msg + " (inside bounds)")
+            log.debug(msg + " (inside bounds)")
             return 0
             
     def _launch_one(self, control):
-        logging.info("Requesting instance")
+        log.info("Requesting instance")
         launch_description = {}
         launch_description["work_consumer"] = \
                 LaunchItem(1, self._allocation(), self._site(), None)
@@ -182,7 +184,7 @@ class QueueLengthBoundedEngine(Engine):
             if ok:
                 candidates.append(state_item.key)
         
-        logging.debug("Found %d instances that could be killed:\n%s" % (len(candidates), candidates))
+        log.debug("Found %d instances that could be killed:\n%s" % (len(candidates), candidates))
         
         if len(candidates) == 0:
             return None
@@ -193,7 +195,7 @@ class QueueLengthBoundedEngine(Engine):
             return candidates[idx]
     
     def _destroy_one(self, control, instanceid):
-        logging.info("Destroying an instance ('%s')" % instanceid)
+        log.info("Destroying an instance ('%s')" % instanceid)
         instance_list = [instanceid]
         control.destroy_instances(instance_list)
         

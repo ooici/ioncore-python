@@ -1,4 +1,6 @@
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import time
 import uuid
 from collections import defaultdict
@@ -39,12 +41,12 @@ class ControllerCore(object):
         elif content.has_key("queue_id"):
             self.state.new_queuelen(content)
         else:
-            logging.error("received unknown sensor info: '%s'" % content)
+            log.error("received unknown sensor info: '%s'" % content)
 
     def begin_controlling(self):
         """Call the decision engine at the appropriate times.
         """
-        logging.debug('Starting engine decision loop - %s second interval', 
+        log.debug('Starting engine decision loop - %s second interval', 
                 self.control.sleep_seconds)
         self.control_loop = LoopingCall(self.engine.decide, self.control, 
                 self.state)
@@ -127,12 +129,12 @@ class InstanceStateParser(object):
         pass
     
     def state_item(self, content):
-        logging.debug("received new instance state message: '%s'" % content)
+        log.debug("received new instance state message: '%s'" % content)
         try:
             instance_id = self._expected(content, "node_id")
             state = self._expected(content, "state")
         except KeyError:
-            logging.error("could not capture sensor info (full message: '%s')" % content)
+            log.error("could not capture sensor info (full message: '%s')" % content)
             return None
         return StateItem("instance-state", instance_id, time.time(), state)
         
@@ -140,7 +142,7 @@ class InstanceStateParser(object):
         if content.has_key(key):
             return str(content[key])
         else:
-            logging.error("message does not contain part with key '%s'" % key)
+            log.error("message does not contain part with key '%s'" % key)
             raise KeyError()
 
 class QueueLengthParser(object):
@@ -151,16 +153,16 @@ class QueueLengthParser(object):
         pass
     
     def state_item(self, content):
-        logging.debug("received new queulen state message: '%s'" % content)
+        log.debug("received new queulen state message: '%s'" % content)
         try:
             queuelen = self._expected(content, "queuelen")
             queuelen = int(queuelen)
             queueid = self._expected(content, "queue_id")
         except KeyError:
-            logging.error("could not capture sensor info (full message: '%s')" % content)
+            log.error("could not capture sensor info (full message: '%s')" % content)
             return None
         except ValueError:
-            logging.error("could not convert queulen into integer (full message: '%s')" % content)
+            log.error("could not convert queulen into integer (full message: '%s')" % content)
             return None
         return StateItem("queue-length", queueid, time.time(), queuelen)
         
@@ -168,7 +170,7 @@ class QueueLengthParser(object):
         if content.has_key(key):
             return str(content[key])
         else:
-            logging.error("message does not contain part with key '%s'" % key)
+            log.error("message does not contain part with key '%s'" % key)
             raise KeyError()
 
 
@@ -196,7 +198,7 @@ class ControllerCoreControl(Control):
         if parameters and parameters.has_key("timed-pulse-irregular"):
             sleep_ms = int(parameters["timed-pulse-irregular"])
             self.sleep_seconds = sleep_ms / 1000.0
-        logging.info("ControllerCoreControl is configured")
+        log.info("ControllerCoreControl is configured")
     
     def launch(self, deployable_type_id, launch_description):
         """Choose instance IDs for each instance desired, a launch ID and send
@@ -212,10 +214,10 @@ class ControllerCoreControl(Control):
         """
         
         launch_id = str(uuid.uuid4())
-        logging.info("Request for DP '%s' is a new launch with id '%s'" % (deployable_type_id, launch_id))
+        log.info("Request for DP '%s' is a new launch with id '%s'" % (deployable_type_id, launch_id))
         new_instance_id_list = []
         for group,item in launch_description.iteritems():
-            logging.info(" - %s is %d %s from %s" % (group, item.num_instances, item.allocation_id, item.site))
+            log.info(" - %s is %d %s from %s" % (group, item.num_instances, item.allocation_id, item.site))
             for i in range(item.num_instances):
                 new_instance_id = str(uuid.uuid4())
                 self.state.new_launch(new_instance_id)

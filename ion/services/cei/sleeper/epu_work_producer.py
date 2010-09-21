@@ -1,4 +1,6 @@
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import random
 from twisted.internet import defer
 from twisted.internet.task import LoopingCall
@@ -10,9 +12,6 @@ from ion.core.base_process import ProtocolFactory
 import Queue
 import uuid
 from ion.services.cei import cei_events
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
 
 class EPUWorkProducer(BaseService):
     """EPU Work Producer.
@@ -36,21 +35,21 @@ class EPUWorkProducer(BaseService):
                 job = self.web_resource.queue.get(block=False)
                 if job == None:
                     raise Queue.Empty()
-                
+
                 yield self.send(self.queue_name_work, 'work', {"work_amount":job.length, "batchid":job.batchid, "jobid":job.jobid})
-                
+
                 self.queue_length += 1
-                
-                extradict = {"batchid":job.batchid, 
+
+                extradict = {"batchid":job.batchid,
                              "jobid":job.jobid,
                              "work_amount":job.length}
-                cei_events.event("workproducer", "job_sent", 
+                cei_events.event("workproducer", "job_sent",
                                  logging, extra=extradict)
-                
+
         except Queue.Empty:
             if self.queue_length == self.last_quelen_send:
                 return
-            
+
             # simulates an increasing queue while we wait for fix
             content = {"queue_id": self.queue_name_work,
                        "queuelen": self.queue_length}
@@ -72,7 +71,7 @@ class Sidechannel(resource.Resource):
     isLeaf = True
     def __init__(self):
         self.queue = Queue.Queue()
-        
+
     def render_GET(self, request):
         parts = request.postpath
         if parts[-1] == "":
@@ -80,7 +79,7 @@ class Sidechannel(resource.Resource):
         if len(parts) != 4:
             request.setResponseCode(500, "expecting four 'args', /batchid/jobidx/#jobs/#sleepsecs")
             return
-        
+
         try:
             batchid = parts[0]
             jobidx = int(parts[1])
@@ -94,9 +93,9 @@ class Sidechannel(resource.Resource):
         for i in range(jobnum):
             jobid = i + jobidx
             sleepjobs.append(SleepJob(jobid, batchid, secperjob))
-        
+
         for job in sleepjobs:
             self.queue.put(job)
-        
-        logging.debug("enqueued %d jobs with %d sleep seconds" % (jobnum, secperjob))
+
+        log.debug("enqueued %d jobs with %d sleep seconds" % (jobnum, secperjob))
         return "<html>Success.</html>\n"

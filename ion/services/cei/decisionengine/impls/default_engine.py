@@ -1,4 +1,6 @@
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import random
 
 from ion.services.cei.decisionengine import Engine
@@ -51,7 +53,7 @@ class DefaultEngine(Engine):
             valid_count += 1
             
     def _launch_one(self, control):
-        logging.info("Requesting instance")
+        log.info("Requesting instance")
         launch_description = {}
         launch_description["work_consumer"] = \
                 LaunchItem(1, self._allocation(), self._site(), None)

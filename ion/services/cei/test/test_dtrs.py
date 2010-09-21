@@ -6,7 +6,9 @@
 @brief Test provisioner behavior
 """
 
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from twisted.internet import defer
 
 from ion.test.iontest import IonTestCase
@@ -101,7 +103,7 @@ class TestDeployableTypeRegistryService(IonTestCase):
         try:
             yield self.client.lookup('this-dt-doesnt-exist', nodes)
         except DeployableTypeLookupError, e:
-            logging.info('Got expected error: ' + str(e))
+            log.info('Got expected error: ' + str(e))
             got_error = True
         self.assertTrue(got_error)
 
@@ -110,7 +112,7 @@ class TestDeployableTypeRegistryService(IonTestCase):
         try:
             yield self.client.lookup('base-cluster-1', req_nodes)
         except DeployableTypeLookupError, e:
-            logging.info('Got expected error: ' + str(e))
+            log.info('Got expected error: ' + str(e))
             got_error = True
         
         self.assertTrue(got_error)
@@ -130,7 +132,7 @@ class TestDeployableTypeRegistryService(IonTestCase):
         try:
             yield self.client.lookup('no-default', req_nodes)
         except DeployableTypeLookupError, e:
-            logging.info('Got expected error: ' + str(e))
+            log.info('Got expected error: ' + str(e))
             got_error = True
         self.assertTrue(got_error)
         

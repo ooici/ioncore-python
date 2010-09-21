@@ -1,4 +1,6 @@
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 
 class EngineLoader(object):
     """
@@ -11,7 +13,7 @@ class EngineLoader(object):
     
     def load(self, classname):
         """Return instance of specified decision engine"""
-        logging.debug("attempting to load Decision Engine '%s'" % classname)
+        log.debug("attempting to load Decision Engine '%s'" % classname)
         kls = self._get_class(classname)
         if not kls:
             raise Exception("Cannot find decision engine implementation: '%s'" % classname)
@@ -19,7 +21,7 @@ class EngineLoader(object):
         # but it is not actually that helpful.
         
         engine = kls()
-        logging.info("Loaded Decision Engine: %s" % str(engine))
+        log.info("Loaded Decision Engine: %s" % str(engine))
         return engine
     
     def _get_class(self, kls):

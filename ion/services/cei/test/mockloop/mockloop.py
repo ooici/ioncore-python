@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from twisted.internet import defer
 from magnet.container import Container
 from magnet.spawnable import spawn
@@ -36,7 +38,7 @@ class MockLoop(IonTestCase):
         aggregatorId = yield self.procRegistry.get("sensor_aggregator")
         controllerId = yield self.procRegistry.get("epu_controller")
         provisionerId = yield self.procRegistry.get("provisioner")
-        logging.info("aggregatorId: "+repr(aggregatorId) + ", " + "provisionerId: "+repr(provisionerId) + ", " + "controllerId: "+repr(controllerId))
+        log.info("aggregatorId: "+repr(aggregatorId) + ", " + "provisionerId: "+repr(provisionerId) + ", " + "controllerId: "+repr(controllerId))
         
         testmsg = {
                     'operation':'start',

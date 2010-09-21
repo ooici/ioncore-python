@@ -7,8 +7,9 @@
 """
 
 import os
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from itertools import izip
 from twisted.internet import defer, threads
 
@@ -27,13 +28,13 @@ from ion.services.cei import cei_events
 __all__ = ['ProvisionerCore', 'ProvisioningError']
 
 _NIMBOSS_STATE_MAP = {
-        NimbossNodeState.RUNNING : states.STARTED, 
+        NimbossNodeState.RUNNING : states.STARTED,
         NimbossNodeState.REBOOTING : states.STARTED, #TODO hmm
         NimbossNodeState.PENDING : states.PENDING,
         NimbossNodeState.TERMINATED : states.TERMINATED,
         NimbossNodeState.UNKNOWN : states.ERROR_RETRYING}
 
-# Window of time in which nodes are allowed to be launched 
+# Window of time in which nodes are allowed to be launched
 # but not returned in queries to the IaaS. After this, nodes
 # are assumed to be terminated out of band and marked FAILED
 _IAAS_NODE_QUERY_WINDOW_SECONDS = 60
@@ -56,7 +57,7 @@ class ProvisionerCore(object):
                 host='tp-vm1.ci.uchicago.edu', port=8445)
         nimbus_magellan_drv = NimbusNodeDriver(nimbus_key, secret=nimbus_secret,
                 host='user04', port=8444)
-       
+
         ec2_key = os.environ['AWS_ACCESS_KEY_ID']
         ec2_secret = os.environ['AWS_SECRET_ACCESS_KEY']
         ec2_east_driver = EC2NodeDriver(ec2_key, ec2_secret)
@@ -67,11 +68,11 @@ class ProvisionerCore(object):
                 'ec2-east' : ec2_east_driver,
                 'magellan' : nimbus_magellan_drv,
                 }
-        
+
         self.context = context or ProvisionerContextClient(
-                'https://nimbus.ci.uchicago.edu:8888/ContextBroker/ctx/', 
+                'https://nimbus.ci.uchicago.edu:8888/ContextBroker/ctx/',
                 nimbus_key, nimbus_secret)
-        
+
         self.cluster_driver = ClusterDriver()
 
     @defer.inlineCallbacks
@@ -84,9 +85,9 @@ class ProvisionerCore(object):
         If the request is invalid and doesn't contain enough information
         to notify subscribers via normal channels, a ProvisioningError
         is raised. This is almost certainly a client programming error.
-        
-        If the request is well-formed but invalid, for example if the 
-        deployable type does not exist in the DTRS, FAILED records are 
+
+        If the request is well-formed but invalid, for example if the
+        deployable type does not exist in the DTRS, FAILED records are
         recorded in data store and subscribers are notified.
 
         Returns a tuple (launch record, node records).
@@ -112,12 +113,12 @@ class ProvisionerCore(object):
             try:
                 dtrs_nodes[node_name] = {
                         'count' : len(node['ids']),
-                        'site' : node['site'], 
+                        'site' : node['site'],
                         'allocation' : node['allocation']}
             except (KeyError, ValueError):
-                raise ProvisioningError('Invalid request. Node %s spec is invalid' % 
+                raise ProvisioningError('Invalid request. Node %s spec is invalid' %
                         node_name)
-        
+
         # from this point on, errors result in failure records, not exceptions.
         # except for, you know, bugs.
         state = states.REQUESTED
@@ -126,9 +127,9 @@ class ProvisionerCore(object):
             dt = yield self.dtrs.lookup(deployable_type, dtrs_nodes, vars)
             document = dt['document']
             dtrs_nodes = dt['nodes']
-            logging.debug('got dtrs nodes: ' + str(dtrs_nodes))
+            log.debug('got dtrs nodes: ' + str(dtrs_nodes))
         except DeployableTypeLookupError, e:
-            logging.error('Failed to lookup deployable type "%s" in DTRS: %s', 
+            log.error('Failed to lookup deployable type "%s" in DTRS: %s',
                     deployable_type, str(e))
             state = states.FAILED
             state_description = "DTRS_LOOKUP_FAILED " + str(e)
@@ -170,24 +171,24 @@ class ProvisionerCore(object):
         Any errors or problems will result in FAILURE states
         which will be recorded in datastore and sent to subscribers.
         """
-    
+
         error_state = None
         error_description = None
-        try: 
+        try:
             yield self._really_execute_provision_request(launch, nodes)
-        
+
         except ProvisioningError, e:
-            logging.error('Failed to execute launch. Problem: ' + str(e))
+            log.error('Failed to execute launch. Problem: ' + str(e))
             error_state = states.FAILED
             error_description = e.message
-        
+
         except Exception, e: # catch all exceptions, need to ensure nodes are marked FAILED
-            logging.error('Launch failed due to an unexpected error. '+
-                    'This is likely a bug and should be reported. Problem: ' + 
+            log.error('Launch failed due to an unexpected error. '+
+                    'This is likely a bug and should be reported. Problem: ' +
                     str(e))
             error_state = states.FAILED
             error_description = 'PROGRAMMER_ERROR '+str(e)
-        
+
         if error_state:
             launch['state'] = error_state
             launch['state_desc'] = error_description
@@ -199,7 +200,7 @@ class ProvisionerCore(object):
             #store and notify launch and nodes with FAILED states
             yield self.store.put_record(launch)
             yield self.store_and_notify(nodes, launch['subscribers'], error_state)
-    
+
     @defer.inlineCallbacks
     def _really_execute_provision_request(self, launch, nodes):
         """Brings a launch to the PENDING state.
@@ -212,9 +213,9 @@ class ProvisionerCore(object):
             doc = NimbusClusterDocument(docstr)
         except ValidationError, e:
             raise ProvisioningError('CONTEXT_DOC_INVALID '+str(e))
-        
+
         launch_groups = group_records(nodes, 'ctx_name')
-        
+
         context = None
         if doc.needs_contextualization:
             try:
@@ -222,15 +223,15 @@ class ProvisionerCore(object):
             except BrokerError, e:
                 raise ProvisioningError('CONTEXT_CREATE_FAILED ' + str(e))
 
-            logging.debug('Created new context: ' + context.uri)
+            log.debug('Created new context: ' + context.uri)
             launch['context'] = context
-            
+
             yield self.store.put_record(launch, states.PENDING)
-        
+
         else:
             raise ProvisioningError('NOT_IMPLEMENTED launches without contextualization '+
                     'unsupported')
-        
+
         cluster = self.cluster_driver.new_bare_cluster(context.uri)
         specs = doc.build_specs(context)
 
@@ -242,14 +243,14 @@ class ProvisionerCore(object):
             newstate = None
             try:
                 yield self._launch_one_group(launch_spec, launch_nodes, cluster)
-            
+
             except Exception,e:
-                logging.exception('Problem launching group %s: %s', 
+                log.exception('Problem launching group %s: %s',
                         launch_spec.name, str(e))
                 newstate = states.FAILED
                 # should we have a backout of earlier groups here? or just leave it up
                 # to EPU controller to decide what to do?
-            
+
             yield self.store_and_notify(launch_nodes, subscribers, newstate)
 
     def _validate_launch_groups(self, groups, specs):
@@ -263,8 +264,8 @@ class ProvisionerCore(object):
                 raise ProvisioningError('INVALID_REQUEST missing \''+ spec.name +
                         '\' node group, present in cluster document')
             if spec.count != len(group):
-                raise ProvisioningError('INVALID_REQUEST node group \''+ 
-                        spec.name + '\' specifies ' + len(group) + 
+                raise ProvisioningError('INVALID_REQUEST node group \''+
+                        spec.name + '\' specifies ' + len(group) +
                         ' nodes, but cluster document has '+ spec.count)
             pairs.append((spec, group))
         return pairs
@@ -280,7 +281,7 @@ class ProvisionerCore(object):
         one_node = nodes[0]
         site = one_node['site']
         driver = self.node_drivers[site]
-        
+
         #set some extras in the spec
         allocation = one_node.get('iaas_allocation')
         if allocation:
@@ -289,17 +290,17 @@ class ProvisionerCore(object):
         if sshkeyname:
             spec.keyname = sshkeyname
 
-        logging.debug('Launching group %s - %s nodes (keypair=%s)', 
+        log.debug('Launching group %s - %s nodes (keypair=%s)',
                 spec.name, spec.count, spec.keyname)
-        
+
         try:
             iaas_nodes = yield threads.deferToThread(
                     self.cluster_driver.launch_node_spec, spec, driver)
         except Exception, e:
-            logging.exception('Error launching nodes: ' + str(e))
+            log.exception('Error launching nodes: ' + str(e))
             # wrap this up?
             raise
-        
+
         cluster.add_node(iaas_nodes)
 
         # underlying node driver may return a list or an object
@@ -309,9 +310,9 @@ class ProvisionerCore(object):
         if len(iaas_nodes) != len(nodes):
             message = '%s nodes from IaaS launch but %s were expected' % (
                     len(iaas_nodes), len(nodes))
-            logging.error(message)
+            log.error(message)
             raise ProvisioningError('IAAS_PROBLEM '+ message)
-            
+
         for node_rec, iaas_node in izip(nodes, iaas_nodes):
             node_rec['iaas_id'] = iaas_node.id
             # for some reason, ec2 libcloud driver places IP in a list
@@ -327,11 +328,11 @@ class ProvisionerCore(object):
             node_rec['private_ip'] = private_ip
             node_rec['extra'] = iaas_node.extra.copy()
             node_rec['state'] = states.PENDING
-            
+
             extradict = {'public_ip': public_ip, 'iaas_id': iaas_node.id}
-            cei_events.event("provisioner", "new_node", 
+            cei_events.event("provisioner", "new_node",
                              logging, extra=extradict)
-    
+
     @defer.inlineCallbacks
     def store_and_notify(self, records, subscribers, newstate=None):
         """Convenience method to store records and notify subscribers.
@@ -346,7 +347,7 @@ class ProvisionerCore(object):
         # Right now we just query everything. Could be made more granular later
 
         for site in self.node_drivers.iterkeys():
-            nodes = yield self.store.get_site_nodes(site, 
+            nodes = yield self.store.get_site_nodes(site,
                     before_state=states.TERMINATED)
             if nodes:
                 yield self.query_one_site(site, nodes)
@@ -357,7 +358,7 @@ class ProvisionerCore(object):
     def query_one_site(self, site, nodes, driver=None):
         node_driver = driver or self.node_drivers[site]
 
-        logging.info('Querying site "%s"', site)
+        log.info('Querying site "%s"', site)
         nimboss_nodes = yield threads.deferToThread(node_driver.list_nodes)
         nimboss_nodes = dict((node.id, node) for node in nimboss_nodes)
 
@@ -366,23 +367,23 @@ class ProvisionerCore(object):
             state = node['state']
             if state < states.PENDING or state >= states.TERMINATED:
                 continue
-            
+
             nimboss_id = node.get('iaas_id')
             nimboss_node = nimboss_nodes.pop(nimboss_id, None)
             if not nimboss_node:
                 # this state is unknown to underlying IaaS. What could have
                 # happened? IaaS error? Recovery from loss of net to IaaS?
-                
+
                 # Or lazily-updated records. On EC2, there can be a short
                 # window where pending instances are not included in query
                 # response
 
                 if calc_record_age(node) <= _IAAS_NODE_QUERY_WINDOW_SECONDS:
-                    logging.debug('node %s: not in query of IaaS, but within '+
+                    log.debug('node %s: not in query of IaaS, but within '+
                             'allowed startup window (%d seconds)',
                             node['node_id'], _IAAS_NODE_QUERY_WINDOW_SECONDS)
                 else:
-                    logging.warn('node %s: in data store but unknown to IaaS. '+
+                    log.warn('node %s: in data store but unknown to IaaS. '+
                             'Marking as terminated.', node['node_id'])
 
                     node['state'] = states.FAILED
@@ -395,7 +396,7 @@ class ProvisionerCore(object):
                 if nimboss_state > node['state']:
                     #TODO nimboss could go backwards in state.
                     node['state'] = nimboss_state
-                    
+
                     public_ip = nimboss_node.public_ip
                     if isinstance(public_ip, list):
                         public_ip = public_ip[0]
@@ -404,14 +405,14 @@ class ProvisionerCore(object):
                         private_ip = private_ip[0]
                     node['public_ip'] = public_ip
                     node['private_ip'] = private_ip
-                    
+
                     if nimboss_state == states.STARTED:
-                        extradict = {'node_id': nimboss_id, 
+                        extradict = {'node_id': nimboss_id,
                                      'public_ip': public_ip,
                                      'private_ip': private_ip }
-                        cei_events.event("provisioner", "node_started", 
+                        cei_events.event("provisioner", "node_started",
                                          logging, extra=extradict)
-                    
+
                     launch = yield self.store.get_launch(node['launch_id'])
                     yield self.store_and_notify([node], launch['subscribers'])
         #TODO nimboss_nodes now contains any other running instances that
@@ -429,61 +430,61 @@ class ProvisionerCore(object):
             context = launch.get('context')
             launch_id = launch['launch_id']
             if not context:
-                logging.warn('Launch %s is in %s state but it has no context!',
+                log.warn('Launch %s is in %s state but it has no context!',
                         launch['launch_id'], launch['state'])
                 continue
-            
+
             ctx_uri = context['uri']
-            logging.debug('Querying context %s for launch %s ', ctx_uri, launch_id)
+            log.debug('Querying context %s for launch %s ', ctx_uri, launch_id)
             context_status = yield self.context.query(ctx_uri)
-            
+
             ctx_nodes = context_status.nodes
             if not ctx_nodes:
-                logging.debug('Launch %s context has no nodes (yet)', launch_id)
+                log.debug('Launch %s context has no nodes (yet)', launch_id)
                 continue
 
             nodes = yield self.store.get_launch_nodes(launch_id)
             updated_nodes = update_nodes_from_context(nodes, ctx_nodes)
 
             if updated_nodes:
-                logging.debug("%d nodes need to be updated as a result of the context query" % 
+                log.debug("%d nodes need to be updated as a result of the context query" %
                         len(updated_nodes))
                 yield self.store_and_notify(updated_nodes, launch['subscribers'])
-            
+
             all_done = True
             for ctx_node in ctx_nodes:
                 if not (ctx_node.ok_occurred or ctx_node.error_occurred):
                     all_done = False
                     break
-                    
+
             if context_status.complete and all_done:
-                logging.info('Launch %s context is "all-ok": done!', launch_id)
+                log.info('Launch %s context is "all-ok": done!', launch_id)
                 # update the launch record so this context won't be re-queried
                 launch['state'] = states.RUNNING
                 node_ids = []
                 for node in nodes:
                     node_ids.append(node['node_id'])
                 extradict = {'launch_id': launch_id, 'node_ids': node_ids}
-                cei_events.event("provisioner", "launch_ctx_done", 
+                cei_events.event("provisioner", "launch_ctx_done",
                                  logging, extra=extradict)
                 yield self.store.put_record(launch)
-            
+
             elif context_status.complete:
-                logging.info('Launch %s context is "complete" (all checked in, but not all-ok)', launch_id)
+                log.info('Launch %s context is "complete" (all checked in, but not all-ok)', launch_id)
             else:
-                logging.debug('Launch %s context is incomplete: %s of %s nodes',
-                        launch_id, len(context_status.nodes), 
+                log.debug('Launch %s context is incomplete: %s of %s nodes',
+                        launch_id, len(context_status.nodes),
                         context_status.expected_count)
-    
+
     @defer.inlineCallbacks
     def mark_launch_terminating(self, launch_id):
         """Mark a launch as Terminating in data store.
         """
         launch = yield self.store.get_launch(launch_id)
         nodes = yield self.store.get_launch_nodes(launch_id)
-        yield self.store_and_notify(nodes, launch['subscribers'], 
+        yield self.store_and_notify(nodes, launch['subscribers'],
                 states.TERMINATING)
-    
+
     @defer.inlineCallbacks
     def terminate_launch(self, launch_id):
         """Destroy all nodes in a launch and mark as terminated in store.
@@ -497,7 +498,7 @@ class ProvisionerCore(object):
                 continue
             #would be nice to do this as a batch operation
             yield self._terminate_node(node, launch)
-            
+
     @defer.inlineCallbacks
     def terminate_launches(self, launch_ids):
         """Destroy all node in a set of launches.
@@ -513,19 +514,19 @@ class ProvisionerCore(object):
         for node_id, node in izip(node_ids, nodes):
             if not node:
                 #maybe an error should make it's way to controller from here?
-                logging.warn('Node %s unknown but requested for termination',
+                log.warn('Node %s unknown but requested for termination',
                         node_id)
                 continue
             launch = yield self.store.get_launch(node['launch_id'])
             yield self._terminate_node(node, launch)
-            
+
     @defer.inlineCallbacks
     def _terminate_node(self, node, launch):
         nimboss_node = self._to_nimboss_node(node)
         driver = self.node_drivers[node['site']]
         yield threads.deferToThread(driver.destroy_node, nimboss_node)
-    
-        yield self.store_and_notify([node], launch['subscribers'], 
+
+        yield self.store_and_notify([node], launch['subscribers'],
                 states.TERMINATED)
 
     def _to_nimboss_node(self, node):
@@ -536,7 +537,7 @@ class ProvisionerCore(object):
         # attribute needed for termination (id). Would need to be fleshed out
         # to work with other drivers.
         return NimbossNode(id=node['iaas_id'], name=None, state=None,
-                public_ip=None, private_ip=None, 
+                public_ip=None, private_ip=None,
                 driver=self.node_drivers[node['site']])
 
 def update_nodes_from_context(nodes, ctx_nodes):
@@ -557,8 +558,8 @@ def update_nodes_from_context(nodes, ctx_nodes):
                 # can add more matches if needed
 
             if match_node:
-                logging.debug('Matched ctx identity to node by: ' + match_reason)
-                
+                log.debug('Matched ctx identity to node by: ' + match_reason)
+
                 if _update_one_node_from_ctx(match_node, ctx_node, ident):
                     updated_nodes.append(match_node)
                     break
@@ -566,7 +567,7 @@ def update_nodes_from_context(nodes, ctx_nodes):
             else:
                 # this isn't necessarily an exceptional condition. could be a private
                 # IP for example. Right now we are only matching against public
-                logging.debug('Context identity has unknown IP (%s) and hostname (%s)', 
+                log.debug('Context identity has unknown IP (%s) and hostname (%s)',
                         ident.ip, ident.hostname)
     return updated_nodes
 

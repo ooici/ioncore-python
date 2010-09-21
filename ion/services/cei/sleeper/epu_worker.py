@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 import time
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from twisted.internet import defer, reactor
 from magnet.spawnable import spawn, Receiver
 from ion.core import bootstrap
@@ -9,9 +11,6 @@ from ion.services.base_service import BaseService
 from ion.core.base_process import ProtocolFactory
 import ion.util.procutils as pu
 from ion.services.cei import cei_events
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
 
 class EPUWorkerService(BaseService):
     """EPU Worker service.
@@ -32,7 +31,7 @@ class EPUWorkerService(BaseService):
         yield bootstrap.declare_messaging(self.worker_queue)
         self.workReceiver.handle(self.receive)
         spawnId = yield spawn(self.workReceiver)
-        logging.debug("spawnId: %s" % spawnId)
+        log.debug("spawnId: %s" % spawnId)
         self.laterinitialized = True
         extradict = {"queue_name_work":self.queue_name_work}
         cei_events.event("worker", "init_end", logging, extra=extradict)
@@ -40,13 +39,13 @@ class EPUWorkerService(BaseService):
     @defer.inlineCallbacks
     def op_work(self, content, headers, msg):
         if not self.laterinitialized:
-            logging.error("message got here without the later-init")
+            log.error("message got here without the later-init")
         sleepsecs = int(content['work_amount'])
-        extradict = {"batchid":content['batchid'], 
+        extradict = {"batchid":content['batchid'],
                      "jobid":content['jobid'],
                      "work_amount":sleepsecs}
         cei_events.event("worker", "job_begin", logging, extra=extradict)
-        logging.info("WORK: sleeping for %d seconds ---" % sleepsecs)
+        log.info("WORK: sleeping for %d seconds ---" % sleepsecs)
         yield pu.asleep(sleepsecs)
         yield self.reply(msg, 'result', {'result':'work_complete'}, {})
         cei_events.event("worker", "job_end", logging, extra=extradict)
@@ -54,5 +53,3 @@ class EPUWorkerService(BaseService):
 
 # Direct start of the service as a process with its default name
 factory = ProtocolFactory(EPUWorkerService)
-
-

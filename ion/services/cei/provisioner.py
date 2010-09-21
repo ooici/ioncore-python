@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer #, reactor
 from ion.services.base_service import BaseService, BaseServiceClient
@@ -26,27 +26,27 @@ class ProvisionerService(BaseService):
         self.dtrs = DeployableTypeRegistryClient(self)
         self.core = ProvisionerCore(self.store, self.notifier, self.dtrs)
         cei_events.event("provisioner", "init_end", logging)
-    
+
     @defer.inlineCallbacks
     def op_provision(self, content, headers, msg):
         """Service operation: Provision a taskable resource
         """
-        logging.debug("op_provision content:"+str(content))
-        
+        log.debug("op_provision content:"+str(content))
+
         launch, nodes = yield self.core.prepare_provision(content)
-        
+
         # now we can ACK the request as it is safe in datastore
 
         # set up a callLater to fulfill the request after the ack. Would be
         # cleaner to have explicit ack control.
         #reactor.callLater(0, self.core.execute_provision_request, launch, nodes)
         yield self.core.execute_provision(launch, nodes)
-    
+
     @defer.inlineCallbacks
     def op_terminate_nodes(self, content, headers, msg):
         """Service operation: Terminate one or more nodes
         """
-        logging.debug('op_terminate_nodess content:'+str(content))
+        log.debug('op_terminate_nodess content:'+str(content))
 
         #expecting one or more node IDs
         if not isinstance(content, list):
@@ -61,7 +61,7 @@ class ProvisionerService(BaseService):
     def op_terminate_launches(self, content, headers, msg):
         """Service operation: Terminate one or more launches
         """
-        logging.debug('op_terminate_launches content:'+str(content))
+        log.debug('op_terminate_launches content:'+str(content))
 
         #expecting one or more launch IDs
         if not isinstance(content, list):
@@ -80,8 +80,8 @@ class ProvisionerService(BaseService):
         # immediate ACK is desired
         #reactor.callLater(0, self.core.query_nodes, content)
         yield self.core.query_nodes(content)
-    
-        
+
+
 class ProvisionerClient(BaseServiceClient):
     """
     Client for provisioning deployable types
@@ -109,17 +109,17 @@ class ProvisionerClient(BaseServiceClient):
                 'nodes' : nodes,
                 'subscribers' : [sa],
                 'vars' : vars}
-        logging.debug('Sending provision request: ' + str(request))
+        log.debug('Sending provision request: ' + str(request))
         yield self.send('provision', request)
-        
+
     @defer.inlineCallbacks
     def query(self):
         """Triggers a query operation in the provisioner. Node updates
-        are not sent in reply, but are instead sent to subscribers 
+        are not sent in reply, but are instead sent to subscribers
         (most likely a sensor aggregator).
         """
         yield self._check_init()
-        logging.debug('Sending query request to provisioner')
+        log.debug('Sending query request to provisioner')
         yield self.send('query', None)
 
     @defer.inlineCallbacks
@@ -127,7 +127,7 @@ class ProvisionerClient(BaseServiceClient):
         """Terminates one or more launches
         """
         yield self._check_init()
-        logging.debug('Sending terminate_launches request to provisioner')
+        log.debug('Sending terminate_launches request to provisioner')
         yield self.send('terminate_launches', launches)
 
     @defer.inlineCallbacks
@@ -135,7 +135,7 @@ class ProvisionerClient(BaseServiceClient):
         """Terminates one or more nodes
         """
         yield self._check_init()
-        logging.debug('Sending terminate_nodes request to provisioner')
+        log.debug('Sending terminate_nodes request to provisioner')
         yield self.send('terminate_nodes', nodes)
 
 class ProvisionerNotifier(object):
@@ -148,7 +148,7 @@ class ProvisionerNotifier(object):
     def send_record(self, record, subscribers, operation='node_status'):
         """Send a single node record to all subscribers.
         """
-        logging.debug('Sending status record about node %s to %s', 
+        log.debug('Sending status record about node %s to %s',
                 record['node_id'], repr(subscribers))
         for sub in subscribers:
             yield self.process.send(sub, operation, record)

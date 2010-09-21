@@ -4,7 +4,9 @@
 @brief Starts, stops, and tracks instance and context state for fake instances.
 """
 
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from twisted.internet import defer
 from twisted.internet.task import LoopingCall
 from magnet.spawnable import Receiver
@@ -44,10 +46,10 @@ class MockLoopProvisionerService(BaseService):
         launch_id = content['launch_id']
         instances = {}
         for key in content['instances'].keys():
-            logging.info("request to provision %s" % key)
+            log.info("request to provision %s" % key)
             id_list = content['instances'][key]['id']
             for instance_id in id_list:
-                logging.info(" - %s" % instance_id)
+                log.info(" - %s" % instance_id)
                 instances[instance_id] = 0
                 
         self.tracker[launch_id] = instances
@@ -55,7 +57,7 @@ class MockLoopProvisionerService(BaseService):
     def op_terminate(self, content, headers, msg):
         """Service operation: Terminate a taskable resource
         """
-        logging.error("cannot terminate yet")
+        log.error("cannot terminate yet")
         
     def _move_states(self):
         # in future will be per-instance, provided by provisioner client
@@ -64,7 +66,7 @@ class MockLoopProvisionerService(BaseService):
         for (launch_id, instance_dict) in self.tracker.iteritems():
             for instance_id in instance_dict.keys():
                 if instance_dict[instance_id] == 6:
-                    logging.info("'%s' instance: '%s'" % (instance_id, STATES[instance_dict[instance_id]]))
+                    log.info("'%s' instance: '%s'" % (instance_id, STATES[instance_dict[instance_id]]))
                     # moving to 7 means it won't show up again in logging
                     instance_dict[instance_id] += 1
                     
@@ -72,7 +74,7 @@ class MockLoopProvisionerService(BaseService):
                     current = STATES[instance_dict[instance_id]]
                     instance_dict[instance_id] += 1
                     newstate = STATES[instance_dict[instance_id]]
-                    logging.info("'%s' instance: state was '%s', moved to '%s'" % (instance_id, current, newstate))
+                    log.info("'%s' instance: state was '%s', moved to '%s'" % (instance_id, current, newstate))
                     
                     iaas_info = self._construct_iaas_info(launch_id, instance_id, instance_dict[instance_id])
                     self._send_iaas_notification(iaas_info, sa_instance)

@@ -1,4 +1,6 @@
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from twisted.internet import defer
 from twisted.trial import unittest
 
@@ -57,7 +59,7 @@ class TestSensors(IonTestCase):
     @defer.inlineCallbacks
     def test_rabbitmq_sensor(self):
         yield pu.asleep(5) #async wait
-        logging.info("test_rabbitmq_sensor => message_count='%s'"% self.test_sa.message_count)
+        log.info("test_rabbitmq_sensor => message_count='%s'"% self.test_sa.message_count)
         self.assertEqual(self.total_messages, self.test_sa.message_count)
 
 

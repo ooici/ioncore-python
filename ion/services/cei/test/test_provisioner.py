@@ -6,7 +6,9 @@
 @brief Test provisioner behavior
 """
 
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import uuid
 import os
 
@@ -103,19 +105,19 @@ class FakeProvisionerNotifier(object):
             old_record = self.nodes[node_id]
             old_state = old_record['state']
             if old_state == state:
-                logging.debug('Got dupe state for node %s: %s', node_id, state)
+                log.debug('Got dupe state for node %s: %s', node_id, state)
             elif old_state < state:
                 self.nodes[node_id] = record
                 self.nodes_rec_count[node_id] += 1
-                logging.debug('Got updated state record for node %s: %s -> %s',
+                log.debug('Got updated state record for node %s: %s -> %s',
                         node_id, old_state, state)
             else:
-                logging.debug('Got out-of-order record for node %s. %s -> %s', 
+                log.debug('Got out-of-order record for node %s. %s -> %s', 
                         node_id, old_state, state)
         else:
             self.nodes[node_id] = record
             self.nodes_rec_count[node_id] = 1
-            logging.debug('Recorded new state record for node %s: %s', 
+            log.debug('Recorded new state record for node %s: %s', 
                     node_id, state)
         return defer.succeed(None)
 
@@ -170,9 +172,9 @@ class FakeProvisionerNotifier(object):
                 yield runfirst()
         win = self.assure_state(state, nodes)
         if win:
-            logging.debug('All nodes in %s state', state)
+            log.debug('All nodes in %s state', state)
         else:
-            logging.warn('Timeout hit before all nodes hit %s state!', state)
+            log.warn('Timeout hit before all nodes hit %s state!', state)
         defer.returnValue(win)
 
 

@@ -1,4 +1,6 @@
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import random
 
 from ion.services.cei.decisionengine import Engine
@@ -27,11 +29,11 @@ class InfiniteEngine(Engine):
         """Engine API method"""
         self.call_count += 1
         if self.call_count == 1:
-            logging.debug("Thought about this 1 time.")
+            log.debug("Thought about this 1 time.")
         else:
-            logging.debug("Thought about this %d times." % self.call_count)
+            log.debug("Thought about this %d times." % self.call_count)
         if self.call_count % 5 == 0:
-            logging.info("Requesting new instance")
+            log.info("Requesting new instance")
             self._launch_one(control)
             
     def _launch_one(self, control):

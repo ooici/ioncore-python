@@ -6,14 +6,13 @@
 @brief Obtains data about exchange points, EPU workers, and operational unit data/statuses.
 """
 
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from twisted.internet import defer
 from magnet.spawnable import Receiver
 from ion.services.base_service import BaseService
 from ion.core.base_process import ProtocolFactory
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug('Loaded: '+__name__)
 
 class SensorAggregatorService(BaseService):
     """SensorAggregator service interface
@@ -23,7 +22,7 @@ class SensorAggregatorService(BaseService):
     @defer.inlineCallbacks
     def op_node_status(self, content, headers, msg):
         epu_controller = yield self.get_scoped_name('system', 'epu_controller')
-        logging.info('SensorAggregatorService.node_status called.')
+        log.info('SensorAggregatorService.node_status called.')
         yield self.send(epu_controller, 'sensor_info', content)
 
 # Direct start of the service as a process with its default name

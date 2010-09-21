@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import os
 import uuid
 import time

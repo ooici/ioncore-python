@@ -6,7 +6,9 @@
 @brief Test provisioner store behavior
 """
 
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import uuid
 
 from twisted.internet import defer

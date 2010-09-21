@@ -23,7 +23,9 @@ Test case for SensorAggregator
 """
 #XXX All 'Sensors' are 'Process'. Should they live in a different dir that 'ion.services.cei'?
 
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 

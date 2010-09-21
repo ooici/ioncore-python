@@ -1,4 +1,6 @@
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import random
 
 from ion.services.cei.decisionengine import Engine
@@ -46,15 +48,15 @@ class QueueLengthGreedyEngine(Engine):
             if ok:
                 valid_count += 1
         
-        #logging.debug("Before: %s" % self._aware_txt(valid_count))
+        #log.debug("Before: %s" % self._aware_txt(valid_count))
         
         qlen = self._getqlen(state)
-        #logging.debug("most recent qlen reading is %d" % qlen)
+        #log.debug("most recent qlen reading is %d" % qlen)
         while valid_count < qlen:
             self._launch_one(control)
             valid_count += 1
         
-        logging.debug("After: %s" % self._aware_txt(valid_count))
+        log.debug("After: %s" % self._aware_txt(valid_count))
         
     def _aware_txt(self, valid_count):
         txt = "instance"
@@ -66,7 +68,7 @@ class QueueLengthGreedyEngine(Engine):
         all_qlens = state.get_all("queue-length")
         # should only be one queue reading for now:
         if len(all_qlens) == 0:
-            logging.debug("no queuelen readings to analyze")
+            log.debug("no queuelen readings to analyze")
             return 0
         
         if len(all_qlens) != 1:
@@ -75,7 +77,7 @@ class QueueLengthGreedyEngine(Engine):
         qlens = all_qlens[0]
         
         if len(qlens) == 0:
-            logging.debug("no queuelen readings to analyze")
+            log.debug("no queuelen readings to analyze")
             return 0
             
         return qlens[-1].value

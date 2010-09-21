@@ -7,7 +7,9 @@
 @brief Deployable Type Registry Service. Used to look up Deployable type data/metadata.
 """
 
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import string
 
 from twisted.internet import defer
@@ -22,7 +24,7 @@ __all__ = ['DeployableTypeRegistryService', 'DeployableTypeRegistryClient']
 _REGISTRY = {}
 CONF = ioninit.config(__name__)
 execfile(CONF['deployable_types'])
-logging.debug('Loaded %s deployable types.', len(_REGISTRY))
+log.debug('Loaded %s deployable types.', len(_REGISTRY))
 
 class DeployableTypeRegistryService(BaseService):
     """Deployable Type Registry service interface
@@ -38,7 +40,7 @@ class DeployableTypeRegistryService(BaseService):
         """Resolve a depoyable type
         """
 
-        logging.debug('Recieved DTRS lookup. content: ' + str(content))
+        log.debug('Recieved DTRS lookup. content: ' + str(content))
         # just using a file for this right now, to keep it simple
         dt_id = content['deployable_type']
         nodes = content.get('nodes')
@@ -47,7 +49,7 @@ class DeployableTypeRegistryService(BaseService):
             dt = self.registry[dt_id]
         except KeyError:
             return self._dtrs_error(msg, 'Unknown deployable type name: '+ dt_id)
-        
+
         doc_tpl = dt['document']
         defaults = dt.get('vars')
         all_vars = {}
@@ -61,12 +63,12 @@ class DeployableTypeRegistryService(BaseService):
             document = template.substitute(all_vars)
         except KeyError,e:
             return self._dtrs_error(msg,
-                    'DT doc has variable not present in request or defaults: %s' 
+                    'DT doc has variable not present in request or defaults: %s'
                     % str(e))
         except ValueError,e:
             return self._dtrs_error(msg, 'Deployable type document has bad variable: %s'
                     % str(e))
-        
+
         response_nodes = {}
         result = {'document' : document, 'nodes' : response_nodes}
         sites = dt['sites']
@@ -77,11 +79,11 @@ class DeployableTypeRegistryService(BaseService):
                 node_site = node['site']
             except KeyError:
                 return self._dtrs_error(msg,'Node request missing site: "%s"' % node_name)
-                
+
             try:
                 site_node = sites[node_site][node_name]
             except KeyError:
-                return self._dtrs_error(msg, 
+                return self._dtrs_error(msg,
                         'Invalid deployable type site specified: "%s" ' % node_site)
 
             response_nodes[node_name] = {
@@ -90,12 +92,12 @@ class DeployableTypeRegistryService(BaseService):
                     'iaas_sshkeyname' : site_node.get('sshkeyname'),
                     }
 
-        logging.debug('Sending DTRS response: ' + str(result))
+        log.debug('Sending DTRS response: ' + str(result))
 
         return self.reply_ok(msg, result)
 
     def _dtrs_error(self, msg, error):
-        logging.debug('Sending DTRS error reply: ' + error)
+        log.debug('Sending DTRS error reply: ' + error)
         return self.reply_err(msg, error)
 
 class DeployableTypeRegistryClient(BaseServiceClient):
@@ -105,13 +107,13 @@ class DeployableTypeRegistryClient(BaseServiceClient):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "dtrs"
         BaseServiceClient.__init__(self, proc, **kwargs)
-        
+
     @defer.inlineCallbacks
     def lookup(self, dt, nodes=None, vars=None):
         """Lookup a deployable type
         """
         yield self._check_init()
-        logging.debug("Sending DTRS lookup request")
+        log.debug("Sending DTRS lookup request")
         (content, headers, msg) = yield self.rpc_send('lookup', {
             'deployable_type' : dt,
             'nodes' : nodes,
