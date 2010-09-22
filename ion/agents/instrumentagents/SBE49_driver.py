@@ -95,9 +95,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
         # --------------------------------------------------------------------
         self.hsm.addState ( "idle",           self.idle,               None)
         self.hsm.addState ( "stateConfigured",  self.stateConfigured,     self.idle)
+        self.hsm.addState ( "stateDisconnecting",  self.stateDisconnecting,     self.stateConfigured)
         self.hsm.addState ( "stateDisconnected",  self.stateDisconnected,     self.stateConfigured)
         self.hsm.addState ( "stateConnecting",  self.stateConnecting,     self.stateConfigured)
         self.hsm.addState ( "stateConnected",  self.stateConnected,     self.stateConfigured)
+        self.hsm.addState ( "stateDisconnecting",  self.stateDisconnecting,     self.stateConfigured)
     
         """
         A translation dictionary to translate from the commands being sent
@@ -207,6 +209,29 @@ class SBE49InstrumentDriver(InstrumentDriver):
             return 0
         return caller.tEvt['sType']
 
+    def stateDisconnecting(self, caller):
+        log.debug("!!!!!!!!!!!!!!!  In stateDisconnecting state")
+        if caller.tEvt['sType'] == "init":
+            log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
+            log.debug("disconnecting from instrument")
+            self.proto.transport.loseConnection()
+            return 0
+        elif caller.tEvt['sType'] == "entry":
+            log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
+            return 0
+        elif caller.tEvt['sType'] == "exit":
+            log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
+            return 0
+            return 0
+        elif caller.tEvt['sType'] == "eventDisconnectComplete":
+            log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
+            #
+            # Transition to the stateConnected state
+            #
+            caller.stateTran(self.stateDisconnected)
+            return 0
+        return caller.tEvt['sType']
+
     def stateDisconnected(self, caller):
         log.debug("!!!!!!!!!!!!!!!  In stateDisconnected state")
         if caller.tEvt['sType'] == "init":
@@ -271,6 +296,13 @@ class SBE49InstrumentDriver(InstrumentDriver):
             # if command pending
             if self.command:
                self.instrument.transport.write(self.command)
+            return 0
+        elif caller.tEvt['sType'] == "eventDisconnectReceived":
+            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
+            #
+            # Transition to the stateDisconnecting state
+            #
+            caller.stateTran(self.stateDisconnecting)
             return 0
         return caller.tEvt['sType']
 
@@ -365,7 +397,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         log.debug("gotDisconnected!!!")
 
-        self.instrument = instrument
+        # NEW NEW
+        self.hsm.onEvent('eventDisconnectComplete')
         self.setConnected(False)
 
     def gotData(self, data):
@@ -424,11 +457,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
     @defer.inlineCallbacks
     def op_disconnect(self, content, headers, msg):
         log.debug("in Instrument Driver op_disconnect!")
-        if (self.isConnected()):
-            log.debug("disconnecting from instrument")
-            #self.connector.disconnect()
-            self.proto.transport.loseConnection()
-            self.setConnected(False)
+        self.hsm.onEvent('eventDisconnectReceived')
+        #if (self.isConnected()):
+        #    log.debug("disconnecting from instrument")
+        #    self.proto.transport.loseConnection()
+        #    self.setConnected(False)
         if msg:
             yield self.reply_ok(msg, content)
 
