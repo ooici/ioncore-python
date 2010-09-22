@@ -9,7 +9,7 @@
 
 from twisted.internet import defer
 
-from ion.services.dm.scheduler.scheduler_service import SchedulerService, SchedulerServiceClient
+from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
 
 from ion.test.iontest import IonTestCase
 
@@ -36,7 +36,7 @@ class SchedulerTest(IonTestCase):
     def test_add_remove(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        yield sc.add_task('foobar', 'pingtest')
+        yield sc.add_task('foobar', 1.0, 'pingtest')
         rc = yield sc.rm_task('foobar')
         self.failUnlessEqual(rc['status'], 'OK')
 
@@ -44,7 +44,7 @@ class SchedulerTest(IonTestCase):
     def test_query(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        yield sc.add_task('foobar', 'pingtest')
+        yield sc.add_task('foobar', 1.0, 'pingtest')
         rl = yield sc.query_tasks('.+?')
         self.failUnlessSubstring('foobar', str(rl['value']))
 
@@ -52,7 +52,7 @@ class SchedulerTest(IonTestCase):
     def test_rm(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        yield sc.add_task('foobar', 'pingtest')
+        yield sc.add_task('foobar', 1.0, 'pingtest')
         yield sc.rm_task('foobar')
         rl = yield sc.query_tasks('foobar')
         self.failUnlessEqual(rl['value'], [])

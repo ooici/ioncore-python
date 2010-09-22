@@ -13,7 +13,7 @@ from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.services.dm.scheduler.scheduler_registry import SchedulerRegistry
+from ion.services.dm.scheduler.scheduler_registry import SchedulerRegistryClient
 
 class SchedulerService(BaseService):
     """
@@ -24,16 +24,32 @@ class SchedulerService(BaseService):
     # Declaration of service
     declare = BaseService.service_declare(name='scheduler',
                                           version='0.1.0',
-                                          dependencies=[])
+                                          dependencies=['scheduler_registry'])
 
     def slc_init(self):
-        pass
+        self.ctab = SchedulerRegistryClient()
 
     @defer.inlineCallbacks
     def op_add_task(self, content, headers, msg):
         """
-        Add a new task to the crontab
+        @brief Add a new task to the crontab. Interval is in seconds, fractional.
+        @param content Message payload, must be a dictionary with 'target', 'interval' and 'payload' keys
+        @param headers Ignored here
+        @param msg Ignored here
+        @retval reply_ok or reply_err
         """
+        try:
+            tid = content['target']
+            msg_payload = content['payload']
+            msg_interval = float(content['interval'])
+        except KeyError, ke:
+            log.exception('Required keys in payload not found!')
+            yield self.reply_err(msg, {'value': str(ke)})
+            return
+
+        log.debug('ok, gotta task to save')
+        yield self.ctab.add_task(tid, msg_interval, msg_payload)
+
         yield self.reply_err(msg, {'value':'Not implemented!'}, {})
 
     @defer.inlineCallbacks
@@ -60,9 +76,9 @@ class SchedulerServiceClient(BaseServiceClient):
         BaseServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
-    def add_task(self, target, payload):
+    def add_task(self, target, interval, payload):
         yield self._check_init()
-        msg_dict = {'target': target, 'payload': payload}
+        msg_dict = {'target': target, 'payload': payload, 'interval': interval}
         (content, headers, msg) = yield self.rpc_send('add_task', msg_dict)
         defer.returnValue(content)
 
