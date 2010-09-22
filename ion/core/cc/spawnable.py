@@ -86,7 +86,7 @@ class Spawnable(object):
         d = s.run()
         def _return_id(res, id):
             return id
-        d.addErrback(log.err)
+        d.addErrback(log.error)
         return d.addCallback(_return_id, s.id)
 
     @classmethod
@@ -110,7 +110,7 @@ class Spawnable(object):
             d = s.run()
             def _return_id(res, id):
                 return id
-            d.addErrback(log.err)
+            d.addErrback(log.error)
             return d.addCallback(_return_id, s.id)
         elif hasattr(m, 'receiver'):
             # @todo this is a deprecated way of spawning. Remove in the long run
@@ -120,7 +120,7 @@ class Spawnable(object):
             d = s.run()
             def _return_id(res, id):
                 return id
-            d.addErrback(log.err)
+            d.addErrback(log.error)
             return d.addCallback(_return_id, s.id)
         else:
             raise Exception("Must use Receiver in your module")
@@ -139,7 +139,7 @@ class Spawnable(object):
         d = s.run()
         def _return_id(res, id):
             return id
-        d.addErrback(log.err)
+        d.addErrback(log.error)
         return d.addCallback(_return_id, s.id)
 
 
@@ -157,7 +157,7 @@ class Spawnable(object):
             return consumer
 
         def _eb(reason):
-            log.err(reason)
+            log.error(reason)
             return reason
 
         d = self.target.makeConsumer(self)
@@ -312,11 +312,6 @@ class Receiver(object):
         else:
             self.handlers['receive'](data, msg)
 
-    @defer.inlineCallbacks
-    def send(self, to_id, data):
-        # self.spawned._send_from(to_id, data)
-        # NOTE: Here, a deferred is returned and not yielded (runaway)!!!
-        yield send(to_id, data)
 
 class IProtocolFactory(Interface):
 
@@ -341,7 +336,7 @@ class ProtocolFactory(object):
 
 # Container API
 @defer.inlineCallbacks
-def send(to_name, data, space=None):
+def send(to_name, data, exchange_space=None):
     """
     Sends a message
     @param to_name if int, local identifier (sequence number) of process;
@@ -350,16 +345,8 @@ def send(to_name, data, space=None):
     # If int, interpret name as local identifier and convert to global
     if type(to_name) is int:
         to_name = Id(to_name).full
-    name_config = yield store.get(str(to_name))
-    if not name_config:
-        pass
-    # @todo I don't think we need this config dict in the way it is used here.
-    # The only thing we need to know is exchange (given) and routing key.
-    # In the future, different types of names might have different attributes.
-    pub_config = {'routing_key' : str(to_name)}
-    pubs = yield Container.instance.new_publisher(pub_config)
-    yield pubs.send(data)
-    pubs.close()
+
+    yield Container.instance.send(to_name, data, exchange_space)
 
 def ps():
     """list running instances
@@ -369,7 +356,7 @@ def ps():
     print '---------------------------------'
     for id, s in Spawnable.progeny.iteritems():
         if id.full == s.target.name:
-            print id.local, s.target.label, s.target.name, s.space.hostname
+            print id.local, s.target.label, s.target.name, s.space.connection.hostname
 
 def ms():
     """list messaging info.

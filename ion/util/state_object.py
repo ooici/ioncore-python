@@ -128,16 +128,16 @@ class BasicLifecycleObject(StateObject):
         self._so_set_fsm(fsm)
 
     def initialize(self, *args, **kwargs):
-        self._so_process(BasicFSMFactory.E_INITIALIZE, *args, **kwargs)
+        return self._so_process(BasicFSMFactory.E_INITIALIZE, *args, **kwargs)
 
     def activate(self, *args, **kwargs):
-        self._so_process(BasicFSMFactory.E_ACTIVATE, *args, **kwargs)
+        return self._so_process(BasicFSMFactory.E_ACTIVATE, *args, **kwargs)
 
     def deactivate(self, *args, **kwargs):
-        self._so_process(BasicFSMFactory.E_DEACTIVATE, *args, **kwargs)
+        return self._so_process(BasicFSMFactory.E_DEACTIVATE, *args, **kwargs)
 
     def terminate(self, *args, **kwargs):
-        self._so_process(BasicFSMFactory.E_TERMINATE, *args, **kwargs)
+        return self._so_process(BasicFSMFactory.E_TERMINATE, *args, **kwargs)
 
     def on_initialize(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")

@@ -30,7 +30,8 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.id import Id
 from ion.core.messaging import messaging
-from ion.core.messaging.messaging import MessageSpace
+from ion.core.messaging.messaging import MessageSpace, Publisher, Consumer
+from ion.core.messaging.messaging import ProcessExchangeSpace
 from ion.core.cc.store import Store
 from ion.util.state_object import BasicLifecycleObject
 
@@ -99,8 +100,8 @@ class Container(BasicLifecycleObject):
         """
         Container._started = True
 
-        self.exchange_space = messaging.Exchange(self.message_space,
-                                                 DEFAULT_EXCHANGE_SPACE)
+        self.exchange_space = ProcessExchangeSpace(message_space=self.message_space,
+                                                   name=DEFAULT_EXCHANGE_SPACE)
         yield self.message_space.activate()
 
     def on_deactivate(self, *args, **kwargs):
@@ -132,8 +133,7 @@ class Container(BasicLifecycleObject):
         amqp_config = name_type_f(name)
         amqp_config.update(config)
         def _cb(res):
-            return messaging.BaseConsumer.name(Container.instance.exchange_space,
-                                               amqp_config)
+            return Consumer.name(Container.instance.exchange_space, amqp_config)
         d = Container.store.put(name, amqp_config)
         d.addCallback(_cb)
         return d
@@ -147,18 +147,17 @@ class Container(BasicLifecycleObject):
         @param id should be of type Id
         @retval defer.Deferred that fires a consumer instance
         """
-        consumer = yield BaseConsumer.name(self.exchange_space, name_config)
+        consumer = yield Consumer.name(self.exchange_space, name_config)
         consumer.register_callback(target.send)
         consumer.iterconsume()
         defer.returnValue(consumer)
 
-    @defer.inlineCallbacks
-    def new_publisher(self, name_config):
+    def send(self, to_name, message_data, exchange_space=None):
         """
+        Sends a message
         """
-        publisher = yield Publisher.name(self.exchange_space, name_config)
-        defer.returnValue(publisher)
-
+        exchange_space = exchange_space or self.exchange_space
+        return exchange_space.send(to_name, message_data)
 
 def create_new_container():
     """
