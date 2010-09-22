@@ -466,7 +466,7 @@ class ProvisionerCore(object):
                     node_ids.append(node['node_id'])
                 extradict = {'launch_id': launch_id, 'node_ids': node_ids}
                 cei_events.event("provisioner", "launch_ctx_done",
-                                 logging, extra=extradict)
+                                 log, extra=extradict)
                 yield self.store.put_record(launch)
 
             elif context_status.complete:

@@ -17,7 +17,9 @@ from ion.services.dm.scheduler.scheduler_registry import SchedulerRegistry
 
 class SchedulerService(BaseService):
     """
-
+    First pass at a message-based cron service, where you register a send-to address,
+    interval and payload, and the scheduler will message you when the timer expires.
+    @note this will be subsumed into CEI at some point; consider this a prototype.
     """
     # Declaration of service
     declare = BaseService.service_declare(name='scheduler',
@@ -34,30 +36,23 @@ class SchedulerService(BaseService):
         """
         yield self.reply_err(msg, {'value':'Not implemented!'}, {})
 
+    @defer.inlineCallbacks
     def op_rm_task(self, content, headers, msg):
         """
         Remove a task from the list
         """
         yield self.reply_err(msg, {'value':'Not implemented!'}, {})
 
+    @defer.inlineCallbacks
     def op_query_tasks(self, content, headers, msg):
         """
         Query tasks registered, returns a maybe-empty list
         """
         yield self.reply_err(msg, {'value':'Not implemented!'}, {})
 
-    def op_update_task(self, content, headers, msg):
-        """
-        Redefine an existing task
-        @todo Necessary feature?
-        """
-        yield self.reply_err(msg, {'value':'Not implemented!'}, {})
-
-
 class SchedulerServiceClient(BaseServiceClient):
     """
-    This is an exemplar service client that calls the hello service. It
-    makes service calls RPC style.
+    Client class for the SchedulerService, simple muster/send/reply.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
@@ -67,8 +62,21 @@ class SchedulerServiceClient(BaseServiceClient):
     @defer.inlineCallbacks
     def add_task(self, target, payload):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('add_task', target, payload)
-        defer.returnValue(str(content))
+        msg_dict = {'target': target, 'payload': payload}
+        (content, headers, msg) = yield self.rpc_send('add_task', msg_dict)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def rm_task(self, taskid):
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('rm_task', taskid)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def query_tasks(self, task_regex):
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('query_tasks', task_regex)
+        defer.returnValue(content)
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(SchedulerService)
