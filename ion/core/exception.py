@@ -8,3 +8,6 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+
+class IONException(Exception):
+    pass

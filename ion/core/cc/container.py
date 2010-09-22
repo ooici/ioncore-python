@@ -111,6 +111,21 @@ class Container(object):
     def shutdown_container(self):
         pass
 
+    def start_container(self):
+        if Container._started:
+            raise RuntimeError('Already started')
+        hostname = self.config['broker_host']
+        port = self.config['broker_port']
+        virtual_host = self.config['broker_vhost']
+        heartbeat = int(self.config['broker_heartbeat'])
+        Container.args = self.config.get('args', None)
+        Container.interceptor_system = InterceptorSystem() # hack; time for inst of Container
+        broker = messaging.MessageSpace(hostname=hostname,
+                                port=port,
+                                virtual_host=virtual_host,
+                                heartbeat=heartbeat)
+        return Container.connectMainSpace(broker)
+
 @defer.inlineCallbacks
 def new_consumer(name_config, target):
     """given spawnable instance Id, create consumer
@@ -289,5 +304,13 @@ def startContainer(config):
     return Container.connectMainSpace(broker)
 
 
-def create_new_container():
-    pass
+def create_new_container(config):
+    """
+    This could eventually be more like a factory, but so far, there is only
+    supposed to be on Container (per python process), so the Container is
+    mostly used as a class with out instantiating (facilitating a kind of
+    singleton pattern)
+    """
+    c = Container()
+    c.config = config
+    return c

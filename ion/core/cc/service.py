@@ -98,7 +98,7 @@ class CapabilityContainer(service.Service):
         """
         print 'Starting Container/broker connection...'
         cont = container.create_new_container(self.config)
-        d = cont.startContainer()
+        d = cont.start_container()
         return d
 
     @defer.inlineCallbacks
