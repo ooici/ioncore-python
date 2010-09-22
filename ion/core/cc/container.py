@@ -61,8 +61,11 @@ class Container(BasicLifecycleObject):
         # Config instance
         self.config = None
 
-        # Container broker connection / vhost
+        # Container broker connection / vhost parameters
         self.message_space = None
+
+        # Broker connection instance
+        self.broker_connection = None
 
         # Static: Default exchange space
         self.exchange_space = None
@@ -83,11 +86,12 @@ class Container(BasicLifecycleObject):
         heartbeat = int(self.config['broker_heartbeat'])
 
         # Is a BrokerConnection instance (no action at this point)
-        self.message_space = messaging.MessageSpace(hostname=hostname,
+        self.message_space = MessageSpace(hostname=hostname,
                                 port=port,
                                 virtual_host=virtual_host,
                                 heartbeat=heartbeat)
 
+    @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
         """
         Activates the container
@@ -97,14 +101,16 @@ class Container(BasicLifecycleObject):
 
         self.exchange_space = messaging.Exchange(self.message_space,
                                                  DEFAULT_EXCHANGE_SPACE)
-        d = self.message_space.connect()
-        return d
+        yield self.message_space.activate()
 
     def on_deactivate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
 
+    @defer.inlineCallbacks
     def on_terminate(self, *args, **kwargs):
+        yield self.message_space.terminate()
         Container._started = False
+        self.store = Store()
 
     def on_error(self, *args, **kwargs):
         raise RuntimeError("Illegal state change for container")

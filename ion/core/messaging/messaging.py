@@ -11,10 +11,40 @@ from twisted.internet import defer
 from carrot import connection
 from carrot import messaging
 
-class MessageSpace(connection.BrokerConnection):
+from ion.util.state_object import BasicLifecycleObject
+
+class MessageSpace(BasicLifecycleObject):
     """
-    Configuration for a broker conection and vhost.
+    Represents a broker connection.
     """
+
+    def __init__(self, *args, **kwargs):
+        BasicLifecycleObject.__init__(self)
+        self.conn_params = None
+        self.broker_connection = None
+        self.initialize(*args, **kwargs)
+
+    def on_initialize(self, *args, **kwargs):
+        """
+        Initializes a MessageSpace analogous to a Carrot BrokerConnection
+        instance.
+        """
+        self.conn_params = connection.BrokerConnection(*args, **kwargs)
+
+    @defer.inlineCallbacks
+    def on_activate(self, *args, **kwargs):
+        assert not self.broker_connection, "Already connected to broker"
+        self.broker_connection = yield self.conn_params.connect()
+
+    def on_deactivate(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
+
+    @defer.inlineCallbacks
+    def on_terminate(self, *args, **kwargs):
+        yield self.broker_connection.transport.loseConnection()
+
+    def on_error(self, *args, **kwargs):
+        raise RuntimeError("Illegal state change for MessageSpace")
 
     def __repr__(self):
         params = ['hostname',
@@ -24,8 +54,8 @@ class MessageSpace(connection.BrokerConnection):
                 ]
         s = "MessageSpace("
         for param in params:
-            s += param + "='%s', " % getattr(self, param)
-        s += "port=%d" % self.port
+            s += param + "='%s', " % getattr(self.conn_params, param)
+        s += "port=%d" % self.conn_params.port
         s += ")"
         return s
 

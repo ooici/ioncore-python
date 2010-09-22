@@ -50,7 +50,10 @@ class IonTestCase(unittest.TestCase):
         mopt['boot_script'] = None
         mopt['script'] = None
 
-        self.cont_conn = yield container.startContainer(mopt)
+        self.container = container.create_new_container()
+        self.container.initialize(mopt)
+        yield self.container.activate()
+
         bootstrap.init_container()
         self.procRegistry = base_process.procRegistry
         self.test_sup = yield bootstrap.create_supervisor()
@@ -58,7 +61,7 @@ class IonTestCase(unittest.TestCase):
         #Load All Resource Descriptions for future decoding
         description_utility.load_descriptions()
 
-        log.info("============Magnet container started, "+repr(self.cont_conn))
+        log.info("============Capability Container started, "+repr(self.container.message_space))
 
     @defer.inlineCallbacks
     def _start_core_services(self):
@@ -80,9 +83,7 @@ class IonTestCase(unittest.TestCase):
         for dc in dcs:
             # Cancel the registered delayed call (this is non-async)
             dc.cancel()
-        yield self.cont_conn.transport.loseConnection()
-        container.Container._started = False
-        container.Container.store = Store()
+        yield self.container.terminate()
         bootstrap.reset_container()
         log.info("============ION container closed============")
 
