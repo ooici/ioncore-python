@@ -1,12 +1,24 @@
 """
 @brief Interface definitions for core data store components and entities.
+
+The set of primitive types (and structures/DataObject?) can be thought of
+as an invariant constant. 
 """
 
 from zope.interface import Interface
 
 class IDataObject(Interface):
     """
-    implementation to inherit Structure?
+    In general, this is a struct -- a container that holds typed
+    attributes, which can be other Data Objects, and references (links) to
+    other Data Objects. 
+
+    The behavior of this object is minimal -- it is limited to accessors,
+    structure immutability, and attribute type enforcement. 
+    Architecturally, it is a basic pure data structure.
+    
+    It is possible Data Object might not be the correct name for this object, 
+    in light of recent design discussion.
     """
 
     def set(key, value):
@@ -24,9 +36,8 @@ class IDataObject(Interface):
 
 class IEncoder(Interface):
     """
-    Has a implementation independent set of Types it should be able to
-    encode/decode 
-
+    An encoder has functionality for encoding/decoding the primitive types
+    of the data store.
     """
 
     def encode(obj):
@@ -48,6 +59,18 @@ class ISerializer(Interface):
     """
     Uniform, common "goto" interface for serializing/encoding and
     de-serializing/decoding a DataObject 
+
+    @note The Serializer concept could have a few purposes
+        * Registry/common interface for all different encoders
+        * A binding between messaging and encoding
+            o There could be a 'partial' encoder that, for a data object
+            structure, completes the final serialization process.
+            Separating full-serialization (for sending/storing a structure)
+            from the encoding of the types provides flexibility. 
+                - Some structures need to remain decomposed when
+                  sent/stored (pass by reference and ca store).
+                - Some structures should always be fully serialized and
+                  sent/stored as opaque byte strings/blobs.
     """
 
     def register():
@@ -64,8 +87,7 @@ class ISerializer(Interface):
 
 class IStore(Interface):
     """
-    Interface for all store backend implementations.
-    All operations are returning deferreds and operate asynchronously.
+    Basic key/value store interface.
     """
 
     def get(key):

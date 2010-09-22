@@ -41,9 +41,14 @@ description/reference store interface is a regular key/value interface.
 @note This file is almost Twisted independent; the only exception is in
 CAStore -- ion.data.store.IStore specifies methods that return
 twisted.internet.defer.Deferred objects.
+
+
+-----
+This implementation combines the Node object definitions and their
+encoding and serialization.
+Maybe the encoding and serialization should be decoupled...
 """
 
-import re
 import hashlib
 import struct
 import logging
@@ -131,7 +136,7 @@ class Element(tuple):
 
 class ICAStoreNode(Interface):
     """
-    Interface for objects stored in CAStore.
+    Interface of immutable content objects stored in CAStore.
     """
 
     type = Attribute("""@param type Type of storable object. This should be
@@ -265,7 +270,7 @@ class BaseNode(object):
         pass
 
 
-class Blob(BaseObject):
+class Blob(BaseNode):
     """
     Blob is a container for blob of bytes (string, or serialized object).
     """
@@ -305,7 +310,7 @@ class Blob(BaseObject):
         """
         return cls(encoded_body)
 
-class Tree(BaseObject):
+class Tree(BaseNode):
     """
     Tree Object
 
@@ -417,7 +422,7 @@ class Tree(BaseObject):
         return cls.elementFactory(name, obj, mode)
 
 
-class Commit(BaseObject):
+class Commit(BaseNode):
     """
     Commit Node
     Context for a root node. A commit is a particular state of a root node.
