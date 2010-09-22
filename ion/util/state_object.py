@@ -32,28 +32,27 @@ class StateObject(Actionable):
         assert isinstance(fsm_inst, FSM), "Given object not a FSM"
         self.__fsm = fsm_inst
 
-    def _so_process(self, event):
+    def _so_process(self, event, *args, **kwargs):
         """
         Trigger the FSM with an event. Leads to action functions being called.
         """
         assert  self.__fsm, "FSM not set"
+        self.__fsm.input_args = args
+        self.__fsm.input_kwargs = kwargs
         res = self.__fsm.process(event)
         return res
 
     def _action(self, action, fsm):
         fname = "on_%s" % action
         func = getattr(self, fname)
-        res = func(fsm.memory)
+        args = self.__fsm.input_args
+        kwargs = self.__fsm.input_kwargs
+        res = func(*args, **kwargs)
         return res
-
-class StateObjectFSM(FSM):
-    pass
-
-class StateObjectFactory(object):
-    pass
 
 class FSMFactory(object):
     """
+    A factory for FSMs to be used in StateObjects
     """
 
     def create_fsm(self, target, memory=None):
@@ -144,17 +143,17 @@ class BasicStateObject(StateObject):
         self._so_process(BasicFSMFactory.E_TERMINATE)
         pass
 
-    def on_initialize(self, memory):
+    def on_initialize(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
 
-    def on_activate(self, memory):
+    def on_activate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
 
-    def on_deactivate(self, memory):
+    def on_deactivate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
 
-    def on_terminate(self, memory):
+    def on_terminate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
 
-    def on_error(self, memory):
+    def on_error(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")

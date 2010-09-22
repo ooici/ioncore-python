@@ -68,6 +68,18 @@ class StateObjectTest(IonTestCase):
         yield so._so_process(BasicFSMFactory.E_ACTIVATE)
         self._assertCounts(so, 1, 1, 0, 0, 0)
 
+    def test_SO_argument(self):
+        so = TestSO()
+        so._so_process(BasicFSMFactory.E_INITIALIZE, 1, 2, 3)
+        self._assertCounts(so, 1, 0, 0, 0, 0)
+        self.assertEqual(so.args, (1, 2, 3))
+        self.assertEqual(so.kwargs, {})
+        so._so_process(BasicFSMFactory.E_ACTIVATE, a=1, b=2)
+        self._assertCounts(so, 1, 1, 0, 0, 0)
+        self.assertEqual(so.args, ())
+        self.assertEqual(so.kwargs, dict(a=1, b=2))
+
+
     def _assertCounts(self, so, init, act, deact, term, error):
         self.assertEqual(so.cnt_init, init)
         self.assertEqual(so.cnt_act, act)
@@ -84,24 +96,34 @@ class TestSO(BasicStateObject):
         self.cnt_term = 0
         self.cnt_err = 0
 
-    def on_initialize(self, memory):
+    def on_initialize(self, *args, **kwargs):
         self.cnt_init += 1
+        self.args = args
+        self.kwargs = kwargs
         log.debug("on_initialize called")
 
-    def on_activate(self, memory):
+    def on_activate(self, *args, **kwargs):
         self.cnt_act += 1
+        self.args = args
+        self.kwargs = kwargs
         log.debug("on_activate called")
 
-    def on_deactivate(self, memory):
+    def on_deactivate(self, *args, **kwargs):
         self.cnt_deact += 1
+        self.args = args
+        self.kwargs = kwargs
         log.debug("on_deactivate called")
 
-    def on_terminate(self, memory):
+    def on_terminate(self, *args, **kwargs):
         self.cnt_term += 1
+        self.args = args
+        self.kwargs = kwargs
         log.debug("on_terminate called")
 
-    def on_error(self, memory):
+    def on_error(self, *args, **kwargs):
         self.cnt_err += 1
+        self.args = args
+        self.kwargs = kwargs
         log.debug("on_error called")
 
 class TestSODeferred(TestSO):
@@ -109,28 +131,28 @@ class TestSODeferred(TestSO):
         TestSO.__init__(self)
 
     @defer.inlineCallbacks
-    def on_initialize(self, memory):
-        TestSO.on_initialize(self, memory)
+    def on_initialize(self, *args, **kwargs):
+        TestSO.on_initialize(self, *args, **kwargs)
         log.debug("before sleep")
         yield pu.asleep(0.05)
         log.debug("done sleep")
 
     @defer.inlineCallbacks
-    def on_activate(self, memory):
-        TestSO.on_activate(self, memory)
+    def on_activate(self, *args, **kwargs):
+        TestSO.on_activate(self, *args, **kwargs)
         yield pu.asleep(0.05)
 
     @defer.inlineCallbacks
-    def on_deactivate(self, memory):
-        TestSO.on_deactivate(self, memory)
+    def on_deactivate(self, *args, **kwargs):
+        TestSO.on_deactivate(self, *args, **kwargs)
         yield pu.asleep(0.05)
 
     @defer.inlineCallbacks
-    def on_terminate(self, memory):
-        TestSO.on_terminate(self, memory)
+    def on_terminate(self, *args, **kwargs):
+        TestSO.on_terminate(self, *args, **kwargs)
         yield pu.asleep(0.05)
 
     @defer.inlineCallbacks
-    def on_error(self, memory):
-        TestSO.on_error(self, memory)
+    def on_error(self, *args, **kwargs):
+        TestSO.on_error(self, *args, **kwargs)
         yield pu.asleep(0.05)
