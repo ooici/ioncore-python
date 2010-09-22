@@ -1,22 +1,23 @@
+#!/usr/bin/env python
+
 """
 @file spawnable.py
 @author Dorian Raymer
-@date 03/30/10
+@author Michael Meisinger
 """
+
 import os
 import types
 
 from zope.interface import implements
 from zope.interface import Interface
 
-from twisted.internet import reactor
 from twisted.internet import defer
-from twisted.python import reflect
-from twisted.python import log
-from twisted.plugin import IPlugin
+
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.id import Id
-from ion.core.cc import container
 from ion.core.cc.container import Container
 from ion.core.messaging import messaging
 
@@ -287,7 +288,7 @@ class Receiver(object):
             if not name_config:
                 raise RuntimeError("Messaging name undefined: "+self.name)
 
-        consumer = yield container.new_consumer(name_config, self.spawned)
+        consumer = yield Container.instance.new_consumer(name_config, self.spawned)
         self.consumer = consumer
         defer.returnValue(consumer)
 
@@ -348,7 +349,7 @@ def send(to_name, data, space=None):
     """
     # If int, interpret name as local identifier and convert to global
     if type(to_name) is int:
-        to_name = container.Id(to_name).full
+        to_name = Id(to_name).full
     name_config = yield store.get(str(to_name))
     if not name_config:
         pass
@@ -356,7 +357,7 @@ def send(to_name, data, space=None):
     # The only thing we need to know is exchange (given) and routing key.
     # In the future, different types of names might have different attributes.
     pub_config = {'routing_key' : str(to_name)}
-    pubs = yield container.new_publisher(pub_config)
+    pubs = yield Container.instance.new_publisher(pub_config)
     yield pubs.send(data)
     pubs.close()
 
@@ -423,7 +424,6 @@ def kill(id):
 def lookup(name):
     store = Store()
     return store.query(name)
-
 
 
 factory = ProtocolFactory()

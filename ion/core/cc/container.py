@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 @author Dorian Raymer
 @author Michael Meisinger
@@ -130,26 +132,26 @@ class Container(BasicLifecycleObject):
         d.addCallback(_cb)
         return d
 
-@defer.inlineCallbacks
-def new_consumer(name_config, target):
-    """
-    Given spawnable instance Id, create consumer
-    using hardcoded name conventions
+    @defer.inlineCallbacks
+    def new_consumer(self, name_config, target):
+        """
+        Given spawnable instance Id, create consumer
+        using hardcoded name conventions
 
-    @param id should be of type Id
-    @retval defer.Deferred that fires a consumer instance
-    """
-    consumer = yield BaseConsumer.name(Container.instance.exchange_space, name_config)
-    consumer.register_callback(target.send)
-    consumer.iterconsume()
-    defer.returnValue(consumer)
+        @param id should be of type Id
+        @retval defer.Deferred that fires a consumer instance
+        """
+        consumer = yield BaseConsumer.name(self.exchange_space, name_config)
+        consumer.register_callback(target.send)
+        consumer.iterconsume()
+        defer.returnValue(consumer)
 
-@defer.inlineCallbacks
-def new_publisher(name_config):
-    """
-    """
-    publisher = yield Publisher.name(Container.instance.exchange_space, name_config)
-    defer.returnValue(publisher)
+    @defer.inlineCallbacks
+    def new_publisher(self, name_config):
+        """
+        """
+        publisher = yield Publisher.name(self.exchange_space, name_config)
+        defer.returnValue(publisher)
 
 
 def create_new_container():

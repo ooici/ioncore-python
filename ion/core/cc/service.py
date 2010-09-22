@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 @author Dorian Raymer
 @author Michael Meisinger
