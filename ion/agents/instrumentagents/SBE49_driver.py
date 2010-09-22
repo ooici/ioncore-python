@@ -76,9 +76,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
     """
 
     def __init__(self, receiver=None, spawnArgs=None, **kwargs):
-        self.connected = False
         self.instrument = None
         self.command = None
+        self.setConnected(False)
         self.setTopicDefined(False)
         self.publish_to = None
 
@@ -458,10 +458,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
     def op_disconnect(self, content, headers, msg):
         log.debug("in Instrument Driver op_disconnect!")
         self.hsm.onEvent('eventDisconnectReceived')
-        #if (self.isConnected()):
-        #    log.debug("disconnecting from instrument")
-        #    self.proto.transport.loseConnection()
-        #    self.setConnected(False)
         if msg:
             yield self.reply_ok(msg, content)
 
@@ -524,18 +520,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
         assert(isinstance(content, (tuple, list)))
 
         log.debug("op_execute content: %s" %str(content))
-        """
-        This connection stuff could be abstracted into a communications object.
-        """
-        if self.isConnected() == False:
-            log.info("would be trying to connect this is a test")
-            #log.info("yielding for connect")
-            #yield self.getConnected()
-            log.info("connect returned")
-            # DHE NOTE TO SELF: not using the addCallback anymore, but it might
-            # be a good way to implement a state machine.
-            #d.addCallback(self.gotConnected);
-            #d.addCallback(self.gotPrompt);
 
         if ((content == ()) or (content == [])):
             yield self.reply_err(msg, "Empty command")
@@ -556,15 +540,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 """
                 self.hsm.onEvent('eventCommandReceived')
 
-                """
-                Currently sending the command from right here.  We SHOULD be
-                connected at this point.
-                """
-                if self.isConnected():
-                    log.info("!!!!! WOULD BE SENDING COMMAND HERE")
-                    #self.instrument.transport.write(self.command)
-                else:
-                    log.error("op_execute: instrument not connected.")
                 commands.append(command)
         yield self.reply_ok(msg, commands)
 
