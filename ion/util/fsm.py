@@ -211,18 +211,22 @@ processes one complete input symbol. You can process a list of symbols
 
         self.input_symbol = input_symbol
         (self.action, self.next_state) = self.get_transition(self.input_symbol, self.current_state)
+        res = None
         if self.action is not None:
-            self.action(self)
+            res = self.action(self)
         self.current_state = self.next_state
         self.next_state = None
+        return res
 
     def process_list(self, input_symbols):
 
         """This takes a list and sends each element to process(). The list may
 be a string or any iterable object. """
-
+        res = []
         for s in input_symbols:
-            self.process(s)
+            pres = self.process(s)
+            res.append(pres)
+        return res
 
 ##############################################################################
 # The following is an example that demonstrates the use of the FSM class to

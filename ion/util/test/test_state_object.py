@@ -14,6 +14,7 @@ from twisted.internet.defer import inlineCallbacks
 
 from ion.util.state_object import StateObject, BasicStateObject, BasicFSMFactory
 from ion.test.iontest import IonTestCase
+import ion.util.procutils as pu
 
 class StateObjectTest(IonTestCase):
     """
@@ -57,6 +58,15 @@ class StateObjectTest(IonTestCase):
         so._so_process(BasicFSMFactory.E_TERMINATE)
         self._assertCounts(so, 0, 0, 0, 0, 1)
 
+    @defer.inlineCallbacks
+    def test_SO_deferred(self):
+        so = TestSODeferred()
+        self._assertCounts(so, 0, 0, 0, 0, 0)
+
+        yield so._so_process(BasicFSMFactory.E_INITIALIZE)
+        self._assertCounts(so, 1, 0, 0, 0, 0)
+        yield so._so_process(BasicFSMFactory.E_ACTIVATE)
+        self._assertCounts(so, 1, 1, 0, 0, 0)
 
     def _assertCounts(self, so, init, act, deact, term, error):
         self.assertEqual(so.cnt_init, init)
@@ -93,3 +103,34 @@ class TestSO(BasicStateObject):
     def on_error(self, memory):
         self.cnt_err += 1
         log.debug("on_error called")
+
+class TestSODeferred(TestSO):
+    def __init__(self):
+        TestSO.__init__(self)
+
+    @defer.inlineCallbacks
+    def on_initialize(self, memory):
+        TestSO.on_initialize(self, memory)
+        log.debug("before sleep")
+        yield pu.asleep(0.05)
+        log.debug("done sleep")
+
+    @defer.inlineCallbacks
+    def on_activate(self, memory):
+        TestSO.on_activate(self, memory)
+        yield pu.asleep(0.05)
+
+    @defer.inlineCallbacks
+    def on_deactivate(self, memory):
+        TestSO.on_deactivate(self, memory)
+        yield pu.asleep(0.05)
+
+    @defer.inlineCallbacks
+    def on_terminate(self, memory):
+        TestSO.on_terminate(self, memory)
+        yield pu.asleep(0.05)
+
+    @defer.inlineCallbacks
+    def on_error(self, memory):
+        TestSO.on_error(self, memory)
+        yield pu.asleep(0.05)

@@ -37,12 +37,14 @@ class StateObject(Actionable):
         Trigger the FSM with an event. Leads to action functions being called.
         """
         assert  self.__fsm, "FSM not set"
-        self.__fsm.process(event)
+        res = self.__fsm.process(event)
+        return res
 
     def _action(self, action, fsm):
         fname = "on_%s" % action
         func = getattr(self, fname)
-        func(fsm.memory)
+        res = func(fsm.memory)
+        return res
 
 class StateObjectFSM(FSM):
     pass
@@ -88,7 +90,7 @@ class BasicFSMFactory(FSMFactory):
         @retval a function with a closure with the action name
         """
         def action_target(fsm):
-            target(action, fsm)
+            return target(action, fsm)
         return action_target
 
     def create_fsm(self, target, memory=None):
