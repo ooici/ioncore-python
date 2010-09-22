@@ -12,6 +12,9 @@ from twisted.internet import defer
 from twisted.persisted import sob
 from twisted.python import usage
 
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from ion.core.cc import container
 
 class Options(usage.Options):
@@ -36,7 +39,7 @@ class Options(usage.Options):
 
     def opt_version(self):
         from ion.core.ionconst import VERSION
-        print "ION Capability Container version:", VERSION
+        log.info("ION Capability Container version: "+ VERSION)
         sys.exit(0)
 
     def parseArgs(self, script=None):
@@ -74,9 +77,9 @@ class CapabilityContainer(service.Service):
         """
         service.Service.startService(self)
 
-        print "ION Capability Container Boot..."
+        log.info("ION Capability Container Boot...")
         yield self.start_container()
-        print 'Container started.'
+        log.info("Container started.")
 
         yield self.do_start_actions()
 
@@ -96,9 +99,10 @@ class CapabilityContainer(service.Service):
         When deferred done, fire next step
         @retval Deferred
         """
-        print 'Starting Container/broker connection...'
-        cont = container.create_new_container(self.config)
-        d = cont.start_container()
+        log.info("Starting Container/broker connection...")
+        cont = container.create_new_container()
+        cont.initialize(self.config)
+        d = cont.activate()
         return d
 
     @defer.inlineCallbacks
@@ -118,7 +122,7 @@ class CapabilityContainer(service.Service):
         """
         script = os.path.abspath(self.config['script'])
         if os.path.isfile(script):
-            print "Executing script %s ..." % self.config['script']
+            log.info("Executing script %s ..." % self.config['script'])
             execfile(script, {})
 
     def run_boot_script(self):
@@ -135,7 +139,7 @@ class CapabilityContainer(service.Service):
         """
         Start CC shell (a prog itself)
         """
-        print 'Starting Shell...'
+        log.info("Starting Shell...")
         from ion.core.cc.shell import control
         control.start(self)
 

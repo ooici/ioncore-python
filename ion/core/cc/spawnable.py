@@ -16,9 +16,9 @@ from twisted.python import log
 from twisted.plugin import IPlugin
 
 from ion.core.id import Id
-from ion.core.cc import messaging
 from ion.core.cc import container
 from ion.core.cc.container import Container
+from ion.core.messaging import messaging
 
 store = Container.store
 
@@ -45,8 +45,7 @@ class Spawnable(object):
     def __init__(self, target, space):
         """
         @param target
-        @param space The message [exchange] space to use (default
-        Container.space)
+        @param space The message [exchange] space to use
         """
         self.target = target
         self.space = space # message space of this instance's mailbox
@@ -401,7 +400,7 @@ def spawn(m, space=None, spawnArgs=None):
     Spawn uses a function as an entry point for running a module
     """
     if not space:
-        space = Container.space
+        space = Container.instance.message_space
     if spawnArgs == None:
         spawnArgs = {}
     if type(m) is types.ModuleType:

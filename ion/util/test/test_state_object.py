@@ -12,7 +12,7 @@ from twisted.trial import unittest
 from twisted.internet import defer
 from twisted.internet.defer import inlineCallbacks
 
-from ion.util.state_object import StateObject, BasicStateObject, BasicFSMFactory
+from ion.util.state_object import StateObject, BasicLifecycleObject, BasicFSMFactory
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -58,6 +58,15 @@ class StateObjectTest(IonTestCase):
         so._so_process(BasicFSMFactory.E_TERMINATE)
         self._assertCounts(so, 0, 0, 0, 0, 1)
 
+        so = TestSO()
+        self._assertCounts(so, 0, 0, 0, 0, 0)
+        so.initialize()
+        self._assertCounts(so, 1, 0, 0, 0, 0)
+        so.activate()
+        self._assertCounts(so, 1, 1, 0, 0, 0)
+        so.deactivate()
+        self._assertCounts(so, 1, 1, 1, 0, 0)
+
     @defer.inlineCallbacks
     def test_SO_deferred(self):
         so = TestSODeferred()
@@ -79,6 +88,12 @@ class StateObjectTest(IonTestCase):
         self.assertEqual(so.args, ())
         self.assertEqual(so.kwargs, dict(a=1, b=2))
 
+        so = TestSO()
+        so.initialize(1, 2, 3)
+        self._assertCounts(so, 1, 0, 0, 0, 0)
+        self.assertEqual(so.args, (1, 2, 3))
+        self.assertEqual(so.kwargs, {})
+
 
     def _assertCounts(self, so, init, act, deact, term, error):
         self.assertEqual(so.cnt_init, init)
@@ -87,9 +102,9 @@ class StateObjectTest(IonTestCase):
         self.assertEqual(so.cnt_term, term)
         self.assertEqual(so.cnt_err, error)
 
-class TestSO(BasicStateObject):
+class TestSO(BasicLifecycleObject):
     def __init__(self):
-        BasicStateObject.__init__(self)
+        BasicLifecycleObject.__init__(self)
         self.cnt_init = 0
         self.cnt_act = 0
         self.cnt_deact = 0

@@ -6,8 +6,70 @@
 
 from twisted.internet import defer
 
-from carrot import messaging
 from carrot import connection
+from carrot import messaging
+
+class MessageSpace(connection.BrokerConnection):
+    """
+    Configuration for a broker conection and vhost.
+    """
+
+    def __repr__(self):
+        params = ['hostname',
+                'userid',
+                'password',
+                'virtual_host',
+                ]
+        s = "MessageSpace("
+        for param in params:
+            s += param + "='%s', " % getattr(self, param)
+        s += "port=%d" % self.port
+        s += ")"
+        return s
+
+class Exchange(object):
+    """
+    Represents an AMQP exchange (name and type) in the context of an
+    Exchange Space.
+
+    Currently, the Container has a default space (vhost '/'). An exchange
+    point is just a well known exchange processes can send messages
+    through. It abstracts away amqp details like exchange type, persistance
+    options, etc.
+    The Container has a default exchange called 'magnet.topic'. The default
+    exchange is a topic exchange; topic is generaly useful and flexible
+
+    The amqp exchange parameters stored in this class only have to do with
+    with the amqp method exchange_declare.
+    """
+
+    exchange = ''
+    exchange_type = 'topic'
+    durable = False
+    auto_delete = True # deletes when all queues finish (unbind)
+
+    def __init__(self, connection, exchange, **kwargs):
+        """
+        @param connection the broker connection. It's called space becasue it is
+        also a natural namespace, but not yet the one Magnet will use for
+        it's "Exchange Space"
+        """
+        self.connection = connection
+        self.exchange = exchange
+        self.exchange_type = kwargs.get('exchange_type', self.exchange_type)
+        self.durable = kwargs.get('durable', self.durable)
+        self.auto_delete = kwargs.get('auto_delete', self.auto_delete)
+        self.config_dict = {'exchange':self.exchange,
+                            'exchange_type':self.exchange_type,
+                            'durable':self.durable,
+                            'auto_delete':self.auto_delete,
+                            }
+
+class ProcessExchange(Exchange):
+    pass
+
+class TopicExchange(Exchange):
+    pass
 
 container_exchange = {
                         'exchange':'container',
@@ -58,80 +120,6 @@ def fanout(name):
            'routing_key' : name,
            'immediate' : False,
             }
-
-class ExchangeName(object):
-    """
-    High-level messaging name.
-    Encapsulates messaging (amqp) details
-
-    Might also retain name config dict
-    OR might just be the config
-    """
-
-class MessageSpace(connection.BrokerConnection):
-    """
-    Configuration for a broker conection.
-    """
-
-    def __repr__(self):
-        params = ['hostname',
-                'userid',
-                'password',
-                'virtual_host',
-                ]
-        s = "MessageSpace("
-        for param in params:
-            s += param + "='%s', " % getattr(self, param)
-        s += "port=%d" % self.port
-        s += ")"
-        return s
-
-
-class Exchange(object):
-    """
-    Represents an AMQP exchange (name and type) in the context of an
-    Exchange Space.
-
-    Currently, the Container has a default space (vhost '/'). An exchange
-    point is just a well known exchange processes can send messages
-    through. It abstracts away amqp details like exchange type, persistance
-    options, etc.
-    The Container has a default exchange called 'magnet.topic'. The default
-    exchange is a topic exchange; topic is generaly useful and flexible
-
-    The amqp exchange parameters stored in this class only have to do with
-    with the amqp method exchange_declare.
-    """
-
-    exchange = ''
-    exchange_type = 'topic'
-    durable = False
-    auto_delete = True # deletes when all queues finish (unbind)
-
-    def __init__(self, connection, exchange, **kwargs):
-        """
-        @param connection the broker connection. It's called space becasue it is
-        also a natural namespace, but not yet the one Magnet will use for
-        it's "Exchange Space"
-        """
-        self.connection = connection
-        self.exchange = exchange
-        self.exchange_type = kwargs.get('exchange_type', self.exchange_type)
-        self.durable = kwargs.get('durable', self.durable)
-        self.auto_delete = kwargs.get('auto_delete', self.auto_delete)
-        self.config_dict = {'exchange':self.exchange,
-                            'exchange_type':self.exchange_type,
-                            'durable':self.durable,
-                            'auto_delete':self.auto_delete,
-                            }
-
-class ExchangeSpace(object):
-    """
-    give it a name and a connection
-    """
-    def __init__(self, name, connection):
-        self.name = name
-        self.connection = connection
 
 
 class BaseConsumer(messaging.Consumer):
@@ -202,12 +190,6 @@ class BaseConsumer(messaging.Consumer):
         inst = cls(connection, **full_config)
         return inst.declare()
 
-
-class Configure(BaseConsumer):
-    """
-    Only used for amqp config.
-    """
-
     @classmethod
     def name(cls, ex_space, config):
         """
@@ -264,9 +246,6 @@ def consume_on(name, config_factory=''):
 
     """
     amqp_conf = config_factory(name)
-    consumer = messaging.Consumer(Container.space, **amqp_conf)
+    consumer = messaging.Consumer(Container.instance.message_space, **amqp_conf)
     yield consumer.declare()
 
-def new_publisher():
-    """
-    """

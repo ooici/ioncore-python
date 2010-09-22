@@ -115,7 +115,7 @@ class BasicFSMFactory(FSMFactory):
 
         return fsm
 
-class BasicStateObject(StateObject):
+class BasicLifecycleObject(StateObject):
     """
     A StateObject with a basic life cycle, as determined by the BasicFSMFactory.
     @see BasicFSMFactory
@@ -127,21 +127,17 @@ class BasicStateObject(StateObject):
         fsm = factory.create_fsm(self)
         self._so_set_fsm(fsm)
 
-    def init(self):
-        self._so_process(BasicFSMFactory.E_INITIALIZE)
-        pass
+    def initialize(self, *args, **kwargs):
+        self._so_process(BasicFSMFactory.E_INITIALIZE, *args, **kwargs)
 
-    def activate(self):
-        self._so_process(BasicFSMFactory.E_ACTIVATE)
-        pass
+    def activate(self, *args, **kwargs):
+        self._so_process(BasicFSMFactory.E_ACTIVATE, *args, **kwargs)
 
-    def deactivate(self):
-        self._so_process(BasicFSMFactory.E_DEACTIVATE)
-        pass
+    def deactivate(self, *args, **kwargs):
+        self._so_process(BasicFSMFactory.E_DEACTIVATE, *args, **kwargs)
 
-    def terminate(self):
-        self._so_process(BasicFSMFactory.E_TERMINATE)
-        pass
+    def terminate(self, *args, **kwargs):
+        self._so_process(BasicFSMFactory.E_TERMINATE, *args, **kwargs)
 
     def on_initialize(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
