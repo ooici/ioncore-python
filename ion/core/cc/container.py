@@ -2,8 +2,10 @@
 @author Dorian Raymer
 @author Michael Meisinger
 @brief Capability Container main class
+@see http://www.oceanobservatories.org/spaces/display/syseng/CIAD+COI+SV+Python+Capability+Container
 
-A container utilizes the messaging abstractions.
+A container utilizes the messaging abstractions for AMQP.
+
 A container creates/enters a MessageSpace (a particular vhost in a
 broker)(maybe MessageSpace is a bad name; maybe not, depends on what
 context wants to be managed. A Message space could just be a particular
@@ -25,7 +27,9 @@ from twisted.python import log
 
 from carrot import connection
 
+from ion.core.id import Id
 from ion.core.cc import messaging
+from ion.core.cc.messaging import MessageSpace
 from ion.core.cc.store import Store
 
 DEFAULT_EXCHANGE_SPACE = 'magnet.topic'
@@ -38,58 +42,25 @@ base.py, and a specific txamqp extension in the txamqplib backend.
 should live here too?
 """
 
-class Id(object):
-    """entity instance id
-    local id is the int from Spawnable id count
-    full id is container id + local id
-    XXX local might be pid?
-        full might be named cid (container id)?
-    """
+#Id.default_container_id =
 
-    def __init__(self, local, container=None):
-        self.local = str(local)
-        if container is None:
-            container = Container.id
-        self.container = container
-        self.full = container + '.' + str(local)
-
-    def __str__(self):
-        """XXX print just local...or full?
-        """
-        return "%s" % str(self.full)
-
-    def __repr__(self):
-        return """Id(%s, container="%s")""" % (str(self.local),
-                                             str(self.container),)
-
-    def __eq__(self, other):
-        if self.local == other.local:
-            return True
-        return False
-
-    def __hash__(self):
-        """this is so Id's make sense as dict keys for Spawnable.
-        """
-        return int(self.local)
-
-class Name(object):
-    """
-    High-level messaging name.
-    Encapsulates messaging (amqp) details
-
-    Might also retain name config dict
-    OR might just be the config
-    """
-
+#class Phase(object):
+#    """State machine thing;
+#    Does something (e.g. start service) during boot up.
+#    Waits for thing to finish before proceeding
+#    """
 
 class Container(object):
-    """represents capability container.
-    (like application service...)
-    (like otp node..?)
+    """
+    Represents an instance of the Capability Container. Typically, in one Twisted
+    process (= one UNIX process), there is only one instance of a CC. In test cases,
+    however, there might be more.
 
     As a context, Container interfaces the messaging space with the local
     Spawnable and their Receivers...
     """
+
+    # Static attributes. Remove
 
     common = 'container' # common should be exchange
     space = None # main message space
@@ -131,6 +102,14 @@ class Container(object):
         d.addCallback(_cb)
         return d
 
+    def init_container(self):
+        pass
+
+    def start_container(self):
+        pass
+
+    def shutdown_container(self):
+        pass
 
 @defer.inlineCallbacks
 def new_consumer(name_config, target):
@@ -163,23 +142,6 @@ def new_publisher(name_config):
         publisher_send_gen = _genfunc(publisher.send)
         publisher.send = Container.interceptor_system.out_stack(publisher_send_gen)
     defer.returnValue(publisher)
-
-
-class MessageSpace(connection.BrokerConnection):
-
-    def __repr__(self):
-        params = ['hostname',
-                'userid',
-                'password',
-                'virtual_host',
-                ]
-        s = "MessageSpace("
-        for param in params:
-            s += param +"='%s', " % getattr(self, param)
-        s += "port=%d" % self.port
-        s += ")"
-        return s
-
 
 
 def coroutine(func):
@@ -326,6 +288,6 @@ def startContainer(config):
                             heartbeat=heartbeat)
     return Container.connectMainSpace(broker)
 
-def test():
-    broker = MessageSpace()
-    return Container.connectMainSpace(broker)
+
+def create_new_container():
+    pass

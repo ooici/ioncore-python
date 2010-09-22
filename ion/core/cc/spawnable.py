@@ -15,13 +15,12 @@ from twisted.python import reflect
 from twisted.python import log
 from twisted.plugin import IPlugin
 
+from ion.core.id import Id
 from ion.core.cc import messaging
 from ion.core.cc import container
 from ion.core.cc.container import Container
-from ion.core.cc.container import Id
 
 store = Container.store
-
 
 
 class Spawnable(object):

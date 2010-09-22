@@ -1,8 +1,7 @@
 """
-@file messaging.py
-@brief AMQP configuration factories as a function of application/service
-level names.
-@note All bindings are always to the container exchange (for now).
+@author Dorian Raymer
+@author Michael Meisinger
+@brief AMQP configuration factories as a function of application/service level names.
 """
 
 from twisted.internet import defer
@@ -60,19 +59,29 @@ def fanout(name):
            'immediate' : False,
             }
 
+class ExchangeName(object):
+    """
+    High-level messaging name.
+    Encapsulates messaging (amqp) details
+
+    Might also retain name config dict
+    OR might just be the config
+    """
+
 class MessageSpace(connection.BrokerConnection):
-    """Configuration for a broker conection.
+    """
+    Configuration for a broker conection.
     """
 
     def __repr__(self):
-        params = ['hostname', 
-                'userid', 
-                'password', 
+        params = ['hostname',
+                'userid',
+                'password',
                 'virtual_host',
                 ]
         s = "MessageSpace("
         for param in params:
-            s += param +"='%s', " % getattr(self, param) 
+            s += param + "='%s', " % getattr(self, param)
         s += "port=%d" % self.port
         s += ")"
         return s
@@ -80,9 +89,9 @@ class MessageSpace(connection.BrokerConnection):
 
 class Exchange(object):
     """
-    Represents an amqp exchange (name and type) in the context of an
-    exchange space.
-   
+    Represents an AMQP exchange (name and type) in the context of an
+    Exchange Space.
+
     Currently, the Container has a default space (vhost '/'). An exchange
     point is just a well known exchange processes can send messages
     through. It abstracts away amqp details like exchange type, persistance
@@ -156,22 +165,22 @@ class BaseConsumer(messaging.Consumer):
                                           durable=self.durable,
                                           auto_delete=self.auto_delete)
 
-        # Specific queue name given 
         if self.queue:
-            yield self.backend.queue_declare(queue=self.queue, 
+            # Specific queue name given
+            yield self.backend.queue_declare(queue=self.queue,
                                        durable=self.durable,
                                        exclusive=self.exclusive,
                                        auto_delete=self.auto_delete,
                                        warn_if_exists=self.warn_if_exists)
         else:
-            reply = yield self.backend.queue_declare(queue="", 
+            # Generate internal unique name
+            reply = yield self.backend.queue_declare(queue="",
                                        durable=self.durable,
                                        exclusive=self.exclusive,
                                        auto_delete=self.auto_delete,
                                        warn_if_exists=self.warn_if_exists)
             # remember the queue name the broker made for us
             self.queue = reply.queue
-            #routing_key = reply.queue
 
         yield self.backend.queue_bind(queue=self.queue,
                                     exchange=self.exchange,
@@ -202,7 +211,7 @@ class Configure(BaseConsumer):
     @classmethod
     def name(cls, ex_space, config):
         """
-        @brief configure name with out creating a consumer yet. 
+        @brief configure name with out creating a consumer yet.
         @param ex_space is the broker connection, and (in the current design)
         the exchange information.
         @param config is a dict of amqp options that __init__ extracts.
@@ -255,9 +264,9 @@ def consume_on(name, config_factory=''):
 
     """
     amqp_conf = config_factory(name)
-    consumer = messaging.Consumer(Container.space, **amqp_conf) 
+    consumer = messaging.Consumer(Container.space, **amqp_conf)
     yield consumer.declare()
- 
+
 def new_publisher():
     """
     """
