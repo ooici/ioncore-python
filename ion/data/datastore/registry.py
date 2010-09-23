@@ -4,6 +4,7 @@
 """
 @file ion/data/datastore/registry.py
 @author David Stuebe
+@author Matt Rodriguez
 @brief base service for registering ooi resources
 """
 
@@ -110,32 +111,28 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         by creating a new (unique) resource object to the store.
         @note Is the way objectClass is referenced awkward?
         """
-        #print 'Dataobject Register Start',dataobject.DataObject._types.has_key('__builtins__')
-        #del dataobject.DataObject._types['__builtins__']
-        #print 'Dataobject Register Removed',dataobject.DataObject._types.has_key('__builtins__')
-
+        logging.info("Calling Registry.register_resource")
         if isinstance(resource, self.objectChassis.objectClass):
 
             id = resource.RegistryIdentity
             if not id:
                 raise RuntimeError('Can not register a resource which does not have an identity.')
 
-            #print 'Dataobject Register Is Instance',dataobject.DataObject._types.has_key('__builtins__')
-
-
             try:
+                logging.info("creating res_client")
                 res_client = yield self.create(id, self.objectChassis.objectClass)
+                logging.info("Created client")
             except objstore.ObjectStoreError:
+                logging.info("ObjectStoreError")
                 res_client = yield self.clone(id)
-
-            #print 'Dataobject Chasis',dataobject.DataObject._types.has_key('__builtins__')
-
+            
+            logging.info("Check out resource")    
             yield res_client.checkout()
-
-            #print 'Dataobject checkout',dataobject.DataObject._types.has_key('__builtins__')
-
+            logging.info("Checked out resource")
             res_client.index = resource
+            logging.info("Committing resource")
             resource.RegistryCommit = yield res_client.commit()
+            logging.info("Committed resource")
         else:
             resource = None
 
@@ -146,12 +143,16 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         """
         @brief Get resource description object
         """
+        logging.info("get_resource called")
+        logging.info("resource_reference %s" % resource_reference)
         resource=None
         if isinstance(resource_reference, dataobject.ResourceReference):
-
+            logging.info("resource_reference is correct type")
             branch = resource_reference.RegistryBranch
             resource_client = yield self.clone(resource_reference.RegistryIdentity)
+            logging.info("resource_client %s" % resource_client)
             if resource_client:
+                logging.info("Retrieved resource_client")
                 if not resource_reference.RegistryCommit:
                     resource_reference.RegistryCommit = yield resource_client.get_head(branch)
 
@@ -211,13 +212,19 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         """
         @brief Find resource descriptions in the registry meeting the criteria
         in the FindResourceContainer
+        @param description DataObject that 
+        @param regex Whether a regex is used or not
+        @param ignore_defaults ignore registry defaults
+        @param attnames attribute names associated with the resource
         """
 
         # container for the return arguments
+        logging.info("called find_resource")
+        logging.info("description class %s" % description.__class__)
         results=[]
         if isinstance(description,dataobject.DataObject):
             refs = yield self._list()
-            logging.debug(description)
+            logging.info(description)
 
             # Get the list of descriptions in this registry
 
@@ -225,8 +232,10 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
             logging.info(self.__class__.__name__ + ': find_resource found ' + str(len(reslist)) + ' items in registry')
             num_match = 1
             for ref in refs:
+                logging.info("ref: %s" % ref)
                 res = yield self.get_resource(ref)
-                logging.debug("Found #"+str(num_match)+":"+str(res))
+                
+                logging.info("Found #"+str(num_match)+":"+str(res))
                 num_match += 1
                 matches_desc = description.compared_to(res,
                                         regex=regex,
@@ -473,6 +482,7 @@ class BaseRegistryClient(BaseServiceClient):
         created using the create_new_resource method. Specific registries may
         override this behavior to create the resource inside the register method
         """
+        logging.info("called BaseRegistryClient.base_register_resource")
         yield self._check_init()
         logging.info(self.__class__.__name__ + '; Calling: '+ op_name)
 
