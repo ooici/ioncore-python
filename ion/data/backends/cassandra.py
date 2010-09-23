@@ -5,7 +5,8 @@
 @author Michael Meisinger
 @author Paul Hubbard
 @author Dorian Raymer
-@brief Implementation of ion.data.store.IStore using pycassa to interface a
+@author Matt Rodriguez
+@brief Implementation of ion.data.store.IStore using Telephus to interface a
         Cassandra datastore backend
 @Note Test cases for the cassandra backend are now in ion.data.test.test_store
 """
@@ -21,6 +22,8 @@ from twisted.internet.protocol import ClientCreator
 #import pycassa
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory, ManagedThriftClientProtocol
+from telephus import protocol
+from telephus.cassandra.ttypes import NotFoundException
 
 from ion.core import ioninit
 from ion.data.store import IStore
@@ -79,31 +82,14 @@ class CassandraStore(IStore):
             if inst.namespace:
                 logging.info('Ignoring namespace argument in non super column cassandra store')
             inst.namespace=None
-
-        if not inst.cass_host_list:
-            logging.info('Connecting to Cassandra on localhost...')
-        else:
-            logging.info('Connecting to Cassandra ks:cf=%s:%s at %s ...' %
-                         (inst.keyspace, inst.colfamily, inst.cass_host_list))
-        #inst.client = pycassa.connect(inst.cass_host_list)
-        #inst.kvs = pycassa.ColumnFamily(inst.client, inst.keyspace,
-        #                                inst.colfamily, super=inst.cf_super)
-        inst.manager = ManagedCassandraClientFactory()
-        inst.client = CassandraClient(inst.manager, inst.keyspace)
-        logging.info('connected to Cassandra... OK.')
-        logging.info('cass_host_list: '+str(inst.cass_host_list))
-        logging.info('keyspace: '+str(inst.keyspace))
-        logging.info('colfamily: '+str(inst.colfamily))
-        logging.info('cf_super: '+str(inst.cf_super))
-        logging.info('namespace: '+str(inst.namespace))
-        client_creator = ClientCreator(reactor, ManagedThriftClientProtocol)
-        port = 9160
-        host = 'localhost'
-        factory = ManagedCassandraClientFactory()
-        d = client_creator.connectTCP(host, port, factory)
-        d.addCallback(cls)
-        return d
         
+        port = 9160
+        host = 'amoeba.ucsd.edu'
+        inst.manager = ManagedCassandraClientFactory()
+        inst.client = CassandraClient(inst.manager, inst.keyspace) 
+        inst.connector = reactor.connectTCP(host, port, inst.manager, timeout=1)
+        logging.info("Created Cassandra store")
+        return defer.succeed(inst)               
 
     @defer.inlineCallbacks
     def clear_store(self):
@@ -125,17 +111,23 @@ class CassandraStore(IStore):
         @retval Deferred, for value from the ion dictionary, or None
         """
         value = None
-        #try:
-        if self.cf_super:
-            value = yield self.client.get(self.key, self.colfamily, column=[col], super_column=self.namespace)
-        else:
-            value = yield self.client.get(self.key, self.colfamily, column=[col])
-                #logging.debug('Key "%s":"%s"' % (key, val))
-                #this could fail if insert did it wrong
-        value=value.get(col)
-        #except pycassa.NotFoundException:
-            #logging.debug('Key "%s" not found' % key)
-        #pass
+        logging.info("Calling get on col %s " % col)
+        try:
+            if self.cf_super:
+                logging.info("super_col: Calling get on col %s " % col)
+                #logging.info("get self.key: %s  self.colfamily: %s column: %s  super_column: %s" % (self.key, self.colfamily, col, self.namespace))
+                value = yield self.client.get(self.key, self.colfamily, column=col, super_column=self.namespace)
+                logging.info("super_col: Calling get on col %s " % value)
+            else:
+                logging.info("standard_col: Calling get on col %s " % col)
+                value = yield self.client.get(self.key, self.colfamily, column=col)
+        except NotFoundException, nfe:     
+            #logging.info("standard_col: Calling get on col %s " % value)
+            #logging.debug('Key "%s":"%s"' % (self.key, col))
+            defer.returnValue(None)
+            
+        value = value.column.value 
+        #logging.info("Got back %s" % value)
         defer.returnValue(value)
 
     @defer.inlineCallbacks
@@ -147,12 +139,14 @@ class CassandraStore(IStore):
         @note Value is composed into OOI dictionary under keyname 'value'
         @retval Deferred for success
         """
-        #logging.debug('writing key %s value %s' % (key, value))
+        logging.info("Calling put")
+        logging.info('writing key %s value %s' % (col, value))
         if self.cf_super:
-            yield self.client.insert(self.key, self.colfamily, {self.namespace:{col:value}})
+            #yield self.client.insert(self.key, self.colfamily, {self.namespace:{col:value}})
+            yield self.client.insert(self.key, self.colfamily, value, column=col, super_column=self.namespace) 
         else:
-            yield self.client.insert(self.key, self.colfamily, {col:value})
-        
+            #yield self.client.insert(self.key, self.colfamily, {col:value})
+            yield self.client.insert(self.key, self.colfamily, value, column=col)
         defer.returnValue(None)
 
     @defer.inlineCallbacks
@@ -163,19 +157,22 @@ class CassandraStore(IStore):
         @retval Deferred, for list, possibly empty, of keys that match.
         @note Uses get_range generator of unknown efficiency.
         """
-        #@todo This implementation is very inefficient. Do smarter, but how?
+        #logging.info("searching for regex %s" % regex)
         matched_list = []
         if self.cf_super:
             klist = yield self.client.get(self.key, self.colfamily, super_column=self.namespace)
         else:
             klist = yield self.client.get(self.key, self.colfamily)
-
-        for x in klist.keys():
+        #logging.info("klist %s" % klist)
+        columns = klist.super_column.columns
+        for col in columns:
+            #logging.info("col.name %s" % col.name)
+            m = re.findall(regex, str(col.name))
             #m = re.search(regex, x[0])
-            m = re.findall(regex, x)
-            if m:
-                matched_list.extend(m)
+            if m: 
+                matched_list.append(col.name)
 
+        #logging.info("matched_list %s" % matched_list)
         defer.returnValue(matched_list)
 
     @defer.inlineCallbacks
