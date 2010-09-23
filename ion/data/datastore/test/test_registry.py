@@ -40,15 +40,17 @@ class RegistryTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_register(self):
-        
+        logging.info("Creating new resource")
         res = dataobject.Resource.create_new_resource()
         res.name = 'foo'
+        logging.info("Resource created")
         
         #print 'Dataobject Created',dataobject.DataObject._types.has_key('__builtins__')
         
         #@Note - always over-write the old argument value!
+        logging.info("Calling register resource")
         res = yield self.reg.register_resource(res)
-        
+        logging.info("res is: %s" % (res))
         #print 'Dataobject Registerd!',dataobject.DataObject._types.has_key('__builtins__')
         
         #res.reference is a DataObject function. DataObject can't specify
@@ -56,6 +58,7 @@ class RegistryTest(unittest.TestCase):
         #would not work with a object description language
         ref = res.reference()
         res2 = yield self.reg.get_resource(ref)
+        logging.info("res2 is: %s" % (res2))
         self.failUnless(res == res2)
 
 
@@ -136,6 +139,8 @@ class RegistryTest(unittest.TestCase):
         self.assertEqual(results,[])
         
         results = yield self.reg.find_resource(res1,regex=False,ignore_defaults=False)
+        logging.info("results: %s" % results)
+        logging.info("res1: %s" % res1)
         self.assertIn(res1, results)
         self.assertNotIn(res2, results)
         
@@ -175,7 +180,7 @@ class RegistryCassandraTest(RegistryTest):
 
     @defer.inlineCallbacks
     def _setup_backend(self):
-        clist = ['localhost:9160']
+        clist = ['amoeba.ucsd.edu:9160']
         s = yield cassandra.CassandraStore.create_store(
             cass_host_list=clist,
             cf_super=True,            
@@ -184,7 +189,13 @@ class RegistryCassandraTest(RegistryTest):
             )
         self.reg = registry.Registry(s)
 
-
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.reg.clear_registry()
+        l = dir(self.reg)
+        logging.info("Calling connector.disconnect")
+        self.reg.backend.manager.shutdown()
+        
 class RegistryServiceTest(IonTestCase, RegistryTest):
     """
     """
