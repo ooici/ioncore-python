@@ -14,6 +14,7 @@ logging = logging.getLogger(__name__)
 #import pycassa
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
+from ion.data.backends.cassandra import CassandraStore
 
 
 class SetCassandraStore():
@@ -29,15 +30,15 @@ class SetCassandraStore():
         @retval Connected object instance
         """
         if not cass_host_list:
-            logging.info('Connecting to Cassandra on localhost...')
+            logging.info('Connecting to Cassandra at localhost')
         else:
             hosts = str(cass_host_list)
             logging.info('Connecting to Cassandra at "%s"...' % hosts)
-        self._manager = ManagedCassandraClientFactory()
+        #self._manager = ManagedCassandraClientFactory()
         #keyspace and colfamily needs to be passed into the constructor
         self._keyspace = 'Datasets'
         self._colfamily = 'Catalog'
-        self._client = CassandraClient.create_store()
+        self._client = CassandraStore.create_store()
         #self._client = pycassa.connect(cass_host_list)
         #self._kvs = pycassa.ColumnFamily(client, 'Datasets', 'Catalog')
         logging.info('connected OK.')
