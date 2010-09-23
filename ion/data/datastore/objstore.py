@@ -4,6 +4,7 @@
 @author Dorian Raymer
 @author David Stuebe
 @author Michael Meisinger
+@author Matt Rodriguez
 """
 
 
@@ -197,9 +198,6 @@ class ObjectChassis(object):
         """
         self.objstore = objstore
         self.keyspace = keyspace
-        if objectClass:
-            #self.objectClass = objectClass
-            pass
         self.index = None
         self.cur_commit = None
 
@@ -211,7 +209,8 @@ class ObjectChassis(object):
         @retval Deferred
         """
         return self.keyspace.put('refs.' + head, commit_id)
-
+    
+    @defer.inlineCallbacks
     def get_head(self, name='master'):
         """
         @brief Get reference named 'name'. The head references represent
@@ -222,17 +221,22 @@ class ObjectChassis(object):
         @todo get('heads.master') instead of just get('head')
         @note if head is not there, *IStore says return None*
         """
-        return self.keyspace.get('refs.' + name)
+        logging.info("Calling keyspace.get")
+        yield self.keyspace.get('refs.' + name)
 
     @defer.inlineCallbacks
     def checkout(self, head='master', commit_id=None):
         """
         """
+        logging.info("Inside ObjectChassis.checkout function with commit_id %s" % commit_id)
         if commit_id:
             ref = commit_id
         else:
+            logging.info("Calling get_head method")
             ref = yield self.get_head(head)
+            #ref = self.get_head(head)
         if ref:
+            logging.info("Getting ref %s from objstore" % ref)
             commit = yield self.objstore.get(ref)
             tree = yield self.objstore.get(commit.tree)
             yield tree.load(self.objstore)
@@ -431,6 +435,7 @@ class ObjectStore(BaseObjectStore):
         yet in the object store.
         @retval A Deferred that succeeds with a new instance of ObjectChassis.
         """
+        logging.info("Creating object using ObjectStore.create")
         if not (yield self._object_exists(name)):
             yield self._create_object(name, objectClass)
             obj = yield self._build_object(name)
@@ -503,15 +508,20 @@ class ObjectStore(BaseObjectStore):
     @defer.inlineCallbacks
     def _object_exists(self, name):
         """
-        @brief does object store object exist?
+        @brief Check if the object exists in the object store
         @param name in this context is the id of the cas uuid object.
-        @retval A Deferred
+        @retval True or False wrapped in a Deferred
         """
+        logging.info("Called _object_exists")
         try:
-            #obj = yield self.objs.get(name)
+            
             obj = yield self.refs.get(name)
+            logging.info("obj is %s " % obj)
             exists = bool(obj)
-        except cas.CAStoreError:
+        #This was cas.CasStoreError, which was not catching the exception
+        #thrown by the Telephus client, when the object didn't exist.
+        except Exception, ex:
+            logging.info(ex.args)
             exists = False
         defer.returnValue(exists)
 
@@ -530,6 +540,7 @@ class ObjectStore(BaseObjectStore):
         makes much sense when you consider the compliment 'put' verb. There
         is no 'put', there is 'commit', and update ref...
         """
+        logging.info("Calling clone with name %s" % name)
         if (yield self._object_exists(name)):
             obj = yield self._build_object(name)
             defer.returnValue(obj)
