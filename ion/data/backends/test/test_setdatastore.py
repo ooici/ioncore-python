@@ -19,15 +19,17 @@ from twisted.internet import defer
 
 class SetDataStoreInterfaceTest(unittest.TestCase):
     def setUp(self):
-        clist = ['localhost:9160']
+        clist = ['amoeba.ucsd.edu:9160']
         self.ds = SetCassandraStore(cass_host_list=clist)
         self.key = self._mkey()
         self.value = self._mkey()
         self.value2 = self._mkey()
-
+    
+    @defer.inlineCallbacks
     def tearDown(self):
-        self.ds.remove(self.key)
-        del self.ds
+        yield self.ds.remove(self.key)
+        self.ds._client.manager.shutdown()
+        
 
     def _mkey(self):
         # Generate a pseudo-random string. handy, that.
