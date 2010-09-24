@@ -9,10 +9,11 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
+from twisted.internet import defer, reactor
+import time
 
 from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.services.base_service import BaseService, BaseServiceClient, BaseProcessClient
 from ion.services.dm.scheduler.scheduler_registry import SchedulerRegistryClient
 
 class SchedulerService(BaseService):
@@ -48,9 +49,45 @@ class SchedulerService(BaseService):
             return
 
         log.debug('ok, gotta task to save')
-        yield self.ctab.add_task(tid, msg_interval, msg_payload)
+        task_id = yield self.ctab.add_task(tid, msg_interval, msg_payload)
+        if task_id:
+            yield self.reply_ok(msg, task_id)
+        else:
+            yield self.reply_err(msg, 'Error adding task to registry!')
 
-        yield self.reply_err(msg, {'value':'Not implemented!'}, {})
+        # Now that task is stored into registry, add to messaging callback
+
+
+
+    def _send_message(self, task_id, target_id, payload):
+        # Do work, then reschedule ourself
+        bpc = BaseProcessClient(target=target_id)
+        # @note fire and forget; don't need to wait for send to run to completion.
+        bpc.send(payload)
+
+        # Schedule next invocation
+        self._schedule_next(task_id)
+
+    @defer.inlineCallbacks
+    def _schedule_next(self, task_id):
+        # Pull the task def from the registry
+        tdef = yield self.ctab.query_tasks(task_id)
+
+        try:
+            target_id = tdef['target']
+            interval = tdef['interval']
+            payload = tdef['payload']
+            last_run = tdef['last_run']
+        except KeyError, ke:
+            log.exception('Error parsing task def from registry! Task id: "%s"' % task_id)
+            defer.returnValue(None)
+
+        reactor.callLater(interval, self._send_message, task_id, target_id, payload)
+
+        # Update last-invoked timestamp in registry
+        tdef['last_run'] = time.time()
+        yield self.ctab.store_task(target_id, interval, payload=payload, taskid=task_id)
+
 
     @defer.inlineCallbacks
     def op_rm_task(self, content, headers, msg):
