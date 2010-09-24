@@ -49,15 +49,15 @@ class SchedulerService(BaseService):
             return
 
         log.debug('ok, gotta task to save')
-        task_id = yield self.ctab.add_task(tid, msg_interval, msg_payload)
+        task_id = yield self.ctab.store_task(tid, msg_interval, payload=msg_payload)
         if task_id:
             yield self.reply_ok(msg, task_id)
         else:
             yield self.reply_err(msg, 'Error adding task to registry!')
 
         # Now that task is stored into registry, add to messaging callback
-
-
+        self._schedule_next(task_id)
+        self.reply_ok(msg, 'Task ID %s scheduled' % task_id)
 
     def _send_message(self, task_id, target_id, payload):
         # Do work, then reschedule ourself

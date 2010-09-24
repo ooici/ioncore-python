@@ -61,7 +61,7 @@ class SRT(IonTestCase):
     def test_rm(self):
         sc = SchedulerRegistryClient(proc=self.sup)
 
-        yield sc.add_task('foobar', 1.0, 'pingtest')
+        yield sc.store_task('foobar', 1.0)
         yield sc.rm_task('foobar')
         rl = yield sc.query_tasks('foobar')
         self.failUnlessEqual(rl['value'], [])
