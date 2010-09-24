@@ -1,25 +1,26 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/scheduler/test/test_scheduler.py
-@date 9/21/10
+@file ion/services/dm/scheduler/test/test_registry.py
+@date 9/24/10
 @author Paul Hubbard
-@test ion.services.dm.scheduler Exercise the crontab
+@test ion.services.dm.scheduler Exercise the crontab registry
 """
 
 from twisted.internet import defer
 
-from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
+from ion.services.dm.scheduler.scheduler_registry import SchedulerRegistryClient
 
 from ion.test.iontest import IonTestCase
 
-class SchedulerTest(IonTestCase):
+class SRT(IonTestCase):
+    """
+    Scheduler Registry test
+    """
     @defer.inlineCallbacks
     def setUp(self):
         self.timeout = 5
         services = [
-            {'name': 'scheduler', 'module': 'ion.services.dm.scheduler.scheduler_service',
-             'class': 'SchedulerService'},
             {'name': 'scheduler_registry', 'module': 'ion.services.dm.scheduler.scheduler_registry',
              'class': 'SchedulerRegistry'},
         ]
@@ -36,24 +37,29 @@ class SchedulerTest(IonTestCase):
         pass
 
     @defer.inlineCallbacks
-    def test_add_remove(self):
-        sc = SchedulerServiceClient(proc=self.sup)
+    def test_clear(self):
+        sc = SchedulerRegistryClient(proc=self.sup)
+        yield sc.clear()
 
-        yield sc.add_task('foobar', 1.0, 'pingtest')
-        rc = yield sc.rm_task('foobar')
+    @defer.inlineCallbacks
+    def test_add_remove(self):
+        sc = SchedulerRegistryClient(proc=self.sup)
+        tid = yield sc.store_task('foobar', 1.0)
+
+        rc = yield sc.rm_task(tid)
         self.failUnlessEqual(rc['status'], 'OK')
 
     @defer.inlineCallbacks
     def test_query(self):
-        sc = SchedulerServiceClient(proc=self.sup)
+        sc = SchedulerRegistryClient(proc=self.sup)
 
-        yield sc.add_task('foobar', 1.0, 'pingtest')
+        yield sc.store_task('foobar', 1.0)
         rl = yield sc.query_tasks('.+?')
         self.failUnlessSubstring('foobar', str(rl['value']))
 
     @defer.inlineCallbacks
     def test_rm(self):
-        sc = SchedulerServiceClient(proc=self.sup)
+        sc = SchedulerRegistryClient(proc=self.sup)
 
         yield sc.add_task('foobar', 1.0, 'pingtest')
         yield sc.rm_task('foobar')

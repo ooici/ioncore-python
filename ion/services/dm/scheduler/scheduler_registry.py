@@ -14,65 +14,95 @@ from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.data.store import IStore
+from ion.data.datastore.registry import BaseRegistryService, BaseRegistryClient
+from ion.data import dataobject
 
-class SchedulerRegistry(BaseService):
-    # Declaration of service
+class SchedulerRegistry(BaseRegistryService):
+    """
+    Our registry is an instance of the BaseRegistryService. Just declare the messaging
+    and take the class instance as-is; API skinning is provided in the client.
+    Yes, this is quite clever, thanks very much.
+    """
     declare = BaseService.service_declare(name='scheduler_registry',
                                           version='0.1.0',
                                           dependencies=[])
 
+    """
+    OK, blocked - stupid base class lacks the required op_ prefix, so you're forced
+    to rename the functions to match the LCA signature. This sucks.
+    """
+    op_clear = BaseRegistryService.base_clear_registry
+    op_store_task = BaseRegistryService.base_register_resource
+    """
+    And the base class has no remove function. Weak.
+
+    op_rm_task = BaseRegistryService.
+    """
+    op_query_tasks = BaseRegistryService.base_find_resource
+
     @defer.inlineCallbacks
-    def slc_init(self):
-        self.store = IStore()
-        yield self.store.create_store()
-
-        # @bug Clear store at init - remove once debugged!
-        log.warn('Clearing registry!')
-        yield self.store.clear_store()
-
-    @defer.inlineCallbacks
-    def op_add_task(self, content, headers, msg):
-        """
-        @brief Add a new task to the crontab. Interval is in seconds, fractional.
-        @param content Message payload, must be a dictionary with 'target', 'interval' and 'payload' keys
-        @param headers Ignored here
-        @param msg Ignored here
-        @retval reply_ok or reply_err
-        """
-        try:
-            tid = content['target']
-            msg_payload = content['payload']
-            msg_interval = float(content['interval'])
-        except KeyError, ke:
-            log.exception('Required keys in payload not found!')
-            yield self.reply_err(msg, {'value': str(ke)})
-            return
-
-
-        self.reply_err(msg, {'value':'Not implemented!'}, {})
-
     def op_rm_task(self, content, headers, msg):
-        self.reply_err(msg, {'value':'Not implemented!'}, {})
+        yield self.reply_err(msg, 'Method not implemented!!')
 
-    def op_query_tasks(self, content, headers, msg):
-        self.reply_err(msg, {'value':'Not implemented!'}, {})
-
-class SchedulerRegistryClient(BaseServiceClient):
-
+class SchedulerRegistryClient(BaseRegistryClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = 'scheduler_service'
+            kwargs['targetname'] = "scheduler_registry"
         BaseServiceClient.__init__(self, proc, **kwargs)
 
-    def add_task(self, taskid, interval, payload):
-        pass
+    @defer.inlineCallbacks
+    def clear(self):
+        """
+        Nuke the registry contents.
+        @todo Wrap this with auth*
+        """
+        yield self._check_init()
 
-    def rm_task(self, taskid):
-        pass
+        (content, headers, msg) = yield self.rpc_send('clear', None)
+        if content['status'] == 'OK':
+            defer.returnValue(None)
+        else:
+            log.error('Error clearing registry!')
+
+    @defer.inlineCallbacks
+    def store_task(self, target, interval, payload=None, taskid=None):
+        """
+        @brief Stores a task in the registry, optionally overwriting a previous version.
+        @param target Name to send to in the exchange
+        @param interval periodic interval to send the message, in fractional seconds
+        @param payload Payload to send in the message
+        @taskid Optional - if set, will overwrite the previous task definition
+        @retval taskid Unique task ID
+        """
+        msg = {'target': target, 'interval': interval}
+        if payload:
+            msg['payload'] = payload
+        if taskid:
+            msg['taskid'] = taskid
+
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('store_task', msg)
+        if content['status'] == 'OK':
+            defer.returnValue(content['taskid'])
 
     def query_tasks(self, task_regex):
-        pass
+        """
+        @brief Query the task registry for a list of tasks that match the regex.
+        @note Primary key is taskid
+        @param task_regex Regular expression to match
+        @retval Array of task, possibly empty. Entries in the array are a dictionary holding
+         {'target', 'interval', 'payload', 'last_run'} fields.
+        """
+        return self.base_find_resource('query_tasks', task_regex, regex=True)
+
+    def rm_task(self, taskid):
+        """
+        Remove a given taskid from the registry.
+        @param taskid Task ID to remove.
+        """
+        # As per david s, this is the current way to rm something
+        return self.base_set_resource_lcstate('set_resource_lcstate',taskid, 'retired')
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(SchedulerRegistry)
