@@ -88,7 +88,6 @@ class SchedulerService(BaseService):
         tdef['last_run'] = time.time()
         yield self.ctab.store_task(target_id, interval, payload=payload, taskid=task_id)
 
-
     @defer.inlineCallbacks
     def op_rm_task(self, content, headers, msg):
         """
