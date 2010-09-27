@@ -28,8 +28,7 @@ class SetDataStoreInterfaceTest(unittest.TestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.ds.remove(self.key)
-        self.ds._client.manager.shutdown()
-        
+        logging.info(dir(self.ds._client))
 
     def _mkey(self):
         # Generate a pseudo-random string. handy, that.
