@@ -9,6 +9,7 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 import os.path
+import traceback
 
 from ion.core import ioninit
 from ion.util.config import Config
@@ -51,6 +52,10 @@ class ModuleLoader(object):
             modo = pu.get_module(mod)
         except Exception, ie:
             log.error("Error importing module: "+str(mod))
+            log.error(ie)
+            for line in traceback.format_exc().splitlines():
+                log.error(line)
+
 
     def _load_package(self, pack, recurse=False):
         #log.info('Loading Package %s' % (pack))
@@ -66,3 +71,6 @@ class ModuleLoader(object):
                         self._load_package(pack+'.'+fname)
         except Exception, ie:
             log.error("Error importing package: "+str(pack))
+            log.error(ie)
+            for line in traceback.format_exc().splitlines():
+                log.error(line)
