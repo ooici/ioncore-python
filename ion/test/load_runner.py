@@ -51,12 +51,30 @@ class LoadTestRunner(object):
     @defer.inlineCallbacks
     def start_load_suite(self, suitecls, spawn_procs, options):
         print "Start load suite %s as procs:%s" % (suitecls, spawn_procs)
+        numprocs = int(options['count'])
+
         if spawn_procs:
-            pass
+            load_script = ['python', '-m', 'ion.test.load_runner', '-c', options['class']]
+            timeout = int(options['timeout'])
+            if timeout > 10:
+                load_script.extend(['-t',str(timeout-10)])
+
+            load_script.extend(options['test_args'])
+            print "Starting %s loads: %s" % (numprocs, load_script)
+
+            procs = []
+            for i in range(numprocs):
+                p = subprocess.Popen(load_script)
+                procs.append(p)
+
+            #print "started all procs"
+
+            for p in procs:
+                p.wait()
+
         else:
-            number = int(options['count'])
             deflist = []
-            for i in range(number):
+            for i in range(numprocs):
                 load_proc = suitecls()
                 #defer.maybeDeferred(load_proc.setUp)
                 d = defer.maybeDeferred(load_proc.generate_load)
@@ -65,34 +83,17 @@ class LoadTestRunner(object):
             dl = defer.DeferredList(deflist)
             yield dl
 
-    def start_load1(self, script, numprocs, *args):
-        procs = []
-
-        print "starting %s procs" % numprocs
-        t1 = time.time()
-        load_script = ['python', script]
-        load_script.extend(args)
-
-        for i in range(numprocs):
-
-            p = subprocess.Popen(load_script)
-            procs.append(p)
-
-        print "started all procs"
-
-        for p in procs:
-            p.wait()
-
-        t2 = time.time()
-        print "all procs dead, elapsed = %s" % (t2-t1)
-
     @defer.inlineCallbacks
-    def start_load_proc(self, script, numprocs, *args):
-        pass
+    def start_load_proc(self, suitecls, options):
+        load_proc = suitecls()
+        yield defer.maybeDeferred(load_proc.setUp)
+        yield defer.maybeDeferred(load_proc.generate_load)
+        yield defer.maybeDeferred(load_proc.tearDown)
 
     def timeout(self):
         print "TIMEOUT"
-        reactor.stop()
+        if reactor.running:
+            reactor.stop()
 
     @defer.inlineCallbacks
     def start_load_runner(self):
@@ -105,7 +106,7 @@ class LoadTestRunner(object):
             sys.exit(1)
 
         test_class = pu.get_class(options['class'])
-        print "Load test class", test_class
+        #print "Load test class", test_class
         assert issubclass(test_class, LoadTest), "Class must be LoadTest"
 
         timeout = int(options['timeout'])
@@ -122,6 +123,6 @@ class LoadTestRunner(object):
 if __name__ == '__main__':
     testrunner = LoadTestRunner()
     reactor.callWhenRunning(testrunner.start_load_runner)
-    print "Starting reactor"
+    #print "Starting reactor"
     reactor.run( )
-    print "Reactor stopped"
+    #print "Reactor stopped"

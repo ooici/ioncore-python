@@ -18,5 +18,5 @@ class BrokerTest(LoadTest):
 
     @defer.inlineCallbacks
     def generate_load(self, *args):
-        yield pu.asleep(10)
+        yield pu.asleep(5)
         print "LOAD"
