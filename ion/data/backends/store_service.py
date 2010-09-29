@@ -4,6 +4,7 @@
 @file ion/data/backends/store_service.py
 @author Michael Meisinger
 @author David Stuebe
+@author Matt Rodriguez
 @brief service for storing and retrieving key/value pairs.
 @Note Test cases for the store service backend are now in ion.data.test.test_store
 """
@@ -18,6 +19,8 @@ from ion.data.store import Store, IStore
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
 
+
+from ion.data.backends import cassandra
 
 CONF = ioninit.config(__name__)
 
@@ -38,6 +41,7 @@ class StoreService(BaseService):
 
         self.backend = None
         # self.backend holds the class which is instantiated to provide the Store
+        logging.info("StoreService backend class %s " % backendcls)
         if backendcls:
             self.backend = pu.get_class(backendcls)
         else:
@@ -52,7 +56,18 @@ class StoreService(BaseService):
         logging.info(name + " initialized")
         logging.info(name + " backend:"+str(backendcls))
         logging.info(name + " backend args:"+str(backendargs))
-
+        
+    
+    def slc_shutdown(self):
+        """
+        Shutdown the Store twisted connection, if the store is as CassandraStore
+        This breaks the Store abstraction
+        """
+        logging.info("In StoreService slc_shutdown")
+        if isinstance(self.store, cassandra.CassandraStore):
+            logging.info("Shutting down StoreService")
+            self.store.manager.shutdown()
+            
     @defer.inlineCallbacks
     def op_put(self, content, headers, msg):
         """
