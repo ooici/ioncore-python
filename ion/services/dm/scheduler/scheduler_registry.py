@@ -10,6 +10,8 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+import uuid
+
 from twisted.internet import defer
 
 from ion.core.base_process import ProtocolFactory
@@ -32,7 +34,11 @@ class SchedulerRegistry(BaseRegistryService):
     to rename the functions to match the LCA signature. This sucks.
     """
     op_clear = BaseRegistryService.base_clear_registry
-    op_store_task = BaseRegistryService.base_register_resource
+    # op_store_task = BaseRegistryService.base_register_resource
+    def op_store_task(self, content, headers, msg):
+        log.info('got a message!')
+        log.info(content)
+        self.reply_ok(msg, 'goo')
     """
     And the base class has no remove function. Weak.
 
@@ -43,6 +49,16 @@ class SchedulerRegistry(BaseRegistryService):
     @defer.inlineCallbacks
     def op_rm_task(self, content, headers, msg):
         yield self.reply_err(msg, 'Method not implemented!!')
+
+class ScheduleEntry(dataobject.DataObject):
+    """
+    Class representing a single stored schedule entry. Contents are
+    entry is a dictionary with
+    'target', 'interval', 'payload' and 'last_run' keys
+    """
+    id = dataobject.TypedAttribute(str, 'Not set')
+    entry = dataobject.TypedAttribute(dict, {})
+
 
 class SchedulerRegistryClient(BaseRegistryClient):
     def __init__(self, proc=None, **kwargs):
@@ -77,12 +93,24 @@ class SchedulerRegistryClient(BaseRegistryClient):
         msg = {'target': target, 'interval': interval}
         if payload:
             msg['payload'] = payload
+
         if taskid:
             msg['taskid'] = taskid
+        else:
+            msg['taskid'] = str(uuid.uuid4())
+
+        """
+        Now this blows. You have to create a Resource explicitly via a call to
+        Yet Another Parent Class. I do not like this design.
+        """
+        se_object = ScheduleEntry()
+        se_object.entry = msg
+        #se_object.id = msg['taskid']
 
         yield self._check_init()
 
-        (content, headers, msg) = yield self.rpc_send('store_task', msg)
+        log.info(se_object.encode)
+        (content, headers, msg) = yield self.rpc_send('store_task', se_object)
         if content['status'] == 'OK':
             defer.returnValue(content['taskid'])
 
@@ -106,3 +134,6 @@ class SchedulerRegistryClient(BaseRegistryClient):
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(SchedulerRegistry)
+
+# WTF?
+dataobject.DataObject._types['ScheduleEntry'] = ScheduleEntry
