@@ -204,3 +204,50 @@ class AgentInstance(StatefulResource):
     proc_name = TypedAttribute(str)
     proc_state = TypedAttribute(str)
     subject = TypedAttribute(ResourceReference)
+    
+    
+class ExchangeSpace(InformationResource):
+    """
+    ExchangeSpaces provide a hierarchy or grouping of ExchangeNames.
+    They offer a level of granularity for governance and policy enforcement.
+    Eventually they will play a part in the strategy of segregating exchange
+    traffic and permissions.
+    """
+    name = TypedAttribute(str)
+    description = TypedAttribute(str)
+    
+
+class ExchangeName(InformationResource):
+    """
+    ExchangeName binds a name (string) to an AMQPMapping and a 
+    HardwareMapping.  
+    """
+    name = TypedAttribute(str)
+    description = TypedAttribute(str)
+    
+    
+class BrokerFederation(InformationResource):
+    """
+    TODO:  Flesh this out as federation becomes more of a reality.
+    """
+    
+class BrokerCredentials(InformationResource):
+    """
+    BrokerCredentials carries all the necessary information to authenticate
+    an AMQP client against a AMQP broker.
+    """
+    
+class ExchangeMapping(InformationResource):
+    """
+    ExchangeMapping carries information about an exchange:  
+    type (fanout, direct, etc), routing keys, queues, and so forth.
+    """
+    
+    
+class HardwareMapping(InformationResource):
+    """
+    TODO:  Flesh this out as more is discovered about Solace routing 
+    and/or other hardware routing solutions.
+    """
+    
+    
