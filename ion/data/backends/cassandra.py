@@ -142,10 +142,8 @@ class CassandraStore(IStore):
         logging.info("Calling put")
         logging.info('writing key %s value %s' % (col, value))
         if self.cf_super:
-            #yield self.client.insert(self.key, self.colfamily, {self.namespace:{col:value}})
             yield self.client.insert(self.key, self.colfamily, value, column=col, super_column=self.namespace) 
         else:
-            #yield self.client.insert(self.key, self.colfamily, {col:value})
             yield self.client.insert(self.key, self.colfamily, value, column=col)
         defer.returnValue(None)
 
@@ -162,15 +160,25 @@ class CassandraStore(IStore):
         if self.cf_super:
             klist = yield self.client.get(self.key, self.colfamily, super_column=self.namespace)
         else:
-            klist = yield self.client.get(self.key, self.colfamily)
-        #logging.info("klist %s" % klist)
-        columns = klist.super_column.columns
-        for col in columns:
-            #logging.info("col.name %s" % col.name)
-            m = re.findall(regex, str(col.name))
-            #m = re.search(regex, x[0])
-            if m: 
-                matched_list.append(col.name)
+            klist = yield self.client.get_slice(self.key, self.colfamily)
+        
+        #This code could probably be refactored. The data structures returned are different if
+        #it is called with a column or super_column. Another possibility is that the code 
+        #is removed when the IStore interface doesn't use the query interface.
+        if self.cf_super:
+            columns = klist.super_column.columns
+            for col in columns:
+            
+                m = re.findall(regex, str(col.name))
+                
+                if m: 
+                    matched_list.append(col.name)
+
+        else:
+            for col in klist:
+                m = re.findall(regex, str(col.column.name))
+                if m:
+                    matched_list.append(col.column.name)
 
         #logging.info("matched_list %s" % matched_list)
         defer.returnValue(matched_list)
@@ -184,7 +192,7 @@ class CassandraStore(IStore):
         @note Deletes are lazy, so key may still be visible for some time.
         """
         if self.cf_super:
-            yield self.client.remove(self.key, self.colfamily, columns=[col], super_column=self.namespace)
+            yield self.client.remove(self.key, self.colfamily, column=col, super_column=self.namespace)
         else:
-            yield self.client.remove(self.key, self.colfamily, columns=[col])
+            yield self.client.remove(self.key, self.colfamily, column=col)
         defer.returnValue(None)
