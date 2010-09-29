@@ -10,10 +10,10 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 import subprocess
-import sys
+import sys, os
 import time
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer, protocol, reactor
 from twisted.python import usage
 
 import ion.util.procutils as pu
@@ -48,10 +48,40 @@ class Options(usage.Options):
         print "ION version: ", VERSION
         sys.exit(0)
 
+class TestRunnerProcessProtocol(protocol.ProcessProtocol):
+
+    def connectionMade(self):
+        print "connectionMade"
+    def outReceived(self, data):
+        print "outReceived! with %d bytes!" % len(data)
+        print data
+    def errReceived(self, data):
+        print "errReceived! with %d bytes!" % len(data)
+        print data
+    def inConnectionLost(self):
+        print "inConnectionLost! stdin is closed! (we probably did it)"
+    def outConnectionLost(self):
+        print "outConnectionLost! The child closed their stdout!"
+        # now is the time to examine what they wrote
+        #print "I saw them write:", self.data
+    def errConnectionLost(self):
+        print "errConnectionLost! The child closed their stderr."
+    def processExited(self, reason):
+        print "processExited, status %d" % (reason.value.exitCode,)
+    def processEnded(self, reason):
+        print "processEnded, status %d" % (reason.value.exitCode,)
+        print "quitting"
+        reactor.stop()
+
 class LoadTestRunner(object):
 
     def __init__(self):
         self.exit_level = 0
+        self.mode = None
+        self.load_procs = {}
+        self._shutdown_deferred = None
+        self._is_shutdown = False
+        self._is_kill = False
 
     @defer.inlineCallbacks
     def start_load_suite(self, suitecls, spawn_procs, options):
@@ -60,6 +90,7 @@ class LoadTestRunner(object):
 
         if spawn_procs:
             # Start all as separate unix processes
+            self.mode = "suite-spawn"
             load_script = ['python', '-m', 'ion.test.load_runner', '-c', options['class']]
             timeout = int(options['timeout'])
             if timeout > 0:
@@ -74,16 +105,29 @@ class LoadTestRunner(object):
                 load_proc_args.extend(options['test_args'])
                 #print "Starting load process %s: %s" % (i, load_proc_args)
 
+                #procProt = TestRunnerProcessProtocol()
+                #p = reactor.spawnProcess(procProt,
+                #            load_proc_args[0],
+                #            args=load_proc_args,
+                #            env=os.environ)
+
                 p = subprocess.Popen(load_proc_args)
                 procs.append(p)
+                self.load_procs[str(i)] = p
 
+            #yield pu.asleep(20)
             #print "started all procs"
 
             for p in procs:
-                p.wait()
+                try:
+                    p.wait()
+                except Exception, ex:
+                    print ex
+                    self._is_kill = True
 
         else:
             # Start all in same Twisted reactor
+            self.mode = "suite-internal"
             deflist = []
             for i in range(numprocs):
                 d = self.start_load_proc(suitecls, str(i), options)
@@ -102,6 +146,8 @@ class LoadTestRunner(object):
         load_proc.load_id = str(loadid)
         load_proc.options = options
 
+        self.load_procs[load_proc.load_id] = load_proc
+
         yield defer.maybeDeferred(load_proc.setUp)
         yield defer.maybeDeferred(load_proc.generate_load)
 
@@ -115,8 +161,31 @@ class LoadTestRunner(object):
             except Exception, ex:
                 pass
 
+    def pre_shutdown(self):
+        #print "pre_shutdown"
+        if self._is_shutdown:
+            return
+        self._shutdown_deferred = defer.Deferred()
+        self._shutdown_to = reactor.callLater(2, self.shutdown_timeout)
+
+        prockeys = sorted(self.load_procs.keys())
+        for key in prockeys:
+            proc = self.load_procs[key]
+            if isinstance(proc, LoadTest):
+                proc._shutdown = True
+            else:
+                pass
+
+        return self._shutdown_deferred
+
+    def shutdown_timeout(self):
+        print "SHUTDOWN timeout"
+        self._shutdown_deferred.callback(None)
+
     @defer.inlineCallbacks
     def load_runner_main(self):
+        reactor.addSystemEventTrigger("before", "shutdown", self.pre_shutdown)
+
         try:
             # Parse the options
             options = Options()
@@ -146,6 +215,7 @@ class LoadTestRunner(object):
                 yield self.start_load_suite(test_class, options['proc'], options)
                 print "Load test suite stopped."
             elif options['loadid']:
+                self.mode = "load-process"
                 yield self.start_load_proc(test_class, options['loadid'], options)
             else:
                 self.errout("Wrong arguments: Neither suite nor load process")
@@ -157,10 +227,21 @@ class LoadTestRunner(object):
 
         except SystemExit, se:
             self.exit_level = se.code
+            print "EXIT"
 
-        if reactor.running:
-            reactor.stop()
+        if self._shutdown_deferred:
+            #print "cancel shotdown to"
+            self._shutdown_to.cancel()
+            self._shutdown_deferred.callback(None)
 
+        # Need to check for kill condition. Somehow this interferes with the reactor
+        if not self._is_kill and reactor.running:
+            try:
+                reactor.stop()
+            except Exception, ex:
+                pass
+
+        self._is_shutdown = True
 
     def errout(self, message):
         print '%s: %s' % (sys.argv[0], message)
@@ -169,8 +250,7 @@ class LoadTestRunner(object):
 if __name__ == '__main__':
     testrunner = LoadTestRunner()
     reactor.callWhenRunning(testrunner.load_runner_main)
-    #print "Starting reactor"
     r = reactor.run()
-    #print "Reactor stopped"
+
     if testrunner.exit_level > 0:
         sys.exit(testrunner.exit_level)

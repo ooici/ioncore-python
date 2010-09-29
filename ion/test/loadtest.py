@@ -33,6 +33,7 @@ class LoadTest(object):
     """
     def __init__(self, *args):
         self.load_options = LoadTestOptions()
+        self._shutdown = False
         self.base_state = {}
         self.cur_state = {}
         self.base_state['_time'] = 0.0
@@ -55,6 +56,9 @@ class LoadTest(object):
         Hook method for generating the load.
         """
         return defer.succeed(None)
+
+    def is_shutdown(self):
+        return self._shutdown
 
     def _set_state(self, key, value):
         self.cur_state[key] = value
