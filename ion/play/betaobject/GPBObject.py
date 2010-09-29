@@ -4,8 +4,10 @@
 Other versions can be implemented based on other tool chains. They must provide
 the same behavior!
 """
+
+from google.protobuf import message
 from zope.interface import implements
-from ion.play.betaobject import IObject
+#from ion.play.betaobject import IObject
 
 class GPBContainer():
     """
@@ -42,25 +44,43 @@ class GPBObject():
         A dictionary containing the objects which are already indexed by content
         hash
         """
-        self.container = None
-        self.content = None
-        """
-        The object which the user is currently operating.
-        """
         
-        self._stash = {}
-        """
-        References to object which the user is working on
-        """
+        self._gpbmessage = GPBClass()
         
-        self._GPBMessage = None # What is it?
+        self._AddMessageProperties(GPBClass)
         
         
-        obj_id = self.get_id()        
-        self._workspace[obj_id] = GPBContainer(GPBClass())
-        self.stash('Root',obj_id)                
-        self.stash_apply('Root')
         
+        
+        #obj_id = self.get_id()        
+        #self._workspace[obj_id] = GPBContainer(GPBClass())
+        #self.stash('Root',obj_id)                
+        #self.stash_apply('Root')
+        
+    def _AddMessageProperties(self, GPBClass):
+        
+        assert issubclass(GPBClass, message.Message)
+        
+        for field in GPBClass.DESCRIPTOR.fields_by_name.values():
+
+            self._AddFieldProperty(field)
+        
+        
+    def _AddFieldProperty(self,field):
+        field_name = field.name
+        def getter(self):
+            field_value = getattr(self._gpbmessage, field_name)
+            return field_value
+        getter.__module__ = None
+        getter.__doc__ = 'Getter for %s.' % field_name
+        
+        def setter(self, new_value):
+            setattr(self._gpbmessage, field_name, new_value)
+        setter.__module__ = None
+        setter.__doc__ = 'Setter for %s.' % field_name
+        
+        doc = 'Magic attribute generated for wrapper of "%s" proto field.' % field_name
+        setattr(self, field_name, property(getter, setter, doc=doc))
         
     def get_id(self):
         self.obj_cntr += 1
@@ -95,5 +115,32 @@ class GPBObject():
         Get the linked node
         """
         
-        
+class simple_property(object):
     
+    def __init__(self,name):
+        self.name = name
+        self.funny = 5
+    
+    @property
+    def name(self):
+        return self.__name
+    
+    @name.setter
+    def name(self,value):
+        if not isinstance(value,str):
+            raise TypeError('Must be a string!')
+        self.__name = value
+        
+class property_wrapper(object):
+    
+    def __init__(self, ss):
+        self.ss = ss
+        
+    @property
+    def name(self):
+        return self.ss.name
+    
+    #@name.setter
+    #def name(self,value):
+    #    self.ss.name = value
+        
