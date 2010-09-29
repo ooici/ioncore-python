@@ -3,7 +3,7 @@
 """
 @file ion/core/base_process.py
 @author Michael Meisinger
-@brief base class for all processes within Magnet
+@brief base class for all processes within a capability container
 """
 
 import ion.util.ionlog
