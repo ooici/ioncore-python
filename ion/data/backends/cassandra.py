@@ -17,12 +17,9 @@ logging = logging.getLogger(__name__)
 
 from twisted.internet import defer
 from twisted.internet import reactor
-from twisted.internet.protocol import ClientCreator
 
-#import pycassa
 from telephus.client import CassandraClient
-from telephus.protocol import ManagedCassandraClientFactory, ManagedThriftClientProtocol
-from telephus import protocol
+from telephus.protocol import ManagedCassandraClientFactory
 from telephus.cassandra.ttypes import NotFoundException
 
 from ion.core import ioninit
@@ -94,8 +91,8 @@ class CassandraStore(IStore):
     @defer.inlineCallbacks
     def clear_store(self):
         """
-        @brief Delete the super column namespace. Do not touch default namespace!
-        @note This is complicated by the persistence across many 
+        @brief Delete the super column namespace.
+        @retval Deferred, None
         """
         if self.cf_super:
             yield self.client.remove(self.key, self.colfamily, super_column=self.namespace)
@@ -121,7 +118,7 @@ class CassandraStore(IStore):
             else:
                 logging.info("standard_col: Calling get on col %s " % col)
                 value = yield self.client.get(self.key, self.colfamily, column=col)
-        except NotFoundException, nfe:     
+        except NotFoundException:     
             #logging.info("standard_col: Calling get on col %s " % value)
             #logging.debug('Key "%s":"%s"' % (self.key, col))
             defer.returnValue(None)

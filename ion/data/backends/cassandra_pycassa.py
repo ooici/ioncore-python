@@ -23,7 +23,7 @@ from ion.data.store import IStore
 import uuid
 
 CONF = ioninit.config(__name__)
-#CF_default_keyspace = CONF['default_keyspace']
+CF_default_keyspace = CONF['default_keyspace']
 CF_default_colfamily = CONF['default_colfamily']
 CF_default_cf_super = CONF['default_cf_super']
 CF_default_namespace = CONF['default_namespace']
