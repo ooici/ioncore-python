@@ -1,27 +1,27 @@
+#!/usr/bin/env python
+
 """
 @file spawnable.py
 @author Dorian Raymer
-@date 03/30/10
+@author Michael Meisinger
 """
+
 import os
 import types
 
 from zope.interface import implements
 from zope.interface import Interface
 
-from twisted.internet import reactor
 from twisted.internet import defer
-from twisted.python import reflect
-from twisted.python import log
-from twisted.plugin import IPlugin
 
-from ion.core.messaging import messaging
-from ion.core.cc import container
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
+from ion.core.id import Id
 from ion.core.cc.container import Container
-from ion.core.cc.container import Id
+from ion.core.messaging import messaging
 
 store = Container.store
-
 
 
 class Spawnable(object):
@@ -46,8 +46,7 @@ class Spawnable(object):
     def __init__(self, target, space):
         """
         @param target
-        @param space The message [exchange] space to use (default
-        Container.space)
+        @param space The message [exchange] space to use
         """
         self.target = target
         self.space = space # message space of this instance's mailbox
@@ -87,7 +86,7 @@ class Spawnable(object):
         d = s.run()
         def _return_id(res, id):
             return id
-        d.addErrback(log.err)
+        d.addErrback(log.error)
         return d.addCallback(_return_id, s.id)
 
     @classmethod
@@ -111,7 +110,7 @@ class Spawnable(object):
             d = s.run()
             def _return_id(res, id):
                 return id
-            d.addErrback(log.err)
+            d.addErrback(log.error)
             return d.addCallback(_return_id, s.id)
         elif hasattr(m, 'receiver'):
             # @todo this is a deprecated way of spawning. Remove in the long run
@@ -121,7 +120,7 @@ class Spawnable(object):
             d = s.run()
             def _return_id(res, id):
                 return id
-            d.addErrback(log.err)
+            d.addErrback(log.error)
             return d.addCallback(_return_id, s.id)
         else:
             raise Exception("Must use Receiver in your module")
@@ -140,7 +139,7 @@ class Spawnable(object):
         d = s.run()
         def _return_id(res, id):
             return id
-        d.addErrback(log.err)
+        d.addErrback(log.error)
         return d.addCallback(_return_id, s.id)
 
 
@@ -158,7 +157,7 @@ class Spawnable(object):
             return consumer
 
         def _eb(reason):
-            log.err(reason)
+            log.error(reason)
             return reason
 
         d = self.target.makeConsumer(self)
@@ -289,7 +288,7 @@ class Receiver(object):
             if not name_config:
                 raise RuntimeError("Messaging name undefined: "+self.name)
 
-        consumer = yield container.new_consumer(name_config, self.spawned)
+        consumer = yield Container.instance.new_consumer(name_config, self.spawned)
         self.consumer = consumer
         defer.returnValue(consumer)
 
@@ -313,11 +312,6 @@ class Receiver(object):
         else:
             self.handlers['receive'](data, msg)
 
-    @defer.inlineCallbacks
-    def send(self, to_id, data):
-        # self.spawned._send_from(to_id, data)
-        # NOTE: Here, a deferred is returned and not yielded (runaway)!!!
-        yield send(to_id, data)
 
 class IProtocolFactory(Interface):
 
@@ -342,7 +336,7 @@ class ProtocolFactory(object):
 
 # Container API
 @defer.inlineCallbacks
-def send(to_name, data, space=None):
+def send(to_name, data, exchange_space=None):
     """
     Sends a message
     @param to_name if int, local identifier (sequence number) of process;
@@ -350,17 +344,9 @@ def send(to_name, data, space=None):
     """
     # If int, interpret name as local identifier and convert to global
     if type(to_name) is int:
-        to_name = container.Id(to_name).full
-    name_config = yield store.get(str(to_name))
-    if not name_config:
-        pass
-    # @todo I don't think we need this config dict in the way it is used here.
-    # The only thing we need to know is exchange (given) and routing key.
-    # In the future, different types of names might have different attributes.
-    pub_config = {'routing_key' : str(to_name)}
-    pubs = yield container.new_publisher(pub_config)
-    yield pubs.send(data)
-    pubs.close()
+        to_name = Id(to_name).full
+
+    yield Container.instance.send(to_name, data, exchange_space)
 
 def ps():
     """list running instances
@@ -370,7 +356,7 @@ def ps():
     print '---------------------------------'
     for id, s in Spawnable.progeny.iteritems():
         if id.full == s.target.name:
-            print id.local, s.target.label, s.target.name, s.space.hostname
+            print id.local, s.target.label, s.target.name, s.space.connection.hostname
 
 def ms():
     """list messaging info.
@@ -402,7 +388,7 @@ def spawn(m, space=None, spawnArgs=None):
     Spawn uses a function as an entry point for running a module
     """
     if not space:
-        space = Container.space
+        space = Container.instance.message_space
     if spawnArgs == None:
         spawnArgs = {}
     if type(m) is types.ModuleType:
@@ -425,7 +411,6 @@ def kill(id):
 def lookup(name):
     store = Store()
     return store.query(name)
-
 
 
 factory = ProtocolFactory()

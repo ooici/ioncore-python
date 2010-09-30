@@ -15,6 +15,14 @@ from ion.util.config import Config
 
 print "ION (Integrated Observatory Network) core packages initializing (ver. %s)" % (ic.VERSION)
 
+# ION has a minimum required python version
+import sys
+if not hasattr(sys, "version_info") or sys.version_info < (2,5):
+    raise RuntimeError("ioncore requires Python 2.5 or later.")
+if sys.version_info > (3,0):
+    raise RuntimeError("ioncore is not compatible with Python 3.0 or later.")
+del sys
+
 # Configure logging system (console, logfile, other loggers)
 # NOTE: Console logging is appended to Twisted log output prefix!!
 logging.config.fileConfig(ic.LOGCONF_FILENAME)

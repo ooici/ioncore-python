@@ -7,11 +7,11 @@
 @brief setup file for OOI ION Capability Container and Core Modules
 """
 
-from ion.core.ionconst import VERSION
+#from ion.core.ionconst import VERSION
 
 setupdict = {
     'name' : 'ioncore',
-    'version' : VERSION,
+    'version' : '0.3.0', #VERSION,
     'description' : 'OOI ION Python Capability Container and Core Modules',
     'url': 'http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project',
     'download_url' : 'http://ooici.net/packages',

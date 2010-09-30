@@ -11,12 +11,14 @@ import traceback
 import re
 from datetime import datetime
 import time
+import uuid
+
+from twisted.internet import defer, reactor
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-import uuid
-from twisted.internet import defer, reactor
-from ion.core.cc.container import Id
 
+from ion.core.cc.container import Container, Id
 from ion.data.store import Store
 
 def log_exception(msg=None, e=None):
@@ -142,7 +144,7 @@ def send(receiver, send, recv, operation, content, headers=None):
     msg['content'] = content
     #log.debug("Send message op="+operation+" to="+str(recv))
     try:
-        yield receiver.send(recv, msg)
+        yield Container.instance.send(recv, msg)
     except Exception, ex:
         log_exception("Send error: ", ex)
     else:

@@ -10,6 +10,9 @@ from twisted.internet import stdio
 from twisted.conch.insults import insults
 from twisted.conch import manhole
 
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from ion.core import ionconst
 from ion.core.cc.spawnable import Receiver
 from ion.core.cc.spawnable import send
@@ -90,7 +93,7 @@ class Control(object):
     cc = cc() # Extension slot for shell functions
 
     def start(self, ccService):
-        print 'Shell Start'
+        log.info('Shell Start')
         fd = sys.__stdin__.fileno()
         fdout = sys.__stdout__.fileno()
 
@@ -118,10 +121,10 @@ class Control(object):
 
     def stop(self):
         termios.tcsetattr(self.fd, termios.TCSANOW, self.oldSettings)
-        print 'Shell Stop'
+        log.info('Shell Stop')
         # if terminal write reset doesnt work in handle QUIT, use this
         os.write(self.fd, "\r\x1bc\r")
-        print 'Shell exited. Press Ctrl-c to stop container'
+        log.info('Shell exited. Press Ctrl-c to stop container')
 
 try:
     control
