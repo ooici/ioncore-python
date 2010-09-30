@@ -120,13 +120,33 @@ class CassandraStoreTestNoSuperCols(IStoreTest):
         
     @defer.inlineCallbacks
     def tearDown(self):
+        logging.info("in tearDown")
         yield self.ds.clear_store()
+        logging.info("Calling shutdown")
         self.ds.manager.shutdown()
-        
+        logging.info("Shutdown")
+    
+    @defer.inlineCallbacks  
     def test_clear_store(self):
-        raise unittest.SkipTest('Can not clear the persistent store if the name space is not unique')
+        """
+        @note This doesn't work if I just raise an exception. The problem
+        seems to be that shutdown is called on the protocol factory before
+        a connection has been made. This might be a bug with the Telephus
+        client. I'll investigate further after I get this merged back 
+        into the main branch
+        
+        Matt Rodriguez 9/30/10
+        """
+        yield self.ds.put(self.key, self.value)
+        yield self.ds.remove(self.key)
+        #import twisted.internet.base
+        #twisted.internet.base.DelayedCall.debug = True
+        #raise unittest.SkipTest('Can not clear the persistent store if the name space is not unique')
+    
+    
+        
+    
 
-"""
 class CassandraStoreTestSup(IStoreTest):
 
     def _setup_backend(self):
@@ -150,8 +170,11 @@ class CassandraSuperStoreRandomNameSpaceTest(IStoreTest):
             cf_super=True)
         return ds
 
-"""
-
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.ds.clear_store()
+        self.ds.manager.shutdown()
+        
 class StoreServiceTest(IonTestCase, IStoreTest):
     """
     Testing example hello service.
