@@ -1,22 +1,23 @@
 #!/usr/bin/env python
 """
-@brief The Google Protocol Buffers implementation of the IObject Interface.
-Other versions can be implemented based on other tool chains. They must provide
-the same behavior!
+@Brief Test implementation of a wrapper for Google Protocol Buffer Message Classes.
 """
 
 from google.protobuf import message
-#from zope.interface import implements
-#import test_pb2
-#from ion.play.betaobject import IObject
+
     
 class Wrapper(object):
     '''
     A Wrapper class for intercepting access to protocol buffers message fields.
+    For instance, in the example below I can create a wrapper which is
+    read-only*.
     
     To make the wrapper general - apply to more than one kind of protobuffer -
     we can not use descriptors (properties) to transparently intercept a get or
-    set request because they are class attributes - shared between all instances.
+    set request because they are class attributes - shared between all instances
+    of the wrapper class. If we add properties each time we create a wrapper
+    instance for a new kind of protobuf, new properties will be added to all
+    wrapper instances.
     
     The solution I can up with is clunky! Override the __getattribute__ and
     _setattr__ method to preemptively check a list of fields to get from the
@@ -24,13 +25,18 @@ class Wrapper(object):
     protocol buffer rather than the wrapper class. The problem is that now we
     can not use the default get/set to initialize our own class or get the list
     of fields!
+    
+    * it is mostly, read-only - methods like add() pass through getatter. Can
+    I fix that somehow?
     '''
     
-    def __init__(self, GPBClass):
+    def __init__(self, GPBClass, read_only=False):
         
         # Set list of fields empty for now... so that we can use getter/setters
         object.__setattr__(self,'_gpbFields',[])
+        object.__setattr__(self,'read_only', read_only)
         
+        # Set the 
         assert issubclass(GPBClass, message.Message)
         self._gpbMessage = GPBClass()
         self._GPBClass = GPBClass
@@ -54,18 +60,39 @@ class Wrapper(object):
         else:
             v = object.__getattribute__(self, key)
         return v        
-    
 
     def __setattr__(self,key,value):
+
         gpbfields = object.__getattribute__(self,'_gpbFields')
-        
+        read_only = object.__getattribute__(self,'read_only')
         if key in gpbfields:
+            if read_only:
+                raise AttributeError, 'This object wrapper is read only!'
+            
             gpb = object.__getattribute__(self,'_gpbMessage')
             setattr(gpb, key, value)
         else:
             v = object.__setattr__(self, key, value)
     
-    
+'''
+Example Usage:
+import GPBObject
+import addressbook_pb2
+
+w = GPBObject.Wrapper(addressbook_pb2.AddressBook)
+
+# Set stuff through the wrapper
+w.person.add()
+w.person[0].name = 'David'
+
+# Get through the wrapper
+w.person[0].name
+
+# Get from the deligated class!
+w._gpbMessage.person[0].name
+
+
+'''
     
     
 # This is a mess - sets class properties!    
@@ -260,24 +287,18 @@ class Wrapper(object):
     
 
 class SP(object):
+    '''
+    Simple Properties Class - not descriptors for x only work on the class!
+    '''
+    def getx(self): return self.__x
+    def setx(self, value): self.__x = value
+    def delx(self): del self.__x
+    x = property(getx, setx, delx, "I'm the 'x' property.")
     
-    def __init__(self,name=''):
-        self.name = name
-        self.funny = 5
+    def __init__(self):
+        self.__x = None
     
-    @property
-    def name(self):
-        return self.__name
     
-    @name.setter
-    def name(self,value):
-        if not isinstance(value,str):
-            raise TypeError('Must be a string!')
-        self.__name = value
-        
-        
-        
-        
 class PW(object):
     
     def __init__(self, spc):
@@ -286,7 +307,7 @@ class PW(object):
         assert issubclass(spc, SP)
         self.sp = spc()
         self.spc = spc
-        self.alist = ['name']
+        self.alist = ['x']
     
 
     def __getattribute__(self, key):
