@@ -204,3 +204,72 @@ class AgentInstance(StatefulResource):
     proc_name = TypedAttribute(str)
     proc_state = TypedAttribute(str)
     subject = TypedAttribute(ResourceReference)
+    
+    
+class ExchangeSpace(InformationResource):
+    """
+    ExchangeSpaces provide a hierarchy or grouping of ExchangeNames.
+    They offer a level of granularity for governance and policy enforcement.
+    Eventually they will play a part in the strategy of segregating exchange
+    traffic and permissions.
+    """
+    name = TypedAttribute(str)
+    description = TypedAttribute(str)
+    exchangenames = TypedAttribute(list) # 1-N ExchangeName below
+
+
+class ExchangeName(InformationResource):
+    """
+    ExchangeName binds a name (string) to an AMQPMapping and a 
+    HardwareMapping.  
+    """
+    name = TypedAttribute(str)
+    description = TypedAttribute(str)
+    exchangemapping = TypedAttribute(StatefulResource) # 1-1 ExchangeMapping below
+    hardwaremapping = TypedAttribute(StatefulResource) # 1-1 HardwareMapping below
+    
+    
+class ExchangeMapping(StatefulResource):
+    """
+    ExchangeMapping carries information about an exchange:  
+    type (fanout, direct, etc), routing keys, queues, and so forth.
+    """
+    name = TypedAttribute(str)           # unnecessary?         
+    description = TypedAttribute(str)    # unnecessary?
+    routing_key = TypedAttribute(str)
+    delivery_mode = TypedAttribute(str)  # transient | persistent
+    exchange_type = TypedAttribute(str)  # direct | topic | fanout | headers
+    durable = TypedAttribute(bool)
+    auto_delete = TypedAttribute(bool)
+    auto_declare = TypedAttribute(bool)
+    
+    
+class HardwareMapping(StatefulResource):
+    """
+    TODO:  Flesh this out as more is discovered about Solace routing 
+    and/or other hardware routing solutions.
+    """
+
+    
+class BrokerCredentials(StatefulResource):
+    """
+    BrokerCredentials carries all the necessary information to authenticate
+    and connect to an AMQP broker.
+    """
+    name = TypedAttribute(str)         # unnecessary?         
+    description = TypedAttribute(str)  # unnecessary?
+    hostname = TypedAttribute(str)
+    port = TypedAttribute(int)         
+    connect_timeout = TypedAttribute(int)
+    ssl = TypedAttribute(bool)
+    vhost = TypedAttribute(str)
+    insist = TypedAttribute(bool)
+    userid = TypedAttribute(str)
+    password = TypedAttribute(str)
+
+    
+class BrokerFederation(StatefulResource):
+    """
+    TODO:  Flesh this out as federation becomes more of a reality.
+    """
+    

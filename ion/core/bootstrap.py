@@ -71,11 +71,11 @@ def init_container():
     Performs global initializations on the local container on startup.
     """
     _set_container_args(Container.args)
-    interceptorsys = CONF.getValue('interceptor_system',None)
-    if interceptorsys:
-        log.info("Setting capability container interceptor system")
-        cls = pu.get_class(interceptorsys)
-        Container.interceptor_system = cls()
+    #interceptorsys = CONF.getValue('interceptor_system',None)
+    #if interceptorsys:
+    #    log.info("Setting capability container interceptor system")
+    #    cls = pu.get_class(interceptorsys)
+    #    Container.interceptor_system = cls()
     # Collect all service declarations in local code modules
     ModuleLoader().load_modules()
 
@@ -203,8 +203,3 @@ def reset_container():
     spawnable.store = Container.store
     spawnable.Spawnable.progeny = {}
 
-
-"""
-from ion.core import bootstrap as b
-b.start()
-"""
