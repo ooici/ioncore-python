@@ -4,7 +4,7 @@
 """
 
 from google.protobuf import message
-
+from google.protobuf.internal import containers
     
 class Wrapper(object):
     '''
@@ -30,22 +30,38 @@ class Wrapper(object):
     I fix that somehow?
     '''
     
-    def __init__(self, GPBClass, read_only=False):
+    def __init__(self, gpbMessage, read_only=False):
         
         # Set list of fields empty for now... so that we can use getter/setters
         object.__setattr__(self,'_gpbFields',[])
         object.__setattr__(self,'read_only', read_only)
         
         # Set the 
-        assert issubclass(GPBClass, message.Message)
-        self._gpbMessage = GPBClass()
-        self._GPBClass = GPBClass
-        field_names = GPBClass.DESCRIPTOR.fields_by_name.keys()
+        assert isinstance(gpbMessage, message.Message)
+        
+        self._gpbMessage = gpbMessage
+        self._GPBClass = gpbMessage.__class__
+        field_names = self._GPBClass.DESCRIPTOR.fields_by_name.keys()
         
         # Now set the fields to preempt!
         object.__setattr__(self,'_gpbFields',field_names)
 
-
+    @classmethod
+    def wrap(cls,gpbMessage,read_only=False):
+        inst = cls(gpbMessage,read_only)
+        return inst
+    
+    
+    def rewrap(self, gpbMessage):
+        '''
+        Factory method to return a new instance of wrapper for a gpbMessage
+        from self - used for access to composite structures, it has all the same
+        shared variables as the parent wrapper
+        '''
+        cls = self.__class__
+        
+        inst = cls(gpbMessage,self.read_only)
+        return inst
 
 
     def __getattribute__(self, key):
@@ -56,10 +72,18 @@ class Wrapper(object):
         
         if key in gpbfields:
             gpb = object.__getattribute__(self,'_gpbMessage')
-            v = getattr(gpb,key)
+            value = getattr(gpb,key)
+
+            print 'Value', value, type(value), hasattr(value,'__iter__')
+            
+            if isinstance(value, containers.RepeatedCompositeFieldContainer):
+                value = ContainerWrapper(value)
+            elif isinstance(value, message.Message):
+                value = self.rewrap(value)
+                
         else:
-            v = object.__getattribute__(self, key)
-        return v        
+            value = object.__getattribute__(self, key)
+        return value        
 
     def __setattr__(self,key,value):
 
@@ -76,13 +100,14 @@ class Wrapper(object):
     
 '''
 Example Usage:
-import GPBObject
+import GPBObject 
 import addressbook_pb2
 
-w = GPBObject.Wrapper(addressbook_pb2.AddressBook)
+w = GPBObject.Wrapper(addressbook_pb2.AddressBook())
 
 # Set stuff through the wrapper
 w.person.add()
+# Notice that all objects returned are wrapped!
 w.person[0].name = 'David'
 
 # Get through the wrapper
@@ -94,6 +119,42 @@ w._gpbMessage.person[0].name
 
 '''
     
+class ContainerWrapper(object):
+    
+    def __init__(self,gpbcontainer):
+        self._gpbcontainer = gpbcontainer
+    
+    def __getitem__(self, key):
+        """Retrieves item by the specified key."""
+        return Wrapper.wrap(self._gpbcontainer[key])
+    
+    def __len__(self):
+        """Returns the number of elements in the container."""
+        return len(self._gpbcontainer)
+        
+    def __ne__(self, other):
+        """Checks if another instance isn't equal to this one."""
+        # The concrete classes should define __eq__.
+        return not self._gpbcontainer == other._gpbcontainer
+
+    def __eq__(self, other):
+        """Compares the current instance with another one."""
+        if self is other:
+            return True
+        if not isinstance(other, self.__class__):
+            raise TypeError('Can only compare repeated composite fields against '
+                          'other repeated composite fields.')
+        return self._gpbcontainer == other._gpbcontainer
+
+    def __repr__(self):
+        return repr(self._gpbcontainer)
+        
+        
+    # Composite specific methods:
+    def add(self):
+        new_element = self._gpbcontainer.add()
+        return Wrapper.wrap(new_element)
+        
     
 # This is a mess - sets class properties!    
 #class GPBWrapperMeta(type):
