@@ -26,9 +26,16 @@ class Wrapper(object):
     can not use the default get/set to initialize our own class or get the list
     of fields!
     
-    * it is mostly, read-only - methods like add() pass through getatter. Can
-    I fix that somehow?
+    Organization:
+    The meat of the class is at the top - Init and class methods are at the top
+    along with overrides for __getattribute__ and __setattr__ which are the heart
+    of the wrapper.
+    
+    Below that are all of the methods of protobuffers exposed by the wrapper.
+    
     '''
+    
+    
     
     def __init__(self, gpbMessage, read_only=False):
         
@@ -97,6 +104,160 @@ class Wrapper(object):
             setattr(gpb, key, value)
         else:
             v = object.__setattr__(self, key, value)
+    
+    def __eq__(self, other):
+        if not isinstance(other, Wrapper):
+            return False
+        
+        if self is other:
+            return True
+        
+        return self._gpbMessage == other._gpbMessage
+    
+    def __ne__(self, other):
+        # Can't just say self != other_msg, since that would infinitely recurse. :)
+        return not self == other
+    
+    def __str__(self):
+        return self._gpbMessage.__str__()
+        
+        
+    def MergeFrom(self, other):
+        """Merges the contents of the specified message into current message.
+        
+        This method merges the contents of the specified message into the current
+        message. Singular fields that are set in the specified message overwrite
+        the corresponding fields in the current message. Repeated fields are
+        appended. Singular sub-messages and groups are recursively merged.
+        
+        Args:
+            other_msg: Message to merge into the current message.
+        """
+        assert isinstance(other, Wrapper), \
+            'MergeFrom can only be performed on another Wrapper Object'
+        
+        # There does not seem to be any way to check if these are mergable?
+        # What happens if they are not the same kind of GPB Message?
+        self._gpbMessage.MergeFrom(other._gbpMessage)
+    
+    def CopyFrom(self, other_msg):
+        """Copies the content of the specified message into the current message.
+        
+        The method clears the current message and then merges the specified
+        message using MergeFrom.
+        
+        Args:
+            other_msg: Message to copy into the current one.
+        """
+        if self is other_msg:
+            return
+        self.Clear()
+        self.MergeFrom(other_msg)
+    
+    def Clear(self):
+        """Clears all data that was set in the message."""
+        self._gpbMessage.Clear()
+    
+    def IsInitialized(self):
+        """Checks if the message is initialized.
+        
+        Returns:
+            The method returns True if the message is initialized (i.e. all of its
+        required fields are set).
+        """
+        return self._gpbMessage.IsInitialized()
+        
+    def SerializeToString(self):
+        """Serializes the protocol message to a binary string.
+        
+        Returns:
+          A binary string representation of the message if all of the required
+        fields in the message are set (i.e. the message is initialized).
+        
+        Raises:
+          message.EncodeError if the message isn't initialized.
+        """
+        return self._gpbMessage.SerializeToString()
+    
+    def ParseFromString(self, serialized):
+        """Clear the message and read from serialized."""
+        self._gpbMessage.ParseFromString(serialized)
+        
+    def ListFields(self):
+        """Returns a list of (FieldDescriptor, value) tuples for all
+        fields in the message which are not empty.  A singular field is non-empty
+        if HasField() would return true, and a repeated field is non-empty if
+        it contains at least one element.  The fields are ordered by field
+        number"""
+        return self._gpbMessage.ListFields()
+
+    def HasField(self, field_name):
+        return self._gpbMessage.HasField(field_name)
+    
+    def ClearField(self, field_name):
+        return self._gpbMessage.ClearField(field_name)
+        
+    def HasExtension(self, extension_handle):
+        return self._gpbMessage.HasExtension(extension_handle)
+    
+    def ClearExtension(self, extension_handle):
+        return self._gpbMessage.ClearExtension(extension_handle)
+    
+    def ByteSize(self):
+        """Returns the serialized size of this message.
+        Recursively calls ByteSize() on all contained messages.
+        """
+        return self._gpbMessage.ByteSize()
+    
+    
+    '''
+    Methods not included in the Wrapper:
+
+    def SetInParent(self):
+    """Mark this as present in the parent.
+
+    This normally happens automatically when you assign a field of a
+    sub-message, but sometimes you want to make the sub-message
+    present while keeping it empty.  If you find yourself using this,
+    you may want to reconsider your design."""
+    raise NotImplementedError
+
+    def MergeFromString(self, serialized):
+    """Merges serialized protocol buffer data into this message.
+
+    When we find a field in |serialized| that is already present
+    in this message:
+      - If it's a "repeated" field, we append to the end of our list.
+      - Else, if it's a scalar, we overwrite our field.
+      - Else, (it's a nonrepeated composite), we recursively merge
+        into the existing composite.
+
+    TODO(robinson): Document handling of unknown fields.
+
+    Args:
+      serialized: Any object that allows us to call buffer(serialized)
+        to access a string of bytes using the buffer interface.
+
+    TODO(robinson): When we switch to a helper, this will return None.
+
+    Returns:
+      The number of bytes read from |serialized|.
+      For non-group messages, this will always be len(serialized),
+      but for messages which are actually groups, this will
+      generally be less than len(serialized), since we must
+      stop when we reach an END_GROUP tag.  Note that if
+      we *do* stop because of an END_GROUP tag, the number
+      of bytes returned does not include the bytes
+      for the END_GROUP tag information.
+    """
+    raise NotImplementedError
+
+    def ParseFromString(self, serialized):
+    """Like MergeFromString(), except we clear the object first."""
+    self.Clear()
+    self.MergeFromString(serialized)
+
+    '''
     
 '''
 Example Usage:
