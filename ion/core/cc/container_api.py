@@ -1,18 +1,13 @@
 #!/usr/bin/env python
 
 """
-@file ion/core/cc/container.py
+@file ion/core/cc/container_api.py
 @author Michael Meisinger
-@brief Python Capability Container
+@brief Python Capability Container interface
 """
 
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
+from zope.interface import implements, Interface
+from zope.interface import Attribute
 
-from ion.core import ioninit
-from ion.util.config import Config
-import ion.util.procutils as pu
-
-class Container(object):
+class IContainer(Interface):
     pass
-

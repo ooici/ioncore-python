@@ -30,6 +30,7 @@ class Options(usage.Options):
     longdesc = """This starts a capability container."""
 
     optParameters = [
+                ["sysname", "s", None, "System name for group of capability containers" ],
                 ["broker_host", "h", "localhost", "Message space broker hostname"],
                 ["broker_port", "p", 5672, "Message space broker port"],
                 ["broker_vhost", "v", "/", "Message space..."],
@@ -91,16 +92,13 @@ class CapabilityContainer(service.Service):
         if not self.config['no_shell']:
             self.start_shell()
 
+        # @todo At this point, can signal successful container start
+
     @defer.inlineCallbacks
     def stopService(self):
         yield self.container.terminate()
         yield service.Service.stopService(self)
         log.info("Container stopped.")
-
-    #def startMonitor(self):
-    #    """
-    #    @todo What is this for? Twisted?
-    #    """
 
     def start_container(self):
         """
@@ -119,10 +117,9 @@ class CapabilityContainer(service.Service):
             yield self.run_boot_script()
 
         if self.config['script']:
-            self.start_script()
+            yield self.start_script()
 
-        # @todo At this point, can signal successful container start
-
+    @defer.inlineCallbacks
     def start_script(self):
         """
         given the path to a file, open that file and exec the code.
@@ -131,13 +128,14 @@ class CapabilityContainer(service.Service):
         script = os.path.abspath(self.config['script'])
         if os.path.isfile(script):
             if script.endswith('.app'):
-                self.container.start_app(script)
+                yield self.container.start_app(script)
+            elif script.endswith('.rel'):
+                yield self.container.start_rel(script)
             else:
                 log.info("Executing script %s ..." % self.config['script'])
                 execfile(script, {})
         else:
             log.error('Bad startup script path: %s' % self.config['script'])
-
 
     def run_boot_script(self):
         """

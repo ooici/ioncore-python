@@ -11,7 +11,7 @@ import os, sys
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core.pack.application import AppLoader, Application
+from ion.core.pack.application import AppLoader, AppDefinition
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -25,4 +25,4 @@ class AppLoaderTest(IonTestCase):
         app = AppLoader.load_app_definition(filename)
         print app
         self.assertTrue(app)
-        self.assertIsInstance(app, Application)
+        self.assertIsInstance(app, AppDefinition)

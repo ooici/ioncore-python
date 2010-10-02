@@ -24,11 +24,13 @@ import os
 import sys
 
 from twisted.internet import defer
+from zope.interface import implements, Interface
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.cc.store import Store
+from ion.core.cc.container_api import IContainer
 from ion.core.id import Id
 from ion.core.messaging import messaging
 from ion.core.messaging.messaging import MessageSpace, Publisher, Consumer
@@ -47,6 +49,7 @@ class Container(BasicLifecycleObject):
     As a context, Container interfaces the messaging space with the local
     Spawnable and their Receivers...
     """
+    implements(IContainer)
 
     # Static: the one instance of a Container
     instance = None
@@ -125,6 +128,11 @@ class Container(BasicLifecycleObject):
         """
         log.info("Starting app: %s" % app_filename)
         app = AppLoader.load_app_definition(app_filename)
+        d = AppLoader.start_application(self, app)
+        return d
+
+    def start_rel(self, rel_filename):
+        pass
 
     @staticmethod
     def configure_messaging(name, config):

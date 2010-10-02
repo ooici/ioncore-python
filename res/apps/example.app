@@ -1,21 +1,18 @@
 # Example Python Capability Container application
 {
     "type":"application",
-    "name":"example",
-    "description": "Channel allocator",
+    "name":"ExampleApp",
+    "description": "ION Example application",
     "version": "1",
+    "mod": ("ion.zapps.example", []),
     "modules": [
-        "ch_app",
-        "ch_sup",
-        "ch3"
+        "ion.zapps.example",
     ],
     "registered": [
-        "ch3"
+        "example"
     ],
     "applications": [
-        "kernel",
+        "core",
         "stdlib",
-        "sasl"
-    ],
-    "mod": ("ch_app",[])
+    ]
 }
