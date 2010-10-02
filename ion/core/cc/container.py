@@ -28,11 +28,12 @@ from twisted.internet import defer
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core.cc.store import Store
 from ion.core.id import Id
 from ion.core.messaging import messaging
 from ion.core.messaging.messaging import MessageSpace, Publisher, Consumer
 from ion.core.messaging.messaging import ProcessExchangeSpace
-from ion.core.cc.store import Store
+from ion.core.pack.application import AppLoader
 from ion.util.state_object import BasicLifecycleObject
 
 DEFAULT_EXCHANGE_SPACE = 'magnet.topic'
@@ -110,11 +111,20 @@ class Container(BasicLifecycleObject):
     @defer.inlineCallbacks
     def on_terminate(self, *args, **kwargs):
         yield self.message_space.terminate()
+        #log.info("Container closed")
         Container._started = False
         self.store = Store()
 
     def on_error(self, *args, **kwargs):
         raise RuntimeError("Illegal state change for container")
+
+    def start_app(self, app_filename):
+        """
+        Start a Capability Container application from an .app file.
+        @see OTP design principles, applications
+        """
+        log.info("Starting app: %s" % app_filename)
+        app = AppLoader.load_app_definition(app_filename)
 
     @staticmethod
     def configure_messaging(name, config):

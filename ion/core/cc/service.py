@@ -3,7 +3,7 @@
 """
 @author Dorian Raymer
 @author Michael Meisinger
-@brief Python Capability Container Twisted plugin for twistd
+@brief Python Capability Container Twisted application plugin for twistd
 """
 
 import os
@@ -21,7 +21,9 @@ from ion.core.cc import container
 
 class Options(usage.Options):
     """
-    Extra arg for file of "program"/"module" to run
+    Extra arg for file of "program"/"module" to run.
+    This class must be named Options with the usage.Options base class for the
+    Twisted ServiceMaker to find it.
     """
     synopsis = "[ION Capability Container options]"
 
@@ -66,6 +68,7 @@ class CapabilityContainer(service.Service):
         use phases to do things in order and wait for success/fail
         """
         self.config = config
+        self.container = None
 
     @defer.inlineCallbacks
     def startService(self):
@@ -88,13 +91,16 @@ class CapabilityContainer(service.Service):
         if not self.config['no_shell']:
             self.start_shell()
 
+    @defer.inlineCallbacks
     def stopService(self):
-        service.Service.stopService(self)
+        yield self.container.terminate()
+        yield service.Service.stopService(self)
+        log.info("Container stopped.")
 
-    def startMonitor(self):
-        """
-        @todo What is this for? Twisted?
-        """
+    #def startMonitor(self):
+    #    """
+    #    @todo What is this for? Twisted?
+    #    """
 
     def start_container(self):
         """
@@ -102,9 +108,9 @@ class CapabilityContainer(service.Service):
         @retval Deferred
         """
         log.info("Starting Container/broker connection...")
-        cont = container.create_new_container()
-        cont.initialize(self.config)
-        d = cont.activate()
+        self.container = container.create_new_container()
+        self.container.initialize(self.config)
+        d = self.container.activate()
         return d
 
     @defer.inlineCallbacks
@@ -124,8 +130,14 @@ class CapabilityContainer(service.Service):
         """
         script = os.path.abspath(self.config['script'])
         if os.path.isfile(script):
-            log.info("Executing script %s ..." % self.config['script'])
-            execfile(script, {})
+            if script.endswith('.app'):
+                self.container.start_app(script)
+            else:
+                log.info("Executing script %s ..." % self.config['script'])
+                execfile(script, {})
+        else:
+            log.error('Bad startup script path: %s' % self.config['script'])
+
 
     def run_boot_script(self):
         """
@@ -148,14 +160,8 @@ class CapabilityContainer(service.Service):
 def makeService(config):
     """
     Twisted plugin service instantiation.
-    Required by Twisted
+    Required by Twisted; IServiceMaker interface
     """
     global cc_instance
     cc_instance = CapabilityContainer(config)
     return cc_instance
-
-
-#def Main(receiver):
-#    """Create a service out of a spawnable program.
-#    """
-#    return main

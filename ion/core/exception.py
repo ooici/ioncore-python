@@ -9,5 +9,10 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-class IONException(Exception):
+class IONError(StandardError):
+    pass
+
+    # @todo Some better str output
+
+class ConfigurationError(IONError):
     pass
