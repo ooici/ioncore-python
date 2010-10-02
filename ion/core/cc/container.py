@@ -29,6 +29,7 @@ from zope.interface import implements, Interface
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core import ioninit
 from ion.core.cc.store import Store
 from ion.core.cc.container_api import IContainer
 from ion.core.id import Id
@@ -37,6 +38,8 @@ from ion.core.messaging.messaging import MessageSpace, Publisher, Consumer
 from ion.core.messaging.messaging import ProcessExchangeSpace
 from ion.core.pack.application import AppLoader
 from ion.util.state_object import BasicLifecycleObject
+
+CONF = ioninit.config(__name__)
 
 DEFAULT_EXCHANGE_SPACE = 'magnet.topic'
 
@@ -111,6 +114,8 @@ class Container(BasicLifecycleObject):
                                                    name=DEFAULT_EXCHANGE_SPACE)
         yield self.message_space.activate()
 
+        yield self.start_app(CONF['ioncore_app'])
+
     def on_deactivate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
 
@@ -132,9 +137,10 @@ class Container(BasicLifecycleObject):
         """
         Start a Capability Container application from an .app file.
         @see OTP design principles, applications
+        @retval Deferred
         """
         log.info("Starting app: %s" % app_filename)
-        
+
         appdef = AppLoader.load_app_definition(app_filename)
         for app in self.applications:
             if app.name == appdef.name:

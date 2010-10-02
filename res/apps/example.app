@@ -12,7 +12,6 @@
         "example"
     ],
     "applications": [
-        "core",
-        "stdlib",
+        "ioncore",
     ]
 }
