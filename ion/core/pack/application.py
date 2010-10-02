@@ -17,7 +17,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.cc.container_api import IContainer
-from ion.core.exception import ConfigurationError
+from ion.core.exception import ConfigurationError, StartupError
 from ion.util.config import Config
 
 START_PERMANENT = "permanent"
@@ -39,6 +39,7 @@ class AppLoader(object):
         return newapp
 
     @classmethod
+    @defer.inlineCallbacks
     def start_application(cls, container, appdef):
         assert IContainer.providedBy(container)
         assert isinstance(appdef, AppDefinition)
@@ -50,8 +51,23 @@ class AppLoader(object):
         if not (hasattr(appmod, "start") and hasattr(appmod, "stop")):
             raise ConfigurationError("App module malformed")
 
-        d = appmod.start(container, START_PERMANENT, *modargs)
-        return d
+        res = yield appmod.start(container, START_PERMANENT, *modargs)
+        (status, supid, state) = res
+
+        if not status == "OK":
+            log.error("Error starting app %s: %s" % (appdef.name, status))
+
+        appdef._supid = supid
+        appdef._state = state
+        appdef._mod_loaded = appmod
+
+    @classmethod
+    @defer.inlineCallbacks
+    def stop_application(cls, container, appdef):
+        assert IContainer.providedBy(container)
+        assert isinstance(appdef, AppDefinition)
+
+        yield appdef._mod_loaded.stop(container, appdef._state)
 
 class AppDefinition(object):
     """

@@ -16,3 +16,6 @@ class IONError(StandardError):
 
 class ConfigurationError(IONError):
     pass
+
+class StartupError(IONError):
+    pass

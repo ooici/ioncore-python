@@ -75,6 +75,9 @@ class Container(BasicLifecycleObject):
         # Static: Default exchange space
         self.exchange_space = None
 
+        # Static: List of started applications (name -> AppDefinition)
+        self.applications = []
+
     def on_initialize(self, config, *args, **kwargs):
         """
         Initializes the instance of a container
@@ -113,8 +116,12 @@ class Container(BasicLifecycleObject):
 
     @defer.inlineCallbacks
     def on_terminate(self, *args, **kwargs):
+        # Stop apps in reverse order of startup
+        for app in reversed(self.applications):
+            yield AppLoader.stop_application(self, app)
+
         yield self.message_space.terminate()
-        #log.info("Container closed")
+        log.info("Container closed")
         Container._started = False
         self.store = Store()
 
@@ -127,8 +134,14 @@ class Container(BasicLifecycleObject):
         @see OTP design principles, applications
         """
         log.info("Starting app: %s" % app_filename)
-        app = AppLoader.load_app_definition(app_filename)
-        d = AppLoader.start_application(self, app)
+        
+        appdef = AppLoader.load_app_definition(app_filename)
+        for app in self.applications:
+            if app.name == appdef.name:
+                raise StartupError('Application %s already started' % appdef.name)
+
+        self.applications.append(appdef)
+        d = AppLoader.start_application(self, appdef)
         return d
 
     def start_rel(self, rel_filename):
