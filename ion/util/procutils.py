@@ -17,6 +17,7 @@ from twisted.internet import defer, reactor
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core import ioninit
 from ion.core.id import Id
 from ion.data.store import Store
 
@@ -49,7 +50,7 @@ def log_message(msg):
     lstr = ""
     procname = str(body.get('receiver',None))
     lstr += "===Message=== receiver=%s op=%s===" % (procname, body.get('op', None))
-    if body.get('quiet', False):
+    if body.get('quiett', False):
         lstr += " (Q)"
     else:
         amqpm = str(msg._amqp_message)
@@ -151,6 +152,7 @@ def send(receiver, send, recv, operation, content, headers=None):
         log_exception("Send error: ", ex)
     else:
         log.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
+        log.info("msg"+str(msg))
 
 def dispatch_message(payload, msg, dispatchIn, conv=None):
     """

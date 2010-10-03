@@ -111,73 +111,14 @@ def _set_container_args(contargs=None):
     if 'sysname' in ioninit.cont_args:
         ioninit.sys_name = ioninit.cont_args['sysname']
 
-@defer.inlineCallbacks
 def declare_messaging(messagingCfg, cgroup=None):
-    """
-    Configures messaging resources.
-    @todo this needs to go to the exchange registry service
-    """
-    # for each messaging resource call Magnet to define a resource
-    for name, msgResource in messagingCfg.iteritems():
-        scope = msgResource.get('args',{}).get('scope','global')
-        msgName = name
-        if scope == 'local':
-            msgName = Container.id + "." + msgName
-        elif scope == 'system':
-            # @todo: in the root bootstrap this is ok, but HACK
-            msgName = Container.id + "." + msgName
+    return ioninit.container_instance.declare_messaging(messagingCfg, cgroup)
 
-        # declare queues, bindings as needed
-        log.info("Messaging name config: name="+msgName+', '+str(msgResource))
-        yield Container.configure_messaging(msgName, msgResource)
-
-# Sequence number of supervisors
-sup_seq = 0
-
-@defer.inlineCallbacks
 def spawn_processes(procs, sup=None):
-    """
-    Spawns a set of processes.
-    @param procs  list of processes (as description dict) to start up
-    @param sup  spawned BaseProcess instance acting as supervisor
-    @retval Deferred, for supervisor BaseProcess instance
-    """
-    children = []
-    for procDef in procs:
-        child = ProcessDesc(**procDef)
-        children.append(child)
+    return ioninit.container_instance.spawn_processes(procs, sup)
 
-    if sup == None:
-        sup = yield create_supervisor()
-
-    log.info("Spawning child processes")
-    for child in children:
-        child_id = yield sup.spawn_child(child)
-
-    log.debug("process_ids: "+ str(base_process.procRegistry.kvs))
-
-    defer.returnValue(sup)
-
-@defer.inlineCallbacks
 def create_supervisor():
-    """
-    Creates a supervisor process
-    @retval Deferred, for supervisor BaseProcess instance
-    """
-    global sup_seq
-    # Makes the boostrap a process
-    log.info("Spawning supervisor")
-    if sup_seq == 0:
-        supname = "bootstrap"
-    else:
-        supname = "supervisor."+str(sup_seq)
-    suprec = base_process.factory.build({'proc-name':supname})
-    sup = suprec.process
-    sup.receiver.group = supname
-    supId = yield sup.spawn()
-    yield base_process.procRegistry.put(supname, str(supId))
-    sup_seq += 1
-    defer.returnValue(sup)
+    return ioninit.container_instance.create_supervisor()
 
 '''
 This method is out of date with the service registry

@@ -6,17 +6,17 @@
 @brief test case for ION integration and system test cases (and some unit tests)
 """
 
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
-
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
-from ion.core.cc import container
-from ion.core.cc.container import Id
+
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import base_process, bootstrap, ioninit
 from ion.core import ioninit
 from ion.core.base_process import BaseProcess
+from ion.core.cc import container
+from ion.core.cc.container import Id
 from ion.data.store import Store
 import ion.util.procutils as pu
 
@@ -51,7 +51,7 @@ class IonTestCase(unittest.TestCase):
         mopt['script'] = None
 
         self.container = container.create_new_container()
-        self.container.initialize(mopt)
+        yield self.container.initialize(mopt)
         yield self.container.activate()
 
         bootstrap.init_container()
@@ -61,7 +61,7 @@ class IonTestCase(unittest.TestCase):
         #Load All Resource Descriptions for future decoding
         description_utility.load_descriptions()
 
-        log.info("============Capability Container started, "+repr(self.container.message_space))
+        log.info("============Capability Container started, "+repr(self.container.exchange_manager.message_space))
 
     @defer.inlineCallbacks
     def _start_core_services(self):

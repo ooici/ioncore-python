@@ -71,22 +71,16 @@ class Receiver(BasicLifecycleObject):
         """
         @retval Deferred
         """
-        if not self.name:
-            procid = str(self.process.id)
-            self.name = procid
-
-            name_config = messaging.process(procid)
-            name_config.update({'name_type':'process'})
-            xnamestore = ioninit.container_instance.exchange_manager.exchange_space.store
-            yield xnamestore.put(procid, name_config)
-        else:
-            xnamestore = ioninit.container_instance.exchange_manager.exchange_space.store
-            name_config = yield xnamestore.get(procid)
-            if not name_config:
-                raise RuntimeError("Messaging name undefined: "+self.name)
+        assert self.name, "Receiver must have a name or be ProcessReceiver"
+        procid = str(self.process.id)
+        xnamestore = ioninit.container_instance.exchange_manager.exchange_space.store
+        name_config = yield xnamestore.get(procid)
+        if not name_config:
+            raise RuntimeError("Messaging name undefined: "+self.name)
 
         consumer = yield ioninit.container_instance.new_consumer(name_config, self.receive)
         self.consumer = consumer
+        print "activate",
 
     def on_terminate(self, *args, **kwargs):
         """
@@ -113,8 +107,30 @@ class Receiver(BasicLifecycleObject):
         for handler in self.handlers:
             d = defer.maybeDeferred(handler, data, msg)
 
+    def __str__(self):
+        res = "Receiver(label=%s,name=%s,group=%s)" % (self.label, self.name, self.group)
+
 class ProcessReceiver(Receiver):
-    pass
+    """
+    A ProcessReceiver is a Receiver that is exclusive to a process. It does
+    not require keeping track of specific attributes.
+    """
+
+    @defer.inlineCallbacks
+    def on_activate(self, *args, **kwargs):
+        """
+        @retval Deferred
+        """
+        procid = str(self.process.id)
+        if not self.name:
+            self.name = procid
+
+        name_config = messaging.process(procid)
+        name_config.update({'name_type':'process'})
+        xnamestore = ioninit.container_instance.exchange_manager.exchange_space.store
+        yield xnamestore.put(procid, name_config)
+
+        yield Receiver.on_activate(self, *args, **kwargs)
 
 class NameReceiver(Receiver):
     pass

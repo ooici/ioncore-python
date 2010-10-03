@@ -23,7 +23,7 @@ __all__ = ['DeployableTypeRegistryService', 'DeployableTypeRegistryClient']
 #TODO ugggggggggghhhhhhhhh
 _REGISTRY = {}
 CONF = ioninit.config(__name__)
-execfile(CONF['deployable_types'])
+execfile(ioninit.adjust_dir(CONF['deployable_types']))
 log.debug('Loaded %s deployable types.', len(_REGISTRY))
 
 class DeployableTypeRegistryService(BaseService):

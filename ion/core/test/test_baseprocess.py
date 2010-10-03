@@ -8,18 +8,17 @@
 
 import os
 import sha
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from ion.core.cc.container import Container
-from ion.core.messaging.receiver import Receiver
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.base_process import BaseProcess, ProcessDesc, ProcessFactory
-
+from ion.core.cc.container import Container
+from ion.core.messaging.receiver import Receiver
 from ion.test.iontest import IonTestCase, ReceiverProcess
 import ion.util.procutils as pu
 

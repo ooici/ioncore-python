@@ -75,13 +75,14 @@ class ProcessDesc(object):
             if self.spawn_args:
                 spawnargs.update(self.spawn_args)
             #log.debug("spawn(%s, args=%s)" % (self.proc_module, spawnargs))
-            proc_id = yield ioninit.container_instance.spawn_process(proc_mod, None, spawnargs)
-            self.proc_id = proc_id
+            process = yield ioninit.container_instance.spawn_process(proc_mod, None, spawnargs)
+            self.proc_id = process.id
             self.proc_state = 'SPAWNED'
 
-            log.info("Process "+str(self.proc_class)+" ID: "+str(proc_id))
+            log.info("Process %s ID: %s" % (self.proc_class, self.proc_id))
         else:
             log.error('Cannot spawn '+self.proc_class+' on node='+str(self.proc_node))
+            
         defer.returnValue(self.proc_id)
 
     @defer.inlineCallbacks
@@ -152,7 +153,7 @@ class ProcessFactory(object):
         spawnargs['proc-group'] = self.name
 
         # Instantiate the IProcess class
-        process = self.process_class(receiver=receiver, spawnargs=spawnargs)
+        process = self.process_class(spawnargs=spawnargs)
 
         return process
 
@@ -165,9 +166,10 @@ class ProcessInstantiator(object):
     idcount = 0
 
     @classmethod
-    def create_process_id(cls, container):
-        idcount += 1
-        return Id(idcount, container.id)
+    def create_process_id(cls, container=None):
+        container = container or ioninit.container_instance
+        cls.idcount += 1
+        return Id(cls.idcount, container.id)
 
     @classmethod
     @defer.inlineCallbacks
@@ -185,7 +187,7 @@ class ProcessInstantiator(object):
         if not hasattr(procmod, 'factory'):
             raise RuntimeError("Must define factory in process module to spawn")
 
-        if not IProcessFactory.providedBy(procmod):
+        if not IProcessFactory.providedBy(procmod.factory):
             raise RuntimeError("Process model factory must provide IProcessFactory")
 
         procid = ProcessInstantiator.create_process_id(container)
@@ -199,4 +201,3 @@ class ProcessInstantiator(object):
         yield process.spawn()
 
         defer.returnValue(process)
-

@@ -305,5 +305,5 @@ def fanout(name):
 #
 #    """
 #    amqp_conf = config_factory(name)
-#    consumer = messaging.Consumer(ioninit.container_instance.message_space.connection, **amqp_conf)
+#    consumer = messaging.Consumer(ioninit.container_instance.exchange_manager.message_space.connection, **amqp_conf)
 #    yield consumer.declare()

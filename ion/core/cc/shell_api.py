@@ -68,7 +68,7 @@ def spawn(m, space=None, spawnArgs=None):
     Spawn uses a function as an entry point for running a module
     """
     if not space:
-        space = ioninit.container_instance.message_space
+        space = ioninit.container_instance.exchange_manager.message_space
     if spawnArgs == None:
         spawnArgs = {}
     if type(m) is types.ModuleType:

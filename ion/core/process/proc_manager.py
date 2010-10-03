@@ -80,7 +80,7 @@ class ProcessManager(BasicLifecycleObject):
         """
         assert type(module) is types.ModuleType, "Can only spawn from a module"
         if not space:
-            space = ioninit.container_instance.message_space
+            space = ioninit.container_instance.exchange_manager.message_space
         if spawnargs == None:
             spawnargs = {}
 
@@ -116,20 +116,19 @@ class ProcessManager(BasicLifecycleObject):
     @defer.inlineCallbacks
     def create_supervisor(self):
         """
-        Creates a supervisor process
+        Creates a supervisor process.
         @retval Deferred, for supervisor BaseProcess instance
         """
-        global sup_seq
         # Makes the boostrap a process
         log.info("Spawning supervisor")
-        if sup_seq == 0:
+        if self.sup_seq == 0:
             supname = "bootstrap"
         else:
             supname = "supervisor."+str(self.sup_seq)
-        suprec = base_process.factory.build({'proc-name':supname})
-        sup = suprec.process
-        sup.receiver.group = supname
+
+        spawnargs = {'proc-name':supname}
+        sup = base_process.factory.build(spawnargs)
         supId = yield sup.spawn()
         yield base_process.procRegistry.put(supname, str(supId))
-        sup_seq += 1
+        self.sup_seq += 1
         defer.returnValue(sup)

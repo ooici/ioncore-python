@@ -14,7 +14,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.id import Id
 from ion.core import ioninit
-from ion.core.messaging.receiver import ProcessReceiver, Receiver
+from ion.core.messaging.receiver import ProcessReceiver
 from ion.core.process.process import IProcess, ProcessDesc, ProcessFactory
 from ion.core.process.process import ProcessInstantiator
 from ion.data.store import Store
@@ -81,13 +81,13 @@ class BaseProcess(object):
                                         name=str(self.id),
                                         group=self.proc_group,
                                         process=self)
-        receiver.add_handler(self.receive)
+        self.receiver.add_handler(self.receive)
 
         # Create a backend receiver for outgoing RPC process interactions.
         # Needed to avoid deadlock when processing incoming messages
         # because only one message can be consumed before ACK.
         self.backend_id = ProcessInstantiator.create_process_id()
-        self.backend_receiver = Receiver(label=self.proc_name + "_back",
+        self.backend_receiver = ProcessReceiver(label=self.proc_name + "_back",
                                          name=str(self.backend_id),
                                          group=self.proc_group,
                                          process=self)
@@ -107,8 +107,8 @@ class BaseProcess(object):
         # List of ProcessDesc instances of defined and spawned child processes
         self.child_procs = []
 
-        log.debug("NEW Process [%s], sup-id=%s, sys-name=%s" % (
-                self.proc_name, self.proc_supid, self.sys_name))
+        log.debug("NEW Process [%s], sup-id=%s, sys-name=%s, backend=%s" % (
+                self.proc_name, self.proc_supid, self.sys_name, self.backend_id))
 
     def add_receiver(self, receiver):
         self.receivers[receiver.name] = receiver
@@ -123,6 +123,7 @@ class BaseProcess(object):
         assert not self.backend_receiver.consumer, "Process already spawned"
 
         for rec in self.receivers.values():
+            print "rec", rec
             yield rec.activate()
 
         log.debug('Process spawn(): pid=%s' % (self.id))
@@ -130,7 +131,7 @@ class BaseProcess(object):
 
         # Call init right away. This is what you would expect anyways in a
         # container executed spawn
-        yield self.init()
+        #yield self.init()
 
         defer.returnValue(self.id)
 
@@ -382,7 +383,7 @@ class BaseProcess(object):
 
     def _create_convid(self):
         # Returns a new unique conversation id
-        send = self.receiver.spawned.id.full
+        send = self.id.full
         BaseProcess.convIdCnt += 1
         convid = "#" + str(BaseProcess.convIdCnt)
         #convid = send + "#" + BaseProcess.convIdCnt

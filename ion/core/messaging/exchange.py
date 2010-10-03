@@ -11,7 +11,7 @@ from twisted.internet import defer
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core.messaging.messaging import MessageSpace, ProcessExchangeSpace
+from ion.core.messaging.messaging import MessageSpace, ProcessExchangeSpace, Consumer
 from ion.util.state_object import BasicLifecycleObject
 
 DEFAULT_EXCHANGE_SPACE = 'magnet.topic'
@@ -27,9 +27,6 @@ class ExchangeManager(BasicLifecycleObject):
 
         # Container broker connection / vhost parameters
         self.message_space = None
-
-        # Broker connection instance
-        self.broker_connection = None
 
         # Default exchange space
         self.exchange_space = None
@@ -122,13 +119,13 @@ class ExchangeManager(BasicLifecycleObject):
         return d
 
     @defer.inlineCallbacks
-    def new_consumer(self, name_config, target):
+    def new_consumer(self, name_config, callback):
         """
         @brief create consumer
         @retval Deferred that fires a consumer instance
         """
         consumer = yield Consumer.name(self.exchange_space, name_config)
-        consumer.register_callback(target.send)
+        consumer.register_callback(callback)
         consumer.iterconsume()
         defer.returnValue(consumer)
 
@@ -136,5 +133,5 @@ class ExchangeManager(BasicLifecycleObject):
         """
         Sends a message
         """
-        exchange_space = exchange_space or self.container.exchange_space
+        exchange_space = exchange_space or self.container.exchange_manager.exchange_space
         return exchange_space.send(to_name, message_data)

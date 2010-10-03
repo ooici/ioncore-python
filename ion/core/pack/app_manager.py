@@ -44,8 +44,9 @@ class AppManager(BasicLifecycleObject):
         """
 
         # Bootstrap the container/ION core system
-        filename = ioninit.adjust_dir(CONF['ioncore_app'])
-        yield self.start_app(filename)
+        if not ioninit.testing:
+            filename = ioninit.adjust_dir(CONF['ioncore_app'])
+            yield self.start_app(filename)
 
     @defer.inlineCallbacks
     def on_terminate(self, *args, **kwargs):
