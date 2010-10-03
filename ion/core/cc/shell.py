@@ -14,9 +14,6 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ionconst
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import send
-from ion.core.cc.spawnable import spawn
 
 def get_virtualenv():
     if 'VIRTUAL_ENV' in os.environ:
@@ -77,12 +74,12 @@ class ConsoleManhole(manhole.ColoredManhole):
         self.factory.stop()
 
 def makeNamespace():
-    from ion.core.cc.spawnable import send, ps, ms, spawn, kill
-    from ion.core.cc.container import Container, Id
+    from ion.core.cc.shell_api import send, ps, ms, spawn, kill
+    from ion.core.cc.container import Container
+    from ion.core.id import Id
 
     namespace = locals()
     return namespace
-
 
 class Control(object):
 

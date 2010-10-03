@@ -36,7 +36,7 @@ class StateObject(Actionable):
         """
         Trigger the FSM with an event. Leads to action functions being called.
         """
-        assert  self.__fsm, "FSM not set"
+        assert self.__fsm, "FSM not set"
         self.__fsm.input_args = args
         self.__fsm.input_kwargs = kwargs
         res = self.__fsm.process(event)
@@ -49,6 +49,10 @@ class StateObject(Actionable):
         kwargs = self.__fsm.input_kwargs
         res = func(*args, **kwargs)
         return res
+
+    def _get_state(self):
+        assert self.__fsm, "FSM not set"
+        return self.__fsm.current_state
 
 class FSMFactory(object):
     """

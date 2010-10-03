@@ -6,17 +6,18 @@
 @brief base class for all processes within a capability container
 """
 
+from twisted.internet import defer
+from zope.interface import implements
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from twisted.internet import defer
-from ion.core.cc.container import Container
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import ProtocolFactory
-from ion.core.cc.spawnable import spawn
-from ion.data.store import Store
-
+from ion.core.id import Id
 from ion.core import ioninit
+from ion.core.messaging.receiver import ProcessReceiver, Receiver
+from ion.core.process.process import ProcessDesc, ProcessFactory, IProcess
+from ion.core.process.process import ProcessInstantiator
+from ion.data.store import Store
 from ion.interact.conversation import Conversation
 from ion.interact.message import Message
 import ion.util.procutils as pu
@@ -27,8 +28,6 @@ CF_conversation_log = CONF['conversation_log']
 # @todo CHANGE: Static store (kvs) to register process instances with names
 procRegistry = Store()
 
-# @todo HACK: Dict of process "alias" to process declaration
-processes = {}
 
 # @todo HACK: List of process instances
 receivers = []
@@ -42,54 +41,66 @@ class BaseProcess(object):
     calls, spawning and terminating child processes. Subclasses may use the
     plc-* process life cycle events.
     """
+    implements(IProcess)
+
     # @todo CHANGE: Conversation ID counter
     convIdCnt = 0
 
-    def __init__(self, receiver=None, spawnArgs=None, **kwargs):
+    def __init__(self, receiver=None, spawnargs=None, **kwargs):
         """
         Initialize process using an optional receiver and optional spawn args
-        @param receiver  instance of a Receiver for process control
-        @param spawnArgs  standard and additional spawn arguments
+        @param receiver instance of a Receiver for process control (unused)
+        @param spawnargs standard and additional spawn arguments
         """
         self.proc_state = "NEW"
-        spawnArgs = spawnArgs.copy() if spawnArgs else {}
-        self.spawn_args = spawnArgs
+        spawnargs = spawnargs.copy() if spawnargs else {}
+        self.spawn_args = spawnargs
         self.proc_init_time = pu.currenttime_ms()
+
+        # An Id with the process ID (fully qualified)
+        procid = self.spawn_args.get('proc-id', ProcessInstantiator.create_process_id())
+        self.id = procid
+        assert isinstance(self.id, Id), "Process id must be Id"
 
         # Name (human readable label) of this process.
         self.proc_name = self.spawn_args.get('proc-name', __name__)
 
-        # The system unique ID; propagates from root supv to all child procs
-        sysname = ioninit.cont_args.get('sysname', Container.id)
-        self.sys_name = self.spawn_args.get('sys-name', sysname)
+        # The system unique name; propagates from root supv to all child procs
+        default_sysname = ioninit.sys_name or Id.default_container_id
+        self.sys_name = self.spawn_args.get('sys-name', default_sysname)
 
-        # The process ID of the supervisor process
+        # An Id with the process ID of the parent (supervisor) process
         self.proc_supid = pu.get_process_id(self.spawn_args.get('sup-id', None))
 
-        if not receiver:
-            receiver = Receiver(self.proc_name)
-        self.receiver = receiver
-        receiver.handle(self.receive)
-        self.id = None
+        # Name (human readable label) of this process.
+        self.proc_group = self.spawn_args.get('proc-group', self.proc_name)
 
-        # We need a second receiver (i.e. messaging queue) for backend
-        # interactions, while processing incoming messages. Otherwise deadlock
+        # Ignore supplied receiver for consistency purposes
+        # Create main receiver; used for incoming process interactions
+        self.receiver = ProcessReceiver(label=self.proc_name,
+                                        name=str(self.id),
+                                        group=self.proc_group,
+                                        process=self)
+        receiver.add_handler(self.receive)
+
+        # Create a backend receiver for outgoing RPC process interactions.
+        # Needed to avoid deadlock when processing incoming messages
         # because only one message can be consumed before ACK.
-        self.backend_receiver = Receiver(self.proc_name + "_back")
-        self.backend_receiver.handle(self.receive)
-        if hasattr(self.receiver, 'group'):
-            self.backend_receiver.group = self.receiver.group
-        else:
-            self.backend_receiver.group = self.proc_name
-        self.backend_id = None
+        self.backend_id = ProcessInstantiator.create_process_id()
+        self.backend_receiver = Receiver(label=self.proc_name + "_back",
+                                         name=str(self.backend_id),
+                                         group=self.proc_group,
+                                         process=self)
+        self.backend_receiver.add_handler(self.receive)
 
         # Dict of all receivers of this process. Key is the name
         self.receivers = {}
         self.add_receiver(self.receiver)
+        self.add_receiver(self.backend_receiver)
 
-        # Dict of converations.
-        # @todo: make sure this is garbage collected once in a while
+        # Dict of converations by conv-id
         self.conversations = {}
+
         # Conversations by conv-id for currently outstanding RPCs
         self.rpc_conv = {}
 
@@ -100,19 +111,20 @@ class BaseProcess(object):
                 self.proc_name, self.proc_supid, self.sys_name))
 
     def add_receiver(self, receiver):
-        key = receiver.name
-        self.receivers[key] = receiver
+        self.receivers[receiver.name] = receiver
 
     @defer.inlineCallbacks
     def spawn(self):
         """
         Spawns this process using the process' receiver and initializes it in
         the same call. Self spawn can only be called once per instance.
-        @note this method is not called when spawned through CC. This makes
-        it tricky to do consistent initialization on spawn.
         """
-        assert not self.receiver.spawned, "Process already spawned"
-        self.id = yield spawn(self.receiver)
+        assert not self.receiver.consumer, "Process already spawned"
+        assert not self.backend_receiver.consumer, "Process already spawned"
+
+        for rec in self.receivers.values():
+            yield rec.activate()
+
         log.debug('Process spawn(): pid=%s' % (self.id))
         yield defer.maybeDeferred(self.plc_spawn)
 
@@ -142,7 +154,7 @@ class BaseProcess(object):
         """
 
     def is_spawned(self):
-        return self.receiver.spawned != None
+        return self.receiver.consumer != None
 
     @defer.inlineCallbacks
     def op_init(self, content, headers, msg):
@@ -159,8 +171,6 @@ class BaseProcess(object):
             self.proc_state = "INIT"
 
             try:
-                self.id = self.receiver.spawned.id
-                self.backend_id = yield spawn(self.backend_receiver)
                 yield defer.maybeDeferred(self.plc_init)
                 self.proc_state = "ACTIVE"
                 log.info('----- Process %s INIT OK -----' % (self.proc_name))
@@ -434,7 +444,7 @@ class BaseProcess(object):
         """
         scoped_name = name
         if scope == 'local':
-            scoped_name =  str(Container.id) + "." + name
+            scoped_name =  str(Id.default_container_id) + "." + name
         elif scope == 'system':
             scoped_name =  self.sys_name + "." + name
         elif scope == 'global':
@@ -494,120 +504,7 @@ class BaseProcess(object):
         """
         return self.op_shutdown(None, None, None)
 
-class ProcessDesc(object):
-    """
-    Class that encapsulates attributes about a spawnable process; can spawn
-    and init processes.
-    """
-    def __init__(self, **kwargs):
-        """
-        Initializes ProcessDesc instance with process attributes
-        @param name  name label of process
-        @param module  module name of process module
-        @param class  or procclass is class name in process module (optional)
-        @param node  ID of container to spawn process on (optional)
-        @param spawnargs  dict of additional spawn arguments (optional)
-        """
-        self.proc_name = kwargs.get('name', None)
-        self.proc_module = kwargs.get('module', None)
-        self.proc_class = kwargs.get('class', kwargs.get('procclass', None))
-        self.proc_node = kwargs.get('node', None)
-        self.spawn_args = kwargs.get('spawnargs', None)
-        self.proc_id = None
-        self.proc_state = 'DEFINED'
-
-    @defer.inlineCallbacks
-    def spawn(self, supProc=None):
-        """
-        Spawns this process description with the initialized attributes.
-        @param supProc  the process instance that should be set as supervisor
-        """
-        assert self.proc_state == 'DEFINED', "Cannot spawn process twice"
-        self.sup_process = supProc
-        if self.proc_node == None:
-            log.info('Spawning name=%s node=%s' %
-                         (self.proc_name, self.proc_node))
-
-            # Importing service module
-            proc_mod = pu.get_module(self.proc_module)
-            self.proc_mod_obj = proc_mod
-
-            # Spawn instance of a process
-            # During spawn, the supervisor process id, system name and proc name
-            # get provided as spawn args, in addition to any give spawn args.
-            spawnargs = {'proc-name':self.proc_name,
-                         'sup-id':self.sup_process.receiver.spawned.id.full,
-                         'sys-name':self.sup_process.sys_name}
-            if self.spawn_args:
-                spawnargs.update(self.spawn_args)
-            #log.debug("spawn(%s, args=%s)" % (self.proc_module, spawnargs))
-            proc_id = yield spawn(proc_mod, None, spawnargs)
-            self.proc_id = proc_id
-            self.proc_state = 'SPAWNED'
-
-            log.info("Process "+str(self.proc_class)+" ID: "+str(proc_id))
-        else:
-            log.error('Cannot spawn '+self.proc_class+' on node='+str(self.proc_node))
-        defer.returnValue(self.proc_id)
-
-    @defer.inlineCallbacks
-    def init(self):
-        (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
-                                                'init', {}, {'quiet':True})
-        if content.get('status','ERROR') == 'OK':
-            self.proc_state = 'INIT_OK'
-        else:
-            self.proc_state = 'INIT_ERROR'
-
-    @defer.inlineCallbacks
-    def shutdown(self):
-        (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
-                                                'shutdown', {}, {'quiet':True})
-        if content.get('status','ERROR') == 'OK':
-            self.proc_state = 'TERMINATED'
-        else:
-            self.proc_state = 'SHUTDOWN_ERROR'
-
-
-class ProtocolFactory(ProtocolFactory):
-    """
-    This protocol factory returns receiver instances used to spawn processes
-    from a module. This implementation creates process class instances together
-    with the receiver. This is a standard implementation that can be used
-    in the code of every module containing a process. This factory also collects
-    process declarations alongside.
-    """
-    def __init__(self, pcls, name=None, args=None):
-        self.processClass = pcls
-        if not name:
-            name = pcls.__name__
-        self.name = name
-        if not args:
-            args = {}
-        self.args = args
-        # Collecting the declare static class variable in a process class
-        if pcls and hasattr(pcls, 'declare') and type(pcls.declare) is dict:
-            procdec = pcls.declare.copy()
-            procdec['class'] = pcls
-            procname = pcls.declare.get('name', pcls.__name__)
-            if procname in processes:
-                raise RuntimeError('Process already declared: '+str(procname))
-            processes[procname] = procdec
-
-    def build(self, spawnArgs=None):
-        """
-        Factory method return a new receiver for a new process. At the same
-        time instantiate class.
-        """
-        if not spawnArgs:
-            spawnArgs = {}
-        #log.debug("ProtocolFactory.build(name=%s, args=%s)" % (self.name,spawnArgs))
-        receiver = self.receiver(spawnArgs.get('proc-name', self.name))
-        receiver.group = self.name
-        instance = self.processClass(receiver, spawnArgs)
-        receiver.procinst = instance
-        receivers.append(receiver)
-        return receiver
+ProtocolFactory = ProcessFactory
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(BaseProcess)

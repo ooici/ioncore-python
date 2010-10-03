@@ -116,8 +116,8 @@ class IonTestCase(unittest.TestCase):
         @retval BaseProcess instance for process id
         """
         for rec in base_process.receivers:
-            if rec.spawned.id.full == str(pid):
-                return rec.procinst
+            if rec.process.id.full == str(pid):
+                return rec.process
         return None
 
 class ReceiverProcess(BaseProcess):

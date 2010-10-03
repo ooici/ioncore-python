@@ -10,8 +10,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from ion.core.cc.container import Container
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import spawn
+from ion.core.messaging.receiver import Receiver
 
 from ion.core import base_process
 from ion.core.base_process import BaseProcess, BaseProcessClient
@@ -76,7 +75,7 @@ class BaseService(BaseProcess):
     @defer.inlineCallbacks
     def plc_init(self):
         yield self._declare_service_name()
-        svcid = yield spawn(self.svc_receiver)
+        svcid = yield self.svc_receiver.activate()
         log.info('Service process bound to name=%s as pid=%s' % (self.svc_receiver.name, svcid))
         yield defer.maybeDeferred(self.slc_init)
         yield defer.maybeDeferred(self.slc_start)

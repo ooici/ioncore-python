@@ -18,8 +18,7 @@ from twisted.internet import reactor
 
 
 #from ion.core.cc.container import Container
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import spawn
+from ion.core.messaging.receiver import Receiver
 
 from ion.core.base_process import BaseProcess, ProcessDesc
 import ion.util.procutils as pu
@@ -110,7 +109,7 @@ class BaseConsumer(BaseProcess):
 
         dataReceiver = Receiver(__name__, str(queue))
         dataReceiver.handle(self.receive)
-        dr_id = yield spawn(dataReceiver)
+        dr_id = yield dataReceive.activate()
 
         #print dr_id, dataReceiver.name
 

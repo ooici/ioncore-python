@@ -15,9 +15,7 @@ from twisted.trial import unittest
 from twisted.internet import defer
 
 from ion.core.cc.container import Container
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import send
-from ion.core.cc.spawnable import spawn
+from ion.core.messaging.receiver import Receiver
 
 from ion.core import ioninit
 from ion.core.base_process import BaseProcess, ProcessDesc, ProtocolFactory
@@ -43,11 +41,11 @@ class BaseProcessTest(IonTestCase):
         p1 = BaseProcess()
         self.assertEquals(p1.id, None)
         self.assertTrue(p1.receiver)
-        self.assertEquals(p1.receiver.spawned, None)
+        self.assertEquals(p1.receiver.consumer, None)
         self.assertEquals(p1.proc_state, "NEW")
 
         pid1 = yield p1.spawn()
-        self.assertEquals(pid1, p1.receiver.spawned.id)
+        self.assertEquals(pid1, p1.id)
 
         # Note: this tests init without actually sending a message.
         self.assertEquals(p1.proc_state, "ACTIVE")
@@ -84,7 +82,7 @@ class BaseProcessTest(IonTestCase):
         self.assertEquals(child1.proc_state,'INIT_OK')
         proc = self._get_procinstance(pid1)
         self.assertEquals(str(proc.__class__),"<class 'ion.core.test.test_baseprocess.EchoProcess'>")
-        self.assertEquals(pid1, proc.receiver.spawned.id)
+        self.assertEquals(pid1, proc.id)
         log.info('Process 1 spawned and initd correctly')
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo','content123')
@@ -97,7 +95,7 @@ class BaseProcessTest(IonTestCase):
         yield Container.configure_messaging(msgName, messaging)
         extraRec = Receiver(proc.proc_name, msgName)
         extraRec.handle(proc.receive)
-        extraid = yield spawn(extraRec)
+        extraid = yield extraRec.activate()
         log.info('Created new receiver %s with pid %s' % (msgName, extraid))
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(msgName,'echo','content456')
@@ -162,7 +160,7 @@ class BaseProcessTest(IonTestCase):
         yield Container.configure_messaging(msgName, messaging)
         extraRec = Receiver(proc2.proc_name, msgName)
         extraRec.handle(proc2.receive)
-        extraid = yield spawn(extraRec)
+        extraid = yield extraRec.activate()
         log.info('Created new receiver %s with pid %s' % (msgName, extraid))
 
         yield self.test_sup.send(pid2, 'init',{},{'quiet':True})

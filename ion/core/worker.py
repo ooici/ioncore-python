@@ -9,8 +9,7 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import spawn
+from ion.core.messaging.receiver import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import BaseProcess, ProtocolFactory
@@ -34,7 +33,7 @@ class WorkerProcess(BaseService):
         self.workReceiver.handle(self.receive)
 
         log.info("slc_init worker receiver spawning")
-        id = yield spawn(workReceiver)
+        id = yield workReceiver.activate()
         log.info("slc_init worker receiver spawned:"+str(id))
 
     @defer.inlineCallbacks
@@ -44,7 +43,7 @@ class WorkerProcess(BaseService):
 
     @defer.inlineCallbacks
     def _work(self,content):
-        myid = self.proc_name + ":" + self.receiver.spawned.id.local
+        myid = self.proc_name + ":" + self.id.local
         workid = str(content['work-id'])
         waittime = float(content['work'])
         log.info("worker="+myid+" job="+workid+" work="+str(waittime))

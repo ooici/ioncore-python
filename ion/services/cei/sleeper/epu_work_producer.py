@@ -6,7 +6,7 @@ from twisted.internet import defer
 from twisted.internet.task import LoopingCall
 from twisted.web import server, resource
 from twisted.internet import reactor
-from ion.core.cc.spawnable import Receiver
+from ion.core.messaging.receiver import Receiver
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.core.base_process import ProtocolFactory
 import Queue

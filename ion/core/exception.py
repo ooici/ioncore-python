@@ -19,3 +19,6 @@ class ConfigurationError(IONError):
 
 class StartupError(IONError):
     pass
+
+class IllegalStateError(IONError):
+    pass

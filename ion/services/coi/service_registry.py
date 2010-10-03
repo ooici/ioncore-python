@@ -9,7 +9,7 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
+from ion.core.messaging.receiver import Receiver
 
 import inspect
 

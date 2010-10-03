@@ -17,6 +17,7 @@ from twisted.python import usage
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core import ioninit
 from ion.core.cc import container
 
 class Options(usage.Options):
@@ -70,6 +71,7 @@ class CapabilityContainer(service.Service):
         """
         self.config = config
         self.container = None
+        ioninit.testing = False
 
     @defer.inlineCallbacks
     def startService(self):
@@ -92,6 +94,8 @@ class CapabilityContainer(service.Service):
         if not self.config['no_shell']:
             self.start_shell()
 
+        log.info("All startup actions completed.")
+
         # @todo At this point, can signal successful container start
 
     @defer.inlineCallbacks
@@ -100,6 +104,7 @@ class CapabilityContainer(service.Service):
         yield service.Service.stopService(self)
         log.info("Container stopped.")
 
+    @defer.inlineCallbacks
     def start_container(self):
         """
         When deferred done, fire next step
@@ -107,9 +112,8 @@ class CapabilityContainer(service.Service):
         """
         log.info("Starting Container/broker connection...")
         self.container = container.create_new_container()
-        self.container.initialize(self.config)
-        d = self.container.activate()
-        return d
+        yield self.container.initialize(self.config)
+        yield self.container.activate()
 
     @defer.inlineCallbacks
     def do_start_actions(self):

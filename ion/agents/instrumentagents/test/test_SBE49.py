@@ -18,8 +18,7 @@ from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriver
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.core import bootstrap
 
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import spawn
+from ion.core.messaging.receiver import Receiver
 from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.services.base_service import BaseServiceClient
@@ -220,7 +219,7 @@ class DataConsumer(BaseProcess):
         yield self.init()
         self.dataReceiver = Receiver(__name__, topic_name)
         self.dataReceiver.handle(self.receive)
-        self.dr_id = yield spawn(self.dataReceiver)
+        self.dr_id = yield self.dataReceiver.activate()
 
         self.receive_cnt = 0
         self.received_msg = []

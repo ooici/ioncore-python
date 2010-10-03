@@ -9,7 +9,6 @@
 import sys
 import traceback
 import re
-from datetime import datetime
 import time
 import uuid
 
@@ -18,7 +17,7 @@ from twisted.internet import defer, reactor
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core.cc.container import Container, Id
+from ion.core.id import Id
 from ion.data.store import Store
 
 def log_exception(msg=None, e=None):
@@ -86,16 +85,19 @@ def create_guid():
     """
     return str(uuid.uuid4())
 
-def get_process_id(long_id):
-    """Returns the instance part of a long process id
+def get_process_id(some_id):
     """
-    if long_id == None:
+    @brief Always returns an Id with qualified process id
+    @param some_id any form of id, short or long, Id or str
+    @retval Id with full process id
+    """
+    if some_id == None:
         return None
-    parts = str(long_id).rpartition('.')
+    parts = str(some_id).rpartition('.')
     if parts[1] != '':
         procId = Id(parts[2],parts[0])
     else:
-        procId = Id(long_id)
+        procId = Id(some_id)
     return procId
 
 @defer.inlineCallbacks
@@ -144,7 +146,7 @@ def send(receiver, send, recv, operation, content, headers=None):
     msg['content'] = content
     #log.debug("Send message op="+operation+" to="+str(recv))
     try:
-        yield Container.instance.send(recv, msg)
+        yield ioninit.container_instance.send(recv, msg)
     except Exception, ex:
         log_exception("Send error: ", ex)
     else:
@@ -264,16 +266,16 @@ class FakeMessage(object):
 
 class FakeSpawnable(object):
     def __init__(self, id=None):
-        self.id = id if id else Id('fakec','fakep')
+        self.id = id or Id('fakec','fakep')
 
 class FakeReceiver(object):
     """Instances of this object are given to send/spawn functions
-    by test cases, in lieu of ion.core.spawnable.Receiver instances. Production code
-    detects these and no send is done.
+    by test cases, in lieu of ion.core.messaging.receiver.Receiver instances.
+    Production code detects these and no send is done.
     """
     def __init__(self, id=None):
         self.payload = None
-        self.spawned = FakeSpawnable()
+        self.process = FakeSpawnable()
         self.group = 'fake'
 
     @defer.inlineCallbacks

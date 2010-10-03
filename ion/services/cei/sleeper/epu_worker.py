@@ -5,7 +5,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer, reactor
-from ion.core.cc.spawnable import spawn, Receiver
+from ion.core.messaging.receiver import Receiver
 from ion.core import bootstrap
 from ion.services.base_service import BaseService
 from ion.core.base_process import ProtocolFactory
@@ -29,8 +29,8 @@ class EPUWorkerService(BaseService):
     @defer.inlineCallbacks
     def later_init(self):
         yield bootstrap.declare_messaging(self.worker_queue)
-        self.workReceiver.handle(self.receive)
-        spawnId = yield spawn(self.workReceiver)
+        self.workReceiver.add_handler(self.receive)
+        spawnId = yield self.workReceiver.activate()
         log.debug("spawnId: %s" % spawnId)
         self.laterinitialized = True
         extradict = {"queue_name_work":self.queue_name_work}

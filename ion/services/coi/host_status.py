@@ -36,7 +36,7 @@ class HostStatusService(BaseService):
     )
 
 
-    
+
     def slc_init(self):
         self.INTERVAL = 1 # seconds
         self.COUNT    = 1
@@ -54,15 +54,15 @@ class HostStatusService(BaseService):
             log.debug('Shutting down host status looping call')
             self.lc.stop()
             return
-            
+
         log.debug('Starting report query')
         status = yield self.client.callRemote("getStatusString","all")
         log.debug('Received report')
         print status
-    
+
     def isRunning(self):
         return self.lc.running
-    
+
     def op_config(self, content, headers, msg):
         pass
 
@@ -88,8 +88,3 @@ class HostStatusClient(BaseServiceClient):
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(HostStatusService)
-
-"""
-from ion.services.coi import logger
-spawn(logger)
-"""

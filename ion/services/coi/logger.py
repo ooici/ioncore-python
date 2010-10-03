@@ -86,8 +86,3 @@ class LoggerClient(BaseServiceClient):
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(LoggerService)
-
-"""
-from ion.services.coi import logger
-spawn(logger)
-"""

@@ -11,6 +11,7 @@ from twisted.internet import defer
 from carrot import connection
 from carrot import messaging
 
+from ion.core.cc.store import Store
 from ion.util.state_object import BasicLifecycleObject
 
 class MessageSpace(BasicLifecycleObject):
@@ -69,6 +70,9 @@ class ExchangeSpace(object):
         self.name = name
         self.message_space = message_space
         self.connection = self.message_space.connection
+
+        # @todo remove: Store of messaging names
+        self.store = Store()
 
 class ProcessExchangeSpace(ExchangeSpace):
     """
@@ -301,6 +305,5 @@ def fanout(name):
 #
 #    """
 #    amqp_conf = config_factory(name)
-#    consumer = messaging.Consumer(Container.instance.message_space.connection, **amqp_conf)
+#    consumer = messaging.Consumer(ioninit.container_instance.message_space.connection, **amqp_conf)
 #    yield consumer.declare()
-

@@ -10,16 +10,14 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import ProtocolFactory
-
-from ion.core.base_process import BaseProcess
+from ion.core.messaging.receiver import Receiver
+from ion.core.base_process import BaseProcess, ProtocolFactory
 import ion.util.procutils as pu
 
 class BaseServiceProcess(BaseProcess):
     """
     This is a base class for service processes.
-    
+
     A service process is a Capability Container process that can be spawned
     anywhere in the network and that provides a service. This process actually
     instantiates the service class.
@@ -38,11 +36,11 @@ class ProcessProtocolFactory(ProtocolFactory):
         if not svcmodule:
             log.error("No spawn argument svcmodule given. Cannot spawn")
             return None
-        
+
         svcclass = spawnArgs.get('svcclass',None)
 
         svc_mod = pu.get_module(svcmodule)
-        
+
         if hasattr(svc_mod,'factory'):
             log.info("Found module factory. Using factory to get service receiver")
             return svc_mod.factory.build()
@@ -54,7 +52,7 @@ class ProcessProtocolFactory(ProtocolFactory):
             return self.create_process_instance(svc_mod,'name')
         else:
             log.error("Service process module cannot be spawned")
-    
+
     def create_process_instance(self, svc_mod, className):
         """Given a class name and a loaded module, instantiate the class
         with a receiver.
@@ -62,7 +60,7 @@ class ProcessProtocolFactory(ProtocolFactory):
         svc_class = pu.get_class(className, svc_mod)
         #if not issubclass(svc_class,BaseProcess):
         #    raise RuntimeError("class is not a BaseProcess")
-        
+
         receiver = Receiver(svc_mod.__name__)
         serviceInstance = svc_class(receiver)
         log.info('create_process_instance: created service instance '+str(serviceInstance))

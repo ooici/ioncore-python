@@ -4,24 +4,25 @@
 @file ion/core/bootstrap.py
 @author Michael Meisinger
 @brief main module for bootstrapping the system and support functions. Functions
-        in here are actually called from start scripts and test cases.
+        in here are actually called from ioncore application module and test cases.
 """
+
+from twisted.internet import defer
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
 
-from ion.core.cc import spawnable
-from ion.core.cc.container import Container
-from ion.core.cc.spawnable import spawn
-from ion.data.store import Store
+
 
 from ion.core import ioninit, base_process
 from ion.core.base_process import BaseProcess, ProcessDesc
+from ion.core.cc.container import Container
 from ion.core.cc.modloader import ModuleLoader
+from ion.core.process import process
+from ion.data.store import Store
+from ion.data.datastore import registry
 from ion.resources import description_utility
 from ion.services.coi import service_registry
-from ion.data.datastore import registry
 
 from ion.util.config import Config
 import ion.util.procutils as pu
@@ -107,6 +108,8 @@ def _set_container_args(contargs=None):
             ioninit.cont_args['args'] = contargs
     if 'contid' in ioninit.cont_args:
         Container.id = ioninit.cont_args['contid']
+    if 'sysname' in ioninit.cont_args:
+        ioninit.sys_name = ioninit.cont_args['sysname']
 
 @defer.inlineCallbacks
 def declare_messaging(messagingCfg, cgroup=None):
@@ -169,7 +172,7 @@ def create_supervisor():
     else:
         supname = "supervisor."+str(sup_seq)
     suprec = base_process.factory.build({'proc-name':supname})
-    sup = suprec.procinst
+    sup = suprec.process
     sup.receiver.group = supname
     supId = yield sup.spawn()
     yield base_process.procRegistry.put(supname, str(supId))
@@ -198,8 +201,4 @@ def reset_container():
     # to their defaults. Even further, reset imported names in other modules
     # to the new objects.
     base_process.procRegistry = Store()
-    base_process.processes = {}
-    base_process.receivers = []
-    spawnable.store = Container.store
-    spawnable.Spawnable.progeny = {}
-
+    process.processes = {}

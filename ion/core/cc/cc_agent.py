@@ -13,7 +13,7 @@ import os
 from twisted.internet import defer, reactor
 
 from ion.core.cc.container import Container
-from ion.core.cc.spawnable import Receiver, spawn
+from ion.core.messaging.receiver import Receiver
 
 from ion.agents.resource_agent import ResourceAgent
 from ion.core import ionconst
@@ -49,7 +49,7 @@ class CCAgent(ResourceAgent):
         self.ann_receiver = annReceiver
         self.ann_receiver.handle(self.receive)
         self.add_receiver(self.ann_receiver)
-        annid = yield spawn(self.ann_receiver)
+        annid = yield self.ann_receiver.activate()
         log.info("Listening to CC anouncements: "+str(annid))
 
         # Start with an identify request. Will lead to an announce by myself
@@ -66,7 +66,7 @@ class CCAgent(ResourceAgent):
         """
         cdesc = {'node':str(os.uname()[1]),
                  'container-id':str(Container.id),
-                 'agent':str(self.receiver.spawned.id.full),
+                 'agent':str(self.id.full),
                  'version':ionconst.VERSION,
                  'start-time':self.start_time,
                  'current-time':pu.currenttime_ms(),
@@ -152,10 +152,10 @@ class CCAgent(ResourceAgent):
         procs = {}
         for rec in receivers:
             recinfo = {}
-            recinfo['classname'] = rec.procinst.__class__.__name__
-            recinfo['module'] = rec.procinst.__class__.__module__
+            recinfo['classname'] = rec.process.__class__.__name__
+            recinfo['module'] = rec.process.__class__.__module__
             recinfo['label'] = rec.label
-            procs[rec.spawned.id.full] = recinfo
+            procs[rec.name] = recinfo
         res['processes'] = procs
         yield self.reply_ok(msg, res)
 
@@ -214,7 +214,7 @@ class CCAgent(ResourceAgent):
         def ps():
             for r in control.cc.procs:
                 print r.label, r.name
-                setattr(control.cc, r.label, r.procinst)
+                setattr(control.cc, r.label, r.process)
         control.cc.ps = ps
         def nodes():
             nodes = {}

@@ -519,7 +519,7 @@ class DataPubsubClient(BaseServiceClient):
 
         publication.data = do
         publication.topic_ref = topic_ref
-        publication.publisher = publisher_proc.receiver.spawned.id.full
+        publication.publisher = publisher_proc.id.full
 
         (content, headers, msg) = yield self.rpc_send('publish',
                                             publication.encode())
@@ -558,4 +558,3 @@ class DataPubsubClient(BaseServiceClient):
 
 # Spawn off the process using the module name
 factory = ProtocolFactory(DataPubsubService)
-

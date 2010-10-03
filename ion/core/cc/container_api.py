@@ -7,7 +7,6 @@
 """
 
 from zope.interface import implements, Interface
-from zope.interface import Attribute
 
 class IContainer(Interface):
     pass
