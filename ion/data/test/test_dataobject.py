@@ -15,7 +15,7 @@ from ion.test.iontest import IonTestCase
 from twisted.internet import defer
 
 from ion.core.messaging.receiver import Receiver
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 from ion.data.datastore import cas
@@ -625,7 +625,7 @@ class ResponseServiceClient(BaseServiceClient):
         defer.returnValue(response)
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(ResponseService)
+factory = ProcessFactory(ResponseService)
 
 
 

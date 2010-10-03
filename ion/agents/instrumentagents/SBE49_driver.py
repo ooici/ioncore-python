@@ -28,7 +28,7 @@ from ion.agents.instrumentagents.SBE49_constants import instrument_commands
 
 import ion.util.procutils as pu
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 
 class InstrumentClient(Protocol):
     """
@@ -419,4 +419,4 @@ class SBE49InstrumentDriverClient(InstrumentDriverClient):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(SBE49InstrumentDriver)
+factory = ProcessFactory(SBE49InstrumentDriver)

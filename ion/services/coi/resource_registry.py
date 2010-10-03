@@ -21,7 +21,7 @@ import inspect
 
 from ion.core import ioninit
 from ion.core import base_process
-from ion.core.base_process import ProtocolFactory, BaseProcess
+from ion.core.base_process import ProcessFactory, BaseProcess
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
 
@@ -346,7 +346,7 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         return self.base_find_resource('find_registered_resource_instance_from_description',description,regex,ignore_defaults,attnames)
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(ResourceRegistryService)
+factory = ProcessFactory(ResourceRegistryService)
 
 
 """

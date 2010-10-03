@@ -12,7 +12,7 @@ from twisted.internet import defer
 from ion.core.messaging.receiver import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import BaseProcess, ProtocolFactory
+from ion.core.base_process import BaseProcess, ProcessFactory
 from ion.services.base_service import BaseService
 
 class WorkerProcess(BaseService):
@@ -75,4 +75,4 @@ class WorkerClient(BaseProcess):
         yield self.send(str(to),'work',{'work-id':workid,'work':work},{})
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(WorkerProcess)
+factory = ProcessFactory(WorkerProcess)

@@ -8,7 +8,7 @@
 """
 
 #from ion.core import bootstrap
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 from ion.data.datastore import registry
@@ -44,7 +44,7 @@ class DataPubsubRegistryService(registry.BaseRegistryService):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(DataPubsubRegistryService)
+factory = ProcessFactory(DataPubsubRegistryService)
 
 
 class DataPubsubRegistryClient(registry.BaseRegistryClient):

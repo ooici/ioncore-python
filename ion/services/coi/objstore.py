@@ -269,6 +269,6 @@ class ObjectStoreClient(base_service.BaseServiceClient, cas.CAStore):
         id = content['value']
         return id
 
-factory = base_process.ProtocolFactory(ObjectStoreService)
+factory = base_process.ProcessFactory(ObjectStoreService)
 
 

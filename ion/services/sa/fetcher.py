@@ -22,7 +22,7 @@ from socket import gaierror
 import urlparse
 import simplejson as json
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.util.url_manipulation import base_dap_url
 
@@ -291,4 +291,4 @@ class FetcherClient(BaseServiceClient):
         yield self.send('get_dap_dataset', content, self._rewrite_headers(headers))
 
 # If loaded as a module, spawn the process
-factory = ProtocolFactory(FetcherService)
+factory = ProcessFactory(FetcherService)

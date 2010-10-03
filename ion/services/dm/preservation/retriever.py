@@ -13,7 +13,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 from ion.services.dm.util.url_manipulation import rewrite_url
@@ -68,4 +68,4 @@ class RetrieverClient(BaseServiceClient):
         (content, headers, msg) = yield self.rpc_send('get_url', url)
         defer.returnValue(content)
 
-factory = ProtocolFactory(RetrieverService)
+factory = ProcessFactory(RetrieverService)

@@ -9,7 +9,7 @@
 import logging
 from twisted.internet import defer
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -85,4 +85,4 @@ class LoggerClient(BaseServiceClient):
         defer.returnValue(str(content))
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(LoggerService)
+factory = ProcessFactory(LoggerService)

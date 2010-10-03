@@ -11,7 +11,7 @@ from twisted.internet import defer
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core.base_process import BaseProcess, ProtocolFactory
+from ion.core.base_process import BaseProcess, ProcessFactory
 import ion.util.procutils as pu
 
 class Supervisor(BaseProcess):
@@ -25,7 +25,7 @@ class Supervisor(BaseProcess):
         return
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(Supervisor)
+factory = ProcessFactory(Supervisor)
 
 """
 from ion.core import supervisor as s

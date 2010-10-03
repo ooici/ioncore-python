@@ -13,7 +13,7 @@ from ion.core.messaging.receiver import Receiver
 
 from ion.services.base_service import BaseService
 from ion.core import base_process
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 
 STATES = {0:"requesting",
           1:"requested",
@@ -111,4 +111,4 @@ class MockLoopProvisionerService(BaseService):
         
         
 # Spawn of the process using the module name
-factory = ProtocolFactory(MockLoopProvisionerService)
+factory = ProcessFactory(MockLoopProvisionerService)

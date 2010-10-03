@@ -14,7 +14,7 @@ from twisted.trial import unittest
 #from ion.core.cc.container import Container
 from ion.core.messaging.receiver import Receiver
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.core import bootstrap
 from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.test.iontest import IonTestCase

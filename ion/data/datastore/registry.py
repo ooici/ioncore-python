@@ -20,7 +20,7 @@ from ion.data.datastore import objstore
 
 from ion.core import ioninit
 from ion.core import base_process
-from ion.core.base_process import ProtocolFactory, BaseProcess
+from ion.core.base_process import ProcessFactory, BaseProcess
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.resources import coi_resource_descriptions
 import ion.util.procutils as pu
@@ -442,7 +442,7 @@ class RegistryService(BaseRegistryService):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(RegistryService)
+factory = ProcessFactory(RegistryService)
 
 
 class BaseRegistryClient(BaseServiceClient):

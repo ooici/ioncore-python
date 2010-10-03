@@ -19,7 +19,7 @@ from ion.data import store
 
 from ion.core import ioninit
 from ion.core import base_process
-from ion.core.base_process import ProtocolFactory, BaseProcess
+from ion.core.base_process import ProcessFactory, BaseProcess
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
 
@@ -51,7 +51,7 @@ class DataRegistryService(registry.BaseRegistryService):
 
         
 # Spawn of the process using the module name
-factory = ProtocolFactory(DataRegistryService)
+factory = ProcessFactory(DataRegistryService)
 
 
 class DataRegistryClient(registry.BaseRegistryClient):

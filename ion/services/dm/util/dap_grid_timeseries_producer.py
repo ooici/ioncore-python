@@ -14,7 +14,7 @@ import time
 from twisted.internet import defer
 from twisted.internet.task import LoopingCall
 from twisted.internet import reactor
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 
 
 #from ion.core.cc.container import Container
@@ -90,4 +90,4 @@ class DapGridDataStreamProducer(BaseProcess):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(DapGridDataStreamProducer)
+factory = ProcessFactory(DapGridDataStreamProducer)

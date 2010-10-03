@@ -12,7 +12,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.data.backends import store_service
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
@@ -52,4 +52,4 @@ class AttributeStoreClient(store_service.StoreServiceClient):
         BaseServiceClient.__init__(self, proc, **kwargs)
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(AttributeStoreService)
+factory = ProcessFactory(AttributeStoreService)

@@ -12,7 +12,7 @@ from twisted.internet import defer
 from ion.core.messaging.receiver import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.data.datastore import registry
 from ion.resources import sa_resource_descriptions
@@ -81,4 +81,4 @@ class DataProductRegistryClient(registry.BaseRegistryClient, registry.LCStateMix
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(DataProductRegistryService)
+factory = ProcessFactory(DataProductRegistryService)

@@ -8,7 +8,7 @@ from twisted.internet import defer, reactor
 from ion.core.messaging.receiver import Receiver
 from ion.core import bootstrap
 from ion.services.base_service import BaseService
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 import ion.util.procutils as pu
 from ion.services.cei import cei_events
 
@@ -52,4 +52,4 @@ class EPUWorkerService(BaseService):
 
 
 # Direct start of the service as a process with its default name
-factory = ProtocolFactory(EPUWorkerService)
+factory = ProcessFactory(EPUWorkerService)

@@ -7,7 +7,7 @@ from twisted.internet import defer, reactor
 from twisted.internet.task import LoopingCall
 from ion.core.messaging.receiver import Receiver
 from ion.services.base_service import BaseService
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.core import bootstrap
 import ion.util.procutils as pu
 from ion.services.cei.epucontroller import ControllerCore
@@ -72,4 +72,4 @@ class EPUControllerService(BaseService):
         log.info('EPU Controller: CEI test'+ content)
 
 # Direct start of the service as a process with its default name
-factory = ProtocolFactory(EPUControllerService)
+factory = ProcessFactory(EPUControllerService)

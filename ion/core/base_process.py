@@ -15,7 +15,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core.id import Id
 from ion.core import ioninit
 from ion.core.messaging.receiver import ProcessReceiver, Receiver
-from ion.core.process.process import ProcessDesc, ProcessFactory, IProcess
+from ion.core.process.process import IProcess, ProcessDesc, ProcessFactory
 from ion.core.process.process import ProcessInstantiator
 from ion.data.store import Store
 from ion.interact.conversation import Conversation
@@ -504,10 +504,8 @@ class BaseProcess(object):
         """
         return self.op_shutdown(None, None, None)
 
-ProtocolFactory = ProcessFactory
-
 # Spawn of the process using the module name
-factory = ProtocolFactory(BaseProcess)
+factory = ProcessFactory(BaseProcess)
 
 class BaseProcessClient(object):
     """

@@ -15,7 +15,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.services.dm.distribution import base_consumer
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.dm.inventory import data_registry
 from ion.data import dataobject
 try:
@@ -52,7 +52,7 @@ class IngestionConsumer(base_consumer.BaseConsumer):
     
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(IngestionConsumer)
+factory = ProcessFactory(IngestionConsumer)
 
 
 

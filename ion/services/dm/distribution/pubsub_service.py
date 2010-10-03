@@ -16,7 +16,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import bootstrap
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 from ion.resources import dm_resource_descriptions
@@ -557,4 +557,4 @@ class DataPubsubClient(BaseServiceClient):
             defer.returnValue(None)
 
 # Spawn off the process using the module name
-factory = ProtocolFactory(DataPubsubService)
+factory = ProcessFactory(DataPubsubService)

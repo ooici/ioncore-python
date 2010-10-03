@@ -12,7 +12,7 @@ from twisted.internet import defer
 from ion.core.messaging.receiver import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class HelloService(BaseService):
@@ -59,7 +59,7 @@ class HelloServiceClient(BaseServiceClient):
         defer.returnValue(str(content))
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(HelloService)
+factory = ProcessFactory(HelloService)
 
 
 

@@ -13,7 +13,7 @@ from twisted.internet import defer
 from ion.core.messaging.receiver import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class JavaIntegrationService(BaseService):
@@ -102,4 +102,4 @@ class JavaIntegrationService(BaseService):
         yield self.reply_ok(msg, {'value':self.services})
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(JavaIntegrationService)
+factory = ProcessFactory(JavaIntegrationService)

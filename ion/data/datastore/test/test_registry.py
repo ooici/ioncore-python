@@ -17,7 +17,7 @@ from ion.test.iontest import IonTestCase
 from twisted.internet import defer
 
 from ion.core.messaging.receiver import Receiver
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class RegistryTest(unittest.TestCase):

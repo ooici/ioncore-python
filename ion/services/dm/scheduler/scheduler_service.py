@@ -11,7 +11,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.scheduler.scheduler_registry import SchedulerRegistry
 
@@ -71,4 +71,4 @@ class SchedulerServiceClient(BaseServiceClient):
         defer.returnValue(str(content))
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(SchedulerService)
+factory = ProcessFactory(SchedulerService)

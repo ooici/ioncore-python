@@ -8,7 +8,7 @@ from twisted.web import server, resource
 from twisted.internet import reactor
 from ion.core.messaging.receiver import Receiver
 from ion.services.base_service import BaseService, BaseServiceClient
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 import Queue
 import uuid
 from ion.services.cei import cei_events
@@ -58,7 +58,7 @@ class EPUWorkProducer(BaseService):
             return
 
 # Direct start of the service as a process with its default name
-factory = ProtocolFactory(EPUWorkProducer)
+factory = ProcessFactory(EPUWorkProducer)
 
 class SleepJob:
     def __init__(self, jobid, batchid, length):

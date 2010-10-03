@@ -14,7 +14,7 @@ from twisted.internet import defer
 from ion.core.messaging.receiver import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class DataStoreService(BaseService):
@@ -149,4 +149,4 @@ class DataStoreServiceClient(BaseServiceClient):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(DataStoreService)
+factory = ProcessFactory(DataStoreService)

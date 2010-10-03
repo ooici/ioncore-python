@@ -18,7 +18,7 @@ from ion.core.cc.container import Container
 from ion.core.messaging.receiver import Receiver
 
 from ion.core import ioninit
-from ion.core.base_process import BaseProcess, ProcessDesc, ProtocolFactory
+from ion.core.base_process import BaseProcess, ProcessDesc, ProcessFactory
 
 from ion.test.iontest import IonTestCase, ReceiverProcess
 import ion.util.procutils as pu
@@ -254,4 +254,4 @@ class EchoProcess(BaseProcess):
         yield self.reply_ok(msg, content)
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(EchoProcess)
+factory = ProcessFactory(EchoProcess)

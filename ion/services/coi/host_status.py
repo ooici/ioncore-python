@@ -18,7 +18,7 @@ except:
 from twisted.internet import defer, task
 from twisted.web import xmlrpc
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 
@@ -87,4 +87,4 @@ class HostStatusClient(BaseServiceClient):
         defer.returnValue(0)
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(HostStatusService)
+factory = ProcessFactory(HostStatusService)

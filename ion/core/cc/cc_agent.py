@@ -17,7 +17,7 @@ from ion.core.messaging.receiver import Receiver
 
 from ion.agents.resource_agent import ResourceAgent
 from ion.core import ionconst
-from ion.core.base_process import BaseProcess, ProtocolFactory, ProcessDesc
+from ion.core.base_process import BaseProcess, ProcessFactory, ProcessDesc
 from ion.core.base_process import procRegistry, processes, receivers
 from ion.core.ioninit import ion_config
 from ion.core.supervisor import Supervisor
@@ -230,7 +230,7 @@ class CCAgent(ResourceAgent):
         control.cc.help = "CC Helpers. ATTRS: agent, config, pids, svcs, procs, help FUNC: send, rpc_send, spawn, svc, ps, nodes, cont, info, identify, ping"
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(CCAgent)
+factory = ProcessFactory(CCAgent)
 
 """
 twistd -n --pidfile t1.pid cc -h amoeba.ucsd.edu -a sysname=mm res/scripts/newcc.py

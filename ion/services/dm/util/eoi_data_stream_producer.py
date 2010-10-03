@@ -12,7 +12,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.sa.fetcher import FetcherClient
 
@@ -85,4 +85,4 @@ class CoordinatorClient(BaseServiceClient):
         #log.info('Reply from service: '+ content['value'])
         defer.returnValue(content)
 
-factory = ProtocolFactory(CoordinatorService)
+factory = ProcessFactory(CoordinatorService)

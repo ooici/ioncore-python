@@ -12,7 +12,7 @@ from twisted.internet import defer
 from ion.core.messaging.receiver import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class StateRepositoryService(BaseService):
@@ -37,5 +37,5 @@ class StateRepositoryService(BaseService):
         """
         
 # Spawn of the process using the module name
-factory = ProtocolFactory(StateRepositoryService)
+factory = ProcessFactory(StateRepositoryService)
 

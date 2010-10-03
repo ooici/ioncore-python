@@ -14,7 +14,7 @@ from twisted.internet import defer
 import inspect
 
 from ion.core.base_process import BaseProcess
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 from ion.data.datastore import registry
@@ -78,7 +78,7 @@ class AgentRegistryService(registry.BaseRegistryService):
     Service operation: Find all the registered agent instances which match a description
     """
 # Spawn of the process using the module name
-factory = ProtocolFactory(AgentRegistryService)
+factory = ProcessFactory(AgentRegistryService)
 
 
 class AgentRegistryClient(registry.BaseRegistryClient):

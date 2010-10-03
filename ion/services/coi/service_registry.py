@@ -15,7 +15,7 @@ import inspect
 
 from ion.core import base_process
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 
@@ -81,7 +81,7 @@ class ServiceRegistryService(registry.BaseRegistryService):
     Service operation: Find all the registered service instances which match a description
     """
 # Spawn of the process using the module name
-factory = ProtocolFactory(ServiceRegistryService)
+factory = ProcessFactory(ServiceRegistryService)
 
 
 class ServiceRegistryClient(registry.BaseRegistryClient):

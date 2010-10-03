@@ -11,7 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 from ion.core.messaging.receiver import Receiver
-from ion.core.base_process import BaseProcess, ProtocolFactory
+from ion.core.base_process import BaseProcess, ProcessFactory
 import ion.util.procutils as pu
 
 class BaseServiceProcess(BaseProcess):
@@ -23,7 +23,7 @@ class BaseServiceProcess(BaseProcess):
     instantiates the service class.
     """
 
-class ProcessProtocolFactory(ProtocolFactory):
+class ProcessProcessFactory(ProcessFactory):
     """This protocol factory actually returns a receiver for a new service
     process instance, as named in the spawn args.
     """
@@ -31,7 +31,7 @@ class ProcessProtocolFactory(ProtocolFactory):
         """Factory method return a new receiver for a new process. At the same
         time instantiate class.
         """
-        log.info("ProcessProtocolFactory.build() with args="+str(spawnArgs))
+        log.info("ProcessProcessFactory.build() with args="+str(spawnArgs))
         svcmodule = spawnArgs.get('svcmodule',None)
         if not svcmodule:
             log.error("No spawn argument svcmodule given. Cannot spawn")
@@ -67,7 +67,7 @@ class ProcessProtocolFactory(ProtocolFactory):
         return receiver
 
 # Spawn of the process using the module name
-factory = ProcessProtocolFactory()
+factory = ProcessProcessFactory()
 
 """
 from ion.services import base_svcproc as b
