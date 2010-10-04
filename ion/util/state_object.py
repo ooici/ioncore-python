@@ -6,6 +6,8 @@
 @brief base class for objects that are controlled by an underlying state machine
 """
 
+from twisted.internet import defer
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -35,11 +37,34 @@ class StateObject(Actionable):
     def _so_process(self, event, *args, **kwargs):
         """
         Trigger the FSM with an event. Leads to action functions being called.
+        The complication is to make it deferred and non-deferred compliant.
+        The downside is now a dependency on Twisted. Alternative: subclass
         """
         assert self.__fsm, "FSM not set"
         self.__fsm.input_args = args
         self.__fsm.input_kwargs = kwargs
-        res = self.__fsm.process(event)
+        try:
+            res = self.__fsm.process(event)
+            if isinstance(res, defer.Deferred):
+                d1 = defer.Deferred()
+                def _cb(result):
+                    d1.callback(result)
+                def _err(result):
+                    #print "In error, %s" % (result)
+                    d2 = self.__fsm.process(BasicStates.E_ERROR)
+                    if isinstance(d2, defer.Deferred):
+                        # FSM error action deferred too
+                        def _cb2(result1):
+                            d1.errback(result)
+                        d2.addCallbacks(_cb2,log.error)
+                    else:
+                        d1.errback(result)
+                res.addCallbacks(_cb,_err)
+                res = d1
+        except StandardError, ex:
+            # This catches only if not deferred
+            res = self.__fsm.process(BasicStates.E_ERROR)
+            raise ex
         return res
 
     def _action(self, action, fsm):
@@ -71,11 +96,7 @@ class FSMFactory(object):
         fsm = FSM('INIT', memory)
         return fsm
 
-class BasicFSMFactory(FSMFactory):
-    """
-    A FSM factory for FSMs with basic state model.
-    """
-
+class BasicStates(object):
     S_INIT = "INIT"
     S_READY = "READY"
     S_ACTIVE = "ACTIVE"
@@ -88,6 +109,10 @@ class BasicFSMFactory(FSMFactory):
     E_TERMINATE = "terminate"
     E_ERROR = "error"
 
+class BasicFSMFactory(FSMFactory):
+    """
+    A FSM factory for FSMs with basic state model.
+    """
     def _create_action_func(self, target, action):
         """
         @retval a function with a closure with the action name
@@ -101,21 +126,21 @@ class BasicFSMFactory(FSMFactory):
 
         actf = target._action
 
-        actionfct = self._create_action_func(actf, self.E_INITIALIZE)
-        fsm.add_transition(self.E_INITIALIZE, self.S_INIT, actionfct, self.S_READY)
+        actionfct = self._create_action_func(actf, BasicStates.E_INITIALIZE)
+        fsm.add_transition(BasicStates.E_INITIALIZE, BasicStates.S_INIT, actionfct, BasicStates.S_READY)
 
-        actionfct = self._create_action_func(actf, self.E_ACTIVATE)
-        fsm.add_transition(self.E_ACTIVATE, self.S_READY, actionfct, self.S_ACTIVE)
+        actionfct = self._create_action_func(actf, BasicStates.E_ACTIVATE)
+        fsm.add_transition(BasicStates.E_ACTIVATE, BasicStates.S_READY, actionfct, BasicStates.S_ACTIVE)
 
-        actionfct = self._create_action_func(actf, self.E_DEACTIVATE)
-        fsm.add_transition(self.E_DEACTIVATE, self.S_ACTIVE, actionfct, self.S_READY)
+        actionfct = self._create_action_func(actf, BasicStates.E_DEACTIVATE)
+        fsm.add_transition(BasicStates.E_DEACTIVATE, BasicStates.S_ACTIVE, actionfct, BasicStates.S_READY)
 
-        actionfct = self._create_action_func(actf, self.E_TERMINATE)
-        fsm.add_transition(self.E_TERMINATE, self.S_READY, actionfct, self.S_TERMINATED)
-        fsm.add_transition(self.E_TERMINATE, self.S_ACTIVE, actionfct, self.S_TERMINATED)
+        actionfct = self._create_action_func(actf, BasicStates.E_TERMINATE)
+        fsm.add_transition(BasicStates.E_TERMINATE, BasicStates.S_READY, actionfct, BasicStates.S_TERMINATED)
+        fsm.add_transition(BasicStates.E_TERMINATE, BasicStates.S_ACTIVE, actionfct, BasicStates.S_TERMINATED)
 
-        actionfct = self._create_action_func(actf, self.E_ERROR)
-        fsm.set_default_transition (actionfct, self.S_ERROR)
+        actionfct = self._create_action_func(actf, BasicStates.E_ERROR)
+        fsm.set_default_transition (actionfct, BasicStates.S_ERROR)
 
         return fsm
 
@@ -132,16 +157,19 @@ class BasicLifecycleObject(StateObject):
         self._so_set_fsm(fsm)
 
     def initialize(self, *args, **kwargs):
-        return self._so_process(BasicFSMFactory.E_INITIALIZE, *args, **kwargs)
+        return self._so_process(BasicStates.E_INITIALIZE, *args, **kwargs)
 
     def activate(self, *args, **kwargs):
-        return self._so_process(BasicFSMFactory.E_ACTIVATE, *args, **kwargs)
+        return self._so_process(BasicStates.E_ACTIVATE, *args, **kwargs)
 
     def deactivate(self, *args, **kwargs):
-        return self._so_process(BasicFSMFactory.E_DEACTIVATE, *args, **kwargs)
+        return self._so_process(BasicStates.E_DEACTIVATE, *args, **kwargs)
 
     def terminate(self, *args, **kwargs):
-        return self._so_process(BasicFSMFactory.E_TERMINATE, *args, **kwargs)
+        return self._so_process(BasicStates.E_TERMINATE, *args, **kwargs)
+
+    def error(self, *args, **kwargs):
+        return self._so_process(BasicStates.E_ERROR, *args, **kwargs)
 
     def on_initialize(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
