@@ -291,7 +291,7 @@ class ContainerWrapper(object):
     
     def __len__(self):
         """Returns the number of elements in the container."""
-        return len(self._gpbcontainer)
+        return self._gpbcontainer.__len__()
         
     def __ne__(self, other):
         """Checks if another instance isn't equal to this one."""
@@ -308,7 +308,7 @@ class ContainerWrapper(object):
         return self._gpbcontainer == other._gpbcontainer
 
     def __repr__(self):
-        return repr(self._gpbcontainer)
+        return self._gpbcontainer.__repr__()
         
         
     # Composite specific methods:
@@ -316,6 +316,25 @@ class ContainerWrapper(object):
         new_element = self._gpbcontainer.add()
         return Wrapper.wrap(new_element)
         
+    def MergeFrom(self, other):
+        """Appends the contents of another repeated field of the same type to this
+        one, copying each individual message.
+        """
+        assert isinstance(other, ContainerWrapper), \
+        'Invalid argument to merge from: must be a ContainerWrapper'
+        self._gpbcontainer.MergeFrom(other._gpbcontainer)
+    
+    def __getslice__(self, start, stop):
+        """Retrieves the subset of items from between the specified indices."""
+        return self._gpbcontainer.__getslice__(start, stop)
+    
+    def __delitem__(self, key):
+        """Deletes the item at the specified position."""
+        self._gpbcontainer.__delitem__(key)
+        
+    def __delslice__(self, start, stop):
+        """Deletes the subset of items from between the specified indices."""
+        self._gpbcontainer.__delslice__(start, stop)
     
 # This is a mess - sets class properties!    
 #class GPBWrapperMeta(type):
