@@ -12,6 +12,10 @@
 //file, and that is it. 
 //Other derived types/structures can be managed separately.
 
+package ion;
+option java_package = "ion.data";
+option java_outer_classname = "OOITypes";
+
 message Short {
     required sint32 value = 1;
 }
@@ -79,13 +83,35 @@ message DataObject {
     repeated Attribute atts = 1;
 }
 
-// meta/ref object
-message DataObjectRef {
-    required string id = 1;
-    required bytes pointer = 2;
+//Describes structure of a dataobject
+message DataObjectDescription {
+    message Attribute {
+        required string key = 1;
+        required bytes value = 2;
+    }
+    required string name = 1;
+    repeated Attribute atts = 2;
+}
+
+// Full protobuffers version of DataObjectNode
+// ** Tentative ** //
+message DataObjectNode {
+    required string id = 1; // identity (from external key space)
+    required bytes content = 2; // id of root content node
+    required bytes type = 3; // ObjectNode type
+    required bytes flag = 4; // Write behavior
 }
 
 message Container {
     repeated bytes items = 1;
 }
+
+message CAStore {
+    message Node {
+        required bytes key = 1;
+        required bytes value = 2;
+    }
+    repeated Node nodes = 1;
+}
+
 

@@ -12,13 +12,15 @@ An encoding library can be implemented as a module that provides
 encoders/decoders for this set of types. 
 """
 
-from zope.interface import implements
 
-class PrimitiveType(object):
+class BasicType(object):
     """
-    Base class for the primitive types. 
+    Base class for the basic types. 
 
     The exact way the datatypes are used is still under consideration.
+
+    Basic type containers could provide a map for allowed language
+    types
     """
 
     def __init__(self, value=None):
@@ -33,43 +35,61 @@ class PrimitiveType(object):
     def __repr__(self):
         return "%s" % str(self._value)
 
-class Short(PrimitiveType):
+    def get(self):
+        """
+        get value
+        """
+
+    def set(self, value):
+        """
+        set value
+        """
+
+class Short(BasicType):
 
     def __init__(self, value=int()):
         self._value = value
 
-class Int(PrimitiveType):
+class Int(BasicType):
 
     def __init__(self, value=int()):
         self._value = value
 
-class Long(PrimitiveType):
+class Long(BasicType):
 
     def __init__(self, value=long()):
         self._value = value
 
-class Float(PrimitiveType):
+class Float(BasicType):
 
     def __init__(self, value=float()):
         self._value = value
 
-class Double(PrimitiveType):
+class Double(BasicType):
 
     def __init__(self, value=float()):
         self._value = value
 
-class Boolean(PrimitiveType):
+class Boolean(BasicType):
 
     def __init__(self, value=bool()):
         self._value = value
 
-class String(PrimitiveType):
+class String(BasicType):
     """
     Unicode character string.
     """
     
     def __init__(self, value=u''):
         self._value = value #has to be unicode
+
+class Bytes(BasicType):
+    """
+    The common data model names this "Opaque"
+    """
+
+    def __init__(self, value=''):
+        self._value = value
 
 class Structure(dict):
     """
@@ -79,48 +99,7 @@ class Sequence:
     """
     """
 
-class Bytes:
-    """
-    The common data model names this "Opaque"
-    """
 
-    def __init__(self, value=''):
-        self._value = value
-
-class DataObject(dict):
-    """
-    Pure Data Object.
-    A map structure of attributes. Each attribute has a name, a type, and a data
-    value.
-
-    This is not necessarily a tool for defining structures. 
-    
-    Uses of Data Object as a structure:
-        * Data Object can be used as a generic structure, defined on the
-          spot. This can be encoded in a self describing way such that
-          knowledge of the primitive types and the Data Object type are
-          sufficient for decoding.
-        * Data Object could also be used to make new types (composite
-          types). The new type would be a subclass of Data Object.
-          In this case, Data Object represents a known type (defined by the
-          system somehow). This class provides the Python representation of
-          that type and enforces type checking on the component attributes.
-
-    Implementation Notes
-    With the exception of the 'set' method, this implementation of
-    IDataObject is mostly provided by the python 'dict'.
-
-    Review
-    Is this really what the original intent of Data Object was?
-    This may as well just be the same implementation as the Structure data
-    type.
-    """
-
-    def set(self, key, value):
-        """
-        """
-        if self.has_key(key):
-            self[key] = value
 
 
 
