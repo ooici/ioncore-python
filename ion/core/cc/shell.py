@@ -127,3 +127,72 @@ try:
     control
 except NameError:
     control = Control()
+
+def _augment_shell(self):
+    """
+    Dirty little helper functions attached to the 'cc' object in the
+    container shell. Quick spawn of processes and send
+    """
+    from ion.core.cc.shell import control
+    if not hasattr(control, 'cc'):
+        return
+    log.info("Augmenting Container Shell...")
+    control.cc.agent = self
+    control.cc.config = ion_config
+    control.cc.pids = procRegistry.kvs
+    control.cc.svcs = processes
+    control.cc.procs = receivers
+    def send(recv, op, content=None, headers=None, **kwargs):
+        if content == None: content = {}
+        if recv in control.cc.pids: recv = control.cc.pids[recv]
+        d = self.send(recv, op, content, headers, **kwargs)
+    control.cc.send = send
+    def rpc_send(recv, op, content=None, headers=None, **kwargs):
+        if content == None: content = {}
+        if recv in control.cc.pids: recv = control.cc.pids[recv]
+        d = self.rpc_send(recv, op, content, headers, **kwargs)
+    control.cc.rpc_send = rpc_send
+    def _get_target(name):
+        mod = name
+        for p in control.cc.svcs.keys():
+            if p.startswith(name):
+                mod = control.cc.svcs[p]['class'].__module__
+                name = p
+                break
+        return (mod, name)
+    def _get_node(node=None):
+        if type(node) is int:
+            for cid in self.containers.keys():
+                if cid.find(str(node)) >= 0:
+                    node = str(self.containers[cid]['agent'])
+                    break
+        return node
+    def spawn(name, node=None, args=None):
+        (mod,name) = _get_target(name)
+        if node != None:
+            node = _get_node(node)
+            self.send(node,'spawn',{'module':mod})
+        else:
+            d = self.spawn_child(ProcessDesc(name=name, module=mod))
+    control.cc.spawn = spawn
+    def svc():
+        for pk,p in control.cc.svcs.iteritems():
+            print pk, p['class'].__module__
+    control.cc.svc = svc
+    def ps():
+        for r in control.cc.procs:
+            print r.label, r.name
+            setattr(control.cc, r.label, r.process)
+    control.cc.ps = ps
+    def nodes():
+        nodes = {}
+        for c in self.containers.values():
+            nodes[str(c['node'])] = 1
+        return nodes.keys()
+    control.cc.nodes = nodes
+    control.cc.cont = lambda: [str(k) for k in self.containers.keys()]
+    control.cc.info = lambda: self.containers[str(Container.id)]
+    control.cc.identify = lambda: self.send(self.ann_name, 'identify', '', {'quiet':True})
+    control.cc.getinfo = lambda n: self.send(_get_node(n), 'get_info', '')
+    control.cc.ping = lambda n: self.send(_get_node(n), 'ping', '', {'quiet':True})
+    control.cc.help = "CC Helpers. ATTRS: agent, config, pids, svcs, procs, help FUNC: send, rpc_send, spawn, svc, ps, nodes, cont, info, identify, ping"

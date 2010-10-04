@@ -237,7 +237,7 @@ class BaseProcess(BasicLifecycleObject):
 
     def on_error(self, cause= None, *args, **kwargs):
         if cause:
-            #log.error("BaseProcess error: %s" % cause)
+            log.error("BaseProcess error: %s" % cause)
             pass
         else:
             raise RuntimeError("Illegal process state change")

@@ -83,8 +83,12 @@ class Receiver(BasicLifecycleObject):
         #log.debug("Receiver %s initialized (queue attached) cfg=%s" % (self.name,name_config))
 
     @defer.inlineCallbacks
-    def _init_receiver(self, receiver_config):
+    def _init_receiver(self, receiver_config, store_config=False):
         container = ioninit.container_instance
+        if store_config:
+            xnamestore = container.exchange_manager.exchange_space.store
+            yield xnamestore.put(self.name, receiver_config)
+
         self.consumer = yield container.new_consumer(receiver_config)
 
     @defer.inlineCallbacks
@@ -148,14 +152,11 @@ class ProcessReceiver(Receiver):
         @retval Deferred
         """
         assert self.name, "Receiver must have a name"
-        container = ioninit.container_instance
 
         name_config = messaging.process(self.name)
         name_config.update({'name_type':'process'})
-        xnamestore = container.exchange_manager.exchange_space.store
-        yield xnamestore.put(self.name, name_config)
 
-        yield self._init_receiver(name_config)
+        yield self._init_receiver(name_config, store_config=True)
 
 class WorkerReceiver(Receiver):
     """
@@ -168,14 +169,28 @@ class WorkerReceiver(Receiver):
         @retval Deferred
         """
         assert self.name, "Receiver must have a name"
-        container = ioninit.container_instance
 
         name_config = messaging.worker(self.name)
         name_config.update({'name_type':'worker'})
-        xnamestore = container.exchange_manager.exchange_space.store
-        yield xnamestore.put(self.name, name_config)
 
-        yield self._init_receiver(name_config)
+        yield self._init_receiver(name_config, store_config=True)
+
+class FanoutReceiver(Receiver):
+    """
+    A FanoutReceiver is a Receiver from a fanout exchange.
+    """
+
+    @defer.inlineCallbacks
+    def on_initialize(self, *args, **kwargs):
+        """
+        @retval Deferred
+        """
+        assert self.name, "Receiver must have a name"
+
+        name_config = messaging.fanout(self.name)
+        name_config.update({'name_type':'fanout'})
+
+        yield self._init_receiver(name_config, store_config=True)
 
 class NameReceiver(Receiver):
     pass
