@@ -21,6 +21,7 @@ from ion.data.store import Store
 from ion.interact.conversation import Conversation
 from ion.interact.message import Message
 import ion.util.procutils as pu
+from ion.util.state_object import BasicLifecycleObject
 
 CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
@@ -28,11 +29,7 @@ CF_conversation_log = CONF['conversation_log']
 # @todo CHANGE: Static store (kvs) to register process instances with names
 procRegistry = Store()
 
-
-# @todo HACK: List of process instances
-receivers = []
-
-class BaseProcess(object):
+class BaseProcess(BasicLifecycleObject):
     """
     This is the base class for all processes. Processes can be spawned and
     have a unique identifier. Each process has one main process receiver and can
@@ -52,7 +49,8 @@ class BaseProcess(object):
         @param receiver instance of a Receiver for process control (unused)
         @param spawnargs standard and additional spawn arguments
         """
-        self.proc_state = "NEW"
+        BasicLifecycleObject.__init__(self)
+
         spawnargs = spawnargs.copy() if spawnargs else {}
         self.spawn_args = spawnargs
         self.proc_init_time = pu.currenttime_ms()
@@ -77,21 +75,23 @@ class BaseProcess(object):
 
         # Ignore supplied receiver for consistency purposes
         # Create main receiver; used for incoming process interactions
-        self.receiver = ProcessReceiver(label=self.proc_name,
-                                        name=str(self.id),
-                                        group=self.proc_group,
-                                        process=self)
-        self.receiver.add_handler(self.receive)
+        self.receiver = ProcessReceiver(
+                                    label=self.proc_name,
+                                    name=self.id.full,
+                                    group=self.proc_group,
+                                    process=self,
+                                    handler=self.receive)
 
         # Create a backend receiver for outgoing RPC process interactions.
         # Needed to avoid deadlock when processing incoming messages
         # because only one message can be consumed before ACK.
-        self.backend_id = ProcessInstantiator.create_process_id()
-        self.backend_receiver = ProcessReceiver(label=self.proc_name + "_back",
-                                         name=str(self.backend_id),
-                                         group=self.proc_group,
-                                         process=self)
-        self.backend_receiver.add_handler(self.receive)
+        self.backend_id = Id(self.id.local+"b", self.id.container)
+        self.backend_receiver = ProcessReceiver(
+                                    label=self.proc_name,
+                                    name=self.backend_id.full,
+                                    group=self.proc_group,
+                                    process=self,
+                                    handler=self.receive)
 
         # Dict of all receivers of this process. Key is the name
         self.receivers = {}
@@ -107,86 +107,53 @@ class BaseProcess(object):
         # List of ProcessDesc instances of defined and spawned child processes
         self.child_procs = []
 
-        log.debug("NEW Process [%s], sup-id=%s, sys-name=%s, backend=%s" % (
-                self.proc_name, self.proc_supid, self.sys_name, self.backend_id))
+        log.debug("NEW Process instance [%s]: id=%s, sup-id=%s, sys-name=%s" % (
+                self.proc_name, self.id, self.proc_supid, self.sys_name))
 
-    def add_receiver(self, receiver):
-        self.receivers[receiver.name] = receiver
+    # --- Life cycle management
+    # Categories:
+    # op_XXX Message incoming interface
+    # spawn, init: Boilerplate API
+    # initialize, activate, deactivate, terminate: (Super class) State management API
+    # on_XXX: State management API action callbacks
+    # plc_XXX: Callback hooks for subclass processes
 
     @defer.inlineCallbacks
     def spawn(self):
         """
-        Spawns this process using the process' receiver and initializes it in
-        the same call. Self spawn can only be called once per instance.
+        Manually (instead of through the container) spawns this process and
+        activate it in the same call. Spawn can only be called once.
+        Equivalent to calling initialize() and activate()
+        @retval Deferred for the Id of the process (self.id)
         """
-        assert not self.receiver.consumer, "Process already spawned"
-        assert not self.backend_receiver.consumer, "Process already spawned"
-
-        for rec in self.receivers.values():
-            print "rec", rec
-            yield rec.activate()
-
-        log.debug('Process spawn(): pid=%s' % (self.id))
-        yield defer.maybeDeferred(self.plc_spawn)
-
-        # Call init right away. This is what you would expect anyways in a
-        # container executed spawn
-        #yield self.init()
-
+        yield self.initialize()
+        yield self.activate()
+        yield ioninit.container_instance.proc_manager.register_local_process(self)
         defer.returnValue(self.id)
 
-    def init(self):
-        """
-        DO NOT CALL. Automatically called by spawn().
-        Initializes this process instance. Typically a call should not be
-        necessary because the init message is received from the supervisor
-        process. It may be necessary for the root supervisor and for test
-        processes.
-        @retval Deferred
-        """
-        if self.proc_state == "NEW":
-            return self.op_init(None, None, None)
-        else:
-            return defer.succeed(None)
-
-    def plc_spawn(self):
-        """
-        Process life cycle event: on spawn of process (once)
-        """
-
-    def is_spawned(self):
-        return self.receiver.consumer != None
-
     @defer.inlineCallbacks
-    def op_init(self, content, headers, msg):
+    def on_initialize(self, *args, **kwargs):
         """
-        Init operation, on receive of the init message
+        Life cycle callback for the initialization "spawn" of the process.
+        @retval Deferred for the Id of the process (self.id)
         """
-        if self.proc_state == "NEW":
-            # @todo: Right after giving control to the process specific init,
-            # the process can enable message consumption and messages can be
-            # received. How to deal with the situation that the process is not
-            # fully initialized yet???? Stop message floodgate until init'd?
+        assert not self.backend_receiver.consumer, "Process already initialized"
+        log.debug('Process id=%s initialize()' % (self.id))
 
-            # Change state from NEW early, to prevent consistenct probs.
-            self.proc_state = "INIT"
+        # Create queue only for process receiver
+        yield self.receiver.initialize()
 
-            try:
-                yield defer.maybeDeferred(self.plc_init)
-                self.proc_state = "ACTIVE"
-                log.info('----- Process %s INIT OK -----' % (self.proc_name))
-                if msg != None:
-                    # msg is None only if called from local process self.init()
-                    yield self.reply_ok(msg)
-            except Exception, ex:
-                self.proc_state = "ERROR"
-                log.exception('----- Process %s INIT ERROR -----' % (self.proc_name))
-                if msg != None:
-                    # msg is None only if called from local process self.init()
-                    yield self.reply_err(msg, "Process %s INIT ERROR" % (self.proc_name) + str(ex))
-        else:
-            self.proc_state = "ERROR"
-            log.error('Process %s in wrong state %s for op_init' % (self.proc_name, self.proc_state))
+        # Create queue and consumer for backend receiver
+        yield self.backend_receiver.initialize()
+        yield self.backend_receiver.activate()
+
+        # Callback to subclasses
+        try:
+            yield defer.maybeDeferred(self.plc_init)
+            log.info('Process id=%s [%s]: INIT OK' % (self.id, self.proc_name))
+        except Exception, ex:
+            log.exception('----- Process %s INIT ERROR -----' % (self.id))
+            raise ex
 
     def plc_init(self):
         """
@@ -194,30 +161,96 @@ class BaseProcess(object):
         """
 
     @defer.inlineCallbacks
-    def op_shutdown(self, content, headers, msg):
+    def op_activate(self, content, headers, msg):
         """
-        Init operation, on receive of the init message
+        Activate operation, on receive of the activate system message
+        @note PROBLEM: Cannot receive activate if receiver not active.
+                Activation has to go through the container (agent)
         """
-        assert self.proc_state == "ACTIVE", "Process not initalized"
+        try:
+            yield self.activate(content, headers, msg)
+            if msg != None:
+                yield self.reply_ok(msg)
+        except Exception, ex:
+            if msg != None:
+                yield self.reply_err(msg, "Process %s ACTIVATE ERROR" % (self.id), exception=ex)
 
+    @defer.inlineCallbacks
+    def on_activate(self, *args, **kwargs):
+        """
+        @retval Deferred
+        """
+        log.debug('Process id=%s activate()' % (self.id))
+
+        # Create consumer for process receiver
+        yield self.receiver.activate()
+
+        # Callback to subclasses
+        try:
+            yield defer.maybeDeferred(self.plc_activate)
+        except Exception, ex:
+            log.exception('----- Process %s ACTIVATE ERROR -----' % (self.id))
+            raise ex
+
+    def plc_activate(self):
+        """
+        Process life cycle event: on activate of process
+        """
+
+    def shutdown(self):
+        return self.terminate()
+
+    @defer.inlineCallbacks
+    def op_terminate(self, content, headers, msg):
+        """
+        Shutdown operation, on receive of the init message
+        """
+        try:
+            yield self.terminate()
+            if msg != None:
+                yield self.reply_ok(msg)
+        except Exception, ex:
+            if msg != None:
+                yield self.reply_err(msg, "Process %s TERMINATE ERROR" % (self.id), exception=ex)
+
+    @defer.inlineCallbacks
+    def on_terminate(self, msg=None, *args, **kwargs):
+        """
+        @retval Deferred
+        """
         if len(self.child_procs) > 0:
             log.info("Shutting down child processes")
         while len(self.child_procs) > 0:
             child = self.child_procs.pop()
-            res = yield self.shutdown_child(child)
+            try:
+                res = yield self.shutdown_child(child)
+            except Exception, ex:
+                log.exception("Error terminating child %s" % child.proc_id)
 
         yield defer.maybeDeferred(self.plc_shutdown)
         log.info('----- Process %s TERMINATED -----' % (self.proc_name))
-
-        if msg != None:
-                # msg is None only if called from local process self.shutdown()
-            yield self.reply_ok(msg)
-        self.proc_state = "TERMINATED"
 
     def plc_shutdown(self):
         """
         Process life cycle event: on shutdown of process (once)
         """
+
+    def on_error(self, cause= None, *args, **kwargs):
+        if cause:
+            #log.error("BaseProcess error: %s" % cause)
+            pass
+        else:
+            raise RuntimeError("Illegal process state change")
+
+    # --- Internal helper methods
+
+    def add_receiver(self, receiver):
+        self.receivers[receiver.name] = receiver
+
+    def is_spawned(self):
+        return self.receiver.consumer != None
+
+    # --- Incoming message handling
 
     def receive(self, payload, msg):
         """
@@ -237,7 +270,7 @@ class BaseProcess(object):
             log.exception('Error in process %s receive ' % self.proc_name)
             # @todo: There was an error and now what??
             if msg and msg.payload['reply-to']:
-                d = self.reply_err(msg, 'ERROR in process receive(): '+str(ex))
+                d = self.reply_err(msg, 'ERROR in process receive()', exception=ex)
 
     def _receive_rpc(self, payload, msg):
         """
@@ -304,20 +337,14 @@ class BaseProcess(object):
         Dispatch of messages to operations within this process instance. The
         default behavior is to dispatch to 'op_*' functions, where * is the
         'op' message attribute.
-        @retval deferred
+        @retval Deferred
         """
-        #@BUG Added hack to handle messages from plc_init in cc_agent!
-        if payload['op'] == 'init' or \
-                self.proc_state == "INIT" or self.proc_state == "ACTIVE" or \
-                (payload['op'] == 'identify' and payload['content']=='started'):
+        if self._get_state() == "ACTIVE":
             # Regular message handling in expected state
-            if payload['op'] != 'init' and self.proc_state == "INIT":
-                log.warn('Process %s received message before completed init' % (self.proc_name))
-
             d = pu.dispatch_message(payload, msg, target, conv)
             return d
         else:
-            text = "Process %s in invalid state %s." % (self.proc_name, self.proc_state)
+            text = "Process %s in invalid state %s." % (self.proc_name, self._get_state())
             log.error(text)
 
             # @todo: Requeue would be ok, but does not work (Rabbit limitation)
@@ -333,6 +360,8 @@ class BaseProcess(object):
         The method called if operation callback operation is not defined
         """
         log.info('Catch message op=%s' % headers.get('op',None))
+
+    # --- Outgoing message handling
 
     def rpc_send(self, recv, operation, content, headers=None, **kwargs):
         """
@@ -359,15 +388,19 @@ class BaseProcess(object):
         # to call back the caller on the rpc_deferred when the receipt is done.
         return rpc_deferred
 
-    def send(self, recv, operation, content, headers=None):
+    def send(self, recv, operation, content, headers=None, reply=False):
         """
         @brief Send a message via the process receiver to destination.
         Starts a new conversation.
         @retval Deferred for send of message
         """
-        send = self.backend_id
         msgheaders = self._prepare_message(headers)
-        return pu.send(self.backend_receiver, send, recv, operation, content, msgheaders)
+        if reply:
+            send = self.id
+        else:
+            send = self.backend_id
+
+        return pu.send(None, send, recv, operation, content, msgheaders)
 
     def _prepare_message(self, headers):
         msgheaders = {}
@@ -403,37 +436,43 @@ class BaseProcess(object):
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
             headers['conv-seq'] = int(ionMsg.get('conv-seq',0)) + 1
-            return self.send(pu.get_process_id(recv), operation, content, headers)
+            return self.send(pu.get_process_id(recv), operation, content, headers, reply=True)
 
     def reply_ok(self, msg, content=None, headers=None):
         """
-        Glue method that replies to a given message with a success message and
-        a given result value
+        Boilerplate method that replies to a given message with a success
+        message and a given result value
+        @content any sendable type to be converted to dict, or dict (untouched)
         @retval Deferred for send of reply
         """
-        rescont = {'status':'OK'}
-        if type(content) is dict:
-            rescont.update(content)
-        else:
-            rescont['value'] = content
-        return self.reply(msg, 'result', rescont, headers)
+        # Note: Header status=OK is automatically set
+        if not type(content) is dict:
+            content = dict(value=content, status='OK')
+        return self.reply(msg, 'result', content, headers)
 
-    def reply_err(self, msg, content=None, headers=None):
+    def reply_err(self, msg, content=None, headers=None, exception=None):
         """
-        Glue method that replies to a given message with an error message and
+        Boilerplate method for reply to a message with an error message and
         an indication of the error.
+        @content any sendable type to be converted to dict, or dict (untouched)
+        @exception an instance of Exception
         @retval Deferred for send of reply
         """
-        rescont = {'status':'ERROR'}
-        if type(content) is dict:
-            rescont.update(content)
-        else:
-            rescont['value'] = content
-        return self.reply(msg, 'result', rescont, headers)
+        reshdrs = dict(status='ERROR')
+        if headers != None:
+            reshdrs.update(headers)
+        if not type(content) is dict:
+            content = dict(value=content, status='ERROR')
+            if exception:
+                # @todo Add more info from exception
+                content['errmsg'] = str(exception)
+        return self.reply(msg, 'result', content, reshdrs)
 
     def get_conversation(self, headers):
         convid = headers.get('conv-id', None)
         return self.conversations(convid, None)
+
+    # --- Process and child process management
 
     def get_scoped_name(self, scope, name):
         """
@@ -457,7 +496,7 @@ class BaseProcess(object):
     # OTP style functions for working with processes and modules/apps
 
     @defer.inlineCallbacks
-    def spawn_child(self, childproc, init=True):
+    def spawn_child(self, childproc, activate=True):
         """
         Spawns a process described by the ProcessDesc instance as child of this
         process instance. An init message is sent depending on flag.
@@ -466,12 +505,10 @@ class BaseProcess(object):
         @retval process id of the child process
         """
         assert isinstance(childproc, ProcessDesc)
-        assert not childproc in self.child_procs
+        assert not childproc in self.child_procs, "Process already spawned"
         self.child_procs.append(childproc)
-        child_id = yield childproc.spawn(self)
+        child_id = yield childproc.spawn(self, activate=activate)
         yield procRegistry.put(str(childproc.proc_name), str(child_id))
-        if init:
-            yield childproc.init()
         defer.returnValue(child_id)
 
     def link_child(self, supervisor):
@@ -498,12 +535,6 @@ class BaseProcess(object):
         child = self.get_child_def(name)
         return child.proc_id if child else None
 
-    def shutdown(self):
-        """
-        Recursivey terminates all child processes and then itself.
-        @retval Deferred
-        """
-        return self.op_shutdown(None, None, None)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(BaseProcess)

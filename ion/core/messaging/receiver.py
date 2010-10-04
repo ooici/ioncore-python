@@ -39,11 +39,10 @@ class Receiver(BasicLifecycleObject):
     """
     implements(IReceiver)
 
-    def __init__(self, label, name=None, process=None, group=None):
+    def __init__(self, label, name, process=None, group=None, handler=None):
         """
-        @param label descriptive label of the module or function
-        @param name the actual name, if specified. else, use
-        spawned id
+        @param label descriptive label
+        @param name the actual name in the exchange. Used for routing
         """
         BasicLifecycleObject.__init__(self)
 
@@ -55,6 +54,9 @@ class Receiver(BasicLifecycleObject):
         self.handlers = []
         self.consumer = None
 
+        if handler:
+            self.add_handler(handler)
+
     @defer.inlineCallbacks
     def attach(self, *args, **kwargs):
         """
@@ -62,6 +64,7 @@ class Receiver(BasicLifecycleObject):
         """
         yield self.initialize(*args, **kwargs)
         yield self.activate(*args, **kwargs)
+        defer.returnValue(self.name)
 
     @defer.inlineCallbacks
     def on_initialize(self, *args, **kwargs):
@@ -69,16 +72,20 @@ class Receiver(BasicLifecycleObject):
         @brief Declare the queue and binding only.
         @retval Deferred
         """
-        assert self.name, "Receiver must have a name or be ProcessReceiver"
-        procid = str(self.process.id)
+        assert self.name, "Receiver must have a name"
         container = ioninit.container_instance
         xnamestore = container.exchange_manager.exchange_space.store
-        name_config = yield xnamestore.get(procid)
+        name_config = yield xnamestore.get(self.name)
         if not name_config:
             raise RuntimeError("Messaging name undefined: "+self.name)
 
-        consumer = yield container.new_consumer(name_config)
-        self.consumer = consumer
+        yield self._init_receiver(name_config)
+        #log.debug("Receiver %s initialized (queue attached) cfg=%s" % (self.name,name_config))
+
+    @defer.inlineCallbacks
+    def _init_receiver(self, receiver_config):
+        container = ioninit.container_instance
+        self.consumer = yield container.new_consumer(receiver_config)
 
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
@@ -88,6 +95,7 @@ class Receiver(BasicLifecycleObject):
         """
         self.consumer.register_callback(self.receive)
         yield self.consumer.iterconsume()
+        #log.debug("Receiver %s activated (consumer enabled)" % self.name)
 
     @defer.inlineCallbacks
     def on_deactivate(self, *args, **kwargs):
@@ -131,8 +139,7 @@ class Receiver(BasicLifecycleObject):
 
 class ProcessReceiver(Receiver):
     """
-    A ProcessReceiver is a Receiver that is exclusive to a process. It does
-    not require keeping track of specific attributes.
+    A ProcessReceiver is a Receiver that is exclusive to a process.
     """
 
     @defer.inlineCallbacks
@@ -140,17 +147,35 @@ class ProcessReceiver(Receiver):
         """
         @retval Deferred
         """
-        procid = str(self.process.id)
+        assert self.name, "Receiver must have a name"
         container = ioninit.container_instance
-        if not self.name:
-            self.name = procid
 
-        name_config = messaging.process(procid)
+        name_config = messaging.process(self.name)
         name_config.update({'name_type':'process'})
         xnamestore = container.exchange_manager.exchange_space.store
-        yield xnamestore.put(procid, name_config)
+        yield xnamestore.put(self.name, name_config)
 
-        yield Receiver.on_initialize(self, *args, **kwargs)
+        yield self._init_receiver(name_config)
+
+class WorkerReceiver(Receiver):
+    """
+    A WorkerReceiver is a Receiver from a worker queue.
+    """
+
+    @defer.inlineCallbacks
+    def on_initialize(self, *args, **kwargs):
+        """
+        @retval Deferred
+        """
+        assert self.name, "Receiver must have a name"
+        container = ioninit.container_instance
+
+        name_config = messaging.worker(self.name)
+        name_config.update({'name_type':'worker'})
+        xnamestore = container.exchange_manager.exchange_space.store
+        yield xnamestore.put(self.name, name_config)
+
+        yield self._init_receiver(name_config)
 
 class NameReceiver(Receiver):
     pass

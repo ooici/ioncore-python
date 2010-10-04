@@ -11,6 +11,7 @@ from twisted.internet import defer
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core.messaging import messaging
 from ion.core.messaging.messaging import MessageSpace, ProcessExchangeSpace, Consumer
 from ion.util.state_object import BasicLifecycleObject
 
@@ -97,8 +98,8 @@ class ExchangeManager(BasicLifecycleObject):
             log.info("Messaging name config: name="+msgName+', '+str(msgResource))
             yield self.configure_messaging(msgName, msgResource)
 
-    @staticmethod
-    def configure_messaging(name, config):
+    @defer.inlineCallbacks
+    def configure_messaging(self, name, config):
         """
         """
         if config['name_type'] == 'worker':
@@ -112,11 +113,9 @@ class ExchangeManager(BasicLifecycleObject):
 
         amqp_config = name_type_f(name)
         amqp_config.update(config)
-        def _cb(res):
-            return Consumer.name(self.container.exchange_space, amqp_config)
-        d = self.container.store.put(name, amqp_config)
-        d.addCallback(_cb)
-        return d
+        res = yield Consumer.name(self.exchange_space, amqp_config)
+        yield self.exchange_space.store.put(name, amqp_config)
+        defer.returnValue(res)
 
     @defer.inlineCallbacks
     def new_consumer(self, name_config):

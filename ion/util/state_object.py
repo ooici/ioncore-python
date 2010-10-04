@@ -43,6 +43,7 @@ class StateObject(Actionable):
         assert self.__fsm, "FSM not set"
         self.__fsm.input_args = args
         self.__fsm.input_kwargs = kwargs
+        self.__fsm.error_cause = None
         try:
             res = self.__fsm.process(event)
             if isinstance(res, defer.Deferred):
@@ -50,19 +51,25 @@ class StateObject(Actionable):
                 def _cb(result):
                     d1.callback(result)
                 def _err(result):
-                    #print "In error, %s" % (result)
-                    d2 = self.__fsm.process(BasicStates.E_ERROR)
-                    if isinstance(d2, defer.Deferred):
-                        # FSM error action deferred too
-                        def _cb2(result1):
+                    #print "In exception processing, %r" % (result)
+                    try:
+                        self.__fsm.error_cause = result
+                        d2 = self.__fsm.process(BasicStates.E_ERROR)
+                        if isinstance(d2, defer.Deferred):
+                            # FSM error action deferred too
+                            def _cb2(result1):
+                                d1.errback(result)
+                            d2.addCallbacks(_cb2,log.error)
+                        else:
                             d1.errback(result)
-                        d2.addCallbacks(_cb2,log.error)
-                    else:
+                    except Exception, ex:
+                        log.exception("Exception in StateObject error() after exception %r" % result)
                         d1.errback(result)
                 res.addCallbacks(_cb,_err)
                 res = d1
         except StandardError, ex:
             # This catches only if not deferred
+            self.__fsm.error_cause = ex
             res = self.__fsm.process(BasicStates.E_ERROR)
             raise ex
         return res
@@ -72,7 +79,10 @@ class StateObject(Actionable):
         func = getattr(self, fname)
         args = self.__fsm.input_args
         kwargs = self.__fsm.input_kwargs
-        res = func(*args, **kwargs)
+        if action == BasicStates.E_ERROR:
+            res = func(self.__fsm.error_cause, *args, **kwargs)
+        else:
+            res = func(*args, **kwargs)
         return res
 
     def _get_state(self):

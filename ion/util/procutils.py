@@ -134,6 +134,9 @@ def send(receiver, send, recv, operation, content, headers=None):
     msg['conv-seq'] = 1
     # Conversation type id
     msg['protocol'] = ''
+    # Status code
+    msg['status'] = 'OK'
+    # Local timestamp in ms
     msg['ts'] = str(currenttime_ms())
     #msg['reply-with'] = ''
     #msg['in-reply-to'] = ''
@@ -151,7 +154,7 @@ def send(receiver, send, recv, operation, content, headers=None):
     except Exception, ex:
         log_exception("Send error: ", ex)
     else:
-        log.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
+        #log.debug("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
         log.info("msg"+str(msg))
 
 def dispatch_message(payload, msg, dispatchIn, conv=None):

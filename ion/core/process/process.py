@@ -16,6 +16,7 @@ from ion.core import ioninit
 from ion.core.id import Id
 from ion.core.messaging.receiver import ProcessReceiver
 import ion.util.procutils as pu
+from ion.util.state_object import BasicLifecycleObject
 
 # @todo HACK: Dict of process "alias" to process declaration
 processes = {}
@@ -28,80 +29,94 @@ class IProcess(Interface):
     def spawn():
         pass
 
-class ProcessDesc(object):
+class ProcessDesc(BasicLifecycleObject):
     """
     Class that encapsulates attributes about a spawnable process; can spawn
     and init processes.
     """
     def __init__(self, **kwargs):
         """
-        Initializes ProcessDesc instance with process attributes
+        Initializes ProcessDesc instance with process attributes.
+        Also acts as a weak proxy object for use by the parent process.
         @param name  name label of process
         @param module  module name of process module
         @param class  or procclass is class name in process module (optional)
         @param node  ID of container to spawn process on (optional)
         @param spawnargs  dict of additional spawn arguments (optional)
         """
+        BasicLifecycleObject.__init__(self)
         self.proc_name = kwargs.get('name', None)
         self.proc_module = kwargs.get('module', None)
         self.proc_class = kwargs.get('class', kwargs.get('procclass', None))
         self.proc_node = kwargs.get('node', None)
         self.spawn_args = kwargs.get('spawnargs', None)
         self.proc_id = None
-        self.proc_state = 'DEFINED'
+        self.no_activate = False
+
+    # Life cycle
 
     @defer.inlineCallbacks
-    def spawn(self, supProc=None):
+    def spawn(self, parent=None, container=None, activate=True):
+        """
+        Boilerplate for initialize()
+        @param parent the process instance that should be set as supervisor
+        """
+        log.info('Spawning name=%s on node=%s' %
+                     (self.proc_name, self.proc_node))
+        self.sup_process = parent
+        self.container = container or ioninit.container_instance
+        pid = yield self.initialize(activate)
+        if activate:
+            self.no_activate = activate
+            yield self.activate()
+        defer.returnValue(pid)
+
+    @defer.inlineCallbacks
+    def on_initialize(self, activate=False, *args, **kwargs):
         """
         Spawns this process description with the initialized attributes.
-        @param supProc  the process instance that should be set as supervisor
+        @retval Deferred -> Id with process id
         """
-        assert self.proc_state == 'DEFINED', "Cannot spawn process twice"
-        self.sup_process = supProc
-        if self.proc_node == None:
-            log.info('Spawning name=%s node=%s' %
-                         (self.proc_name, self.proc_node))
+        # Note: If this fails, an exception will occur and be passed through
+        self.proc_id = yield self.container.spawn_process(
+                procdesc=self,
+                parent=self.sup_process,
+                node=self.proc_node,
+                activate=activate)
 
-            # Importing service module
-            proc_mod = pu.get_module(self.proc_module)
-            self.proc_mod_obj = proc_mod
+        log.info("Process %s ID: %s" % (self.proc_class, self.proc_id))
 
-            # Spawn instance of a process
-            # During spawn, the supervisor process id, system name and proc name
-            # get provided as spawn args, in addition to any give spawn args.
-            spawnargs = {'proc-name':self.proc_name,
-                         'sup-id':self.sup_process.id.full,
-                         'sys-name':self.sup_process.sys_name}
-            if self.spawn_args:
-                spawnargs.update(self.spawn_args)
-            #log.debug("spawn(%s, args=%s)" % (self.proc_module, spawnargs))
-            process = yield ioninit.container_instance.spawn_process(proc_mod, None, spawnargs)
-            self.proc_id = process.id
-            self.proc_state = 'SPAWNED'
-
-            log.info("Process %s ID: %s" % (self.proc_class, self.proc_id))
-        else:
-            log.error('Cannot spawn '+self.proc_class+' on node='+str(self.proc_node))
-            
         defer.returnValue(self.proc_id)
 
     @defer.inlineCallbacks
-    def init(self):
-        (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
-                                                'init', {}, {'quiet':True})
-        if content.get('status','ERROR') == 'OK':
-            self.proc_state = 'INIT_OK'
+    def on_activate(self, *args, **kwargs):
+        """
+        @retval Deferred
+        """
+        if self.no_activate:
+            self.no_activate = True
         else:
-            self.proc_state = 'INIT_ERROR'
+            headers = yield self.container.activate_process(parent=self.sup_process, pid=self.proc_id)
+
+    def shutdown(self):
+        return self.terminate()
 
     @defer.inlineCallbacks
-    def shutdown(self):
-        (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
-                                                'shutdown', {}, {'quiet':True})
-        if content.get('status','ERROR') == 'OK':
-            self.proc_state = 'TERMINATED'
+    def on_terminate(self, *args, **kwargs):
+        """
+        @retval Deferred
+        """
+        headers = yield self.container.terminate_process(parent=self.sup_process, pid=self.proc_id)
+        if not headers.get('status','ERROR') == 'OK':
+            self.error('shutdown', headers)
+
+    def on_error(self, cause=None, *args, **kwargs):
+        if cause:
+            #log.error("ProcessDesc error: %s" % cause)
+            pass
         else:
-            self.proc_state = 'SHUTDOWN_ERROR'
+            raise RuntimeError("Illegal state change for ProcessDesc")
+
 
 class IProcessFactory(Interface):
 
@@ -173,31 +188,38 @@ class ProcessInstantiator(object):
 
     @classmethod
     @defer.inlineCallbacks
-    def spawn_from_module(cls, procmod, space, spawnargs=None, container=None):
+    def spawn_from_module(cls, module, space=None, spawnargs=None, container=None, activate=True):
         """
-        @brief Factory method to spawn a BaseProcess instance from a Python module
-        @param m A module (<type 'module'>)
-        @param space container.MessageSpace instance
+        @brief Factory method to spawn a BaseProcess instance from a Python module.
+                By default, spawn includes an activate
+        @param module A module (<type 'module'>) with a ProcessFactory factory
+        @param space MessageSpace instance
         @param spawnargs argument dict given to the factory on spawn
-        @retval Deferred which fires with the instance id (container.Id)
+        @retval Deferred which fires with the IProcess instance
         """
         spawnargs = spawnargs or {}
         container = container or ioninit.container_instance
 
-        if not hasattr(procmod, 'factory'):
+        if not hasattr(module, 'factory'):
             raise RuntimeError("Must define factory in process module to spawn")
 
-        if not IProcessFactory.providedBy(procmod.factory):
+        if not IProcessFactory.providedBy(module.factory):
             raise RuntimeError("Process model factory must provide IProcessFactory")
 
         procid = ProcessInstantiator.create_process_id(container)
         spawnargs['proc-id'] = procid
 
-        process = yield defer.maybeDeferred(procmod.factory.build, spawnargs)
+        process = yield defer.maybeDeferred(module.factory.build, spawnargs)
         if not IProcess.providedBy(process):
             raise RuntimeError("ProcessFactory returned non-IProcess instance")
 
-        # Give a callback to the process
-        yield process.spawn()
+        # Give a callback to the process to initialize and activate (if desired)
+        try:
+            yield process.initialize()
+            if activate:
+                yield process.activate()
+        except Exception, ex:
+            log.exception("Error spawning process from module")
+            raise ex
 
         defer.returnValue(process)

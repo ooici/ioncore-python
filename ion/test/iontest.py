@@ -17,6 +17,7 @@ from ion.core import ioninit
 from ion.core.base_process import BaseProcess
 from ion.core.cc import container
 from ion.core.cc.container import Id
+from ion.core.process.process import IProcess
 from ion.data.store import Store
 import ion.util.procutils as pu
 
@@ -40,7 +41,6 @@ class IonTestCase(unittest.TestCase):
     def _start_container(self):
         """
         Starting and initialzing the container with a connection to a broker.
-        @note Hardwired to connect to amoeba for broker.
         """
         mopt = {}
         mopt['broker_host'] = CONF['broker_host']
@@ -54,14 +54,13 @@ class IonTestCase(unittest.TestCase):
         yield self.container.initialize(mopt)
         yield self.container.activate()
 
-        bootstrap.init_container()
+        # Manually perform some ioncore initializations
+        yield bootstrap.init_ioncore()
+
         self.procRegistry = base_process.procRegistry
         self.test_sup = yield bootstrap.create_supervisor()
 
-        #Load All Resource Descriptions for future decoding
-        description_utility.load_descriptions()
-
-        log.info("============Capability Container started, "+repr(self.container.exchange_manager.message_space))
+        log.info("============ %s ===" % self.container)
 
     @defer.inlineCallbacks
     def _start_core_services(self):
@@ -115,10 +114,8 @@ class IonTestCase(unittest.TestCase):
         @param pid  process id
         @retval BaseProcess instance for process id
         """
-        for rec in base_process.receivers:
-            if rec.process.id.full == str(pid):
-                return rec.process
-        return None
+        process = ioninit.container_instance.proc_manager.process_registry.kvs.get(pid, None)
+        return process
 
 class ReceiverProcess(BaseProcess):
     """
@@ -128,6 +125,7 @@ class ReceiverProcess(BaseProcess):
     def __init__(self, *args, **kwargs):
         BaseProcess.__init__(self, *args, **kwargs)
         self.inbox = defer.DeferredQueue()
+        self.inbox_count = 0
 
     def _dispatch_message(self, payload, msg, target, conv):
         """
@@ -139,6 +137,7 @@ class ReceiverProcess(BaseProcess):
         log.info('ReceiverProcess: Received message op=%s from sender=%s' %
                      (msg.payload['op'], msg.payload['sender']))
         self.inbox.put(msg)
+        self.inbox_count += 1
         return defer.succeed(True)
 
     def await_message(self):

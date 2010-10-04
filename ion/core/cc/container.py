@@ -128,11 +128,14 @@ class Container(BasicLifecycleObject):
     # Process management, handled by ProcessManager
     def spawn_process(self, *args, **kwargs):
         return self.proc_manager.spawn_process(*args, **kwargs)
-
     def spawn_processes(self, *args, **kwargs):
         return self.proc_manager.spawn_processes(*args, **kwargs)
     def create_supervisor(self, *args, **kwargs):
         return self.proc_manager.create_supervisor(*args, **kwargs)
+    def activate_process(self, *args, **kwargs):
+        return self.proc_manager.activate_process(*args, **kwargs)
+    def terminate_process(self, *args, **kwargs):
+        return self.proc_manager.terminate_process(*args, **kwargs)
 
     # Exchange management, handled by ExchangeManager
     def declare_messaging(self, *args, **kwargs):
@@ -151,6 +154,10 @@ class Container(BasicLifecycleObject):
     def start_rel(self, rel_filename):
         pass
 
+    def __str__(self):
+        return "CapabilityContainer(state=%s,%r)" % (
+            self._get_state(),
+            self.exchange_manager.message_space)
 
 def create_new_container():
     """

@@ -6,14 +6,15 @@
 @brief base classes for all service processes and clients.
 """
 
+from twisted.internet import defer
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
+
+from ion.core import base_process, ioninit
+from ion.core.base_process import BaseProcess, BaseProcessClient
 from ion.core.cc.container import Container
 from ion.core.messaging.receiver import Receiver
-
-from ion.core import base_process
-from ion.core.base_process import BaseProcess, BaseProcessClient
 import ion.util.procutils as pu
 
 class BaseService(BaseProcess):
@@ -85,7 +86,7 @@ class BaseService(BaseProcess):
         # Ad hoc service exchange name declaration
         msgName = self.get_scoped_name('system', self.svc_name)
         messaging = {'name_type':'worker', 'args':{'scope':'system'}}
-        yield Container.configure_messaging(msgName, messaging)
+        yield ioninit.container_instance.configure_messaging(msgName, messaging)
 
     @defer.inlineCallbacks
     def plc_shutdown(self):

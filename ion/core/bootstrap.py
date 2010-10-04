@@ -53,10 +53,10 @@ def bootstrap(messaging=None, services=None):
     setup args.
     @param messaging  dict of messaging name configuration dicts
     @param services list of services (as svc description dict) to start up
-    @retval supervisor BaseProcess instance
+    @retval Deferred -> supervisor BaseProcess instance
     """
     log.info("Init container, configuring messaging and starting services...")
-    init_container()
+    yield init_ioncore()
     sup = None
     if messaging:
         assert type(messaging) is dict
@@ -67,9 +67,10 @@ def bootstrap(messaging=None, services=None):
 
     defer.returnValue(sup)
 
-def init_container():
+def init_ioncore():
     """
     Performs global initializations on the local container on startup.
+    @retval Deferred
     """
     _set_container_args(Container.args)
     #interceptorsys = CONF.getValue('interceptor_system',None)
@@ -84,6 +85,7 @@ def init_container():
     description_utility.load_descriptions()
 
     #yield bs_register_services()
+    return defer.succeed(None)
 
 def _set_container_args(contargs=None):
     ioninit.cont_args['_args'] = contargs

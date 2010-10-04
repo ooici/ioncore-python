@@ -16,7 +16,7 @@ from ion.core.cc.container import Container
 from ion.core.messaging.receiver import Receiver
 
 from ion.agents.resource_agent import ResourceAgent
-from ion.core import ionconst
+from ion.core import ionconst, ioninit
 from ion.core.base_process import BaseProcess, ProcessFactory, ProcessDesc
 from ion.core.base_process import procRegistry, processes, receivers
 from ion.core.ioninit import ion_config
@@ -40,7 +40,7 @@ class CCAgent(ResourceAgent):
 
         # Declare CC announcement name
         messaging = {'name_type':'fanout', 'args':{'scope':'system'}}
-        yield Container.configure_messaging(self.ann_name, messaging)
+        yield ioninit.container_instance.configure_messaging(self.ann_name, messaging)
         log.info("Declared CC anounce name: "+str(self.ann_name))
 
         # Attach to CC announcement name

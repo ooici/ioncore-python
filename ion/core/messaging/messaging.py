@@ -255,7 +255,7 @@ def worker(name):
            'mandatory' : True,
            'warn_if_exists' : True,
            'no_ack' : False,
-           'auto_delete' : False,
+           'auto_delete' : True,
            'routing_key' : name,
            'immediate' : False,
             }
