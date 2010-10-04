@@ -119,14 +119,12 @@ class ExchangeManager(BasicLifecycleObject):
         return d
 
     @defer.inlineCallbacks
-    def new_consumer(self, name_config, callback):
+    def new_consumer(self, name_config):
         """
         @brief create consumer
         @retval Deferred that fires a consumer instance
         """
         consumer = yield Consumer.name(self.exchange_space, name_config)
-        consumer.register_callback(callback)
-        consumer.iterconsume()
         defer.returnValue(consumer)
 
     def send(self, to_name, message_data, exchange_space=None):
