@@ -8,106 +8,22 @@ from google.protobuf import descriptor_pb2
 
 
 DESCRIPTOR = descriptor.FileDescriptor(
-  name='ooi_types.proto',
-  package='',
-  serialized_pb='\n\x0fooi_types.proto\"\x16\n\x05Short\x12\r\n\x05value\x18\x01 \x02(\x11\"\x14\n\x03Int\x12\r\n\x05value\x18\x01 \x02(\x05\"\x15\n\x04Long\x12\r\n\x05value\x18\x01 \x02(\x12\"\x16\n\x05\x46loat\x12\r\n\x05value\x18\x01 \x02(\x02\"\x17\n\x06\x44ouble\x12\r\n\x05value\x18\x01 \x02(\x01\"\x17\n\x06String\x12\r\n\x05value\x18\x01 \x02(\t\"\x18\n\x07\x42oolean\x12\r\n\x05value\x18\x01 \x02(\x08\"\x16\n\x05\x42ytes\x12\r\n\x05value\x18\x01 \x02(\x0c\"u\n\tStructure\x12*\n\x05items\x18\x01 \x03(\x0b\x32\x1b.Structure.StructureElement\x1a<\n\x10StructureElement\x12\x0b\n\x03key\x18\x01 \x02(\t\x12\x0c\n\x04type\x18\x02 \x02(\t\x12\r\n\x05value\x18\x03 \x02(\x0c\")\n\nTypedValue\x12\x0c\n\x04type\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\x0c\"Z\n\nDataObject\x12#\n\x04\x61tts\x18\x01 \x03(\x0b\x32\x15.DataObject.Attribute\x1a\'\n\tAttribute\x12\x0b\n\x03key\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\x0c\"~\n\x15\x44\x61taObjectDescription\x12\x0c\n\x04name\x18\x01 \x02(\t\x12.\n\x04\x61tts\x18\x02 \x03(\x0b\x32 .DataObjectDescription.Attribute\x1a\'\n\tAttribute\x12\x0b\n\x03key\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\x0c\"I\n\x0e\x44\x61taObjectNode\x12\n\n\x02id\x18\x01 \x02(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x02(\x0c\x12\x0c\n\x04type\x18\x03 \x02(\x0c\x12\x0c\n\x04\x66lag\x18\x04 \x02(\x0c\"\x1a\n\tContainer\x12\r\n\x05items\x18\x01 \x03(\x0c\"K\n\x07\x43\x41Store\x12\x1c\n\x05nodes\x18\x01 \x03(\x0b\x32\r.CAStore.Node\x1a\"\n\x04Node\x12\x0b\n\x03key\x18\x01 \x02(\x0c\x12\r\n\x05value\x18\x02 \x02(\x0c')
+  name='ion_basic.proto',
+  package='ion',
+  serialized_pb='\n\x0fion_basic.proto\x12\x03ion\"\x18\n\x07\x46loat32\x12\r\n\x05value\x18\x01 \x02(\x02\"\x18\n\x07\x46loat64\x12\r\n\x05value\x18\x01 \x02(\x01\"\x16\n\x05Int32\x12\r\n\x05value\x18\x01 \x02(\x05\"\x16\n\x05Int64\x12\r\n\x05value\x18\x01 \x02(\x03\"\x17\n\x06UInt32\x12\r\n\x05value\x18\x01 \x02(\r\"\x17\n\x06UInt64\x12\r\n\x05value\x18\x01 \x02(\x04\"\x17\n\x06String\x12\r\n\x05value\x18\x01 \x02(\t\"\x18\n\x07\x42oolean\x12\r\n\x05value\x18\x01 \x02(\x08\"\x15\n\x04\x42yte\x12\r\n\x05value\x18\x01 \x02(\x0c\"\x16\n\x05\x42ytes\x12\r\n\x05value\x18\x01 \x02(\x0c\"+\n\rCompositeType\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x0c\n\x04type\x18\x02 \x02(\x05\"y\n\tStructure\x12.\n\x05items\x18\x01 \x03(\x0b\x32\x1f.ion.Structure.StructureElement\x1a<\n\x10StructureElement\x12\x0b\n\x03key\x18\x01 \x02(\t\x12\x0c\n\x04type\x18\x02 \x02(\t\x12\r\n\x05value\x18\x03 \x02(\x0c\")\n\nTypedValue\x12\x0c\n\x04type\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\x0c\"^\n\nDataObject\x12\'\n\x04\x61tts\x18\x01 \x03(\x0b\x32\x19.ion.DataObject.Attribute\x1a\'\n\tAttribute\x12\x0b\n\x03key\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\x0c\"\x82\x01\n\x15\x44\x61taObjectDescription\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x32\n\x04\x61tts\x18\x02 \x03(\x0b\x32$.ion.DataObjectDescription.Attribute\x1a\'\n\tAttribute\x12\x0b\n\x03key\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\x0c\"I\n\x0e\x44\x61taObjectNode\x12\n\n\x02id\x18\x01 \x02(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x02(\x0c\x12\x0c\n\x04type\x18\x03 \x02(\x0c\x12\x0c\n\x04\x66lag\x18\x04 \x02(\x0c\"\x1a\n\tContainer\x12\r\n\x05items\x18\x01 \x03(\x0c\"O\n\x07\x43\x41Store\x12 \n\x05nodes\x18\x01 \x03(\x0b\x32\x11.ion.CAStore.Node\x1a\"\n\x04Node\x12\x0b\n\x03key\x18\x01 \x02(\x0c\x12\r\n\x05value\x18\x02 \x02(\x0c\x42\x14\n\x08ion.dataB\x08IONTypes')
 
 
 
 
-_SHORT = descriptor.Descriptor(
-  name='Short',
-  full_name='Short',
+_FLOAT32 = descriptor.Descriptor(
+  name='Float32',
+  full_name='ion.Float32',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='value', full_name='Short.value', index=0,
-      number=1, type=17, cpp_type=1, label=2,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  extension_ranges=[],
-  serialized_start=19,
-  serialized_end=41,
-)
-
-
-_INT = descriptor.Descriptor(
-  name='Int',
-  full_name='Int',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    descriptor.FieldDescriptor(
-      name='value', full_name='Int.value', index=0,
-      number=1, type=5, cpp_type=1, label=2,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  extension_ranges=[],
-  serialized_start=43,
-  serialized_end=63,
-)
-
-
-_LONG = descriptor.Descriptor(
-  name='Long',
-  full_name='Long',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    descriptor.FieldDescriptor(
-      name='value', full_name='Long.value', index=0,
-      number=1, type=18, cpp_type=2, label=2,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  extension_ranges=[],
-  serialized_start=65,
-  serialized_end=86,
-)
-
-
-_FLOAT = descriptor.Descriptor(
-  name='Float',
-  full_name='Float',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    descriptor.FieldDescriptor(
-      name='value', full_name='Float.value', index=0,
+      name='value', full_name='ion.Float32.value', index=0,
       number=1, type=2, cpp_type=6, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
@@ -122,20 +38,20 @@ _FLOAT = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=88,
-  serialized_end=110,
+  serialized_start=24,
+  serialized_end=48,
 )
 
 
-_DOUBLE = descriptor.Descriptor(
-  name='Double',
-  full_name='Double',
+_FLOAT64 = descriptor.Descriptor(
+  name='Float64',
+  full_name='ion.Float64',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='value', full_name='Double.value', index=0,
+      name='value', full_name='ion.Float64.value', index=0,
       number=1, type=1, cpp_type=5, label=2,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
@@ -150,20 +66,132 @@ _DOUBLE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=112,
-  serialized_end=135,
+  serialized_start=50,
+  serialized_end=74,
 )
 
 
-_STRING = descriptor.Descriptor(
-  name='String',
-  full_name='String',
+_INT32 = descriptor.Descriptor(
+  name='Int32',
+  full_name='ion.Int32',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='value', full_name='String.value', index=0,
+      name='value', full_name='ion.Int32.value', index=0,
+      number=1, type=5, cpp_type=1, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=76,
+  serialized_end=98,
+)
+
+
+_INT64 = descriptor.Descriptor(
+  name='Int64',
+  full_name='ion.Int64',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    descriptor.FieldDescriptor(
+      name='value', full_name='ion.Int64.value', index=0,
+      number=1, type=3, cpp_type=2, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=100,
+  serialized_end=122,
+)
+
+
+_UINT32 = descriptor.Descriptor(
+  name='UInt32',
+  full_name='ion.UInt32',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    descriptor.FieldDescriptor(
+      name='value', full_name='ion.UInt32.value', index=0,
+      number=1, type=13, cpp_type=3, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=124,
+  serialized_end=147,
+)
+
+
+_UINT64 = descriptor.Descriptor(
+  name='UInt64',
+  full_name='ion.UInt64',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    descriptor.FieldDescriptor(
+      name='value', full_name='ion.UInt64.value', index=0,
+      number=1, type=4, cpp_type=4, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=149,
+  serialized_end=172,
+)
+
+
+_STRING = descriptor.Descriptor(
+  name='String',
+  full_name='ion.String',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    descriptor.FieldDescriptor(
+      name='value', full_name='ion.String.value', index=0,
       number=1, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
@@ -178,20 +206,20 @@ _STRING = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=137,
-  serialized_end=160,
+  serialized_start=174,
+  serialized_end=197,
 )
 
 
 _BOOLEAN = descriptor.Descriptor(
   name='Boolean',
-  full_name='Boolean',
+  full_name='ion.Boolean',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='value', full_name='Boolean.value', index=0,
+      name='value', full_name='ion.Boolean.value', index=0,
       number=1, type=8, cpp_type=7, label=2,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
@@ -206,20 +234,20 @@ _BOOLEAN = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=162,
-  serialized_end=186,
+  serialized_start=199,
+  serialized_end=223,
 )
 
 
-_BYTES = descriptor.Descriptor(
-  name='Bytes',
-  full_name='Bytes',
+_BYTE = descriptor.Descriptor(
+  name='Byte',
+  full_name='ion.Byte',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='value', full_name='Bytes.value', index=0,
+      name='value', full_name='ion.Byte.value', index=0,
       number=1, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
@@ -234,34 +262,97 @@ _BYTES = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=188,
-  serialized_end=210,
+  serialized_start=225,
+  serialized_end=246,
 )
 
 
-_STRUCTURE_STRUCTUREELEMENT = descriptor.Descriptor(
-  name='StructureElement',
-  full_name='Structure.StructureElement',
+_BYTES = descriptor.Descriptor(
+  name='Bytes',
+  full_name='ion.Bytes',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='key', full_name='Structure.StructureElement.key', index=0,
+      name='value', full_name='ion.Bytes.value', index=0,
+      number=1, type=12, cpp_type=9, label=2,
+      has_default_value=False, default_value="",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=248,
+  serialized_end=270,
+)
+
+
+_COMPOSITETYPE = descriptor.Descriptor(
+  name='CompositeType',
+  full_name='ion.CompositeType',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    descriptor.FieldDescriptor(
+      name='name', full_name='ion.CompositeType.name', index=0,
       number=1, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='type', full_name='Structure.StructureElement.type', index=1,
+      name='type', full_name='ion.CompositeType.type', index=1,
+      number=2, type=5, cpp_type=1, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=272,
+  serialized_end=315,
+)
+
+
+_STRUCTURE_STRUCTUREELEMENT = descriptor.Descriptor(
+  name='StructureElement',
+  full_name='ion.Structure.StructureElement',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    descriptor.FieldDescriptor(
+      name='key', full_name='ion.Structure.StructureElement.key', index=0,
+      number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    descriptor.FieldDescriptor(
+      name='type', full_name='ion.Structure.StructureElement.type', index=1,
       number=2, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='value', full_name='Structure.StructureElement.value', index=2,
+      name='value', full_name='ion.Structure.StructureElement.value', index=2,
       number=3, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
@@ -276,19 +367,19 @@ _STRUCTURE_STRUCTUREELEMENT = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=269,
-  serialized_end=329,
+  serialized_start=378,
+  serialized_end=438,
 )
 
 _STRUCTURE = descriptor.Descriptor(
   name='Structure',
-  full_name='Structure',
+  full_name='ion.Structure',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='items', full_name='Structure.items', index=0,
+      name='items', full_name='ion.Structure.items', index=0,
       number=1, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -303,27 +394,27 @@ _STRUCTURE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=212,
-  serialized_end=329,
+  serialized_start=317,
+  serialized_end=438,
 )
 
 
 _TYPEDVALUE = descriptor.Descriptor(
   name='TypedValue',
-  full_name='TypedValue',
+  full_name='ion.TypedValue',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='type', full_name='TypedValue.type', index=0,
+      name='type', full_name='ion.TypedValue.type', index=0,
       number=1, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='value', full_name='TypedValue.value', index=1,
+      name='value', full_name='ion.TypedValue.value', index=1,
       number=2, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
@@ -338,27 +429,27 @@ _TYPEDVALUE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=331,
-  serialized_end=372,
+  serialized_start=440,
+  serialized_end=481,
 )
 
 
 _DATAOBJECT_ATTRIBUTE = descriptor.Descriptor(
   name='Attribute',
-  full_name='DataObject.Attribute',
+  full_name='ion.DataObject.Attribute',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='key', full_name='DataObject.Attribute.key', index=0,
+      name='key', full_name='ion.DataObject.Attribute.key', index=0,
       number=1, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='value', full_name='DataObject.Attribute.value', index=1,
+      name='value', full_name='ion.DataObject.Attribute.value', index=1,
       number=2, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
@@ -373,19 +464,19 @@ _DATAOBJECT_ATTRIBUTE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=425,
-  serialized_end=464,
+  serialized_start=538,
+  serialized_end=577,
 )
 
 _DATAOBJECT = descriptor.Descriptor(
   name='DataObject',
-  full_name='DataObject',
+  full_name='ion.DataObject',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='atts', full_name='DataObject.atts', index=0,
+      name='atts', full_name='ion.DataObject.atts', index=0,
       number=1, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -400,27 +491,27 @@ _DATAOBJECT = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=374,
-  serialized_end=464,
+  serialized_start=483,
+  serialized_end=577,
 )
 
 
 _DATAOBJECTDESCRIPTION_ATTRIBUTE = descriptor.Descriptor(
   name='Attribute',
-  full_name='DataObjectDescription.Attribute',
+  full_name='ion.DataObjectDescription.Attribute',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='key', full_name='DataObjectDescription.Attribute.key', index=0,
+      name='key', full_name='ion.DataObjectDescription.Attribute.key', index=0,
       number=1, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='value', full_name='DataObjectDescription.Attribute.value', index=1,
+      name='value', full_name='ion.DataObjectDescription.Attribute.value', index=1,
       number=2, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
@@ -435,26 +526,26 @@ _DATAOBJECTDESCRIPTION_ATTRIBUTE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=425,
-  serialized_end=464,
+  serialized_start=538,
+  serialized_end=577,
 )
 
 _DATAOBJECTDESCRIPTION = descriptor.Descriptor(
   name='DataObjectDescription',
-  full_name='DataObjectDescription',
+  full_name='ion.DataObjectDescription',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='name', full_name='DataObjectDescription.name', index=0,
+      name='name', full_name='ion.DataObjectDescription.name', index=0,
       number=1, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='atts', full_name='DataObjectDescription.atts', index=1,
+      name='atts', full_name='ion.DataObjectDescription.atts', index=1,
       number=2, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -469,41 +560,41 @@ _DATAOBJECTDESCRIPTION = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=466,
-  serialized_end=592,
+  serialized_start=580,
+  serialized_end=710,
 )
 
 
 _DATAOBJECTNODE = descriptor.Descriptor(
   name='DataObjectNode',
-  full_name='DataObjectNode',
+  full_name='ion.DataObjectNode',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='id', full_name='DataObjectNode.id', index=0,
+      name='id', full_name='ion.DataObjectNode.id', index=0,
       number=1, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='content', full_name='DataObjectNode.content', index=1,
+      name='content', full_name='ion.DataObjectNode.content', index=1,
       number=2, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='type', full_name='DataObjectNode.type', index=2,
+      name='type', full_name='ion.DataObjectNode.type', index=2,
       number=3, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='flag', full_name='DataObjectNode.flag', index=3,
+      name='flag', full_name='ion.DataObjectNode.flag', index=3,
       number=4, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
@@ -518,20 +609,20 @@ _DATAOBJECTNODE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=594,
-  serialized_end=667,
+  serialized_start=712,
+  serialized_end=785,
 )
 
 
 _CONTAINER = descriptor.Descriptor(
   name='Container',
-  full_name='Container',
+  full_name='ion.Container',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='items', full_name='Container.items', index=0,
+      name='items', full_name='ion.Container.items', index=0,
       number=1, type=12, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -546,27 +637,27 @@ _CONTAINER = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=669,
-  serialized_end=695,
+  serialized_start=787,
+  serialized_end=813,
 )
 
 
 _CASTORE_NODE = descriptor.Descriptor(
   name='Node',
-  full_name='CAStore.Node',
+  full_name='ion.CAStore.Node',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='key', full_name='CAStore.Node.key', index=0,
+      name='key', full_name='ion.CAStore.Node.key', index=0,
       number=1, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     descriptor.FieldDescriptor(
-      name='value', full_name='CAStore.Node.value', index=1,
+      name='value', full_name='ion.CAStore.Node.value', index=1,
       number=2, type=12, cpp_type=9, label=2,
       has_default_value=False, default_value="",
       message_type=None, enum_type=None, containing_type=None,
@@ -581,19 +672,19 @@ _CASTORE_NODE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=738,
-  serialized_end=772,
+  serialized_start=860,
+  serialized_end=894,
 )
 
 _CASTORE = descriptor.Descriptor(
   name='CAStore',
-  full_name='CAStore',
+  full_name='ion.CAStore',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     descriptor.FieldDescriptor(
-      name='nodes', full_name='CAStore.nodes', index=0,
+      name='nodes', full_name='ion.CAStore.nodes', index=0,
       number=1, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -608,8 +699,8 @@ _CASTORE = descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=697,
-  serialized_end=772,
+  serialized_start=815,
+  serialized_end=894,
 )
 
 
@@ -622,53 +713,71 @@ _DATAOBJECTDESCRIPTION.fields_by_name['atts'].message_type = _DATAOBJECTDESCRIPT
 _CASTORE_NODE.containing_type = _CASTORE;
 _CASTORE.fields_by_name['nodes'].message_type = _CASTORE_NODE
 
-class Short(message.Message):
+class Float32(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
-  DESCRIPTOR = _SHORT
+  DESCRIPTOR = _FLOAT32
   
-  # @@protoc_insertion_point(class_scope:Short)
+  # @@protoc_insertion_point(class_scope:ion.Float32)
 
-class Int(message.Message):
+class Float64(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
-  DESCRIPTOR = _INT
+  DESCRIPTOR = _FLOAT64
   
-  # @@protoc_insertion_point(class_scope:Int)
+  # @@protoc_insertion_point(class_scope:ion.Float64)
 
-class Long(message.Message):
+class Int32(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
-  DESCRIPTOR = _LONG
+  DESCRIPTOR = _INT32
   
-  # @@protoc_insertion_point(class_scope:Long)
+  # @@protoc_insertion_point(class_scope:ion.Int32)
 
-class Float(message.Message):
+class Int64(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
-  DESCRIPTOR = _FLOAT
+  DESCRIPTOR = _INT64
   
-  # @@protoc_insertion_point(class_scope:Float)
+  # @@protoc_insertion_point(class_scope:ion.Int64)
 
-class Double(message.Message):
+class UInt32(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
-  DESCRIPTOR = _DOUBLE
+  DESCRIPTOR = _UINT32
   
-  # @@protoc_insertion_point(class_scope:Double)
+  # @@protoc_insertion_point(class_scope:ion.UInt32)
+
+class UInt64(message.Message):
+  __metaclass__ = reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _UINT64
+  
+  # @@protoc_insertion_point(class_scope:ion.UInt64)
 
 class String(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
   DESCRIPTOR = _STRING
   
-  # @@protoc_insertion_point(class_scope:String)
+  # @@protoc_insertion_point(class_scope:ion.String)
 
 class Boolean(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
   DESCRIPTOR = _BOOLEAN
   
-  # @@protoc_insertion_point(class_scope:Boolean)
+  # @@protoc_insertion_point(class_scope:ion.Boolean)
+
+class Byte(message.Message):
+  __metaclass__ = reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _BYTE
+  
+  # @@protoc_insertion_point(class_scope:ion.Byte)
 
 class Bytes(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
   DESCRIPTOR = _BYTES
   
-  # @@protoc_insertion_point(class_scope:Bytes)
+  # @@protoc_insertion_point(class_scope:ion.Bytes)
+
+class CompositeType(message.Message):
+  __metaclass__ = reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _COMPOSITETYPE
+  
+  # @@protoc_insertion_point(class_scope:ion.CompositeType)
 
 class Structure(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
@@ -677,16 +786,16 @@ class Structure(message.Message):
     __metaclass__ = reflection.GeneratedProtocolMessageType
     DESCRIPTOR = _STRUCTURE_STRUCTUREELEMENT
     
-    # @@protoc_insertion_point(class_scope:Structure.StructureElement)
+    # @@protoc_insertion_point(class_scope:ion.Structure.StructureElement)
   DESCRIPTOR = _STRUCTURE
   
-  # @@protoc_insertion_point(class_scope:Structure)
+  # @@protoc_insertion_point(class_scope:ion.Structure)
 
 class TypedValue(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
   DESCRIPTOR = _TYPEDVALUE
   
-  # @@protoc_insertion_point(class_scope:TypedValue)
+  # @@protoc_insertion_point(class_scope:ion.TypedValue)
 
 class DataObject(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
@@ -695,10 +804,10 @@ class DataObject(message.Message):
     __metaclass__ = reflection.GeneratedProtocolMessageType
     DESCRIPTOR = _DATAOBJECT_ATTRIBUTE
     
-    # @@protoc_insertion_point(class_scope:DataObject.Attribute)
+    # @@protoc_insertion_point(class_scope:ion.DataObject.Attribute)
   DESCRIPTOR = _DATAOBJECT
   
-  # @@protoc_insertion_point(class_scope:DataObject)
+  # @@protoc_insertion_point(class_scope:ion.DataObject)
 
 class DataObjectDescription(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
@@ -707,22 +816,22 @@ class DataObjectDescription(message.Message):
     __metaclass__ = reflection.GeneratedProtocolMessageType
     DESCRIPTOR = _DATAOBJECTDESCRIPTION_ATTRIBUTE
     
-    # @@protoc_insertion_point(class_scope:DataObjectDescription.Attribute)
+    # @@protoc_insertion_point(class_scope:ion.DataObjectDescription.Attribute)
   DESCRIPTOR = _DATAOBJECTDESCRIPTION
   
-  # @@protoc_insertion_point(class_scope:DataObjectDescription)
+  # @@protoc_insertion_point(class_scope:ion.DataObjectDescription)
 
 class DataObjectNode(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
   DESCRIPTOR = _DATAOBJECTNODE
   
-  # @@protoc_insertion_point(class_scope:DataObjectNode)
+  # @@protoc_insertion_point(class_scope:ion.DataObjectNode)
 
 class Container(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
   DESCRIPTOR = _CONTAINER
   
-  # @@protoc_insertion_point(class_scope:Container)
+  # @@protoc_insertion_point(class_scope:ion.Container)
 
 class CAStore(message.Message):
   __metaclass__ = reflection.GeneratedProtocolMessageType
@@ -731,9 +840,9 @@ class CAStore(message.Message):
     __metaclass__ = reflection.GeneratedProtocolMessageType
     DESCRIPTOR = _CASTORE_NODE
     
-    # @@protoc_insertion_point(class_scope:CAStore.Node)
+    # @@protoc_insertion_point(class_scope:ion.CAStore.Node)
   DESCRIPTOR = _CASTORE
   
-  # @@protoc_insertion_point(class_scope:CAStore)
+  # @@protoc_insertion_point(class_scope:ion.CAStore)
 
 # @@protoc_insertion_point(module_scope)

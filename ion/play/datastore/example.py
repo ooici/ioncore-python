@@ -1,10 +1,11 @@
 
+import msgpack
 
 from ion.play.datastore import datatype
 from ion.play.datastore.encoders import gpb
 
 person = {
-        'name':datatype.String(u'Joe'),
+        'name':datatype.String(u'joe'),
         'email':datatype.String(u'joe@home.net'),
         'weight':datatype.Float(170.5),
         }
@@ -14,12 +15,23 @@ def google_encoder():
 
     print "\nA DataObject instance of the person structure"
     print person_dataobject
+    print 'len', len(str(person_dataobject))
+
+    print '\nmsgpack'
+    msgpack_person = msgpack.packb({
+        'name':u'joe',
+        'email':u'joe@home.net',
+        'weight':170.5,
+        })
+    print repr(msgpack_person)
+    print 'len', len(msgpack_person)
 
     encoder = gpb.Encoder()
     encoded_person_bytes = encoder.encode(person_dataobject)
 
     print "\nThe encode DataObject byte string"
     print repr(encoded_person_bytes)
+    print 'len', len(encoded_person_bytes)
 
     decoded_person = encoder.decode(encoded_person_bytes)
 

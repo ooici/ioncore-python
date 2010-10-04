@@ -1,0 +1,10 @@
+
+import "descriptor.proto";
+
+message SelfDescribingMessage {
+    required google.protobuf.FileDescriptorSet proto_files = 1;
+
+    required string type_name = 2;
+
+    required bytes message_data = 3;
+}
