@@ -112,7 +112,9 @@ def _set_container_args(contargs=None):
         Container.id = ioninit.cont_args['contid']
     if 'sysname' in ioninit.cont_args:
         ioninit.sys_name = ioninit.cont_args['sysname']
-
+    else:
+        ioninit.sys_name = ioninit.container_instance.id
+        
 def declare_messaging(messagingCfg, cgroup=None):
     return ioninit.container_instance.declare_messaging(messagingCfg, cgroup)
 

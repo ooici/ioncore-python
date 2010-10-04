@@ -61,8 +61,8 @@ class ProcessDesc(BasicLifecycleObject):
         Boilerplate for initialize()
         @param parent the process instance that should be set as supervisor
         """
-        log.info('Spawning name=%s on node=%s' %
-                     (self.proc_name, self.proc_node))
+        #log.info('Spawning name=%s on node=%s' %
+        #             (self.proc_name, self.proc_node))
         self.sup_process = parent
         self.container = container or ioninit.container_instance
         pid = yield self.initialize(activate)
@@ -112,7 +112,7 @@ class ProcessDesc(BasicLifecycleObject):
 
     def on_error(self, cause=None, *args, **kwargs):
         if cause:
-            #log.error("ProcessDesc error: %s" % cause)
+            log.error("ProcessDesc error: %s" % cause)
             pass
         else:
             raise RuntimeError("Illegal state change for ProcessDesc")

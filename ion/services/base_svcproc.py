@@ -27,17 +27,17 @@ class ProcessProcessFactory(ProcessFactory):
     """This protocol factory actually returns a receiver for a new service
     process instance, as named in the spawn args.
     """
-    def build(self, spawnArgs={}):
+    def build(self, spawnargs={}):
         """Factory method return a new receiver for a new process. At the same
         time instantiate class.
         """
-        log.info("ProcessProcessFactory.build() with args="+str(spawnArgs))
-        svcmodule = spawnArgs.get('svcmodule',None)
+        log.info("ProcessProcessFactory.build() with args="+str(spawnargs))
+        svcmodule = spawnargs.get('svcmodule',None)
         if not svcmodule:
             log.error("No spawn argument svcmodule given. Cannot spawn")
             return None
 
-        svcclass = spawnArgs.get('svcclass',None)
+        svcclass = spawnargs.get('svcclass',None)
 
         svc_mod = pu.get_module(svcmodule)
 

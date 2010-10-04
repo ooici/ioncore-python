@@ -227,12 +227,12 @@ class BaseProcess(BasicLifecycleObject):
             except Exception, ex:
                 log.exception("Error terminating child %s" % child.proc_id)
 
-        yield defer.maybeDeferred(self.plc_shutdown)
+        yield defer.maybeDeferred(self.plc_terminate)
         log.info('----- Process %s TERMINATED -----' % (self.proc_name))
 
-    def plc_shutdown(self):
+    def plc_terminate(self):
         """
-        Process life cycle event: on shutdown of process (once)
+        Process life cycle event: on termination of process (once)
         """
 
     def on_error(self, cause= None, *args, **kwargs):
@@ -475,23 +475,7 @@ class BaseProcess(BasicLifecycleObject):
     # --- Process and child process management
 
     def get_scoped_name(self, scope, name):
-        """
-        Returns a name that is scoped. Local=Name prefixed by container id.
-        System=Name prefixed by system name, ie id of root process's container.
-        Global=Name unchanged.
-        @param scope  one of "local", "system" or "global"
-        @param name name to be scoped
-        """
-        scoped_name = name
-        if scope == 'local':
-            scoped_name =  str(Id.default_container_id) + "." + name
-        elif scope == 'system':
-            scoped_name =  self.sys_name + "." + name
-        elif scope == 'global':
-            pass
-        else:
-            assert 0, "Unknown scope: "+scope
-        return  scoped_name
+        return pu.get_scoped_name(name, scope)
 
     # OTP style functions for working with processes and modules/apps
 
@@ -535,6 +519,8 @@ class BaseProcess(BasicLifecycleObject):
         child = self.get_child_def(name)
         return child.proc_id if child else None
 
+    def __str__(self):
+        return "BaseProcess(id=%s,name=%s)" % (self.id, self.proc_name)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(BaseProcess)

@@ -148,7 +148,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         log.debug("Instrument driver initialized")
 
     @defer.inlineCallbacks
-    def plc_shutdown(self):
+    def plc_terminate(self):
         yield self.op_disconnect(None, None, None)
 
     def isConnected(self):

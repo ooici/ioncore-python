@@ -9,6 +9,7 @@
 import logging
 import logging.config
 import re
+import os
 
 from ion.core import ionconst as ic
 from ion.util.config import Config
@@ -68,7 +69,8 @@ def adjust_dir(filename):
     """
     if not filename:
         return None
-    if testing:
+    #if testing:
+    if os.getcwd().endswith("_trial_temp"):
         return "../" + filename
     else:
         return filename

@@ -23,6 +23,8 @@ import ion.util.procutils as pu
 
 from ion.resources import description_utility
 
+# The following modules must be imported here, because they load config
+# files. If done while in test, it does not work!
 
 CONF = ioninit.config(__name__)
 
@@ -102,6 +104,9 @@ class IonTestCase(unittest.TestCase):
         sup = sup if sup else self.test_sup
         return bootstrap.spawn_processes(procs, sup)
 
+    def _spawn_process(self, process):
+        return process.spawn()
+        
     def _get_procid(self, name):
         """
         @param name  process instance label given when spawning

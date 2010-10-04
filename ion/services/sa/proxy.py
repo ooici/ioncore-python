@@ -149,7 +149,7 @@ class ProxyService(BaseService):
         log.info('Proxy listener running.')
 
     @defer.inlineCallbacks
-    def slc_shutdown(self):
+    def slc_terminate(self):
         """
         Close TCP listener
         """

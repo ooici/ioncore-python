@@ -101,6 +101,26 @@ def get_process_id(some_id):
         procId = Id(some_id)
     return procId
 
+def get_scoped_name(name, scope):
+    """
+    Returns a name that is scoped.
+    - scope='local': name prefixed by container id.
+    - scope='system': name prefixed by system name.
+    - scope='global': name unchanged.
+    @param name name to be scoped
+    @param scope  one of "local", "system" or "global"
+    """
+    scoped_name = name
+    if scope == 'local':
+        scoped_name =  str(ioninit.container_instance.id) + "." + name
+    elif scope == 'system':
+        scoped_name =  ioninit.sys_name + "." + name
+    elif scope == 'global':
+        pass
+    else:
+        raise RuntimeError("Unknown scope: %s" % scope)
+    return  scoped_name
+
 @defer.inlineCallbacks
 def send(receiver, send, recv, operation, content, headers=None):
     """
@@ -154,8 +174,8 @@ def send(receiver, send, recv, operation, content, headers=None):
     except Exception, ex:
         log_exception("Send error: ", ex)
     else:
-        #log.debug("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
-        log.info("msg"+str(msg))
+        log.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
+        #log.debug("msg"+str(msg))
 
 def dispatch_message(payload, msg, dispatchIn, conv=None):
     """

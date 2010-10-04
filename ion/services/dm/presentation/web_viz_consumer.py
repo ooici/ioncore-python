@@ -52,7 +52,7 @@ class WebVizConsumer(base_consumer.BaseConsumer):
 
 
     @defer.inlineCallbacks
-    def plc_shutdown(self):
+    def plc_terminate(self):
         log.info('Shutdown triggered')
         if self.port:
             yield self.port.stopListening()

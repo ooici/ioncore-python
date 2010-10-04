@@ -47,7 +47,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
                                                          target=driver_id)
 
     #@defer.inlineCallbacks
-    #def plc_shutdown(self):
+    #def plc_terminate(self):
     #    yield self.pd.shutdown()
 
 

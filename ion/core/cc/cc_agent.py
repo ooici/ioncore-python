@@ -19,7 +19,6 @@ from ion.core.ioninit import ion_config
 from ion.core.base_process import BaseProcess, ProcessFactory, ProcessDesc
 from ion.core.cc.container import Container
 from ion.core.messaging.receiver import Receiver
-from ion.core.supervisor import Supervisor
 import ion.util.procutils as pu
 
 
@@ -27,7 +26,6 @@ class CCAgent(ResourceAgent):
     """
     Capability Container agent process interface
     """
-    @defer.inlineCallbacks
     def plc_init(self):
         # Init self and container
         annName = 'cc_announce'
@@ -37,7 +35,10 @@ class CCAgent(ResourceAgent):
         self.contalive = {}
         self.last_identify = 0
 
+    @defer.inlineCallbacks
+    def plc_activate(self):
         # Declare CC announcement name
+        annName = 'cc_announce'
         messaging = {'name_type':'fanout', 'args':{'scope':'system'}}
         yield ioninit.container_instance.configure_messaging(self.ann_name, messaging)
         log.info("Declared CC anounce name: "+str(self.ann_name))
@@ -48,15 +49,12 @@ class CCAgent(ResourceAgent):
         self.ann_receiver = annReceiver
         self.ann_receiver.handle(self.receive)
         self.add_receiver(self.ann_receiver)
-        annid = yield self.ann_receiver.activate()
+        annid = yield self.ann_receiver.attach()
         log.info("Listening to CC anouncements: "+str(annid))
 
         # Start with an identify request. Will lead to an announce by myself
         #@todo - Can not send a message to a base process which is not initialized!
         yield self.send(self.ann_name, 'identify', 'started', {'quiet':True})
-
-        # Convenience HACK: Add a few functions to container shell
-        self._augment_shell()
 
     @defer.inlineCallbacks
     def _send_announcement(self, event):
