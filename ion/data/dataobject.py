@@ -388,7 +388,7 @@ class DataObject(object):
         decode store object[s]
         """
         #d = dict([(str(name), TypedAttribute.decode(value)) for name, value in attrs])
-        d={}
+        
         clsobj = cls
         if isinstance(attrs, tuple):
             attrs = list(attrs)
