@@ -13,8 +13,8 @@ log = ion.util.ionlog.getLogger(__name__)
 import uuid
 
 from twisted.internet import defer
+from ion.core.base_process import ProcessFactory
 
-from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.data.datastore.registry import BaseRegistryService, BaseRegistryClient
 from ion.data import dataobject
@@ -128,7 +128,7 @@ class SchedulerRegistryClient(BaseRegistryClient):
         return self.base_set_resource_lcstate('rm_task', se_object, 'retired')
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(SchedulerRegistry)
+factory = ProcessFactory(SchedulerRegistry)
 
 # WTF?
 dataobject.DataObject._types['ScheduleEntry'] = ScheduleEntry
