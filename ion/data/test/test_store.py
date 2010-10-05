@@ -158,6 +158,11 @@ class CassandraStoreTestSup(IStoreTest):
             cf_super=True,
             namespace='n')
         return ds
+    
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.ds.clear_store()
+        self.ds.manager.shutdown()
 
 class CassandraSuperStoreRandomNameSpaceTest(IStoreTest):
 
