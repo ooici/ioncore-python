@@ -11,8 +11,6 @@
 import logging
 logging = logging.getLogger(__name__)
 
-from zope import interface
-
 from twisted.internet import defer
 
 from ion.data import store
@@ -20,8 +18,7 @@ from ion.data import dataobject
 from ion.data.datastore import objstore
 
 from ion.core import ioninit
-from ion.core import base_process
-from ion.core.base_process import ProtocolFactory, BaseProcess
+from ion.core.base_process import ProtocolFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.resources import coi_resource_descriptions
 import ion.util.procutils as pu
@@ -30,7 +27,7 @@ CONF = ioninit.config(__name__)
 
 class LCStateMixin(object):
     """
-    @Brief This mixin class is used to add life cycle state convience methods
+    @Brief This mixin class is used to add life cycle state convenience methods
     """
     def set_resource_lcstate_new(self, resource_reference):
         return self.set_resource_lcstate(resource_reference, dataobject.LCStates.new)
@@ -247,21 +244,6 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         defer.returnValue(results)
 
 
-
-@defer.inlineCallbacks
-def test(ns):
-    from ion.data import store
-    s = yield store.Store.create_store()
-    ns.update(locals())
-    reg = yield ResourceRegistry.new(s, 'registry')
-    res1 = dataobject.Resource.create_new_resource()
-    ns.update(locals())
-    res1.name = 'foo'
-    commit_id = yield reg.register_resource(res1)
-    res2 = dataobject.Resource.create_new_resource()
-    res2.name = 'doo'
-    commit_id = yield reg.register_resource(res2)
-    ns.update(locals())
 
 
 
