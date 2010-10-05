@@ -14,14 +14,14 @@ from twisted.internet import defer
 
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.data.datastore.datastore_service import DataStoreServiceClient
 
 from ion.resources import sa_resource_descriptions
 from ion.services.sa.instrument_registry import InstrumentRegistryClient
 from ion.services.sa.data_product_registry import DataProductRegistryClient
 
-class DataAcquisitionService(BaseService):
+class DataAcquisitionService(ServiceProcess):
     """
     Data acquisition service interface.
     Data acquisition is the service coordinating the acquisition of samples
@@ -29,7 +29,7 @@ class DataAcquisitionService(BaseService):
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='data_acquisition',
+    declare = ServiceProcess.service_declare(name='data_acquisition',
                                           version='0.1.0',
                                           dependencies=[])
 
@@ -59,7 +59,7 @@ class DataAcquisitionService(BaseService):
 
 
 
-class DataAcquisitionServiceClient(BaseServiceClient):
+class DataAcquisitionServiceClient(ServiceClient):
    """
    This is an exemplar service client that calls the Data acquisition service. It
    makes service calls RPC style.
@@ -67,7 +67,7 @@ class DataAcquisitionServiceClient(BaseServiceClient):
    def __init__(self, proc=None, **kwargs):
        if not 'targetname' in kwargs:
            kwargs['targetname'] = "data_acquisition"
-       BaseServiceClient.__init__(self, proc, **kwargs)
+       ServiceClient.__init__(self, proc, **kwargs)
    @defer.inlineCallbacks
    def acquire_block(self, text='Hi there'):
        yield self._check_init()

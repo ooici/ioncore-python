@@ -392,11 +392,11 @@ factory = ProcessFactory(PersisterConsumer)
 
 '''
 There is no client for a consumer...
-class PersisterClient(BaseServiceClient): # Not really needed - consumers don't have clients
+class PersisterClient(ServiceClient): # Not really needed - consumers don't have clients
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'persister'
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def persist_dap_dataset(self, dap_message):

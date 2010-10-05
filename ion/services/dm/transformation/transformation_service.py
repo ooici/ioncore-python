@@ -12,14 +12,14 @@ from twisted.internet import defer
 
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-class TransformationService(BaseService):
+class TransformationService(ServiceProcess):
     """Transformation service interface
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='transformation_service', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='transformation_service', version='0.1.0', dependencies=[])
 
     def op_transform(self, content, headers, msg):
         """Service operation: TBD
@@ -28,11 +28,11 @@ class TransformationService(BaseService):
 # Spawn of the process using the module name
 factory = ProcessFactory(TransformationService)
 
-class TransformationClient(BaseServiceClient):
+class TransformationClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'transformation_service'
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     def transform(self, object):
         '''

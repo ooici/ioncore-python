@@ -8,17 +8,17 @@
 import logging
 import ion.util.ionlog
 from ion.core.process.process import ProcessFactory
-from ion.services.base_service import BaseService
+from ion.core.process.service_process import ServiceProcess
 
 logserv = logging.getLogger('convRepos')
 log = ion.util.ionlog.getLogger(__name__)
 
-class ConversationRepositoryService(BaseService):
+class ConversationRepositoryService(ServiceProcess):
     """Conversation repository service interface
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='conversation_repository', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='conversation_repository', version='0.1.0', dependencies=[])
 
     def slc_init(self):
         pass

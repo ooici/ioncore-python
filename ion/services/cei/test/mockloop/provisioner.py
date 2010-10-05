@@ -10,7 +10,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.internet.task import LoopingCall
 
-from ion.services.base_service import BaseService
+from ion.core.process.service_process import ServiceProcess
 from ion.core.process import process
 from ion.core.process.process import ProcessFactory
 
@@ -22,12 +22,12 @@ STATES = {0:"requesting",
           5:"shutting-down",
           6:"terminated"}
 
-class MockLoopProvisionerService(BaseService):
+class MockLoopProvisionerService(ServiceProcess):
     """Provisioner service for "mockloop" setup
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='provisioner', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='provisioner', version='0.1.0', dependencies=[])
 
     def slc_init(self):
 

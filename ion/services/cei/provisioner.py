@@ -4,19 +4,19 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer #, reactor
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.process.process import ProcessFactory
 from ion.services.cei.provisioner_store import ProvisionerStore
 from ion.services.cei.provisioner_core import ProvisionerCore
 from ion.services.cei.dtrs import DeployableTypeRegistryClient
 from ion.services.cei import cei_events
 
-class ProvisionerService(BaseService):
+class ProvisionerService(ServiceProcess):
     """Provisioner service interface
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='provisioner', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='provisioner', version='0.1.0', dependencies=[])
 
     def slc_init(self):
         cei_events.event("provisioner", "init_begin", logging)
@@ -82,14 +82,14 @@ class ProvisionerService(BaseService):
         yield self.core.query_nodes(content)
 
 
-class ProvisionerClient(BaseServiceClient):
+class ProvisionerClient(ServiceClient):
     """
     Client for provisioning deployable types
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "provisioner"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def provision(self, launch_id, deployable_type, launch_description, vars=None):

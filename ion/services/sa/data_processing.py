@@ -12,14 +12,14 @@ from twisted.internet import defer
 
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-class DataProcessingService(BaseService):
+class DataProcessingService(ServiceProcess):
     """Data processing service interface
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='data_processing',
+    declare = ServiceProcess.service_declare(name='data_processing',
                                           version='0.1.0',
                                           dependencies=[])
 

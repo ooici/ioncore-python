@@ -20,7 +20,7 @@ from ion.data.datastore import objstore
 
 from ion.core import ioninit
 from ion.core.process.process import ProcessFactory, Process
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.resources import coi_resource_descriptions
 import ion.util.procutils as pu
 
@@ -255,7 +255,7 @@ def test(ns):
 
 
 
-class BaseRegistryService(BaseService):
+class BaseRegistryService(ServiceProcess):
     """
     @brief Base Registry Service Clase
     To create a Registry Service inherit this class and over ride the method
@@ -430,7 +430,7 @@ class RegistryService(BaseRegistryService):
     @brief Example Registry Service implementation using the base class
     """
      # Declaration of service
-    declare = BaseService.service_declare(name='registry_service', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='registry_service', version='0.1.0', dependencies=[])
 
     op_clear_registry = BaseRegistryService.base_clear_registry
     op_register_resource = BaseRegistryService.base_register_resource
@@ -444,7 +444,7 @@ class RegistryService(BaseRegistryService):
 factory = ProcessFactory(RegistryService)
 
 
-class BaseRegistryClient(BaseServiceClient):
+class BaseRegistryClient(ServiceClient):
     """
     @brief BaseRegistryClient is the base class used to simplify implementation
     of Registry Service Clients. The client for a particular registry should
@@ -613,7 +613,7 @@ class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "registry_service"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
 
     def clear_registry(self):

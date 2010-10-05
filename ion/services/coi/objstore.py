@@ -10,8 +10,8 @@ from zope import interface
 
 from twisted.internet import defer
 
-from ion.services import base_service
 from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.exception import ReceivedError
 from ion.data import store
 from ion.data.datastore import cas
@@ -64,14 +64,14 @@ class ObjectChassis(object):
         """
 
 
-class ObjectStoreService(base_service.BaseService):
+class ObjectStoreService(ServiceProcess):
     """
     The service end of Distributed ObjectStore that mediates between the message based
     interface and the actual implementation.
 
     """
 
-    declare = base_service.BaseService.service_declare(name='objstore', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='objstore', version='0.1.0', dependencies=[])
 
     @defer.inlineCallbacks
     def slc_init(self):
@@ -154,7 +154,7 @@ class ObjectStoreService(base_service.BaseService):
 
 
 
-class ObjectStoreClient(base_service.BaseServiceClient, cas.CAStore):
+class ObjectStoreClient(ServiceClient, cas.CAStore):
     """
     The client end of Distributed ObjectStore that presents the same
     interface as the actual ObjectStore.

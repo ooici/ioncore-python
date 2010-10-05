@@ -6,7 +6,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 from twisted.internet.task import LoopingCall
 
-from ion.services.base_service import BaseService
+from ion.core.process.service_process import ServiceProcess
 from ion.core.process.process import ProcessFactory
 from ion.core import bootstrap
 import ion.util.procutils as pu
@@ -14,11 +14,11 @@ from ion.services.cei.epucontroller import ControllerCore
 from ion.services.cei.provisioner import ProvisionerClient
 from ion.services.cei import cei_events
 
-class EPUControllerService(BaseService):
+class EPUControllerService(ServiceProcess):
     """EPU Controller service interface
     """
 
-    declare = BaseService.service_declare(name='epu_controller', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='epu_controller', version='0.1.0', dependencies=[])
 
     def slc_init(self):
         self.queue_name_work = self.get_scoped_name("system", self.spawn_args["queue_name_work"])

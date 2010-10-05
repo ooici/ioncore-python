@@ -12,14 +12,14 @@ from twisted.internet import defer
 
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-class PresentationService(BaseService):
+class PresentationService(ServiceProcess):
     """Presentation service interface
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='presentation_service', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='presentation_service', version='0.1.0', dependencies=[])
 
     def op_present_catalog(self, content, headers, msg):
         """Service operation: TBD
@@ -29,11 +29,11 @@ class PresentationService(BaseService):
 factory = ProcessFactory(PresentationService)
 
 
-class PresentationClient(BaseServiceClient):
+class PresentationClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'presentation_service'
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     def present_catalog(self, resources):
         '''

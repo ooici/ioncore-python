@@ -12,7 +12,7 @@ from twisted.internet import defer
 
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory, Process, ProcessClient
-#from ion.services.base_service import BaseService, BaseServiceClient
+#from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 class HelloProcess(Process):
     """

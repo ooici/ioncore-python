@@ -12,7 +12,7 @@ from twisted.internet import defer, reactor
 
 """
 from ion.data.dataobject import LCStates as LCS
-from ion.services.base_service import BaseService
+from ion.core.process.service_process import ServiceProcess
 """
 
 from twisted.internet.protocol import Protocol, ClientFactory, ClientCreator

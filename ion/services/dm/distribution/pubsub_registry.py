@@ -9,7 +9,7 @@
 
 #from ion.core import bootstrap
 from ion.core.process.process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.data.datastore import registry
 #from ion.data import store
@@ -22,7 +22,7 @@ class DataPubsubRegistryService(registry.BaseRegistryService):
     """
 
      # Declaration of service
-    declare = BaseService.service_declare(name='datapubsub_registry', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='datapubsub_registry', version='0.1.0', dependencies=[])
 
     op_clear_registry = registry.BaseRegistryService.base_clear_registry
     """
@@ -56,7 +56,7 @@ class DataPubsubRegistryClient(registry.BaseRegistryClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "datapubsub_registry"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
 
     def clear_registry(self):

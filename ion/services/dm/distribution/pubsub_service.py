@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from ion.core import bootstrap
 from ion.core.process.process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.resources import dm_resource_descriptions
 
@@ -33,13 +33,13 @@ from pydap.model import DatasetType
 from ion.services.dm.distribution import base_consumer
 
 
-class DataPubsubService(BaseService):
+class DataPubsubService(ServiceProcess):
     """
     @brief Service for Publication and Subscription to topics
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='data_pubsub',
+    declare = ServiceProcess.service_declare(name='data_pubsub',
                                           version='0.1.0',
                                           dependencies=[])
     @defer.inlineCallbacks
@@ -426,14 +426,14 @@ class DataPubsubService(BaseService):
         #topic_list = yield self.reg.find(topic_description,regex=True, attnames=['name','keywords','aoi'])
         return self.reg.find(topic_description,regex=True, attnames=['name','keywords','aoi'])
 
-class DataPubsubClient(BaseServiceClient):
+class DataPubsubClient(ServiceClient):
     """
     @brief Client class for accessing the data pubsub service.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "data_pubsub"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def define_topic(self, topic):

@@ -21,7 +21,6 @@ from ion.core import bootstrap
 from ion.core.messaging.receiver import Receiver
 from ion.core.process.process import Process, ProcessDesc
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
-from ion.services.base_service import BaseServiceClient
 
 from ion.services.dm.distribution import base_consumer
 from ion.services.dm.distribution.consumers import forwarding_consumer

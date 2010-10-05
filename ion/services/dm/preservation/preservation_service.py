@@ -13,18 +13,18 @@ from twisted.internet import defer
 
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.services.dm.preservation import preservation_registry
 
 from ion.resources import dm_resource_descriptions
 
-class PreservationService(BaseService):
+class PreservationService(ServiceProcess):
     """Preservation Service interface
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='preservation_service', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='preservation_service', version='0.1.0', dependencies=[])
 
     @defer.inlineCallbacks
     def slc_init(self):
@@ -87,11 +87,11 @@ class PreservationService(BaseService):
 factory = ProcessFactory(PreservationService)
 
 
-class PreservationClient(BaseServiceClient):
+class PreservationClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'preservation_service'
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     def create_archive(self, data_reg_resource):
         '''

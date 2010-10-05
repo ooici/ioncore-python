@@ -19,17 +19,17 @@ from twisted.internet import defer, task
 from twisted.web import xmlrpc
 
 from ion.core.process.process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 
-class HostStatusService(BaseService):
+class HostStatusService(ServiceProcess):
     """
     Host status interface
     """
 
 
     # Declaration of service
-    declare = BaseService.service_declare(
+    declare = ServiceProcess.service_declare(
         name='host_status',
         version='0.1.0',
         dependencies=[]
@@ -72,14 +72,14 @@ class HostStatusService(BaseService):
         yield self.reply_ok(msg)
 
 
-class HostStatusClient(BaseServiceClient):
+class HostStatusClient(ServiceClient):
     """
     Class for client to sent log message to service
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "host_status"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def logmsg(self, level, msg, sender, logtime):

@@ -12,15 +12,15 @@ from twisted.internet import defer
 
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-class StateRepositoryService(BaseService):
+class StateRepositoryService(ServiceProcess):
     """Repository for service state service interface. Service state is
     information shared between many processes.
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='state_repository', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='state_repository', version='0.1.0', dependencies=[])
 
     def op_define_state(self, content, headers, msg):
         """Service operation: Create a new state object (session) or update

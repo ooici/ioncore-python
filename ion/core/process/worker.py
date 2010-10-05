@@ -13,7 +13,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.process.process import Process, ProcessFactory
 from ion.core.messaging.receiver import Receiver, WorkerReceiver, FanoutReceiver
-from ion.services.base_service import BaseService
+from ion.core.process.service_process import ServiceProcess
 import ion.util.procutils as pu
 
 class WorkerProcess(Process):

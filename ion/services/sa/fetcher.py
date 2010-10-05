@@ -24,10 +24,10 @@ import simplejson as json
 
 from ion.core.process.process import ProcessFactory
 from ion.core.exception import ReceivedError
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.dm.util.url_manipulation import base_dap_url
 
-class FetcherService(BaseService):
+class FetcherService(ServiceProcess):
     """
     Fetcher, implemented as a service.
 
@@ -37,7 +37,7 @@ class FetcherService(BaseService):
     @note These are not class methods!
     """
     #log.info('Declaring fetcher...')
-    declare = BaseService.service_declare(name='fetcher',
+    declare = ServiceProcess.service_declare(name='fetcher',
                                           version='0.1.2',
                                           dependencies=[])
     """
@@ -205,7 +205,7 @@ class FetcherService(BaseService):
         yield self.reply_ok(msg, dmesg)
         log.debug('Send complete')
 
-class FetcherClient(BaseServiceClient):
+class FetcherClient(ServiceClient):
     """
     Client class for the fetcher.
     @note RPC style interactions
@@ -213,7 +213,7 @@ class FetcherClient(BaseServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "fetcher"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def get_head(self, requested_url):

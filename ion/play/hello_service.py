@@ -12,20 +12,20 @@ from twisted.internet import defer
 
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-class HelloService(BaseService):
+class HelloService(ServiceProcess):
     """
     Example service interface
     """
     # Declaration of service
-    declare = BaseService.service_declare(name='hello',
-                                          version='0.1.0',
-                                          dependencies=[])
+    declare = ServiceProcess.service_declare(name='hello',
+                                             version='0.1.0',
+                                             dependencies=[])
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
-        BaseService.__init__(self, *args, **kwargs)
+        ServiceProcess.__init__(self, *args, **kwargs)
         log.info('HelloService.__init__()')
 
     def slc_init(self):
@@ -40,7 +40,7 @@ class HelloService(BaseService):
         yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
 
 
-class HelloServiceClient(BaseServiceClient):
+class HelloServiceClient(ServiceClient):
     """
     This is an exemplar service client that calls the hello service. It
     makes service calls RPC style.
@@ -48,7 +48,7 @@ class HelloServiceClient(BaseServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "hello"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def hello(self, text='Hi there'):
