@@ -5,23 +5,6 @@
 
 from google.protobuf import message
 from google.protobuf.internal import containers
-  
-  
-"""  
-def _AddLinker():
-    
-    def Linker(self,wrapper):
-        
-        print 'Hello from Linker!'
-        wrapper._links.append(self)
-        idx = self.get_id()
-                
-        self._workspace[idx] = wrapper
-        setattr(self,'id',idx)
-        setattr(self,'type',wrapper._full_name)
-        
-    return Linker
-""" 
     
 class Wrapper(object):
     '''
@@ -120,6 +103,12 @@ class Wrapper(object):
         inst = cls(gpbMessage,self.read_only)
         return inst
 
+    def index(self):
+        """
+        Index the current state and its workspace and move a copy of the values
+        to the index
+        """
+
 
     def __getattribute__(self, key):
         
@@ -139,7 +128,7 @@ class Wrapper(object):
                 value = ContainerWrapper(self, value)
             elif isinstance(value, message.Message):
                 if value.DESCRIPTOR.full_name == self.LinkClassName:
-                    value = self._workspace[value.id]
+                    value = self._workspace.get(value.id, None)
                 else:
                     value = self.rewrap(value)
                 
@@ -171,19 +160,25 @@ class Wrapper(object):
                     # If it is a link - set a link to the value in the wrapper
                     if field.DESCRIPTOR.full_name == self.LinkClassName:
                         
-                        # add a reference to links in the value in the wrapper
-                        value._links.append(self)
+                        current = self._workspace.get(field.id,None)
+                        if current:
+                            current.CopyFrom(value)
+                            
+                        else:
                         
-                        # Get a new local identity for this new link
-                        idx = self.get_id()
-                        
-                        # add the value in the wrapper to the local workspace
-                        self._workspace[idx] = value
-                        
-                        # Set the type and id of the linked wrapper
-                        setattr(field,'id',idx)
-                        gpb_name = value._gpb_full_name
-                        setattr(field,'type',gpb_name)
+                            # add a reference to links in the value in the wrapper
+                            value._links.append(self)
+                            
+                            # Get a new local identity for this new link
+                            idx = self.get_id()
+                            
+                            # add the value in the wrapper to the local workspace
+                            self._workspace[idx] = value
+                            
+                            # Set the type and id of the linked wrapper
+                            setattr(field,'id',idx)
+                            gpb_name = value._gpb_full_name
+                            setattr(field,'type',gpb_name)
                     else:
                         #Over ride Protobufs - I want to be able to setdirectly
                         wrapped_field = self.rewrap(field)
