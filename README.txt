@@ -137,7 +137,7 @@ Change log:
 2010-10-04:
 - MASSIVE REFACTORING IN BASE CLASSES
 - Refactored the former magnet code into more object oriented style.
-- Requires Carrot 0.10.10. Carrot before does not handle all deferred
+- Requires Carrot 0.10.11. Carrot before does not handle all deferred
   operations correctly.
 - Refactored the Receiver use. There are now subclasses for Receivers that
   manage and declare the specific types of AMQP resources, such as worker and
@@ -145,7 +145,7 @@ Change log:
 - Refactoried the capability container classes.
 - Added a FSM based StateObject. Many manager/controller level objects now make
   use of states. States and operations INIT -> initialize() -> READY ->
-  activate() -> READY -> terminate() -> TERMINATED
+  activate() -> ACTIVE -> terminate() -> TERMINATED (and more, with errors)
 - BaseProcess (and subclasses), Receiver, ProcessDesc, Container etc are all
   BasicLifecyleObjects.
 - BaseProcess now waits to activate the receiver until in ACTIVE state. Before,
@@ -153,7 +153,9 @@ Change log:
 - Massively enhanced the capability container API. Delegated the actual
   implementation to manager classes: proc, exchange, app manager
 - Refactored the way processes are spawned. Refactored ProcessDesc to use the
-  new container API.
+  new container API. Processes are by default immediately initialized and
+  activated. The op_init message has been eliminated.
+- Renamed ProtocolFactory to ProcessFactory; changed in each process module
 - Message headers now contain status code for every message. 'OK is the default
   and 'ERROR' is set on error
 - BaseProcess.rpc_send now raises a ReceivedError in case the RPC comes back
