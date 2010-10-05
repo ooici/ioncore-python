@@ -43,7 +43,7 @@ class EPUWorkProducer(ServiceProcess):
                              "jobid":job.jobid,
                              "work_amount":job.length}
                 cei_events.event("workproducer", "job_sent",
-                                 logging, extra=extradict)
+                                 log, extra=extradict)
 
         except Queue.Empty:
             if self.queue_length == self.last_quelen_send:

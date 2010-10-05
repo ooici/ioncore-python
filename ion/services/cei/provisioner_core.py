@@ -331,7 +331,7 @@ class ProvisionerCore(object):
 
             extradict = {'public_ip': public_ip, 'iaas_id': iaas_node.id}
             cei_events.event("provisioner", "new_node",
-                             logging, extra=extradict)
+                             log, extra=extradict)
 
     @defer.inlineCallbacks
     def store_and_notify(self, records, subscribers, newstate=None):
@@ -411,7 +411,7 @@ class ProvisionerCore(object):
                                      'public_ip': public_ip,
                                      'private_ip': private_ip }
                         cei_events.event("provisioner", "node_started",
-                                         logging, extra=extradict)
+                                         log, extra=extradict)
 
                     launch = yield self.store.get_launch(node['launch_id'])
                     yield self.store_and_notify([node], launch['subscribers'])

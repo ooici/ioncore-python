@@ -19,13 +19,13 @@ class ProvisionerService(ServiceProcess):
     declare = ServiceProcess.service_declare(name='provisioner', version='0.1.0', dependencies=[])
 
     def slc_init(self):
-        cei_events.event("provisioner", "init_begin", logging)
+        cei_events.event("provisioner", "init_begin", log)
         self.store = ProvisionerStore()
         notifier = self.spawn_args.get('notifier')
         self.notifier = notifier or ProvisionerNotifier(self)
         self.dtrs = DeployableTypeRegistryClient(self)
         self.core = ProvisionerCore(self.store, self.notifier, self.dtrs)
-        cei_events.event("provisioner", "init_end", logging)
+        cei_events.event("provisioner", "init_end", log)
 
     @defer.inlineCallbacks
     def op_provision(self, content, headers, msg):
