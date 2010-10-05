@@ -54,7 +54,11 @@ class IonTestCase(unittest.TestCase):
         mopt['boot_script'] = None
         mopt['script'] = None
 
-        self.container = container.create_new_container()
+        # Little trick to have no consecutive failures if previous setUp() failed
+        if Container._started:
+            log.error("PROBLEM: Previous test did not stop container. Fixing...")
+            yield self._stop_container()
+
         yield self.container.initialize(mopt)
         yield self.container.activate()
 

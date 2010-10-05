@@ -150,6 +150,7 @@ Change log:
   manage and declare the specific types of AMQP resources, such as worker and
   fanout. No more declare_messaging necessary.
 - Refactored the former magnet code into more object oriented style.
+- Requires Carrot 0.10.10
 - Message headers now contain status code for every message. 'OK is the default
   and 'ERROR' is set on error
 - Changed reply_ok and reply_err: a dict content value will not be modified

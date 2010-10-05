@@ -14,6 +14,7 @@ from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
 from ion.data.dataobject import ResourceReference
 from ion.core.base_process import BaseProcess, BaseProcessClient
+from ion.core.exception import ReceivedError
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 
 """
@@ -93,6 +94,8 @@ class InstrumentDriverClient(BaseProcessClient):
         (content, headers, message) = yield self.rpc_send('fetch_params',
                                                           param_list)
         assert(isinstance(content, dict))
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -107,6 +110,8 @@ class InstrumentDriverClient(BaseProcessClient):
         (content, headers, message) = yield self.rpc_send('set_params',
                                                           param_dict)
         assert(isinstance(content, dict))
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -122,6 +127,8 @@ class InstrumentDriverClient(BaseProcessClient):
         assert(isinstance(command, (list, tuple)))
         (content, headers, message) = yield self.rpc_send('execute',
                                                           command)
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -132,6 +139,8 @@ class InstrumentDriverClient(BaseProcessClient):
         @retval Result message of some sort
         """
         (content, headers, message) = yield self.rpc_send('get_status', arg)
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -146,6 +155,8 @@ class InstrumentDriverClient(BaseProcessClient):
         assert(isinstance(config_vals, dict))
         (content, headers, message) = yield self.rpc_send('configure_driver',
                                                           config_vals)
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -159,6 +170,8 @@ class InstrumentDriverClient(BaseProcessClient):
         log.debug("DHE: in initialize!")
         (content, headers, message) = yield self.rpc_send('initialize',
                                                           arg)
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -172,6 +185,8 @@ class InstrumentDriverClient(BaseProcessClient):
         log.debug("DHE: in disconnect!")
         (content, headers, message) = yield self.rpc_send('disconnect',
                                                           command)
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
 
@@ -396,6 +411,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         (content, headers, message) = yield self.rpc_send('get_from_instrument',
                                                           paramList)
         assert(isinstance(content, dict))
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -409,6 +426,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         (content, headers, message) = yield self.rpc_send('get_from_CI',
                                                           paramList)
         assert(isinstance(content, dict))
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -424,6 +443,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         (content, headers, message) = yield self.rpc_send('set_to_instrument',
                                                           paramDict)
         assert(isinstance(content, dict))
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -439,6 +460,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         (content, headers, message) = yield self.rpc_send('set_to_CI',
                                                           paramDict)
         assert(isinstance(content, dict))
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -449,6 +472,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         assert(isinstance(argList, list))
         (content, headers, message) = yield self.rpc_send('disconnect',
                                                               argList)
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         assert(isinstance(content, dict))
         defer.returnValue(content)
 
@@ -470,6 +495,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         assert(isinstance(command, list))
         (content, headers, message) = yield self.rpc_send('execute_instrument',
                                                           command)
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     def execute_CI(self, command):
@@ -489,6 +516,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         assert(isinstance(command, list))
         (content, headers, message) = yield self.rpc_send('execute_CI',
                                                           command)
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         assert(isinstance(content, dict))
         defer.returnValue(content)
 
@@ -501,6 +530,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         assert(isinstance(argList, list))
         (content, headers, message) = yield self.rpc_send('get_status',
                                                               argList)
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -513,6 +544,9 @@ class InstrumentAgentClient(ResourceAgentClient):
         """
         (content, headers, message) = yield self.rpc_send('get_capabilities',
                                                           ())
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
+
         assert(isinstance(content, dict))
         assert(ci_commands in content.keys())
         assert(ci_parameters in content.keys())
@@ -541,6 +575,8 @@ class InstrumentAgentClient(ResourceAgentClient):
             and puts it into the repository ready format
         """
         (content, headers, message) = yield self.rpc_send('get_translator', ())
+        if headers['status'] == 'ERROR':
+            raise ReceivedError(headers, content)
         #assert(inspect.isroutine(content))
         defer.returnValue(content)
 
