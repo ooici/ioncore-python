@@ -5,12 +5,29 @@
 
 from google.protobuf import message
 from google.protobuf.internal import containers
+  
+  
+"""  
+def _AddLinker():
+    
+    def Linker(self,wrapper):
+        
+        print 'Hello from Linker!'
+        wrapper._links.append(self)
+        idx = self.get_id()
+                
+        self._workspace[idx] = wrapper
+        setattr(self,'id',idx)
+        setattr(self,'type',wrapper._full_name)
+        
+    return Linker
+""" 
     
 class Wrapper(object):
     '''
     A Wrapper class for intercepting access to protocol buffers message fields.
     For instance, in the example below I can create a wrapper which is
-    read-only*.
+    read-only.
     
     To make the wrapper general - apply to more than one kind of protobuffer -
     we can not use descriptors (properties) to transparently intercept a get or
@@ -33,25 +50,58 @@ class Wrapper(object):
     
     Below that are all of the methods of protobuffers exposed by the wrapper.
     
+    TODO:
+    Fix read only or get rid of it? do we need it?
+    
     '''
     
-    
+    LinkClassName = 'tutorial.Link'
     
     def __init__(self, gpbMessage, read_only=False):
+        """
+        Initialize the Wrapper class and set up it message type.
         
+        """
         # Set list of fields empty for now... so that we can use getter/setters
         object.__setattr__(self,'_gpbFields',[])
         object.__setattr__(self,'read_only', read_only)
         
-        # Set the 
+        # Set the deligated message and it machinary
         assert isinstance(gpbMessage, message.Message)
-        
         self._gpbMessage = gpbMessage
         self._GPBClass = gpbMessage.__class__
         field_names = self._GPBClass.DESCRIPTOR.fields_by_name.keys()
+        self._gpb_full_name = gpbMessage.DESCRIPTOR.full_name
         
-        # Now set the fields to preempt!
+        self._obj_cntr=0
+        """
+        A counter object used by this class to identify content objects untill
+        they are indexed
+        """
+        
+        self._workspace = {}
+        """
+        A dictionary containing objects which are not yet indexed, linked by a
+        counter refrence in the current workspace
+        """
+        
+        self._index = {}
+        """
+        A dictionary containing the objects which are already indexed by content
+        hash
+        """
+        
+        self._links=[]
+        """
+        A list of all the wrappers which link to me
+        """
+        
+        
+        # Now set the fields from that GPB to preempt getter/setter!
         object.__setattr__(self,'_gpbFields',field_names)
+
+
+    
 
     @classmethod
     def wrap(cls,gpbMessage,read_only=False):
@@ -77,16 +127,21 @@ class Wrapper(object):
         # careful about how we use it!
         gpbfields = object.__getattribute__(self,'_gpbFields')
         
+        
         if key in gpbfields:
+            print '__getattribute__: self, key:', object.__getattribute__(self,'_gpb_full_name'), key
             gpb = object.__getattribute__(self,'_gpbMessage')
             value = getattr(gpb,key)
 
-            print 'Value', value, type(value), hasattr(value,'__iter__')
-            
+            #print 'Value', value, type(value), hasattr(value,'__iter__')
+                        
             if isinstance(value, containers.RepeatedCompositeFieldContainer):
-                value = ContainerWrapper(value)
+                value = ContainerWrapper(self, value)
             elif isinstance(value, message.Message):
-                value = self.rewrap(value)
+                if value.DESCRIPTOR.full_name == self.LinkClassName:
+                    value = self._workspace[value.id]
+                else:
+                    value = self.rewrap(value)
                 
         else:
             value = object.__getattribute__(self, key)
@@ -96,14 +151,56 @@ class Wrapper(object):
 
         gpbfields = object.__getattribute__(self,'_gpbFields')
         read_only = object.__getattribute__(self,'read_only')
+        
         if key in gpbfields:
+            print '__setattr__: self, key, value:', self._gpb_full_name, key, value
+
             if read_only:
                 raise AttributeError, 'This object wrapper is read only!'
             
             gpb = object.__getattribute__(self,'_gpbMessage')
-            setattr(gpb, key, value)
+            
+            # If the value we are setting is a Wrapper Object
+            if isinstance(value, Wrapper):
+                
+                #Examin the field we are trying to set 
+                field = getattr(gpb,key)
+                # Make sure it is a GPBMessage
+                if isinstance(field, message.Message):
+                    
+                    # If it is a link - set a link to the value in the wrapper
+                    if field.DESCRIPTOR.full_name == self.LinkClassName:
+                        
+                        # add a reference to links in the value in the wrapper
+                        value._links.append(self)
+                        
+                        # Get a new local identity for this new link
+                        idx = self.get_id()
+                        
+                        # add the value in the wrapper to the local workspace
+                        self._workspace[idx] = value
+                        
+                        # Set the type and id of the linked wrapper
+                        setattr(field,'id',idx)
+                        gpb_name = value._gpb_full_name
+                        setattr(field,'type',gpb_name)
+                    else:
+                        #Over ride Protobufs - I want to be able to setdirectly
+                        wrapped_field = self.rewrap(field)
+                        wrapped_field.CopyFrom(value)
+                else:
+                    raise AttributeError, 'Can not set invalid types!'
+                        
+            else:
+                setattr(gpb, key, value)
         else:
             v = object.__setattr__(self, key, value)
+    
+    def get_id(self):
+        self._obj_cntr += 1
+        return str(self._obj_cntr)
+    
+    
     
     def __eq__(self, other):
         if not isinstance(other, Wrapper):
@@ -136,9 +233,12 @@ class Wrapper(object):
         assert isinstance(other, Wrapper), \
             'MergeFrom can only be performed on another Wrapper Object'
         
+        assert self._gpb_full_name == other._gpb_full_name, \
+            'MergeFrom can only operate on two wrapped objects of the same type'
+        
         # There does not seem to be any way to check if these are mergable?
         # What happens if they are not the same kind of GPB Message?
-        self._gpbMessage.MergeFrom(other._gbpMessage)
+        self._gpbMessage.MergeFrom(other._gpbMessage)
     
     def CopyFrom(self, other_msg):
         """Copies the content of the specified message into the current message.
@@ -281,13 +381,32 @@ w._gpbMessage.person[0].name
 '''
     
 class ContainerWrapper(object):
+    """
+    This class is only for use with containers.RepeatedCompositeFieldContainer
+    It is not needed for repeated scalars!
+    """
     
-    def __init__(self,gpbcontainer):
+    
+    def __init__(self, wrapper, gpbcontainer):
+        # Be careful - this is a hard link
+        self._wrapper = wrapper
+        assert isinstance(gpbcontainer, containers.RepeatedCompositeFieldContainer), \
+            'The Container Wrapper is only for use with Repeated Composit Field Containers'
         self._gpbcontainer = gpbcontainer
     
+    def __setitem__(self, key, value):
+        """Sets the item on the specified position."""
+        assert isinstance(value, Wrapper), \
+            'To set an item, the value must be a Wrapper'
+        item = self.__getitem__(key)
+        print 'item',item, type(item)
+        print 'value',value
+        item.CopyFrom(value)
+        
+            
     def __getitem__(self, key):
         """Retrieves item by the specified key."""
-        return Wrapper.wrap(self._gpbcontainer[key])
+        return self._wrapper.rewrap(self._gpbcontainer[key])
     
     def __len__(self):
         """Returns the number of elements in the container."""
@@ -308,13 +427,15 @@ class ContainerWrapper(object):
         return self._gpbcontainer == other._gpbcontainer
 
     def __repr__(self):
+        """Need to improve this!"""
         return self._gpbcontainer.__repr__()
         
         
     # Composite specific methods:
     def add(self):
+        
         new_element = self._gpbcontainer.add()
-        return Wrapper.wrap(new_element)
+        return self._wrapper.rewrap(new_element)
         
     def MergeFrom(self, other):
         """Appends the contents of another repeated field of the same type to this
@@ -326,7 +447,11 @@ class ContainerWrapper(object):
     
     def __getslice__(self, start, stop):
         """Retrieves the subset of items from between the specified indices."""
-        return self._gpbcontainer.__getslice__(start, stop)
+        gpbs = self._gpbcontainer.__getslice__(start, stop)
+        wrapper_list=[]
+        for item in gpbs:
+            wrapper_list.append(self._wrapper.rewrap(item))
+        return wrapper_list
     
     def __delitem__(self, key):
         """Deletes the item at the specified position."""

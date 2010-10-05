@@ -24,19 +24,25 @@ message Person {
   repeated PhoneNumber phone = 4;
 }
 
-// Our address book file is just one of these.
-message AddressBook {
-  repeated Person person = 1;
-}
-
-
 message Link{
     required string id = 1;
     required string type = 2;
 }
 
+// Our address book file is just one of these.
+message AddressBook {
+  repeated Person person = 1;
+}
+
+// Our address book file is just one of these.
+message AddressLink {
+  repeated Link person = 1;
+}
+
+
 message Structure{
     optional Link alink = 1;
     repeated Link links = 2;
+    optional AddressBook abook = 4;
     required int32 id = 3;
 }
