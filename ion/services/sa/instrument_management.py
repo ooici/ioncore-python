@@ -323,10 +323,7 @@ class InstrumentManagementClient(BaseServiceClient):
         reqcont['userInput'] = userInput
 
         (cont, hdrs, msg) = yield self.rpc_send('create_new_instrument', reqcont)
-        if cont.get('status') == 'OK':
-            defer.returnValue(DataObject.decode(cont['value']))
-        else:
-            defer.returnValue(None)
+        defer.returnValue(DataObject.decode(cont['value']))
 
     @defer.inlineCallbacks
     def create_new_data_product(self, dataProductInput):
@@ -334,10 +331,7 @@ class InstrumentManagementClient(BaseServiceClient):
         reqcont['dataProductInput'] = dataProductInput
 
         (cont, hdrs, msg) = yield self.rpc_send('create_new_data_product', reqcont)
-        if cont.get('status') == 'OK':
-            defer.returnValue(DataObject.decode(cont['value']))
-        else:
-            defer.returnValue(None)
+        defer.returnValue(DataObject.decode(cont['value']))
 
     @defer.inlineCallbacks
     def start_instrument_agent(self, instrumentID, model):
@@ -384,10 +378,7 @@ class InstrumentManagementClient(BaseServiceClient):
     @defer.inlineCallbacks
     def _base_command(self, op, content):
         (cont, hdrs, msg) = yield self.rpc_send(op, content)
-        if cont.get('status') == 'OK':
-            defer.returnValue(cont)
-        else:
-            defer.returnValue(None)
+        defer.returnValue(cont)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(InstrumentManagementService)

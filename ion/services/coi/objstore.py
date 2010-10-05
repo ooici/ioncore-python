@@ -10,8 +10,9 @@ from zope import interface
 
 from twisted.internet import defer
 
-from ion.services import base_service 
+from ion.services import base_service
 from ion.core import base_process
+from ion.core.exception import ReceivedError
 from ion.data import store
 from ion.data.datastore import cas
 from ion.data.datastore import objstore
@@ -28,7 +29,7 @@ class Serializer(object):
         """
         @brief Operates on encoded sendable objects
         """
-        return  
+        return
 
 class ObjectChassis(object):
     """
@@ -39,17 +40,17 @@ class ObjectChassis(object):
     The chassis presents the revision control functional interface.
     The chassis provides access to the data of any storable data object.
 
-        This interface relies solely on object/cas store interface methods. 
+        This interface relies solely on object/cas store interface methods.
         This means that all information stored/retrieved from the backend
         IStore should be apart of the standard DataObject, or be part of
         another meta model.
 
-    
+
 
     The object chassis is the working version of any data object. Data
     object content is always extracted from the data store via it's commit
     object. In this way, the context of a data object (wrt
-    history/ancestry change) is always determinable. 
+    history/ancestry change) is always determinable.
 
     """
 
@@ -70,12 +71,12 @@ class ObjectStoreService(base_service.BaseService):
 
     """
 
-    declare = base_service.BaseService.service_declare(name='objstore', version='0.1.0', dependencies=[]) 
+    declare = base_service.BaseService.service_declare(name='objstore', version='0.1.0', dependencies=[])
 
     @defer.inlineCallbacks
     def slc_init(self):
         """
-        @brief setup creation of ObjectStore instance 
+        @brief setup creation of ObjectStore instance
         decide on which backend to use based on option
 
         It would be nice to separate the existence/creation of the
@@ -86,7 +87,7 @@ class ObjectStoreService(base_service.BaseService):
         question, how is that connection managed?
         """
         # Need to make this an option:
-        # IStore interface to local persistent store. 
+        # IStore interface to local persistent store.
         backend = yield store.Store.create_store()
         self.objstore = yield objstore.ObjectStore(backend)
 
@@ -115,7 +116,7 @@ class ObjectStoreService(base_service.BaseService):
         @note A data object id is a topic that can be subscribed
         to/conversation. There needs to be a way to enforce an affinity
         (with in some messaging domain) between object operations and
-        IObjectStore service process instances. 
+        IObjectStore service process instances.
         """
 
     @defer.inlineCallbacks
@@ -123,7 +124,7 @@ class ObjectStoreService(base_service.BaseService):
         """
         @brief The content should be a 'cas content' id
         @note The backend decodes right before we re-encode. Is this
-        necessary? 
+        necessary?
         Ans: cas.BaseObject has a cache for this encoding step
         """
         id = content
@@ -146,7 +147,7 @@ class ObjectStoreService(base_service.BaseService):
             id_local = yield self.objstore.put(obj)
             if not id == id_local:
                 yield self.reply_err(msg, 'Content inconsistency')
-            yield self.reply_ok(msg, id) 
+            yield self.reply_ok(msg, id)
         except cas.CAStoreError, e:
             yield self.reply_err(msg, e)
 
@@ -192,11 +193,8 @@ class ObjectStoreClient(base_service.BaseServiceClient, cas.CAStore):
         encoded_baseClass = dataobject.DEncoder().encode(baseClass())
 
         (content, headers, msg) = yield self.rpc_send('create', [name, encoded_baseClass])
-        if content['status'] == 'OK':
-            obj = content['value']
-            defer.returnValue(obj)
-        else:
-            defer.returnValue(None) #what to return?
+        obj = content['value']
+        defer.returnValue(obj)
 
 
     @defer.inlineCallbacks
@@ -209,14 +207,9 @@ class ObjectStoreClient(base_service.BaseServiceClient, cas.CAStore):
         @todo Change name to id.
         """
         (content, headers, msg) = yield self.rpc_send('clone', name)
-        if content['status'] == 'OK':
-            obj = content['value']
-            defer.returnValue(obj)
-        else:
-            defer.returnValue(None) #what to return?
+        obj = content['value']
+        defer.returnValue(obj)
 
-        
-        
 
     def get(self, id):
         """
@@ -234,19 +227,18 @@ class ObjectStoreClient(base_service.BaseServiceClient, cas.CAStore):
         """
         """
         data = content['value'] # This should not be content['value']
-        if content['status'] == 'OK':
-            """@todo make 'ok' a bool instead
-            """
-            obj = self.decode(data)
-            if not id == cas.sha1(obj, bin=False):
-                raise cas.CAStoreError("Object Integrity Error!")
-            return obj
-        else:
-            """@todo should check for not found in store error
-            """
-            raise cas.CAStoreError("Client Error")
+        """@todo make 'ok' a bool instead
+        """
+        obj = self.decode(data)
+        if not id == cas.sha1(obj, bin=False):
+            raise cas.CAStoreError("Object Integrity Error!")
+        return obj
 
     def _get_errback(self, reason):
+        try:
+            reason.raiseException()
+        except ReceivedError, re:
+            raise cas.CAStoreError("not found")
         return reason
 
     def put(self, obj):
@@ -270,5 +262,3 @@ class ObjectStoreClient(base_service.BaseServiceClient, cas.CAStore):
         return id
 
 factory = base_process.ProcessFactory(ObjectStoreService)
-
-

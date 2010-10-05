@@ -153,6 +153,8 @@ Change log:
 - Requires Carrot 0.10.10
 - Message headers now contain status code for every message. 'OK is the default
   and 'ERROR' is set on error
+- BaseProcess.rpc_send now raises a ReceivedError in case the RPC comes back
+  with status='ERROR'
 - Changed reply_ok and reply_err: a dict content value will not be modified
 - Fixed imports and tests throughout the code base
 

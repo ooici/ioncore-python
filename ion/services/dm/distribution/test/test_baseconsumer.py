@@ -15,6 +15,7 @@ from twisted.trial import unittest
 
 from ion.core.base_process import ProcessFactory
 from ion.core import bootstrap
+from ion.core.exception import ReceivedError
 #from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
@@ -94,8 +95,11 @@ class BaseConsumerTest(IonTestCase):
         #self.assertEqual(child.proc_attached,self.queue1)
 
 
-        res = yield child1.attach(None)
-        self.assertEqual(res,'ERROR')
+        try:
+            res = yield child1.attach(None)
+            self.fail("ReceivedError expected")
+        except ReceivedError, re:
+            pass
         #self.assertEqual(child.proc_attached,None)
 
         yield child1.shutdown()

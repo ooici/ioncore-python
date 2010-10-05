@@ -18,6 +18,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 from ion.core.base_process import BaseProcess, ProcessDesc, ProcessFactory
 from ion.core.cc.container import Container
+from ion.core.exception import ReceivedError
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.id import Id
 from ion.test.iontest import IonTestCase, ReceiverProcess
@@ -178,9 +179,11 @@ class BaseProcessTest(IonTestCase):
         child1 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
         pid1 = yield self.test_sup.spawn_child(child1)
 
-        (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echofail2','content123')
-        self.assertEquals(hdrs['status'], 'ERROR')
-        log.info('Process 1 responded to error correctly')
+        try:
+            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echofail2','content123')
+            self.fail("ReceivedError expected")
+        except ReceivedError, re:
+            log.info('Process 1 responded to error correctly')
 
     @defer.inlineCallbacks
     def test_send_byte_string(self):

@@ -131,6 +131,8 @@ class ServiceRegistryClient(registry.BaseRegistryClient):
 
 
     def describe_service(self,service_class):
+        if type(service_class) is str:
+            service_class = pu.get_class(service_class)
 
         assert issubclass(service_class, BaseService)
 
@@ -204,7 +206,7 @@ class ServiceRegistryClient(registry.BaseRegistryClient):
         # is also used to look for an existing description
         service_resource = coi_resource_descriptions.ServiceInstance()
 
-        service_class = getattr(service_instance.proc_mod_obj,service_instance.proc_class)
+        service_class = service_instance.proc_class
 
         sd = yield self.register_service_definition(service_class)
         service_resource.description = sd.reference(head=True)
@@ -212,7 +214,7 @@ class ServiceRegistryClient(registry.BaseRegistryClient):
 
         if service_instance.proc_node:
             service_resource.proc_node = service_instance.proc_node
-        service_resource.proc_id = str(service_instance.id)
+        service_resource.proc_id = service_instance.proc_id
         service_resource.proc_name = service_instance.proc_name
         if service_instance.spawn_args:
             service_resource.spawn_args = service_instance.spawn_args

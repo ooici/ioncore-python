@@ -14,6 +14,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.id import Id
 from ion.core import ioninit
+from ion.core.exception import ReceivedError
 from ion.core.messaging.receiver import ProcessReceiver
 from ion.core.process.process import IProcess, ProcessDesc, ProcessFactory
 from ion.core.process.process import ProcessInstantiator
@@ -285,22 +286,20 @@ class BaseProcess(BasicLifecycleObject):
         d = self.rpc_conv.pop(payload['conv-id'])
         content = payload.get('content', None)
         res = (content, payload, msg)
-        if type(content) is dict and payload.get('status',None) == 'OK':
-            pass
-        elif type(content) is dict and payload.get('status',None) == 'ERROR':
-            log.warn('RPC reply is an ERROR: '+str(content.get('value',None)))
-        else:
+        if not type(content) is dict:
             log.error('RPC reply is not well formed. Use reply_ok or reply_err')
         # @todo is it OK to ack the response at this point already?
         d1 = msg.ack()
-        if d1:
-            d1.addCallback(lambda res1: d.callback(res))
-            d1.addErrback(lambda c: d.errback(c))
-            return d1
+        if payload.get('status','OK') == 'ERROR':
+            def _cb(result):
+                log.warn('RPC reply is an ERROR: '+str(content.get('value',None)))
+                raise ReceivedError(payload, content)
+            d1.addCallback(_cb)
         else:
-            # Support for older carrot version where ack did not return deferred
-            d.callback(res)
-            return d
+            d1.addCallback(lambda res1: d.callback(res))
+        d1.addErrback(lambda c: d.errback(c))
+        return d1
+
 
     def _receive_msg(self, payload, msg):
         """

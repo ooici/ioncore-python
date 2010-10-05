@@ -16,7 +16,7 @@ from ion.core import base_process, bootstrap, ioninit
 from ion.core import ioninit
 from ion.core.base_process import BaseProcess
 from ion.core.cc import container
-from ion.core.cc.container import Id
+from ion.core.cc.container import Id, Container
 from ion.core.process.process import IProcess
 from ion.data.store import Store
 import ion.util.procutils as pu
@@ -59,6 +59,7 @@ class IonTestCase(unittest.TestCase):
             log.error("PROBLEM: Previous test did not stop container. Fixing...")
             yield self._stop_container()
 
+        self.container = container.create_new_container()
         yield self.container.initialize(mopt)
         yield self.container.activate()
 

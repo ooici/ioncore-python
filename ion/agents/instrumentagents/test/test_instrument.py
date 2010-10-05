@@ -118,6 +118,7 @@ class TestInstrumentAgent(IonTestCase):
             try:
                 response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
                                                     'badvalue': 1})
+                self.fail("ReceivedError expected")
             except ReceivedError, re:
                 pass
 
@@ -183,20 +184,19 @@ class TestInstrumentAgent(IonTestCase):
                                                                ['stop']])
             print "response ", response
             self.assert_(isinstance(response, dict))
-            self.assert_('status' in response.keys())
-            self.assertEqual(response['status'], 'OK')
             self.assert_('start' in response['value'])
             self.assert_('stop' in response['value'])
-            self.assert_(response['status'] == 'OK')
 
             try:
                 response = yield self.IAClient.execute_instrument([['badcommand',
                                                                 'now','1']])
+                self.fail("ReceivedError expected")
             except ReceivedError, re:
                 pass
 
             try:
                 response = yield self.IAClient.execute_instrument([])
+                self.fail("ReceivedError expected")
             except ReceivedError, re:
                 pass
 
@@ -227,7 +227,6 @@ class TestInstrumentAgent(IonTestCase):
         """
         response = yield self.IAClient.get_status(['some_arg'])
         self.assert_(isinstance(response, dict))
-        self.assertEqual(response['status'], "OK")
         self.assertEqual(response['value'], 'a-ok')
 
     @defer.inlineCallbacks

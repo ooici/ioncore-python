@@ -107,8 +107,6 @@ class ProcessDesc(BasicLifecycleObject):
         @retval Deferred
         """
         headers = yield self.container.terminate_process(parent=self.sup_process, pid=self.proc_id)
-        if not headers.get('status','ERROR') == 'OK':
-            self.error('shutdown', headers)
 
     def on_error(self, cause=None, *args, **kwargs):
         if cause:

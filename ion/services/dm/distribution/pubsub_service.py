@@ -451,13 +451,12 @@ class DataPubsubClient(BaseServiceClient):
                                             topic.encode())
         log.debug(self.__class__.__name__ + ': define_topic; Result:' + str(headers))
 
-        if content['status']=='OK':
-            topic = dataobject.Resource.decode(content['value'])
-            log.info(self.__class__.__name__ + '; define_topic: Success!')
-            defer.returnValue(topic)
-        else:
-            log.info(self.__class__.__name__ + '; define_topic: Failed!')
-            defer.returnValue(None)
+        topic = dataobject.Resource.decode(content['value'])
+        log.info(self.__class__.__name__ + '; define_topic: Success!')
+        defer.returnValue(topic)
+        #else:
+        #    log.info(self.__class__.__name__ + '; define_topic: Failed!')
+        #    defer.returnValue(None)
 
 
     @defer.inlineCallbacks
@@ -475,13 +474,12 @@ class DataPubsubClient(BaseServiceClient):
                                             publisher.encode())
         log.debug(self.__class__.__name__ + ': define_publisher; Result:' + str(headers))
 
-        if content['status']=='OK':
-            log.info(self.__class__.__name__ + '; define_publisher: Success!')
-            publisher = dataobject.Resource.decode(content['value'])
-            defer.returnValue(publisher)
-        else:
-            log.info(self.__class__.__name__ + '; define_publisher: Failed!')
-            defer.returnValue(None)
+        log.info(self.__class__.__name__ + '; define_publisher: Success!')
+        publisher = dataobject.Resource.decode(content['value'])
+        defer.returnValue(publisher)
+        #else:
+        #    log.info(self.__class__.__name__ + '; define_publisher: Failed!')
+        #    defer.returnValue(None)
 
 
     @defer.inlineCallbacks
@@ -524,12 +522,11 @@ class DataPubsubClient(BaseServiceClient):
                                             publication.encode())
         log.debug(self.__class__.__name__ + ': publish; Result:' + str(headers))
 
-        if content['status']=='OK':
-            log.info(self.__class__.__name__ + '; publish: Success!')
-            defer.returnValue('sent')
-        else:
-            log.info(self.__class__.__name__ + '; publish: Failed!')
-            defer.returnValue('error sending message!')
+        log.info(self.__class__.__name__ + '; publish: Success!')
+        defer.returnValue('sent')
+        #else:
+        #    log.info(self.__class__.__name__ + '; publish: Failed!')
+        #    defer.returnValue('error sending message!')
 
 
     @defer.inlineCallbacks
@@ -547,13 +544,12 @@ class DataPubsubClient(BaseServiceClient):
                                             subscription.encode())
         log.debug(self.__class__.__name__ + ': define_subscription; Result:' + str(headers))
 
-        if content['status']=='OK':
-            log.info(self.__class__.__name__ + '; define_subscription: Success!')
-            subscription = dataobject.Resource.decode(content['value'])
-            defer.returnValue(subscription)
-        else:
-            log.info(self.__class__.__name__ + '; define_subscription: Failed!')
-            defer.returnValue(None)
+        log.info(self.__class__.__name__ + '; define_subscription: Success!')
+        subscription = dataobject.Resource.decode(content['value'])
+        defer.returnValue(subscription)
+        #else:
+        #    log.info(self.__class__.__name__ + '; define_subscription: Failed!')
+        #    defer.returnValue(None)
 
 # Spawn off the process using the module name
 factory = ProcessFactory(DataPubsubService)

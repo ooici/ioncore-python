@@ -23,6 +23,7 @@ import urlparse
 import simplejson as json
 
 from ion.core.base_process import ProcessFactory
+from ion.core.exception import ReceivedError
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.util.url_manipulation import base_dap_url
 
@@ -222,9 +223,10 @@ class FetcherClient(BaseServiceClient):
         yield self._check_init()
 
         log.info('Sending HEAD request to fetcher...')
-        (content, headers, msg) = yield self.rpc_send('get_head', requested_url)
-        if 'ERROR' in headers:
-            raise ValueError('Error on URL: ' + content['failure'])
+        try:
+            (content, headers, msg) = yield self.rpc_send('get_head', requested_url)
+        except ReceivedError, re:
+            raise ValueError('Error on URL: ' + re.msg_content['value'])
         defer.returnValue(content)
 
 
@@ -238,9 +240,10 @@ class FetcherClient(BaseServiceClient):
         yield self._check_init()
 
         log.info('Sending request')
-        (content, headers, msg) = yield self.rpc_send('get_url', requested_url)
-        if 'ERROR' in headers:
-            raise ValueError('Error on URL: ' + content['failure'])
+        try:
+            (content, headers, msg) = yield self.rpc_send('get_url', requested_url)
+        except ReceivedError, re:
+            raise ValueError('Error on URL: ' + re.msg_content['value'])
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -249,9 +252,10 @@ class FetcherClient(BaseServiceClient):
         Pull an entire dataset.
         """
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('get_dap_dataset', requested_url)
-        if 'ERROR' in headers:
-            raise ValueError('Error on URL: ' + content['failure'])
+        try:
+            (content, headers, msg) = yield self.rpc_send('get_dap_dataset', requested_url)
+        except ReceivedError, re:
+            raise ValueError('Error on URL: ' + re.msg_content['value'])
         defer.returnValue(content)
 
     def _rewrite_headers(self, old_headers):

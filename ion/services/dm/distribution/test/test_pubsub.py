@@ -16,6 +16,7 @@ from twisted.internet import defer
 
 
 from ion.core import bootstrap
+from ion.core.exception import ReceivedError
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
@@ -78,8 +79,11 @@ class PubSubEndToEndTest(IonTestCase):
         self.topic2 = yield self.pubsub_client.define_topic(self.topic2)
         self.pub1 = PublisherResource.create("Grids", self.sup, [self.topic1], "content")
         yield self.pubsub_client.define_publisher(self.pub1)
-        res = yield self.pubsub_client.publish(self.sup, self.topic2, "Point data")
-        self.assertEqual(res,'error sending message!')
+        try:
+            yield self.pubsub_client.publish(self.sup, self.topic2, "Point data")
+            self.fail("ReceivedError expected")
+        except ReceivedError, re:
+            pass
 
 class PubSubServiceMethodTest(IonTestCase):
 
