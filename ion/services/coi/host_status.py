@@ -18,7 +18,7 @@ except:
 from twisted.internet import defer, task
 from twisted.web import xmlrpc
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 

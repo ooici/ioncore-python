@@ -17,7 +17,7 @@ from ion.services.base_service import BaseService
 
 from twisted.internet.protocol import Protocol, ClientFactory, ClientCreator
 
-from ion.core.base_process import BaseProcess
+from ion.core.process.process import Process
 from ion.data.dataobject import ResourceReference
 from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource, DAPMessageObject
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
@@ -28,7 +28,7 @@ from ion.agents.instrumentagents.SBE49_constants import instrument_commands
 
 import ion.util.procutils as pu
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 
 class InstrumentClient(Protocol):
     """

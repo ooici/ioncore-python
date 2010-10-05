@@ -12,7 +12,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.data.backends import store_service
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu

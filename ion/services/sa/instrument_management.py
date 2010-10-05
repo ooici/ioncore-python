@@ -12,7 +12,7 @@ from twisted.internet import defer
 
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
-from ion.core.base_process import ProcessFactory, ProcessDesc
+from ion.core.process.process import ProcessFactory, ProcessDesc
 from ion.data.dataobject import DataObject, ResourceReference, LCStates
 from ion.resources.coi_resource_descriptions import AgentInstance
 from ion.resources.dm_resource_descriptions import PubSubTopicResource

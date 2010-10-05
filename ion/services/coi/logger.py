@@ -9,7 +9,7 @@
 import logging
 from twisted.internet import defer
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)

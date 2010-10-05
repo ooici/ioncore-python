@@ -11,10 +11,10 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 from ion.core.messaging.receiver import Receiver
-from ion.core.base_process import BaseProcess, ProcessFactory
+from ion.core.process.process import Process, ProcessFactory
 import ion.util.procutils as pu
 
-class BaseServiceProcess(BaseProcess):
+class BaseServiceProcess(Process):
     """
     This is a base class for service processes.
 
@@ -58,8 +58,8 @@ class ProcessProcessFactory(ProcessFactory):
         with a receiver.
         """
         svc_class = pu.get_class(className, svc_mod)
-        #if not issubclass(svc_class,BaseProcess):
-        #    raise RuntimeError("class is not a BaseProcess")
+        #if not issubclass(svc_class,Process):
+        #    raise RuntimeError("class is not a Process")
 
         receiver = Receiver(svc_mod.__name__)
         serviceInstance = svc_class(receiver)

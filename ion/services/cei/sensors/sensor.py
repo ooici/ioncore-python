@@ -29,10 +29,10 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 
-from ion.core.base_process import BaseProcess
+from ion.core.process.process import Process
 
 
-class SensorProcess(BaseProcess):
+class SensorProcess(Process):
     """Base Sensor Process.
 
     Intended to be subclassed to target specific Sensor data.

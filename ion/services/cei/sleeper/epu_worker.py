@@ -8,7 +8,7 @@ from twisted.internet import defer, reactor
 from ion.core.messaging.receiver import WorkerReceiver
 from ion.core import bootstrap
 from ion.services.base_service import BaseService
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 import ion.util.procutils as pu
 from ion.services.cei import cei_events
 

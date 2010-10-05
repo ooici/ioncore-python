@@ -11,7 +11,7 @@ from zope import interface
 from twisted.internet import defer
 
 from ion.services import base_service
-from ion.core import base_process
+from ion.core.process.process import ProcessFactory
 from ion.core.exception import ReceivedError
 from ion.data import store
 from ion.data.datastore import cas
@@ -261,4 +261,4 @@ class ObjectStoreClient(base_service.BaseServiceClient, cas.CAStore):
         id = content['value']
         return id
 
-factory = base_process.ProcessFactory(ObjectStoreService)
+factory = ProcessFactory(ObjectStoreService)

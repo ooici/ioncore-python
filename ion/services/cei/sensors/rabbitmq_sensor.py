@@ -8,7 +8,7 @@ from ion.services.cei.sensors.sensor import SensorProcess
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.task import LoopingCall
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 
 from ion.services.cei import cei_events
 

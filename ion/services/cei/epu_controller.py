@@ -7,7 +7,7 @@ from twisted.internet import defer, reactor
 from twisted.internet.task import LoopingCall
 
 from ion.services.base_service import BaseService
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.core import bootstrap
 import ion.util.procutils as pu
 from ion.services.cei.epucontroller import ControllerCore

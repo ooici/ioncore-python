@@ -6,7 +6,7 @@ from twisted.trial import unittest
 
 from ion.core.messaging.receiver import Receiver
 from ion.test.iontest import IonTestCase
-from ion.core.base_process import BaseProcess
+from ion.core.process.process import Process
 
 from ion.services.cei.sensors.rabbitmq_sensor import RabbitMQSensor
 import ion.util.procutils as pu
@@ -23,7 +23,7 @@ class TestSensors(IonTestCase):
         raise unittest.SkipTest('Sensor is broken but also likely moving to a service model, skipping this test.')
 
         yield self._start_container()
-        bproc = BaseProcess()
+        bproc = Process()
         # the 'test' work queue:
         self.queue_name_work = bproc.get_scoped_name("system", "test_cei_sensors_work")
         #for the sensor events queue:
@@ -64,18 +64,18 @@ class TestSensors(IonTestCase):
         self.assertEqual(self.total_messages, self.test_sa.message_count)
 
 
-class TestSensorAggregator(BaseProcess):
+class TestSensorAggregator(Process):
     """Class for the client accessing the object store.
     """
     def __init__(self, queue_name_events, *args):
-        BaseProcess.__init__(self, *args)
+        Process.__init__(self, *args)
         self.queue_name_events = queue_name_events
         self.message_count = 0
 
     @defer.inlineCallbacks
     def plc_init(self):
         # create new receiver ('listener'), for the events (just the receiver object)
-        # set BaseProcesses receive method as the callback for the new receiver that was just created.
+        # set Processes receive method as the callback for the new receiver that was just created.
         self.event_receiver = Receiver(label="event_receiver",
                                        name=self.queue_name_events,
                                        handler=self.receive)

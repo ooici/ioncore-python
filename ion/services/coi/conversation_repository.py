@@ -7,7 +7,7 @@
 """
 import logging
 import ion.util.ionlog
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.services.base_service import BaseService
 
 logserv = logging.getLogger('convRepos')

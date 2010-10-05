@@ -16,7 +16,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.base_process import BaseProcess, ProcessDesc, ProcessFactory
+from ion.core.process.process import Process, ProcessDesc, ProcessFactory
 from ion.core.cc.container import Container
 from ion.core.exception import ReceivedError
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
@@ -24,7 +24,7 @@ from ion.core.id import Id
 from ion.test.iontest import IonTestCase, ReceiverProcess
 import ion.util.procutils as pu
 
-class BaseProcessTest(IonTestCase):
+class ProcessTest(IonTestCase):
     """
     Tests the process base class, the root class of all message based interaction.
     """
@@ -39,7 +39,7 @@ class BaseProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_process_basics(self):
-        p1 = BaseProcess()
+        p1 = Process()
         self.assertTrue(p1.id)
         self.assertIsInstance(p1.id, Id)
         self.assertTrue(p1.receiver)
@@ -64,7 +64,7 @@ class BaseProcessTest(IonTestCase):
 
         procid = Id('local','container')
         args = {'proc-id':procid.full}
-        p2 = BaseProcess(spawnargs=args)
+        p2 = Process(spawnargs=args)
         self.assertEquals(p2.id, procid)
         yield p2.initialize()
         self.assertEquals(p2._get_state(), "READY")
@@ -72,7 +72,7 @@ class BaseProcessTest(IonTestCase):
         self.assertEquals(p2._get_state(), "ACTIVE")
 
         args = {'arg1':'value1','arg2':{}}
-        p3 = BaseProcess(None, args)
+        p3 = Process(None, args)
         self.assertEquals(p3.spawn_args, args)
 
     @defer.inlineCallbacks
@@ -107,7 +107,7 @@ class BaseProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_child_processes(self):
-        p1 = BaseProcess()
+        p1 = Process()
         pid1 = yield p1.spawn()
 
         child = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
@@ -224,7 +224,7 @@ class BaseProcessTest(IonTestCase):
         yield self._shutdown_processes()
 
 
-class EchoProcess(BaseProcess):
+class EchoProcess(Process):
 
     @defer.inlineCallbacks
     def plc_noinit(self):

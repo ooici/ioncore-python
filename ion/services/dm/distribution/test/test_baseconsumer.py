@@ -13,10 +13,10 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.core import bootstrap
 from ion.core.exception import ReceivedError
-#from ion.core.base_process import BaseProcess, ProcessDesc
+#from ion.core.process.process import Process, ProcessDesc
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 

@@ -12,12 +12,12 @@ from twisted.internet import defer, reactor
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core import base_process, bootstrap, ioninit
+from ion.core import bootstrap, ioninit
 from ion.core import ioninit
-from ion.core.base_process import BaseProcess
 from ion.core.cc import container
 from ion.core.cc.container import Id, Container
-from ion.core.process.process import IProcess
+from ion.core.process import process
+from ion.core.process.process import IProcess, Process
 from ion.data.store import Store
 import ion.util.procutils as pu
 
@@ -39,7 +39,7 @@ class IonTestCase(unittest.TestCase):
 
     # Set timeout for Trial tests
     timeout = 20
-    procRegistry = base_process.procRegistry
+    procRegistry = process.procRegistry
 
     @defer.inlineCallbacks
     def _start_container(self):
@@ -66,7 +66,7 @@ class IonTestCase(unittest.TestCase):
         # Manually perform some ioncore initializations
         yield bootstrap.init_ioncore()
 
-        self.procRegistry = base_process.procRegistry
+        self.procRegistry = process.procRegistry
         self.test_sup = yield bootstrap.create_supervisor()
 
         log.info("============ %s ===" % self.container)
@@ -124,18 +124,18 @@ class IonTestCase(unittest.TestCase):
     def _get_procinstance(self, pid):
         """
         @param pid  process id
-        @retval BaseProcess instance for process id
+        @retval Process instance for process id
         """
         process = ioninit.container_instance.proc_manager.process_registry.kvs.get(pid, None)
         return process
 
-class ReceiverProcess(BaseProcess):
+class ReceiverProcess(Process):
     """
     A simple process that can send messages and tracks all received
     messages
     """
     def __init__(self, *args, **kwargs):
-        BaseProcess.__init__(self, *args, **kwargs)
+        Process.__init__(self, *args, **kwargs)
         self.inbox = defer.DeferredQueue()
         self.inbox_count = 0
 

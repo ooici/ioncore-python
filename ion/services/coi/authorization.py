@@ -11,7 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class AuthorizationService(BaseService):

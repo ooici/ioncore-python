@@ -10,7 +10,7 @@ Porting from LCO implementation to new LCA arch - complete rewrite.
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.services.dm.util.eoi_data_stream_producer import CoordinatorClient
 
 from ion.services.base_service import BaseService

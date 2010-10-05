@@ -19,8 +19,7 @@ from ion.data import dataobject
 from ion.data.datastore import objstore
 
 from ion.core import ioninit
-from ion.core import base_process
-from ion.core.base_process import ProcessFactory, BaseProcess
+from ion.core.process.process import ProcessFactory, Process
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.resources import coi_resource_descriptions
 import ion.util.procutils as pu

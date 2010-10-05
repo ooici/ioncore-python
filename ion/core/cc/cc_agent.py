@@ -16,7 +16,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.agents.resource_agent import ResourceAgent
 from ion.core import ionconst, ioninit
 from ion.core.ioninit import ion_config
-from ion.core.base_process import BaseProcess, ProcessFactory, ProcessDesc
+from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 from ion.core.cc.container import Container
 from ion.core.messaging.receiver import Receiver, FanoutReceiver
 import ion.util.procutils as pu

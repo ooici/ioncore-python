@@ -13,7 +13,7 @@ import SBE49_constants as const
 from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 
-from ion.core.base_process import BaseProcess, ProcessFactory, ProcessDesc
+from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 
 
 # Gotta have this AFTER the "static" variables above

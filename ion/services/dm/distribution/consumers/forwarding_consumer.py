@@ -13,7 +13,7 @@ queue due to the way consumers are created from a work flow.
 """
 
 from ion.services.dm.distribution import base_consumer
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 
 
 class ForwardingConsumer(base_consumer.BaseConsumer):

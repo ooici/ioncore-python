@@ -22,7 +22,7 @@ from socket import gaierror
 import urlparse
 import simplejson as json
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.core.exception import ReceivedError
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.services.dm.util.url_manipulation import base_dap_url

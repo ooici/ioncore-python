@@ -19,7 +19,7 @@ from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.core import bootstrap
 
 from ion.core.messaging.receiver import Receiver
-from ion.core.base_process import BaseProcess, ProcessDesc
+from ion.core.process.process import Process, ProcessDesc
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.services.base_service import BaseServiceClient
 
@@ -196,7 +196,7 @@ class TestSBE49(IonTestCase):
 
         result = yield self.driver_client.disconnect(['some arg'])
 
-class DataConsumer(BaseProcess):
+class DataConsumer(Process):
     """
     A class for spawning as a separate process to consume the responses from
     the instrument.

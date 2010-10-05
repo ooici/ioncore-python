@@ -17,8 +17,7 @@ from ion.data.datastore import registry
 from ion.data import store
 
 from ion.core import ioninit
-from ion.core import base_process
-from ion.core.base_process import ProcessFactory, BaseProcess
+from ion.core.process.process import ProcessFactory, Process
 from ion.services.base_service import BaseService, BaseServiceClient
 import ion.util.procutils as pu
 

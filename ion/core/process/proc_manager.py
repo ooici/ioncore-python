@@ -13,8 +13,9 @@ from twisted.internet import defer
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core import ioninit, base_process
-from ion.core.base_process import BaseProcess
+from ion.core import ioninit
+from ion.core.process import process
+from ion.core.process.process import Process
 from ion.core.process.process import IProcess, ProcessDesc, ProcessInstantiator
 from ion.data.store import Store
 from ion.util.state_object import BasicLifecycleObject
@@ -63,8 +64,8 @@ class ProcessManager(BasicLifecycleObject):
         """
         Spawns a list of processes.
         @param procs  list of processes (as description dict) to start up
-        @param sup  spawned BaseProcess instance acting as supervisor
-        @retval Deferred -> BaseProcess instance
+        @param sup  spawned Process instance acting as supervisor
+        @retval Deferred -> Process instance
         """
         children = []
         for procDef in procs:
@@ -81,7 +82,7 @@ class ProcessManager(BasicLifecycleObject):
         for child in children:
             child_id = yield sup.spawn_child(child)
 
-        #log.debug("process_ids: "+ str(base_process.procRegistry.kvs))
+        #log.debug("process_ids: "+ str(process.procRegistry.kvs))
 
         defer.returnValue(sup)
 
@@ -146,7 +147,7 @@ class ProcessManager(BasicLifecycleObject):
     def create_supervisor(self):
         """
         Creates a supervisor process. There is only one root supervisor.
-        @retval Deferred -> supervisor BaseProcess instance
+        @retval Deferred -> supervisor Process instance
         """
         if self.supervisor:
             defer.returnValue(self.supervisor)
@@ -159,9 +160,9 @@ class ProcessManager(BasicLifecycleObject):
             supname = "supervisor."+str(self.sup_seq)
 
         spawnargs = {'proc-name':supname}
-        sup = base_process.factory.build(spawnargs)
+        sup = process.factory.build(spawnargs)
         supId = yield sup.spawn()
-        yield base_process.procRegistry.put(supname, str(supId))
+        yield process.procRegistry.put(supname, str(supId))
         self.sup_seq += 1
         self.supervisor = sup
         defer.returnValue(sup)

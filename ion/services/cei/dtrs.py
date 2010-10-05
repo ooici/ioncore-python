@@ -14,7 +14,7 @@ import string
 
 from twisted.internet import defer
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.core.exception import ReceivedError
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.core import ioninit

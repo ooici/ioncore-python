@@ -13,8 +13,8 @@ from twisted.internet import defer
 
 import inspect
 
-from ion.core.base_process import BaseProcess
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import Process
+from ion.core.process.process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 from ion.data.datastore import registry
@@ -130,7 +130,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
 
     def describe_agent(self,agent_class):
 
-        assert issubclass(agent_class, BaseProcess)
+        assert issubclass(agent_class, Process)
 
         # Do not make a new resource idenity - this is a generic method which
         # is also used to look for an existing description

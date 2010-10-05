@@ -12,9 +12,8 @@ from twisted.internet import defer
 
 import inspect
 
-from ion.core import base_process
 import ion.util.procutils as pu
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 
