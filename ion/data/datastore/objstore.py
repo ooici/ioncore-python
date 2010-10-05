@@ -463,7 +463,7 @@ class ObjectStore(BaseObjectStore):
         """
         XXX Here DataObject is assumed as the base class
         """
-        objectClassName = obj['class'].content
+        #objectClassName = obj['class'].content
         obj_parts = [(child[0], child.obj.content) for child in obj['attrs'].children]
         objectClass = self.objectChassis.objectClass.decode(obj_parts,header=False)
         return objectClass
@@ -552,44 +552,4 @@ class Identity(dataobject.DataObject):
     age = dataobject.TypedAttribute(int)
     email = dataobject.TypedAttribute(str)
 
-@defer.inlineCallbacks
-def _test(ns):
-    """
-    Creating a namespace on the amoeba cassandra instillation can only
-    happen once. (And it worked, first try ;-)
-    """
-    from ion.data import store
-    #from ion.data.backends import cassandra
-    s = yield store.Store.create_store()
-    #s = yield cassandra.CassandraStore.create_store(cass_host_list=['amoeba.ucsd.edu:9160'])
-    ns.update(locals())
-    ObjectStore.objectChassis.objectClass = Identity
-    obs = yield ObjectStore.new(s, 'test_partition')
-    obj = yield obs.create('thing', Identity)
-    ind = yield obj.checkout()
-    ind.name = 'Carlos S'
-    ind.email = 'carlos@ooici.biz'
-    yield obj.commit()
-    ns.update(locals())
-    ind = yield obj.checkout()
-    ind.name = 'wwww S'
-    ind.email = 'carlos@ooici.biz'
-    yield obj.commit()
-    ind = yield obj.checkout()
-    ind.name = 'Carly S'
-    ind.email = 'carlos@ooici.com'
-    yield obj.commit()
-    ind = yield obj.checkout()
-    obj2 = yield obs.clone('thing')
-    ind2 = yield obj2.checkout()
-    ns.update(locals())
-
-@defer.inlineCallbacks
-def _test2(ns):
-    from ion.data.backends import cassandra
-    s = yield cassandra.CassandraStore.create_store(cass_host_list=['amoeba.ucsd.edu:9160'])
-    obs = yield ObjectStore.load(s, 'test_partition')
-    ns.update(locals())
-    obj = yield obs.clone('thing')
-    ns.update(locals())
 
