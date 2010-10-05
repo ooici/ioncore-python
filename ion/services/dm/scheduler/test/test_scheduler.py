@@ -8,6 +8,7 @@
 """
 
 from twisted.internet import defer
+from twisted.trial import unittest
 
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
 
@@ -37,6 +38,8 @@ class SchedulerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_add_remove(self):
+        raise unittest.SkipTest('code not implemented yet')
+
         sc = SchedulerServiceClient(proc=self.sup)
 
         yield sc.add_task('foobar', 1.0, 'pingtest')
@@ -45,6 +48,7 @@ class SchedulerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_query(self):
+        raise unittest.SkipTest('code not implemented yet')
         sc = SchedulerServiceClient(proc=self.sup)
 
         yield sc.add_task('foobar', 1.0, 'pingtest')
@@ -53,6 +57,7 @@ class SchedulerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_rm(self):
+        raise unittest.SkipTest('code not implemented yet')
         sc = SchedulerServiceClient(proc=self.sup)
 
         yield sc.add_task('foobar', 1.0, 'pingtest')

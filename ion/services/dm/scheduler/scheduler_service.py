@@ -61,9 +61,9 @@ class SchedulerService(ServiceProcess):
 
     def _send_message(self, task_id, target_id, payload):
         # Do work, then reschedule ourself
-        bpc = BaseProcessClient(target=target_id)
+        #bpc = BaseProcessClient(target=target_id)
         # @note fire and forget; don't need to wait for send to run to completion.
-        bpc.send(payload)
+        #bpc.send(payload)
 
         # Schedule next invocation
         self._schedule_next(task_id)
@@ -102,7 +102,7 @@ class SchedulerService(ServiceProcess):
         """
         yield self.reply_err(msg, {'value':'Not implemented!'}, {})
 
-class SchedulerServiceClient(BaseServiceClient):
+class SchedulerServiceClient(ServiceClient):
     """
     Client class for the SchedulerService, simple muster/send/reply.
     """

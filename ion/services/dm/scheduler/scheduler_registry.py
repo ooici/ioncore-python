@@ -13,9 +13,10 @@ log = ion.util.ionlog.getLogger(__name__)
 import uuid
 
 from twisted.internet import defer
-from ion.core.base_process import ProcessFactory
 
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.data.datastore.registry import BaseRegistryService, BaseRegistryClient
 from ion.data import dataobject
 
@@ -23,7 +24,7 @@ class SchedulerRegistry(BaseRegistryService):
     """
     Our registry is an instance of the BaseRegistryService.
     """
-    declare = BaseService.service_declare(name='scheduler_registry',
+    declare = ServiceProcess.service_declare(name='scheduler_registry',
                                           version='0.1.0',
                                           dependencies=[])
 
@@ -62,8 +63,8 @@ class ScheduleEntry(dataobject.Resource):
 class SchedulerRegistryClient(BaseRegistryClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "scheduler_registry"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+            kwargs['targetname'] = 'scheduler_registry'
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def clear(self):
