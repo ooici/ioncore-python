@@ -10,9 +10,9 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.internet.task import LoopingCall
 
-from ion.services.base_service import BaseService
-from ion.core import base_process
-from ion.core.base_process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess
+from ion.core.process import process
+from ion.core.process.process import ProcessFactory
 
 STATES = {0:"requesting",
           1:"requested",
@@ -22,12 +22,12 @@ STATES = {0:"requesting",
           5:"shutting-down",
           6:"terminated"}
 
-class MockLoopProvisionerService(BaseService):
+class MockLoopProvisionerService(ServiceProcess):
     """Provisioner service for "mockloop" setup
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='provisioner', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='provisioner', version='0.1.0', dependencies=[])
 
     def slc_init(self):
 
@@ -104,8 +104,8 @@ class MockLoopProvisionerService(BaseService):
     def _send_iaas_notification(self, iaas_info, sa_id):
         """Sends out IAAS information about an instance.
         """
-
-        sa = yield base_process.procRegistry.get(sa_id)
+        # @todo Change the static access
+        sa = yield process.procRegistry.get(sa_id)
         (content, headers, msg) = yield self.rpc_send(sa, "sensor_aggregator_info", iaas_info, {})
 
 

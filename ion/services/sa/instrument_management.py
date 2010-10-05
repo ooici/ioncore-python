@@ -12,20 +12,20 @@ from twisted.internet import defer
 
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgentClient
-from ion.core.base_process import ProcessFactory, ProcessDesc
+from ion.core.process.process import ProcessFactory, ProcessDesc
 from ion.data.dataobject import DataObject, ResourceReference, LCStates
 from ion.resources.coi_resource_descriptions import AgentInstance
 from ion.resources.dm_resource_descriptions import PubSubTopicResource
 from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.services.sa.instrument_registry import InstrumentRegistryClient
 from ion.services.sa.data_product_registry import DataProductRegistryClient
 from ion.services.coi.agent_registry import AgentRegistryClient
 import ion.util.procutils as pu
 
-class InstrumentManagementService(BaseService):
+class InstrumentManagementService(ServiceProcess):
     """
     Instrument management service interface.
     This service provides overall coordination for instrument management within
@@ -35,7 +35,7 @@ class InstrumentManagementService(BaseService):
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='instrument_management',
+    declare = ServiceProcess.service_declare(name='instrument_management',
                                           version='0.1.0',
                                           dependencies=[])
 
@@ -308,14 +308,14 @@ class InstrumentManagementService(BaseService):
         log.info("Agent process id for instrument id %s is: %s" % (instrument_id, agent_pid))
         defer.returnValue(agent_pid)
 
-class InstrumentManagementClient(BaseServiceClient):
+class InstrumentManagementClient(ServiceClient):
     """
     Class for the client accessing the instrument management service.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "instrument_management"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def create_new_instrument(self, userInput):

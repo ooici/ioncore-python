@@ -24,7 +24,7 @@ from pydap.handlers.nca import Handler as ncaHandler
 from ion.data import dataobject
 from ion.resources.dm_resource_descriptions import DAPMessageObject, StringMessageObject, DictionaryMessageObject
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 
 import uuid
 from ion.services.dm.distribution import base_consumer
@@ -392,11 +392,11 @@ factory = ProcessFactory(PersisterConsumer)
 
 '''
 There is no client for a consumer...
-class PersisterClient(BaseServiceClient): # Not really needed - consumers don't have clients
+class PersisterClient(ServiceClient): # Not really needed - consumers don't have clients
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'persister'
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def persist_dap_dataset(self, dap_message):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/base_service.py
+@file ion/core/process/service_process.py
 @author Michael Meisinger
 @brief base classes for all service processes and clients.
 """
@@ -12,8 +12,8 @@ from zope.interface import implements, Interface
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core import base_process, ioninit
-from ion.core.base_process import BaseProcess, BaseProcessClient
+from ion.core import ioninit
+from ion.core.process.process import Process, ProcessClient
 from ion.core.cc.container import Container
 from ion.core.messaging.receiver import ServiceWorkerReceiver
 import ion.util.procutils as pu
@@ -23,7 +23,7 @@ class IServiceProcess(Interface):
     Interface for all capability container service worker processes
     """
 
-class BaseService(BaseProcess):
+class ServiceProcess(Process):
     """
     This is the superclass for all service processes.  A service process is a
     Capability Container process that can be spawned anywhere in the network
@@ -45,7 +45,7 @@ class BaseService(BaseProcess):
         service inbound queue that is shared among all service processes with
         the same name
         """
-        BaseProcess.__init__(self, *args, **kwargs)
+        Process.__init__(self, *args, **kwargs)
 
         # Determine public service messaging name either from spawn args or
         # use default name from service declaration
@@ -158,7 +158,7 @@ class BaseService(BaseProcess):
         return kwargs
 
 
-class BaseServiceClient(BaseProcessClient):
+class ServiceClient(ProcessClient):
     """
     This is the base class for service client libraries. Service client libraries
     can be used from any process or standalone (in which case they spawn their

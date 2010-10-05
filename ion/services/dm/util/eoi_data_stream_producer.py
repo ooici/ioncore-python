@@ -12,20 +12,20 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.core.base_process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.sa.fetcher import FetcherClient
 
-class CoordinatorService(BaseService): 
+class CoordinatorService(ServiceProcess):
     """
-    Refactor this into a BaseService that provides dap data on a looping call
-    
+    Refactor this into a ServiceProcess that provides dap data on a looping call
+
     Make the url a parameter of the process - one per url...
-    
+
     Brains behind preservation, and also the primary interface.
     """
     # Define ourselves for the CC
-    declare = BaseService.service_declare(name='coordinator',
+    declare = ServiceProcess.service_declare(name='coordinator',
                                           version='0.1.0',
                                           dependencies=['fetcher'])
 
@@ -61,7 +61,7 @@ class CoordinatorService(BaseService):
         yield self.fc.forward_get_dap_dataset(content, headers)
 
 
-class CoordinatorClient(BaseServiceClient):
+class CoordinatorClient(ServiceClient):
     """
     Caller interface to coordinator.
     @see ion.services.sa.proxy for an example
@@ -69,7 +69,7 @@ class CoordinatorClient(BaseServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'coordinator'
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def get_url(self, url):

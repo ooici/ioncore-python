@@ -134,6 +134,13 @@ To compile all code to see if there are Python compile errors anywhere:
 Change log:
 ===========
 
+2010-10-05:
+- REFACTORING OF BASE CLASSES CONTINUED
+- Changed ion.core.base_process.BaseProcess to ion.core.process.process.Process
+- Changed ion.services.base_service.BaseService to
+  ion.core.process.service_process.ServiceProcess
+- Modified all dependent classes
+
 2010-10-04:
 - MASSIVE REFACTORING IN BASE CLASSES
 - Refactored the former magnet code into more object oriented style.

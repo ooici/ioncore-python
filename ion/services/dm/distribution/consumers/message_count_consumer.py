@@ -10,7 +10,7 @@ http://code.google.com/apis/visualization/documentation/index.html
 
 from ion.services.dm.distribution import base_consumer
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)

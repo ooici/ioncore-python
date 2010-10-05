@@ -13,15 +13,15 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-class DataStoreService(BaseService):
+class DataStoreService(ServiceProcess):
     """
     Example service interface
     """
     # Declaration of service
-    declare = BaseService.service_declare(name='DataStoreService',
+    declare = ServiceProcess.service_declare(name='DataStoreService',
                                           version='0.1.0',
                                           dependencies=[])
 
@@ -30,7 +30,7 @@ class DataStoreService(BaseService):
         @brief Init method for the DataStore Frontend service
         @param frontend - an instance of a CAStore Frontend
         """
-        BaseService.__init__(self, *args, **kwargs)
+        ServiceProcess.__init__(self, *args, **kwargs)
 
         # Service class initializer. Basic config, but no yields allowed.
         self.frontend = self.spawn_args['MyFrontend']
@@ -66,7 +66,7 @@ class DataStoreService(BaseService):
 
 
 
-class DataStoreServiceClient(BaseServiceClient):
+class DataStoreServiceClient(ServiceClient):
     """
     This is an exemplar service client that calls the hello service. It
     makes service calls RPC style.
@@ -78,7 +78,7 @@ class DataStoreServiceClient(BaseServiceClient):
         """
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "DataStoreService"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
         self.frontend=frontend
         log.info('DataStoreServiceClient.__init__()')
 

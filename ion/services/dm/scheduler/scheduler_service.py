@@ -12,18 +12,18 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 import time
 
-from ion.core.base_process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient, BaseProcessClient
 from ion.services.dm.scheduler.scheduler_registry import SchedulerRegistryClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-class SchedulerService(BaseService):
+class SchedulerService(ServiceProcess):
     """
     First pass at a message-based cron service, where you register a send-to address,
     interval and payload, and the scheduler will message you when the timer expires.
     @note this will be subsumed into CEI at some point; consider this a prototype.
     """
     # Declaration of service
-    declare = BaseService.service_declare(name='scheduler',
+    declare = ServiceProcess.service_declare(name='scheduler',
                                           version='0.1.0',
                                           dependencies=['scheduler_registry'])
 
@@ -109,7 +109,7 @@ class SchedulerServiceClient(BaseServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'scheduler'
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def add_task(self, target, interval, payload):

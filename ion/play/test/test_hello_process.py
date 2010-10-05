@@ -13,7 +13,7 @@ from twisted.internet import defer
 from ion.play.hello_process import HelloProcessClient
 from ion.test.iontest import IonTestCase
 
-from ion.core.base_process import BaseProcess, BaseProcessClient, ProcessDesc
+from ion.core.process.process import Process, ProcessClient, ProcessDesc
 from ion.core import bootstrap
 
 class HelloTest(IonTestCase):

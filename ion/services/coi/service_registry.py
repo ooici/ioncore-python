@@ -12,12 +12,9 @@ from twisted.internet import defer
 
 import inspect
 
-from ion.core import base_process
 import ion.util.procutils as pu
-from ion.core.base_process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
-
-
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.data.datastore import registry
 from ion.data import dataobject
 from ion.data import store
@@ -35,7 +32,7 @@ class ServiceRegistryService(registry.BaseRegistryService):
     @todo a service is a resource and should also be living in the resource registry
     """
     # Declaration of service
-    declare = BaseService.service_declare(name='service_registry', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='service_registry', version='0.1.0', dependencies=[])
 
     op_clear_registry = registry.BaseRegistryService.base_clear_registry
 
@@ -93,7 +90,7 @@ class ServiceRegistryClient(registry.BaseRegistryClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "service_registry"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     def clear_registry(self):
         return self.base_clear_registry('clear_registry')
@@ -134,7 +131,7 @@ class ServiceRegistryClient(registry.BaseRegistryClient):
         if type(service_class) is str:
             service_class = pu.get_class(service_class)
 
-        assert issubclass(service_class, BaseService)
+        assert issubclass(service_class, ServiceProcess)
 
         # Do not make a new resource idenity - this is a generic method which
         # is also used to look for an existing description

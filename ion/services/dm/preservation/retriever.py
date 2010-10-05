@@ -13,8 +13,8 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-from ion.core.base_process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.services.dm.util.url_manipulation import rewrite_url
 from ion.services.sa.fetcher import FetcherService
@@ -34,7 +34,7 @@ class RetrieverService(FetcherService):
     @see ion.services.dm.url_manipulation for the rewrite_url routine and its
     unit tests.
     """
-    declare = BaseService.service_declare(name='retriever',
+    declare = ServiceProcess.service_declare(name='retriever',
                                   version='0.0.2',
                                   dependencies=[])
 
@@ -49,14 +49,14 @@ class RetrieverService(FetcherService):
         # Note that _http_op is inherited fetcher code...
         return self._http_op('GET', new_url, msg)
 
-class RetrieverClient(BaseServiceClient):
+class RetrieverClient(ServiceClient):
     """
     Client interface to the retriever.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'retriever'
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def get_url(self, url):

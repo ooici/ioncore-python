@@ -12,14 +12,14 @@ from twisted.internet import defer
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core.base_process import BaseProcess, ProcessFactory
+from ion.core.process.process import Process, ProcessFactory
 import ion.util.procutils as pu
 
-class Supervisor(BaseProcess):
+class Supervisor(Process):
     """
     Base class for a supervisor process. A supervisor is a process with the
     purpose to monitor child processes and to restart them in case
-    of failure. Spawing child processes is a function of the BaseProcess itself.
+    of failure. Spawing child processes is a function of the Process itself.
     """
 
     def event_failure(self):

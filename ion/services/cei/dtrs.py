@@ -14,9 +14,9 @@ import string
 
 from twisted.internet import defer
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.core.exception import ReceivedError
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core import ioninit
 
 __all__ = ['DeployableTypeRegistryService', 'DeployableTypeRegistryClient']
@@ -27,10 +27,10 @@ CONF = ioninit.config(__name__)
 execfile(ioninit.adjust_dir(CONF['deployable_types']))
 log.debug('Loaded %s deployable types.', len(_REGISTRY))
 
-class DeployableTypeRegistryService(BaseService):
+class DeployableTypeRegistryService(ServiceProcess):
     """Deployable Type Registry service interface
     """
-    declare = BaseService.service_declare(name='dtrs', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='dtrs', version='0.1.0', dependencies=[])
 
     def slc_init(self):
         self.registry = self.spawn_args.get('registry')
@@ -101,13 +101,13 @@ class DeployableTypeRegistryService(BaseService):
         log.debug('Sending DTRS error reply: ' + error)
         return self.reply_err(msg, error)
 
-class DeployableTypeRegistryClient(BaseServiceClient):
+class DeployableTypeRegistryClient(ServiceClient):
     """Client for accessing DTRS
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "dtrs"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def lookup(self, dt, nodes=None, vars=None):

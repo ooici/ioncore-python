@@ -11,7 +11,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.base_process import BaseProcess, ProcessFactory
+from ion.core.process.process import Process, ProcessFactory
 from ion.core.cc.container import Container
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
@@ -79,12 +79,12 @@ class WorkerTest(IonTestCase):
             sum += v
         self.assertEqual(sum, 10)
 
-class WorkerClient(BaseProcess):
+class WorkerClient(Process):
     """
     Client for worker processes.
     """
     def __init__(self, *args, **kwargs):
-        BaseProcess.__init__(self, *args, **kwargs)
+        Process.__init__(self, *args, **kwargs)
         self.workresult = {}
         self.worker = {}
 

@@ -14,8 +14,8 @@ from ion.data import dataobject
 from ion.test.iontest import IonTestCase
 from twisted.internet import defer
 
-from ion.core.base_process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.data.datastore import cas
 
@@ -581,11 +581,11 @@ class TestDataContainer(TestSimpleObject):
                     ('dt','DataType1\x00[["f", "float\\u00003.14159"], ["s", "str\\u0000Datatype1"]]'),
                     ('name', 'str\x00a container with datatype1')]
 
-class ResponseService(BaseService):
+class ResponseService(ServiceProcess):
     """Example service implementation
     """
     # Declaration of service
-    declare = BaseService.service_declare(name='responder', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='responder', version='0.1.0', dependencies=[])
 
     def slc_init(self):
         pass
@@ -602,7 +602,7 @@ class ResponseService(BaseService):
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)
 
-class ResponseServiceClient(BaseServiceClient):
+class ResponseServiceClient(ServiceClient):
     """
     This is an exemplar service class that calls the hello service. It
     applies the RPC pattern.
@@ -610,7 +610,7 @@ class ResponseServiceClient(BaseServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "responder"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def send_data_object(self, obj):

@@ -14,11 +14,11 @@ from ion.services.coi.agent_registry import AgentRegistryClient
 #from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance, AgentInstance
 from ion.resources.coi_resource_descriptions import AgentDescription
 from ion.resources.coi_resource_descriptions import AgentInstance
-from ion.core.base_process import BaseProcess
-from ion.core.base_process import BaseProcessClient
+from ion.core.process.process import Process
+from ion.core.process.process import ProcessClient
 from ion.data.dataobject import LCState, LCStateNames
 
-class ResourceAgent(BaseProcess):
+class ResourceAgent(Process):
     """
     Base class for resource agent processes
     If you are going to write a new agent process, subclass this one and
@@ -189,7 +189,7 @@ class ResourceAgent(BaseProcess):
         Abstract method for the Resource Agent interface
         """
 
-class ResourceAgentClient(BaseProcessClient):
+class ResourceAgentClient(ProcessClient):
     """
     A parent class to handle common resource agent requests. Consider
     subclassing this one when creating a new agent client

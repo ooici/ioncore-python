@@ -12,13 +12,11 @@ from twisted.internet import defer
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-
-
-from ion.core import ioninit, base_process
-from ion.core.base_process import BaseProcess, ProcessDesc
+from ion.core import ioninit
 from ion.core.cc.container import Container
 from ion.core.cc.modloader import ModuleLoader
 from ion.core.process import process
+from ion.core.process.process import Process, ProcessDesc
 from ion.data.store import Store
 from ion.data.datastore import registry
 from ion.resources import description_utility
@@ -53,7 +51,7 @@ def bootstrap(messaging=None, services=None):
     setup args.
     @param messaging  dict of messaging name configuration dicts
     @param services list of services (as svc description dict) to start up
-    @retval Deferred -> supervisor BaseProcess instance
+    @retval Deferred -> supervisor Process instance
     """
     log.info("Init container, configuring messaging and starting services...")
     yield init_ioncore()
@@ -114,7 +112,7 @@ def _set_container_args(contargs=None):
         ioninit.sys_name = ioninit.cont_args['sysname']
     else:
         ioninit.sys_name = ioninit.container_instance.id
-        
+
 def declare_messaging(messagingCfg, cgroup=None):
     return ioninit.container_instance.declare_messaging(messagingCfg, cgroup)
 
@@ -132,7 +130,7 @@ def bs_register_services():
     Register all the declared processes.
     """
     src = service_registry.ServiceRegistryClient()
-    for proc in base_process.processes.values():
+    for proc in process.processes.values():
         sd = service_registry.ServiceDesc()
         sd.name = proc['name']
         res = yield src.register_service(sd)
@@ -145,5 +143,5 @@ def reset_container():
     # The following is extremely hacky. Reset static module and classvariables
     # to their defaults. Even further, reset imported names in other modules
     # to the new objects.
-    base_process.procRegistry = Store()
+    process.procRegistry = Store()
     process.processes = {}

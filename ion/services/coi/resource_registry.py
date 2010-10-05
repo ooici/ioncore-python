@@ -19,9 +19,8 @@ from ion.data import store
 import inspect
 
 from ion.core import ioninit
-from ion.core import base_process
-from ion.core.base_process import ProcessFactory, BaseProcess
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory, Process
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
 from ion.resources import coi_resource_descriptions
@@ -41,7 +40,7 @@ class ResourceRegistryService(registry.BaseRegistryService):
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='resource_registry', version='0.1.0', dependencies=[])
 
 
     op_clear_registry = registry.BaseRegistryService.base_clear_registry
@@ -95,7 +94,7 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "resource_registry"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
 
     def clear_registry(self):

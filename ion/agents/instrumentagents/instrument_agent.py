@@ -14,7 +14,7 @@ from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
 from ion.core.exception import ReceivedError
 from ion.data.dataobject import ResourceReference
-from ion.core.base_process import BaseProcess, BaseProcessClient
+from ion.core.process.process import Process, ProcessClient
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 
 """
@@ -29,7 +29,7 @@ instrument_parameters = 'instrument_parameters'
 driver_address = 'driver_address'
 
 
-class InstrumentDriver(BaseProcess):
+class InstrumentDriver(Process):
     """
     A base driver class. This is intended to provide the common parts of
     the interface that instrument drivers should follow in order to use
@@ -76,7 +76,7 @@ class InstrumentDriver(BaseProcess):
         @param none
         """
 
-class InstrumentDriverClient(BaseProcessClient):
+class InstrumentDriverClient(ProcessClient):
     """
     The base class for the instrument driver client interface. This interface
     is designed to be used by the instrument agent to work with the driver.

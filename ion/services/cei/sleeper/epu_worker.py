@@ -7,15 +7,15 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 from ion.core.messaging.receiver import WorkerReceiver
 from ion.core import bootstrap
-from ion.services.base_service import BaseService
-from ion.core.base_process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess
+from ion.core.process.process import ProcessFactory
 import ion.util.procutils as pu
 from ion.services.cei import cei_events
 
-class EPUWorkerService(BaseService):
+class EPUWorkerService(ServiceProcess):
     """EPU Worker service.
     """
-    declare = BaseService.service_declare(name='epu_worker', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='epu_worker', version='0.1.0', dependencies=[])
 
     def slc_init(self):
         queue_name = self.spawn_args["queue_name_work"]

@@ -13,8 +13,7 @@ try:
     import json
 except:
     import simplejson as json
-    
-from ion.core.cc.container import InterceptorSystem, Interceptor
+
 from carrot.backends.base import BaseMessage
 from ion.core import ioninit
 import ion.util.procutils as pu
@@ -37,7 +36,7 @@ if encrypt:
 else:
     encrypter = None
 
-class IdmInterceptor(Interceptor):
+class IdmInterceptor(object):
     """Message interceptor for identity management and security purposes.
     Called last before message hits the wire, and first after message received.
     """
@@ -94,7 +93,7 @@ class MessageEncrypter(object):
         log.info("Encrypted message len="+str(len(encmsg)))
         # HACK1: Returning the encrypted message in a mutable dict so that
         # we can replace dict content when decoding
-        # HACK2: Need to repr the binary encmsg because otherwise failure        
+        # HACK2: Need to repr the binary encmsg because otherwise failure
         return {'msg':repr(encmsg)}
 
     @classmethod
@@ -110,8 +109,8 @@ class MessageEncrypter(object):
         assert msgobj is msg.payload
         #log.info("Message payload recreated: "+str(msg.payload))
         return msg
-         
-class PolicyInterceptor(Interceptor):
+
+class PolicyInterceptor(object):
     @classmethod
     def transform(cls, msg):
         """Policy transform -- pass all
@@ -124,8 +123,8 @@ class PolicyInterceptor(Interceptor):
             ""
             #log.info('Policy interceptor OUT')
         return msg
-    
-class GovernanceInterceptor(Interceptor):
+
+class GovernanceInterceptor(object):
     @classmethod
     def transform(cls, msg):
         """Governance transform -- pass all
@@ -143,13 +142,13 @@ class GovernanceInterceptor(Interceptor):
 class MessageEncoder(object):
     pass
 
-class BaseInterceptorSystem(InterceptorSystem):
-    """Custom capability container interceptor system for secutiry and
-    governance purposes.
-    """
-    def __init__(self):
-        InterceptorSystem.__init__(self)
-        self.registerIdmInterceptor(IdmInterceptor.transform)
-        self.registerPolicyInterceptor(PolicyInterceptor.transform)
-        self.registerGovernanceInterceptor(GovernanceInterceptor.transform)
-        log.info("Initialized ION BaseInterceptorSystem")
+#class BaseInterceptorSystem(InterceptorSystem):
+#    """Custom capability container interceptor system for secutiry and
+#    governance purposes.
+#    """
+#    def __init__(self):
+#        InterceptorSystem.__init__(self)
+#        self.registerIdmInterceptor(IdmInterceptor.transform)
+#        self.registerPolicyInterceptor(PolicyInterceptor.transform)
+#        self.registerGovernanceInterceptor(GovernanceInterceptor.transform)
+#        log.info("Initialized ION BaseInterceptorSystem")

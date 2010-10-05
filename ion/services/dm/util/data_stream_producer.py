@@ -14,9 +14,9 @@ import time
 from twisted.internet import defer
 from twisted.internet.task import LoopingCall
 from twisted.internet import reactor
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 
-from ion.core.base_process import BaseProcess, ProcessDesc
+from ion.core.process.process import Process, ProcessDesc
 import ion.util.procutils as pu
 
 from ion.data import dataobject
@@ -32,7 +32,7 @@ import random
 from ion.services.dm.util import dap_tools
 
 
-class DataStreamProducer(BaseProcess):
+class DataStreamProducer(Process):
     '''
     @brief a data stream producer process - it spits out dap messages
     '''

@@ -10,10 +10,10 @@ Porting from LCO implementation to new LCA arch - complete rewrite.
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 from ion.services.dm.util.eoi_data_stream_producer import CoordinatorClient
 
-from ion.services.base_service import BaseService
+from ion.core.process.service_process import ServiceProcess
 from twisted.internet import defer, protocol, reactor
 from twisted.protocols.basic import LineReceiver
 
@@ -130,12 +130,12 @@ class DAPProxyProtocol(LineReceiver):
 class DAPProxyFactory(protocol.ServerFactory):
     protocol = DAPProxyProtocol
 
-class ProxyService(BaseService):
+class ProxyService(ServiceProcess):
     """
     Proxy service. Stub, really, since the proxy listens on a plain tcp port.
     """
     # Declaration of service
-    declare = BaseService.service_declare(name='proxy',
+    declare = ServiceProcess.service_declare(name='proxy',
                                           version='0.1.0',
                                           dependencies=['controller'])
 

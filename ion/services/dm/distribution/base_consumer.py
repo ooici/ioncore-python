@@ -20,7 +20,7 @@ from twisted.internet import reactor
 #from ion.core.cc.container import Container
 from ion.core.messaging.receiver import Receiver, FanoutReceiver
 
-from ion.core.base_process import BaseProcess, ProcessDesc
+from ion.core.process.process import Process, ProcessDesc
 import ion.util.procutils as pu
 
 from ion.data import dataobject
@@ -36,7 +36,7 @@ from pydap.model import DatasetType
 from ion.services.dm.util import dap_tools
 
 
-class BaseConsumer(BaseProcess):
+class BaseConsumer(Process):
     '''
     @brief This is the base class from which all consumer processes should inherit.
     All tranformaitons and data presentation methods should inherit for this

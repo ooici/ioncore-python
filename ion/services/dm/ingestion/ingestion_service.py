@@ -10,8 +10,8 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.core.base_process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.dm.ingestion import ingestion_registry
 from ion.services.dm.distribution import pubsub_service
 from ion.services.dm.preservation import preservation_service
@@ -24,7 +24,7 @@ from ion.resources.dm_resource_descriptions import PubSubTopicResource
 from ion.resources.dm_resource_descriptions import DMDataResource
 from ion.resources.dm_resource_descriptions import ArchiveResource
 
-class IngestionService(BaseService):
+class IngestionService(ServiceProcess):
     """
     Ingestion service interface
     @note Needs work - Should create a subscription to ingest a data source
@@ -32,7 +32,7 @@ class IngestionService(BaseService):
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='ingestion_service',
+    declare = ServiceProcess.service_declare(name='ingestion_service',
                                           version='0.1.0',
                                           dependencies=[])
 
@@ -148,11 +148,11 @@ factory = ProcessFactory(IngestionService)
 
 
 
-class IngestionClient(BaseServiceClient):
+class IngestionClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'ingestion_service'
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     def create_ingestion_datastream(self,isr):
         '''

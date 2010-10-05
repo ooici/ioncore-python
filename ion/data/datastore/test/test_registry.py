@@ -16,8 +16,8 @@ from ion.data import dataobject
 from ion.test.iontest import IonTestCase
 from twisted.internet import defer
 
-from ion.core.base_process import ProcessFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 class RegistryTest(unittest.TestCase):
     """

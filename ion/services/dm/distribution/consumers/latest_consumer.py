@@ -7,7 +7,7 @@
 """
 
 from ion.services.dm.distribution import base_consumer
-from ion.core.base_process import ProcessFactory
+from ion.core.process.process import ProcessFactory
 
 
 class LatestConsumer(base_consumer.BaseConsumer):
