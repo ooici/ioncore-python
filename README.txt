@@ -148,9 +148,12 @@ Change log:
   activate() -> READY -> terminate() -> TERMINATED
 - BaseProcess (and subclasses), Receiver, ProcessDesc, Container etc are all
   BasicLifecyleObjects.
+- BaseProcess now waits to activate the receiver until in ACTIVE state. Before,
+  code can do RPC, but not receive messages on the process id
 - Massively enhanced the capability container API. Delegated the actual
   implementation to manager classes: proc, exchange, app manager
-- Refactored the way processes are spawned
+- Refactored the way processes are spawned. Refactored ProcessDesc to use the
+  new container API.
 - Message headers now contain status code for every message. 'OK is the default
   and 'ERROR' is set on error
 - BaseProcess.rpc_send now raises a ReceivedError in case the RPC comes back
