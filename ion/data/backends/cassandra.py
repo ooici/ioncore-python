@@ -152,7 +152,7 @@ class CassandraStore(IStore):
         @retval Deferred, for list, possibly empty, of keys that match.
         @note Uses get_range generator of unknown efficiency.
         """
-        #logging.info("searching for regex %s" % regex)
+        logging.info("searching for regex %s" % regex)
         matched_list = []
         if self.cf_super:
             klist = yield self.client.get(self.key, self.colfamily, super_column=self.namespace)
@@ -169,15 +169,14 @@ class CassandraStore(IStore):
                 m = re.findall(regex, str(col.name))
                 
                 if m: 
-                    matched_list.append(col.name)
-
+                    matched_list.extend(m)
         else:
             for col in klist:
                 m = re.findall(regex, str(col.column.name))
                 if m:
-                    matched_list.append(col.column.name)
+                    matched_list.extend(m)
 
-        #logging.info("matched_list %s" % matched_list)
+        logging.info("matched_list %s" % matched_list)
         defer.returnValue(matched_list)
 
     @defer.inlineCallbacks
