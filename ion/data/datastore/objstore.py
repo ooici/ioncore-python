@@ -198,6 +198,7 @@ class ObjectChassis(object):
         """
         self.objstore = objstore
         self.keyspace = keyspace
+        
         self.index = None
         self.cur_commit = None
 
@@ -210,7 +211,7 @@ class ObjectChassis(object):
         """
         return self.keyspace.put('refs.' + head, commit_id)
     
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def get_head(self, name='master'):
         """
         @brief Get reference named 'name'. The head references represent
@@ -222,7 +223,8 @@ class ObjectChassis(object):
         @note if head is not there, *IStore says return None*
         """
         logging.info("Calling keyspace.get")
-        yield self.keyspace.get('refs.' + name)
+        return self.keyspace.get('refs.' + name)
+        
 
     @defer.inlineCallbacks
     def checkout(self, head='master', commit_id=None):
