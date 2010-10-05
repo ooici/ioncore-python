@@ -216,10 +216,8 @@ class DataConsumer(BaseProcess):
         """
         Attach to the given topic name
         """
-        yield self.init()
-        self.dataReceiver = Receiver(__name__, topic_name)
-        self.dataReceiver.handle(self.receive)
-        self.dr_id = yield self.dataReceiver.activate()
+        self.dataReceiver = Receiver(name=topic_name, handler=self.receive)
+        yield self.dataReceiver.attach()
 
         self.receive_cnt = 0
         self.received_msg = []

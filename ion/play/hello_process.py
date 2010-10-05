@@ -9,7 +9,6 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.messaging.receiver import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import ProcessFactory, BaseProcess, BaseProcessClient

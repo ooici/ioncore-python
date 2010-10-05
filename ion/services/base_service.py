@@ -32,7 +32,7 @@ class BaseService(BaseProcess):
     version identifier and dependencies.
     """
     implements(IServiceProcess)
-    
+
     # Service declaration, to be set by the subclass
     declare = {}
 

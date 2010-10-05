@@ -10,7 +10,6 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.messaging.receiver import Receiver
 
 @defer.inlineCallbacks
 def send(to_name, data, exchange_space=None):
@@ -75,8 +74,6 @@ def spawn(m, space=None, spawnArgs=None):
         return Spawnable.spawn_m(m, space, spawnArgs)
     elif type(m) is types.FunctionType:
         return Spawnable.spawn_f(m, space)
-    elif isinstance(m, Receiver):
-        return Spawnable.spawn_mr(m, space)
 
 @staticmethod
 def kill(id):

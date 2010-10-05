@@ -9,7 +9,6 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.messaging.receiver import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import ProcessFactory
@@ -23,7 +22,7 @@ class AuthorizationService(BaseService):
     declare = BaseService.service_declare(name='authorization', version='0.1.0', dependencies=[])
 
     def op_authorize(self, content, headers, msg):
-        """Service operation: 
+        """Service operation:
         """
 
 
@@ -54,4 +53,3 @@ class AuthorizationService(BaseService):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(AuthorizationService)
-

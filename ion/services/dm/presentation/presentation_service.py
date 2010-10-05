@@ -6,12 +6,9 @@
 @brief service for presentation of DM resources and services.
 """
 
-
-
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.messaging.receiver import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import ProcessFactory
@@ -23,11 +20,11 @@ class PresentationService(BaseService):
 
     # Declaration of service
     declare = BaseService.service_declare(name='presentation_service', version='0.1.0', dependencies=[])
- 
+
     def op_present_catalog(self, content, headers, msg):
         """Service operation: TBD
         """
-        
+
 # Spawn of the process using the module name
 factory = ProcessFactory(PresentationService)
 

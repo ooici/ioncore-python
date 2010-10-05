@@ -16,10 +16,6 @@ from twisted.internet.task import LoopingCall
 from twisted.internet import reactor
 from ion.core.base_process import ProcessFactory
 
-
-#from ion.core.cc.container import Container
-from ion.core.messaging.receiver import Receiver
-
 from ion.core.base_process import BaseProcess, ProcessDesc
 import ion.util.procutils as pu
 

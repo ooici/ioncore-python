@@ -35,9 +35,6 @@ class Container(BasicLifecycleObject):
     Represents an instance of the Capability Container. Typically, in one Twisted
     process (= one UNIX process), there is only one instance of a CC. In test cases,
     however, there might be more.
-
-    As a context, Container interfaces the messaging space with the local
-    Spawnable and their Receivers...
     """
     implements(IContainer)
 

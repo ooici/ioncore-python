@@ -72,7 +72,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         controlled vocabulary
     """
 
-    def __init__(self, receiver=None, spawnArgs=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         self.connected = False
         self.instrument = None
         self.command = None
@@ -131,7 +131,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             "ptcb2": 0.0
         }
 
-        InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
+        InstrumentDriver.__init__(self, *args, **kwargs)
 
     @defer.inlineCallbacks
     def plc_init(self):

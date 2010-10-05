@@ -134,6 +134,27 @@ To compile all code to see if there are Python compile errors anywhere:
 Change log:
 ===========
 
+2010-10-04:
+- MASSIVE REFACTORING IN BASE CLASSES
+- Added OTP style apps and app files as primary way to start up processes
+  in the container
+- Added a FSM based StateObject. Many manager/controller level objects now make
+  use of states. States and operations INIT -> initialize() -> READY ->
+  activate() -> READY -> terminate() -> TERMINATED
+- BaseProcess (and subclasses), Receiver, ProcessDesc, Container etc are all
+  BasicLifecyleObjects.
+- Massively enhanced the capability container API. Delegated the actual
+  implementation to manager classes: proc, exchange, app manager
+- Refactored the way processes are spawned
+- Refactored the Receiver use. There are now subclasses for Receivers that
+  manage and declare the specific types of AMQP resources, such as worker and
+  fanout. No more declare_messaging necessary.
+- Refactored the former magnet code into more object oriented style.
+- Message headers now contain status code for every message. 'OK is the default
+  and 'ERROR' is set on error
+- Changed reply_ok and reply_err: a dict content value will not be modified
+- Fixed imports and tests throughout the code base
+
 2010-09-20:
 - Added start scripts in bin/
 - Use ant install to install Python dependencies (calls python setup.py install)

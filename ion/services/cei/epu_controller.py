@@ -5,7 +5,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer, reactor
 from twisted.internet.task import LoopingCall
-from ion.core.messaging.receiver import Receiver
+
 from ion.services.base_service import BaseService
 from ion.core.base_process import ProcessFactory
 from ion.core import bootstrap

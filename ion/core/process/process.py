@@ -160,7 +160,7 @@ class ProcessFactory(object):
         spawnargs = spawnargs or {}
         container = container or ioninit.container_instance
 
-        #log.debug("ProcessFactory.build(name=%s, args=%s)" % (self.name,spawnArgs))
+        #log.debug("ProcessFactory.build(name=%s, args=%s)" % (self.name,spawnargs))
 
         # Create a process receiver
         procname = spawnargs.get('proc-name', self.name)
@@ -184,7 +184,12 @@ class ProcessInstantiator(object):
     def create_process_id(cls, container=None):
         container = container or ioninit.container_instance
         cls.idcount += 1
-        return Id(cls.idcount, container.id)
+        if container:
+            containerid = container.id
+        else:
+            # Purely for tests to avoid a _start_container() in setUp()
+            containerid = "TEST-CONTAINER-ID"
+        return Id(cls.idcount, containerid)
 
     @classmethod
     @defer.inlineCallbacks
@@ -207,7 +212,7 @@ class ProcessInstantiator(object):
             raise RuntimeError("Process model factory must provide IProcessFactory")
 
         procid = ProcessInstantiator.create_process_id(container)
-        spawnargs['proc-id'] = procid
+        spawnargs['proc-id'] = procid.full
 
         process = yield defer.maybeDeferred(module.factory.build, spawnargs)
         if not IProcess.providedBy(process):

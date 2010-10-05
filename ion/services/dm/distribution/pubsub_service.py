@@ -199,7 +199,6 @@ class DataPubsubService(BaseService):
             child_id = yield self.spawn_child(child)
             #subscription.consumer_procids[name]=child_id
 
-
         subscription = yield self.reg.register(subscription)
 
         defer.returnValue(subscription)

@@ -28,6 +28,7 @@ class TestSensors(IonTestCase):
         self.queue_name_work = bproc.get_scoped_name("system", "test_cei_sensors_work")
         #for the sensor events queue:
         self.queue_name_events = bproc.get_scoped_name("system", "test_cei_sensors_events")
+        # @todo Remove the declarations below
         self.total_messages = 5
         topic = {
             self.queue_name_work:{'name_type':'worker', 'args':{'scope':'global'}},
@@ -74,11 +75,12 @@ class TestSensorAggregator(BaseProcess):
     @defer.inlineCallbacks
     def plc_init(self):
         # create new receiver ('listener'), for the events (just the receiver object)
-        self.event_receiver = Receiver("event_receiver", self.queue_name_events)
         # set BaseProcesses receive method as the callback for the new receiver that was just created.
-        self.event_receiver.handle(self.receive)
+        self.event_receiver = Receiver(label="event_receiver",
+                                       name=self.queue_name_events,
+                                       handler=self.receive)
         # actually create queue consumer:
-        receiver_id = yield self.event_receiver.activate()
+        receiver_id = yield self.event_receiver.attach()
 
     def op_event(self, content, headers, msg):
         self.message_count = int(content['messages'])

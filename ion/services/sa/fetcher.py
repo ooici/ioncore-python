@@ -223,7 +223,7 @@ class FetcherClient(BaseServiceClient):
 
         log.info('Sending HEAD request to fetcher...')
         (content, headers, msg) = yield self.rpc_send('get_head', requested_url)
-        if 'ERROR' in content:
+        if 'ERROR' in headers:
             raise ValueError('Error on URL: ' + content['failure'])
         defer.returnValue(content)
 
@@ -239,7 +239,7 @@ class FetcherClient(BaseServiceClient):
 
         log.info('Sending request')
         (content, headers, msg) = yield self.rpc_send('get_url', requested_url)
-        if 'ERROR' in content:
+        if 'ERROR' in headers:
             raise ValueError('Error on URL: ' + content['failure'])
         defer.returnValue(content)
 
@@ -250,7 +250,7 @@ class FetcherClient(BaseServiceClient):
         """
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('get_dap_dataset', requested_url)
-        if 'ERROR' in content:
+        if 'ERROR' in headers:
             raise ValueError('Error on URL: ' + content['failure'])
         defer.returnValue(content)
 

@@ -57,6 +57,7 @@ class BaseProcess(BasicLifecycleObject):
 
         # An Id with the process ID (fully qualified)
         procid = self.spawn_args.get('proc-id', ProcessInstantiator.create_process_id())
+        procid = pu.get_process_id(procid)
         self.id = procid
         assert isinstance(self.id, Id), "Process id must be Id"
 
@@ -284,9 +285,9 @@ class BaseProcess(BasicLifecycleObject):
         d = self.rpc_conv.pop(payload['conv-id'])
         content = payload.get('content', None)
         res = (content, payload, msg)
-        if type(content) is dict and content.get('status',None) == 'OK':
+        if type(content) is dict and payload.get('status',None) == 'OK':
             pass
-        elif type(content) is dict and content.get('status',None) == 'ERROR':
+        elif type(content) is dict and payload.get('status',None) == 'ERROR':
             log.warn('RPC reply is an ERROR: '+str(content.get('value',None)))
         else:
             log.error('RPC reply is not well formed. Use reply_ok or reply_err')

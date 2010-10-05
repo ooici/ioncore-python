@@ -9,7 +9,6 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.messaging.receiver import Receiver
 
 import ion.util.procutils as pu
 from ion.core.base_process import ProcessFactory
@@ -107,7 +106,7 @@ class InstrumentRegistryClient(registry.BaseRegistryClient, registry.LCStateMixi
 
     def get_instrument_by_id(self, id):
         return self.base_get_resource_by_id('get_instrument_by_id', id)
-        
+
     #def set_resource_lcstate(self, resource_reference, lcstate):
     #    return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_instrument_lcstate')
 
@@ -120,4 +119,3 @@ class InstrumentRegistryClient(registry.BaseRegistryClient, registry.LCStateMixi
 
 # Spawn of the process using the module name
 factory = ProcessFactory(InstrumentRegistryService)
-

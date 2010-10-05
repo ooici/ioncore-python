@@ -120,7 +120,7 @@ class DeployableTypeRegistryClient(BaseServiceClient):
             'vars' : vars
         })
 
-        if content.get('status') == 'ERROR':
+        if headers.get('status') == 'ERROR':
             raise DeployableTypeLookupError(content.get('value'))
 
         defer.returnValue({

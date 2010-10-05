@@ -12,8 +12,6 @@ log = ion.util.ionlog.getLogger(__name__)
 #import time
 from twisted.internet import defer
 from twisted.trial import unittest
-#from ion.core.cc.container import Container
-from ion.core.messaging.receiver import Receiver
 
 from ion.core.base_process import ProcessFactory
 from ion.core import bootstrap

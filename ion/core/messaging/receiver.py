@@ -44,7 +44,7 @@ class Receiver(BasicLifecycleObject):
     SCOPE_SYSTEM = 'system'
     SCOPE_LOCAL = 'local'
 
-    def __init__(self, label, name, scope='global', xspace=None, process=None, group=None, handler=None):
+    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None):
         """
         @param label descriptive label for the receiver
         @param name the actual exchange name. Used for routing

@@ -61,9 +61,10 @@ class BaseProcessTest(IonTestCase):
         self.assertEquals(pid1, p1.id)
         self.assertEquals(p1._get_state(), "ACTIVE")
 
-        args = {'proc-id':Id('local','container')}
+        procid = Id('local','container')
+        args = {'proc-id':procid.full}
         p2 = BaseProcess(spawnargs=args)
-        self.assertEquals(p2.id, args['proc-id'])
+        self.assertEquals(p2.id, procid)
         yield p2.initialize()
         self.assertEquals(p2._get_state(), "READY")
         yield p2.activate()
@@ -178,7 +179,7 @@ class BaseProcessTest(IonTestCase):
         pid1 = yield self.test_sup.spawn_child(child1)
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echofail2','content123')
-        self.assertEquals(cont['status'], 'ERROR')
+        self.assertEquals(hdrs['status'], 'ERROR')
         log.info('Process 1 responded to error correctly')
 
     @defer.inlineCallbacks

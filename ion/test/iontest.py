@@ -37,6 +37,8 @@ class IonTestCase(unittest.TestCase):
      class DatastoreTest(IonTestCase):
     """
 
+    # Set timeout for Trial tests
+    timeout = 20
     procRegistry = base_process.procRegistry
 
     @defer.inlineCallbacks
@@ -106,7 +108,7 @@ class IonTestCase(unittest.TestCase):
 
     def _spawn_process(self, process):
         return process.spawn()
-        
+
     def _get_procid(self, name):
         """
         @param name  process instance label given when spawning

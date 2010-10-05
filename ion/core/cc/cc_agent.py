@@ -18,7 +18,7 @@ from ion.core import ionconst, ioninit
 from ion.core.ioninit import ion_config
 from ion.core.base_process import BaseProcess, ProcessFactory, ProcessDesc
 from ion.core.cc.container import Container
-from ion.core.messaging.receiver import Receiver
+from ion.core.messaging.receiver import Receiver, FanoutReceiver
 import ion.util.procutils as pu
 
 
@@ -39,16 +39,14 @@ class CCAgent(ResourceAgent):
     def plc_activate(self):
         # Declare CC announcement name
         annName = 'cc_announce'
-        messaging = {'name_type':'fanout', 'args':{'scope':'system'}}
-        yield ioninit.container_instance.configure_messaging(self.ann_name, messaging)
         log.info("Declared CC anounce name: "+str(self.ann_name))
 
         # Attach to CC announcement name
-        annReceiver = Receiver(annName+'.'+self.receiver.label, self.ann_name)
-        annReceiver.group = self.receiver.group
-        self.ann_receiver = annReceiver
-        self.ann_receiver.handle(self.receive)
-        self.add_receiver(self.ann_receiver)
+        self.ann_receiver = FanoutReceiver(name=self.ann_name,
+                                           label=annName+'.'+self.receiver.label,
+                                           scope=FanoutReceiver.SCOPE_SYSTEM,
+                                           group=self.receiver.group,
+                                           handler=self.receive)
         annid = yield self.ann_receiver.attach()
         log.info("Listening to CC anouncements: "+str(annid))
 
