@@ -1,17 +1,18 @@
 #!/usr/bin/env python
 
 """
-@file ion/core/supervisor.py
+@file ion/core/process/supervisor.py
 @author Michael Meisinger
-@brief base class for processes that supervise other processes
+@brief base class for processes that supervise other processes and compensate
+        failures
 """
+
+from twisted.internet import defer
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
-from ion.core.cc.spawnable import spawn
 
-from ion.core.base_process import BaseProcess, ProtocolFactory
+from ion.core.base_process import BaseProcess, ProcessFactory
 import ion.util.procutils as pu
 
 class Supervisor(BaseProcess):
@@ -25,9 +26,4 @@ class Supervisor(BaseProcess):
         return
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(Supervisor)
-
-"""
-from ion.core import supervisor as s
-spawn(s)
-"""
+factory = ProcessFactory(Supervisor)

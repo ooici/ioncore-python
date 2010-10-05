@@ -10,7 +10,7 @@ Porting from LCO implementation to new LCA arch - complete rewrite.
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.dm.util.eoi_data_stream_producer import CoordinatorClient
 
 from ion.services.base_service import BaseService
@@ -149,11 +149,11 @@ class ProxyService(BaseService):
         log.info('Proxy listener running.')
 
     @defer.inlineCallbacks
-    def slc_shutdown(self):
+    def slc_terminate(self):
         """
         Close TCP listener
         """
         log.info('Shutting down proxy')
         yield self.proxy_port.stopListening()
 
-factory = ProtocolFactory(ProxyService)
+factory = ProcessFactory(ProxyService)

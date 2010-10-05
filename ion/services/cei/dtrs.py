@@ -14,7 +14,8 @@ import string
 
 from twisted.internet import defer
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
+from ion.core.exception import ReceivedError
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.core import ioninit
 
@@ -23,7 +24,7 @@ __all__ = ['DeployableTypeRegistryService', 'DeployableTypeRegistryClient']
 #TODO ugggggggggghhhhhhhhh
 _REGISTRY = {}
 CONF = ioninit.config(__name__)
-execfile(CONF['deployable_types'])
+execfile(ioninit.adjust_dir(CONF['deployable_types']))
 log.debug('Loaded %s deployable types.', len(_REGISTRY))
 
 class DeployableTypeRegistryService(BaseService):
@@ -114,14 +115,14 @@ class DeployableTypeRegistryClient(BaseServiceClient):
         """
         yield self._check_init()
         log.debug("Sending DTRS lookup request")
-        (content, headers, msg) = yield self.rpc_send('lookup', {
-            'deployable_type' : dt,
-            'nodes' : nodes,
-            'vars' : vars
-        })
-
-        if content.get('status') == 'ERROR':
-            raise DeployableTypeLookupError(content.get('value'))
+        try:
+            (content, headers, msg) = yield self.rpc_send('lookup', {
+                'deployable_type' : dt,
+                'nodes' : nodes,
+                'vars' : vars
+            })
+        except ReceivedError, re:
+            raise DeployableTypeLookupError(re.msg_content.get('value'))
 
         defer.returnValue({
             'document' : content.get('document'),
@@ -134,4 +135,4 @@ class DeployableTypeLookupError(Exception):
     pass
 
 # Direct start of the service as a process with its default name
-factory = ProtocolFactory(DeployableTypeRegistryService)
+factory = ProcessFactory(DeployableTypeRegistryService)

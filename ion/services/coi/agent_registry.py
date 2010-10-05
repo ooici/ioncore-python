@@ -14,7 +14,7 @@ from twisted.internet import defer
 import inspect
 
 from ion.core.base_process import BaseProcess
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 from ion.data.datastore import registry
@@ -78,7 +78,7 @@ class AgentRegistryService(registry.BaseRegistryService):
     Service operation: Find all the registered agent instances which match a description
     """
 # Spawn of the process using the module name
-factory = ProtocolFactory(AgentRegistryService)
+factory = ProcessFactory(AgentRegistryService)
 
 
 class AgentRegistryClient(registry.BaseRegistryClient):
@@ -229,8 +229,7 @@ class AgentRegistryClient(registry.BaseRegistryClient):
             agent_resource.proc_name = agent_instance.proc_name
         if agent_instance.spawn_args:
             agent_resource.spawn_args = agent_instance.spawn_args
-        if agent_instance.proc_state:
-            agent_resource.process_state = agent_instance.proc_state
+        agent_resource.process_state = agent_instance._get_state()
 
         # add a reference to the supervisor - can't base process does not have the same fields as ProcessDesc
         #if agent_resource.sup_process:

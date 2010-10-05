@@ -6,22 +6,25 @@
 @brief test case for ION integration and system test cases (and some unit tests)
 """
 
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
-
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
-from ion.core.cc import container
-from ion.core.cc.container import Id
+
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import base_process, bootstrap, ioninit
 from ion.core import ioninit
 from ion.core.base_process import BaseProcess
+from ion.core.cc import container
+from ion.core.cc.container import Id, Container
+from ion.core.process.process import IProcess
 from ion.data.store import Store
 import ion.util.procutils as pu
 
 from ion.resources import description_utility
 
+# The following modules must be imported here, because they load config
+# files. If done while in test, it does not work!
 
 CONF = ioninit.config(__name__)
 
@@ -34,13 +37,14 @@ class IonTestCase(unittest.TestCase):
      class DatastoreTest(IonTestCase):
     """
 
+    # Set timeout for Trial tests
+    timeout = 20
     procRegistry = base_process.procRegistry
 
     @defer.inlineCallbacks
     def _start_container(self):
         """
         Starting and initialzing the container with a connection to a broker.
-        @note Hardwired to connect to amoeba for broker.
         """
         mopt = {}
         mopt['broker_host'] = CONF['broker_host']
@@ -50,18 +54,22 @@ class IonTestCase(unittest.TestCase):
         mopt['boot_script'] = None
         mopt['script'] = None
 
+        # Little trick to have no consecutive failures if previous setUp() failed
+        if Container._started:
+            log.error("PROBLEM: Previous test did not stop container. Fixing...")
+            yield self._stop_container()
+
         self.container = container.create_new_container()
-        self.container.initialize(mopt)
+        yield self.container.initialize(mopt)
         yield self.container.activate()
 
-        bootstrap.init_container()
+        # Manually perform some ioncore initializations
+        yield bootstrap.init_ioncore()
+
         self.procRegistry = base_process.procRegistry
         self.test_sup = yield bootstrap.create_supervisor()
 
-        #Load All Resource Descriptions for future decoding
-        description_utility.load_descriptions()
-
-        log.info("============Capability Container started, "+repr(self.container.message_space))
+        log.info("============ %s ===" % self.container)
 
     @defer.inlineCallbacks
     def _start_core_services(self):
@@ -103,6 +111,9 @@ class IonTestCase(unittest.TestCase):
         sup = sup if sup else self.test_sup
         return bootstrap.spawn_processes(procs, sup)
 
+    def _spawn_process(self, process):
+        return process.spawn()
+
     def _get_procid(self, name):
         """
         @param name  process instance label given when spawning
@@ -115,10 +126,8 @@ class IonTestCase(unittest.TestCase):
         @param pid  process id
         @retval BaseProcess instance for process id
         """
-        for rec in base_process.receivers:
-            if rec.spawned.id.full == str(pid):
-                return rec.procinst
-        return None
+        process = ioninit.container_instance.proc_manager.process_registry.kvs.get(pid, None)
+        return process
 
 class ReceiverProcess(BaseProcess):
     """
@@ -128,6 +137,7 @@ class ReceiverProcess(BaseProcess):
     def __init__(self, *args, **kwargs):
         BaseProcess.__init__(self, *args, **kwargs)
         self.inbox = defer.DeferredQueue()
+        self.inbox_count = 0
 
     def _dispatch_message(self, payload, msg, target, conv):
         """
@@ -139,6 +149,7 @@ class ReceiverProcess(BaseProcess):
         log.info('ReceiverProcess: Received message op=%s from sender=%s' %
                      (msg.payload['op'], msg.payload['sender']))
         self.inbox.put(msg)
+        self.inbox_count += 1
         return defer.succeed(True)
 
     def await_message(self):

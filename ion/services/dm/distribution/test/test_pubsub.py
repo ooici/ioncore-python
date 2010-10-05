@@ -16,6 +16,7 @@ from twisted.internet import defer
 
 
 from ion.core import bootstrap
+from ion.core.exception import ReceivedError
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
@@ -43,21 +44,21 @@ class PubSubEndToEndTest(IonTestCase):
 
         self.sup = yield self._spawn_processes(services)
         self.pubsub_client = DataPubsubClient(self.sup)
-        
+
         child_id = yield self.sup.get_child_id('pubsub_service')
         log.debug('PubSub Test Service ID:' + str(child_id))
         self.pubsub = self._get_procinstance(child_id)
-        
-       
+
+
         self.topic1 = PubSubTopicResource.create('Test1 Topic',"Grids")
         self.topic2 = PubSubTopicResource.create('Test2 Topic',"Points")
-        
+
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.pubsub.reg.clear_registry()
-        yield self._stop_container()        
-        
-    @defer.inlineCallbacks    
+        yield self._stop_container()
+
+    @defer.inlineCallbacks
     def test_publisher(self):
         """
         Publish to a topic that has been registered with a publisher.
@@ -67,8 +68,8 @@ class PubSubEndToEndTest(IonTestCase):
         yield self.pubsub_client.define_publisher(self.pub1)
         res = yield self.pubsub_client.publish(self.sup, self.topic1, "Gridded data")
         self.assertEqual(res, 'sent')
-    
-    @defer.inlineCallbacks    
+
+    @defer.inlineCallbacks
     def test_publisher_fail(self):
         """
         Try to publish to a topic that has not been registered to a publisher.
@@ -78,9 +79,12 @@ class PubSubEndToEndTest(IonTestCase):
         self.topic2 = yield self.pubsub_client.define_topic(self.topic2)
         self.pub1 = PublisherResource.create("Grids", self.sup, [self.topic1], "content")
         yield self.pubsub_client.define_publisher(self.pub1)
-        res = yield self.pubsub_client.publish(self.sup, self.topic2, "Point data")  
-        self.assertEqual(res,'error sending message!')
-        
+        try:
+            yield self.pubsub_client.publish(self.sup, self.topic2, "Point data")
+            self.fail("ReceivedError expected")
+        except ReceivedError, re:
+            pass
+
 class PubSubServiceMethodTest(IonTestCase):
 
     @defer.inlineCallbacks
@@ -324,7 +328,6 @@ class PubSubServiceMethodTest(IonTestCase):
         '''
         @brief Create a subscription!
         '''
-
         # Create and Register a topic
         topic1 = PubSubTopicResource.create('Davids Topic',"oceans, oil spill, fun things to do")
         # Use the service to create a queue and register the topic

@@ -11,7 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 #from ion.services.base_service import BaseService
 from ion.data import dataobject
 from ion.data.datastore import registry
@@ -94,4 +94,4 @@ class IdentityRegistryService(BaseRegistryService):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(IdentityRegistryService)
+factory = ProcessFactory(IdentityRegistryService)

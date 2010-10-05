@@ -9,10 +9,9 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class TransformationService(BaseService):
@@ -21,13 +20,13 @@ class TransformationService(BaseService):
 
     # Declaration of service
     declare = BaseService.service_declare(name='transformation_service', version='0.1.0', dependencies=[])
- 
+
     def op_transform(self, content, headers, msg):
         """Service operation: TBD
         """
-        
+
 # Spawn of the process using the module name
-factory = ProtocolFactory(TransformationService)
+factory = ProcessFactory(TransformationService)
 
 class TransformationClient(BaseServiceClient):
     def __init__(self, proc=None, **kwargs):

@@ -12,6 +12,7 @@ from twisted.internet import defer
 
 from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
+from ion.core.exception import ReceivedError
 from ion.data.dataobject import ResourceReference
 from ion.core.base_process import BaseProcess, BaseProcessClient
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
@@ -357,13 +358,13 @@ class InstrumentAgent(ResourceAgent):
             indicating code and response message on fail
         """
         assert(isinstance(content, (list, tuple)))
-        execResult = yield self.driver_client.execute(content)
-        assert(isinstance(execResult, dict))
-        if (execResult['status'] == 'OK'):
+        try:
+            execResult = yield self.driver_client.execute(content)
+            assert(isinstance(execResult, dict))
             yield self.reply_ok(msg, execResult['value'])
-        else:
+        except ReceivedError, re:
             yield self.reply_err(msg, "Failure, response is: %s"
-                                 % execResult['value'])
+                                 % re.msg_content['value'])
     @defer.inlineCallbacks
     def op_get_status(self, content, headers, msg):
         """
@@ -373,11 +374,11 @@ class InstrumentAgent(ResourceAgent):
         @retval ACK message with response on success, ERR message on failure
         """
         assert(isinstance(content, (list, tuple)))
-        response = yield self.driver_client.get_status(content)
-        if (response['status'] == 'OK'):
+        try:
+            response = yield self.driver_client.get_status(content)
             yield self.reply_ok(msg, response['value'])
-        else:
-            yield self.reply_err(msg, response['value'])
+        except ReceivedError, re:
+            yield self.reply_err(msg, re.msg_content['value'])
 
 class InstrumentAgentClient(ResourceAgentClient):
     """

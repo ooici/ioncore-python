@@ -11,11 +11,8 @@ log = ion.util.ionlog.getLogger(__name__)
 #import time
 from twisted.internet import defer
 from twisted.trial import unittest
-#from ion.core.cc.container import Container
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import spawn
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.core import bootstrap
 from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.test.iontest import IonTestCase
@@ -48,7 +45,7 @@ class DSPTest(IonTestCase):
         yield bootstrap.declare_messaging(queue_properties)
         self.queue1 = queue1
 
-        
+
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -65,12 +62,12 @@ class DSPTest(IonTestCase):
                  'procclass':'LoggingConsumer',
                  'spawnargs':{'attach':[self.queue1]}}
         child1 = base_consumer.ConsumerDesc(**pd1)
-        
+
         child1_id = yield self.test_sup.spawn_child(child1)
-        
+
         dc1 = self._get_procinstance(child1_id)
-        
-        
+
+
         dsp1={'name':'data_stream_1',
                  'module':'ion.services.dm.util.data_stream_producer',
                  'procclass':'DataStreamProducer',
@@ -78,18 +75,15 @@ class DSPTest(IonTestCase):
                               'delivery interval':5}}
 
         child2 = ProcessDesc(**dsp1)
-        
+
         child2_id = yield self.test_sup.spawn_child(child2)
-        
+
         yield pu.asleep(2)
-        
+
         rec = dc1.receive_cnt[self.queue1]
         self.assertEqual(rec,1)
-                
+
         yield pu.asleep(5)
-        
+
         rec = dc1.receive_cnt[self.queue1]
         self.assertEqual(rec,2)
-                
-        
-

@@ -8,6 +8,7 @@
 """
 
 from twisted.internet import defer
+from twisted.trial import unittest
 
 from ion.services.dm.scheduler.scheduler_registry import SchedulerRegistryClient
 
@@ -51,6 +52,7 @@ class SRT(IonTestCase):
 
     @defer.inlineCallbacks
     def test_query(self):
+        raise unittest.SkipTest('query code incomplete')
         sc = SchedulerRegistryClient(proc=self.sup)
 
         yield sc.store_task('foobar', 1.0)
@@ -59,6 +61,7 @@ class SRT(IonTestCase):
 
     @defer.inlineCallbacks
     def test_rm(self):
+        raise unittest.SkipTest('rm not implemented in registry')
         sc = SchedulerRegistryClient(proc=self.sup)
 
         yield sc.store_task('foobar', 1.0)

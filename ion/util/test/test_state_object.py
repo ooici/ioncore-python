@@ -12,7 +12,7 @@ from twisted.trial import unittest
 from twisted.internet import defer
 from twisted.internet.defer import inlineCallbacks
 
-from ion.util.state_object import StateObject, BasicLifecycleObject, BasicFSMFactory
+from ion.util.state_object import StateObject, BasicLifecycleObject, BasicFSMFactory, BasicStates
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -24,44 +24,45 @@ class StateObjectTest(IonTestCase):
     def test_SO(self):
         so = TestSO()
         self._assertCounts(so, 0, 0, 0, 0, 0)
-        so._so_process(BasicFSMFactory.E_INITIALIZE)
+        so._so_process(BasicStates.E_INITIALIZE)
         self._assertCounts(so, 1, 0, 0, 0, 0)
-        so._so_process(BasicFSMFactory.E_ACTIVATE)
+        so._so_process(BasicStates.E_ACTIVATE)
         self._assertCounts(so, 1, 1, 0, 0, 0)
-        so._so_process(BasicFSMFactory.E_DEACTIVATE)
+        so._so_process(BasicStates.E_DEACTIVATE)
         self._assertCounts(so, 1, 1, 1, 0, 0)
-        so._so_process(BasicFSMFactory.E_ACTIVATE)
+        so._so_process(BasicStates.E_ACTIVATE)
         self._assertCounts(so, 1, 2, 1, 0, 0)
-        so._so_process(BasicFSMFactory.E_DEACTIVATE)
+        so._so_process(BasicStates.E_DEACTIVATE)
         self._assertCounts(so, 1, 2, 2, 0, 0)
-        so._so_process(BasicFSMFactory.E_TERMINATE)
+        so._so_process(BasicStates.E_TERMINATE)
         self._assertCounts(so, 1, 2, 2, 1, 0)
 
-        so._so_process(BasicFSMFactory.E_INITIALIZE)
+        so._so_process(BasicStates.E_INITIALIZE)
         self._assertCounts(so, 1, 2, 2, 1, 1)
-        so._so_process(BasicFSMFactory.E_ACTIVATE)
+        so._so_process(BasicStates.E_ACTIVATE)
         self._assertCounts(so, 1, 2, 2, 1, 2)
-        so._so_process(BasicFSMFactory.E_DEACTIVATE)
+        so._so_process(BasicStates.E_DEACTIVATE)
         self._assertCounts(so, 1, 2, 2, 1, 3)
-        so._so_process(BasicFSMFactory.E_TERMINATE)
+        so._so_process(BasicStates.E_TERMINATE)
         self._assertCounts(so, 1, 2, 2, 1, 4)
 
         so = TestSO()
-        so._so_process(BasicFSMFactory.E_ACTIVATE)
+        so._so_process(BasicStates.E_ACTIVATE)
         self._assertCounts(so, 0, 0, 0, 0, 1)
 
         so = TestSO()
-        so._so_process(BasicFSMFactory.E_DEACTIVATE)
+        so._so_process(BasicStates.E_DEACTIVATE)
         self._assertCounts(so, 0, 0, 0, 0, 1)
 
         so = TestSO()
-        so._so_process(BasicFSMFactory.E_TERMINATE)
+        so._so_process(BasicStates.E_TERMINATE)
         self._assertCounts(so, 0, 0, 0, 0, 1)
 
         so = TestSO()
         self._assertCounts(so, 0, 0, 0, 0, 0)
-        so.initialize()
+        res = so.initialize()
         self._assertCounts(so, 1, 0, 0, 0, 0)
+        self.assertEqual(res, 33)
         so.activate()
         self._assertCounts(so, 1, 1, 0, 0, 0)
         so.deactivate()
@@ -72,18 +73,46 @@ class StateObjectTest(IonTestCase):
         so = TestSODeferred()
         self._assertCounts(so, 0, 0, 0, 0, 0)
 
-        yield so._so_process(BasicFSMFactory.E_INITIALIZE)
+        res = yield so._so_process(BasicStates.E_INITIALIZE)
         self._assertCounts(so, 1, 0, 0, 0, 0)
-        yield so._so_process(BasicFSMFactory.E_ACTIVATE)
+        self.assertEqual(res, 33)
+        yield so._so_process(BasicStates.E_ACTIVATE)
         self._assertCounts(so, 1, 1, 0, 0, 0)
+
+    def test_SO_error(self):
+        so = TestSO()
+        self._assertCounts(so, 0, 0, 0, 0, 0)
+
+        so.initialize()
+        self._assertCounts(so, 1, 0, 0, 0, 0)
+        try:
+            so.activate(blow=True)
+            self.fail("Exception expected")
+        except RuntimeError, re:
+            self.assertEqual(str(re),"blow")
+        self._assertCounts(so, 1, 1, 0, 0, 1)
+
+    @defer.inlineCallbacks
+    def test_SO_error_def(self):
+        so = TestSODeferred()
+        self._assertCounts(so, 0, 0, 0, 0, 0)
+
+        yield so.initialize()
+        self._assertCounts(so, 1, 0, 0, 0, 0)
+        try:
+            yield so.activate(blow=True)
+            self.fail("Exception expected")
+        except RuntimeError, re:
+            self.assertEqual(str(re),"blow")
+        self._assertCounts(so, 1, 1, 0, 0, 1)
 
     def test_SO_argument(self):
         so = TestSO()
-        so._so_process(BasicFSMFactory.E_INITIALIZE, 1, 2, 3)
+        so._so_process(BasicStates.E_INITIALIZE, 1, 2, 3)
         self._assertCounts(so, 1, 0, 0, 0, 0)
         self.assertEqual(so.args, (1, 2, 3))
         self.assertEqual(so.kwargs, {})
-        so._so_process(BasicFSMFactory.E_ACTIVATE, a=1, b=2)
+        so._so_process(BasicStates.E_ACTIVATE, a=1, b=2)
         self._assertCounts(so, 1, 1, 0, 0, 0)
         self.assertEqual(so.args, ())
         self.assertEqual(so.kwargs, dict(a=1, b=2))
@@ -116,12 +145,15 @@ class TestSO(BasicLifecycleObject):
         self.args = args
         self.kwargs = kwargs
         log.debug("on_initialize called")
+        return 33
 
     def on_activate(self, *args, **kwargs):
         self.cnt_act += 1
         self.args = args
         self.kwargs = kwargs
         log.debug("on_activate called")
+        if kwargs.get('blow', False):
+            raise RuntimeError("blow")
 
     def on_deactivate(self, *args, **kwargs):
         self.cnt_deact += 1
@@ -147,13 +179,15 @@ class TestSODeferred(TestSO):
 
     @defer.inlineCallbacks
     def on_initialize(self, *args, **kwargs):
-        TestSO.on_initialize(self, *args, **kwargs)
+        res = TestSO.on_initialize(self, *args, **kwargs)
         log.debug("before sleep")
         yield pu.asleep(0.05)
         log.debug("done sleep")
+        defer.returnValue(res)
 
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
+        yield pu.asleep(0.05)
         TestSO.on_activate(self, *args, **kwargs)
         yield pu.asleep(0.05)
 

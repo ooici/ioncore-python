@@ -24,7 +24,7 @@ from pydap.handlers.nca import Handler as ncaHandler
 from ion.data import dataobject
 from ion.resources.dm_resource_descriptions import DAPMessageObject, StringMessageObject, DictionaryMessageObject
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 
 import uuid
 from ion.services.dm.distribution import base_consumer
@@ -387,7 +387,7 @@ class PersisterConsumer(base_consumer.BaseConsumer):
             return 1
 '''
 # Must change name after refactor
-factory = ProtocolFactory(PersisterConsumer)
+factory = ProcessFactory(PersisterConsumer)
 
 
 '''

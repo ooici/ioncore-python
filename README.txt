@@ -134,6 +134,37 @@ To compile all code to see if there are Python compile errors anywhere:
 Change log:
 ===========
 
+2010-10-04:
+- MASSIVE REFACTORING IN BASE CLASSES
+- Refactored the former magnet code into more object oriented style.
+- Requires Carrot 0.10.11. Carrot before does not handle all deferred
+  operations correctly.
+- Refactored the Receiver use. There are now subclasses for Receivers that
+  manage and declare the specific types of AMQP resources, such as worker and
+  fanout. No more declare_messaging necessary.
+- Refactoried the capability container classes.
+- Added a FSM based StateObject. Many manager/controller level objects now make
+  use of states. States and operations INIT -> initialize() -> READY ->
+  activate() -> ACTIVE -> terminate() -> TERMINATED (and more, with errors)
+- BaseProcess (and subclasses), Receiver, ProcessDesc, Container etc are all
+  BasicLifecyleObjects.
+- BaseProcess now waits to activate the receiver until in ACTIVE state. Before,
+  code can do RPC, but not receive messages on the process id
+- Massively enhanced the capability container API. Delegated the actual
+  implementation to manager classes: proc, exchange, app manager
+- Refactored the way processes are spawned. Refactored ProcessDesc to use the
+  new container API. Processes are by default immediately initialized and
+  activated. The op_init message has been eliminated.
+- Renamed ProtocolFactory to ProcessFactory; changed in each process module
+- Message headers now contain status code for every message. 'OK is the default
+  and 'ERROR' is set on error
+- BaseProcess.rpc_send now raises a ReceivedError in case the RPC comes back
+  with status='ERROR'
+- Changed reply_ok and reply_err: a dict content value will not be modified
+- Fixed imports and tests throughout the code base
+- Added OTP style apps and app files as primary way to start up processes
+  in the container. See res/apps/*.app files and ion.core.pack
+
 2010-09-20:
 - Added start scripts in bin/
 - Use ant install to install Python dependencies (calls python setup.py install)

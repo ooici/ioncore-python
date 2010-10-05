@@ -53,7 +53,7 @@ class PydapIntegrationTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        # @note Required to trigger the slc_shutdown hook
+        # @note Required to trigger the slc_terminate hook
         yield self._shutdown_processes()
         yield self._stop_container()
 
@@ -113,7 +113,7 @@ class IntegrationTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        # @note Required to trigger the slc_shutdown hook
+        # @note Required to trigger the slc_terminate hook
         yield self._shutdown_processes()
         yield self._stop_container()
 

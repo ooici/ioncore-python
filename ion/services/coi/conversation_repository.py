@@ -7,7 +7,7 @@
 """
 import logging
 import ion.util.ionlog
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService
 
 logserv = logging.getLogger('convRepos')
@@ -50,4 +50,4 @@ class ConversationRepositoryService(BaseService):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(ConversationRepositoryService)
+factory = ProcessFactory(ConversationRepositoryService)

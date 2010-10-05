@@ -131,4 +131,4 @@ class SchedulerServiceClient(BaseServiceClient):
         defer.returnValue(content)
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(SchedulerService)
+factory = ProcessFactory(SchedulerService)

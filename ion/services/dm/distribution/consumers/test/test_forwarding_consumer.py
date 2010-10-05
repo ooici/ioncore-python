@@ -30,44 +30,43 @@ class TestForwardingConsumer(IonTestCase):
     '''
     @defer.inlineCallbacks
     def setUp(self):
-        
+
         self.dapdata = dap_tools.demo_dataset()
-        
+
         self.dictdata = {'data':3.14159,'name':'stuff'}
         self.strdata = 'Junk in a string'
-        
+
         self.notification='Notify me that OOI is working'
-        
+
         self.timestamp=3.14159
 
-        self.queues1=['abc']        
+        self.queues1=['abc']
         self.queues2=['abc','def']
-        
+
         self.fc = forwarding_consumer.ForwardingConsumer()
         yield self.fc.plc_init()
-        
+
     def test_no_queues(self):
         self.fc.ondata(self.dictdata, self.notification, self.timestamp)
-        
+
         self.assertEqual(self.fc.msgs_to_send,[])
 
     def test_dict_queues1(self):
         self.fc.ondata(self.dictdata, self.notification, self.timestamp,queues=self.queues1)
-        
+
         self.assertEqual(len(self.fc.msgs_to_send),1)
 
 
     def test_dict_queues2(self):
         self.fc.ondata(self.dictdata, self.notification, self.timestamp,queues=self.queues2)
-        
+
         self.assertEqual(len(self.fc.msgs_to_send),2)
 
 
     def test_dapdata(self):
         self.fc.ondata(self.dapdata, self.notification, self.timestamp,queues=self.queues1)
         self.assertEqual(len(self.fc.msgs_to_send),1)
-        
+
     def test_strdata(self):
         self.fc.ondata(self.strdata, self.notification, self.timestamp,queues=self.queues1)
         self.assertEqual(len(self.fc.msgs_to_send),1)
-        

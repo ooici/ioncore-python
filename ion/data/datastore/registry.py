@@ -20,7 +20,7 @@ from ion.data.datastore import objstore
 
 from ion.core import ioninit
 from ion.core import base_process
-from ion.core.base_process import ProtocolFactory, BaseProcess
+from ion.core.base_process import ProcessFactory, BaseProcess
 from ion.services.base_service import BaseService, BaseServiceClient
 from ion.resources import coi_resource_descriptions
 import ion.util.procutils as pu
@@ -442,7 +442,7 @@ class RegistryService(BaseRegistryService):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(RegistryService)
+factory = ProcessFactory(RegistryService)
 
 
 class BaseRegistryClient(BaseServiceClient):
@@ -459,8 +459,7 @@ class BaseRegistryClient(BaseServiceClient):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send(op_name,None)
-        if content['status'] == 'OK':
-            defer.returnValue(None)
+        defer.returnValue(None)
 
 
     @defer.inlineCallbacks
@@ -485,14 +484,10 @@ class BaseRegistryClient(BaseServiceClient):
 
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
-        if content['status']=='OK':
-            #resource = dataobject.Resource.decode(content['value'])
-            resource = dataobject.serializer.decode(content['value'], headers['encoding'])
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(resource)
-        else:
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
-            defer.returnValue(None)
+        #resource = dataobject.Resource.decode(content['value'])
+        resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+        defer.returnValue(resource)
 
     @defer.inlineCallbacks
     def base_get_resource(self,op_name ,resource_reference):
@@ -514,14 +509,10 @@ class BaseRegistryClient(BaseServiceClient):
 
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
-        if content['status']=='OK':
-            #resource = dataobject.Resource.decode(content['value'])
-            resource = dataobject.serializer.decode(content['value'], headers['encoding'])
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(resource)
-        else:
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
-            defer.returnValue(None)
+        #resource = dataobject.Resource.decode(content['value'])
+        resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+        defer.returnValue(resource)
 
     @defer.inlineCallbacks
     def base_get_resource_by_id(self, op_name, id):
@@ -532,14 +523,10 @@ class BaseRegistryClient(BaseServiceClient):
         (content, headers, msg) = yield self.rpc_send(op_name, id, headers)
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
-        if content['status']=='OK':
-            #resource = dataobject.Resource.decode(content['value'])
-            resource = dataobject.serializer.decode(content['value'], headers['encoding'])
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(resource)
-        else:
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
-            defer.returnValue(None)
+        #resource = dataobject.Resource.decode(content['value'])
+        resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+        defer.returnValue(resource)
 
 
     @defer.inlineCallbacks
@@ -570,14 +557,10 @@ class BaseRegistryClient(BaseServiceClient):
 
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
-        if content['status'] == 'OK':
-            #resource_reference = dataobject.ResourceReference.decode(content['value'])
-            resource_reference = dataobject.serializer.decode(content['value'], headers['encoding'])
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(resource_reference)
-        else:
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
-            defer.returnValue(None)
+        #resource_reference = dataobject.ResourceReference.decode(content['value'])
+        resource_reference = dataobject.serializer.decode(content['value'], headers['encoding'])
+        log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+        defer.returnValue(resource_reference)
 
 
     @defer.inlineCallbacks
@@ -616,14 +599,10 @@ class BaseRegistryClient(BaseServiceClient):
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
         # Return a list of resources
-        if content['status'] == 'OK':
-            #results = dataobject.DataObject.decode(content['value'])
-            results = dataobject.serializer.decode(content['value'], headers['encoding'])
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(results.resources)
-        else:
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
-            defer.returnValue([])
+        #results = dataobject.DataObject.decode(content['value'])
+        results = dataobject.serializer.decode(content['value'], headers['encoding'])
+        log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+        defer.returnValue(results.resources)
 
 
 class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):

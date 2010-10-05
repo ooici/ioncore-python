@@ -7,7 +7,7 @@
 """
 
 from ion.services.dm.distribution import base_consumer
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 
 
 class LatestConsumer(base_consumer.BaseConsumer):
@@ -37,4 +37,4 @@ class LatestConsumer(base_consumer.BaseConsumer):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(LatestConsumer)
+factory = ProcessFactory(LatestConsumer)

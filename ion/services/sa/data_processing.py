@@ -9,10 +9,9 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class DataProcessingService(BaseService):
@@ -46,4 +45,4 @@ class DataProcessingService(BaseService):
         self.reply_err(msg,"Not yet implemented")
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(DataProcessingService)
+factory = ProcessFactory(DataProcessingService)

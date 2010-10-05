@@ -16,7 +16,7 @@ class PublisherResource(StatefulResource):
     """
     A registry object which contains information about publishers
     """
-    #Name - inherited!    
+    #Name - inherited!
     publisher= TypedAttribute(str) #The identity of the publisher
     topics = TypedAttribute(list) # List of Topic Resource References
     content_type = TypedAttribute(str) #What types are there?
@@ -26,13 +26,13 @@ class PublisherResource(StatefulResource):
         """
         """
         inst = cls.create_new_resource()
-        
+
         inst.name = name
-        inst.publisher = publisher_proc.receiver.spawned.id.full
-        
+        inst.publisher = publisher_proc.id.full
+
         if not hasattr(topics, '__iter__'):
             topics = [topics]
-        
+
         for topic in topics:
             inst.topics.append(topic.reference(head=True))
 
@@ -43,15 +43,15 @@ class PublisherResource(StatefulResource):
 
 """
 Pub Sub Messaging objects!
-"""    
+"""
 class DataMessageObject(DataObject):
     """
     Base Class for Data PubSub Message Objects
     """
     notification = TypedAttribute(str)
     timestamp = TypedAttribute(float)
-    
-    
+
+
 class DAPMessageObject(DataMessageObject):
     """Container object for messaging DAP data"""
     das = TypedAttribute(str)
@@ -61,12 +61,12 @@ class DAPMessageObject(DataMessageObject):
 class StringMessageObject(DataMessageObject):
     """Container object for messaging STRING data"""
     data = TypedAttribute(str)
-    
+
 class DictionaryMessageObject(DataMessageObject):
     """Container object for messaging DICTIONARY data"""
     data = TypedAttribute(dict)
-    
-    
+
+
 class Publication(DataObject):
     """
     A container message for things published
@@ -79,8 +79,8 @@ class Publication(DataObject):
 class AOI(DataObject):
     """
     Implement class and comparison methods for AOI!
-    """  
-    
+    """
+
 class Queue(DataObject):
     '''
     @brief The exchange message Queue is really an exchange registry object
@@ -89,19 +89,19 @@ class Queue(DataObject):
     type = TypedAttribute(str)
     name = TypedAttribute(str)
     args = TypedAttribute(dict)
-    
-    
+
+
 class PubSubTopicResource(InformationResource):
     """
     A topic definition which can be stored in the registry
     Contains a Name, a Keyword, an Exchange Queue, and an AOI
     """
     #name - inherited, a handle for the topic
-    
+
     queue = TypedAttribute(Queue)
     keywords = TypedAttribute(str)
-    aoi = TypedAttribute(AOI)    
-    
+    aoi = TypedAttribute(AOI)
+
     @classmethod
     def create(cls,name, keywords,aoi=None):
         """
@@ -123,12 +123,12 @@ class SubscriptionResource(StatefulResource):
     #Name - inherited
 
     #owner = TypedAttribute(ResourceReference) # Don't worry about owner yet
-    
+
     # hack for now to allow naming one-three more topic descriptions used to find topics that are subscribed to!
     topic1 = TypedAttribute(PubSubTopicResource)
-    topic2 = TypedAttribute(PubSubTopicResource) 
+    topic2 = TypedAttribute(PubSubTopicResource)
     topic3 = TypedAttribute(PubSubTopicResource)
-    
+
     workflow = TypedAttribute(dict)
     '''
     Only specify who you attach to - not who you produce to - consistent with pubsub model!
@@ -170,25 +170,25 @@ Preliminary!
 class AttributeData(DataObject):
     """
     """
-    
+
 class FloatAttribute(AttributeData):
     """
     #@todo convert to use numpy types
     """
     f = TypedAttribute(float)
-    
+
 class IntegerAttribute(AttributeData):
     """
     #@todo convert to use numpy types
     """
     i = TypedAttribute(int)
-    
+
 class StringAttribute(AttributeData):
     """
     #@todo convert to use numpy types
     """
     s = TypedAttribute(str)
-    
+
 
 class DMDataResource(InformationResource):
     '''
@@ -202,15 +202,15 @@ class DMDataResource(InformationResource):
     input_topic = TypedAttribute(ResourceReference)
     ingested_archive = TypedAttribute(ResourceReference)
     ingested_topic = TypedAttribute(ResourceReference)
-        
-    
+
+
 class CDMResource(InformationResource):
     '''
     A resource class to describe Unidata Common data model data
     '''
     groups = TypedAttribute(list)
-    
-    
+
+
 class DMGroupData(CDMResource):
     #Name - inherited
     attributes = TypedAttribute(list)
@@ -218,7 +218,7 @@ class DMGroupData(CDMResource):
     variables = TypedAttribute(list)
     dmdataresource = TypedAttribute(ResourceReference)
     archive_grpid = TypedAttribute(int,0)
-    
+
 class DMAttributeData(CDMResource):
     #Name - inherited
     value = TypedAttribute(AttributeData)
@@ -233,7 +233,7 @@ class DMDimensionData(CDMResource):
     is_variable_length = TypedAttribute(bool,False)
     dmdataresource = TypedAttribute(ResourceReference)
     archive_dimid = TypedAttribute(int,0) # Varid or name?
-    
+
 class DMVariableData(CDMResource):
     """
     """
@@ -243,14 +243,14 @@ class DMVariableData(CDMResource):
     type = TypedAttribute(str)
     dmdataresource = TypedAttribute(ResourceReference)
     archive_varid = TypedAttribute(str) # Varid or name?
-    
+
 class DMStructureData(CDMResource):
     """
     """
     #Name - inherited
     members = TypedAttribute(list)
     # What?
-    
+
 
 """
 DM Ingestion data stream object
@@ -265,7 +265,3 @@ class IngestionStreamResource(StatefulResource):
     persisteing_ingested = TypedAttribute(bool)
     ingesting = TypedAttribute(bool)
     dataregistry = TypedAttribute(ResourceReference)
-
-
-    
-    

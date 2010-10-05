@@ -21,24 +21,24 @@ from ion.data import dataobject
 
 class SchedulerRegistry(BaseRegistryService):
     """
-    Our registry is an instance of the BaseRegistryService. Just declare the messaging
-    and take the class instance as-is; API skinning is provided in the client.
-    Yes, this is quite clever, thanks very much.
+    Our registry is an instance of the BaseRegistryService.
     """
     declare = BaseService.service_declare(name='scheduler_registry',
                                           version='0.1.0',
                                           dependencies=[])
 
     """
-    OK, blocked - stupid base class lacks the required op_ prefix, so you're forced
-    to rename the functions to match the LCA signature. This sucks.
+    OK, base class lacks the required op_ prefix, so you're forced
+    to rename the functions to match the LCA signature. This needs a redesign.
     """
     op_clear = BaseRegistryService.base_clear_registry
-    # op_store_task = BaseRegistryService.base_register_resource
+
+    #op_store_task = BaseRegistryService.base_register_resource
     def op_store_task(self, content, headers, msg):
         log.info('got a message!')
         log.info(content)
-        self.reply_ok(msg, 'goo')
+        return self.base_register_resource(content, headers, msg)
+
     """
     And the base class has no remove function. Weak.
 
@@ -46,11 +46,10 @@ class SchedulerRegistry(BaseRegistryService):
     """
     op_query_tasks = BaseRegistryService.base_find_resource
 
-    @defer.inlineCallbacks
     def op_rm_task(self, content, headers, msg):
-        yield self.reply_err(msg, 'Method not implemented!!')
+        self.reply_err(msg, 'Method not implemented!!')
 
-class ScheduleEntry(dataobject.DataObject):
+class ScheduleEntry(dataobject.Resource):
     """
     Class representing a single stored schedule entry. Contents are
     entry is a dictionary with
@@ -80,7 +79,6 @@ class SchedulerRegistryClient(BaseRegistryClient):
         else:
             log.error('Error clearing registry!')
 
-    @defer.inlineCallbacks
     def store_task(self, target, interval, payload=None, taskid=None):
         """
         @brief Stores a task in the registry, optionally overwriting a previous version.
@@ -105,14 +103,9 @@ class SchedulerRegistryClient(BaseRegistryClient):
         """
         se_object = ScheduleEntry()
         se_object.entry = msg
-        #se_object.id = msg['taskid']
+        se_object.id = msg['taskid']
 
-        yield self._check_init()
-
-        log.info(se_object.encode)
-        (content, headers, msg) = yield self.rpc_send('store_task', se_object)
-        if content['status'] == 'OK':
-            defer.returnValue(content['taskid'])
+        return self.base_register_resource('store_task', se_object)
 
     def query_tasks(self, task_regex):
         """
@@ -129,8 +122,10 @@ class SchedulerRegistryClient(BaseRegistryClient):
         Remove a given taskid from the registry.
         @param taskid Task ID to remove.
         """
+        se_object = ScheduleEntry()
+        se_object.id = taskid
         # As per david s, this is the current way to rm something
-        return self.base_set_resource_lcstate('set_resource_lcstate',taskid, 'retired')
+        return self.base_set_resource_lcstate('rm_task', se_object, 'retired')
 
 # Spawn of the process using the module name
 factory = ProtocolFactory(SchedulerRegistry)

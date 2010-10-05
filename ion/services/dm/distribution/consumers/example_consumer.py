@@ -10,7 +10,7 @@ is sent to a separate queue. These destinations are set as part of the spawnargs
 
 from ion.services.dm.distribution import base_consumer
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -60,4 +60,4 @@ class ExampleConsumer(base_consumer.BaseConsumer):
         
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(ExampleConsumer)
+factory = ProcessFactory(ExampleConsumer)

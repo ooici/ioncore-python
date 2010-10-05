@@ -18,8 +18,7 @@ from twisted.internet import reactor
 
 
 #from ion.core.cc.container import Container
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import spawn
+from ion.core.messaging.receiver import Receiver, FanoutReceiver
 
 from ion.core.base_process import BaseProcess, ProcessDesc
 import ion.util.procutils as pu
@@ -43,7 +42,6 @@ class BaseConsumer(BaseProcess):
     All tranformaitons and data presentation methods should inherit for this
     and implement the ondata method to perform the desired task.
     '''
-
 
     @defer.inlineCallbacks
     def plc_init(self):
@@ -94,23 +92,20 @@ class BaseConsumer(BaseProcess):
         log.debug(self.__class__.__name__ + ' customize_consumer complete!')
 
 
-
     def customize_consumer(self):
         '''
         Use this method to customize the initialization of the consumer
         '''
-
-
 
     @defer.inlineCallbacks
     def attach(self, queue):
         #@note - I tried to put a try/except here, but it did not catch the error from CC
 
         # Check and make sure it is not already attached?
-
-        dataReceiver = Receiver(__name__, str(queue))
-        dataReceiver.handle(self.receive)
-        dr_id = yield spawn(dataReceiver)
+        dataReceiver = FanoutReceiver(label=__name__,
+                                        name=str(queue),
+                                        handler=self.receive)
+        dr_id = yield dataReceiver.attach()
 
         #print dr_id, dataReceiver.name
 
@@ -392,12 +387,7 @@ class ConsumerDesc(ProcessDesc):
     def attach(self,queues):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
                                                 'attach', {'queues':queues})
-        if content.get('status','ERROR') == 'OK':
-            #self.proc_attached = queue
-            defer.returnValue('OK')
-        else:
-            #self.proc_attached = None
-            defer.returnValue('ERROR')
+        defer.returnValue('OK')
 
     '''
     Magnet does not yet support Deattach
@@ -405,60 +395,39 @@ class ConsumerDesc(ProcessDesc):
     def deattach(self,queues):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
                                                 'deattach', {'queues':queues})
-        if content.get('status','ERROR') == 'OK':
-            #self.proc_attached = queue
-            defer.returnValue('OK')
-        else:
-            #self.proc_attached = None
-            defer.returnValue('ERROR')
+        #self.proc_attached = queue
+        defer.returnValue('OK')
     '''
 
     @defer.inlineCallbacks
     def set_process_parameters(self,params):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
                                                 'set_process_parameters', params)
-        if content.get('status','ERROR') == 'OK':
-            #self.proc_params = params
-            defer.returnValue('OK')
-        else:
-            #self.proc_params = None
-            defer.returnValue('ERROR')
+        #self.proc_params = params
+        defer.returnValue('OK')
 
     @defer.inlineCallbacks
     def get_process_parameters(self):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
                                                 'get_process_parameters', {})
-        if content.pop('status','ERROR') == 'OK':
-            defer.returnValue(content)
-        else:
-            defer.returnValue('ERROR')
+        defer.returnValue(content)
 
     @defer.inlineCallbacks
     def set_delivery_queues(self,params):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
                                                 'set_delivery_queues', params)
-        if content.get('status','ERROR') == 'OK':
-            #self.proc_params = params
-            defer.returnValue('OK')
-        else:
-            #self.proc_params = None
-            defer.returnValue('ERROR')
+        #self.proc_params = params
+        defer.returnValue('OK')
 
     @defer.inlineCallbacks
     def get_delivery_queues(self):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
                                                 'get_delivery_queues', {})
-        if content.pop('status','ERROR') == 'OK':
-            defer.returnValue(content)
-        else:
-            defer.returnValue('ERROR')
+        defer.returnValue(content)
 
     @defer.inlineCallbacks
     def get_msg_count(self):
         (content, headers, msg) = yield self.sup_process.rpc_send(self.proc_id,
                                                 'get_msg_count', {})
-        if content.pop('status','ERROR') == 'OK':
-            #defer.returnValue(content.get('count','ERROR'))
-            defer.returnValue(content)
-        else:
-            defer.returnValue('ERROR')
+        #defer.returnValue(content.get('count','ERROR'))
+        defer.returnValue(content)

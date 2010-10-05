@@ -11,7 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.services.coi.service_registry import ServiceRegistryClient 
+from ion.services.coi.service_registry import ServiceRegistryClient
 from ion.test.iontest import IonTestCase
 
 from ion.play import hello_service
@@ -38,33 +38,33 @@ class ServiceRegistryTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_service_reg(self):
-        
+
         # Register a service class object
         play_desc = yield self.src.register_service_definition(hello_service.HelloService)
-        
+
         # create a reference to the description in the registry
         ref = play_desc.reference()
-        
+
         # get the description back from its reference
         svc_desc = yield self.src.get_service_definition(ref)
-        
+
         #print svc_desc
 
     @defer.inlineCallbacks
     def test_service_instance_reg(self):
         """
-        """        
+        """
         services = [
-            {'name':'hello1','module':'ion.play.hello_service','class':'HelloService'},
+            {'name':'hello1','module':'ion.play.hello_service','class':'ion.play.hello_service.HelloService'},
         ]
         # Create a process supervisor class
         sup = yield self._spawn_processes(services, sup=self.sup)
-        
+
         # Register the service instance from the supervisors child_procs - Agument is a ProcessDesc object.
         # See base process!
         play_desc = yield self.src.register_service_instance(sup.child_procs[1])
         #print play_desc
-        
+
 
 
 class ServiceRegistryCoreServiceTest(IonTestCase):
@@ -86,6 +86,3 @@ class ServiceRegistryCoreServiceTest(IonTestCase):
         raise unittest.SkipTest('Not implimented yet!')
         # Not sure what the point is here?
         # Lets get it integrated with base process!
-        
-        
-        

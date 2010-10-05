@@ -9,10 +9,9 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class HelloService(BaseService):
@@ -24,9 +23,9 @@ class HelloService(BaseService):
                                           version='0.1.0',
                                           dependencies=[])
 
-    def __init__(self, receiver, spawnArgs=None):
+    def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
-        BaseService.__init__(self, receiver, spawnArgs)
+        BaseService.__init__(self, *args, **kwargs)
         log.info('HelloService.__init__()')
 
     def slc_init(self):
@@ -59,7 +58,7 @@ class HelloServiceClient(BaseServiceClient):
         defer.returnValue(str(content))
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(HelloService)
+factory = ProcessFactory(HelloService)
 
 
 

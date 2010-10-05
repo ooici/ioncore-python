@@ -6,16 +6,22 @@
 @brief base classes for all service processes and clients.
 """
 
+from twisted.internet import defer
+from zope.interface import implements, Interface
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
-from ion.core.cc.container import Container
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import spawn
 
-from ion.core import base_process
+from ion.core import base_process, ioninit
 from ion.core.base_process import BaseProcess, BaseProcessClient
+from ion.core.cc.container import Container
+from ion.core.messaging.receiver import ServiceWorkerReceiver
 import ion.util.procutils as pu
+
+class IServiceProcess(Interface):
+    """
+    Interface for all capability container service worker processes
+    """
 
 class BaseService(BaseProcess):
     """
@@ -25,10 +31,12 @@ class BaseService(BaseProcess):
     The service subclass must have declaration with defaule service name,
     version identifier and dependencies.
     """
+    implements(IServiceProcess)
+
     # Service declaration, to be set by the subclass
     declare = {}
 
-    def __init__(self, receiver=None, spawnArgs=None):
+    def __init__(self, *args, **kwargs):
         """
         Initializes base service. The default service name is taken from the
         service declaration, a different service name can be provided in the
@@ -37,7 +45,7 @@ class BaseService(BaseProcess):
         service inbound queue that is shared among all service processes with
         the same name
         """
-        BaseProcess.__init__(self, receiver, spawnArgs)
+        BaseProcess.__init__(self, *args, **kwargs)
 
         # Determine public service messaging name either from spawn args or
         # use default name from service declaration
@@ -46,52 +54,26 @@ class BaseService(BaseProcess):
         self.svc_name = self.spawn_args.get('servicename', default_svcname)
         assert self.svc_name, "Service must have a declare with a valid name"
 
-        # Scope (prefix) the service name with the system name
-        msgName = self.get_scoped_name('system', self.svc_name)
-
         # Create a receiver (inbound queue consumer) for service name
-        svcReceiver = Receiver(self.svc_name+'.'+self.receiver.label, msgName)
-        if hasattr(self.receiver, 'group'):
-            svcReceiver.group = self.receiver.group
-        self.svc_receiver = svcReceiver
-        self.svc_receiver.handle(self.receive)
+        self.svc_receiver = ServiceWorkerReceiver(
+                label=self.svc_name+'.'+self.receiver.label,
+                name=self.svc_name,
+                scope='system',
+                group=self.receiver.group,
+                handler=self.receive)
         self.add_receiver(self.svc_receiver)
 
     @defer.inlineCallbacks
-    def op_start(self, content, headers, msg):
-        """
-        Start service operation, on receive of a start message
-        """
-        yield defer.maybeDeferred(self.slc_start)
-        yield self.reply_ok(msg)
-
-    @defer.inlineCallbacks
-    def op_stop(self, content, headers, msg):
-        """
-        Stop service operation, on receive of a stop message
-        """
-        yield defer.maybeDeferred(self.slc_stop)
-        yield self.reply_ok(msg)
-
-    @defer.inlineCallbacks
     def plc_init(self):
-        yield self._declare_service_name()
-        svcid = yield spawn(self.svc_receiver)
-        log.info('Service process bound to name=%s as pid=%s' % (self.svc_receiver.name, svcid))
-        yield defer.maybeDeferred(self.slc_init)
-        yield defer.maybeDeferred(self.slc_start)
+        # Step 1: Service init callback
+        try:
+            yield defer.maybeDeferred(self.slc_init)
+        except Exception, ex:
+            log.exception('----- Service %s process %s INIT ERROR -----' % (self.svc_name, self.id))
+            raise ex
 
-    @defer.inlineCallbacks
-    def _declare_service_name(self):
-        # Ad hoc service exchange name declaration
-        msgName = self.get_scoped_name('system', self.svc_name)
-        messaging = {'name_type':'worker', 'args':{'scope':'system'}}
-        yield Container.configure_messaging(msgName, messaging)
-
-    @defer.inlineCallbacks
-    def plc_shutdown(self):
-        yield defer.maybeDeferred(self.slc_stop)
-        yield defer.maybeDeferred(self.slc_shutdown)
+        # Step 2: Init service name receiver (declare queue)
+        yield self.svc_receiver.initialize()
 
     def slc_init(self):
         """
@@ -101,30 +83,69 @@ class BaseService(BaseProcess):
         """
         #log.debug('slc_init()')
 
-    def slc_start(self):
+    @defer.inlineCallbacks
+    def plc_activate(self):
+        # Step 1: Service activate callback
+        try:
+            yield defer.maybeDeferred(self.slc_activate)
+        except Exception, ex:
+            log.exception('----- Service %s process %s ACTIVATE ERROR -----' % (self.svc_name, self.id))
+            raise ex
+
+        # Step 2: Activate service name receiver (activate consumer)
+        yield self.svc_receiver.activate()
+        log.info('Service process bound to name=%s' % (self.svc_receiver.xname))
+
+    def slc_activate(self):
         """
-        Service life cycle event: start of service process. Will be called once
+        Service life cycle event: activate service process. Will be called once
         or many times after the slc_init of a service process. At this point,
         all service dependencies must be present.
         """
         #log.info('slc_start()')
 
-    def slc_stop(self):
-        """
-        Service life cycle event: stop of service process. Will be called to
-        stop a started service process, and before shutdown. A stopped service
-        can be restarted again.
-        """
-        #log.info('slc_stop()')
+    @defer.inlineCallbacks
+    def plc_deactivate(self):
+        # Step 1: Activate service name receiver (deactivate consumer)
+        yield self.svc_receiver.deactivate()
+        log.info('Service process detached from name=%s' % (self.svc_receiver.xname))
 
-    def slc_shutdown(self):
+        # Step 2: Service deactivate callback
+        try:
+            yield defer.maybeDeferred(self.slc_deactivate)
+        except Exception, ex:
+            log.exception('----- Service %s process %s DEACTIVATE ERROR -----' % (self.svc_name, self.id))
+            raise ex
+
+    def slc_deactivate(self):
+        """
+        Service life cycle event: deactivate service process. Will be called to
+        deactivate an activated service process, and before terminate. A
+        deactivated service can be restarted again.
+        """
+        #log.info('slc_deactivate()')
+
+    @defer.inlineCallbacks
+    def plc_terminate(self):
+        try:
+            yield defer.maybeDeferred(self.slc_deactivate)
+            yield defer.maybeDeferred(self.slc_terminate)
+        except Exception, ex:
+            log.exception('----- Service %s process %s TERMINATE ERROR -----' % (self.svc_name, self.id))
+            raise ex
+
+        yield defer.maybeDeferred(self.slc_stop)
+        yield defer.maybeDeferred(self.slc_shutdown)
+
+
+    def slc_terminate(self):
         """
         Service life cycle event: final shutdown of service process. Will be
         called after a slc_stop before the actual termination of the process.
         No further asyncronous activities are allowed by the process after
         reply from this function.
         """
-        #log.info('slc_shutdown()')
+        #log.info('slc_terminate()')
 
     @classmethod
     def service_declare(cls, **kwargs):
@@ -133,10 +154,9 @@ class BaseService(BaseProcess):
         @param kwargs keyword attributes for service. Common ones must be present.
         @retval a dict with service attributes
         """
-        log.debug("Service-declare: "+str(kwargs))
-        decl = {}
-        decl.update(kwargs)
-        return decl
+        log.debug("Service-declare: %s" % (kwargs))
+        return kwargs
+
 
 class BaseServiceClient(BaseProcessClient):
     """

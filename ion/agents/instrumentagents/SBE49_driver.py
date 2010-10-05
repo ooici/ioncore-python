@@ -28,7 +28,7 @@ from ion.agents.instrumentagents.SBE49_constants import instrument_commands
 
 import ion.util.procutils as pu
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 
 class InstrumentClient(Protocol):
     """
@@ -72,7 +72,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         controlled vocabulary
     """
 
-    def __init__(self, receiver=None, spawnArgs=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         self.connected = False
         self.instrument = None
         self.command = None
@@ -131,7 +131,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             "ptcb2": 0.0
         }
 
-        InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
+        InstrumentDriver.__init__(self, *args, **kwargs)
 
     @defer.inlineCallbacks
     def plc_init(self):
@@ -148,7 +148,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         log.debug("Instrument driver initialized")
 
     @defer.inlineCallbacks
-    def plc_shutdown(self):
+    def plc_terminate(self):
         yield self.op_disconnect(None, None, None)
 
     def isConnected(self):
@@ -419,4 +419,4 @@ class SBE49InstrumentDriverClient(InstrumentDriverClient):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(SBE49InstrumentDriver)
+factory = ProcessFactory(SBE49InstrumentDriver)

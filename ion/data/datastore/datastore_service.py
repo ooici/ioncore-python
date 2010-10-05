@@ -11,10 +11,9 @@ The associations can be walked to find content.
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
+from ion.core.base_process import ProcessFactory
 from ion.services.base_service import BaseService, BaseServiceClient
 
 class DataStoreService(BaseService):
@@ -26,14 +25,15 @@ class DataStoreService(BaseService):
                                           version='0.1.0',
                                           dependencies=[])
 
-    def __init__(self, receiver, spawnArgs=None):
+    def __init__(self, *args, **kwargs):
         """
         @brief Init method for the DataStore Frontend service
         @param frontend - an instance of a CAStore Frontend
         """
+        BaseService.__init__(self, *args, **kwargs)
+
         # Service class initializer. Basic config, but no yields allowed.
-        self.frontend = spawnArgs['MyFrontend']
-        BaseService.__init__(self, receiver, spawnArgs)
+        self.frontend = self.spawn_args['MyFrontend']
         log.info('DataStoreService.__init__()')
 
 #    @defer.inlineCallbacks
@@ -149,4 +149,4 @@ class DataStoreServiceClient(BaseServiceClient):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(DataStoreService)
+factory = ProcessFactory(DataStoreService)
