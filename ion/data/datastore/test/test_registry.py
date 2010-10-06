@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""
+@file ion/data/datastore/test/test_registry.py
+@author David Stuebe
+@author Matt Rodriguez
+"""
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -7,17 +12,12 @@ from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.data import store
-from ion.data.backends import store_service
 from ion.data.backends import cassandra
 from ion.data.datastore import registry
 from ion.data import dataobject
 
-
 from ion.test.iontest import IonTestCase
-from twisted.internet import defer
 
-from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 class RegistryTest(unittest.TestCase):
     """
@@ -55,6 +55,7 @@ class RegistryTest(unittest.TestCase):
         #would not work with a object description language
         ref = res.reference()
         res2 = yield self.reg.get_resource(ref)
+        log.info("res2 is: %s" % (res2))
         self.failUnless(res == res2)
 
 
@@ -135,6 +136,8 @@ class RegistryTest(unittest.TestCase):
         self.assertEqual(results,[])
 
         results = yield self.reg.find_resource(res1,regex=False,ignore_defaults=False)
+        log.info("results: %s" % results)
+        log.info("res1: %s" % res1)
         self.assertIn(res1, results)
         self.assertNotIn(res2, results)
 
@@ -183,7 +186,12 @@ class RegistryCassandraTest(RegistryTest):
             )
         self.reg = registry.Registry(s)
 
-
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.reg.clear_registry()
+        log.info("Calling connector.disconnect")
+        self.reg.backend.manager.shutdown()
+        
 class RegistryServiceTest(IonTestCase, RegistryTest):
     """
     """

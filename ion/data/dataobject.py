@@ -4,6 +4,7 @@
 @author Dorian Raymer
 @author Michael Meisinger
 @author David Stuebe
+@author Matt Rodriguez
 @brief module for ION structured data object definitions
 """
 
@@ -15,6 +16,9 @@ except:
     import simplejson as json
 import uuid
 import re
+
+import logging
+logging = logging.getLogger(__name__)
 
 from twisted.python import reflect
 
@@ -186,10 +190,19 @@ class DataObject(object):
 
     def compared_to(self,other,regex=False,ignore_defaults=False,attnames=None):
         """
-        Compares only attributes of self by default
+        @brief Compares only attributes of self by default
+        @param other The other object to compare to this object
+        @param regex A regex to use in the comparison
+        @param ignore_defaults 
+        @param attnames 
         """
-        #assert isinstance(other, DataObject)
-        if not isinstance(other, DataObject):
+        
+        logging.info("Called compared_to")
+        logging.info("other.__class__ %s " % other.__class__)
+        logging.info("regex %s" % regex)
+        logging.info("ignore_defaults %s" % ignore_defaults)
+        logging.info("attnames %s" % attnames)
+        if not isinstance(other, DataObject):    
             return False
 
         atts=None
@@ -201,18 +214,13 @@ class DataObject(object):
         if ignore_defaults:
             atts = self.non_default_atts(atts)
 
-        #print 'ATTTTS',atts
-
-        #print 'REGEX',regex
-        #print 'ignore_defaults',ignore_defaults
-        #print 'other',other.get_typedattributes()['name'].default
-        #print 'self',self.get_typedattributes()['name'].default
 
         if not atts:
-            # A degenerate case
             return True
 
+        
         if not regex:
+            logging.info("Evaluating branch")
             try:
                 m=[]
                 for a in atts:
@@ -227,6 +235,7 @@ class DataObject(object):
             except:
                 return False
         else:
+            
             try:
                 m=[]
                 for a in atts:
@@ -379,7 +388,7 @@ class DataObject(object):
         decode store object[s]
         """
         #d = dict([(str(name), TypedAttribute.decode(value)) for name, value in attrs])
-        d={}
+        
         clsobj = cls
         if isinstance(attrs, tuple):
             attrs = list(attrs)
