@@ -12,11 +12,8 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.data.datastore import registry
 
-from ion.core import ioninit
-from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
-
-CONF = ioninit.config(__name__)
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 
 class ExchangeRegistryService(registry.BaseRegistryService):
@@ -57,7 +54,7 @@ class ExchangeRegistryService(registry.BaseRegistryService):
     op_x_brokercredentials = registry.BaseRegistryService.base_get_resource
     op_y_brokercredentials = registry.BaseRegistryService.base_find_resource
 
-    declare = BaseService.service_declare(name='exchange_registry', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='exchange_registry', version='0.1.0', dependencies=[])
 
 
 
@@ -71,8 +68,7 @@ class ExchangeRegistryClient(registry.BaseRegistryClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "exchange_registry"
-        BaseServiceClient.__init__(self, proc, **kwargs)
-
+        ServiceClient.__init__(self, proc, **kwargs)
 
     def register_exchangename(self, exchangename):
         """
@@ -95,4 +91,4 @@ class ExchangeRegistryClient(registry.BaseRegistryClient):
         return self.base_register_resource('register_hardwaremapping', hardwaremapping)
 
 
-factory = ProtocolFactory(ExchangeRegistryService)
+factory = ProcessFactory(ExchangeRegistryService)
