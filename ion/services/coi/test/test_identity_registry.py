@@ -11,6 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
+from ion.core.exception import ReceivedError
 from ion.test.iontest import IonTestCase
 from ion.services.coi.identity_registry import IdentityRegistryClient
 
@@ -115,7 +116,6 @@ class UserRegistrationClientTest(IonTestCase):
         user = yield self.identity_registry_client.register_user(user)
 
         ooi_id = user.reference()
-        print str(ooi_id.RegistryIdentity) + "******************************************************"
         # load the user back
         user0 = yield self.identity_registry_client.get_user(ooi_id)
 
@@ -137,8 +137,11 @@ class UserRegistrationClientTest(IonTestCase):
 
         # Test for user not found handled properly.
         ooi_id.RegistryIdentity = "bogus-ooi_id"
-        result = yield self.identity_registry_client.get_user(ooi_id)
-        self.assertEqual(result, None)
+        try:
+            result = yield self.identity_registry_client.get_user(ooi_id)
+            self.fail("ReceivedError expected")
+        except ReceivedError, re:
+            pass
 
         # Test if we can find the user we have stuffed in.
         user_description = coi_resource_descriptions.IdentityResource()

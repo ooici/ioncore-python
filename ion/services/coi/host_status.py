@@ -18,25 +18,25 @@ except:
 from twisted.internet import defer, task
 from twisted.web import xmlrpc
 
-from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 
-class HostStatusService(BaseService):
+class HostStatusService(ServiceProcess):
     """
     Host status interface
     """
 
 
     # Declaration of service
-    declare = BaseService.service_declare(
+    declare = ServiceProcess.service_declare(
         name='host_status',
         version='0.1.0',
         dependencies=[]
     )
 
 
-    
+
     def slc_init(self):
         self.INTERVAL = 1 # seconds
         self.COUNT    = 1
@@ -54,15 +54,15 @@ class HostStatusService(BaseService):
             log.debug('Shutting down host status looping call')
             self.lc.stop()
             return
-            
+
         log.debug('Starting report query')
         status = yield self.client.callRemote("getStatusString","all")
         log.debug('Received report')
         print status
-    
+
     def isRunning(self):
         return self.lc.running
-    
+
     def op_config(self, content, headers, msg):
         pass
 
@@ -72,14 +72,14 @@ class HostStatusService(BaseService):
         yield self.reply_ok(msg)
 
 
-class HostStatusClient(BaseServiceClient):
+class HostStatusClient(ServiceClient):
     """
     Class for client to sent log message to service
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "host_status"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def logmsg(self, level, msg, sender, logtime):
@@ -87,9 +87,4 @@ class HostStatusClient(BaseServiceClient):
         defer.returnValue(0)
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(HostStatusService)
-
-"""
-from ion.services.coi import logger
-spawn(logger)
-"""
+factory = ProcessFactory(HostStatusService)

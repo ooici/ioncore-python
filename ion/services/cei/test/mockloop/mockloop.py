@@ -5,7 +5,6 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 from ion.core.cc.container import Container
-from ion.core.cc.spawnable import spawn
 
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
@@ -39,10 +38,10 @@ class MockLoop(IonTestCase):
         controllerId = yield self.procRegistry.get("epu_controller")
         provisionerId = yield self.procRegistry.get("provisioner")
         log.info("aggregatorId: "+repr(aggregatorId) + ", " + "provisionerId: "+repr(provisionerId) + ", " + "controllerId: "+repr(controllerId))
-        
+
         testmsg = {
                     'operation':'start',
-                    'deployable_type':'extraction-service-dt-5124', 
+                    'deployable_type':'extraction-service-dt-5124',
                      'launch_id':'fa6baaaf-b4a3-4969-b10f-99f87b3117cd',
                     'instances' : {
                          'head-node' : {
@@ -51,7 +50,7 @@ class MockLoop(IonTestCase):
                             'site':'ec2-west',
                             'data' : {}
                          },
-                        'worker-node' : { 
+                        'worker-node' : {
                             'id': ['5fee8009-67db-4efc-8f35-4cee5d65c917', '228a0ea6-e1eb-4634-b57f-1f4162a89f63'],
                             'allocation' : 'small',
                             'site':'ec2-west',
@@ -62,9 +61,7 @@ class MockLoop(IonTestCase):
                 }
 
         yield pu.asleep(5)
-        
-        yield supervisor.send(provisionerId, "provision", testmsg)
-        
-        yield pu.asleep(1000000) # "forever"
-        
 
+        yield supervisor.send(provisionerId, "provision", testmsg)
+
+        yield pu.asleep(1000000) # "forever"

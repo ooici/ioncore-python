@@ -13,20 +13,20 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit
-from ion.core.base_process import ProtocolFactory
+from ion.core.process.process import ProcessFactory
 from ion.data.store import Store, IStore
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
 
 CONF = ioninit.config(__name__)
 
-class StoreService(BaseService):
+class StoreService(ServiceProcess):
     """
     Service to store and retrieve key/value pairs.
     """
     # Declaration of service
-    declare = BaseService.service_declare(name='store',
+    declare = ServiceProcess.service_declare(name='store',
                                           version='0.1.0',
                                           dependencies=[])
 
@@ -102,14 +102,14 @@ class StoreService(BaseService):
         yield self.reply_ok(msg, {'result':res})
 
 
-class StoreServiceClient(BaseServiceClient, IStore):
+class StoreServiceClient(ServiceClient, IStore):
     """
     Class for the client accessing the attribute store via Exchange
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "store"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def get(self, key):
@@ -147,4 +147,4 @@ class StoreServiceClient(BaseServiceClient, IStore):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(StoreService)
+factory = ProcessFactory(StoreService)

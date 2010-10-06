@@ -12,7 +12,7 @@ from twisted.internet import defer, reactor
 
 """
 from ion.data.dataobject import LCStates as LCS
-from ion.services.base_service import BaseService
+from ion.core.process.service_process import ServiceProcess
 """
 
 # DHE: testing the miros HSM
@@ -21,7 +21,7 @@ from instrument_hsm import InstrumentHsm
 
 from twisted.internet.protocol import Protocol, ClientFactory, ClientCreator
 
-from ion.core.base_process import BaseProcess
+from ion.core.process.process import Process
 from ion.data.dataobject import ResourceReference
 from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource, DAPMessageObject
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
@@ -32,7 +32,7 @@ from ion.agents.instrumentagents.SBE49_constants import instrument_commands
 
 import ion.util.procutils as pu
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.process.process import ProcessFactory
 
 class InstrumentClient(Protocol):
     """
@@ -79,7 +79,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         controlled vocabulary
     """
 
-    def __init__(self, receiver=None, spawnArgs=None, **kwargs):
+    def __init__(self, *args, **kwargs):
+        self.connected = False
         self.instrument = None
         self.command = None
         self.setConnected(False)
@@ -169,7 +170,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             "ptcb2": 0.0
         }
 
-        InstrumentDriver.__init__(self, receiver, spawnArgs, **kwargs)
+        InstrumentDriver.__init__(self, *args, **kwargs)
 
     def top(self, caller):
         log.debug("!!!!!!!!!!!!!!! In top state")
@@ -344,7 +345,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.hsm.onEvent('configured');
 
     @defer.inlineCallbacks
-    def plc_shutdown(self):
+    def plc_terminate(self):
         yield self.op_disconnect(None, None, None)
 
     def isConnected(self):
@@ -616,4 +617,4 @@ class SBE49InstrumentDriverClient(InstrumentDriverClient):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(SBE49InstrumentDriver)
+factory = ProcessFactory(SBE49InstrumentDriver)

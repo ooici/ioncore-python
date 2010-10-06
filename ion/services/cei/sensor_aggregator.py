@@ -10,14 +10,13 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
-from ion.services.base_service import BaseService
-from ion.core.base_process import ProtocolFactory
+from ion.core.process.service_process import ServiceProcess
+from ion.core.process.process import ProcessFactory
 
-class SensorAggregatorService(BaseService):
+class SensorAggregatorService(ServiceProcess):
     """SensorAggregator service interface
     """
-    declare = BaseService.service_declare(name='sensor_aggregator', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='sensor_aggregator', version='0.1.0', dependencies=[])
 
     @defer.inlineCallbacks
     def op_node_status(self, content, headers, msg):
@@ -26,4 +25,4 @@ class SensorAggregatorService(BaseService):
         yield self.send(epu_controller, 'sensor_info', content)
 
 # Direct start of the service as a process with its default name
-factory = ProtocolFactory(SensorAggregatorService)
+factory = ProcessFactory(SensorAggregatorService)

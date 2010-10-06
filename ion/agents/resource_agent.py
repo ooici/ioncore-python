@@ -14,11 +14,11 @@ from ion.services.coi.agent_registry import AgentRegistryClient
 #from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance, AgentInstance
 from ion.resources.coi_resource_descriptions import AgentDescription
 from ion.resources.coi_resource_descriptions import AgentInstance
-from ion.core.base_process import BaseProcess
-from ion.core.base_process import BaseProcessClient
+from ion.core.process.process import Process
+from ion.core.process.process import ProcessClient
 from ion.data.dataobject import LCState, LCStateNames
 
-class ResourceAgent(BaseProcess):
+class ResourceAgent(Process):
     """
     Base class for resource agent processes
     If you are going to write a new agent process, subclass this one and
@@ -189,7 +189,7 @@ class ResourceAgent(BaseProcess):
         Abstract method for the Resource Agent interface
         """
 
-class ResourceAgentClient(BaseProcessClient):
+class ResourceAgentClient(ProcessClient):
     """
     A parent class to handle common resource agent requests. Consider
     subclassing this one when creating a new agent client
@@ -206,10 +206,7 @@ class ResourceAgentClient(BaseProcessClient):
         assert(isinstance(value, LCState))
         (content, headers, msg) = yield self.rpc_send('set_lifecycle_state',
                                                       str(value))
-        if content['status'] == 'OK':
-            defer.returnValue(value)
-        else:
-            defer.returnValue(False)
+        defer.returnValue(value)
 
     @defer.inlineCallbacks
     def get_lifecycle_state(self):
@@ -219,10 +216,7 @@ class ResourceAgentClient(BaseProcessClient):
         """
         (content, headers, msg) = yield self.rpc_send('get_lifecycle_state',
                                                       '')
-        if content['status'] == 'OK':
-            defer.returnValue(LCState(content['value']))
-        else:
-            defer.returnValue(False)
+        defer.returnValue(LCState(content['value']))
 
     @defer.inlineCallbacks
     def get_resource_ref(self):
@@ -230,10 +224,7 @@ class ResourceAgentClient(BaseProcessClient):
         Obtain the resource ID that the resource is registered with.
         """
         (content, headers, msg) = yield self.rpc_send('get_resource_ref', '')
-        if content['status'] == 'OK':
-            defer.returnValue(AgentInstance.decode(content['value']))
-        else:
-            defer.returnValue(None)
+        defer.returnValue(AgentInstance.decode(content['value']))
 
     @defer.inlineCallbacks
     def get_resource_instance(self):
@@ -243,12 +234,9 @@ class ResourceAgentClient(BaseProcessClient):
         """
         (content, headers, msg) = \
             yield self.rpc_send('get_resource_instance', '')
-        if content['status'] == 'OK':
-            content_decode = AgentInstance.decode(content['value'])
-            assert(isinstance(content_decode, AgentInstance))
-            defer.returnValue(content_decode)
-        else:
-            defer.returnValue(None)
+        content_decode = AgentInstance.decode(content['value'])
+        assert(isinstance(content_decode, AgentInstance))
+        defer.returnValue(content_decode)
 
     @defer.inlineCallbacks
     def register_resource(self, agent_instance=None, descriptor=None):
@@ -267,7 +255,4 @@ class ResourceAgentClient(BaseProcessClient):
             (content, headers, msg) = \
               yield self.rpc_send('register_resource', agent_instance.encode())
 
-        if (content['status'] == 'OK'):
-            defer.returnValue(AgentInstance.decode(content['value']))
-        else:
-            defer.returnValue(None)
+        defer.returnValue(AgentInstance.decode(content['value']))

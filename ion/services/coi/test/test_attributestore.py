@@ -11,7 +11,6 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.core import base_process
 from ion.services.coi.attributestore import AttributeStoreService, AttributeStoreClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu

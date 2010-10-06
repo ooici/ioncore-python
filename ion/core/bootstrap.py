@@ -4,24 +4,23 @@
 @file ion/core/bootstrap.py
 @author Michael Meisinger
 @brief main module for bootstrapping the system and support functions. Functions
-        in here are actually called from start scripts and test cases.
+        in here are actually called from ioncore application module and test cases.
 """
+
+from twisted.internet import defer
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
 
-from ion.core.cc import spawnable
+from ion.core import ioninit
 from ion.core.cc.container import Container
-from ion.core.cc.spawnable import spawn
-from ion.data.store import Store
-
-from ion.core import ioninit, base_process
-from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core.cc.modloader import ModuleLoader
+from ion.core.process import process
+from ion.core.process.process import Process, ProcessDesc
+from ion.data.store import Store
+from ion.data.datastore import registry
 from ion.resources import description_utility
 from ion.services.coi import service_registry
-from ion.data.datastore import registry
 
 from ion.util.config import Config
 import ion.util.procutils as pu
@@ -52,10 +51,10 @@ def bootstrap(messaging=None, services=None):
     setup args.
     @param messaging  dict of messaging name configuration dicts
     @param services list of services (as svc description dict) to start up
-    @retval supervisor BaseProcess instance
+    @retval Deferred -> supervisor Process instance
     """
     log.info("Init container, configuring messaging and starting services...")
-    init_container()
+    yield init_ioncore()
     sup = None
     if messaging:
         assert type(messaging) is dict
@@ -66,9 +65,10 @@ def bootstrap(messaging=None, services=None):
 
     defer.returnValue(sup)
 
-def init_container():
+def init_ioncore():
     """
     Performs global initializations on the local container on startup.
+    @retval Deferred
     """
     _set_container_args(Container.args)
     #interceptorsys = CONF.getValue('interceptor_system',None)
@@ -83,6 +83,7 @@ def init_container():
     description_utility.load_descriptions()
 
     #yield bs_register_services()
+    return defer.succeed(None)
 
 def _set_container_args(contargs=None):
     ioninit.cont_args['_args'] = contargs
@@ -107,74 +108,19 @@ def _set_container_args(contargs=None):
             ioninit.cont_args['args'] = contargs
     if 'contid' in ioninit.cont_args:
         Container.id = ioninit.cont_args['contid']
-
-@defer.inlineCallbacks
-def declare_messaging(messagingCfg, cgroup=None):
-    """
-    Configures messaging resources.
-    @todo this needs to go to the exchange registry service
-    """
-    # for each messaging resource call Magnet to define a resource
-    for name, msgResource in messagingCfg.iteritems():
-        scope = msgResource.get('args',{}).get('scope','global')
-        msgName = name
-        if scope == 'local':
-            msgName = Container.id + "." + msgName
-        elif scope == 'system':
-            # @todo: in the root bootstrap this is ok, but HACK
-            msgName = Container.id + "." + msgName
-
-        # declare queues, bindings as needed
-        log.info("Messaging name config: name="+msgName+', '+str(msgResource))
-        yield Container.configure_messaging(msgName, msgResource)
-
-# Sequence number of supervisors
-sup_seq = 0
-
-@defer.inlineCallbacks
-def spawn_processes(procs, sup=None):
-    """
-    Spawns a set of processes.
-    @param procs  list of processes (as description dict) to start up
-    @param sup  spawned BaseProcess instance acting as supervisor
-    @retval Deferred, for supervisor BaseProcess instance
-    """
-    children = []
-    for procDef in procs:
-        child = ProcessDesc(**procDef)
-        children.append(child)
-
-    if sup == None:
-        sup = yield create_supervisor()
-
-    log.info("Spawning child processes")
-    for child in children:
-        child_id = yield sup.spawn_child(child)
-
-    log.debug("process_ids: "+ str(base_process.procRegistry.kvs))
-
-    defer.returnValue(sup)
-
-@defer.inlineCallbacks
-def create_supervisor():
-    """
-    Creates a supervisor process
-    @retval Deferred, for supervisor BaseProcess instance
-    """
-    global sup_seq
-    # Makes the boostrap a process
-    log.info("Spawning supervisor")
-    if sup_seq == 0:
-        supname = "bootstrap"
+    if 'sysname' in ioninit.cont_args:
+        ioninit.sys_name = ioninit.cont_args['sysname']
     else:
-        supname = "supervisor."+str(sup_seq)
-    suprec = base_process.factory.build({'proc-name':supname})
-    sup = suprec.procinst
-    sup.receiver.group = supname
-    supId = yield sup.spawn()
-    yield base_process.procRegistry.put(supname, str(supId))
-    sup_seq += 1
-    defer.returnValue(sup)
+        ioninit.sys_name = ioninit.container_instance.id
+
+def declare_messaging(messagingCfg, cgroup=None):
+    return ioninit.container_instance.declare_messaging(messagingCfg, cgroup)
+
+def spawn_processes(procs, sup=None):
+    return ioninit.container_instance.spawn_processes(procs, sup)
+
+def create_supervisor():
+    return ioninit.container_instance.create_supervisor()
 
 '''
 This method is out of date with the service registry
@@ -184,7 +130,7 @@ def bs_register_services():
     Register all the declared processes.
     """
     src = service_registry.ServiceRegistryClient()
-    for proc in base_process.processes.values():
+    for proc in process.processes.values():
         sd = service_registry.ServiceDesc()
         sd.name = proc['name']
         res = yield src.register_service(sd)
@@ -197,9 +143,5 @@ def reset_container():
     # The following is extremely hacky. Reset static module and classvariables
     # to their defaults. Even further, reset imported names in other modules
     # to the new objects.
-    base_process.procRegistry = Store()
-    base_process.processes = {}
-    base_process.receivers = []
-    spawnable.store = Container.store
-    spawnable.Spawnable.progeny = {}
-
+    process.procRegistry = Store()
+    process.processes = {}

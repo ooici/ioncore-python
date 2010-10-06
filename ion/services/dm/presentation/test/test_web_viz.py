@@ -31,7 +31,7 @@ class WebVizTest(unittest.TestCase):
 
         self.failUnlessSubstring('No data yet...', page)
 
-        yield wviz.plc_shutdown()
+        yield wviz.plc_terminate()
 
 
     @defer.inlineCallbacks
@@ -46,7 +46,7 @@ class WebVizTest(unittest.TestCase):
 
         self.failUnlessSubstring('No data yet...', page)
 
-        yield wviz.plc_shutdown()
+        yield wviz.plc_terminate()
 
     @defer.inlineCallbacks
     def test_two_consumers(self):
@@ -69,8 +69,8 @@ class WebVizTest(unittest.TestCase):
         page = yield client.getPage('http://127.0.0.1:2100/')
         self.failUnlessSubstring('No data yet...', page)
 
-        yield wviz1.plc_shutdown()
-        yield wviz2.plc_shutdown()
+        yield wviz1.plc_terminate()
+        yield wviz2.plc_terminate()
 
     @defer.inlineCallbacks
     def test_two_consumers_bad_port(self):
@@ -91,5 +91,5 @@ class WebVizTest(unittest.TestCase):
         self.failUnlessSubstring('No data yet...', page)
 
 
-        yield wviz1.plc_shutdown()
-        yield wviz2.plc_shutdown()
+        yield wviz1.plc_terminate()
+        yield wviz2.plc_terminate()

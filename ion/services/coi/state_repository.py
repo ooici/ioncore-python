@@ -9,19 +9,18 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-class StateRepositoryService(BaseService):
-    """Repository for service state service interface. Service state is 
+class StateRepositoryService(ServiceProcess):
+    """Repository for service state service interface. Service state is
     information shared between many processes.
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='state_repository', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='state_repository', version='0.1.0', dependencies=[])
 
     def op_define_state(self, content, headers, msg):
         """Service operation: Create a new state object (session) or update
@@ -35,7 +34,6 @@ class StateRepositoryService(BaseService):
     def op_retrieve_state(self, content, headers, msg):
         """Service operation: TBD
         """
-        
-# Spawn of the process using the module name
-factory = ProtocolFactory(StateRepositoryService)
 
+# Spawn of the process using the module name
+factory = ProcessFactory(StateRepositoryService)

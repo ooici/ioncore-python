@@ -27,6 +27,7 @@ from ion.agents.instrumentagents.SBE49_constants import ci_parameters as IACIPar
 from ion.agents.instrumentagents.SBE49_constants import instrument_commands as IAInstCommands
 from ion.agents.instrumentagents.SBE49_constants import instrument_parameters as IAInstParameters
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
+from ion.core.exception import ReceivedError
 import ion.util.procutils as pu
 
 
@@ -94,34 +95,32 @@ class TestInstrumentAgent(IonTestCase):
         yield pu.asleep(1)
 
         try:
-            
+
             response = yield self.IAClient.get_from_instrument(['baudrate',
                                                                 'outputformat'])
-            self.assert_(response['status'] == 'OK')
             self.assertEqual(response['baudrate'], 9600)
             self.assertEqual(response['outputformat'], 0)
-    
+
             response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
                                                 'outputformat': 1})
-            self.assert_(response['status'] == 'OK')
             self.assertEqual(response['baudrate'], 19200)
             self.assertEqual(response['outputformat'], 1)
-            
+
             response = yield self.IAClient.get_from_instrument(['baudrate',
                                                                 'outputformat'])
-            self.assert_(response['status'] == 'OK')
             self.assertEqual(response['baudrate'], 19200)
             self.assertEqual(response['outputformat'], 1)
-    
+
             response = yield self.IAClient.set_to_instrument({'outputformat': 2})
-            self.assert_(response['status'] == 'OK')
             self.assertEqual(response['outputformat'], 2)
-            
+
             # Try setting something bad
-            response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
-                                                'badvalue': 1})
-            self.assert_(response['status'] == 'ERROR')
-            self.assert_('baudrate' not in response)
+            try:
+                response = yield self.IAClient.set_to_instrument({'baudrate': 19200,
+                                                    'badvalue': 1})
+                self.fail("ReceivedError expected")
+            except ReceivedError, re:
+                pass
 
         finally:
             yield self.simulator.stop()
@@ -185,20 +184,21 @@ class TestInstrumentAgent(IonTestCase):
                                                                ['stop']])
             print "response ", response
             self.assert_(isinstance(response, dict))
-            self.assert_('status' in response.keys())
-            self.assertEqual(response['status'], 'OK')
             self.assert_('start' in response['value'])
             self.assert_('stop' in response['value'])
-            self.assert_(response['status'] == 'OK')
 
-            response = yield self.IAClient.execute_instrument([['badcommand',
+            try:
+                response = yield self.IAClient.execute_instrument([['badcommand',
                                                                 'now','1']])
-            self.assert_(isinstance(response, dict))
-            self.assertEqual(response['status'], 'ERROR')
+                self.fail("ReceivedError expected")
+            except ReceivedError, re:
+                pass
 
-            response = yield self.IAClient.execute_instrument([])
-            self.assert_(isinstance(response, dict))
-            self.assertEqual(response['status'], 'ERROR')
+            try:
+                response = yield self.IAClient.execute_instrument([])
+                self.fail("ReceivedError expected")
+            except ReceivedError, re:
+                pass
 
         finally:
             yield self.simulator.stop()
@@ -227,7 +227,6 @@ class TestInstrumentAgent(IonTestCase):
         """
         response = yield self.IAClient.get_status(['some_arg'])
         self.assert_(isinstance(response, dict))
-        self.assertEqual(response['status'], "OK")
         self.assertEqual(response['value'], 'a-ok')
 
     @defer.inlineCallbacks

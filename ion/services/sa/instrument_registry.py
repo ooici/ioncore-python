@@ -9,11 +9,10 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.data.datastore import registry
 
 from ion.resources import sa_resource_descriptions
@@ -25,7 +24,7 @@ class InstrumentRegistryService(registry.BaseRegistryService):
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='instrument_registry',
+    declare = ServiceProcess.service_declare(name='instrument_registry',
                                           version='0.1.0',
                                           dependencies=[])
 
@@ -75,7 +74,7 @@ class InstrumentRegistryClient(registry.BaseRegistryClient, registry.LCStateMixi
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "instrument_registry"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
 
     def clear_registry(self):
@@ -107,7 +106,7 @@ class InstrumentRegistryClient(registry.BaseRegistryClient, registry.LCStateMixi
 
     def get_instrument_by_id(self, id):
         return self.base_get_resource_by_id('get_instrument_by_id', id)
-        
+
     #def set_resource_lcstate(self, resource_reference, lcstate):
     #    return self.base_set_resource_lcstate(resource_reference, lcstate, 'set_instrument_lcstate')
 
@@ -119,5 +118,4 @@ class InstrumentRegistryClient(registry.BaseRegistryClient, registry.LCStateMixi
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(InstrumentRegistryService)
-
+factory = ProcessFactory(InstrumentRegistryService)
