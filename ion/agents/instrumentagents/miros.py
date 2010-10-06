@@ -1,5 +1,5 @@
-import logging
-logging = logging.getLogger(__name__)
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 # $Id$
 
@@ -86,9 +86,9 @@ class Hsm():
 
 	def onStart(self, top):
 		# expandable table containing event parameters sent to HSM
-		logging.debug("!!!!!!!!! instantiating tEvt!!!")
+		log.debug("!!!!!!!!! instantiating tEvt!!!")
 		self.tEvt = {'sType': "entry", 'nFoo': 0}
-		logging.debug("!!!!!!!!! done instantiating tEvt!!!")
+		log.debug("!!!!!!!!! done instantiating tEvt!!!")
 		
 		self.rCurr = self.hsm[top]
 		# self.pp.pprint(self.rCurr)

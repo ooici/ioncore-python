@@ -17,6 +17,7 @@ from ion.services.base_service import BaseService
 
 # DHE: testing the miros HSM
 import miros
+from instrument_hsm import InstrumentHsm
 
 from twisted.internet.protocol import Protocol, ClientFactory, ClientCreator
 
@@ -68,6 +69,9 @@ class InstrumentClient(Protocol):
             #self.factory.data_received(data)
             self.parent.gotData(data)
 
+class SBE49InstrumentHsm(InstrumentHsm):
+    def someFunction():
+        log.debug("some function")
 
 class SBE49InstrumentDriver(InstrumentDriver):
     """
@@ -84,9 +88,17 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
     
         #
+        # DHE: trying to objectize the hsm stuff...
+        #
+        
+        #self.Testhsm = instrument_hsm.InstrumentHsm()
+        #self.hsm = InstrumentHsm()
+        self.hsm = SBE49InstrumentHsm()
+        
+        #
         # DHE: Testing miros FSM.
         #
-        self.hsm = miros.Hsm()
+        #self.hsm = miros.Hsm()
 
         # --------------------------------------------------------------------
         #             name                               parent's
@@ -94,6 +106,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
         #             state            handler           handler
         # --------------------------------------------------------------------
         self.hsm.addState ( "idle",           self.idle,               None)
+        #
+        # DHE!!! This did not work...how am I going to be able to have a base HSM and then
+        # specialize it???
+        #self.hsm.addState ( "idle",           self.hsm.idle,               None)
         self.hsm.addState ( "stateConfigured",  self.stateConfigured,     self.idle)
         self.hsm.addState ( "stateDisconnecting",  self.stateDisconnecting,     self.stateConfigured)
         self.hsm.addState ( "stateDisconnected",  self.stateDisconnected,     self.stateConfigured)
