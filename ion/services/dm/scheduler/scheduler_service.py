@@ -77,8 +77,7 @@ class SchedulerService(ServiceProcess):
             target_id = tdef['target']
             interval = tdef['interval']
             payload = tdef['payload']
-            last_run = tdef['last_run']
-        except KeyError, ke:
+        except KeyError:
             log.exception('Error parsing task def from registry! Task id: "%s"' % task_id)
             defer.returnValue(None)
 
@@ -86,7 +85,7 @@ class SchedulerService(ServiceProcess):
 
         # Update last-invoked timestamp in registry
         tdef['last_run'] = time.time()
-        yield self.ctab.store_task(target_id, interval, payload=payload, taskid=task_id)
+        yield self.ctab.store_task(tdef)
 
     @defer.inlineCallbacks
     def op_rm_task(self, content, headers, msg):

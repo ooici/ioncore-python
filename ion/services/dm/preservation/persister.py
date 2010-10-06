@@ -108,8 +108,8 @@ class PersisterConsumer(base_consumer.BaseConsumer):
 
 
         # Later - these will be sent to a historical log for the dataset...
-        notification = datamessage.notification
-        timestamp = datamessage.timestamp
+        #notification = datamessage.notification
+        #timestamp = datamessage.timestamp
 
 
     def _create_nca_configfile(self,base_name):
