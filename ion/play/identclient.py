@@ -119,7 +119,7 @@ class AddUser(resource.Resource):
             request.write('</body></html>')
             request.finish()
 
-        print str(request)
+        #print str(request)
 
         if (len(request.args) > 0):
             new_user = coi_resource_descriptions.IdentityResource.create_new_resource()
@@ -227,20 +227,20 @@ class FindUser(resource.Resource):
                     user_description = coi_resource_descriptions.IdentityResource()
 
                     attnames = []
-                    print "************ " + str(request.args)
+                    #print "************ " + str(request.args)
                     for field_name in user_description.attributes:
                         if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle")):
                             if (len(request.args[field_name]) > 0) and (len(request.args[field_name][0]) > 0) :
                                 setattr(user_description, field_name, request.args[field_name][0])
                                 attnames.append(field_name)
-                                print "************************* " + field_name + " = '" + request.args[field_name][0] + "'"
-                    print "lifecycle = " + request.args["lifecycle"][0]
+                                #print "************************* " + field_name + " = '" + request.args[field_name][0] + "'"
+                    #print "lifecycle = " + request.args["lifecycle"][0]
                     if (request.args["lifecycle"][0] != '*'):
                         attnames.append('lifecycle')
                         foo = dataobject.LCState(state=request.args["lifecycle"][0].lower())
                         user_description.set_lifecyclestate(foo)
-                    print "************ LOOKING FOR..... " + str(user_description)
-                    print "************ attnames ......... " + str(attnames)
+                    #print "************ LOOKING FOR..... " + str(user_description)
+                    #print "************ attnames ......... " + str(attnames)
                     d = self.client.find_users(user_description, regex=True, attnames=attnames) #, ignore_defaults=True)
                     d.addCallback(show_array_cb)
             return server.NOT_DONE_YET
@@ -253,7 +253,7 @@ class FindUser(resource.Resource):
 
 
 def main(ns={}):
-    print "STARTING...."
+    #print "STARTING...."
     from ion.services.coi import identity_registry
     from ion.data import dataobject
     from ion.resources import coi_resource_descriptions as coi

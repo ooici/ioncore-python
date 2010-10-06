@@ -116,7 +116,6 @@ class UserRegistrationClientTest(IonTestCase):
         user = yield self.identity_registry_client.register_user(user)
 
         ooi_id = user.reference()
-        print str(ooi_id.RegistryIdentity) + "******************************************************"
         # load the user back
         user0 = yield self.identity_registry_client.get_user(ooi_id)
 
