@@ -16,6 +16,7 @@ from ion.core import ioninit
 from ion.core.exception import ReceivedError
 from ion.core.id import Id
 from ion.core.messaging.receiver import ProcessReceiver
+from ion.core.process.cprocess import IContainerProcess, ContainerProcess
 from ion.data.store import Store
 from ion.interact.conversation import Conversation
 from ion.interact.message import Message
@@ -33,7 +34,7 @@ procRegistry = Store()
 
 class IProcess(Interface):
     """
-    Interface for all capability container processes
+    Interface for all capability container application processes
     """
 
 class Process(BasicLifecycleObject):
@@ -527,6 +528,9 @@ class Process(BasicLifecycleObject):
 
     def __str__(self):
         return "Process(id=%s,name=%s)" % (self.id, self.proc_name)
+
+class AppContProcess(ContainerProcess):
+    pass
 
 # ============================================================================
 
