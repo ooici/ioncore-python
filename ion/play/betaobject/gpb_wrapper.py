@@ -56,7 +56,7 @@ class Wrapper(object):
         field_names = self._GPBClass.DESCRIPTOR.fields_by_name.keys()
         self._gpb_full_name = gpbMessage.DESCRIPTOR.full_name
         
-        self._obj_cntr=0
+        self._obj_cntr=1
         """
         A counter object used by this class to identify content objects untill
         they are indexed
@@ -79,18 +79,29 @@ class Wrapper(object):
         A list of all the wrappers which link to me
         """
         
+        self.root = self
+        """
+        A reference to the root object wrapper for this protobuffer
+        """
+        
+        self.stash = {}
+        """
+        A map to indexed states of the root object
+        """
+        
         
         # Now set the fields from that GPB to preempt getter/setter!
         object.__setattr__(self,'_gpbFields',field_names)
 
-
+    def isroot(self):
+        return self is self.root
     
-
+    """
     @classmethod
     def wrap(cls,gpbMessage,read_only=False):
         inst = cls(gpbMessage,read_only)
         return inst
-    
+    """
     
     def rewrap(self, gpbMessage):
         '''
@@ -101,6 +112,14 @@ class Wrapper(object):
         cls = self.__class__
         
         inst = cls(gpbMessage,self.read_only)
+
+        inst._index = self._index
+        inst._workspace = self._workspace
+        inst._obj_cntr = self._obj_cntr
+        inst._links = self._links
+        inst._root = self._root
+        
+        
         return inst
 
     def index(self):
@@ -147,47 +166,9 @@ class Wrapper(object):
             if read_only:
                 raise AttributeError, 'This object wrapper is read only!'
             
-            gpb = object.__getattribute__(self,'_gpbMessage')
+            # Setter helper method
+            self._set_gpb_field(key, value)
             
-            # If the value we are setting is a Wrapper Object
-            if isinstance(value, Wrapper):
-                
-                #Examin the field we are trying to set 
-                field = getattr(gpb,key)
-                # Make sure it is a GPBMessage
-                if isinstance(field, message.Message):
-                    
-                    # If it is a link - set a link to the value in the wrapper
-                    if field.DESCRIPTOR.full_name == self.LinkClassName:
-                        
-                        current = self._workspace.get(field.id,None)
-                        if current:
-                            current.CopyFrom(value)
-                            
-                        else:
-                        
-                            # add a reference to links in the value in the wrapper
-                            value._links.append(self)
-                            
-                            # Get a new local identity for this new link
-                            idx = self.get_id()
-                            
-                            # add the value in the wrapper to the local workspace
-                            self._workspace[idx] = value
-                            
-                            # Set the type and id of the linked wrapper
-                            setattr(field,'id',idx)
-                            gpb_name = value._gpb_full_name
-                            setattr(field,'type',gpb_name)
-                    else:
-                        #Over ride Protobufs - I want to be able to setdirectly
-                        wrapped_field = self.rewrap(field)
-                        wrapped_field.CopyFrom(value)
-                else:
-                    raise AttributeError, 'Can not set invalid types!'
-                        
-            else:
-                setattr(gpb, key, value)
         else:
             v = object.__setattr__(self, key, value)
     
@@ -195,7 +176,51 @@ class Wrapper(object):
         self._obj_cntr += 1
         return str(self._obj_cntr)
     
+    def _set_gpb_field(self, key, value):
+        
+        gpb = object.__getattribute__(self,'_gpbMessage')
+        # If the value we are setting is a Wrapper Object
+        if isinstance(value, Wrapper):
+            
+            #Examin the field we are trying to set 
+            field = getattr(gpb,key)
+            wrapped_field = self.rewrap(field)
+            self._set_message(wrapped_field,value)
+            
+        else:
+            setattr(gpb, key, value)
     
+    def _set_message(self,field, value):        
+        # If it is a link - set a link to the value in the wrapper
+        if field._gpb_full_name == self.LinkClassName:
+            
+            current = self._workspace.get(field.id,None)
+            if current:
+                # Modify the existing value already lined in the worksapce
+                current.CopyFrom(value)
+                # Reset the type name
+                setattr(field,'type',value._gpb_full_name)
+                    
+            else:
+                
+                # add a reference to links in the value in the wrapper
+                value._links.append(self)
+                    
+                # Get a new local identity for this new link
+                idx = self.get_id()
+                    
+                # add the value in the wrapper to the local workspace
+                self._workspace[idx] = value
+                
+                # Set the type and id of the linked wrapper
+                setattr(field,'id',idx)
+                # Set the type name
+                setattr(field,'type',value._gpb_full_name)
+                
+        else:
+            #Over ride Protobufs - I want to be able to set a message directly
+            field.CopyFrom(value)
+
     
     def __eq__(self, other):
         if not isinstance(other, Wrapper):
@@ -225,17 +250,18 @@ class Wrapper(object):
         Args:
             other_msg: Message to merge into the current message.
         """
+        if self is other:
+            return
+        
         assert isinstance(other, Wrapper), \
             'MergeFrom can only be performed on another Wrapper Object'
         
         assert self._gpb_full_name == other._gpb_full_name, \
             'MergeFrom can only operate on two wrapped objects of the same type'
         
-        # There does not seem to be any way to check if these are mergable?
-        # What happens if they are not the same kind of GPB Message?
         self._gpbMessage.MergeFrom(other._gpbMessage)
     
-    def CopyFrom(self, other_msg):
+    def CopyFrom(self, other):
         """Copies the content of the specified message into the current message.
         
         The method clears the current message and then merges the specified
@@ -244,15 +270,42 @@ class Wrapper(object):
         Args:
             other_msg: Message to copy into the current one.
         """
-        if self is other_msg:
+        if self is other:
             return
+        assert isinstance(other, Wrapper), \
+            'CopyFrom can only be performed on another Wrapper Object'
+        
+        assert self._gpb_full_name == other._gpb_full_name, \
+            'CopyFrom can only operate on two wrapped objects of the same type'
+        
+        
         self.Clear()
         self.MergeFrom(other_msg)
+        
+    
     
     def Clear(self):
         """Clears all data that was set in the message."""
+            
+        if self.isroot():
+            self._workspace={}
+        
         self._gpbMessage.Clear()
     
+        for key, linked_node in self._workspace.items():
+            stillmine = False
+            for link in linked_node._links:
+                if link.id == -1:
+                    # if it is no longer 'set' remove it
+                    linked_node.links.remove(link)
+                elif link._root == self._root:
+                    stillmine = True
+                    
+            if not stillmine:
+                del self._workspace[key]
+                
+                
+                    
     def IsInitialized(self):
         """Checks if the message is initialized.
         
@@ -394,9 +447,12 @@ class ContainerWrapper(object):
         assert isinstance(value, Wrapper), \
             'To set an item, the value must be a Wrapper'
         item = self.__getitem__(key)
-        print 'item',item, type(item)
-        print 'value',value
-        item.CopyFrom(value)
+        if item._gpb_full_name == self._wrapper.LinkClassName:
+            
+            
+                
+        else:
+            item.CopyFrom(value)
         
             
     def __getitem__(self, key):
