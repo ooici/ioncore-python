@@ -80,8 +80,14 @@ class CassandraStore(IStore):
                 log.info('Ignoring namespace argument in non super column cassandra store')
             inst.namespace=None
         
-        port = 9160
-        host = 'amoeba.ucsd.edu'
+        if  inst.cass_host_list is None:
+            port = 9160
+            host = 'amoeba.ucsd.edu'
+        else:
+            port = int(inst.cass_host_list[0].split(":")[1])
+            host = inst.cass_host_list[0].split(":")[0]
+            log.info("Got host %s and port %d from cass_host_list" % (host, port))
+                
         inst.manager = ManagedCassandraClientFactory()
         inst.client = CassandraClient(inst.manager, inst.keyspace) 
         inst.connector = reactor.connectTCP(host, port, inst.manager, timeout=1)
@@ -107,8 +113,8 @@ class CassandraStore(IStore):
         @param col Cassandra column
         @retval Deferred, for value from the ion dictionary, or None
         """
-        value = None
-        log.info("Calling get on col %s " % col)
+        
+        log.info("CassandraStore: Calling get on col %s " % col)
         try:
             if self.cf_super:
                 log.info("super_col: Calling get on col %s " % col)
@@ -117,11 +123,12 @@ class CassandraStore(IStore):
             else:
                 log.info("standard_col: Calling get on col %s " % col)
                 value = yield self.client.get(self.key, self.colfamily, column=col)
-        except NotFoundException:     
+        except NotFoundException:
+            log.info("Didn't find the col: %s. Returning None" % col)     
             defer.returnValue(None)
             
-        value = value.column.value 
-        defer.returnValue(value)
+        column_value = value.column.value 
+        defer.returnValue(column_value)
 
     @defer.inlineCallbacks
     def put(self, col, value):
@@ -132,11 +139,15 @@ class CassandraStore(IStore):
         @note Value is composed into OOI dictionary under keyname 'value'
         @retval Deferred for success
         """
-
-        if self.cf_super:
-            yield self.client.insert(self.key, self.colfamily, value, column=col, super_column=self.namespace) 
-        else:
-            yield self.client.insert(self.key, self.colfamily, value, column=col)
+        log.info("CassandraStore: Calling put on col: %s  value: %s " % (col, value))
+        try:
+            if self.cf_super:
+                log.info("CassandraStore: super_col key %s colfamily %s value %s column %s super_column %s " % (self.key, self.colfamily, value, col, self.namespace))
+                yield self.client.insert(self.key, self.colfamily, value, column=col, super_column=self.namespace) 
+            else:
+                yield self.client.insert(self.key, self.colfamily, value, column=col)
+        except:
+            log.info("CassandraStore: Exception was thrown during the put")
         defer.returnValue(None)
 
     @defer.inlineCallbacks
