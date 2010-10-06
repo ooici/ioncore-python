@@ -104,6 +104,47 @@ class InterceptorTest(IonTestCase):
         self.assertEqual(ti2.numafter, 1)
 
     @defer.inlineCallbacks
+    def test_intercept_drop(self):
+        is_config1 = {
+            'interceptors':{
+                'drop1':{
+                    'classname':'ion.core.intercept.interceptor.DropInterceptor'
+                },
+                'test1':{
+                    'classname':'ion.core.intercept.test.test_interceptor.TestInterceptor',
+                },
+                'test3':{
+                    'classname':'ion.core.intercept.test.test_interceptor.TestInterceptor',
+                },
+            },
+            'stack':[
+                {'name':'test1', 'interceptor':'test1' },
+                {'name':'drop1', 'interceptor':'drop1' },
+                {'name':'test3', 'interceptor':'test3' },
+            ]
+        }
+
+        intercept_sys = InterceptorSystem()
+        yield intercept_sys.initialize(is_config1)
+        yield intercept_sys.activate()
+        ti1 = intercept_sys.interceptors['test1']
+        ti2 = intercept_sys.interceptors['test3']
+
+        inv1a = Invocation(path=Invocation.PATH_IN, message="123")
+        inv1b = yield intercept_sys.process(inv1a)
+        self.assertEqual(ti1.numbefore, 0)
+        self.assertEqual(ti2.numbefore, 1)
+        self.assertEqual(ti1.numafter, 0)
+        self.assertEqual(ti2.numafter, 0)
+
+        inv2a = Invocation(path=Invocation.PATH_OUT, message="123")
+        inv2b = yield intercept_sys.process(inv2a)
+        self.assertEqual(ti1.numbefore, 0)
+        self.assertEqual(ti2.numbefore, 1)
+        self.assertEqual(ti1.numafter, 1)
+        self.assertEqual(ti2.numafter, 0)
+
+    @defer.inlineCallbacks
     def test_intercept_fail(self):
         is_config1 = {}
         try:
@@ -162,6 +203,16 @@ class InterceptorTest(IonTestCase):
         except ConfigurationError, ce:
             pass
 
+    @defer.inlineCallbacks
+    def test_intercept_container(self):
+        yield self._start_container()
+        try:
+            intercept_sys = ioninit.container_instance.interceptor_system
+            self.assertIsInstance(intercept_sys, InterceptorSystem)
+            self.assertEqual(intercept_sys._get_state(),"ACTIVE")
+            self.assertEqual(len(intercept_sys.interceptors), len(is_config['interceptors']))
+        finally:
+            yield self._stop_container()
 
 class TestInterceptor(EnvelopeInterceptor):
     """

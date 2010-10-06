@@ -87,6 +87,14 @@ class InterceptorSystem(Interceptor):
                     invocation.path, path_element['name']))
                 invocation.error(str(ex))
                 raise ex
+
+            # Continuation
+            if invocation.status == Invocation.STATUS_DROP:
+                #log.debug("Process path %s step %s: DROP" % (invocation.path, path_element['name']))
+                break
+            if invocation.status == Invocation.STATUS_DONE:
+                #log.debug("Process path %s step %s: DONE" % (invocation.path, path_element['name']))
+                break
         defer.returnValue(invocation)
 
     # Helpers

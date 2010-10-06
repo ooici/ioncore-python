@@ -18,7 +18,6 @@ import ion.util.procutils as pu
 
 # Configuration
 CONF = ioninit.config(__name__)
-master_off = CONF.getValue('master_off', False)
 msg_sign = CONF.getValue('msg_sign', True)
 
 

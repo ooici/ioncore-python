@@ -14,6 +14,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.id import Id
+from ion.core.intercept.interceptor import EnvelopeInterceptor
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject
 
