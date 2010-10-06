@@ -61,10 +61,12 @@ class StoreService(ServiceProcess):
     
     def slc_stop(self):
         """
-        Shutdown the Store twisted connection, if the store is as CassandraStore
+        @brief Shutdown the Store twisted connection
+        
+        @note if the store is as CassandraStore then tell the factory to shutdown the connection.
         This breaks the Store abstraction
         """
-        log.info("In StoreService slc_shutdown")
+        log.info("In StoreService slc_stop")
         if isinstance(self.store, cassandra.CassandraStore):
             log.info("Shutting down StoreService")
             self.store.manager.shutdown()
