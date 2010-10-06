@@ -5,21 +5,22 @@
 @author Michael Meisinger
 @author Paul Hubbard
 @author Dorian Raymer
+@author Matt Rodriguez
 @brief Implementation of ion.data.store.IStore using pycassa to interface a
         Cassandra datastore backend
 @Note Test cases for the cassandra backend are now in ion.data.test.test_store
 """
 
 import re
-import logging
-logging = logging.getLogger(__name__)
+
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
-import pycassa
 
 from ion.core import ioninit
 from ion.data.store import IStore
-
+import pycassa
 import uuid
 
 CONF = ioninit.config(__name__)
@@ -71,23 +72,23 @@ class CassandraStore(IStore):
                 inst.namespace = ':'
         else:
             if inst.namespace:
-                logging.info('Ignoring namespace argument in non super column cassandra store')
+                log.info('Ignoring namespace argument in non super column cassandra store')
             inst.namespace=None
 
         if not inst.cass_host_list:
-            logging.info('Connecting to Cassandra on localhost...')
+            log.info('Connecting to Cassandra on localhost...')
         else:
-            logging.info('Connecting to Cassandra ks:cf=%s:%s at %s ...' %
+            log.info('Connecting to Cassandra ks:cf=%s:%s at %s ...' %
                          (inst.keyspace, inst.colfamily, inst.cass_host_list))
-        inst.client = pycassa.connect(inst.cass_host_list)
+        inst.client = pycassa.connect(inst.cass_host_list, framed_transport=True)
         inst.kvs = pycassa.ColumnFamily(inst.client, inst.keyspace,
                                         inst.colfamily, super=inst.cf_super)
-        logging.info('connected to Cassandra... OK.')
-        logging.info('cass_host_list: '+str(inst.cass_host_list))
-        logging.info('keyspace: '+str(inst.keyspace))
-        logging.info('colfamily: '+str(inst.colfamily))
-        logging.info('cf_super: '+str(inst.cf_super))
-        logging.info('namespace: '+str(inst.namespace))
+        log.info('connected to Cassandra... OK.')
+        log.info('cass_host_list: '+str(inst.cass_host_list))
+        log.info('keyspace: '+str(inst.keyspace))
+        log.info('colfamily: '+str(inst.colfamily))
+        log.info('cf_super: '+str(inst.cf_super))
+        log.info('namespace: '+str(inst.namespace))
         return defer.succeed(inst)
 
 
@@ -99,7 +100,7 @@ class CassandraStore(IStore):
         if self.cf_super:
             self.kvs.remove(self.key,super_column=self.namespace)
         else:
-            logging.info('Can not clear root of persistent store!')
+            log.info('Can not clear root of persistent store!')
         return defer.succeed(None)
         
 
@@ -115,11 +116,11 @@ class CassandraStore(IStore):
                 value = self.kvs.get(self.key, columns=[col], super_column=self.namespace)
             else:
                 value = self.kvs.get(self.key, columns=[col])
-            #logging.debug('Key "%s":"%s"' % (key, val))
+            #log.debug('Key "%s":"%s"' % (key, val))
             #this could fail if insert did it wrong
             value=value.get(col)
         except pycassa.NotFoundException:
-            #logging.debug('Key "%s" not found' % key)
+            #log.debug('Key "%s" not found' % key)
             pass
         return defer.succeed(value)
 
@@ -131,11 +132,19 @@ class CassandraStore(IStore):
         @note Value is composed into OOI dictionary under keyname 'value'
         @retval Deferred for success
         """
-        #logging.debug('writing key %s value %s' % (key, value))
-        if self.cf_super:
-            self.kvs.insert(self.key, {self.namespace:{col:value}})
-        else:
-            self.kvs.insert(self.key, {col:value})
+        #log.debug('writing key %s value %s' % (key, value))
+        try:
+            if self.cf_super:
+                #from IPython.Shell import IPShellEmbed
+                #ipshell = IPShellEmbed('')
+                #ipshell()
+                self.kvs.insert(self.key, {self.namespace:{col:value}})
+            else:
+                self.kvs.insert(self.key, {col:value})
+        except pycassa.connection.NoServerAvailable, ex: 
+            log.info("Problem with the put col: %s value %s " % (col, value))
+            print ex.argskw
+            #log.info("Exception with put: %s" % ex.args)
         return defer.succeed(None)
 
     def query(self, regex):
