@@ -9,11 +9,10 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.data.datastore import registry
 from ion.resources import sa_resource_descriptions
 
@@ -27,7 +26,7 @@ class DataProductRegistryService(registry.BaseRegistryService):
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='data_product_registry',
+    declare = ServiceProcess.service_declare(name='data_product_registry',
                                           version='0.1.0',
                                           dependencies=[])
 
@@ -59,7 +58,7 @@ class DataProductRegistryClient(registry.BaseRegistryClient, registry.LCStateMix
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "data_product_registry"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     def clear_registry(self):
         return self.base_clear_registry('clear_data_product_registry')
@@ -81,4 +80,4 @@ class DataProductRegistryClient(registry.BaseRegistryClient, registry.LCStateMix
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(DataProductRegistryService)
+factory = ProcessFactory(DataProductRegistryService)

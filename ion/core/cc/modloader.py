@@ -51,10 +51,11 @@ class ModuleLoader(object):
         try:
             modo = pu.get_module(mod)
         except Exception, ie:
-            log.error("Error importing module: "+str(mod))
-            log.error(ie)
+            log.error("Error importing module: " + str(mod))
+            bugstr = "Error importing module: " + str(mod) + '\n' + str(ie)
             for line in traceback.format_exc().splitlines():
-                log.error(line)
+                bugstr += line + '\n'
+            log.debug(bugstr)
 
 
     def _load_package(self, pack, recurse=False):
@@ -70,7 +71,8 @@ class ModuleLoader(object):
                     elif os.path.isdir(os.path.join(path1,fname)) and recurse:
                         self._load_package(pack+'.'+fname)
         except Exception, ie:
-            log.error("Error importing package: "+str(pack))
-            log.error(ie)
+            log.error("Error importing package: " + str(pack))
+            bugstr = "Error importing package: " + str(pack) + '\n' + str(ie)
             for line in traceback.format_exc().splitlines():
-                log.error(line)
+                bugstr += line + '\n'
+            log.debug(bugstr)

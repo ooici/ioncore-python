@@ -58,20 +58,14 @@ class IdentityRegistryUITest(IonTestCase):
         services = [
             {
                 'name':'identity',
-                'module':'ion.services.coi.identity_registry',
-                'class':'IdentityRegistryService',
-                'spawnargs':{
-                    'sys-name':'mysys',
-                    'servicename':'identity',
-                    'scope':'system'
-                    }
-                }
+                'module':'ion.services.coi.identity_registry'
+            }
             ]
         supervisor = yield self._spawn_processes(services)
 
 
 
-        client = identity_registry.IdentityRegistryClient(target='mysys.identity')
+        client = identity_registry.IdentityRegistryClient()
 
 
         webservice = identclient.IdentityWebResource(client)

@@ -16,8 +16,8 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import bootstrap
-from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.resources import dm_resource_descriptions
 
@@ -33,13 +33,13 @@ from pydap.model import DatasetType
 from ion.services.dm.distribution import base_consumer
 
 
-class DataPubsubService(BaseService):
+class DataPubsubService(ServiceProcess):
     """
     @brief Service for Publication and Subscription to topics
     """
 
     # Declaration of service
-    declare = BaseService.service_declare(name='data_pubsub',
+    declare = ServiceProcess.service_declare(name='data_pubsub',
                                           version='0.1.0',
                                           dependencies=[])
     @defer.inlineCallbacks
@@ -198,7 +198,6 @@ class DataPubsubService(BaseService):
             child = base_consumer.ConsumerDesc(**args)
             child_id = yield self.spawn_child(child)
             #subscription.consumer_procids[name]=child_id
-
 
         subscription = yield self.reg.register(subscription)
 
@@ -427,14 +426,14 @@ class DataPubsubService(BaseService):
         #topic_list = yield self.reg.find(topic_description,regex=True, attnames=['name','keywords','aoi'])
         return self.reg.find(topic_description,regex=True, attnames=['name','keywords','aoi'])
 
-class DataPubsubClient(BaseServiceClient):
+class DataPubsubClient(ServiceClient):
     """
     @brief Client class for accessing the data pubsub service.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "data_pubsub"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def define_topic(self, topic):
@@ -452,13 +451,12 @@ class DataPubsubClient(BaseServiceClient):
                                             topic.encode())
         log.debug(self.__class__.__name__ + ': define_topic; Result:' + str(headers))
 
-        if content['status']=='OK':
-            topic = dataobject.Resource.decode(content['value'])
-            log.info(self.__class__.__name__ + '; define_topic: Success!')
-            defer.returnValue(topic)
-        else:
-            log.info(self.__class__.__name__ + '; define_topic: Failed!')
-            defer.returnValue(None)
+        topic = dataobject.Resource.decode(content['value'])
+        log.info(self.__class__.__name__ + '; define_topic: Success!')
+        defer.returnValue(topic)
+        #else:
+        #    log.info(self.__class__.__name__ + '; define_topic: Failed!')
+        #    defer.returnValue(None)
 
 
     @defer.inlineCallbacks
@@ -476,13 +474,12 @@ class DataPubsubClient(BaseServiceClient):
                                             publisher.encode())
         log.debug(self.__class__.__name__ + ': define_publisher; Result:' + str(headers))
 
-        if content['status']=='OK':
-            log.info(self.__class__.__name__ + '; define_publisher: Success!')
-            publisher = dataobject.Resource.decode(content['value'])
-            defer.returnValue(publisher)
-        else:
-            log.info(self.__class__.__name__ + '; define_publisher: Failed!')
-            defer.returnValue(None)
+        log.info(self.__class__.__name__ + '; define_publisher: Success!')
+        publisher = dataobject.Resource.decode(content['value'])
+        defer.returnValue(publisher)
+        #else:
+        #    log.info(self.__class__.__name__ + '; define_publisher: Failed!')
+        #    defer.returnValue(None)
 
 
     @defer.inlineCallbacks
@@ -519,18 +516,17 @@ class DataPubsubClient(BaseServiceClient):
 
         publication.data = do
         publication.topic_ref = topic_ref
-        publication.publisher = publisher_proc.receiver.spawned.id.full
+        publication.publisher = publisher_proc.id.full
 
         (content, headers, msg) = yield self.rpc_send('publish',
                                             publication.encode())
         log.debug(self.__class__.__name__ + ': publish; Result:' + str(headers))
 
-        if content['status']=='OK':
-            log.info(self.__class__.__name__ + '; publish: Success!')
-            defer.returnValue('sent')
-        else:
-            log.info(self.__class__.__name__ + '; publish: Failed!')
-            defer.returnValue('error sending message!')
+        log.info(self.__class__.__name__ + '; publish: Success!')
+        defer.returnValue('sent')
+        #else:
+        #    log.info(self.__class__.__name__ + '; publish: Failed!')
+        #    defer.returnValue('error sending message!')
 
 
     @defer.inlineCallbacks
@@ -548,14 +544,12 @@ class DataPubsubClient(BaseServiceClient):
                                             subscription.encode())
         log.debug(self.__class__.__name__ + ': define_subscription; Result:' + str(headers))
 
-        if content['status']=='OK':
-            log.info(self.__class__.__name__ + '; define_subscription: Success!')
-            subscription = dataobject.Resource.decode(content['value'])
-            defer.returnValue(subscription)
-        else:
-            log.info(self.__class__.__name__ + '; define_subscription: Failed!')
-            defer.returnValue(None)
+        log.info(self.__class__.__name__ + '; define_subscription: Success!')
+        subscription = dataobject.Resource.decode(content['value'])
+        defer.returnValue(subscription)
+        #else:
+        #    log.info(self.__class__.__name__ + '; define_subscription: Failed!')
+        #    defer.returnValue(None)
 
 # Spawn off the process using the module name
-factory = ProtocolFactory(DataPubsubService)
-
+factory = ProcessFactory(DataPubsubService)

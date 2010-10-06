@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 @author Dorian Raymer
 @author Michael Meisinger
@@ -5,13 +7,18 @@
 """
 
 class Id(object):
+    """
+    @todo Remove static dependency on default container
+    """
+
     # Class attribute with default container id
+    # @note STATICALLY SET BY OUTSIDE CODE
     default_container_id = "/"
 
     """
-    Entity instance id
+    Create an entity instance id
     @param local is a local identifier, such as an incrementing counter
-    @param container the id of a container
+    @param container a qualifier, such as the id of a container
     """
     def __init__(self, local, container=None):
         self.local = str(local)
@@ -27,7 +34,12 @@ class Id(object):
         return """Id(%s, container="%s")""" % (self.local, self.container)
 
     def __eq__(self, other):
-        return self.local == other.local
+        try:
+            # Should equality be about the str content, or also be the instance?
+            return self.full == str(other)
+            #return self.full == other.full
+        except AttributeError, ae:
+            return False
 
     def __hash__(self):
         return str.__hash__(self.full)

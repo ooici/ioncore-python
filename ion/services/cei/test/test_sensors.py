@@ -4,11 +4,11 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.core.cc.spawnable import Receiver, spawn
+from ion.core.messaging.receiver import Receiver
 from ion.test.iontest import IonTestCase
-from ion.core.base_process import BaseProcess
+from ion.core.process.process import Process
 
-from ion.services.cei.sensors.rabbitmq_sensor import RabbitMQSensor 
+from ion.services.cei.sensors.rabbitmq_sensor import RabbitMQSensor
 import ion.util.procutils as pu
 
 
@@ -18,16 +18,17 @@ class TestSensors(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        
+
         # Needs analysis
         raise unittest.SkipTest('Sensor is broken but also likely moving to a service model, skipping this test.')
-        
+
         yield self._start_container()
-        bproc = BaseProcess()
+        bproc = Process()
         # the 'test' work queue:
         self.queue_name_work = bproc.get_scoped_name("system", "test_cei_sensors_work")
         #for the sensor events queue:
         self.queue_name_events = bproc.get_scoped_name("system", "test_cei_sensors_events")
+        # @todo Remove the declarations below
         self.total_messages = 5
         topic = {
             self.queue_name_work:{'name_type':'worker', 'args':{'scope':'global'}},
@@ -38,16 +39,16 @@ class TestSensors(IonTestCase):
         #create a test SA:
         self.test_sa = TestSensorAggregator(self.queue_name_events)
         #now spawn it:
-        sa_id = yield spawn(self.test_sa.receiver) 
+        sa_id = yield self.test_sa.receiver.activate()
         yield self.test_sa.plc_init()
 
         services = [
-            {'name':'rabbitmq_sensor','module':'ion.services.cei.sensors.rabbitmq_sensor', 
+            {'name':'rabbitmq_sensor','module':'ion.services.cei.sensors.rabbitmq_sensor',
             'spawnargs':{'queue_name_work':self.queue_name_work, 'queue_name_events':self.queue_name_events}}
         ]
         self.sup = yield self._spawn_processes(services)
         self.rabbitmq_sensor = self.sup.get_child_id("rabbitmq_sensor")
-        
+
         for i in range(self.total_messages):
             yield self.sup.send(self.queue_name_work, 'data', "test_message"+str(i))
 
@@ -63,22 +64,23 @@ class TestSensors(IonTestCase):
         self.assertEqual(self.total_messages, self.test_sa.message_count)
 
 
-class TestSensorAggregator(BaseProcess):
+class TestSensorAggregator(Process):
     """Class for the client accessing the object store.
     """
     def __init__(self, queue_name_events, *args):
-        BaseProcess.__init__(self, *args)
+        Process.__init__(self, *args)
         self.queue_name_events = queue_name_events
         self.message_count = 0
 
     @defer.inlineCallbacks
     def plc_init(self):
         # create new receiver ('listener'), for the events (just the receiver object)
-        self.event_receiver = Receiver("event_receiver", self.queue_name_events)
-        # set BaseProcesses receive method as the callback for the new receiver that was just created.
-        self.event_receiver.handle(self.receive)
+        # set Processes receive method as the callback for the new receiver that was just created.
+        self.event_receiver = Receiver(label="event_receiver",
+                                       name=self.queue_name_events,
+                                       handler=self.receive)
         # actually create queue consumer:
-        receiver_id = yield spawn(self.event_receiver)
-        
+        receiver_id = yield self.event_receiver.attach()
+
     def op_event(self, content, headers, msg):
         self.message_count = int(content['messages'])

@@ -9,6 +9,7 @@
 import logging
 import logging.config
 import re
+import os
 
 from ion.core import ionconst as ic
 from ion.util.config import Config
@@ -36,6 +37,15 @@ ion_config.update_from_file(ic.ION_LOCAL_CONF_FILENAME)
 # Arguments given to the container (i.e. the python process executing this code)
 cont_args = {}
 
+# Always refers to current container singleton instance, once first initialized
+container_instance = None
+
+# The name shared by all containers of one system (i.e. cluster name)
+sys_name = None
+
+# Global flag determining whether currently running unit test
+testing = True
+
 def config(name):
     """
     Get a subtree of the global configuration, typically for a module
@@ -52,6 +62,18 @@ def get_config(confname, conf=None):
     if conf == None:
         conf = ion_config
     return Config(conf.getValue(confname)).getObject()
+
+def adjust_dir(filename):
+    """
+    @brief Compensates for different current directories in tests and production
+    """
+    if not filename:
+        return None
+    #if testing:
+    if os.getcwd().endswith("_trial_temp"):
+        return "../" + filename
+    else:
+        return filename
 
 def install_msgpacker():
     from carrot.serialization import registry

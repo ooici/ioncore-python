@@ -3,7 +3,7 @@
 """
 @author Dorian Raymer
 @author Michael Meisinger
-@brief Python Capability Container Twisted plugin for twistd
+@brief Python Capability Container Twisted application plugin for twistd
 """
 
 import os
@@ -17,17 +17,21 @@ from twisted.python import usage
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core import ioninit
 from ion.core.cc import container
 
 class Options(usage.Options):
     """
-    Extra arg for file of "program"/"module" to run
+    Extra arg for file of "program"/"module" to run.
+    This class must be named Options with the usage.Options base class for the
+    Twisted ServiceMaker to find it.
     """
     synopsis = "[ION Capability Container options]"
 
     longdesc = """This starts a capability container."""
 
     optParameters = [
+                ["sysname", "s", None, "System name for group of capability containers" ],
                 ["broker_host", "h", "localhost", "Message space broker hostname"],
                 ["broker_port", "p", 5672, "Message space broker port"],
                 ["broker_vhost", "v", "/", "Message space..."],
@@ -66,6 +70,8 @@ class CapabilityContainer(service.Service):
         use phases to do things in order and wait for success/fail
         """
         self.config = config
+        self.container = None
+        ioninit.testing = False
 
     @defer.inlineCallbacks
     def startService(self):
@@ -88,24 +94,26 @@ class CapabilityContainer(service.Service):
         if not self.config['no_shell']:
             self.start_shell()
 
+        log.info("All startup actions completed.")
+
+        # @todo At this point, can signal successful container start
+
+    @defer.inlineCallbacks
     def stopService(self):
-        service.Service.stopService(self)
+        yield self.container.terminate()
+        yield service.Service.stopService(self)
+        log.info("Container stopped.")
 
-    def startMonitor(self):
-        """
-        @todo What is this for? Twisted?
-        """
-
+    @defer.inlineCallbacks
     def start_container(self):
         """
         When deferred done, fire next step
         @retval Deferred
         """
         log.info("Starting Container/broker connection...")
-        cont = container.create_new_container()
-        cont.initialize(self.config)
-        d = cont.activate()
-        return d
+        self.container = container.create_new_container()
+        yield self.container.initialize(self.config)
+        yield self.container.activate()
 
     @defer.inlineCallbacks
     def do_start_actions(self):
@@ -113,10 +121,9 @@ class CapabilityContainer(service.Service):
             yield self.run_boot_script()
 
         if self.config['script']:
-            self.start_script()
+            yield self.start_script()
 
-        # @todo At this point, can signal successful container start
-
+    @defer.inlineCallbacks
     def start_script(self):
         """
         given the path to a file, open that file and exec the code.
@@ -124,8 +131,15 @@ class CapabilityContainer(service.Service):
         """
         script = os.path.abspath(self.config['script'])
         if os.path.isfile(script):
-            log.info("Executing script %s ..." % self.config['script'])
-            execfile(script, {})
+            if script.endswith('.app'):
+                yield self.container.start_app(script)
+            elif script.endswith('.rel'):
+                yield self.container.start_rel(script)
+            else:
+                log.info("Executing script %s ..." % self.config['script'])
+                execfile(script, {})
+        else:
+            log.error('Bad startup script path: %s' % self.config['script'])
 
     def run_boot_script(self):
         """
@@ -148,14 +162,8 @@ class CapabilityContainer(service.Service):
 def makeService(config):
     """
     Twisted plugin service instantiation.
-    Required by Twisted
+    Required by Twisted; IServiceMaker interface
     """
     global cc_instance
     cc_instance = CapabilityContainer(config)
     return cc_instance
-
-
-#def Main(receiver):
-#    """Create a service out of a spawnable program.
-#    """
-#    return main

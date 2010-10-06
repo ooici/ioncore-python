@@ -8,52 +8,39 @@
 
 A container utilizes the messaging abstractions for AMQP.
 
-A container creates/enters a MessageSpace (a particular vhost in a
-broker)(maybe MessageSpace is a bad name; maybe not, depends on what
-context wants to be managed. A Message space could just be a particular
-exchange. Using the vhost as the main context setter for a message space,
-assuming a common broker/cluster, means a well known common exchange can be
-used as a default namespace, where the names are spawnable instance ids, as
-well as, permanent abstract endpoints. The same Message Space holding this
-common exchange could also hold any other exchanges where the names
-(routing keys) can have possibly different semantic meaning or other usage
-strategies.
 """
 
 import os
 import sys
 
 from twisted.internet import defer
+from zope.interface import implements, Interface
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from ion.core import ioninit
+from ion.core.cc.container_api import IContainer
 from ion.core.id import Id
-from ion.core.messaging import messaging
-from ion.core.messaging.messaging import MessageSpace, Publisher, Consumer
-from ion.core.messaging.messaging import ProcessExchangeSpace
-from ion.core.cc.store import Store
+from ion.core.messaging.exchange import ExchangeManager
+from ion.core.pack.application import AppLoader
+from ion.core.pack.app_manager import AppManager
+from ion.core.process.proc_manager import ProcessManager
 from ion.util.state_object import BasicLifecycleObject
 
-DEFAULT_EXCHANGE_SPACE = 'magnet.topic'
+CONF = ioninit.config(__name__)
 
 class Container(BasicLifecycleObject):
     """
     Represents an instance of the Capability Container. Typically, in one Twisted
     process (= one UNIX process), there is only one instance of a CC. In test cases,
     however, there might be more.
-
-    As a context, Container interfaces the messaging space with the local
-    Spawnable and their Receivers...
     """
-
-    # Static: the one instance of a Container
-    instance = None
+    implements(IContainer)
 
     # Static variables
     id = '%s.%d' % (os.uname()[1], os.getpid())
     args = None  # Startup arguments
-    store = Store()
     _started = False
 
     def __init__(self):
@@ -62,102 +49,112 @@ class Container(BasicLifecycleObject):
         # Config instance
         self.config = None
 
-        # Container broker connection / vhost parameters
-        self.message_space = None
+        # ExchangeManager instance
+        self.exchange_manager = None
 
-        # Broker connection instance
-        self.broker_connection = None
+        # ProcessManager instance
+        self.proc_manager = None
 
-        # Static: Default exchange space
-        self.exchange_space = None
+        # AppManager instance
+        self.app_manager = None
 
     def on_initialize(self, config, *args, **kwargs):
         """
-        Initializes the instance of a container
+        Initializes the instance of a container. Actions include
+        - Receive and parse the configuration
+        - Prepare some active objects
         """
         self.config = config
 
         # Set additional container args
         Container.args = self.config.get('args', None)
 
-        # Configure the broker connection
-        hostname = self.config['broker_host']
-        port = self.config['broker_port']
-        virtual_host = self.config['broker_vhost']
-        heartbeat = int(self.config['broker_heartbeat'])
+        self.exchange_manager = ExchangeManager(self)
+        self.exchange_manager.initialize(config, *args, **kwargs)
 
-        # Is a BrokerConnection instance (no action at this point)
-        self.message_space = MessageSpace(hostname=hostname,
-                                port=port,
-                                virtual_host=virtual_host,
-                                heartbeat=heartbeat)
+        self.proc_manager = ProcessManager(self)
+        self.proc_manager.initialize(config, *args, **kwargs)
+
+        self.app_manager = AppManager(self)
+        self.app_manager.initialize(config, *args, **kwargs)
+
+        return defer.succeed(None)
 
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
         """
-        Activates the container
+        Activates the container. Actions include
+        - Initiate broker connection
+        - Start
         @retval Deferred
         """
         Container._started = True
 
-        self.exchange_space = ProcessExchangeSpace(message_space=self.message_space,
-                                                   name=DEFAULT_EXCHANGE_SPACE)
-        yield self.message_space.activate()
+        yield self.exchange_manager.activate()
+
+        yield self.proc_manager.activate()
+
+        yield self.app_manager.activate()
 
     def on_deactivate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
 
     @defer.inlineCallbacks
     def on_terminate(self, *args, **kwargs):
-        yield self.message_space.terminate()
+        """
+        Deactivates and terminates the container. Actions include
+        - Stop and terminate all container applications
+        - Close broker connection
+        @retval Deferred
+        """
+
+        yield self.app_manager.terminate()
+
+        yield self.proc_manager.terminate()
+
+        yield self.exchange_manager.terminate()
+
+        log.info("Container closed")
         Container._started = False
-        self.store = Store()
 
     def on_error(self, *args, **kwargs):
         raise RuntimeError("Illegal state change for container")
 
-    @staticmethod
-    def configure_messaging(name, config):
-        """
-        XXX This is not acceptable: config is defined by lcaarch!!!!
-        """
-        if config['name_type'] == 'worker':
-            name_type_f = messaging.worker
-        elif config['name_type'] == 'direct':
-            name_type_f = messaging.direct
-        elif config['name_type'] == 'fanout':
-            name_type_f = messaging.fanout
-        else:
-            raise RuntimeError("Invalid name_type: "+config['name_type'])
+    # --- Container API -----------
 
-        amqp_config = name_type_f(name)
-        amqp_config.update(config)
-        def _cb(res):
-            return Consumer.name(Container.instance.exchange_space, amqp_config)
-        d = Container.store.put(name, amqp_config)
-        d.addCallback(_cb)
-        return d
+    # Process management, handled by ProcessManager
+    def spawn_process(self, *args, **kwargs):
+        return self.proc_manager.spawn_process(*args, **kwargs)
+    def spawn_processes(self, *args, **kwargs):
+        return self.proc_manager.spawn_processes(*args, **kwargs)
+    def create_supervisor(self, *args, **kwargs):
+        return self.proc_manager.create_supervisor(*args, **kwargs)
+    def activate_process(self, *args, **kwargs):
+        return self.proc_manager.activate_process(*args, **kwargs)
+    def terminate_process(self, *args, **kwargs):
+        return self.proc_manager.terminate_process(*args, **kwargs)
 
-    @defer.inlineCallbacks
-    def new_consumer(self, name_config, target):
-        """
-        Given spawnable instance Id, create consumer
-        using hardcoded name conventions
+    # Exchange management, handled by ExchangeManager
+    def declare_messaging(self, *args, **kwargs):
+        return self.exchange_manager.declare_messaging(*args, **kwargs)
+    def configure_messaging(self, *args, **kwargs):
+        return self.exchange_manager.configure_messaging(*args, **kwargs)
+    def new_consumer(self, *args, **kwargs):
+        return self.exchange_manager.new_consumer(*args, **kwargs)
+    def send(self, *args, **kwargs):
+        return self.exchange_manager.send(*args, **kwargs)
 
-        @param id should be of type Id
-        @retval defer.Deferred that fires a consumer instance
-        """
-        consumer = yield Consumer.name(self.exchange_space, name_config)
-        consumer.register_callback(target.send)
-        consumer.iterconsume()
-        defer.returnValue(consumer)
+    # App management, handled by AppManager
+    def start_app(self, *args, **kwargs):
+        return self.app_manager.start_app(*args, **kwargs)
 
-    def send(self, to_name, message_data, exchange_space=None):
-        """
-        Sends a message
-        """
-        exchange_space = exchange_space or self.exchange_space
-        return exchange_space.send(to_name, message_data)
+    def start_rel(self, rel_filename):
+        pass
+
+    def __str__(self):
+        return "CapabilityContainer(state=%s,%r)" % (
+            self._get_state(),
+            self.exchange_manager.message_space)
 
 def create_new_container():
     """
@@ -169,7 +166,7 @@ def create_new_container():
         raise RuntimeError('Already started')
 
     c = Container()
-    Container.instance = c
+    ioninit.container_instance = c
 
     return c
 

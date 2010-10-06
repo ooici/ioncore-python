@@ -11,15 +11,15 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-from ion.core.base_process import ProtocolFactory
-#from ion.services.base_service import BaseService
+from ion.core.process.process import ProcessFactory
+#from ion.core.process.service_process import ServiceProcess
 from ion.data import dataobject
 from ion.data.datastore import registry
 from ion.data.datastore.registry import  BaseRegistryClient,  BaseRegistryService
 #import uuid
 from ion.core import ioninit
 #import re
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.resources import coi_resource_descriptions 
 
@@ -34,7 +34,7 @@ class IdentityRegistryClient(BaseRegistryClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "identity_service"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
 
     def clear_identity_registry(self):
@@ -79,7 +79,7 @@ class IdentityRegistryClient(BaseRegistryClient):
 class IdentityRegistryService(BaseRegistryService):
 
      # Declaration of service
-    declare = BaseService.service_declare(name='identity_service', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='identity_service', version='0.1.0', dependencies=[])
 
     op_clear_identity_registry = BaseRegistryService.base_clear_registry
     op_register_user = BaseRegistryService.base_register_resource
@@ -94,4 +94,4 @@ class IdentityRegistryService(BaseRegistryService):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(IdentityRegistryService)
+factory = ProcessFactory(IdentityRegistryService)

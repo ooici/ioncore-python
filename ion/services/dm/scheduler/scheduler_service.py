@@ -11,16 +11,16 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.dm.scheduler.scheduler_registry import SchedulerRegistry
 
-class SchedulerService(BaseService):
+class SchedulerService(ServiceProcess):
     """
 
     """
     # Declaration of service
-    declare = BaseService.service_declare(name='scheduler',
+    declare = ServiceProcess.service_declare(name='scheduler',
                                           version='0.1.0',
                                           dependencies=[])
 
@@ -54,7 +54,7 @@ class SchedulerService(BaseService):
         yield self.reply_err(msg, {'value':'Not implemented!'}, {})
 
 
-class SchedulerServiceClient(BaseServiceClient):
+class SchedulerServiceClient(ServiceClient):
     """
     This is an exemplar service client that calls the hello service. It
     makes service calls RPC style.
@@ -62,7 +62,7 @@ class SchedulerServiceClient(BaseServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'scheduler'
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def add_task(self, target, payload):
@@ -71,4 +71,4 @@ class SchedulerServiceClient(BaseServiceClient):
         defer.returnValue(str(content))
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(SchedulerService)
+factory = ProcessFactory(SchedulerService)

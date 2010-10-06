@@ -6,17 +6,16 @@ from twisted.internet import defer
 from twisted.internet.task import LoopingCall
 from twisted.web import server, resource
 from twisted.internet import reactor
-from ion.core.cc.spawnable import Receiver
-from ion.services.base_service import BaseService, BaseServiceClient
-from ion.core.base_process import ProtocolFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
+from ion.core.process.process import ProcessFactory
 import Queue
 import uuid
 from ion.services.cei import cei_events
 
-class EPUWorkProducer(BaseService):
+class EPUWorkProducer(ServiceProcess):
     """EPU Work Producer.
     """
-    declare = BaseService.service_declare(name='epu_work_producer', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='epu_work_producer', version='0.1.0', dependencies=[])
 
     def slc_init(self):
         self.queue_name_work = self.get_scoped_name("system", self.spawn_args["queue_name_work"])
@@ -58,7 +57,7 @@ class EPUWorkProducer(BaseService):
             return
 
 # Direct start of the service as a process with its default name
-factory = ProtocolFactory(EPUWorkProducer)
+factory = ProcessFactory(EPUWorkProducer)
 
 class SleepJob:
     def __init__(self, jobid, batchid, length):
