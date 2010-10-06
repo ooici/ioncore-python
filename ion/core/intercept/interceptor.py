@@ -91,8 +91,8 @@ class IdmInterceptor(object):
             else:
                 if msg_sign:
                     msg = cls.message_signer(msg)
-        except Exception, e:
-            pu.log_exception("IdM Interceptor failed",e)
+        except Exception, ex:
+            log.exception("IdM Interceptor failed")
         return msg
 
     @classmethod

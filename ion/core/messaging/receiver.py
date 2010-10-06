@@ -177,55 +177,27 @@ class Receiver(BasicLifecycleObject):
             yield defer.maybeDeferred(handler, data, msg)
 
     @defer.inlineCallbacks
-    def send(self, recv, operation, content, headers=None, sender=None):
+    def send(self, **kwargs):
         """
         Constructs a standard message with standard headers and sends on given
         receiver.
-        @param rec recipient name of the message
+        @param sender sender name of the message
+        @param recipient recipient name of the message
         @param operation the operation (performative) of the message
+        @param content the black-box content of the message
         @param headers dict with headers that may override standard headers
         """
-        msg = {}
-        # The following headers are FIPA ACL Message Format based
-        # Exchange name of sender (DO NOT SEND replies here)
-        msg['sender'] = str(sender or self.xname)
-        # Exchange name of message recipient
-        msg['receiver'] = str(recv)
-        # Exchange name for message replies
-        msg['reply-to'] = str(sender or self.xname)
-        # Wire form encoding, such as 'json', 'fudge', 'XDR', 'XML', 'custom'
-        msg['encoding'] = 'json'
-        # See ion.data.dataobject Serializers for choices
-        msg['accept-encoding'] = ''
-        # Language of the format specification
-        msg['language'] = 'ion1'
-        # Identifier of a registered format specification (i.e. message schema)
-        msg['format'] = 'raw'
-        # Ontology associated with the content of the message
-        msg['ontology'] = ''
-        # Conversation instance id
-        msg['conv-id'] = ''
-        # Conversation message sequence number
-        msg['conv-seq'] = 1
-        # Conversation type id
-        msg['protocol'] = ''
-        # Status code
-        msg['status'] = 'OK'
-        # Local timestamp in ms
-        msg['ts'] = str(pu.currenttime_ms())
-        #msg['reply-with'] = ''
-        #msg['in-reply-to'] = ''
-        #msg['reply-by'] = ''
-        # Sender defined headers are updating the default headers set above.
-        if headers:
-            msg.update(headers)
-        # Operation of the message, aka performative, verb, method
-        msg['op'] = operation
-        # The actual content
-        msg['content'] = content
+        msg = kwargs
+        msg['sender'] = msg.get('sender', self.xname)
         #log.debug("Send message op="+operation+" to="+str(recv))
         try:
-            yield ioninit.container_instance.send(recv, msg)
+            if not self.raw:
+                inv = Invocation(path=Invocation.PATH_OUT,
+                                 message=msg,
+                                 content=msg['content'])
+                inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
+                msg = inv1.message
+            yield ioninit.container_instance.send(msg.get('receiver'), msg)
         except Exception, ex:
             log.exception("Send error")
         else:

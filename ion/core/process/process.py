@@ -436,10 +436,11 @@ class Process(BasicLifecycleObject):
         @retval Deferred for send of message
         """
         msgheaders = self._prepare_message(headers)
+        message = dict(recipient=recv, operation=operation, content=content, headers=msgheaders)
         if reply:
-            d = self.receiver.send(recv, operation, content, msgheaders)
+            d = self.receiver.send(**message)
         else:
-            d = self.backend_receiver.send(recv, operation, content, msgheaders)
+            d = self.backend_receiver.send(**message)
         return d
 
     def _prepare_message(self, headers):
