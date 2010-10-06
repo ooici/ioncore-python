@@ -137,6 +137,7 @@ class UserRegistrationClientTest(IonTestCase):
 
         # Test for user not found handled properly.
         ooi_id.RegistryIdentity = "bogus-ooi_id"
+        print "THIS IS SUPPOSED TO FAIL. ITS SEARCHING FOR A BOGUS ID"
         result = yield self.identity_registry_client.get_user(ooi_id)
         self.assertEqual(result, None)
 
