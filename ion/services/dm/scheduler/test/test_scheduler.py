@@ -21,8 +21,8 @@ class SchedulerTest(IonTestCase):
         services = [
             {'name': 'scheduler', 'module': 'ion.services.dm.scheduler.scheduler_service',
              'class': 'SchedulerService'},
-            {'name': 'scheduler_registry', 'module': 'ion.services.dm.scheduler.scheduler_registry',
-             'class': 'SchedulerRegistry'},
+            {'name' : 'attributestore', 'module' : 'ion.services.coi.attributestore',
+             'class' : 'AttributeStoreService'},
         ]
 
         yield self._start_container()
@@ -38,12 +38,10 @@ class SchedulerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_add_remove(self):
-        raise unittest.SkipTest('code not implemented yet')
-
         sc = SchedulerServiceClient(proc=self.sup)
 
-        yield sc.add_task('foobar', 1.0, 'pingtest')
-        rc = yield sc.rm_task('foobar')
+        task_id = yield sc.add_task('foobar', 1.0, 'pingtest')
+        rc = yield sc.rm_task(task_id)
         self.failUnlessEqual(rc['status'], 'OK')
 
     @defer.inlineCallbacks

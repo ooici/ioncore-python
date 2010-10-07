@@ -42,7 +42,7 @@ try:
                                      'pydap.handlers.netcdf','pydap.handlers.nca',
                                      'pydap.responses.netcdf',
                                      'msgpack-python','gviz_api.py',
-                                     'nimboss','txrabbitmq']
+                                     'nimboss','txrabbitmq', 'Telephus']
     setupdict['include_package_data'] = True
     setup(**setupdict)
 

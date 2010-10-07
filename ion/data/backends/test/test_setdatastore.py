@@ -14,6 +14,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from uuid import uuid4
 from ion.data.backends.setdatastore import SetCassandraStore
+from twisted.internet import defer
 
 
 class SetDataStoreInterfaceTest(unittest.TestCase):
@@ -23,10 +24,10 @@ class SetDataStoreInterfaceTest(unittest.TestCase):
         self.key = self._mkey()
         self.value = self._mkey()
         self.value2 = self._mkey()
-
+    
+    @defer.inlineCallbacks
     def tearDown(self):
-        self.ds.remove(self.key)
-        del self.ds
+        yield self.ds.remove(self.key)
 
     def _mkey(self):
         # Generate a pseudo-random string. handy, that.
