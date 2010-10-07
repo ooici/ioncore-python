@@ -63,7 +63,7 @@ class SchedulerService(ServiceProcess):
 
         # Now that task is stored into registry, add to messaging callback
         log.debug('Adding task to scheduler')
-        self._schedule_next(task_id)
+        reactor.callLater(msg_interval, self._send_and_reschedule, task_id)
         log.debug('Add completed OK')
         yield self.reply_ok(msg, {'value':task_id})
 
@@ -71,7 +71,7 @@ class SchedulerService(ServiceProcess):
     def op_rm_task(self, content, headers, msg):
         """
         Remove a task from the list/store. Will be dropped from the reactor
-        when the timer fires and _send_message checks the registry.
+        when the timer fires and _send_and_reschedule checks the registry.
         """
         task_id = content
 
@@ -81,7 +81,7 @@ class SchedulerService(ServiceProcess):
             self.reply_err(msg, {'value': err})
             return
 
-        self.store.remove(task_id)
+        yield self.store.remove(task_id)
         log.debug('Remove completed OK')
         yield self.reply_ok(msg, {'value': 'OK'})
 
@@ -107,39 +107,26 @@ class SchedulerService(ServiceProcess):
     # Internal methods
 
     @defer.inlineCallbacks
-    def _send_message(self, task_id, target_id, payload):
+    def _send_and_reschedule(self, task_id):
         """
         Check to see if we're still in the store - if not, we've been removed
         and should abort the run.
         """
-        log.debug('Time to send "%s" to "%s", id "%s"' % (payload, target_id, task_id))
+        log.debug('Worker activated for task %s' % task_id)
         tdef = yield self.store.get(task_id)
         if not tdef:
-            log.info('Task ID missing on send, assuming removal and aborting')
+            log.info('Task ID missing in store, assuming removal and aborting')
             return
 
-        send(target_id, 'scheduler', None, 'scheduler', payload)
-        # @note fire and forget; don't need to wait for send to run to completion.
+        payload = tdef['payload']
+        target_id = tdef['target']
+        interval = tdef['interval']
 
-        # Schedule next invocation
-        self._schedule_next(task_id)
+        log.debug('Time to send "%s" to "%s", id "%s"' % (payload, target_id, task_id))
+        yield send(target_id, 'scheduler', target_id, 'scheduler', payload)
+        log.debug('Send completed, rescheduling %s' % task_id)
 
-    @defer.inlineCallbacks
-    def _schedule_next(self, task_id):
-        # Reschedule the next periodic invocation using the Twisted reactor
-        log.debug('Rescheduling %s' % task_id)
-
-        # Pull the task def from the registry
-        tdef = yield self.store.get(task_id)
-        try:
-            target_id = tdef['target']
-            interval = tdef['interval']
-            payload = tdef['payload']
-        except KeyError:
-            log.exception('Error parsing task def from registry! Task id: "%s"' % task_id)
-            defer.returnValue(None)
-
-        reactor.callLater(interval, self._send_message, task_id, target_id, payload)
+        reactor.callLater(interval, self._send_and_reschedule, task_id)
 
         # Update last-invoked timestamp in registry
         log.debug('Updating last-run time')

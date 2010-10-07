@@ -10,6 +10,8 @@
 from twisted.internet import defer
 from twisted.trial import unittest
 
+from ion.core.process.service_process import ServiceProcess
+
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
 
 from ion.test.iontest import IonTestCase
@@ -17,7 +19,6 @@ import ion.util.ionlog
 from ion.util.procutils import asleep
 
 log = ion.util.ionlog.getLogger(__name__)
-
 
 class SchedulerTest(IonTestCase):
     @defer.inlineCallbacks
@@ -28,6 +29,8 @@ class SchedulerTest(IonTestCase):
              'class': 'SchedulerService'},
             {'name' : 'attributestore', 'module' : 'ion.services.coi.attributestore',
              'class' : 'AttributeStoreService'},
+            {'name' : 'scheduled_task', 'module' : 'ion.services.dm.scheduler.test.receiver',
+             'class' : 'ScheduledTask'},
         ]
 
         yield self._start_container()
@@ -45,7 +48,7 @@ class SchedulerTest(IonTestCase):
     def test_add_only(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        reply = yield sc.add_task('foobar', 1.0, 'pingtest')
+        reply = yield sc.add_task('scheduled_task', 1.0, 'pingtest')
         task_id = reply['value']
         log.debug(task_id)
         self.failUnless(task_id != None)
@@ -55,11 +58,11 @@ class SchedulerTest(IonTestCase):
     def test_add_remove(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        task_id = yield sc.add_task('foobar', 1.0, 'pingtest')
+        task_id = yield sc.add_task('scheduled_task', 1.0, 'pingtest')
         rc = yield sc.rm_task(task_id)
         self.failUnlessEqual(rc['value'], 'OK')
         log.debug(rc)
-        yield asleep(6.0)
+        yield asleep(3.0)
 
     @defer.inlineCallbacks
     def test_query(self):
