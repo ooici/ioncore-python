@@ -125,14 +125,14 @@ class IdentityResource(StatefulResource):
     rsa_private_key = TypedAttribute(str)
     expiration_date = TypedAttribute(str)
     # These are the fields we prompt the user for during registration
-    first_name = TypedAttribute(str)
-    last_name = TypedAttribute(str)
-    phone = TypedAttribute(str)
-    fax = TypedAttribute(str)
-    email = TypedAttribute(str)
-    organization = TypedAttribute(str)
-    department = TypedAttribute(str)
-    title = TypedAttribute(str)
+    #first_name = TypedAttribute(str)
+    #last_name = TypedAttribute(str)
+    #phone = TypedAttribute(str)
+    #fax = TypedAttribute(str)
+    #email = TypedAttribute(str)
+    #organization = TypedAttribute(str)
+    #department = TypedAttribute(str)
+    #title = TypedAttribute(str)
 
 
 
