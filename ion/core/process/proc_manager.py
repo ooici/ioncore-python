@@ -76,7 +76,7 @@ class ProcessManager(BasicLifecycleObject):
             sup = yield self.create_supervisor()
 
         assert IProcess.providedBy(sup), "Parent must provide IProcess"
-        assert sup._get_state() == "ACTIVE", "Illegal parent process state"
+        assert sup._get_state() in ("READY", "ACTIVE"), "Illegal parent process state"
 
         log.info("Spawning %s child processes for sup=[%s]" % (len(children), sup.proc_name))
         for child in children:
@@ -95,6 +95,8 @@ class ProcessManager(BasicLifecycleObject):
         @param node the container id where process should be spawned; None for local
         @retval Deferred -> Id with process id
         """
+        if not parent:
+            parent = yield self.create_supervisor()
         assert isinstance(procdesc, ProcessDesc), "procdesc must be ProcessDesc"
         assert IProcess.providedBy(parent), "parent must be IProcess"
 

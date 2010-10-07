@@ -3,7 +3,7 @@
     "type":"application",
     "name":"ExampleApp",
     "description": "ION Example application",
-    "version": "1",
+    "version": "0.1",
     "mod": ("ion.zapps.example", []),
     "modules": [
         "ion.zapps.example",

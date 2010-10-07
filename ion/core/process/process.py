@@ -151,7 +151,7 @@ class Process(BasicLifecycleObject):
         @retval Deferred for the Id of the process (self.id)
         """
         assert not self.backend_receiver.consumer, "Process already initialized"
-        log.debug('Process id=%s initialize()' % (self.id))
+        log.debug('Process [%s] id=%s initialize()' % (self.proc_name, self.id))
 
         # Create queue only for process receiver
         yield self.receiver.initialize()
@@ -163,7 +163,7 @@ class Process(BasicLifecycleObject):
         # Callback to subclasses
         try:
             yield defer.maybeDeferred(self.plc_init)
-            log.info('Process id=%s [%s]: INIT OK' % (self.id, self.proc_name))
+            log.info('Process [%s] id=%s: INIT OK' % (self.proc_name, self.id))
         except Exception, ex:
             log.exception('----- Process %s INIT ERROR -----' % (self.id))
             raise ex
@@ -193,7 +193,7 @@ class Process(BasicLifecycleObject):
         """
         @retval Deferred
         """
-        log.debug('Process id=%s activate()' % (self.id))
+        log.debug('Process [%s] id=%s activate()' % (self.proc_name, self.id))
 
         # Create consumer for process receiver
         yield self.receiver.activate()
@@ -436,7 +436,8 @@ class Process(BasicLifecycleObject):
         @retval Deferred for send of message
         """
         msgheaders = self._prepare_message(headers)
-        message = dict(recipient=recv, operation=operation, content=content, headers=msgheaders)
+        message = dict(recipient=recv, operation=operation,
+                       content=content, headers=msgheaders)
         if reply:
             d = self.receiver.send(**message)
         else:

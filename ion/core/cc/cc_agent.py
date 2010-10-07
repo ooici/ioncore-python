@@ -16,9 +16,10 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.agents.resource_agent import ResourceAgent
 from ion.core import ionconst, ioninit
 from ion.core.ioninit import ion_config
-from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 from ion.core.cc.container import Container
 from ion.core.messaging.receiver import Receiver, FanoutReceiver
+from ion.core.pack import app_supervisor
+from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 import ion.util.procutils as pu
 
 
@@ -157,6 +158,27 @@ class CCAgent(ResourceAgent):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(CCAgent)
+
+
+# Functions required
+@defer.inlineCallbacks
+def start(container, starttype, app_definition, *args, **kwargs):
+    agent_proc = [
+        {'name':'ccagent','module':__name__},
+    ]
+
+    appsup_desc = ProcessDesc(name='app-supervisor-'+app_definition.name,
+                              module=app_supervisor.__name__,
+                              spawnargs={'spawn-procs':agent_proc})
+    supid = yield appsup_desc.spawn()
+
+    res = (supid.full, [])
+    defer.returnValue(res)
+
+def stop(container, state):
+    return defer.succeed(None)
+
+
 
 """
 twistd -n --pidfile t1.pid cc -h amoeba.ucsd.edu -a sysname=mm res/scripts/newcc.py
