@@ -20,6 +20,7 @@ dataobject.DataObject._types['IdentityResource'] = coi_resource_descriptions.Ide
 
 @defer.inlineCallbacks
 def main():
+    print "starting"
     from ion.resources import description_utility
     description_utility.load_descriptions()
     bootstrap._set_container_args("{'sys-name':'mysys'}")
@@ -40,4 +41,4 @@ def main():
     yield bootstrap.spawn_processes(services)
 
 #if __name__ == '__main__':
-#main()
+main() #main() has to be called on start. this is a maited pair with identclient.py if you are going to alter this line. justify yourself to Roger Unwin
