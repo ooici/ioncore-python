@@ -11,12 +11,13 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 import time
+import re
 from uuid import uuid4
 
-from ion.services.dm.scheduler.scheduler_registry import SchedulerRegistryClient
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.attributestore import AttributeStoreClient
+from ion.util.procutils import send
 
 class SchedulerService(ServiceProcess):
     """
@@ -56,13 +57,15 @@ class SchedulerService(ServiceProcess):
 
         # Just drop the entire message payload in
         rc = yield self.store.put(task_id, content)
-        if rc != 'OK':
-            yield self.reply_err(msg, 'Error adding task to registry!')
+        if re.search('rror', rc):
+            yield self.reply_err(msg, 'Error "%s" adding task to registry!' % rc)
             return
 
         # Now that task is stored into registry, add to messaging callback
+        log.debug('Adding task to scheduler')
         self._schedule_next(task_id)
-        self.reply_ok(msg, 'Task ID %s scheduled' % task_id)
+        log.debug('Add completed OK')
+        yield self.reply_ok(msg, {'value':task_id})
 
     @defer.inlineCallbacks
     def op_rm_task(self, content, headers, msg):
@@ -70,16 +73,17 @@ class SchedulerService(ServiceProcess):
         Remove a task from the list/store. Will be dropped from the reactor
         when the timer fires and _send_message checks the registry.
         """
-        try:
-            task_id = content['task_id']
-        except KeyError:
+        task_id = content
+
+        if not task_id:
             err = 'required argument task_id not found in message'
-            log.exception(err)
+            log.error(err)
             self.reply_err(msg, {'value': err})
             return
 
         self.store.remove(task_id)
-        self.reply_ok(msg, {'value': 'task removed'})
+        log.debug('Remove completed OK')
+        yield self.reply_ok(msg, {'value': 'OK'})
 
     @defer.inlineCallbacks
     def op_query_tasks(self, content, headers, msg):
@@ -108,14 +112,13 @@ class SchedulerService(ServiceProcess):
         Check to see if we're still in the store - if not, we've been removed
         and should abort the run.
         """
+        log.debug('Time to send "%s" to "%s", id "%s"' % (payload, target_id, task_id))
         tdef = yield self.store.get(task_id)
         if not tdef:
             log.info('Task ID missing on send, assuming removal and aborting')
             return
 
-        # Do work, then reschedule ourself
-        sc = ServiceClient(target=target_id)
-        sc.send(payload)
+        send(target_id, 'scheduler', None, 'scheduler', payload)
         # @note fire and forget; don't need to wait for send to run to completion.
 
         # Schedule next invocation
@@ -124,6 +127,7 @@ class SchedulerService(ServiceProcess):
     @defer.inlineCallbacks
     def _schedule_next(self, task_id):
         # Reschedule the next periodic invocation using the Twisted reactor
+        log.debug('Rescheduling %s' % task_id)
 
         # Pull the task def from the registry
         tdef = yield self.store.get(task_id)
@@ -138,8 +142,10 @@ class SchedulerService(ServiceProcess):
         reactor.callLater(interval, self._send_message, task_id, target_id, payload)
 
         # Update last-invoked timestamp in registry
+        log.debug('Updating last-run time')
         tdef['last_run'] = time.time()
         self.store.put(task_id, tdef)
+        log.debug('Task %s rescheduled for %f seconds OK' % (task_id, interval))
 
 class SchedulerServiceClient(ServiceClient):
     """

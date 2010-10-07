@@ -255,6 +255,11 @@ def get_module(qualmodname):
     return mod
 
 def asleep(secs):
+    """
+    @brief Do a reactor-safe sleep call. Call with yield to block until done.
+    @param secs Time, in seconds
+    @retval Deferred whose callback will fire after time has expired
+    """
     d = defer.Deferred()
     reactor.callLater(secs, d.callback, None)
     return d
