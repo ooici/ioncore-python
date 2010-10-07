@@ -5,7 +5,8 @@
 @author Michael Meisinger
 @author Paul Hubbard
 @author Dorian Raymer
-@brief Implementation of ion.data.store.IStore using pycassa to interface a
+@author Matt Rodriguez
+@brief Implementation of ion.data.store.IStore using Telephus to interface a
         Cassandra datastore backend
 @note Test cases for the cassandra backend are now in ion.data.test.test_store
 """
@@ -15,7 +16,11 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
-import pycassa
+from twisted.internet import reactor
+
+from telephus.client import CassandraClient
+from telephus.protocol import ManagedCassandraClientFactory
+from telephus.cassandra.ttypes import NotFoundException
 
 from ion.core import ioninit
 from ion.data.store import IStore
@@ -53,6 +58,7 @@ class CassandraStore(IStore):
         @param cass_host_list List of hostname:ports for cassandra host or cluster
         @retval Deferred, for IStore instance.
         """
+        log.info('In create_store method')
         inst = cls(**kwargs)
         inst.kwargs = kwargs
         inst.cass_host_list = kwargs.get('cass_host_list', None)
@@ -73,56 +79,58 @@ class CassandraStore(IStore):
             if inst.namespace:
                 log.info('Ignoring namespace argument in non super column cassandra store')
             inst.namespace=None
-
-        if not inst.cass_host_list:
-            log.info('Connecting to Cassandra on localhost...')
+        
+        if  inst.cass_host_list is None:
+            port = 9160
+            host = 'amoeba.ucsd.edu'
         else:
-            log.info('Connecting to Cassandra ks:cf=%s:%s at %s ...' %
-                         (inst.keyspace, inst.colfamily, inst.cass_host_list))
-        inst.client = pycassa.connect(inst.cass_host_list, framed_transport=True)
-        inst.kvs = pycassa.ColumnFamily(inst.client, inst.keyspace,
-                                        inst.colfamily, super=inst.cf_super)
-        log.info('connected to Cassandra... OK.')
-        log.info('cass_host_list: '+str(inst.cass_host_list))
-        log.info('keyspace: '+str(inst.keyspace))
-        log.info('colfamily: '+str(inst.colfamily))
-        log.info('cf_super: '+str(inst.cf_super))
-        log.info('namespace: '+str(inst.namespace))
-        return defer.succeed(inst)
+            port = int(inst.cass_host_list[0].split(":")[1])
+            host = inst.cass_host_list[0].split(":")[0]
+            log.info("Got host %s and port %d from cass_host_list" % (host, port))
+                
+        inst.manager = ManagedCassandraClientFactory()
+        inst.client = CassandraClient(inst.manager, inst.keyspace) 
+        inst.connector = reactor.connectTCP(host, port, inst.manager, timeout=1)
+        log.info("Created Cassandra store")
+        return defer.succeed(inst)               
 
-
+    @defer.inlineCallbacks
     def clear_store(self):
         """
-        @brief Delete the super column namespace. Do not touch default namespace!
-        @note This is complicated by the persistence across many 
+        @brief Delete the super column namespace.
+        @retval Deferred, None
         """
         if self.cf_super:
-            self.kvs.remove(self.key,super_column=self.namespace)
+            yield self.client.remove(self.key, self.colfamily, super_column=self.namespace)
         else:
             log.info('Can not clear root of persistent store!')
-        return defer.succeed(None)
+        defer.returnValue(None)
         
-
+    @defer.inlineCallbacks
     def get(self, col):
         """
         @brief Return a value corresponding to a given key
         @param col Cassandra column
         @retval Deferred, for value from the ion dictionary, or None
         """
-        value = None
+        
+        log.info("CassandraStore: Calling get on col %s " % col)
         try:
             if self.cf_super:
-                value = self.kvs.get(self.key, columns=[col], super_column=self.namespace)
+                log.info("super_col: Calling get on col %s " % col)
+                value = yield self.client.get(self.key, self.colfamily, column=col, super_column=self.namespace)
+                log.info("super_col: Calling get on col %s " % value)
             else:
-                value = self.kvs.get(self.key, columns=[col])
-            #log.debug('Key "%s":"%s"' % (key, val))
-            #this could fail if insert did it wrong
-            value=value.get(col)
-        except pycassa.NotFoundException:
-            #log.debug('Key "%s" not found' % key)
-            pass
-        return defer.succeed(value)
+                log.info("standard_col: Calling get on col %s " % col)
+                value = yield self.client.get(self.key, self.colfamily, column=col)
+        except NotFoundException:
+            log.info("Didn't find the col: %s. Returning None" % col)     
+            defer.returnValue(None)
+            
+        column_value = value.column.value 
+        defer.returnValue(column_value)
 
+    @defer.inlineCallbacks
     def put(self, col, value):
         """
         @brief Write a key/value pair into cassandra
@@ -131,13 +139,18 @@ class CassandraStore(IStore):
         @note Value is composed into OOI dictionary under keyname 'value'
         @retval Deferred for success
         """
-        #log.debug('writing key %s value %s' % (key, value))
-        if self.cf_super:
-            self.kvs.insert(self.key, {self.namespace:{col:value}})
-        else:
-            self.kvs.insert(self.key, {col:value})
-        return defer.succeed(None)
+        log.info("CassandraStore: Calling put on col: %s  value: %s " % (col, value))
+        try:
+            if self.cf_super:
+                log.info("CassandraStore: super_col key %s colfamily %s value %s column %s super_column %s " % (self.key, self.colfamily, value, col, self.namespace))
+                yield self.client.insert(self.key, self.colfamily, value, column=col, super_column=self.namespace) 
+            else:
+                yield self.client.insert(self.key, self.colfamily, value, column=col)
+        except:
+            log.info("CassandraStore: Exception was thrown during the put")
+        defer.returnValue(None)
 
+    @defer.inlineCallbacks
     def query(self, regex):
         """
         @brief Search by regular expression
@@ -145,21 +158,34 @@ class CassandraStore(IStore):
         @retval Deferred, for list, possibly empty, of keys that match.
         @note Uses get_range generator of unknown efficiency.
         """
-        #@todo This implementation is very inefficient. Do smarter, but how?
+        log.info("searching for regex %s" % regex)
         matched_list = []
         if self.cf_super:
-            klist = self.kvs.get(self.key, super_column=self.namespace)
+            klist = yield self.client.get(self.key, self.colfamily, super_column=self.namespace)
         else:
-            klist = self.kvs.get(self.key)
+            klist = yield self.client.get_slice(self.key, self.colfamily)
+        
+        #This code could probably be refactored. The data structures returned are different if
+        #it is called with a column or super_column. Another possibility is that the code 
+        #is removed when the IStore interface doesn't use the query interface.
+        if self.cf_super:
+            columns = klist.super_column.columns
+            for col in columns:
+            
+                m = re.findall(regex, str(col.name))
+                
+                if m: 
+                    matched_list.extend(m)
+        else:
+            for col in klist:
+                m = re.findall(regex, str(col.column.name))
+                if m:
+                    matched_list.extend(m)
 
-        for x in klist.keys():
-            #m = re.search(regex, x[0])
-            m = re.findall(regex, x)
-            if m:
-                matched_list.extend(m)
+        log.info("matched_list %s" % matched_list)
+        defer.returnValue(matched_list)
 
-        return defer.succeed(matched_list)
-
+    @defer.inlineCallbacks
     def remove(self, col):
         """
         @brief delete a key/value pair
@@ -168,7 +194,7 @@ class CassandraStore(IStore):
         @note Deletes are lazy, so key may still be visible for some time.
         """
         if self.cf_super:
-            self.kvs.remove(self.key, columns=[col], super_column=self.namespace)
+            yield self.client.remove(self.key, self.colfamily, column=col, super_column=self.namespace)
         else:
-            self.kvs.remove(self.key, columns=[col])
-        return defer.succeed(None)
+            yield self.client.remove(self.key, self.colfamily, column=col)
+        defer.returnValue(None)

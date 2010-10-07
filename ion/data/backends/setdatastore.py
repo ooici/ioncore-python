@@ -14,6 +14,7 @@ log = ion.util.ionlog.getLogger(__name__)
 import pycassa
 
 
+
 class SetCassandraStore():
     """
     Provides a set data structure abstraction for interacting with the
