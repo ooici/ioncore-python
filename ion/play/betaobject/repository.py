@@ -44,7 +44,7 @@ class Repository(object):
         """
         
         
-        self._dotgit = gpb_wrapper.Wrapper(mutable_pb2.MutableNode())
+        self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode)
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
         """
@@ -89,15 +89,104 @@ class Repository(object):
         Stash the current workspace for later reference
         """
         
-    def create_wrapped_object(self, rootclass):        
+    def create_wrapped_object(self, rootclass, obj_id=None):        
         
-        obj_id = self.get_id()
-        self._workspace[obj_id] = gpb_wrapper.Wrapper(self, rootclass(), obj_id)        
+        if not obj_id:
+            obj_id = self.new_id()
+        obj = gpb_wrapper.Wrapper(self, rootclass(), obj_id)
+        self._workspace[obj_id] = obj
+        return obj
         
-        
-    def get_id(self):
+    def new_id(self):
         self._object_counter += 1
-        return str(self.__object_counter)
- 
+        return str(self._object_counter)
+     
+    def get_linked_object(self, link):
+                
+        if self._workspace.has_key(link.key):
+            return self._workspace.get(link.key)
+        elif self._hashed_elements.has_key(link.key):
+            
+            element = self._hashed_elements.get(link.key)
+            
+            # Make sure the type is the same!
+            if not link.type == element.type:
+                raise Exception, 'The link type does not match the element type!'
+            
+            cls = self._load_class_from_type(link.type)
+                
+            obj = self.create_wrapped_object(cls, link.key)
+            
+            obj.ParseFromString(element.value)
+            return obj
+        else:
+            return self._workbench.fetch_linked_objects(link)
+            
+            
+        
+    def _load_class_from_type(self,ltype):
+        module = ltype.protofile.split('.')[0] + '_pb2'
+        cls_name = ltype.cls
+                
+        temp= __import__(ltype.package, fromlist=module)
+        
+        mod = getattr(temp,module)
+        cls = getattr(mod, cls_name)
+        return cls
         
         
+    def _set_type_from_obj(self, ltype, wrapped_obj):
+        
+        msg = wrapped_obj._gpbMessage
+                
+        ltype.protofile = msg.DESCRIPTOR.file.name.split('/')[-1]        
+        ltype.package = msg.DESCRIPTOR.file.package        
+        ltype.cls = msg.DESCRIPTOR.name
+        
+        
+    def set_linked_object(self,field, value):        
+        # If it is a link - set a link to the value in the wrapper
+        if field._gpb_full_name == self.LinkClassName:
+            
+            #Make sure the link is in the nodes set of children 
+            field._child_links.add(field)
+            
+            # If the link is currently set
+            if field.IsInitialized():
+                
+                if field.key == value._myid:
+                    return
+                
+                
+                old_obj = self._workspace.get(field.key,None)
+                if old_obj:
+                    plinks = old_obj._parent_links
+                    plinks.remove(field.key)
+                    # If there are no parents left for the object delete it
+                    if len(plinks)==0:
+                        del self._workspace[field.key]
+                    
+                
+                # Modify the existing link
+                setattr(field,'key',value._myid)
+                
+                # Set the new type
+                tp = getattr(field,'type')
+                self._set_type_from_obj(tp, field)
+                    
+            else:
+                
+                # Set the id of the linked wrapper
+                setattr(field,'key',value._myid)
+                
+                # Set the type
+                tp = getattr(field,'type')
+                self._set_type_from_obj(tp, field)
+                
+        else:
+            
+            raise Exception, 'Can not set a composit field'
+            #Over ride Protobufs - I want to be able to set a message directly
+        #    field.CopyFrom(value)
+        
+            

@@ -53,7 +53,7 @@ class Wrapper(object):
     
     '''
     
-    LinkClassName = 'net.ooici.core.link.CASRef'
+    LinkClassName = link_pb2.DESCRIPTOR.full_name
     
     def __init__(self, repository, gpbMessage, myid, read_only=False):
         """
@@ -71,12 +71,12 @@ class Wrapper(object):
         field_names = self._GPBClass.DESCRIPTOR.fields_by_name.keys()
         self._gpb_full_name = gpbMessage.DESCRIPTOR.full_name
         
-        self._parent_links=[]
+        self._parent_links=set()
         """
         A list of all the wrappers which link to me
         """
         
-        self._child_links=[]
+        self._child_links=set()
         """
         A list of all the wrappers which I link to
         """
@@ -120,8 +120,14 @@ class Wrapper(object):
         cls = self.__class__
         # note - cant use @classmethod because I need context from this message
         
-        inst = cls(gpbMessage,self.read_only)
+        inst = cls(self._repository, gpbMessage, self._myid, self.read_only)
+        # Over ride the root - rewrap is for instances that derive from the root of a composit gpb
         inst._root = self._root
+        
+        # I don't like this...
+        inst._parent_links = self._root._parent_links
+        inst._child_links = self._root._child_links
+        
         return inst
 
 
@@ -136,21 +142,21 @@ class Wrapper(object):
             print '__getattribute__: self, key:', object.__getattribute__(self,'_gpb_full_name'), key
             gpb = object.__getattribute__(self,'_gpbMessage')
             value = getattr(gpb,key)
-
-            #print 'Value', value, type(value), hasattr(value,'__iter__')
                         
             if isinstance(value, containers.RepeatedCompositeFieldContainer):
                 value = ContainerWrapper(self, value)
             elif isinstance(value, message.Message):
                 if value.DESCRIPTOR.full_name == self.LinkClassName:
-                    value = self.get_name(value.id)
+                    value = self._repository._get_linked_object(value)
                     
                 else:
                     value = self.rewrap(value)
                 
         else:
             value = object.__getattribute__(self, key)
-        return value        
+        return value
+    
+
 
     def __setattr__(self,key,value):
 
@@ -176,44 +182,15 @@ class Wrapper(object):
         # If the value we are setting is a Wrapper Object
         if isinstance(value, Wrapper):
             
-            #Examin the field we are trying to set 
+            #Examine the field we are trying to set 
             field = getattr(gpb,key)
-            wrapped_field = self.rewrap(field)
-            self._set_message(wrapped_field,value)
+            assert isinstance(field, message.Message), \
+              'Only a composit field can be set using another message as a value '
+            wrapped_field = self.rewrap(field) # This will throw an exception if field is not a gpbMessage
+            self._repository._set_linked_object(wrapped_field,value)
             
         else:
             setattr(gpb, key, value)
-    
-    def _set_message(self,field, value):        
-        # If it is a link - set a link to the value in the wrapper
-        if field._gpb_full_name == self.LinkClassName:
-            
-            current = self._workspace.get(field.id,None)
-            if current:
-                # Modify the existing value already lined in the worksapce
-                current.CopyFrom(value)
-                # Reset the type name
-                setattr(field,'type',value._gpb_full_name)
-                    
-            else:
-                
-                # add a reference to links in the value in the wrapper
-                value._links.append(self)
-                    
-                # Get a new local identity for this new link
-                idx = self.get_id()
-                    
-                # add the value in the wrapper to the local workspace
-                self._workspace[idx] = value
-                
-                # Set the type and id of the linked wrapper
-                setattr(field,'id',idx)
-                # Set the type name
-                setattr(field,'type',value._gpb_full_name)
-                
-        else:
-            #Over ride Protobufs - I want to be able to set a message directly
-            field.CopyFrom(value)
 
     
     def __eq__(self, other):
@@ -443,10 +420,11 @@ class ContainerWrapper(object):
         item = self.__getitem__(key)
         if item._gpb_full_name == self._wrapper.LinkClassName:
             
-            self._wrapper._set_message(item, value)
-                
-        else:
-            item.CopyFrom(value)
+            self._wrapper._repository._set_linked_object(item, value)
+         
+        # Don't want to expose SetItem for composits!        
+        #else:
+        #    item.CopyFrom(value)
         
             
     def __getitem__(self, key):

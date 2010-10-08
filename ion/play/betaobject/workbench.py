@@ -40,6 +40,20 @@ class WorkBench(object):
         self._repos[name] = repo
         
         return repo
+    
+    def _create_repo(self, rootclass):
+        """
+        Factory method for creating a repository - this is the responsibility
+        of the workbench.
+        """
+        inst = repository.Repository()
+        inst._workbench = self
+        
+        # Now create the root object - this is the responsibility of the repo
+        root_obj = inst._create_wrapper_object(rootclass)
+
+        # Because it is the root object of a new repo - set it
+        inst._workspace_root = root_obj
         
         
         
@@ -70,28 +84,28 @@ class WorkBench(object):
         Helper for the sender to pack message content
         """
         
+        
+    def fetch_linked_objects(self, links):
+        """
+        Fetch the linked objects from the data store service
+        """
+        return None
+    
     
     def get_repository(self,name):
+        """
+        Simple getter for the repository dictionary
+        """
         return self._repos.get(name,None)
         
     def list_repositories(self):
+        """
+        Simple list tool for repository names
+        """
         return self._repos.keys()
         
         
-    def _create_repo(self, rootclass):
-        """
-        Factory method for creating a repository - this is the responsibility
-        of the workbench.
-        """
-        inst = repository.Repository()
-        inst._workbench = self
-        
-        # Now create the root object - this is the responsibility of the repo
-        root_obj = inst._create_wrapper_object(rootclass)
 
-        # Because it is the root object of a new repo - set it
-        inst._workspace_root = root_obj
-        
         
     def _load_repo(self, container):
         """
