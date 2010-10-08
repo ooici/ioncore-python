@@ -122,7 +122,7 @@ class SchedulerService(ServiceProcess):
         interval = tdef['interval']
 
         log.debug('Time to send "%s" to "%s", id "%s"' % (payload, target_id, task_id))
-        yield send(target_id, 'scheduler', target_id, 'scheduler', payload)
+        yield self.send(target_id, 'scheduler', payload)
         log.debug('Send completed, rescheduling %s' % task_id)
 
         reactor.callLater(interval, self._send_and_reschedule, task_id)

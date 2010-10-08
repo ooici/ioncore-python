@@ -9,19 +9,15 @@
 
 from twisted.internet import defer
 from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess
+from ion.core.process.process import Process
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-class ScheduledTask(ServiceProcess):
+class ScheduledTask(Process):
     """
     Test listener class to receive scheduler messages.
     """
-    declare = ServiceProcess.service_declare(name='scheduled_task',
-                                             version='1.0',
-                                             dependencies=[])
-
-    def slc_init(self):
+    def plc_init(self):
         self.msg_count = 0
 
     def op_scheduler(self, content, headers, msg):

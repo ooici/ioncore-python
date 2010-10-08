@@ -35,10 +35,14 @@ class SchedulerTest(IonTestCase):
 
         yield self._start_container()
         self.sup = yield self._spawn_processes(services)
+        # Look up the address by name
+        sptid = yield self._get_procid('scheduled_task')
+        self.dest = str(sptid)
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self._stop_container()
+
 
     def test_service_init(self):
         # Just run the setup/teardown code
@@ -48,7 +52,7 @@ class SchedulerTest(IonTestCase):
     def test_add_only(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        reply = yield sc.add_task('scheduled_task', 1.0, 'pingtest bar')
+        reply = yield sc.add_task(self.dest, 1.0, 'pingtest bar')
         task_id = reply['value']
         log.debug(task_id)
         self.failIf(task_id == None)
@@ -58,7 +62,7 @@ class SchedulerTest(IonTestCase):
     def test_add_remove(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        task_id = yield sc.add_task('scheduled_task', 1.0, 'pingtest foo')
+        task_id = yield sc.add_task(self.dest, 1.0, 'pingtest foo')
         rc = yield sc.rm_task(task_id)
         self.failUnlessEqual(rc['value'], 'OK')
         log.debug(rc)
@@ -68,7 +72,7 @@ class SchedulerTest(IonTestCase):
     def test_query(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        yield sc.add_task('scheduled_task', 0.5, 'baz')
+        yield sc.add_task(self.dest, 0.5, 'baz')
         reply = yield sc.add_task('scheduled_task', 1.0, 'pingtest')
         task_id = reply['value']
         rl = yield sc.query_tasks('.+?')
@@ -79,7 +83,7 @@ class SchedulerTest(IonTestCase):
     def test_rm(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        reply = yield sc.add_task('scheduled_task', 1.0, 'pingtest')
+        reply = yield sc.add_task(self.dest, 1.0, 'pingtest')
         task_id = reply['value']
         yield sc.rm_task(task_id)
         rl = yield sc.query_tasks(task_id)
