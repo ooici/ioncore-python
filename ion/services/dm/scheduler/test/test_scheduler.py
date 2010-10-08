@@ -68,7 +68,8 @@ class SchedulerTest(IonTestCase):
     def test_query(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        reply = yield sc.add_task('foobar', 1.0, 'pingtest')
+        yield sc.add_task('scheduled_task', 0.5, 'baz')
+        reply = yield sc.add_task('scheduled_task', 1.0, 'pingtest')
         task_id = reply['value']
         rl = yield sc.query_tasks('.+?')
         log.debug(rl)
@@ -78,7 +79,7 @@ class SchedulerTest(IonTestCase):
     def test_rm(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        reply = yield sc.add_task('foobar', 1.0, 'pingtest')
+        reply = yield sc.add_task('scheduled_task', 1.0, 'pingtest')
         task_id = reply['value']
         yield sc.rm_task(task_id)
         rl = yield sc.query_tasks(task_id)
