@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+
+
 """
 @Brief Repository for managing data structures
 """
@@ -10,9 +12,9 @@ from ion.play.betaobject import gpb_wrapper
 
 class Repository(object):
     
-    def __init__(self, content=None):
+    def __init__(self):
         
-        self._object_cntr=1
+        self._object_counter=1
         """
         A counter object used by this class to identify content objects untill
         they are indexed
@@ -31,11 +33,18 @@ class Repository(object):
         
         self._commit_index = {}
         """
-        A dictionary containing the objects which are already indexed by content
-        hash
+        A dictionary containing the commit objects - all immutable content hashed
         """
         
-        self._repository= gpb_wrapper.Wrapper(mutable_pb2.MutableNode())
+        self._hashed_elements = {}
+        """
+        All content elements are stored here - from incoming messages and
+        new commits - everything goes here. Now it can be decoded for a checkout
+        or sent in a message.
+        """
+        
+        
+        self._dotgit = gpb_wrapper.Wrapper(mutable_pb2.MutableNode())
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
         """
@@ -51,6 +60,10 @@ class Repository(object):
         A place to stash the work space under a saved name.
         """
         
+        self._workbench=None
+        """
+        The work bench which this repository belongs to...
+        """
         
         
         
@@ -75,4 +88,16 @@ class Repository(object):
         """
         Stash the current workspace for later reference
         """
+        
+    def create_wrapped_object(self, rootclass):        
+        
+        obj_id = self.get_id()
+        self._workspace[obj_id] = gpb_wrapper.Wrapper(self, rootclass(), obj_id)        
+        
+        
+    def get_id(self):
+        self._object_counter += 1
+        return str(self.__object_counter)
+ 
+        
         

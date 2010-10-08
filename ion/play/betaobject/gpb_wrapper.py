@@ -6,6 +6,8 @@
 from google.protobuf import message
 from google.protobuf.internal import containers
     
+from net.ooici.core.link import link_pb2    
+    
 class Wrapper(object):
     '''
     A Wrapper class for intercepting access to protocol buffers message fields.
@@ -36,11 +38,24 @@ class Wrapper(object):
     TODO:
     Fix read only or get rid of it? do we need it?
     
+    cs.DESCRIPTOR.file.name
+    Out[15]: 'net/ooici/core/link/link.proto'
+    
+    In [16]: cs.DESCRIPTOR.file.package
+    Out[16]: 'net.ooici.core.link'
+    
+    In [17]: cs.DESCRIPTOR.name
+    Out[17]: 'CASRef'
+    
+    In [18]: cs.DESCRIPTOR.full_name
+    Out[18]: 'net.ooici.core.link.CASRef'
+
+    
     '''
     
-    LinkClassName = 'tutorial.Link'
+    LinkClassName = 'net.ooici.core.link.CASRef'
     
-    def __init__(self, gpbMessage, read_only=False):
+    def __init__(self, repository, gpbMessage, myid, read_only=False):
         """
         Initialize the Wrapper class and set up it message type.
         
@@ -56,39 +71,32 @@ class Wrapper(object):
         field_names = self._GPBClass.DESCRIPTOR.fields_by_name.keys()
         self._gpb_full_name = gpbMessage.DESCRIPTOR.full_name
         
-        self._obj_cntr=1
-        """
-        A counter object used by this class to identify content objects untill
-        they are indexed
-        """
-        
-        self._workspace = {}
-        """
-        A dictionary containing objects which are not yet indexed, linked by a
-        counter refrence in the current workspace
-        """
-        
-        self._index = {}
-        """
-        A dictionary containing the objects which are already indexed by content
-        hash
-        """
-        
-        self._links=[]
+        self._parent_links=[]
         """
         A list of all the wrappers which link to me
+        """
+        
+        self._child_links=[]
+        """
+        A list of all the wrappers which I link to
+        """
+        
+        self._myid = myid
+        """
+        The name for this object - the SHA1 if it is already hashed or the object
+        counter value if it is still in the workspace.
         """
         
         self.root = self
         """
         A reference to the root object wrapper for this protobuffer
+        A composit protobuffer object may return 
         """
         
-        self.stash = {}
+        self._repository = repository
         """
-        A map to indexed states of the root object
+        Need to cary a reference to the repository I am in.
         """
-        
         
         # Now set the fields from that GPB to preempt getter/setter!
         object.__setattr__(self,'_gpbFields',field_names)
@@ -110,23 +118,11 @@ class Wrapper(object):
         shared variables as the parent wrapper
         '''
         cls = self.__class__
+        # note - cant use @classmethod because I need context from this message
         
         inst = cls(gpbMessage,self.read_only)
-
-        inst._index = self._index
-        inst._workspace = self._workspace
-        inst._obj_cntr = self._obj_cntr
-        inst._links = self._links
         inst._root = self._root
-        
-        
         return inst
-
-    def index(self):
-        """
-        Index the current state and its workspace and move a copy of the values
-        to the index
-        """
 
 
     def __getattribute__(self, key):
@@ -147,7 +143,8 @@ class Wrapper(object):
                 value = ContainerWrapper(self, value)
             elif isinstance(value, message.Message):
                 if value.DESCRIPTOR.full_name == self.LinkClassName:
-                    value = self._workspace.get(value.id, None)
+                    value = self.get_name(value.id)
+                    
                 else:
                     value = self.rewrap(value)
                 
@@ -172,10 +169,7 @@ class Wrapper(object):
         else:
             v = object.__setattr__(self, key, value)
     
-    def get_id(self):
-        self._obj_cntr += 1
-        return str(self._obj_cntr)
-    
+ 
     def _set_gpb_field(self, key, value):
         
         gpb = object.__getattribute__(self,'_gpbMessage')
