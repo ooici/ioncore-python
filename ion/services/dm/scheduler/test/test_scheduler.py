@@ -76,10 +76,11 @@ class SchedulerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_rm(self):
-        raise unittest.SkipTest('code not implemented yet')
         sc = SchedulerServiceClient(proc=self.sup)
 
-        yield sc.add_task('foobar', 1.0, 'pingtest')
-        yield sc.rm_task('foobar')
-        rl = yield sc.query_tasks('foobar')
-        self.failUnlessEqual(rl['value'], [])
+        reply = yield sc.add_task('foobar', 1.0, 'pingtest')
+        task_id = reply['value']
+        yield sc.rm_task(task_id)
+        rl = yield sc.query_tasks(task_id)
+        log.debug(rl)
+        self.failUnlessEqual(rl['value'], '')
