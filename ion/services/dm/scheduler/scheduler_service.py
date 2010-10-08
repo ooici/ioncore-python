@@ -90,16 +90,15 @@ class SchedulerService(ServiceProcess):
         """
         Query tasks registered, returns a maybe-empty list
         """
-        try:
-            task_regex = content['task_regex']
-        except KeyError:
-            log.exception('Missing argument task_regex')
-            self.reply_err(msg, {'value' : 'Missing task regex'})
-            return
+        task_regex = content
 
         log.debug('Looking for matching tasks')
-        tlist = yield self.store.query(content['task_regex'])
-        log.debug('%d tasks found' % len(tlist))
+        tlist = yield self.store.query(content)
+
+        # tlist is a tuple, convert to a string
+        tlist = ''.join(tlist)
+
+        log.debug(tlist)
 
         self.reply_ok(msg, tlist)
 

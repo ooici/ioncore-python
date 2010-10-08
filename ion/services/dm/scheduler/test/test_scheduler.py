@@ -51,7 +51,7 @@ class SchedulerTest(IonTestCase):
         reply = yield sc.add_task('scheduled_task', 1.0, 'pingtest bar')
         task_id = reply['value']
         log.debug(task_id)
-        self.failUnless(task_id != None)
+        self.failIf(task_id == None)
         yield asleep(3.0)
 
     @defer.inlineCallbacks
@@ -66,12 +66,13 @@ class SchedulerTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_query(self):
-        raise unittest.SkipTest('code not implemented yet')
         sc = SchedulerServiceClient(proc=self.sup)
 
-        yield sc.add_task('foobar', 1.0, 'pingtest')
+        reply = yield sc.add_task('foobar', 1.0, 'pingtest')
+        task_id = reply['value']
         rl = yield sc.query_tasks('.+?')
-        self.failUnlessSubstring('foobar', str(rl['value']))
+        log.debug(rl)
+        self.failUnlessSubstring(str(task_id), str(rl['value']))
 
     @defer.inlineCallbacks
     def test_rm(self):
