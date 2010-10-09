@@ -74,7 +74,7 @@ class ConsoleManhole(manhole.ColoredManhole):
         self.factory.stop()
 
 def makeNamespace():
-    from ion.core.cc.shell_api import send, ps, ms, spawn, kill
+    from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info
     from ion.core.cc.container import Container
     from ion.core.id import Id
 
@@ -88,6 +88,7 @@ class Control(object):
     oldSettings = None
     class cc(object): pass
     cc = cc() # Extension slot for shell functions
+    namespace = None
 
     def start(self, ccService):
         log.info('Shell Start')
@@ -104,17 +105,17 @@ class Control(object):
         outSettings[1] = 3 # do CR
         termios.tcsetattr(fdout, termios.TCSANOW, outSettings)
 
-        namespace = makeNamespace()
+        self.namespace = makeNamespace()
 
-        serverProtocol = insults.ServerProtocol(ConsoleManhole, namespace)
+        serverProtocol = insults.ServerProtocol(ConsoleManhole, self.namespace)
         serverProtocol.factory = self
 
-        namespace['ccService'] = ccService
-        namespace['tsp'] = serverProtocol
-        namespace['cc'] = self.cc
+        self.namespace['ccService'] = ccService
+        self.namespace['tsp'] = serverProtocol
+        self.namespace['cc'] = self.cc
 
         self.serverProtocol = serverProtocol
-        stdio.StandardIO(serverProtocol)
+        self.sio = stdio.StandardIO(serverProtocol)
 
     def stop(self):
         termios.tcsetattr(self.fd, termios.TCSANOW, self.oldSettings)

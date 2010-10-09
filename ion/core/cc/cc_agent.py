@@ -22,6 +22,8 @@ from ion.core.pack import app_supervisor
 from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 import ion.util.procutils as pu
 
+CONF = ioninit.config(__name__)
+CF_announce = CONF.getValue('announce', False)
 
 class CCAgent(ResourceAgent):
     """
@@ -29,8 +31,6 @@ class CCAgent(ResourceAgent):
     """
     def plc_init(self):
         # Init self and container
-        annName = 'cc_announce'
-        self.ann_name = self.get_scoped_name('system', annName)
         self.start_time = pu.currenttime_ms()
         self.containers = {}
         self.contalive = {}
@@ -40,20 +40,21 @@ class CCAgent(ResourceAgent):
     def plc_activate(self):
         # Declare CC announcement name
         annName = 'cc_announce'
-        log.info("Declared CC anounce name: "+str(self.ann_name))
 
         # Attach to CC announcement name
-        self.ann_receiver = FanoutReceiver(name=self.ann_name,
+        self.ann_receiver = FanoutReceiver(name=annName,
                                            label=annName+'.'+self.receiver.label,
                                            scope=FanoutReceiver.SCOPE_SYSTEM,
                                            group=self.receiver.group,
                                            handler=self.receive)
-        annid = yield self.ann_receiver.attach()
-        log.info("Listening to CC anouncements: "+str(annid))
+        self.ann_name = yield self.ann_receiver.attach()
 
-        # Start with an identify request. Will lead to an announce by myself
-        #@todo - Can not send a message to a base process which is not initialized!
-        yield self.send(self.ann_name, 'identify', 'started', {'quiet':True})
+        log.info("Listening to CC anouncements: "+str(self.ann_name))
+
+        if CF_announce:
+            # Start with an identify request. Will lead to an announce by myself
+            #@todo - Can not send a message to a base process which is not initialized!
+            yield self.send(self.ann_name, 'identify', 'started', {'quiet':True})
 
     @defer.inlineCallbacks
     def _send_announcement(self, event):
@@ -159,6 +160,8 @@ class CCAgent(ResourceAgent):
 # Spawn of the process using the module name
 factory = ProcessFactory(CCAgent)
 
+
+# --- CC Application interface
 
 # Functions required
 @defer.inlineCallbacks
