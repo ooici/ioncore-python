@@ -82,7 +82,7 @@ class ExchangeManager(BasicLifecycleObject):
     def declare_messaging(self, messagingCfg, cgroup=None):
         """
         Configures messaging resources.
-        @todo this needs tobe called from exchange management service
+        @todo this needs to be called from exchange management service
         """
         # for each messaging resource call Magnet to define a resource
         for name, msgResource in messagingCfg.iteritems():

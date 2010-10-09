@@ -40,7 +40,6 @@ class PublisherResource(StatefulResource):
 
         return inst
 
-
 """
 Pub Sub Messaging objects!
 """

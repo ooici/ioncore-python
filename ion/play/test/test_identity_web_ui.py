@@ -82,7 +82,6 @@ class IdentityRegistryUITest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_register_user(self):
-        print "IN TEST_REGISTER_USER"
         actual_add_user_load = yield client.getPage("http://localhost:8999/add_user")
 
         p = re.compile('name="RegistryBranch" value="([^"]+)"')
@@ -98,7 +97,6 @@ class IdentityRegistryUITest(IonTestCase):
         if (result):
             base_args += "&RegistryCommit=" + result[0]
 
-        print "********************** BASE ARGS = " + base_args
 
         reference_add_user_load = """<html><body><FORM NAME="input" ACTION="/add_user" METHOD="post">
 <input type="hidden" name="RegistryBranch" value="master" /><input type="hidden" name="RegistryCommit" value="" /><input type="hidden" name="RegistryIdentity" value="9fb233d1-322a-45f1-9561-f1f18e3ef8cb" /><table border="1">

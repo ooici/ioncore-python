@@ -5,6 +5,7 @@
 @author Paul Hubbard
 @author Dorian Raymer
 @author David Stuebe
+@author Matt Rodriguez
 @test Service test of IStore Implementation
 """
 
@@ -98,6 +99,11 @@ class CassandraStoreTestSuperCols(IStoreTest):
         clist = ['amoeba.ucsd.edu:9160']
         d = cassandra.CassandraStore.create_store(cass_host_list=clist)
         return d
+    
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.ds.clear_store()
+        self.ds.manager.shutdown()
 
 
 class CassandraStoreTestNoSuperCols(IStoreTest):
@@ -111,11 +117,36 @@ class CassandraStoreTestNoSuperCols(IStoreTest):
             colfamily='Catalog'
             )
         return ds
-
+        
+    @defer.inlineCallbacks
+    def tearDown(self):
+        log.info("in tearDown")
+        yield self.ds.clear_store()
+        log.info("Calling shutdown")
+        self.ds.manager.shutdown()
+        log.info("Shutdown")
+    
+    @defer.inlineCallbacks  
     def test_clear_store(self):
-        raise unittest.SkipTest('Can not clear the persistent store if the name space is not unique')
+        """
+        @note This doesn't work if I just raise an exception. The problem
+        seems to be that shutdown is called on the protocol factory before
+        a connection has been made. This might be a bug with the Telephus
+        client. I'll investigate further after I get this merged back 
+        into the main branch
+        
+        Matt Rodriguez 9/30/10
+        """
+        yield self.ds.put(self.key, self.value)
+        yield self.ds.remove(self.key)
+        #import twisted.internet.base
+        #twisted.internet.base.DelayedCall.debug = True
+        #raise unittest.SkipTest('Can not clear the persistent store if the name space is not unique')
+    
+    
+        
+    
 
-"""
 class CassandraStoreTestSup(IStoreTest):
 
     def _setup_backend(self):
@@ -127,6 +158,11 @@ class CassandraStoreTestSup(IStoreTest):
             cf_super=True,
             namespace='n')
         return ds
+    
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.ds.clear_store()
+        self.ds.manager.shutdown()
 
 class CassandraSuperStoreRandomNameSpaceTest(IStoreTest):
 
@@ -139,8 +175,11 @@ class CassandraSuperStoreRandomNameSpaceTest(IStoreTest):
             cf_super=True)
         return ds
 
-"""
-
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.ds.clear_store()
+        self.ds.manager.shutdown()
+        
 class StoreServiceTest(IonTestCase, IStoreTest):
     """
     Testing example hello service.
@@ -153,17 +192,17 @@ class StoreServiceTest(IonTestCase, IStoreTest):
         services = [
             {'name':'store1','module':'ion.data.backends.store_service','class':'StoreService'},
         ]
-
-        sup = yield self._spawn_processes(services)
-        ds = yield StoreServiceClient.create_store(proc=sup)
-
+        self._sup = yield self._spawn_processes(services)
+        ds = yield StoreServiceClient.create_store(proc=self._sup)
         defer.returnValue(ds)
 
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.ds.clear_store()
+        log.info("dir(self.ds) %s " % self.ds.__dict__)
+        yield self._shutdown_processes(proc=self._sup)
         yield self._stop_container()
 
-#    def test_clear_store(self):
-#        raise unittest.SkipTest('Not implemented yet')
+
+
