@@ -95,9 +95,6 @@ class SchedulerService(ServiceProcess):
         log.debug('Looking for matching tasks')
         tlist = yield self.store.query(content)
 
-        # tlist is a tuple, convert to a string
-        tlist = ''.join(tlist)
-
         log.debug(tlist)
 
         self.reply_ok(msg, tlist)
