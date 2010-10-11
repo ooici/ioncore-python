@@ -143,5 +143,5 @@ def reset_container():
     # The following is extremely hacky. Reset static module and classvariables
     # to their defaults. Even further, reset imported names in other modules
     # to the new objects.
-    process.procRegistry = Store()
-    process.processes = {}
+    process.procRegistry.kvs.clear()
+    process.processes.clear()

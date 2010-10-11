@@ -26,10 +26,14 @@ CONF = ioninit.config(__name__)
 CF_announce = CONF.getValue('announce', False)
 
 class CCAgent(ResourceAgent):
+
+    instance = None
+
     """
     Capability Container agent process interface
     """
     def plc_init(self):
+        CCAgent.instance = self
         # Init self and container
         self.start_time = pu.currenttime_ms()
         self.containers = {}
@@ -62,7 +66,7 @@ class CCAgent(ResourceAgent):
         Send announce message to CC broadcast name
         """
         cdesc = {'node':str(os.uname()[1]),
-                 'container-id':str(Container.id),
+                 'container-id':str(ioninit.container_instance.id),
                  'agent':str(self.id.full),
                  'version':ionconst.VERSION,
                  'start-time':self.start_time,

@@ -24,11 +24,11 @@ from ion.interact.message import Message
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject
 
-# @todo HACK: Dict of process "alias" to process declaration
-processes = {}
-
 CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
+
+# @todo CHANGE: Dict of "name" to process (service) declaration
+processes = {}
 
 # @todo CHANGE: Static store (kvs) to register process instances with names
 procRegistry = Store()
