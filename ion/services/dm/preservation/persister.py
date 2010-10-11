@@ -110,11 +110,6 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         # Later - these will be sent to a historical log for the dataset...
         #notification = datamessage.notification
         #timestamp = datamessage.timestamp
-<<<<<<< HEAD
-
-=======
-        
->>>>>>> 1cbd3176f8181d6371849ac0553441045da30c51
 
     def _create_nca_configfile(self,base_name):
         """
