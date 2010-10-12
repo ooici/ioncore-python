@@ -13,12 +13,14 @@ from twisted.trial import unittest
 from ion.core.process.service_process import ServiceProcess
 
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
+from ion.services.dm.scheduler.test.receiver import STClient
 
 from ion.test.iontest import IonTestCase
 import ion.util.ionlog
 from ion.util.procutils import asleep
 
 log = ion.util.ionlog.getLogger(__name__)
+
 
 class SchedulerTest(IonTestCase):
     @defer.inlineCallbacks
@@ -35,9 +37,12 @@ class SchedulerTest(IonTestCase):
 
         yield self._start_container()
         self.sup = yield self._spawn_processes(services)
-        # Look up the address by name
+
+        # Look up the address of the test receiver by name
         sptid = yield self._get_procid('scheduled_task')
         self.dest = str(sptid)
+        # Instantiate the process client (receiver)
+        self.client = STClient(target=sptid)
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -56,7 +61,16 @@ class SchedulerTest(IonTestCase):
         task_id = reply['value']
         log.debug(task_id)
         self.failIf(task_id == None)
-        yield asleep(3.0)
+
+        # Wait for a message to go through the system - delay is 2x the cycle time of the scheduled task.
+        yield asleep(2.0)
+        mc = yield self.client.get_count()
+        self.failUnless(int(mc['value']) >= 1)
+
+        """
+        @bug For some reason, the container fails unless we delay for a bit here.
+        """
+        yield asleep(1.0)
 
     @defer.inlineCallbacks
     def test_add_remove(self):
@@ -88,4 +102,4 @@ class SchedulerTest(IonTestCase):
         yield sc.rm_task(task_id)
         rl = yield sc.query_tasks(task_id)
         log.debug(rl)
-        self.failUnlessEqual(rl['value'], '')
+        self.failUnlessEqual(len(rl['value']), 0)
