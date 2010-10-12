@@ -80,7 +80,7 @@ class SchedulerTest(IonTestCase):
         rc = yield sc.rm_task(task_id)
         self.failUnlessEqual(rc['value'], 'OK')
         log.debug(rc)
-        yield asleep(3.0)
+        yield asleep(1.0)
 
     @defer.inlineCallbacks
     def test_query(self):

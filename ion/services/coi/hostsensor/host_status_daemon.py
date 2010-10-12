@@ -9,24 +9,24 @@ from optparse import OptionParser
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 from readers import HostReader
 from base_daemon import Daemon
- 
+
 
 class HostStatusDaemon(Daemon):
     """
-    XMLRPC server for returning host status on request.  This wraps 
+    XMLRPC server for returning host status on request.  This wraps
     the various classes in readers.py into an XMLRPC server.
 
-    @todo Include interface ipv4 and ipv6 addresses 
+    @todo Include interface ipv4 and ipv6 addresses
     @todo Move memory from 'storage' to another location
     @todo Add daemon logging
     """
 
     def __init__(
-                 self, 
+                 self,
                  pidfile,
                  logfile,
-                 testmode = False, 
-                 snmpHost          = 'localhost', 
+                 testmode = False,
+                 snmpHost          = 'localhost',
                  snmpPort          = 161,
                  snmpAgentName     = 'ooici',
                  snmpCommunityName = 'ooicinet',
@@ -37,9 +37,9 @@ class HostStatusDaemon(Daemon):
         """
         Daemon.__init__(self, pidfile, logfile)
         self.hostreader = HostReader(
-                                 snmpHost, 
-                                 snmpPort, 
-                                 snmpAgentName, 
+                                 snmpHost,
+                                 snmpPort,
+                                 snmpAgentName,
                                  snmpCommunityName
                                  )
         self.rpcPort = rpcPort
@@ -74,7 +74,7 @@ class HostStatusDaemon(Daemon):
         report = self.hostreader.pformat(report)
         return report
 
-        
+
 
 class _OptionParser(OptionParser):
     """
@@ -109,4 +109,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-        

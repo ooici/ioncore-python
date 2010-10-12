@@ -27,20 +27,20 @@ class HostStatusTest(IonTestCase):
     """
     IONPATH = os.path.abspath(ion.__path__[0])
     HOST_STATUS_DAEMON = IONPATH + '/services/coi/hostsensor/host_status_daemon.py'
-    
-    
-    
+
+
+
     @defer.inlineCallbacks
     def _start_xmlrpc_daemon(self):
         """
         Starts a dependent XMLRPC server (daemon) on the local host.  The
         daemon serves SNMP and other host data.
-        """    
-        
+        """
+
         log.debug('Starting host status daemon')
         p = subprocess.Popen(
-                     [sys.executable, self.HOST_STATUS_DAEMON, 'start'], 
-                     stdout=subprocess.PIPE, 
+                     [sys.executable, self.HOST_STATUS_DAEMON, 'start'],
+                     stdout=subprocess.PIPE,
                      stderr=subprocess.PIPE
                      )
         # wait 10 seconds for the daemon to power up
@@ -61,10 +61,10 @@ class HostStatusTest(IonTestCase):
     def _stop_xmlrpc_daemon(self):
         """
         Stops the XMLRPC server (daemon) on the local host.
-        """    
+        """
         p = subprocess.Popen(
-                     [sys.executable, self.HOST_STATUS_DAEMON, 'stop'], 
-                     stdout=subprocess.PIPE, 
+                     [sys.executable, self.HOST_STATUS_DAEMON, 'stop'],
+                     stdout=subprocess.PIPE,
                      stderr=subprocess.PIPE
                      )
         # wait 10 seconds for the daemon to shutdown
@@ -84,9 +84,9 @@ class HostStatusTest(IonTestCase):
         yield self._declare_messaging(messaging)
 
         # By default ion.services.coi.host_status loops indefinitely
-        # at 60 second intervals.  The default behavior can be modified 
+        # at 60 second intervals.  The default behavior can be modified
         # with spawnargs.
-        # count = 1 : run a single iteration 
+        # count = 1 : run a single iteration
         # interval = 1 : meaningless for a single iteration
 
         services = [
@@ -119,12 +119,12 @@ class HostStatusTest(IonTestCase):
     def tearDown(self):
         yield self._stop_xmlrpc_daemon()
         yield self._stop_container()
-        
+
 
     @defer.inlineCallbacks
     def xtest_BasicService(self):
         retries = 100
         while retries > 0:
             retries -= 1
-            print 'Waiting for reply...'
+            log.debug('Waiting for reply...')
             yield pu.asleep(0.5)
