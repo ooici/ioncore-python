@@ -16,3 +16,4 @@ dist
 .pydevproject
 .project
 /.settings
+dropin.cache
