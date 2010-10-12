@@ -21,7 +21,7 @@ from ion.resources.coi_resource_descriptions import \
     HardwareMapping,    \
     BrokerCredentials,  \
     BrokerFederation,   \
-    ExchangeSpace       
+    ExchangeSpace
 
 class ExchangeClientTest(IonTestCase):
     """
@@ -83,10 +83,10 @@ class ExchangeClientTest(IonTestCase):
 
         for p in sys.path:
             e = os.path.exists(p)
-            print p + " : " + str(e)
+            log.debug(p + " : " + str(e))
 
-        values = { 
-                'name'        : 'AMQP Mapping Test', 
+        values = {
+                'name'        : 'AMQP Mapping Test',
                 'description' : "This AMQP Mapping is part of a unit test"
         }
         mapping = self.make_mapping('amqpmapping', values)
@@ -103,13 +103,13 @@ class ExchangeClientTest(IonTestCase):
         
         self.assertEquals(registered.RegistryIdentity,retrieved.RegistryIdentity)
 
-        
+
     @defer.inlineCallbacks
     def test_hardwaremapping_resource(self):
         """
         """
-        values = { 
-                'name'        : 'Hardware Mapping Test', 
+        values = {
+                'name'        : 'Hardware Mapping Test',
                 'description' : "This Hardware Mapping is part of a unit test"
         }
         mapping = self.make_mapping('hardwaremapping', values)
@@ -122,10 +122,10 @@ class ExchangeClientTest(IonTestCase):
     def test_exchangename_resource(self):
         """
         Trivial test to verify that we can insert an ExchangeName resource into
-        our data store.  Note that the nested resources (AMQPMapping and 
+        our data store.  Note that the nested resources (AMQPMapping and
         HardwareMapping) are left for complex tests below.
         """
-        
+
         values = {
                   'name' :        "Exchange Name Test",
                   'description' : "This exchange name is part of a unit test"
@@ -140,10 +140,10 @@ class ExchangeClientTest(IonTestCase):
     def test_brokerfederation_resource(self):
         """
         Trivial test to verify that we can insert an ExchangeName resource into
-        our data store.  Note that the nested resources (AMQPMapping and 
+        our data store.  Note that the nested resources (AMQPMapping and
         HardwareMapping) are left for complex tests below.
         """
-        
+
         values = {
                   'name' :        "Broker Federation Test",
                   'description' : "This broker federation is part of a unit test"
@@ -153,22 +153,42 @@ class ExchangeClientTest(IonTestCase):
         retrieved = yield self.exchange_registry_client.get_brokerfederation_by_id(registered.RegistryIdentity)
         self.assertEquals(registered.RegistryIdentity,retrieved.RegistryIdentity)
 
-    
+
 
     @defer.inlineCallbacks
     def test_brokercredentials_resource(self):
         """
         Trivial test to verify that we can insert an ExchangeName resource into
-        our data store.  Note that the nested resources (AMQPMapping and 
+        our data store.  Note that the nested resources (AMQPMapping and
         HardwareMapping) are left for complex tests below.
         """
-        
+
         values = {
                   'name' :        "Broker Credentials Test",
                   'description' : "These broker credentials are part of a unit test"
         }
         mapping = self.make_mapping('brokercredentials', values)
-        registered = yield self.exchange_registry_client.register_brokercredentials(mapping)
-        retrieved = yield self.exchange_registry_client.get_brokercredentials_by_id(registered.RegistryIdentity)
-        self.assertEquals(registered.RegistryIdentity,retrieved.RegistryIdentity)
-        
+        result = yield self.exchange_registry_client.register_amqpmapping(mapping)
+
+
+    @defer.inlineCallbacks
+    def test_register_complex_exchangename(self):
+        """
+        """
+        aname = "AMQP Mapping Test"
+        adesc = "This AMQP Mapping is part of a unit test"
+        amap = AMQPMapping.create_new_resource()
+        amap.name = aname
+        amap.description = adesc
+
+
+        hmap = HardwareMapping.create_new_resource()
+        hmap.name = "Hardware Mapping Test"
+        hmap.description = "This Hardware Mapping is part of a unit test"
+
+        exchangename = ExchangeName.create_new_resource()
+        exchangename.name = "Exchange Name Test"
+        exchangename.description = "This Exchange Name is part of a unit test"
+        exchangename.amqpmapping = amap
+        exchangename.hardwaremapping = hmap
+        result = yield self.exchange_registry_client.register_exchangename(exchangename)
