@@ -13,7 +13,12 @@ class WorkBench(object):
         
         self._repos = {}
         
-        self.repo_cntr = 0
+        self._repo_cntr = 0
+        
+        self._hashed_elements={}
+        """
+        A shared dictionary for hashed objects
+        """
         
         
     def clone(self, ID_Ref, name=None):
@@ -24,9 +29,11 @@ class WorkBench(object):
         # rpc_send - datastore, clone, ID_REf
         
         
-    def init(self, gpbtype, name=None):
+    def init(self, rootclass, name=None):
         """
         Initialize a new repository
+        Factory method for creating a repository - this is the responsibility
+        of the workbench.
         """
         if not name:
             name = 'repo_%s' % self._repo_cntr
@@ -35,27 +42,22 @@ class WorkBench(object):
         if name in self._repos.keys():
             raise Exception, 'Can not initialize a new repository with an existing name'
         
-        repo = self._create_repo(self, gpbtype)
+        repo = repository.Repository()
+        repo._workbench = self
+            
+        repo._hashed_elements = self._hashed_elements
+            
+        # Set the default branch
+        repo.branch('master')
+           
+        rootobj = repo.create_wrapped_object(rootclass)
+        
+        repo._workspace_root = rootobj
         
         self._repos[name] = repo
         
-        return repo
-    
-    def _create_repo(self, rootclass):
-        """
-        Factory method for creating a repository - this is the responsibility
-        of the workbench.
-        """
-        inst = repository.Repository()
-        inst._workbench = self
-        
-        # Now create the root object - this is the responsibility of the repo
-        root_obj = inst._create_wrapper_object(rootclass)
+        return repo, rootobj
 
-        # Because it is the root object of a new repo - set it
-        inst._workspace_root = root_obj
-        
-        
         
     def fork(self, structure, name):
         """

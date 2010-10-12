@@ -3,10 +3,37 @@
 @Brief Test implementation of a wrapper for Google Protocol Buffer Message Classes.
 """
 
+from ion.util import procutils as pu
+
 from google.protobuf import message
 from google.protobuf.internal import containers
     
+from net.ooici.core.container import container_pb2
 from net.ooici.core.link import link_pb2    
+import hashlib
+
+    
+def sha1hex(val):
+    return hashlib.sha1(val).hexdigest()
+
+def sha1bin(val):
+    return hashlib.sha1(val).digest()
+
+def sha1(val, bin=True):
+    if isinstance(val, BaseObject):
+        val = val.value
+    if bin:
+        return sha1bin(val)
+    return sha1hex(val)
+
+def sha1_to_hex(bytes):
+    """binary form (20 bytes) of sha1 digest to hex string (40 char)
+    """
+    hex_bytes = struct.unpack('!20B', bytes)
+    almosthex = map(hex, hex_bytes)
+    return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
+
+    
     
 class Wrapper(object):
     '''
@@ -36,80 +63,95 @@ class Wrapper(object):
     Below that are all of the methods of protobuffers exposed by the wrapper.
     
     TODO:
-    Fix read only or get rid of it? do we need it?
-    
-    cs.DESCRIPTOR.file.name
-    Out[15]: 'net/ooici/core/link/link.proto'
-    
-    In [16]: cs.DESCRIPTOR.file.package
-    Out[16]: 'net.ooici.core.link'
-    
-    In [17]: cs.DESCRIPTOR.name
-    Out[17]: 'CASRef'
-    
-    In [18]: cs.DESCRIPTOR.full_name
-    Out[18]: 'net.ooici.core.link.CASRef'
-
     
     '''
+    # Change this to a type message to be more precise?
+    LinkClassName = link_pb2.CASRef.DESCRIPTOR.full_name
     
-    LinkClassName = link_pb2.DESCRIPTOR.full_name
-    
-    def __init__(self, repository, gpbMessage, myid, read_only=False):
+    def __init__(self, gpbMessage):
         """
         Initialize the Wrapper class and set up it message type.
         
         """
         # Set list of fields empty for now... so that we can use getter/setters
         object.__setattr__(self,'_gpbFields',[])
-        object.__setattr__(self,'read_only', read_only)
+        object.__setattr__(self,'_gpbEnums',[])
+        
         
         # Set the deligated message and it machinary
         assert isinstance(gpbMessage, message.Message)
         self._gpbMessage = gpbMessage
         self._GPBClass = gpbMessage.__class__
         field_names = self._GPBClass.DESCRIPTOR.fields_by_name.keys()
+        for enum_type in self._GPBClass.DESCRIPTOR.enum_types:
+            for enum_value in enum_type.values:
+                field_names.append(enum_value.name)
+        
         self._gpb_full_name = gpbMessage.DESCRIPTOR.full_name
         
-        self._parent_links=set()
+        self._parent_links=None
         """
         A list of all the wrappers which link to me
         """
         
-        self._child_links=set()
+        self._child_objs=None
         """
         A list of all the wrappers which I link to
         """
         
-        self._myid = myid
+        self._myid = None
         """
         The name for this object - the SHA1 if it is already hashed or the object
         counter value if it is still in the workspace.
         """
         
-        self.root = self
+        self._root = None
         """
         A reference to the root object wrapper for this protobuffer
         A composit protobuffer object may return 
         """
         
-        self._repository = repository
+        self._modified =  True
+        """
+        Is this wrapper object modified or commited
+        """
+        
+        self._read_only = None
+        """
+        Set this to be a read only wrapper!
+        Used for commit objects and a history checkout...
+        """
+        
+        self._repository = None
         """
         Need to cary a reference to the repository I am in.
         """
         
         # Now set the fields from that GPB to preempt getter/setter!
-        object.__setattr__(self,'_gpbFields',field_names)
-
-    def isroot(self):
-        return self is self.root
+        self._gpbFields = field_names
     
-    """
-    @classmethod
-    def wrap(cls,gpbMessage,read_only=False):
-        inst = cls(gpbMessage,read_only)
-        return inst
-    """
+    @property
+    def isroot(self):
+        return self is self._root
+    
+    def _set_read_only(self):
+        """
+        Set these objects to be read only
+        """
+        self._read_only = True
+        for child in self._child_objs:
+            child._set_read_only()
+        
+        
+    def _set_read_write(self):
+        """
+        Set these object to be read write!
+        """
+        self._read_only = False
+        for child in self._child_objs:
+            child._set_read_write()
+        
+    
     
     def rewrap(self, gpbMessage):
         '''
@@ -120,13 +162,15 @@ class Wrapper(object):
         cls = self.__class__
         # note - cant use @classmethod because I need context from this message
         
-        inst = cls(self._repository, gpbMessage, self._myid, self.read_only)
+        inst = cls(gpbMessage)
         # Over ride the root - rewrap is for instances that derive from the root of a composit gpb
-        inst._root = self._root
-        
-        # I don't like this...
-        inst._parent_links = self._root._parent_links
-        inst._child_links = self._root._child_links
+        if self._root:
+            inst._root = self._root
+            inst._parent_links = self._root._parent_links
+            inst._child_objs = self._root._child_objs
+
+        inst._myid = self._myid
+        inst._repository = self._repository
         
         return inst
 
@@ -137,17 +181,16 @@ class Wrapper(object):
         # careful about how we use it!
         gpbfields = object.__getattribute__(self,'_gpbFields')
         
-        
         if key in gpbfields:
-            print '__getattribute__: self, key:', object.__getattribute__(self,'_gpb_full_name'), key
-            gpb = object.__getattribute__(self,'_gpbMessage')
+            #print '__getattribute__: self, key:', object.__getattribute__(self,'_gpb_full_name'), key
+            gpb = self._gpbMessage
             value = getattr(gpb,key)
                         
             if isinstance(value, containers.RepeatedCompositeFieldContainer):
                 value = ContainerWrapper(self, value)
             elif isinstance(value, message.Message):
                 if value.DESCRIPTOR.full_name == self.LinkClassName:
-                    value = self._repository._get_linked_object(value)
+                    value = self._repository.get_linked_object(value)
                     
                 else:
                     value = self.rewrap(value)
@@ -161,36 +204,94 @@ class Wrapper(object):
     def __setattr__(self,key,value):
 
         gpbfields = object.__getattribute__(self,'_gpbFields')
-        read_only = object.__getattribute__(self,'read_only')
         
         if key in gpbfields:
-            print '__setattr__: self, key, value:', self._gpb_full_name, key, value
+            #print '__setattr__: self, key, value:', self._gpb_full_name, key, value
 
-            if read_only:
+            if self._root._read_only:
                 raise AttributeError, 'This object wrapper is read only!'
+                        
+            gpb = object.__getattribute__(self,'_gpbMessage')
+
+            # If the value we are setting is a Wrapper Object
+            if isinstance(value, Wrapper):
             
-            # Setter helper method
-            self._set_gpb_field(key, value)
+                assert value._repository == self._repository, \
+                    'Copying complex objects from one repository to another is not yet supported!'
             
+                #Examine the field we are trying to set 
+                field = getattr(gpb,key)
+                assert isinstance(field, message.Message), \
+                  'Only a composit field can be set using another message as a value '
+                wrapped_field = self.rewrap(field) # This will throw an exception if field is not a gpbMessage
+                self._repository.set_linked_object(wrapped_field,value)
+            
+            else:
+                setattr(gpb, key, value)
+                
+            if not self.ismodified:
+                self.modified()
+                
         else:
             v = object.__setattr__(self, key, value)
+
+    @property
+    def ismodified(self):
+        return self._modified
     
- 
-    def _set_gpb_field(self, key, value):
+    def modifed(self):
+        self._modified = True
+                
+        self._myid = self._repository.new_id()
+                
+        for link in self._parent_links:
+            # Tricky - set the message directly and call modified!
+            link._gpbMessage.key = self._myid
+            link.modified()
+            
+    def inparents(self,value):
+        '''
+        Check recursively to make sure the object is not already its own parent!
+        '''
+        for item in self._parent_links:
+            if item._root is value:
+                return True
+            if item.inparents(value):
+                return True
+        return False
+
+    def _recurse_commit(self,structure):
         
-        gpb = object.__getattribute__(self,'_gpbMessage')
-        # If the value we are setting is a Wrapper Object
-        if isinstance(value, Wrapper):
+        if not self.ismodified:
+            # This object is already committed!
+            return
+        
+        for child in self._child_objs:
+            child._recurse_commit(structure)
             
-            #Examine the field we are trying to set 
-            field = getattr(gpb,key)
-            assert isinstance(field, message.Message), \
-              'Only a composit field can be set using another message as a value '
-            wrapped_field = self.rewrap(field) # This will throw an exception if field is not a gpbMessage
-            self._repository._set_linked_object(wrapped_field,value)
-            
-        else:
-            setattr(gpb, key, value)
+            # Determine whether this is a leaf node
+            if len(child._child_objs)==0:
+                for parent in child._parent_links:
+                    if parent._root is self:
+                        parent.isleaf = True
+        
+        se = StructureElement()
+        
+        se.value = self.SerializeToString()
+        se.key = sha1hex(se.value)
+        # This is confusing and probably not a great idea...
+        self._repository._set_type_from_obj(se.type,self)
+        
+        self._myid = se.key
+        for parent in self._parent_links:
+            parent.key = self._myid
+        
+        self._modified = False
+        
+        structure[se.key] = se
+        
+        
+
 
     
     def __eq__(self, other):
@@ -210,70 +311,70 @@ class Wrapper(object):
         return self._gpbMessage.__str__()
         
         
-    def MergeFrom(self, other):
-        """Merges the contents of the specified message into current message.
-        
-        This method merges the contents of the specified message into the current
-        message. Singular fields that are set in the specified message overwrite
-        the corresponding fields in the current message. Repeated fields are
-        appended. Singular sub-messages and groups are recursively merged.
-        
-        Args:
-            other_msg: Message to merge into the current message.
-        """
-        if self is other:
-            return
-        
-        assert isinstance(other, Wrapper), \
-            'MergeFrom can only be performed on another Wrapper Object'
-        
-        assert self._gpb_full_name == other._gpb_full_name, \
-            'MergeFrom can only operate on two wrapped objects of the same type'
-        
-        self._gpbMessage.MergeFrom(other._gpbMessage)
-    
-    def CopyFrom(self, other):
-        """Copies the content of the specified message into the current message.
-        
-        The method clears the current message and then merges the specified
-        message using MergeFrom.
-        
-        Args:
-            other_msg: Message to copy into the current one.
-        """
-        if self is other:
-            return
-        assert isinstance(other, Wrapper), \
-            'CopyFrom can only be performed on another Wrapper Object'
-        
-        assert self._gpb_full_name == other._gpb_full_name, \
-            'CopyFrom can only operate on two wrapped objects of the same type'
-        
-        
-        self.Clear()
-        self.MergeFrom(other_msg)
-        
-    
-    
-    def Clear(self):
-        """Clears all data that was set in the message."""
-            
-        if self.isroot():
-            self._workspace={}
-        
-        self._gpbMessage.Clear()
-    
-        for key, linked_node in self._workspace.items():
-            stillmine = False
-            for link in linked_node._links:
-                if link.id == '-1':
-                    # if it is no longer 'set' remove it
-                    linked_node.links.remove(link)
-                elif link._root == self._root:
-                    stillmine = True
-                    
-            if not stillmine:
-                del self._workspace[key]
+    #def MergeFrom(self, other):
+    #    """Merges the contents of the specified message into current message.
+    #    
+    #    This method merges the contents of the specified message into the current
+    #    message. Singular fields that are set in the specified message overwrite
+    #    the corresponding fields in the current message. Repeated fields are
+    #    appended. Singular sub-messages and groups are recursively merged.
+    #    
+    #    Args:
+    #        other_msg: Message to merge into the current message.
+    #    """
+    #    if self is other:
+    #        return
+    #    
+    #    assert isinstance(other, Wrapper), \
+    #        'MergeFrom can only be performed on another Wrapper Object'
+    #    
+    #    assert self._gpb_full_name == other._gpb_full_name, \
+    #        'MergeFrom can only operate on two wrapped objects of the same type'
+    #    
+    #    self._gpbMessage.MergeFrom(other._gpbMessage)
+    #
+    #def CopyFrom(self, other):
+    #    """Copies the content of the specified message into the current message.
+    #    
+    #    The method clears the current message and then merges the specified
+    #    message using MergeFrom.
+    #    
+    #    Args:
+    #        other_msg: Message to copy into the current one.
+    #    """
+    #    if self is other:
+    #        return
+    #    assert isinstance(other, Wrapper), \
+    #        'CopyFrom can only be performed on another Wrapper Object'
+    #    
+    #    assert self._gpb_full_name == other._gpb_full_name, \
+    #        'CopyFrom can only operate on two wrapped objects of the same type'
+    #    
+    #    
+    #    self.Clear()
+    #    self.MergeFrom(other_msg)
+    #    
+    #
+    #
+    #def Clear(self):
+    #    """Clears all data that was set in the message."""
+    #        
+    #    if self.isroot():
+    #        self._workspace={}
+    #    
+    #    self._gpbMessage.Clear()
+    #
+    #    for key, linked_node in self._workspace.items():
+    #        stillmine = False
+    #        for link in linked_node._links:
+    #            if link.id == '-1':
+    #                # if it is no longer 'set' remove it
+    #                linked_node.links.remove(link)
+    #            elif link._root == self._root:
+    #                stillmine = True
+    #                
+    #        if not stillmine:
+    #            del self._workspace[key]
                 
                 
                     
@@ -302,7 +403,7 @@ class Wrapper(object):
         """Clear the message and read from serialized."""
         self._gpbMessage.ParseFromString(serialized)
         
-    def ListFields(self):
+    def ListInitializedFields(self):
         """Returns a list of (FieldDescriptor, value) tuples for all
         fields in the message which are not empty.  A singular field is non-empty
         if HasField() would return true, and a repeated field is non-empty if
@@ -398,6 +499,39 @@ w._gpbMessage.person[0].name
 
 
 '''
+class StructureElement(object):
+    
+    def __init__(self):
+            
+        self._element = container_pb2.StructureElement()
+        
+        self._child_links = set()
+        
+    @property
+    def type(self):
+        return self._element.type
+        
+    #@type.setter
+    #def type(self,value):
+     
+    @property
+    def value(self):
+        return self._element.value
+        
+    @value.setter
+    def value(self,value):
+        self._element.value = value
+        
+    @property
+    def key(self):
+        return self._element.key
+        
+    @key.setter
+    def key(self,value):
+        self._element.key = value
+        
+        
+        
     
 class ContainerWrapper(object):
     """
@@ -417,10 +551,12 @@ class ContainerWrapper(object):
         """Sets the item on the specified position."""
         assert isinstance(value, Wrapper), \
             'To set an item, the value must be a Wrapper'
-        item = self.__getitem__(key)
-        if item._gpb_full_name == self._wrapper.LinkClassName:
+        
+        item = self._gpbcontainer.__getitem__(key)
+        if item and item.DESCRIPTOR.full_name == self._wrapper.LinkClassName:
             
-            self._wrapper._repository._set_linked_object(item, value)
+            item = self._wrapper.rewrap(item)
+            self._wrapper._repository.set_linked_object(item, value)
          
         # Don't want to expose SetItem for composits!        
         #else:
@@ -429,7 +565,11 @@ class ContainerWrapper(object):
             
     def __getitem__(self, key):
         """Retrieves item by the specified key."""
-        return self._wrapper.rewrap(self._gpbcontainer[key])
+        value = self._wrapper.rewrap(self._gpbcontainer[key])
+        
+        if value._gpbMessage.DESCRIPTOR.full_name == self._wrapper.LinkClassName:
+            value = self._wrapper._repository.get_linked_object(value)
+        return value
     
     def __len__(self):
         """Returns the number of elements in the container."""
