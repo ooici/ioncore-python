@@ -49,7 +49,7 @@ class Repository(object):
         or sent in a message.
         """
         
-        self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode, storage={})
+        self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
         It is not 'stored' anywhere - pass in a throwaway dictionary
@@ -88,10 +88,6 @@ class Repository(object):
         if self.status == self.MODIFIED:
             raise Exception, 'Can not checkout while the workspace is dirty'
         
-        # Do some clean up!
-        self._workspace = {}
-        self._workspace_root = None
-        
         # Declare the cref variable
         cref = None
         
@@ -112,12 +108,11 @@ class Repository(object):
                 pass
         
         elif commit_id:
-            self._current_branch = None
             
             if self._hashed_elements.has_key(commit_id):
                 cref = self._load_element(element)
                 
-                self.current_branch = self.create_wrapped_object(mutable_pb2.Branch, storage={})
+                self.current_branch = self.create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
                 self.current_branch.commitref = cref
                 self.current_branch.branchname = 'detached head'
                 
@@ -126,6 +121,10 @@ class Repository(object):
                 # Check more places? Ask for it from the repository?
                 raise Exception, 'Can not checkout an id that does not exist!'
         
+        
+        # Do some clean up!
+        self._workspace = {}
+        self._workspace_root = None
         
         # Not complete yet
         if detached == True:
@@ -153,10 +152,13 @@ class Repository(object):
             self._hashed_elements.update(structure)
                 
             # Now add a Commit Ref     
-            cref = repo.create_wrapped_object(mutable_pb2.CommitRef, storage={})
-            cref.date = pu.currenttime
-            brnch = cref.ancestors.add()
-            brnch._gpbMessage.CopyFrom(self._current_branch._gpbMessage)
+            cref = self.create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
+            cref.date = pu.currenttime()
+
+            # If this is the first commit to a new repository the current branch is a dummy
+            if self._current_branch.IsInitialized():            
+                brnch = cref.ancestors.add()
+                brnch._gpbMessage.CopyFrom(self._current_branch._gpbMessage)
             
             for mrgd in self._merged_from:
                 brnch = cref.ancestors.add()
@@ -165,17 +167,24 @@ class Repository(object):
             cref.comment = comment
             cref.objectroot = self._workspace_root
             
+            # Set this link as a leaf - that way its content is not automagically loaded!
+            # This is probably not the right way to do this?
+            cref._gpbMessage.objectroot.isleaf = True
+            
+            
             # Add the CRef to the hashed elements
             structure={}
             cref._recurse_commit(structure)
             self._hashed_elements.update(structure)
             
             # Add the cref to the active commit objects - for convienance
-            self._commit_index[cref._myid] = cref
+            self._commit_index[cref.myid] = cref
             
             # Update the head of the current branch
             self._current_branch.commitref = cref
                 
+            # set the cref to be readonly
+            cref.readonly = True
                 
         elif self.status == self.UPTODATE:
             pass
@@ -183,7 +192,7 @@ class Repository(object):
             raise Excpetion, 'Repository in invalid state to commit'
         
         # Like git, return the commit id 
-        return self._current_branch.commitref._gpbMessage.key
+        return self._current_branch._gpbMessage.commitref.key
             
         
     def merge(self, branch=None, commit_id = None, older_than=None):
@@ -201,7 +210,7 @@ class Repository(object):
         """
         
         if self._workspace_root:
-            if self._workspace_root.ismodified:
+            if self._workspace_root.modified:
                 return self.MODIFIED
             else:
                 return self.UPTODATE
@@ -232,8 +241,10 @@ class Repository(object):
             brnch.commitref = cref
             
             if self._detached_head:
-                self._workspace_root._set_read_write()
-            
+                self._workspace_root._set_structure_read_write()
+                self._detached_head = False
+                
+                
         self._current_branch = brnch
         
         
@@ -243,20 +254,20 @@ class Repository(object):
         Stash the current workspace for later reference
         """
         
-    def create_wrapped_object(self, rootclass, obj_id=None, storage=None):        
+    def create_wrapped_object(self, rootclass, obj_id=None, addtoworkspace=True):        
         
         if not obj_id:
             obj_id = self.new_id()
         obj = gpb_wrapper.Wrapper(rootclass())
         obj._repository = self
-        obj._myid = obj_id
         obj._root = obj
         obj._parent_links = set()
-        obj._child_objs = set()
-        
-        if storage:
-            storage[obj_id] = obj
-        else:
+        obj._child_links = set()
+        obj._readonly = False
+        obj._myid = obj_id
+        obj._modified = True     
+
+        if addtoworkspace:
             self._workspace[obj_id] = obj
             
         return obj
@@ -291,13 +302,43 @@ class Repository(object):
         else:
             return self._workbench.fetch_linked_objects(link)
             
+    def _load_links(self, obj, loadleaf=False):
+        """
+        Load the child objects into the work space
+        """
+        if loadleaf:
+            
+            for link in obj._child_links:
+                child = self.get_linked_object(link)        
+                self._load_links(child, loadleaf=loadleaf)
+        else:
+            for link in obj._child_links:
+                
+                if not link._gpbMessage.isleaf:
+                    child = self.get_linked_object(link)        
+                    self._load_links(child, loadleaf=loadleaf)
+        
+        
+            
     def _load_element(self, element):
+        
+        assert element.key == sha1hex(element.value), \
+            'The sha1 key does not match the value. The data is corrupted!'
+        
         cls = self._load_class_from_type(element.type)
+                
                 
         # Do not automatically load it into a particular space...
         obj = self.create_wrapped_object(cls, obj_id=element.key, storage={})
             
         obj.ParseFromString(element.value)
+        
+        obj._find_child_links()
+        obj.modified = False
+        
+        for child in obj._child_objs:
+            element._child_links.add(child.myid)
+        
         return obj
         
     def _load_class_from_type(self,ltype):
@@ -333,15 +374,15 @@ class Repository(object):
                 'You can not create a recursive structure - this value is also a parent of the link you are setting.'
             
             
-            #Make sure the link is in the nodes set of children 
-            field._child_objs.add(value)
+            #Make sure the link is in the objects set of child links
+            field._child_links.add(field)
             value._parent_links.add(field)
-            
             
             # If the link is currently set
             if field.key:
-                
-                if field.key == value._myid:
+                                
+                if field.key == value.myid:
+                    # Setting it again is a pass...
                     return
                 
                 
@@ -355,20 +396,20 @@ class Repository(object):
                     
                 
                 # Modify the existing link
-                setattr(field,'key',value._myid)
+                field.key = value.myid
                 
                 # Set the new type
-                tp = getattr(field,'type')
-                self._set_type_from_obj(tp, field)
+                tp = field.type
+                self._set_type_from_obj(tp, value)
                     
             else:
                 
                 # Set the id of the linked wrapper
-                setattr(field,'key',value._myid)
+                field.key = value.myid
                 
                 # Set the type
-                tp = getattr(field,'type')
-                self._set_type_from_obj(tp, field)
+                tp = field.type
+                self._set_type_from_obj(tp, value)
                 
         else:
             

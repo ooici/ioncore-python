@@ -59,11 +59,9 @@ class NodeLinkTest(unittest.TestCase):
         def test_link(self):
             
             p = self.repo.create_wrapped_object(addressbook_pb2.Person)
-            
+                        
             p.name = 'David'
-            
             self.ab.owner = p
-            
             self.assertEqual(self.ab.owner.name ,'David')
             
             
@@ -79,7 +77,7 @@ class NodeLinkTest(unittest.TestCase):
             p.name = 'David'
             
             self.ab.person[0] = p
-                        
+            
             self.assertEqual(self.ab.person[0].name ,'David')
             
         # How do I make this a fail unless?   
