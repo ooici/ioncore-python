@@ -40,6 +40,7 @@ class IonTestCase(unittest.TestCase):
     # Set timeout for Trial tests
     timeout = 20
     procRegistry = process.procRegistry
+    container = None
 
     @defer.inlineCallbacks
     def _start_container(self):
@@ -87,11 +88,13 @@ class IonTestCase(unittest.TestCase):
         log.info("Closing ION container")
         self.test_sup = None
         dcs = reactor.getDelayedCalls()
-        log.info("Cancelling %s delayed reactor calls!" % len(dcs))
+        if len(dcs) > 0:
+            log.debug("Cancelling %s delayed reactor calls!" % len(dcs))
         for dc in dcs:
             # Cancel the registered delayed call (this is non-async)
             dc.cancel()
-        yield self.container.terminate()
+        if self.container:
+            yield self.container.terminate()
         bootstrap.reset_container()
         log.info("============ION container closed============")
 

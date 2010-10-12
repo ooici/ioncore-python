@@ -97,6 +97,7 @@ class ProcessManager(BasicLifecycleObject):
         """
         if not parent:
             parent = yield self.create_supervisor()
+            procdesc.sup_process = parent
         assert isinstance(procdesc, ProcessDesc), "procdesc must be ProcessDesc"
         assert IProcess.providedBy(parent), "parent must be IProcess"
 

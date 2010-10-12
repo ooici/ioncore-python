@@ -57,7 +57,7 @@ class AppLoader(object):
                                 container, START_PERMANENT, appdef, *modargs)
         except Exception, ex:
             log.exception("Application %s start failed" % appdef.name)
-            appdef._state = 'ERROR'
+            appdef._state = None
             return
 
         if res and type(res) in (list,tuple) and len(res) == 2:
@@ -66,7 +66,6 @@ class AppLoader(object):
             raise ConfigurationError("Application %s start() result invalid: %s" %(
                     appdef.name, res))
 
-        appdef._state = 'OK'
         appdef._mod_loaded = appmod
         log.info("Application '%s' started successfully. Root sup-id=%s" % (
                 appdef.name, appdef._supid))

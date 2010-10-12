@@ -145,3 +145,5 @@ def reset_container():
     # to the new objects.
     process.procRegistry.kvs.clear()
     process.processes.clear()
+    from ion.core.cc.cc_agent import CCAgent
+    CCAgent.instance = None

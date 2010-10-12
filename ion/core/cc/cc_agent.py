@@ -33,6 +33,7 @@ class CCAgent(ResourceAgent):
     Capability Container agent process interface
     """
     def plc_init(self):
+        assert not CCAgent.instance, "CC agent already started"
         CCAgent.instance = self
         # Init self and container
         self.start_time = pu.currenttime_ms()
@@ -58,7 +59,13 @@ class CCAgent(ResourceAgent):
         if CF_announce:
             # Start with an identify request. Will lead to an announce by myself
             #@todo - Can not send a message to a base process which is not initialized!
-            yield self.send(self.ann_name, 'identify', 'started', {'quiet':True})
+
+            yield self._send_announcement('initialize')
+
+    @defer.inlineCallbacks
+    def plc_terminate(self):
+        if CF_announce:
+            yield self._send_announcement('terminate')
 
     @defer.inlineCallbacks
     def _send_announcement(self, event):
@@ -81,7 +88,7 @@ class CCAgent(ResourceAgent):
         log.info("op_announce(): Received CC announcement: " + repr(content))
         contid = content['container-id']
         event = content['event']
-        if event == 'started' or event == 'identify':
+        if event == 'initialize' or event == 'identify':
             self.containers[contid] = content
             self.contalive[contid] = int(pu.currenttime_ms())
         elif event == 'terminate':
@@ -179,13 +186,16 @@ def start(container, starttype, app_definition, *args, **kwargs):
                               spawnargs={'spawn-procs':agent_proc})
     supid = yield appsup_desc.spawn()
 
-    res = (supid.full, [])
+    res = (supid.full, [appsup_desc])
     defer.returnValue(res)
 
+@defer.inlineCallbacks
 def stop(container, state):
-    return defer.succeed(None)
-
-
+    print "state", state
+    supdesc = state[0]
+    log.info("Terminating CC agent")
+    yield supdesc.terminate()
+    CCAgent.instance = None
 
 """
 twistd -n --pidfile t1.pid cc -h amoeba.ucsd.edu -a sysname=mm res/scripts/newcc.py

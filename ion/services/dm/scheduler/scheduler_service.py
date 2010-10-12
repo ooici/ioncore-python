@@ -17,7 +17,6 @@ from uuid import uuid4
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.attributestore import AttributeStoreClient
-from ion.util.procutils import send
 
 class SchedulerService(ServiceProcess):
     """
