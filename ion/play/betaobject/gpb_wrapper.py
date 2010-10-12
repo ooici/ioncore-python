@@ -353,7 +353,7 @@ class Wrapper(object):
                 
                 # Get the field of type message
                 sub_gpb = getattr(gpb,field.name)
-                
+                                
                 # if this field is of type link message - add its links
                 if field.message_type.full_name == self.LinkClassName:
                     
@@ -366,8 +366,14 @@ class Wrapper(object):
 
                 # Recursively search the composite structure
                 else:
-                    sub_self = self.rewrap(sub_gpb)
-                    sub_self._recurse_descriptor_for_links()
+                    if isinstance(sub_gpb, containers.RepeatedCompositeFieldContainer):
+                        container = ContainerWrapper(self, sub_gpb)
+                        for sub_self in container:
+                            sub_self._find_child_links()
+                            
+                    else:
+                        sub_self = self.rewrap(sub_gpb)                        
+                        sub_self._find_child_links()
 
 
 

@@ -27,20 +27,16 @@ class RepositoryTest(unittest.TestCase):
         
     def setUp(self):
         wb = workbench.WorkBench('No Process Test')
-        
-        repo, ab = wb.init(addressbook_pb2.AddressLink)
-        
-        self.repo = repo
-        self.ab = ab
         self.wb = wb
         
         
             
     def test_simple_commit(self):
+        
+        repo, ab = self.wb.init(addressbook_pb2.AddressLink)
 
-        p = self.repo.create_wrapped_object(addressbook_pb2.Person)
                         
-        p = self.repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_wrapped_object(addressbook_pb2.Person)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
@@ -48,26 +44,33 @@ class RepositoryTest(unittest.TestCase):
         ph.type = p.WORK
         ph.number = '123 456 7890'
         
-        
-        self.ab.owner = p
-        self.assertEqual(self.ab.owner.name ,'David')
+        ab.owner = p
             
-        self.ab.person.add()
-        self.ab.person[0] = p
+        ab.person.add()
+        ab.person[0] = p
         
-        self.ab.person.add()
-        p = self.repo.create_wrapped_object(addressbook_pb2.Person)
+        ab.person.add()
+        p = repo.create_wrapped_object(addressbook_pb2.Person)
         p.name='John'
         p.id = 78
         p.email = 'J@s.com'
         ph = p.phone.add()
         ph.type = p.WORK
         ph.number = '111 222 3333'
-        self.ab.person[1] = p
         
-        cref = self.repo.commit(comment='testing commit')
+        ab.person[1] = p
+        
+        cref = repo.commit(comment='testing commit')
         print cref
         
-        print 'dotgit', self.repo._dotgit
+        print 'dotgit', repo._dotgit
         
+        p = None
+        ab = None
+        
+        ab = repo.checkout(branch='master')
+        print 'ab after checkout',ab
+        
+        print ab.person[0]
+        print ab.person[1]
         

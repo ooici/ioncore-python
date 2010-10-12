@@ -138,6 +138,7 @@ class Repository(object):
         
         self._load_links(rootobj)
         
+        return rootobj
         
         
     def commit(self, comment=''):
@@ -291,8 +292,9 @@ class Repository(object):
             
             element = self._hashed_elements.get(link.key)
             
-            # Make sure the type field is the same!
-            if not link.type == element.type:
+            
+            if not link.type.package == element.type.package and \
+                    link.type.cls == element.type.cls:
                 raise Exception, 'The link type does not match the element type!'
             
             obj = self._load_element(element)            
@@ -322,22 +324,22 @@ class Repository(object):
             
     def _load_element(self, element):
         
-        assert element.key == sha1hex(element.value), \
+        assert element.key == gpb_wrapper.sha1hex(element.value), \
             'The sha1 key does not match the value. The data is corrupted!'
         
         cls = self._load_class_from_type(element.type)
                 
                 
         # Do not automatically load it into a particular space...
-        obj = self.create_wrapped_object(cls, obj_id=element.key, storage={})
+        obj = self.create_wrapped_object(cls, obj_id=element.key, addtoworkspace=False)
             
         obj.ParseFromString(element.value)
         
         obj._find_child_links()
         obj.modified = False
         
-        for child in obj._child_objs:
-            element._child_links.add(child.myid)
+        for child in obj._child_links:
+            element._child_links.add(child.key)
         
         return obj
         
