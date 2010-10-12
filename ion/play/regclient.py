@@ -3,6 +3,8 @@ from twisted.internet import defer
 
 from ion.core import ioninit
 from ion.core.cc.container import Container
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from ion.resources import description_utility
 description_utility.load_descriptions()
@@ -20,5 +22,5 @@ def main(ns={}):
     ref = r.reference()
 
     r2 = yield client.get_resource(ref)
-    print r2
+    log.debug(rc)
     ns.update(locals())

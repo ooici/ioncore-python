@@ -8,6 +8,7 @@
 
 import sys, os, time, atexit
 import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from signal import SIGTERM
 
 import logging
@@ -152,7 +153,7 @@ class Daemon:
                 if os.path.exists(self.pidfile):
                     os.remove(self.pidfile)
             else:
-                print str(err)
+                log.critical(err)
                 sys.exit(1)
 
 
@@ -173,30 +174,30 @@ class Daemon:
             pf.close()
         except:
             if (clean):
-                print 'Already stopped cleanly'
+                log.info('Already stopped cleanly')
                 sys.exit(0)
-            print 'Stopped'
+            log.debug('Stopped')
             sys.exit(1)
         try:
             os.kill(pid, 0)
             if (clean):
-                print 'Already running cleanly, try stop'
+                log.warn('Already running cleanly, try stop')
                 sys.exit(0)
-            print 'Running'
+            log.debug('Running')
             sys.exit(0)
         except OSError:
             if (clean):
                 try:
                     os.remove(self.pidfile)
-                    print "Cleaned"
+                    log.debug("Cleaned")
                     sys.exit(0)
                 except OSError:
-                    print "Failed to delete " + self.pidfile
+                    log.error("Failed to delete " + self.pidfile)
                     sys.exit(-1)
 
-            print 'Bad state'
-            print 'PID file exits but isn''t matched to a running process'
-            print 'PID file: %s\nPID:      %s'%(self.pidfile,pid)
+            log.critical('Bad state')
+            log.critical('PID file exits but isn''t matched to a running process')
+            log.critical('PID file: %s\nPID:      %s'%(self.pidfile,pid))
             sys.exit(-1)
 
 
@@ -212,7 +213,7 @@ class Daemon:
         elif command == 'clean':
             self.status(True)
         else:
-            print "Unknown command"
+            log.critical("Unknown command")
             sys.exit(2)
         sys.exit(0)
 

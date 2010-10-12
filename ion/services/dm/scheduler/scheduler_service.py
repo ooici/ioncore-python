@@ -34,6 +34,11 @@ class SchedulerService(ServiceProcess):
         # @note Might want to start another AS instance with a different target name
         self.store = AttributeStoreClient(targetname='attributestore')
 
+        # See if this is a restart - any records present?
+        d = self.store.query('.+')
+        d.addCallback(self._maybe_restart)
+
+
     @defer.inlineCallbacks
     def op_add_task(self, content, headers, msg):
         """
@@ -95,9 +100,6 @@ class SchedulerService(ServiceProcess):
         log.debug('Looking for matching tasks')
         tlist = yield self.store.query(content)
 
-        # tlist is a tuple, convert to a string
-        tlist = ''.join(tlist)
-
         log.debug(tlist)
 
         self.reply_ok(msg, tlist)
@@ -132,6 +134,27 @@ class SchedulerService(ServiceProcess):
         tdef['last_run'] = time.time()
         self.store.put(task_id, tdef)
         log.debug('Task %s rescheduled for %f seconds OK' % (task_id, interval))
+
+    def _maybe_restart(self, tasklist):
+        """
+        Callback from slc_init, if tasklist is non-null we have to do a restart.
+        """
+        rec_count = len(tasklist)
+        if rec_count > 0:
+            log.warn('%d old scheduler records found in keystore!' % rec_count)
+            self._do_restart()
+        else:
+            log.debug('Clean startup, no records found.')
+
+    @defer.inlineCallbacks
+    def _do_restart(self):
+        """
+        Handle the case of restarting the service, where there are already records
+        in the keystore at startup time. Have to do the reschedule for each of them
+        as per their interval.
+        @todo Implement restart capability!
+        """
+        pass
 
 class SchedulerServiceClient(ServiceClient):
     """

@@ -21,7 +21,7 @@ from ion.resources.coi_resource_descriptions import \
     HardwareMapping,    \
     BrokerCredentials,  \
     BrokerFederation,   \
-    ExchangeSpace       
+    ExchangeSpace
 
 class ExchangeClientTest(IonTestCase):
     """
@@ -46,7 +46,7 @@ class ExchangeClientTest(IonTestCase):
 
     def make_mapping(self, type, values):
         """
-        Helper function.  Creates an appropriate instance of the resource type 
+        Helper function.  Creates an appropriate instance of the resource type
         specified.  This code tends to get repeated.
         """
         mapping = {
@@ -71,22 +71,22 @@ class ExchangeClientTest(IonTestCase):
 
         for p in sys.path:
             e = os.path.exists(p)
-            print p + " : " + str(e)
+            log.debug(p + " : " + str(e))
 
-        values = { 
-                'name'        : 'AMQP Mapping Test', 
+        values = {
+                'name'        : 'AMQP Mapping Test',
                 'description' : "This AMQP Mapping is part of a unit test"
         }
         mapping = self.make_mapping('amqpmapping', values)
         result = yield self.exchange_registry_client.register_amqpmapping(mapping)
 
-        
+
     @defer.inlineCallbacks
     def test_register_hardwaremapping(self):
         """
         """
-        values = { 
-                'name'        : 'Hardware Mapping Test', 
+        values = {
+                'name'        : 'Hardware Mapping Test',
                 'description' : "This Hardware Mapping is part of a unit test"
         }
         mapping = self.make_mapping('hardwaremapping', values)
@@ -97,10 +97,10 @@ class ExchangeClientTest(IonTestCase):
     def test_register_exchangename(self):
         """
         Trivial test to verify that we can insert an ExchangeName resource into
-        our data store.  Note that the nested resources (AMQPMapping and 
+        our data store.  Note that the nested resources (AMQPMapping and
         HardwareMapping) are left for complex tests below.
         """
-        
+
         values = {
                   'name' :        "Exchange Name Test",
                   'description' : "This exchange name is part of a unit test"
@@ -113,10 +113,10 @@ class ExchangeClientTest(IonTestCase):
     def test_register_brokerfederation(self):
         """
         Trivial test to verify that we can insert an ExchangeName resource into
-        our data store.  Note that the nested resources (AMQPMapping and 
+        our data store.  Note that the nested resources (AMQPMapping and
         HardwareMapping) are left for complex tests below.
         """
-        
+
         values = {
                   'name' :        "Broker Federation Test",
                   'description' : "This broker federation is part of a unit test"
@@ -124,16 +124,16 @@ class ExchangeClientTest(IonTestCase):
         mapping = self.make_mapping('brokerfederation', values)
         result = yield self.exchange_registry_client.register_amqpmapping(mapping)
 
-    
+
 
     @defer.inlineCallbacks
     def test_register_brokercredentials(self):
         """
         Trivial test to verify that we can insert an ExchangeName resource into
-        our data store.  Note that the nested resources (AMQPMapping and 
+        our data store.  Note that the nested resources (AMQPMapping and
         HardwareMapping) are left for complex tests below.
         """
-        
+
         values = {
                   'name' :        "Broker Credentials Test",
                   'description' : "These broker credentials are part of a unit test"
@@ -141,7 +141,7 @@ class ExchangeClientTest(IonTestCase):
         mapping = self.make_mapping('brokercredentials', values)
         result = yield self.exchange_registry_client.register_amqpmapping(mapping)
 
-    
+
     @defer.inlineCallbacks
     def test_register_complex_exchangename(self):
         """
@@ -163,4 +163,3 @@ class ExchangeClientTest(IonTestCase):
         exchangename.amqpmapping = amap
         exchangename.hardwaremapping = hmap
         result = yield self.exchange_registry_client.register_exchangename(exchangename)
-            

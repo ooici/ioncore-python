@@ -23,6 +23,6 @@ class AppLoaderTest(IonTestCase):
         # Tests run in <main>/_trial_temp
         filename = '../res/apps/example.app'
         app = AppLoader.load_app_definition(filename)
-        print app
+        log.debug(app)
         self.assertTrue(app)
         self.assertIsInstance(app, AppDefinition)

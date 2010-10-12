@@ -135,11 +135,11 @@ def clean_twisted_logging():
     from twisted.python import log, util
     obs0 = log.theLogPublisher.observers[0]
     ro = log.removeObserver
-    if not hasattr(obs0.__self__,'write'):
+    if not hasattr(obs0.im_self,'write'):
         # In case of trial testcases this hack does not work.
         return
-    fdwrite = obs0.__self__.write
-    fdflush = obs0.__self__.flush
+    fdwrite = obs0.im_self.write
+    fdflush = obs0.im_self.flush
     def log_emit(eventDict):
         text = log.textFromEventDict(eventDict)
         if text is None:
