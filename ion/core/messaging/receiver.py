@@ -18,6 +18,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.id import Id
+from ion.core.intercept.interceptor import Invocation
 from ion.core.messaging import messaging
 from ion.util.state_object import BasicLifecycleObject
 import ion.util.procutils as pu
@@ -44,7 +45,7 @@ class Receiver(BasicLifecycleObject):
     SCOPE_SYSTEM = 'system'
     SCOPE_LOCAL = 'local'
 
-    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None):
+    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, raw=False):
         """
         @param label descriptive label for the receiver
         @param name the actual exchange name. Used for routing
@@ -53,6 +54,7 @@ class Receiver(BasicLifecycleObject):
         @param process IProcess instance that the receiver belongs to
         @param group a string grouping multiple receivers
         @param handler a callable for the message handler, shorthand for add_handler
+        @param raw if True do not put through receive Interceptors
         """
         BasicLifecycleObject.__init__(self)
 
@@ -63,6 +65,7 @@ class Receiver(BasicLifecycleObject):
         self.xspace = xspace
         self.process = process
         self.group = group
+        self.raw = raw
 
         self.handlers = []
         self.consumer = None
@@ -112,7 +115,7 @@ class Receiver(BasicLifecycleObject):
         @brief Activate the consumer.
         @retval Deferred
         """
-        self.consumer.register_callback(self.receive)
+        self.consumer.register_callback(self._receive)
         yield self.consumer.iterconsume()
         #log.debug("Receiver %s activated (consumer enabled)" % self.xname)
 
@@ -123,7 +126,7 @@ class Receiver(BasicLifecycleObject):
         @retval Deferred
         """
         yield self.consumer.cancel()
-        self.consumer.callbacks.remove(self.receive)
+        self.consumer.callbacks.remove(self._receive)
 
     @defer.inlineCallbacks
     def on_terminate(self, *args, **kwargs):
@@ -144,17 +147,62 @@ class Receiver(BasicLifecycleObject):
 
     handle = add_handler
 
-    # move these messaging related things to Receiver
+    def _receive(self, msg):
+        """
+        @brief entry point for received messages; callback from Carrot. All
+                registered handlers will be called in sequence
+        @note is called from carrot as normal method; no return expected
+        @param msg instance of carrot.backends.txamqp.Message
+        """
+        d = self.receive(msg)
+        return d
+
+    @defer.inlineCallbacks
     def receive(self, msg):
         """
         @brief entry point for received messages; callback from Carrot. All
                 registered handlers will be called in sequence
+        @note is called from carrot as normal method; no return expected
         @param msg instance of carrot.backends.txamqp.Message
         """
         data = msg.payload
+        if not self.raw:
+            inv = Invocation(path=Invocation.PATH_IN,
+                             message=msg,
+                             content=data)
+            inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
+            msg = inv1.message
+            data = inv1.content
         for handler in self.handlers:
-            # @todo call handlers in sequence (chain of callbacks)
-            d = defer.maybeDeferred(handler, data, msg)
+            yield defer.maybeDeferred(handler, data, msg)
+
+    @defer.inlineCallbacks
+    def send(self, **kwargs):
+        """
+        Constructs a standard message with standard headers and sends on given
+        receiver.
+        @param sender sender name of the message
+        @param recipient recipient name of the message
+        @param operation the operation (performative) of the message
+        @param content the black-box content of the message
+        @param headers dict with headers that may override standard headers
+        """
+        msg = kwargs
+        msg['sender'] = msg.get('sender', self.xname)
+        #log.debug("Send message op="+operation+" to="+str(recv))
+        try:
+            if not self.raw:
+                inv = Invocation(path=Invocation.PATH_OUT,
+                                 message=msg,
+                                 content=msg['content'])
+                inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
+                msg = inv1.message
+            yield ioninit.container_instance.send(msg.get('receiver'), msg)
+        except Exception, ex:
+            log.exception("Send error")
+        else:
+            log.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
+            #log.debug("msg"+str(msg))
 
     def __str__(self):
         return "Receiver(label=%s,xname=%s,group=%s)" % (
