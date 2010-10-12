@@ -46,8 +46,15 @@ class ExchangeClientTest(IonTestCase):
 
     def make_mapping(self, type, values):
         """
-        Helper function.  Creates an appropriate instance of the resource type
-        specified.  This code tends to get repeated.
+        Helper function.  
+        Rather than repeat monotonous resource creation code, this function will fill
+        out the resource (type) from a provided dictionary (values).
+        
+        Without this helper, the logic would be much more hardcoded such as:
+        myresource = MyResourseClass.create_new_resource()
+        myresource.myattr1 = myval1
+        myresource.myattr2 = myval2
+        ...
         """
         mapping = {
             'hardwaremapping'   : lambda : HardwareMapping.create_new_resource(),
@@ -64,8 +71,13 @@ class ExchangeClientTest(IonTestCase):
 
 
 
+
+    # SIMPLE RESOURCE OPERATIONS
+    # SIMPLE RESOURCE OPERATIONS
+    # SIMPLE RESOURCE OPERATIONS
+    
     @defer.inlineCallbacks
-    def test_register_amqpmapping(self):
+    def test_amqpmapping_resource(self):
         """
         """
 
@@ -78,11 +90,22 @@ class ExchangeClientTest(IonTestCase):
                 'description' : "This AMQP Mapping is part of a unit test"
         }
         mapping = self.make_mapping('amqpmapping', values)
-        result = yield self.exchange_registry_client.register_amqpmapping(mapping)
+        registered = yield self.exchange_registry_client.register_amqpmapping(mapping)
+        retrieved = yield self.exchange_registry_client.get_exchangename_by_id(registered.RegistryIdentity)
+        
+        tofind = AMQPMapping.create_new_resource()
+        tofind.name = values['name']
+        
+        found = yield self.exchange_registry_client.find_amqpmapping(tofind,regex=True,ignore_defaults=True,attnames=[AMQPMapping.name])
+        print found 
+        print tofind
+        print '----'
+        
+        self.assertEquals(registered.RegistryIdentity,retrieved.RegistryIdentity)
 
 
     @defer.inlineCallbacks
-    def test_register_hardwaremapping(self):
+    def test_hardwaremapping_resource(self):
         """
         """
         values = {
@@ -90,11 +113,13 @@ class ExchangeClientTest(IonTestCase):
                 'description' : "This Hardware Mapping is part of a unit test"
         }
         mapping = self.make_mapping('hardwaremapping', values)
-        result = yield self.exchange_registry_client.register_amqpmapping(mapping)
+        registered = yield self.exchange_registry_client.register_hardwaremapping(mapping)
+        retrieved = yield self.exchange_registry_client.get_hardwaremapping_by_id(registered.RegistryIdentity)
+        self.assertEquals(registered.RegistryIdentity,retrieved.RegistryIdentity)
 
 
     @defer.inlineCallbacks
-    def test_register_exchangename(self):
+    def test_exchangename_resource(self):
         """
         Trivial test to verify that we can insert an ExchangeName resource into
         our data store.  Note that the nested resources (AMQPMapping and
@@ -106,11 +131,13 @@ class ExchangeClientTest(IonTestCase):
                   'description' : "This exchange name is part of a unit test"
         }
         mapping = self.make_mapping('exchangename', values)
-        result = yield self.exchange_registry_client.register_amqpmapping(mapping)
+        registered = yield self.exchange_registry_client.register_exchangename(mapping)
+        retrieved = yield self.exchange_registry_client.get_exchangename_by_id(registered.RegistryIdentity)
+        self.assertEquals(registered.RegistryIdentity,retrieved.RegistryIdentity)
 
 
     @defer.inlineCallbacks
-    def test_register_brokerfederation(self):
+    def test_brokerfederation_resource(self):
         """
         Trivial test to verify that we can insert an ExchangeName resource into
         our data store.  Note that the nested resources (AMQPMapping and
@@ -122,12 +149,14 @@ class ExchangeClientTest(IonTestCase):
                   'description' : "This broker federation is part of a unit test"
         }
         mapping = self.make_mapping('brokerfederation', values)
-        result = yield self.exchange_registry_client.register_amqpmapping(mapping)
+        registered = yield self.exchange_registry_client.register_brokerfederation(mapping)
+        retrieved = yield self.exchange_registry_client.get_brokerfederation_by_id(registered.RegistryIdentity)
+        self.assertEquals(registered.RegistryIdentity,retrieved.RegistryIdentity)
 
 
 
     @defer.inlineCallbacks
-    def test_register_brokercredentials(self):
+    def test_brokercredentials_resource(self):
         """
         Trivial test to verify that we can insert an ExchangeName resource into
         our data store.  Note that the nested resources (AMQPMapping and
