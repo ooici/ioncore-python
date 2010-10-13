@@ -4,6 +4,7 @@
 @file ion/data/backends/store_service.py
 @author Michael Meisinger
 @author David Stuebe
+@author Matt Rodriguez
 @brief service for storing and retrieving key/value pairs.
 @note Test cases for the store service backend are now in ion.data.test.test_store
 """
@@ -13,20 +14,22 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit
-from ion.core.base_process import ProtocolFactory
+from ion.core.process.process import ProcessFactory
 from ion.data.store import Store, IStore
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
 
+from ion.data.backends import cassandra
+
 CONF = ioninit.config(__name__)
 
-class StoreService(BaseService):
+class StoreService(ServiceProcess):
     """
     Service to store and retrieve key/value pairs.
     """
     # Declaration of service
-    declare = BaseService.service_declare(name='store',
+    declare = ServiceProcess.service_declare(name='store',
                                           version='0.1.0',
                                           dependencies=[])
 
@@ -38,6 +41,7 @@ class StoreService(BaseService):
 
         self.backend = None
         # self.backend holds the class which is instantiated to provide the Store
+        log.info("StoreService backend class %s " % backendcls)
         if backendcls:
             self.backend = pu.get_class(backendcls)
         else:
@@ -53,6 +57,20 @@ class StoreService(BaseService):
         log.info(name + " backend:"+str(backendcls))
         log.info(name + " backend args:"+str(backendargs))
 
+
+    
+    def slc_stop(self):
+        """
+        @brief Shutdown the Store twisted connection
+        
+        @note if the store is as CassandraStore then tell the factory to shutdown the connection.
+        This breaks the Store abstraction
+        """
+        log.info("In StoreService slc_stop")
+        if isinstance(self.store, cassandra.CassandraStore):
+            log.info("Shutting down StoreService")
+            self.store.manager.shutdown()
+            
     @defer.inlineCallbacks
     def op_put(self, content, headers, msg):
         """
@@ -102,14 +120,14 @@ class StoreService(BaseService):
         yield self.reply_ok(msg, {'result':res})
 
 
-class StoreServiceClient(BaseServiceClient, IStore):
+class StoreServiceClient(ServiceClient, IStore):
     """
     Class for the client accessing the attribute store via Exchange
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "store"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def get(self, key):
@@ -147,4 +165,4 @@ class StoreServiceClient(BaseServiceClient, IStore):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(StoreService)
+factory = ProcessFactory(StoreService)

@@ -11,6 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
+from ion.core.exception import ReceivedError
 from ion.test.iontest import IonTestCase
 from ion.services.coi.identity_registry import IdentityRegistryClient
 
@@ -101,21 +102,20 @@ class UserRegistrationClientTest(IonTestCase):
                             "cZGidYECf6XdGxhSsf2C81LcDdk99KlPd7fkqLWOs5cAwlR4r3CY"
         user.expiration_date = "Tue Jun 29 23:32:16 PDT 2010"
         # These are the fields we prompt the user for during registration
-        user.first_name = "Roger"
-        user.last_name = "Unwin"
-        user.phone = "8588675309"
-        user.fax = "6198675309"
-        user.email = "unwin@sdsc.edu"
-        user.organization = "University of California San Diego"
-        user.department = "San Diego Supercomputing Center"
-        user.title = "Deep Sea Submarine Captain"
+        #user.first_name = "Roger"
+        #user.last_name = "Unwin"
+        #user.phone = "8588675309"
+        #user.fax = "6198675309"
+        #user.email = "unwin@sdsc.edu"
+        #user.organization = "University of California San Diego"
+        #user.department = "San Diego Supercomputing Center"
+        #user.title = "Deep Sea Submarine Captain"
 
 
 
         user = yield self.identity_registry_client.register_user(user)
 
         ooi_id = user.reference()
-        print str(ooi_id.RegistryIdentity) + "******************************************************"
         # load the user back
         user0 = yield self.identity_registry_client.get_user(ooi_id)
 
@@ -137,8 +137,12 @@ class UserRegistrationClientTest(IonTestCase):
 
         # Test for user not found handled properly.
         ooi_id.RegistryIdentity = "bogus-ooi_id"
-        result = yield self.identity_registry_client.get_user(ooi_id)
-        self.assertEqual(result, None)
+        try:
+            result = yield self.identity_registry_client.get_user(ooi_id)
+            self.fail("ReceivedError expected")
+        except ReceivedError, re:
+            log.error('Above error "WARNING:RPC reply is an ERROR: None" is expected.')
+            pass
 
         # Test if we can find the user we have stuffed in.
         user_description = coi_resource_descriptions.IdentityResource()

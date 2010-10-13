@@ -9,7 +9,7 @@ http://code.google.com/apis/visualization/documentation/index.html
 
 from ion.services.dm.distribution import base_consumer
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.process.process import ProcessFactory
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -161,4 +161,4 @@ class TimeseriesConsumer(base_consumer.BaseConsumer):
         
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(TimeseriesConsumer)
+factory = ProcessFactory(TimeseriesConsumer)

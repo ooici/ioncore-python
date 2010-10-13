@@ -13,7 +13,7 @@ import SBE49_constants as const
 from ion.agents.instrumentagents import instrument_agent as IA
 from ion.agents.instrumentagents.instrument_agent import InstrumentAgent
 
-from ion.core.base_process import BaseProcess, ProtocolFactory, ProcessDesc
+from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 
 
 # Gotta have this AFTER the "static" variables above
@@ -47,7 +47,7 @@ class SBE49InstrumentAgent(InstrumentAgent):
                                                          target=driver_id)
 
     #@defer.inlineCallbacks
-    #def plc_shutdown(self):
+    #def plc_terminate(self):
     #    yield self.pd.shutdown()
 
 
@@ -81,4 +81,4 @@ class SBE49InstrumentAgent(InstrumentAgent):
                           IA.ci_parameters: const.ci_parameters}, {})
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(SBE49InstrumentAgent)
+factory = ProcessFactory(SBE49InstrumentAgent)

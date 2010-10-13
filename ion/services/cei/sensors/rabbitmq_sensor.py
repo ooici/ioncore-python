@@ -8,7 +8,7 @@ from ion.services.cei.sensors.sensor import SensorProcess
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.task import LoopingCall
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.process.process import ProcessFactory
 
 from ion.services.cei import cei_events
 
@@ -63,4 +63,4 @@ class RabbitMQSensor(SensorProcess):
                 #yield self.send(self.epu_controller, "sensor_info", content)
 
 # Direct start of the service as a process with its default name
-factory = ProtocolFactory(RabbitMQSensor)
+factory = ProcessFactory(RabbitMQSensor)

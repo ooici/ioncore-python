@@ -12,13 +12,11 @@ log = ion.util.ionlog.getLogger(__name__)
 #import time
 from twisted.internet import defer
 from twisted.trial import unittest
-#from ion.core.cc.container import Container
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import spawn
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.process.process import ProcessFactory
 from ion.core import bootstrap
-#from ion.core.base_process import BaseProcess, ProcessDesc
+from ion.core.exception import ReceivedError
+#from ion.core.process.process import Process, ProcessDesc
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
@@ -97,8 +95,11 @@ class BaseConsumerTest(IonTestCase):
         #self.assertEqual(child.proc_attached,self.queue1)
 
 
-        res = yield child1.attach(None)
-        self.assertEqual(res,'ERROR')
+        try:
+            res = yield child1.attach(None)
+            self.fail("ReceivedError expected")
+        except ReceivedError, re:
+            pass
         #self.assertEqual(child.proc_attached,None)
 
         yield child1.shutdown()

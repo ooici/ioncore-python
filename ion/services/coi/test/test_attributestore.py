@@ -3,6 +3,7 @@
 """
 @file ion/services/coi/test/test_attributestore.py
 @author Michael Meisinger
+@author Matt Rodriguez
 @brief test attribute store service
 """
 
@@ -11,7 +12,6 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.core import base_process
 from ion.services.coi.attributestore import AttributeStoreService, AttributeStoreClient
 from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
@@ -31,7 +31,7 @@ class AttrStoreServiceTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_put_seperate_backend(self):
+    def test_put_separate_backend(self):
         # Test with seperate store backends
         services = [
             {'name':'attstore1',
@@ -91,7 +91,7 @@ class AttrStoreServiceTest(IonTestCase):
              'module':'ion.services.coi.attributestore',
              'class':'AttributeStoreService',
              'spawnargs':{'servicename':'as1', # this is the name of the instance!
-                            'backend_class':'ion.data.backends.cassandra.CassandraStore',
+                            'backend_class':'ion.data.backends.cassandra_pycassa.CassandraStore',
                             'backend_args':{'cass_host_list':['amoeba.ucsd.edu:9160'],
                                         'keyspace':'Datastore',
                                         'colfamily':'DS1',
@@ -103,7 +103,7 @@ class AttrStoreServiceTest(IonTestCase):
             'module':'ion.services.coi.attributestore',
             'class':'AttributeStoreService',
             'spawnargs':{'servicename':'as2', # this is the name of the instance!
-                        'backend_class':'ion.data.backends.cassandra.CassandraStore',
+                        'backend_class':'ion.data.backends.cassandra_pycassa.CassandraStore',
                         'backend_args':{'cass_host_list':['amoeba.ucsd.edu:9160'],
                                         'keyspace':'Datastore',
                                         'colfamily':'DS1',
@@ -116,14 +116,17 @@ class AttrStoreServiceTest(IonTestCase):
         sup = yield self._spawn_processes(services)
 
         asc1 = AttributeStoreClient(proc=sup, targetname='as1')
-
+        
+        
         res1 = yield asc1.put('key1','value1')
         log.info('Result1 put: '+str(res1))
-
+        
+        
         res2 = yield asc1.get('key1')
         log.info('Result2 get: '+str(res2))
         self.assertEqual(res2, 'value1')
-
+    
+        
         res3 = yield asc1.put('key1','value2')
 
         res4 = yield asc1.get('key1')
@@ -141,8 +144,6 @@ class AttrStoreServiceTest(IonTestCase):
         log.info('tResult2 get: '+str(tres2))
         self.assertEqual(tres2, 'tvalue1')
 
-        # Let cassandra register the new entry
-        pu.asleep(5)
 
         # With common backends the value should be found.
         resx1 = yield asc2.get('key1')

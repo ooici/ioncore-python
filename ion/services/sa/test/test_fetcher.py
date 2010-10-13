@@ -20,8 +20,14 @@ class FetcherServiceTester(IonTestCase):
     Just instantiate the FetcherService class and exercise the inner get_page
     method.
     """
+    @defer.inlineCallbacks
     def setUp(self):
+        yield self._start_container()
         self.mf = FetcherService()
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
 
     def test_single_page_with_headers(self):
         page = self.mf.get_page('http://amoeba.ucsd.edu/tmp/test1.txt',

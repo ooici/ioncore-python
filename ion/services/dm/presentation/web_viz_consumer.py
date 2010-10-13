@@ -11,7 +11,7 @@ http://code.google.com/apis/visualization/documentation/index.html
 
 from ion.services.dm.distribution import base_consumer
 
-from ion.core.base_process import ProtocolFactory
+from ion.core.process.process import ProcessFactory
 
 from twisted.internet import defer, reactor
 from twisted.web import server, resource
@@ -52,7 +52,7 @@ class WebVizConsumer(base_consumer.BaseConsumer):
 
 
     @defer.inlineCallbacks
-    def plc_shutdown(self):
+    def plc_terminate(self):
         log.info('Shutdown triggered')
         if self.port:
             yield self.port.stopListening()
@@ -71,4 +71,4 @@ class WebVizConsumer(base_consumer.BaseConsumer):
         log.info('Update complete!')
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(WebVizConsumer)
+factory = ProcessFactory(WebVizConsumer)

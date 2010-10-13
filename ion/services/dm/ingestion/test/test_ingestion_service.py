@@ -14,7 +14,7 @@ from twisted.trial import unittest
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
-from ion.services.dm.ingestion.ingestion_service import IngestionClient, IngestionService
+from ion.services.dm.ingestion.ingestion_service import IngestionClient
 
 from ion.resources.dm_resource_descriptions import IngestionStreamResource
 

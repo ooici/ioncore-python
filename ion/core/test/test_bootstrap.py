@@ -7,20 +7,11 @@
 """
 
 import os
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from twisted.application.service import ServiceMaker
-
-from twisted.trial import unittest
-from twisted.internet import reactor
 from twisted.internet import defer
-from twisted.internet.defer import inlineCallbacks, DeferredQueue
-
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import send
-from ion.core.cc.spawnable import spawn
-from ion.data.store import Store
 
 from ion.core import bootstrap
 from ion.core import ioninit

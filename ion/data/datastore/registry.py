@@ -4,13 +4,12 @@
 """
 @file ion/data/datastore/registry.py
 @author David Stuebe
+@author Matt Rodriguez
 @brief base service for registering ooi resources
 """
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-
-from zope import interface
 
 from twisted.internet import defer
 
@@ -19,9 +18,8 @@ from ion.data import dataobject
 from ion.data.datastore import objstore
 
 from ion.core import ioninit
-from ion.core import base_process
-from ion.core.base_process import ProtocolFactory, BaseProcess
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.resources import coi_resource_descriptions
 import ion.util.procutils as pu
 
@@ -29,7 +27,7 @@ CONF = ioninit.config(__name__)
 
 class LCStateMixin(object):
     """
-    @brief This mixin class is used to add life cycle state convience methods
+    @brief This mixin class is used to add life cycle state convenience methods
     """
     def set_resource_lcstate_new(self, resource_reference):
         return self.set_resource_lcstate(resource_reference, dataobject.LCStates.new)
@@ -110,32 +108,28 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         by creating a new (unique) resource object to the store.
         @note Is the way objectClass is referenced awkward?
         """
-        #print 'Dataobject Register Start',dataobject.DataObject._types.has_key('__builtins__')
-        #del dataobject.DataObject._types['__builtins__']
-        #print 'Dataobject Register Removed',dataobject.DataObject._types.has_key('__builtins__')
-
+        log.info("Calling Registry.register_resource")
         if isinstance(resource, self.objectChassis.objectClass):
 
             id = resource.RegistryIdentity
             if not id:
                 raise RuntimeError('Can not register a resource which does not have an identity.')
 
-            #print 'Dataobject Register Is Instance',dataobject.DataObject._types.has_key('__builtins__')
-
-
             try:
+                log.info("creating res_client")
                 res_client = yield self.create(id, self.objectChassis.objectClass)
+                log.info("Created client")
             except objstore.ObjectStoreError:
+                log.info("ObjectStoreError")
                 res_client = yield self.clone(id)
-
-            #print 'Dataobject Chasis',dataobject.DataObject._types.has_key('__builtins__')
-
+            
+            log.info("Check out resource")    
             yield res_client.checkout()
-
-            #print 'Dataobject checkout',dataobject.DataObject._types.has_key('__builtins__')
-
+            log.info("Checked out resource")
             res_client.index = resource
+            log.info("Committing resource")
             resource.RegistryCommit = yield res_client.commit()
+            log.info("Committed resource")
         else:
             resource = None
 
@@ -146,12 +140,16 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         """
         @brief Get resource description object
         """
+        log.info("get_resource called")
+        log.info("resource_reference %s" % resource_reference)
         resource=None
         if isinstance(resource_reference, dataobject.ResourceReference):
-
+            log.info("resource_reference is correct type")
             branch = resource_reference.RegistryBranch
             resource_client = yield self.clone(resource_reference.RegistryIdentity)
+            log.info("resource_client %s" % resource_client)
             if resource_client:
+                log.info("Retrieved resource_client")
                 if not resource_reference.RegistryCommit:
                     resource_reference.RegistryCommit = yield resource_client.get_head(branch)
 
@@ -211,9 +209,15 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         """
         @brief Find resource descriptions in the registry meeting the criteria
         in the FindResourceContainer
+        @param description DataObject that 
+        @param regex Whether a regex is used or not
+        @param ignore_defaults ignore registry defaults
+        @param attnames attribute names associated with the resource
         """
 
         # container for the return arguments
+        log.info("called find_resource")
+        log.info("description class %s" % description.__class__)
         results=[]
         if isinstance(description,dataobject.DataObject):
             refs = yield self._list()
@@ -225,6 +229,7 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
             log.info(self.__class__.__name__ + ': find_resource found ' + str(len(reslist)) + ' items in registry')
             num_match = 1
             for ref in refs:
+                log.info("ref: %s" % ref)
                 res = yield self.get_resource(ref)
                 log.debug("Found #"+str(num_match)+":"+str(res))
                 num_match += 1
@@ -239,24 +244,9 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
 
 
 
-@defer.inlineCallbacks
-def test(ns):
-    from ion.data import store
-    s = yield store.Store.create_store()
-    ns.update(locals())
-    reg = yield ResourceRegistry.new(s, 'registry')
-    res1 = dataobject.Resource.create_new_resource()
-    ns.update(locals())
-    res1.name = 'foo'
-    commit_id = yield reg.register_resource(res1)
-    res2 = dataobject.Resource.create_new_resource()
-    res2.name = 'doo'
-    commit_id = yield reg.register_resource(res2)
-    ns.update(locals())
 
 
-
-class BaseRegistryService(BaseService):
+class BaseRegistryService(ServiceProcess):
     """
     @brief Base Registry Service Clase
     To create a Registry Service inherit this class and over ride the method
@@ -431,7 +421,7 @@ class RegistryService(BaseRegistryService):
     @brief Example Registry Service implementation using the base class
     """
      # Declaration of service
-    declare = BaseService.service_declare(name='registry_service', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='registry_service', version='0.1.0', dependencies=[])
 
     op_clear_registry = BaseRegistryService.base_clear_registry
     op_register_resource = BaseRegistryService.base_register_resource
@@ -442,10 +432,10 @@ class RegistryService(BaseRegistryService):
 
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(RegistryService)
+factory = ProcessFactory(RegistryService)
 
 
-class BaseRegistryClient(BaseServiceClient):
+class BaseRegistryClient(ServiceClient):
     """
     @brief BaseRegistryClient is the base class used to simplify implementation
     of Registry Service Clients. The client for a particular registry should
@@ -459,8 +449,7 @@ class BaseRegistryClient(BaseServiceClient):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send(op_name,None)
-        if content['status'] == 'OK':
-            defer.returnValue(None)
+        defer.returnValue(None)
 
 
     @defer.inlineCallbacks
@@ -473,6 +462,7 @@ class BaseRegistryClient(BaseServiceClient):
         created using the create_new_resource method. Specific registries may
         override this behavior to create the resource inside the register method
         """
+        log.info("called BaseRegistryClient.base_register_resource")
         yield self._check_init()
         log.info(self.__class__.__name__ + '; Calling: '+ op_name)
 
@@ -485,14 +475,10 @@ class BaseRegistryClient(BaseServiceClient):
 
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
-        if content['status']=='OK':
-            #resource = dataobject.Resource.decode(content['value'])
-            resource = dataobject.serializer.decode(content['value'], headers['encoding'])
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(resource)
-        else:
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
-            defer.returnValue(None)
+        #resource = dataobject.Resource.decode(content['value'])
+        resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+        defer.returnValue(resource)
 
     @defer.inlineCallbacks
     def base_get_resource(self,op_name ,resource_reference):
@@ -514,14 +500,10 @@ class BaseRegistryClient(BaseServiceClient):
 
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
-        if content['status']=='OK':
-            #resource = dataobject.Resource.decode(content['value'])
-            resource = dataobject.serializer.decode(content['value'], headers['encoding'])
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(resource)
-        else:
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
-            defer.returnValue(None)
+        #resource = dataobject.Resource.decode(content['value'])
+        resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+        defer.returnValue(resource)
 
     @defer.inlineCallbacks
     def base_get_resource_by_id(self, op_name, id):
@@ -532,14 +514,10 @@ class BaseRegistryClient(BaseServiceClient):
         (content, headers, msg) = yield self.rpc_send(op_name, id, headers)
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
-        if content['status']=='OK':
-            #resource = dataobject.Resource.decode(content['value'])
-            resource = dataobject.serializer.decode(content['value'], headers['encoding'])
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(resource)
-        else:
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
-            defer.returnValue(None)
+        #resource = dataobject.Resource.decode(content['value'])
+        resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+        defer.returnValue(resource)
 
 
     @defer.inlineCallbacks
@@ -570,14 +548,10 @@ class BaseRegistryClient(BaseServiceClient):
 
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
-        if content['status'] == 'OK':
-            #resource_reference = dataobject.ResourceReference.decode(content['value'])
-            resource_reference = dataobject.serializer.decode(content['value'], headers['encoding'])
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(resource_reference)
-        else:
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
-            defer.returnValue(None)
+        #resource_reference = dataobject.ResourceReference.decode(content['value'])
+        resource_reference = dataobject.serializer.decode(content['value'], headers['encoding'])
+        log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+        defer.returnValue(resource_reference)
 
 
     @defer.inlineCallbacks
@@ -616,14 +590,10 @@ class BaseRegistryClient(BaseServiceClient):
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
         # Return a list of resources
-        if content['status'] == 'OK':
-            #results = dataobject.DataObject.decode(content['value'])
-            results = dataobject.serializer.decode(content['value'], headers['encoding'])
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
-            defer.returnValue(results.resources)
-        else:
-            log.info(self.__class__.__name__ + ': '+ op_name + ' Failed!')
-            defer.returnValue([])
+        #results = dataobject.DataObject.decode(content['value'])
+        results = dataobject.serializer.decode(content['value'], headers['encoding'])
+        log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
+        defer.returnValue(results.resources)
 
 
 class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
@@ -635,7 +605,7 @@ class RegistryClient(BaseRegistryClient,IRegistry,LCStateMixin):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "registry_service"
-        BaseServiceClient.__init__(self, proc, **kwargs)
+        ServiceClient.__init__(self, proc, **kwargs)
 
 
     def clear_registry(self):

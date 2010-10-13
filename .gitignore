@@ -15,3 +15,5 @@ dist
 *.egg-info
 .pydevproject
 .project
+/.settings
+dropin.cache

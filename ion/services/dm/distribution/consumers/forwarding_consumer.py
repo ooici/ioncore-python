@@ -13,7 +13,7 @@ queue due to the way consumers are created from a work flow.
 """
 
 from ion.services.dm.distribution import base_consumer
-from ion.core.base_process import ProtocolFactory
+from ion.core.process.process import ProcessFactory
 
 
 class ForwardingConsumer(base_consumer.BaseConsumer):
@@ -30,4 +30,4 @@ class ForwardingConsumer(base_consumer.BaseConsumer):
             self.queue_result(queue,data,notification)
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(ForwardingConsumer)
+factory = ProcessFactory(ForwardingConsumer)

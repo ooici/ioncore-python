@@ -10,10 +10,10 @@ from twisted.internet import stdio
 from twisted.conch.insults import insults
 from twisted.conch import manhole
 
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from ion.core import ionconst
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import send
-from ion.core.cc.spawnable import spawn
 
 def get_virtualenv():
     if 'VIRTUAL_ENV' in os.environ:
@@ -74,23 +74,25 @@ class ConsoleManhole(manhole.ColoredManhole):
         self.factory.stop()
 
 def makeNamespace():
-    from ion.core.cc.spawnable import send, ps, ms, spawn, kill
-    from ion.core.cc.container import Container, Id
+    from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify
+    from ion.core.id import Id
 
     namespace = locals()
     return namespace
 
-
 class Control(object):
 
     fd = None
-    terminalProtocol = None
+    serverProtocol = None
     oldSettings = None
-    class cc(object): pass
-    cc = cc() # Extension slot for shell functions
+
+    # A dict with the locals() of the shell, once started
+    namespace = None
+    # A dict to collect the shell variables before shell is started
+    pre_namespace = {}
 
     def start(self, ccService):
-        print 'Shell Start'
+        #log.info('Shell Start')
         fd = sys.__stdin__.fileno()
         fdout = sys.__stdout__.fileno()
 
@@ -108,22 +110,34 @@ class Control(object):
 
         serverProtocol = insults.ServerProtocol(ConsoleManhole, namespace)
         serverProtocol.factory = self
-
-        namespace['ccService'] = ccService
-        namespace['tsp'] = serverProtocol
-        namespace['cc'] = self.cc
-
         self.serverProtocol = serverProtocol
+
+        namespace['control'] = self
+        namespace['cc'] = ccService
+        namespace['tsp'] = serverProtocol
+        namespace.update(self.pre_namespace)
+
         stdio.StandardIO(serverProtocol)
+        self.namespace = self.serverProtocol.terminalProtocol.namespace
+        from ion.core.cc import shell_api
+        shell_api.namespace = self.namespace
+        shell_api._update()
 
     def stop(self):
         termios.tcsetattr(self.fd, termios.TCSANOW, self.oldSettings)
-        print 'Shell Stop'
+        #log.info('Shell Stop')
         # if terminal write reset doesnt work in handle QUIT, use this
         os.write(self.fd, "\r\x1bc\r")
-        print 'Shell exited. Press Ctrl-c to stop container'
+        log.info('Shell exited. Press Ctrl-c to stop container')
+
+    def add_term_name(self, key, value):
+        if self.namespace:
+            self.namespace[key] = value
+        else:
+            self.pre_namespace[key] = value
 
 try:
     control
 except NameError:
     control = Control()
+

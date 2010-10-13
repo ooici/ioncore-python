@@ -78,12 +78,12 @@ def start():
     startsvcs.extend(dm_services)
     sup = yield bootstrap.bootstrap(ion_messaging, startsvcs)
 
-    print 'STARTSVCS',startsvcs
-    print 'ION_MESSAGING',ion_messaging
-    print 'CONT_ARGS',ioninit.cont_args
+    log.debug('STARTSVCS %s' % startsvcs)
+    log.debug('ION_MESSAGING %s'% ion_messaging)
+    log.debug('CONT_ARGS %s' % ioninit.cont_args)
 
     nproducers = int(ioninit.cont_args.get('nproducers',5))
-    print 'NPRODUCERS',nproducers
+    log.debug('NPRODUCERS %s' % nproducers)
     yield create_producers(sup, nproducers)
 
     dpsc = pubsub_service.DataPubsubClient(proc=sup)

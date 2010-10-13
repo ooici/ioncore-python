@@ -5,25 +5,25 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer, reactor
 from twisted.internet.task import LoopingCall
-from ion.core.cc.spawnable import Receiver
-from ion.services.base_service import BaseService
-from ion.core.base_process import ProtocolFactory
+
+from ion.core.process.service_process import ServiceProcess
+from ion.core.process.process import ProcessFactory
 from ion.core import bootstrap
 import ion.util.procutils as pu
 from ion.services.cei.epucontroller import ControllerCore
 from ion.services.cei.provisioner import ProvisionerClient
 from ion.services.cei import cei_events
 
-class EPUControllerService(BaseService):
+class EPUControllerService(ServiceProcess):
     """EPU Controller service interface
     """
 
-    declare = BaseService.service_declare(name='epu_controller', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='epu_controller', version='0.1.0', dependencies=[])
 
     def slc_init(self):
         self.queue_name_work = self.get_scoped_name("system", self.spawn_args["queue_name_work"])
         extradict = {"queue_name_work":self.queue_name_work}
-        cei_events.event("controller", "init_begin", logging, extra=extradict)
+        cei_events.event("controller", "init_begin", log, extra=extradict)
         self.worker_queue = {self.queue_name_work:{'name_type':'worker'}}
         self.laterinitialized = False
         reactor.callLater(0, self.later_init)
@@ -61,7 +61,7 @@ class EPUControllerService(BaseService):
         yield bootstrap.declare_messaging(self.worker_queue)
         self.laterinitialized = True
         extradict = {"queue_name_work":self.queue_name_work}
-        cei_events.event("controller", "init_end", logging, extra=extradict)
+        cei_events.event("controller", "init_end", log, extra=extradict)
 
     def op_sensor_info(self, content, headers, msg):
         if not self.laterinitialized:
@@ -72,4 +72,4 @@ class EPUControllerService(BaseService):
         log.info('EPU Controller: CEI test'+ content)
 
 # Direct start of the service as a process with its default name
-factory = ProtocolFactory(EPUControllerService)
+factory = ProcessFactory(EPUControllerService)

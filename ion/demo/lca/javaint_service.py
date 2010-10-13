@@ -10,25 +10,19 @@ import ast
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from ion.core.cc.spawnable import Receiver
 
 import ion.util.procutils as pu
-from ion.core.base_process import ProtocolFactory
-from ion.services.base_service import BaseService, BaseServiceClient
+from ion.core.process.process import ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-class JavaIntegrationService(BaseService):
+class JavaIntegrationService(ServiceProcess):
     """
     Example service interface
     """
     # Declaration of service
-    declare = BaseService.service_declare(name='javaint',
+    declare = ServiceProcess.service_declare(name='javaint',
                                           version='0.1.0',
                                           dependencies=[])
-
-    def __init__(self, receiver, spawnArgs=None):
-        # Service class initializer. Basic config, but no yields allowed.
-        BaseService.__init__(self, receiver, spawnArgs)
-        log.info('JavaIntegrationService.__init__()')
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
@@ -102,4 +96,4 @@ class JavaIntegrationService(BaseService):
         yield self.reply_ok(msg, {'value':self.services})
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(JavaIntegrationService)
+factory = ProcessFactory(JavaIntegrationService)

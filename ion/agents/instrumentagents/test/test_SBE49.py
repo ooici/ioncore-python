@@ -18,11 +18,9 @@ from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriver
 from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 from ion.core import bootstrap
 
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import spawn
-from ion.core.base_process import BaseProcess, ProcessDesc
+from ion.core.messaging.receiver import Receiver
+from ion.core.process.process import Process, ProcessDesc
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
-from ion.services.base_service import BaseServiceClient
 
 from ion.services.dm.distribution import base_consumer
 from ion.services.dm.distribution.consumers import forwarding_consumer
@@ -82,19 +80,18 @@ class TestSBE49(IonTestCase):
         self.topic = yield dpsc.define_topic(self.topic)
 
 
-        print 'TADA!'
+        log.debug('TADA!')
 
 
     @defer.inlineCallbacks
     def test_initialize(self):
         result = yield self.driver_client.initialize('some arg')
-        print 'TADA!'
+        log.debug('TADA!')
 
     @defer.inlineCallbacks
     def test_driver_load(self):
         config_vals = {'addr':'127.0.0.1', 'port':'9000'}
         result = yield self.driver_client.configure_driver(config_vals)
-        self.assertEqual(result['status'], 'OK')
         self.assertEqual(result['addr'], config_vals['addr'])
         self.assertEqual(result['port'], config_vals['port'])
 
@@ -103,11 +100,9 @@ class TestSBE49(IonTestCase):
     def test_fetch_set(self):
         params = {'outputformat':'2'}
         result = yield self.driver_client.set_params(params)
-        self.assertEqual(result['status'], 'OK')
 
         params = {'baudrate':'19200'}
         result = yield self.driver_client.set_params(params)
-        self.assertEqual(result['status'], 'OK')
 
         """
         params = {'baudrate':'19200', 'outputsal':'N'}
@@ -115,13 +110,10 @@ class TestSBE49(IonTestCase):
         self.assertNotEqual(params, result)
         result = yield self.driver_client.set_params({})
         self.assertEqual(len(result.keys()), 1)
-        self.assertEqual(result['status'], 'OK')
         set_result = yield self.driver_client.set_params(params)
-        self.assertEqual(set_result['status'], 'OK')
         self.assertEqual(set_result['baudrate'], params['baudrate'])
         self.assertEqual(set_result['outputsal'], params['outputsal'])
         result = yield self.driver_client.fetch_params(params.keys())
-        self.assertEqual(result['status'], 'OK')
         self.assertEqual(result['baudrate'], params['baudrate'])
         self.assertEqual(result['outputsal'], params['outputsal'])
         """
@@ -158,11 +150,9 @@ class TestSBE49(IonTestCase):
         #cmd2 = [['stop', 'now']]
         #cmd2 = [['pumpoff', '3600', '1']]
         result = yield self.driver_client.execute(cmd1)
-        self.assertEqual(result['status'], 'OK')
         # DHE: wait a while...
         yield pu.asleep(1)
         #result = yield self.driver_client.execute(cmd2)
-        #self.assertEqual(result['status'], 'OK')
 
 
         # DHE: disconnecting; a connect would probably be good.
@@ -200,13 +190,12 @@ class TestSBE49(IonTestCase):
 
         cmd1 = [['ds', 'now']]
         result = yield self.driver_client.execute(cmd1)
-        self.assertEqual(result['status'], 'OK')
 
         yield pu.asleep(1)
 
         result = yield self.driver_client.disconnect(['some arg'])
 
-class DataConsumer(BaseProcess):
+class DataConsumer(Process):
     """
     A class for spawning as a separate process to consume the responses from
     the instrument.
@@ -217,10 +206,8 @@ class DataConsumer(BaseProcess):
         """
         Attach to the given topic name
         """
-        yield self.init()
-        self.dataReceiver = Receiver(__name__, topic_name)
-        self.dataReceiver.handle(self.receive)
-        self.dr_id = yield spawn(self.dataReceiver)
+        self.dataReceiver = Receiver(name=topic_name, handler=self.receive)
+        yield self.dataReceiver.attach()
 
         self.receive_cnt = 0
         self.received_msg = []

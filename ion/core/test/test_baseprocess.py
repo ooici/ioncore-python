@@ -8,24 +8,23 @@
 
 import os
 import sha
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from ion.core.cc.container import Container
-from ion.core.cc.spawnable import Receiver
-from ion.core.cc.spawnable import send
-from ion.core.cc.spawnable import spawn
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.base_process import BaseProcess, ProcessDesc, ProtocolFactory
-
+from ion.core.process.process import Process, ProcessDesc, ProcessFactory
+from ion.core.cc.container import Container
+from ion.core.exception import ReceivedError
+from ion.core.messaging.receiver import Receiver, WorkerReceiver
+from ion.core.id import Id
 from ion.test.iontest import IonTestCase, ReceiverProcess
 import ion.util.procutils as pu
 
-class BaseProcessTest(IonTestCase):
+class ProcessTest(IonTestCase):
     """
     Tests the process base class, the root class of all message based interaction.
     """
@@ -40,77 +39,50 @@ class BaseProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_process_basics(self):
-        p1 = BaseProcess()
-        self.assertEquals(p1.id, None)
+        p1 = Process()
+        self.assertTrue(p1.id)
+        self.assertIsInstance(p1.id, Id)
         self.assertTrue(p1.receiver)
-        self.assertEquals(p1.receiver.spawned, None)
-        self.assertEquals(p1.proc_state, "NEW")
+        self.assertFalse(p1.receiver.consumer)
+        self.assertEquals(p1.receiver.consumer, None)
+        self.assertEquals(p1._get_state(), "INIT")
+
+        self.assertEquals(p1.spawn_args, {})
+        self.assertTrue(p1.proc_init_time)
+        self.assertTrue(p1.proc_name)
+        self.assertTrue(p1.sys_name)
+        self.assertTrue(p1.proc_group)
+        self.assertTrue(p1.backend_id)
+        self.assertTrue(p1.backend_receiver)
+        self.assertEquals(len(p1.receivers), 2)
+        self.assertEquals(p1.conversations, {})
+        self.assertEquals(p1.child_procs, [])
 
         pid1 = yield p1.spawn()
-        self.assertEquals(pid1, p1.receiver.spawned.id)
+        self.assertEquals(pid1, p1.id)
+        self.assertEquals(p1._get_state(), "ACTIVE")
 
-        # Note: this tests init without actually sending a message.
-        self.assertEquals(p1.proc_state, "ACTIVE")
-
-        yield p1.op_init(None, None, None)
-        self.assertEquals(p1.proc_state, "ERROR")
-
-        rec = Receiver("myname")
-        p2 = BaseProcess(rec)
+        procid = Id('local','container')
+        args = {'proc-id':procid.full}
+        p2 = Process(spawnargs=args)
+        self.assertEquals(p2.id, procid)
+        yield p2.initialize()
+        self.assertEquals(p2._get_state(), "READY")
+        yield p2.activate()
+        self.assertEquals(p2._get_state(), "ACTIVE")
 
         args = {'arg1':'value1','arg2':{}}
-        p3 = BaseProcess(None, args)
+        p3 = Process(None, args)
         self.assertEquals(p3.spawn_args, args)
-
-    @defer.inlineCallbacks
-    def test_child_processes(self):
-        p1 = BaseProcess()
-        pid1 = yield p1.spawn()
-
-        child = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
-        pid2 = yield p1.spawn_child(child)
-
-        (cont,hdrs,msg) = yield p1.rpc_send(pid2,'echo','content123')
-        self.assertEquals(cont['value'], 'content123')
-
-        yield p1.shutdown()
-
-    @defer.inlineCallbacks
-    def test_spawn_child(self):
-        child1 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
-        self.assertEquals(child1.proc_state,'DEFINED')
-
-        pid1 = yield self.test_sup.spawn_child(child1)
-        self.assertEquals(child1.proc_state,'INIT_OK')
-        proc = self._get_procinstance(pid1)
-        self.assertEquals(str(proc.__class__),"<class 'ion.core.test.test_baseprocess.EchoProcess'>")
-        self.assertEquals(pid1, proc.receiver.spawned.id)
-        log.info('Process 1 spawned and initd correctly')
-
-        (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo','content123')
-        self.assertEquals(cont['value'], 'content123')
-        log.info('Process 1 responsive correctly')
-
-        # The following tests the process attaching a second receiver
-        msgName = self.test_sup.get_scoped_name('global', pu.create_guid())
-        messaging = {'name_type':'worker', 'args':{'scope':'global'}}
-        yield Container.configure_messaging(msgName, messaging)
-        extraRec = Receiver(proc.proc_name, msgName)
-        extraRec.handle(proc.receive)
-        extraid = yield spawn(extraRec)
-        log.info('Created new receiver %s with pid %s' % (msgName, extraid))
-
-        (cont,hdrs,msg) = yield self.test_sup.rpc_send(msgName,'echo','content456')
-        self.assertEquals(cont['value'], 'content456')
-        log.info('Process 1 responsive correctly on second receiver')
-
 
     @defer.inlineCallbacks
     def test_process(self):
         # Also test the ReceiverProcess helper class
-        p1 = ReceiverProcess()
+        log.debug('Spawning p1')
+        p1 = ReceiverProcess(spawnargs={'proc-name':'p1'})
         pid1 = yield p1.spawn()
 
+        log.debug('Spawning other processes')
         processes = [
             {'name':'echo','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
         ]
@@ -118,6 +90,7 @@ class BaseProcessTest(IonTestCase):
         assert sup == p1
 
         pid2 = p1.get_child_id('echo')
+        proc2 = self._get_procinstance(pid2)
 
         yield p1.send(pid2, 'echo','content123')
         log.info('Sent echo message')
@@ -128,57 +101,76 @@ class BaseProcessTest(IonTestCase):
         self.assertEquals(msg.payload['op'], 'result')
         self.assertEquals(msg.payload['content']['value'], 'content123')
 
-        yield sup.shutdown()
+        yield sup.terminate()
+        self.assertEquals(sup._get_state(), "TERMINATED")
+        self.assertEquals(proc2._get_state(), "TERMINATED")
 
     @defer.inlineCallbacks
-    def test_message_before_init(self):
-        child2 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
-        pid2 = yield self.test_sup.spawn_child(child2, init=False)
-        self.assertEquals(child2.proc_state, 'SPAWNED')
-        proc2 = self._get_procinstance(pid2)
+    def test_child_processes(self):
+        p1 = Process()
+        pid1 = yield p1.spawn()
 
-        (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid2,'echo','content123')
-        self.assertEquals(cont['status'], 'ERROR')
-        log.info('Process 1 rejected first message correctly')
+        child = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
+        pid2 = yield p1.spawn_child(child)
 
-        yield child2.init()
-        self.assertEquals(child2.proc_state, 'INIT_OK')
-        log.info('Process 1 rejected initialized OK')
-
-        (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid2,'echo','content123')
+        (cont,hdrs,msg) = yield p1.rpc_send(pid2,'echo','content123')
         self.assertEquals(cont['value'], 'content123')
-        log.info('Process 1 responsive correctly after init')
+
+        yield p1.terminate()
+        self.assertEquals(p1._get_state(), "TERMINATED")
 
     @defer.inlineCallbacks
-    def test_message_during_init(self):
-        child2 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
-        pid2 = yield self.test_sup.spawn_child(child2, init=False)
-        proc2 = self._get_procinstance(pid2)
-        proc2.plc_init = proc2.plc_noinit
-        self.assertEquals(proc2.proc_state, 'NEW')
+    def test_spawn_child(self):
+        child1 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
+        self.assertEquals(child1._get_state(),'INIT')
 
-        msgName = self.test_sup.get_scoped_name('global', pu.create_guid())
-        messaging = {'name_type':'worker', 'args':{'scope':'global'}}
-        yield Container.configure_messaging(msgName, messaging)
-        extraRec = Receiver(proc2.proc_name, msgName)
-        extraRec.handle(proc2.receive)
-        extraid = yield spawn(extraRec)
-        log.info('Created new receiver %s with pid %s' % (msgName, extraid))
+        pid1 = yield self.test_sup.spawn_child(child1)
+        self.assertEquals(child1._get_state(),'ACTIVE')
+        proc = self._get_procinstance(pid1)
+        self.assertEquals(str(proc.__class__),"<class 'ion.core.test.test_baseprocess.EchoProcess'>")
+        self.assertEquals(pid1, proc.id)
+        log.info('Process 1 spawned and initd correctly')
 
-        yield self.test_sup.send(pid2, 'init',{},{'quiet':True})
-        log.info('Sent init to process 1')
-
-        yield pu.asleep(0.5)
-        self.assertEquals(proc2.proc_state, 'INIT')
-
-        (cont,hdrs,msg) = yield self.test_sup.rpc_send(msgName,'echo','content123')
+        (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo','content123')
         self.assertEquals(cont['value'], 'content123')
-        log.info('Process 1 responsive correctly after init')
+        log.info('Process 1 responsive correctly')
 
-        yield pu.asleep(2)
-        self.assertEquals(proc2.proc_state, 'ACTIVE')
+        # The following tests the process attaching a second receiver
+        msgName = pu.create_guid()
+        extraRec = WorkerReceiver(label=proc.proc_name, name=msgName, handler=proc.receive)
+        extraid = yield extraRec.attach()
+        log.info('Created new receiver %s' % (msgName))
 
-        (cont,hdrs,msg) = yield self.test_sup.rpc_send(msgName,'echo','content123')
+        (cont,hdrs,msg) = yield self.test_sup.rpc_send(msgName,'echo','content456')
+        self.assertEquals(cont['value'], 'content456')
+        log.info('Process 1 responsive correctly on second receiver')
+
+
+    @defer.inlineCallbacks
+    def test_message_before_activate(self):
+        p1 = ReceiverProcess(spawnargs={'proc-name':'p1'})
+        pid1 = yield p1.spawn()
+        proc1 = self._get_procinstance(pid1)
+
+        child2 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
+        pid2 = yield self.test_sup.spawn_child(child2, activate=False)
+        self.assertEquals(child2._get_state(), 'READY')
+        proc2 = self._get_procinstance(pid2)
+        self.assertEquals(proc2._get_state(), 'READY')
+
+        # The following tests that a message to a not yet activated process
+        # is queued and not lost, but not delivered
+        yield proc1.send(pid2,'echo','content123')
+        self.assertEquals(proc1.inbox_count, 0)
+        yield pu.asleep(1)
+        self.assertEquals(proc1.inbox_count, 0)
+
+        yield child2.activate()
+        yield pu.asleep(1)
+        self.assertEquals(child2._get_state(), 'ACTIVE')
+        self.assertEquals(proc1.inbox_count, 1)
+
+        (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid2,'echo','content123')
         self.assertEquals(cont['value'], 'content123')
         log.info('Process 1 responsive correctly after init')
 
@@ -187,9 +179,11 @@ class BaseProcessTest(IonTestCase):
         child1 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
         pid1 = yield self.test_sup.spawn_child(child1)
 
-        (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echofail2','content123')
-        self.assertEquals(cont['status'], 'ERROR')
-        log.info('Process 1 responded to error correctly')
+        try:
+            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echofail2','content123')
+            self.fail("ReceivedError expected")
+        except ReceivedError, re:
+            log.info('Process 1 responded to error correctly')
 
     @defer.inlineCallbacks
     def test_send_byte_string(self):
@@ -230,7 +224,7 @@ class BaseProcessTest(IonTestCase):
         yield self._shutdown_processes()
 
 
-class EchoProcess(BaseProcess):
+class EchoProcess(Process):
 
     @defer.inlineCallbacks
     def plc_noinit(self):
@@ -256,4 +250,4 @@ class EchoProcess(BaseProcess):
         yield self.reply_ok(msg, content)
 
 # Spawn of the process using the module name
-factory = ProtocolFactory(EchoProcess)
+factory = ProcessFactory(EchoProcess)

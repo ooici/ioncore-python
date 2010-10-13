@@ -1,331 +1,185 @@
+#!/usr/bin/env python
+
 """
 @author Dorian Raymer
 @author Michael Meisinger
 @brief Capability Container main class
+@see http://www.oceanobservatories.org/spaces/display/syseng/CIAD+COI+SV+Python+Capability+Container
 
-A container utilizes the messaging abstractions.
-A container creates/enters a MessageSpace (a particular vhost in a
-broker)(maybe MessageSpace is a bad name; maybe not, depends on what
-context wants to be managed. A Message space could just be a particular
-exchange. Using the vhost as the main context setter for a message space,
-assuming a common broker/cluster, means a well known common exchange can be
-used as a default namespace, where the names are spawnable instance ids, as
-well as, permanent abstract endpoints. The same Message Space holding this
-common exchange could also hold any other exchanges where the names
-(routing keys) can have possibly different semantic meaning or other usage
-strategies.
+A container utilizes the messaging abstractions for AMQP.
+
 """
 
 import os
 import sys
-import traceback
 
 from twisted.internet import defer
-from twisted.python import log
+from zope.interface import implements, Interface
 
-from carrot import connection
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
-from ion.core.messaging import messaging
-from ion.core.cc.store import Store
+from ion.core import ioninit
+from ion.core.cc.container_api import IContainer
+from ion.core.id import Id
+from ion.core.intercept.interceptor_system import InterceptorSystem
+from ion.core.messaging.exchange import ExchangeManager
+from ion.core.pack.application import AppLoader
+from ion.core.pack.app_manager import AppManager
+from ion.core.process.proc_manager import ProcessManager
+from ion.util.state_object import BasicLifecycleObject
+from ion.util.config import Config
 
-DEFAULT_EXCHANGE_SPACE = 'magnet.topic'
+CONF = ioninit.config(__name__)
+CF_is_config = Config(CONF.getValue('interceptor_system')).getObject()
 
-"""
-The integration message object has a Base definition in the carrot/backends
-base.py, and a specific txamqp extension in the txamqplib backend.
-
-@note Since the message operators live here, maybe the Integration message class
-should live here too?
-"""
-
-class Id(object):
-    """entity instance id
-    local id is the int from Spawnable id count
-    full id is container id + local id
-    XXX local might be pid?
-        full might be named cid (container id)?
+class Container(BasicLifecycleObject):
     """
-
-    def __init__(self, local, container=None):
-        self.local = str(local)
-        if container is None:
-            container = Container.id
-        self.container = container
-        self.full = container + '.' + str(local)
-
-    def __str__(self):
-        """XXX print just local...or full?
-        """
-        return "%s" % str(self.full)
-
-    def __repr__(self):
-        return """Id(%s, container="%s")""" % (str(self.local),
-                                             str(self.container),)
-
-    def __eq__(self, other):
-        if self.local == other.local:
-            return True
-        return False
-
-    def __hash__(self):
-        """this is so Id's make sense as dict keys for Spawnable.
-        """
-        return int(self.local)
-
-class Name(object):
+    Represents an instance of the Capability Container. Typically, in one Twisted
+    process (= one UNIX process), there is only one instance of a CC. In test cases,
+    however, there might be more.
     """
-    High-level messaging name.
-    Encapsulates messaging (amqp) details
+    implements(IContainer)
 
-    Might also retain name config dict
-    OR might just be the config
-    """
-
-
-class Container(object):
-    """represents capability container.
-    (like application service...)
-    (like otp node..?)
-
-    As a context, Container interfaces the messaging space with the local
-    Spawnable and their Receivers...
-    """
-
-    common = 'container' # common should be exchange
-    space = None # main message space
-    exchange_space = None # exchange space (namespace)
-    interceptor_system = None #
-    id = '%s.%d' % (os.uname()[1], os.getpid(),)
+    # Static variables
+    id = '%s.%d' % (os.uname()[1], os.getpid())
     args = None  # Startup arguments
-    store = Store()
     _started = False
 
-    @staticmethod
-    def connectMainSpace(broker):
-        Container._started = True
-        Container.space = broker
-        Container.exchange_space = messaging.Exchange(Container.space,
-                                                    'magnet.topic')
-        return broker.connect()
-
-    @staticmethod
-    def configure_messaging(name, config):
-        """
-        XXX This is not acceptable: config is defined by lcaarch!!!!
-        """
-        if config['name_type'] == 'worker':
-            name_type_f = messaging.worker
-        elif config['name_type'] == 'direct':
-            name_type_f = messaging.direct
-        elif config['name_type'] == 'fanout':
-            name_type_f = messaging.fanout
-        else:
-            raise RuntimeError("Invalid name_type: "+config['name_type'])
-
-        amqp_config = name_type_f(name)
-        amqp_config.update(config)
-        def _cb(res):
-            return messaging.Configure.name(Container.exchange_space,
-                                                            amqp_config)
-        d = Container.store.put(name, amqp_config)
-        d.addCallback(_cb)
-        return d
-
-
-@defer.inlineCallbacks
-def new_consumer(name_config, target):
-    """given spawnable instance Id, create consumer
-    using hardcoded name conventions
-
-    @param id should be of type Id
-    @retval defer.Deferred that fires a consumer instance
-    """
-    consumer = yield messaging.BaseConsumer.name(Container.exchange_space, name_config)
-    if Container.interceptor_system:
-        wrapped_target = Container.interceptor_system.in_stack(target)
-    else:
-        wrapped_target = target
-    consumer.register_callback(wrapped_target.send)
-    consumer.iterconsume()
-    defer.returnValue(consumer)
-
-@defer.inlineCallbacks
-def new_publisher(name_config):
-    """
-    """
-    publisher = yield messaging.Publisher.name(Container.exchange_space, name_config)
-    if Container.interceptor_system:
-        @coroutine
-        def _genfunc(func):
-            """Generator function that calls the argument"""
-            msg = (yield)
-            func(msg)
-        publisher_send_gen = _genfunc(publisher.send)
-        publisher.send = Container.interceptor_system.out_stack(publisher_send_gen)
-    defer.returnValue(publisher)
-
-
-class MessageSpace(connection.BrokerConnection):
-
-    def __repr__(self):
-        params = ['hostname',
-                'userid',
-                'password',
-                'virtual_host',
-                ]
-        s = "MessageSpace("
-        for param in params:
-            s += param +"='%s', " % getattr(self, param)
-        s += "port=%d" % self.port
-        s += ")"
-        return s
-
-
-
-def coroutine(func):
-    """decorator for coroutine functions
-    """
-    def start(*args, **kwargs):
-        g = func(*args, **kwargs)
-        g.next()
-        return g
-    return start
-
-@coroutine
-def filter_fixture(transform, target):
-    """
-    @brief General scaffold for a pipeline of message interceptor/filters.
-    @param transform A function that accepts a Message object as its
-    argument.
-    @param target Next destination to send Message object.
-    """
-    while True:
-        msg = (yield)
-        try:
-            if type(transform) is list:
-                msg_prime = transform[0](msg)
-            else:
-                msg_prime = transform(msg)
-            if msg_prime:
-                target.send(msg_prime)
-        except StandardError, e:
-            print 'Exception in interceptor: '+repr(e)
-            (etype, value, trace) = sys.exc_info()
-            traceback.print_tb(trace)
-
-def pass_transform(msg):
-    """Trivial identity transform -- pass all
-    """
-    log.msg('pass_transform', msg)
-    return msg
-
-def drop_transform(msg):
-    """Drop all messages
-    """
-    log.msg('drop_transform', msg)
-    return None
-
-
-class Interceptor(object):
-    """template/interface of a message interceptor
-    """
-
-    def __init__(self, target):
-        self.target = target
-
-    def send(self, msg):
-        """implement functionality
-        default sends to next target.
-        """
-        self.target.send(msg)
-
-class InterceptorSystem(object):
-
     def __init__(self):
-        self._id_implementation = [pass_transform]
-        self._policy_implementation = [pass_transform]
-        self._governance_implementation = [pass_transform]
+        BasicLifecycleObject.__init__(self)
 
-    def registerIdmInterceptor(self, transform):
-        """install function that implements validation/decoration
-        of a message's identity.
-        The function is a decision point:
-            for incoming messages, the decision to pass the message on is
-                based on success of validating the message identity.
-            for outgoing messages, the message is officially signed with
-                the identity of (this container?)
+        # Config instance
+        self.config = None
+
+        # ExchangeManager instance
+        self.exchange_manager = None
+
+        # ProcessManager instance
+        self.proc_manager = None
+
+        # AppManager instance
+        self.app_manager = None
+
+        # InterceptorSystem
+        self.interceptor_system = None
+
+    @defer.inlineCallbacks
+    def on_initialize(self, config, *args, **kwargs):
         """
-        self._id_implementation[0] = transform
-
-    def registerPolicyInterceptor(self, transform):
-        """install function that enforces basic policy in the context of
-        the message identity and the integration level message headers.
-        The function is a decision point:
-            messages that comply with policy are passed through.
+        Initializes the instance of a container. Actions include
+        - Receive and parse the configuration
+        - Prepare some active objects
         """
-        self._policy_implementation[0] = transform
+        self.config = config
 
-    def registerGovernanceInterceptor(self, transform):
-        """install function that decides whether or not to pass a message
-        based on some examination of the entire message.
+        # Set additional container args
+        Container.args = self.config.get('args', None)
+
+        self.exchange_manager = ExchangeManager(self)
+        yield self.exchange_manager.initialize(config, *args, **kwargs)
+
+        self.proc_manager = ProcessManager(self)
+        yield self.proc_manager.initialize(config, *args, **kwargs)
+
+        self.app_manager = AppManager(self)
+        yield self.app_manager.initialize(config, *args, **kwargs)
+
+        self.interceptor_system = InterceptorSystem()
+        yield self.interceptor_system.initialize(CF_is_config)
+
+    @defer.inlineCallbacks
+    def on_activate(self, *args, **kwargs):
         """
-        self._governance_implementation[0] = transform
-
-    def in_stack(self, target):
-        """incoming message interception stack, per consumer.
-        the target should be the callback function given to the messaging
-        consumer
-        (prelim)
+        Activates the container. Actions include
+        - Initiate broker connection
+        - Start
+        @retval Deferred
         """
-        return self.id_check(self.policy_check(self.governance_check(target)))
+        Container._started = True
 
-    def out_stack(self, target):
-        """outgoing message interception stack, per consumer.
-        the target should be the callback function given to the messaging
-        consumer
-        (prelim)
+        yield self.interceptor_system.activate()
+
+        yield self.exchange_manager.activate()
+
+        yield self.proc_manager.activate()
+
+        yield self.app_manager.activate()
+
+    def on_deactivate(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
+
+    @defer.inlineCallbacks
+    def on_terminate(self, *args, **kwargs):
         """
-        def _sendf(gent):
-            """Returns a function that calls a generator"""
-            def _send(msg):
-                """Calls a generator with msg arg"""
-                try: gent.send(msg)
-                except StopIteration: pass
-            return _send
-        return _sendf(self.governance_check(self.policy_check(self.id_check(target))))
+        Deactivates and terminates the container. Actions include
+        - Stop and terminate all container applications
+        - Close broker connection
+        @retval Deferred
+        """
 
-    def id_check(self, target):
-        return filter_fixture(self._id_implementation, target)
+        yield self.app_manager.terminate()
 
-    def policy_check(self, target):
-        return filter_fixture(self._policy_implementation, target)
+        yield self.proc_manager.terminate()
 
-    def governance_check(self, target):
-        return filter_fixture(self._governance_implementation, target)
+        yield self.exchange_manager.terminate()
 
+        yield self.interceptor_system.terminate()
 
+        log.info("Container closed")
+        Container._started = False
 
-def startContainer(config):
+    def on_error(self, *args, **kwargs):
+        raise RuntimeError("Illegal state change for container")
+
+    # --- Container API -----------
+
+    # Process management, handled by ProcessManager
+    def spawn_process(self, *args, **kwargs):
+        return self.proc_manager.spawn_process(*args, **kwargs)
+    def spawn_processes(self, *args, **kwargs):
+        return self.proc_manager.spawn_processes(*args, **kwargs)
+    def create_supervisor(self, *args, **kwargs):
+        return self.proc_manager.create_supervisor(*args, **kwargs)
+    def activate_process(self, *args, **kwargs):
+        return self.proc_manager.activate_process(*args, **kwargs)
+    def terminate_process(self, *args, **kwargs):
+        return self.proc_manager.terminate_process(*args, **kwargs)
+
+    # Exchange management, handled by ExchangeManager
+    def declare_messaging(self, *args, **kwargs):
+        return self.exchange_manager.declare_messaging(*args, **kwargs)
+    def configure_messaging(self, *args, **kwargs):
+        return self.exchange_manager.configure_messaging(*args, **kwargs)
+    def new_consumer(self, *args, **kwargs):
+        return self.exchange_manager.new_consumer(*args, **kwargs)
+    def send(self, *args, **kwargs):
+        return self.exchange_manager.send(*args, **kwargs)
+
+    # App management, handled by AppManager
+    def start_app(self, *args, **kwargs):
+        return self.app_manager.start_app(*args, **kwargs)
+
+    def start_rel(self, rel_filename):
+        pass
+
+    def __str__(self):
+        return "CapabilityContainer(state=%s,%r)" % (
+            self._get_state(),
+            self.exchange_manager.message_space)
+
+def create_new_container():
     """
-    This could eventually be more like a factory, but so far, there is only
-    supposed to be on Container (per python process), so the Container is
-    mostly used as a class with out instantiating (facilitating a kind of
-    singleton pattern)
+    Factory for a container.
+    This also makes sure that only one container is active at any time,
+    currently.
     """
     if Container._started:
         raise RuntimeError('Already started')
-    hostname = config['broker_host']
-    port = config['broker_port']
-    virtual_host = config['broker_vhost']
-    heartbeat = int(config['broker_heartbeat'])
-    Container.args = config.get('args', None)
-    Container.interceptor_system = InterceptorSystem() # hack; time for inst of Container
-    broker = messaging.MessageSpace(hostname=hostname,
-                            port=port,
-                            virtual_host=virtual_host,
-                            heartbeat=heartbeat)
-    return Container.connectMainSpace(broker)
 
-def test():
-    broker = MessageSpace()
-    return Container.connectMainSpace(broker)
+    c = Container()
+    ioninit.container_instance = c
+
+    return c
+
+Id.default_container_id = Container.id
