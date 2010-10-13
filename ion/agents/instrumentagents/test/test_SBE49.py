@@ -90,7 +90,8 @@ class TestSBE49(IonTestCase):
 
     @defer.inlineCallbacks
     def test_driver_load(self):
-        config_vals = {'addr':'127.0.0.1', 'port':'9000'}
+        #config_vals = {'addr':'127.0.0.1', 'port':'9000'}
+        config_vals = {'addr':'137.110.112.119', 'port':'4001'}
         result = yield self.driver_client.configure_driver(config_vals)
         self.assertEqual(result['addr'], config_vals['addr'])
         self.assertEqual(result['port'], config_vals['port'])
@@ -145,13 +146,18 @@ class TestSBE49(IonTestCase):
 
         log.info('Defined subscription: '+str(subscription))
 
+        # DHE: trying something here
+        config_vals = {'ipaddr':'137.110.112.119', 'ipport':'4001'}
+        result = yield self.driver_client.configure_driver(config_vals)
+
         cmd1 = [['ds', 'now']]
         #cmd1 = [['start', 'now']]
         #cmd2 = [['stop', 'now']]
         #cmd2 = [['pumpoff', '3600', '1']]
+        yield pu.asleep(5)
         result = yield self.driver_client.execute(cmd1)
         # DHE: wait a while...
-        yield pu.asleep(1)
+        yield pu.asleep(5)
         #result = yield self.driver_client.execute(cmd2)
 
 
@@ -218,5 +224,6 @@ class DataConsumer(Process):
         """
         Data has been received.  Increment the receive_cnt
         """
+        log.debug("@@@@@@@@@@@@@@@@@@@@@@@@ data received: %s" %s(str(self.received_msg)))
         self.receive_cnt += 1
         self.received_msg.append(content)

@@ -86,7 +86,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.setConnected(False)
         self.setTopicDefined(False)
         self.publish_to = None
-
+        self.dataQueue = []
     
         #
         # DHE: trying to objectize the hsm stuff...
@@ -239,7 +239,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "exit":
             log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
             return 0
-            return 0
         elif caller.tEvt['sType'] == "eventDisconnectComplete":
             log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
             #
@@ -281,13 +280,28 @@ class SBE49InstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "exit":
             log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
             return 0
-            return 0
         elif caller.tEvt['sType'] == "eventConnectionComplete":
+            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
+            #
+            # DHE: Don't transition to the stateConnected state
+            # until we get the prompt.
+            #
+            #caller.stateTran(self.stateConnected)
+            log.debug("!!!!!!!!!!!!! sending crlf!!!")
+            self.instrument.transport.write("\r\n")
+            return 0
+        elif caller.tEvt['sType'] == "eventDataReceived":
             log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
             #
             # Transition to the stateConnected state
             #
-            caller.stateTran(self.stateConnected)
+            data = self.dequeueData()            
+            log.debug("stateConnecting() %s." % (data))
+            if 'S>' in data:
+                log.debug("received Seabird prompt.")
+                caller.stateTran(self.stateConnected)
+            else:
+                log.debug("Did not receive prompt")
             return 0
         return caller.tEvt['sType']
 
@@ -314,6 +328,17 @@ class SBE49InstrumentDriver(InstrumentDriver):
             if self.command:
                self.instrument.transport.write(self.command)
             return 0
+        elif caller.tEvt['sType'] == "eventDataReceived":
+            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
+
+            # send this up to the agent to publish.
+            data = self.dequeueData()            
+            if 'S>' in data:
+                log.debug("gotData() Calling publish.")
+                self.publish(data, self.publish_to)
+            else:
+                log.debug("Did not receive prompt")
+            return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
             #
@@ -326,7 +351,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
     @defer.inlineCallbacks
     def plc_init(self):
         self.instrument_id = self.spawn_args.get('instrument-id', '123')
-        self.instrument_port = self.spawn_args.get('port', 9000)
+        #self.instrument_ipaddr = self.spawn_args.get('ipaddr', "localhost")
+        #self.instrument_ipport = self.spawn_args.get('ipport', 9000)
+        self.instrument_ipaddr = self.spawn_args.get('ipaddr', "137.110.112.119")
+        self.instrument_ipport = self.spawn_args.get('ipport', 4001)
 
         # DHE Testing HSM
         log.debug("!!!!!!!!!!!!!!!!!! Calling onStart!")
@@ -334,8 +362,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         yield self._configure_driver(self.spawn_args)
 
-        log.info("INIT DRIVER for instrument ID=%s, port=%s, publish-to=%s" % (
-            self.instrument_id, self.instrument_port, self.publish_to))
+        log.info("INIT DRIVER for instrument ID=%s, ipaddr=%s, port=%s, publish-to=%s" % (
+            self.instrument_id, self.instrument_ipaddr, self.instrument_ipport, self.publish_to))
 
         self.iaclient = InstrumentAgentClient(proc=self, target=self.proc_supid)
 
@@ -363,6 +391,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
     def setAgentService(self, agent):
         self.agent = agent
+        
+    def enqueueData(self, data):
+        self.dataQueue.append(data)
+
+    def dequeueData(self):
+        return self.dataQueue.pop()
 
     @defer.inlineCallbacks
     def getConnected(self):
@@ -383,7 +417,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
         # Now thinking I might try clientcreator since this will only be a
         # single connection.
         cc = ClientCreator(reactor, InstrumentClient, self)
-        self.proto = yield cc.connectTCP("localhost", self.instrument_port)
+        log.info("Driver connecting to instrument ipaddr: %s, ipport: %s" %(self.instrument_ipaddr, self.instrument_ipport))
+        #self.proto = yield cc.connectTCP("localhost", self.instrument_ipport)
+        self.proto = yield cc.connectTCP(self.instrument_ipaddr, self.instrument_ipport)
         log.info("Driver connected to instrument")
 
     def gotConnected(self, instrument):
@@ -401,6 +437,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.setConnected(True)
         
         # NEW NEW
+        # DHE: Moving this to after gotPromt
         self.hsm.onEvent('eventConnectionComplete')
 
 
@@ -427,9 +464,14 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @retval none
         """
         # send this up to the agent to publish.
-        log.debug("gotData() %s Calling publish." % (data))
-        self.publish(data, self.publish_to)
-
+        # DHE: don't publish here; send event to state machine
+        #log.debug("gotData() %s Calling publish." % (data))
+        #self.publish(data, self.publish_to)
+        
+        log.debug("gotData() %s." % (data))
+        self.enqueueData(data)
+        self.hsm.onEvent('eventDataReceived')
+        
     def gotPrompt(self, instrument):
         """
         This needs to be the general receive routine for the instrument driver
@@ -437,6 +479,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
         log.debug("gotPrompt()")
         #self.instrument = instrument
         #self.setConnected(True)
+
+        # NEW NEW
+        #
+        # We need to not transition from the connected state until we get the eventPromptReceived.
+        #
+        self.hsm.onEvent('eventPromptReceived')
 
         """
         Do we need some sort of state machine so we'll know what data we're
@@ -549,7 +597,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 yield self.reply_err(msg, "Invalid Command")
             else:
                 log.debug("op_execute sending command: %s to instrument" % command)
-                self.command = command
+                self.command = command + "\r\n"
          
                 """
                 Send the command received event.  This should kick off the
@@ -596,8 +644,19 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         Configures driver params either on startup or on command
         """
-        log.info("!!!!! _configure_driver!")
+        #log.info("!!!!! _configure_driver!")
+        log.info("!!!!! _configure_driver! params: %s" %str(params))
         
+        if 'ipaddr' in params:
+            self.instrument_ipaddr = params['ipaddr']
+        else:
+            log.debug("%%%%%%%% No ipaddr in params")
+            
+        if 'ipport' in params:
+            self.instrument_ipportr = params['ipport']
+        else:
+            log.debug("%%%%%%%% No ipport in params")
+            
         if 'publish-to' in params:
             self.publish_to = params['publish-to']
             log.debug("Configured publish-to=" + self.publish_to)
