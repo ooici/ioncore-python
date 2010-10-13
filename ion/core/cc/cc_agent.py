@@ -11,9 +11,9 @@ log = ion.util.ionlog.getLogger(__name__)
 import os
 
 from twisted.internet import defer, reactor
-import magnet
-from magnet.container import Container
-from magnet.spawnable import Receiver, spawn
+
+from ion.core.cc.container import Container
+from ion.core.cc.spawnable import Receiver, spawn
 
 from ion.agents.resource_agent import ResourceAgent
 from ion.core import ionconst
@@ -68,7 +68,6 @@ class CCAgent(ResourceAgent):
                  'container-id':str(Container.id),
                  'agent':str(self.receiver.spawned.id.full),
                  'version':ionconst.VERSION,
-                 'magnet':magnet.__version__,
                  'start-time':self.start_time,
                  'current-time':pu.currenttime_ms(),
                  'event':event}
@@ -166,7 +165,7 @@ class CCAgent(ResourceAgent):
         Dirty little helper functions attached to the 'cc' object in the
         container shell. Quick spawn of processes and send
         """
-        from magnet.shell import control
+        from ion.core.cc.shell import control
         if not hasattr(control, 'cc'):
             return
         log.info("Augmenting Container Shell...")
@@ -234,8 +233,8 @@ class CCAgent(ResourceAgent):
 factory = ProtocolFactory(CCAgent)
 
 """
-twistd -n --pidfile t1.pid magnet -h amoeba.ucsd.edu -a sysname=mm res/scripts/newcc.py
-twistd -n --pidfile t2.pid magnet -h amoeba.ucsd.edu -a sysname=mm res/scripts/newcc.py
+twistd -n --pidfile t1.pid cc -h amoeba.ucsd.edu -a sysname=mm res/scripts/newcc.py
+twistd -n --pidfile t2.pid cc -h amoeba.ucsd.edu -a sysname=mm res/scripts/newcc.py
 
 send (2, {'op':'identify','content':''})
 send (2, {'op':'spawn','content':{'module':'ion.play.hello_service'}})

@@ -427,12 +427,6 @@ class DataPubsubService(BaseService):
         #topic_list = yield self.reg.find(topic_description,regex=True, attnames=['name','keywords','aoi'])
         return self.reg.find(topic_description,regex=True, attnames=['name','keywords','aoi'])
 
-
-
-# Spawn of the process using the module name
-factory = ProtocolFactory(DataPubsubService)
-
-
 class DataPubsubClient(BaseServiceClient):
     """
     @brief Client class for accessing the data pubsub service.
@@ -561,3 +555,7 @@ class DataPubsubClient(BaseServiceClient):
         else:
             log.info(self.__class__.__name__ + '; define_subscription: Failed!')
             defer.returnValue(None)
+
+# Spawn off the process using the module name
+factory = ProtocolFactory(DataPubsubService)
+

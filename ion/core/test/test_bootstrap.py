@@ -17,9 +17,9 @@ from twisted.internet import reactor
 from twisted.internet import defer
 from twisted.internet.defer import inlineCallbacks, DeferredQueue
 
-from magnet.spawnable import Receiver
-from magnet.spawnable import send
-from magnet.spawnable import spawn
+from ion.core.cc.spawnable import Receiver
+from ion.core.cc.spawnable import send
+from ion.core.cc.spawnable import spawn
 from ion.data.store import Store
 
 from ion.core import bootstrap
@@ -35,7 +35,7 @@ class BootstrapTest1(IonTestCase):
     def test_start_container(self):
         yield self._start_container()
 
-        log.info("Started magnet container")
+        log.info("Started capability container")
 
         yield self._stop_container()
 
@@ -44,7 +44,7 @@ class BootstrapTest1(IonTestCase):
         yield self._start_container()
         yield self._start_core_services()
 
-        log.info("Started magnet and core services")
+        log.info("Started container and core services")
 
         yield self._stop_container()
 
