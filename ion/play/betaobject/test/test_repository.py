@@ -68,7 +68,7 @@ class RepositoryTest(unittest.TestCase):
         p = None
         ab = None
         
-        ab = repo.checkout(branch='master')
+        ab = repo.checkout(branch_name='master')
         print 'ab after checkout',ab
         
         print ab.person[0]

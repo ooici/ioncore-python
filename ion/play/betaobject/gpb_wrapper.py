@@ -221,9 +221,6 @@ class Wrapper(object):
             inst._root = self._root
             inst._parent_links = self._root._parent_links
             inst._child_links = self._root._child_links
-
-        #inst._myid = self._myid
-        #inst._repository = self._repository
         
         return inst
 

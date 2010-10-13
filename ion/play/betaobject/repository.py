@@ -79,7 +79,7 @@ class Repository(object):
         The work bench which this repository belongs to...
         """
         
-    def checkout(self, branch=None, commit_id=None, older_than=None):
+    def checkout(self, branch_name=None, commit_id=None, older_than=None):
         """
         Check out a particular branch
         Specify a commit_id or a date
@@ -88,48 +88,85 @@ class Repository(object):
         if self.status == self.MODIFIED:
             raise Exception, 'Can not checkout while the workspace is dirty'
         
-        # Declare the cref variable
-        cref = None
-        
         #Declare that it is a detached head!
         detached = False
         
-        if branch:
+        if older_than and commit_id:
+            raise Excpetion, 'Checkout called with both commit_id and older_than!'
+        
+        
+        if branch_name:
             for item in self._dotgit.branches:
-                if item.branchname == branch:
-                    self.current_branch = item
-                    cref = item.commitref # THIS WILL LOAD IT INTO THE WORKSPACE!
-        
+                if item.branchname == branch_name:
+                    branch = item
+                    head_ref = item.commitref # THIS WILL LOAD THE CREF!
+                    cref = head_ref
+                    break
+            else:
+                raise Exception, 'Branch name: %s, does not exist!' % branch_name
+            
             if commit_id:
-                detached = True
-                pass
+                
+                if head_ref.myid == commit_id:
+                    cref = head_ref
+                else:
+                    
+                    detached = True
+                    ref = head_ref 
+                    while len(ref.ancestors) >0:
+                        for anc in ref.ancestors:
+                            if anc.branchname == branch_name:
+                                ref = anc.commitref
+                                break # There should be only one ancestor from a branch
+                        else:
+                            raise Exception, 'End of Branch: No matching ancestor found on branch name: %s, commit_id: %s' % (branch_name, commit_id)
+                        if ref.myid == commit_id:
+                            cref = ref
+                            break
+                    else:
+                        raise Exception, 'End of Ancestors: No matching ancestor found in commit history on branch name %s, commit_id: %s' % (branch_name, commit_id)
+                        
+                
+                
             elif older_than:
-                detached = True
-                pass
-        
+                
+                if head_ref.date <= older_than:
+                    cref = head_ref
+                    # Not sure this is really the spirit of the thing?
+                else:
+                    
+                    detached = True
+                    ref = head_ref 
+                    while len(ref.ancestors) >0:
+                        for anc in ref.ancestors:
+                            if anc.branchname == branch_name:
+                                ref = anc.commitref
+                                break # There should be only one ancestor from a branch
+                        else:
+                            raise Exception, 'End of Branch: No matching ancestor found on branch name: %s, older_than: %s' % (branch_name, older_than)
+                        if ref.date <= older_than:
+                            cref = ref
+                            break
+                    else:
+                        raise Exception, 'End of Ancestors: No matching ancestor found in commit history on branch name %s, older_than: %s' % (branch_name, older_than)
+                        
         elif commit_id:
             
+            # This is dangerous, but lets do it anyway - for now!
             if self._hashed_elements.has_key(commit_id):
                 cref = self._load_element(element)
-                
-                self.current_branch = self.create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
-                self.current_branch.commitref = cref
-                self.current_branch.branchname = 'detached head'
                 
                 detached = True
             else:
                 # Check more places? Ask for it from the repository?
                 raise Exception, 'Can not checkout an id that does not exist!'
-        
+            
+        else:
+            raise Excpetion, 'Checkout must specify a branch_name or a commit_id'
         
         # Do some clean up!
         self._workspace = {}
         self._workspace_root = None
-        
-        # Not complete yet
-        if detached == True:
-            raise Exception, 'Checking out detached head is not yet implemented!' 
-        self._detached_head = detached
             
             
         # Automatically fetch the object from the hashed dictionary or fetch if needed!
@@ -138,6 +175,18 @@ class Repository(object):
         
         self._load_links(rootobj)
         
+        
+        
+        self._detached_head = detached
+        if detached:
+            self.current_branch = self.create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
+            self.current_branch.commitref = cref
+            self.current_branch.branchname = 'detached head'
+            
+            rootobj._set_structure_read_only()
+            
+        else:
+            self.current_branch = branch
         return rootobj
         
         
@@ -297,8 +346,14 @@ class Repository(object):
                     link.type.cls == element.type.cls:
                 raise Exception, 'The link type does not match the element type!'
             
-            obj = self._load_element(element)            
-            self._workspace[obj._myid]=obj
+            obj = self._load_element(element)
+            
+            if obj._gpbMessage.DESCRIPTOR == 'net.ooici.core.mutable.CommitRef':
+                self._commit_index[obj.myid]=obj
+                obj.readonly = True
+            else:
+                self._workspace[obj.myid]=obj
+                obj.readonly = self._detached_head
             return obj
             
         else:
