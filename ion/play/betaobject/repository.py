@@ -189,6 +189,23 @@ class Repository(object):
             self.current_branch = branch
         return rootobj
         
+    def reset(self):
+        
+        cref = self.current_branch.commitref
+        
+        # Do some clean up!
+        self._workspace = {}
+        self._workspace_root = None
+            
+            
+        # Automatically fetch the object from the hashed dictionary or fetch if needed!
+        rootobj = cref.objectroot
+        self._workspace_root = rootobj
+        
+        self._load_links(rootobj)
+        
+        return rootobj
+        
         
     def commit(self, comment=''):
         """
