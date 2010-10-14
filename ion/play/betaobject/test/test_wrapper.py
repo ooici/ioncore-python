@@ -26,8 +26,10 @@ class WrapperMethodsTest(unittest.TestCase):
         
         
     def test_set_composite(self):
-            
-        ab = gpb_wrapper.Wrapper(addressbook_pb2.AddressBook())
+        
+        wb = workbench.WorkBench('No Process Test')
+        
+        repo, ab = wb.init(addressbook_pb2.AddressBook)
             
         ab.person.add()
         ab.person.add()
@@ -35,6 +37,12 @@ class WrapperMethodsTest(unittest.TestCase):
         ab.person[1].name = 'David'
         ab.person[0].name = 'John'
         ab.person[0].id = 5
+        
+        p = ab.person[0]
+        
+        ph = ab.person[0].phone.add()
+        ph.type = p.WORK
+        ph.number = '123 456 7890'
             
         self.assertEqual(ab.person[1].name, 'David')
         self.assertEqual(ab.person[0].name, 'John')
