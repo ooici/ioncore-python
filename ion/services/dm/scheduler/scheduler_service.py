@@ -166,6 +166,13 @@ class SchedulerServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def add_task(self, target, interval, payload):
+        """
+        @brief Add a recurring task to the scheduler
+        @param target Destination address, available via self._get_procid
+        @param interval Time, in fractional seconds, between messages
+        @param payload Optional payload to include in the scheduled messages
+        @retval Task ID, a GUID used as a key for rm_task
+        """
         yield self._check_init()
         msg_dict = {'target': target, 'payload': payload, 'interval': interval}
         (content, headers, msg) = yield self.rpc_send('add_task', msg_dict)
@@ -173,12 +180,22 @@ class SchedulerServiceClient(ServiceClient):
 
     @defer.inlineCallbacks
     def rm_task(self, taskid):
+        """
+        @brief Remove a task from the scheduler
+        @note If using cassandra, writes are delayed
+        @param taskid Task ID, as returned from add_task
+        @retval OK or error
+        """
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('rm_task', taskid)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
     def query_tasks(self, task_regex):
+        """
+        @brief Query tasks in the scheduler by regex. Use '.+' to return all.
+        @retval List, possibly zero-length.
+        """
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('query_tasks', task_regex)
         defer.returnValue(content)
