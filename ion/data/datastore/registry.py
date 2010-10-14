@@ -4,13 +4,12 @@
 """
 @file ion/data/datastore/registry.py
 @author David Stuebe
+@author Matt Rodriguez
 @brief base service for registering ooi resources
 """
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-
-from zope import interface
 
 from twisted.internet import defer
 
@@ -19,7 +18,7 @@ from ion.data import dataobject
 from ion.data.datastore import objstore
 
 from ion.core import ioninit
-from ion.core.process.process import ProcessFactory, Process
+from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.resources import coi_resource_descriptions
 import ion.util.procutils as pu
@@ -28,7 +27,7 @@ CONF = ioninit.config(__name__)
 
 class LCStateMixin(object):
     """
-    @brief This mixin class is used to add life cycle state convience methods
+    @brief This mixin class is used to add life cycle state convenience methods
     """
     def set_resource_lcstate_new(self, resource_reference):
         return self.set_resource_lcstate(resource_reference, dataobject.LCStates.new)
@@ -109,32 +108,28 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         by creating a new (unique) resource object to the store.
         @note Is the way objectClass is referenced awkward?
         """
-        #print 'Dataobject Register Start',dataobject.DataObject._types.has_key('__builtins__')
-        #del dataobject.DataObject._types['__builtins__']
-        #print 'Dataobject Register Removed',dataobject.DataObject._types.has_key('__builtins__')
-
+        log.info("Calling Registry.register_resource")
         if isinstance(resource, self.objectChassis.objectClass):
 
             id = resource.RegistryIdentity
             if not id:
                 raise RuntimeError('Can not register a resource which does not have an identity.')
 
-            #print 'Dataobject Register Is Instance',dataobject.DataObject._types.has_key('__builtins__')
-
-
             try:
+                log.info("creating res_client")
                 res_client = yield self.create(id, self.objectChassis.objectClass)
+                log.info("Created client")
             except objstore.ObjectStoreError:
+                log.info("ObjectStoreError")
                 res_client = yield self.clone(id)
-
-            #print 'Dataobject Chasis',dataobject.DataObject._types.has_key('__builtins__')
-
+            
+            log.info("Check out resource")    
             yield res_client.checkout()
-
-            #print 'Dataobject checkout',dataobject.DataObject._types.has_key('__builtins__')
-
+            log.info("Checked out resource")
             res_client.index = resource
+            log.info("Committing resource")
             resource.RegistryCommit = yield res_client.commit()
+            log.info("Committed resource")
         else:
             resource = None
 
@@ -145,12 +140,16 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         """
         @brief Get resource description object
         """
+        log.info("get_resource called")
+        log.info("resource_reference %s" % resource_reference)
         resource=None
         if isinstance(resource_reference, dataobject.ResourceReference):
-
+            log.info("resource_reference is correct type")
             branch = resource_reference.RegistryBranch
             resource_client = yield self.clone(resource_reference.RegistryIdentity)
+            log.info("resource_client %s" % resource_client)
             if resource_client:
+                log.info("Retrieved resource_client")
                 if not resource_reference.RegistryCommit:
                     resource_reference.RegistryCommit = yield resource_client.get_head(branch)
 
@@ -210,9 +209,15 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         """
         @brief Find resource descriptions in the registry meeting the criteria
         in the FindResourceContainer
+        @param description DataObject that 
+        @param regex Whether a regex is used or not
+        @param ignore_defaults ignore registry defaults
+        @param attnames attribute names associated with the resource
         """
 
         # container for the return arguments
+        log.info("called find_resource")
+        log.info("description class %s" % description.__class__)
         results=[]
         if isinstance(description,dataobject.DataObject):
             refs = yield self._list()
@@ -224,6 +229,7 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
             log.info(self.__class__.__name__ + ': find_resource found ' + str(len(reslist)) + ' items in registry')
             num_match = 1
             for ref in refs:
+                log.info("ref: %s" % ref)
                 res = yield self.get_resource(ref)
                 log.debug("Found #"+str(num_match)+":"+str(res))
                 num_match += 1
@@ -237,21 +243,6 @@ class Registry(objstore.ObjectStore, IRegistry, LCStateMixin):
         defer.returnValue(results)
 
 
-
-@defer.inlineCallbacks
-def test(ns):
-    from ion.data import store
-    s = yield store.Store.create_store()
-    ns.update(locals())
-    reg = yield ResourceRegistry.new(s, 'registry')
-    res1 = dataobject.Resource.create_new_resource()
-    ns.update(locals())
-    res1.name = 'foo'
-    commit_id = yield reg.register_resource(res1)
-    res2 = dataobject.Resource.create_new_resource()
-    res2.name = 'doo'
-    commit_id = yield reg.register_resource(res2)
-    ns.update(locals())
 
 
 
@@ -471,6 +462,7 @@ class BaseRegistryClient(ServiceClient):
         created using the create_new_resource method. Specific registries may
         override this behavior to create the resource inside the register method
         """
+        log.info("called BaseRegistryClient.base_register_resource")
         yield self._check_init()
         log.info(self.__class__.__name__ + '; Calling: '+ op_name)
 

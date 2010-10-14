@@ -182,7 +182,7 @@ class TestInstrumentAgent(IonTestCase):
 
             response = yield self.IAClient.execute_instrument([['start','now', 1],
                                                                ['stop']])
-            print "response ", response
+            log.debug("response: %s " % response)
             self.assert_(isinstance(response, dict))
             self.assert_('start' in response['value'])
             self.assert_('stop' in response['value'])

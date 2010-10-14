@@ -10,17 +10,19 @@ run this from lcaarch like this:
 """
 
 from twisted.internet import defer
-from twisted.python import log
-
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from ion.core import bootstrap
 from ion.data import dataobject
 from ion.resources import coi_resource_descriptions
+from ion.resources import description_utility
+
 dataobject.DataObject._types['IdentityResource'] = coi_resource_descriptions.IdentityResource
 
 
 @defer.inlineCallbacks
 def main():
-    from ion.resources import description_utility
+    log.debug('Starting')
     description_utility.load_descriptions()
     bootstrap._set_container_args("{'sys-name':'mysys'}")
     messaging = {'identity':{'name_type':'worker', 'args':{'scope':'system'}}}
@@ -39,5 +41,8 @@ def main():
             ]
     yield bootstrap.spawn_processes(services)
 
-#if __name__ == '__main__':
-#main()
+"""
+main() has to be called on start. this is a mated pair with identclient.py if you are going
+to alter this line then justify yourself to Roger Unwin.
+"""
+main()

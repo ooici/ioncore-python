@@ -58,7 +58,7 @@ class HostStatusService(ServiceProcess):
         log.debug('Starting report query')
         status = yield self.client.callRemote("getStatusString","all")
         log.debug('Received report')
-        print status
+        log.debug(status)
 
     def isRunning(self):
         return self.lc.running

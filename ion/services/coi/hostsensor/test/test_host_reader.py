@@ -37,5 +37,6 @@ class HostStatusTest(IonTestCase):
     def test_GoodSnmpReader(self):
         reader = HostReader('localhost', 161, 'ccagent', 'ooicinet')
         report = reader.get('all')
-        status = reader.pprint(report)
-        print status
+        log.debug(report)
+        #status = reader.pprint(report)
+        #log.debug(status)

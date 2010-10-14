@@ -125,14 +125,14 @@ class IdentityResource(StatefulResource):
     rsa_private_key = TypedAttribute(str)
     expiration_date = TypedAttribute(str)
     # These are the fields we prompt the user for during registration
-    first_name = TypedAttribute(str)
-    last_name = TypedAttribute(str)
-    phone = TypedAttribute(str)
-    fax = TypedAttribute(str)
-    email = TypedAttribute(str)
-    organization = TypedAttribute(str)
-    department = TypedAttribute(str)
-    title = TypedAttribute(str)
+    #first_name = TypedAttribute(str)
+    #last_name = TypedAttribute(str)
+    #phone = TypedAttribute(str)
+    #fax = TypedAttribute(str)
+    #email = TypedAttribute(str)
+    #organization = TypedAttribute(str)
+    #department = TypedAttribute(str)
+    #title = TypedAttribute(str)
 
 
 
@@ -225,11 +225,11 @@ class ExchangeName(InformationResource):
     """
     name = TypedAttribute(str)
     description = TypedAttribute(str)
-    exchangemapping = TypedAttribute(StatefulResource) # 1-1 ExchangeMapping below
+    amqpmapping = TypedAttribute(StatefulResource) # 1-1 ExchangeMapping below
     hardwaremapping = TypedAttribute(StatefulResource) # 1-1 HardwareMapping below
     
     
-class ExchangeMapping(StatefulResource):
+class AMQPMapping(StatefulResource):
     """
     ExchangeMapping carries information about an exchange:  
     type (fanout, direct, etc), routing keys, queues, and so forth.
@@ -249,6 +249,8 @@ class HardwareMapping(StatefulResource):
     TODO:  Flesh this out as more is discovered about Solace routing 
     and/or other hardware routing solutions.
     """
+    name = TypedAttribute(str)           # unnecessary?         
+    description = TypedAttribute(str)    # unnecessary?
 
     
 class BrokerCredentials(StatefulResource):

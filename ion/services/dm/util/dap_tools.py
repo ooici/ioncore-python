@@ -24,14 +24,13 @@ import base64
 import StringIO
 
 # Import value types
-from pydap.model import Float32, Float64, Int32, Int16, Byte, String
+from pydap.model import Float32, Float64, Int32
 # Import pydap data types
-from pydap.model import BaseType, DapType, DatasetType, GridType, SequenceData, SequenceType, StructureType
+from pydap.model import BaseType,  DatasetType, GridType, SequenceType, StructureType
 
 import numpy
 
 import os
-import warnings
 
 from ion.resources import dm_resource_descriptions
 

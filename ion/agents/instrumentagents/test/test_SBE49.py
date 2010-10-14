@@ -80,13 +80,13 @@ class TestSBE49(IonTestCase):
         self.topic = yield dpsc.define_topic(self.topic)
 
 
-        print 'TADA!'
+        log.debug('TADA!')
 
 
     @defer.inlineCallbacks
     def test_initialize(self):
         result = yield self.driver_client.initialize('some arg')
-        print 'TADA!'
+        log.debug('TADA!')
 
     @defer.inlineCallbacks
     def test_driver_load(self):

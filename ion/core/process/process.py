@@ -15,25 +15,27 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 from ion.core.exception import ReceivedError
 from ion.core.id import Id
+from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
+from ion.core.process.cprocess import IContainerProcess, ContainerProcess
 from ion.data.store import Store
 from ion.interact.conversation import Conversation
 from ion.interact.message import Message
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject
 
-# @todo HACK: Dict of process "alias" to process declaration
-processes = {}
-
 CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
+
+# @todo CHANGE: Dict of "name" to process (service) declaration
+processes = {}
 
 # @todo CHANGE: Static store (kvs) to register process instances with names
 procRegistry = Store()
 
 class IProcess(Interface):
     """
-    Interface for all capability container processes
+    Interface for all capability container application processes
     """
 
 class Process(BasicLifecycleObject):
@@ -80,6 +82,9 @@ class Process(BasicLifecycleObject):
 
         # Name (human readable label) of this process.
         self.proc_group = self.spawn_args.get('proc-group', self.proc_name)
+
+        # Set the container
+        self.container = ioninit.container_instance
 
         # Ignore supplied receiver for consistency purposes
         # Create main receiver; used for incoming process interactions
@@ -146,7 +151,7 @@ class Process(BasicLifecycleObject):
         @retval Deferred for the Id of the process (self.id)
         """
         assert not self.backend_receiver.consumer, "Process already initialized"
-        log.debug('Process id=%s initialize()' % (self.id))
+        log.debug('Process [%s] id=%s initialize()' % (self.proc_name, self.id))
 
         # Create queue only for process receiver
         yield self.receiver.initialize()
@@ -158,7 +163,7 @@ class Process(BasicLifecycleObject):
         # Callback to subclasses
         try:
             yield defer.maybeDeferred(self.plc_init)
-            log.info('Process id=%s [%s]: INIT OK' % (self.id, self.proc_name))
+            log.info('Process [%s] id=%s: INIT OK' % (self.proc_name, self.id))
         except Exception, ex:
             log.exception('----- Process %s INIT ERROR -----' % (self.id))
             raise ex
@@ -188,7 +193,7 @@ class Process(BasicLifecycleObject):
         """
         @retval Deferred
         """
-        log.debug('Process id=%s activate()' % (self.id))
+        log.debug('Process [%s] id=%s activate()' % (self.proc_name, self.id))
 
         # Create consumer for process receiver
         yield self.receiver.activate()
@@ -320,7 +325,7 @@ class Process(BasicLifecycleObject):
         conv = self.conversations.get(convid, None) if convid else None
         # Perform a dispatch of message by operation
         # @todo: Handle failure case. Message reject?
-        d = self._dispatch_message(payload, msg, self, conv)
+        d = self._dispatch_message(payload, msg, conv)
         def _cb(res):
             if msg._state == "RECEIVED":
                 # Only if msg has not been ack/reject/requeued before
@@ -338,7 +343,7 @@ class Process(BasicLifecycleObject):
         d.addCallbacks(_cb, _err)
         return d
 
-    def _dispatch_message(self, payload, msg, target, conv):
+    def _dispatch_message(self, payload, msg, conv):
         """
         Dispatch of messages to operations within this process instance. The
         default behavior is to dispatch to 'op_*' functions, where * is the
@@ -347,7 +352,7 @@ class Process(BasicLifecycleObject):
         """
         if self._get_state() == "ACTIVE":
             # Regular message handling in expected state
-            d = pu.dispatch_message(payload, msg, target, conv)
+            d = self.dispatch_message(payload, msg, conv)
             return d
         else:
             text = "Process %s in invalid state %s." % (self.proc_name, self._get_state())
@@ -360,6 +365,36 @@ class Process(BasicLifecycleObject):
             if not d:
                 d = defer.succeed(None)
             return d
+
+    def dispatch_message(self, payload, msg, conv=None):
+        """
+        Dispatches a message by operation in a given class.
+        Expected message content:
+        body = {
+            "op": "operation name here",
+            "content": # Any valid type here (str, list, dict)
+        }
+        """
+        try:
+            pu.log_message(msg)
+
+            if "op" in payload:
+                op = payload['op']
+                content = payload.get('content','')
+                opname = 'op_' + str(op)
+
+                # dynamically invoke the operation in the given class
+                if hasattr(self, opname):
+                    opf = getattr(self, opname)
+                    return defer.maybeDeferred(opf, content, payload, msg)
+                elif hasattr(self,'op_none'):
+                    return defer.maybeDeferred(self.op_none, content, payload, msg)
+                else:
+                    log.error("Receive() failed. Cannot dispatch to catch")
+            else:
+                log.error("Invalid message. No 'op' in header", payload)
+        except Exception, ex:
+            log.exception('Exception while dispatching')
 
     def op_none(self, content, headers, msg):
         """
@@ -401,12 +436,13 @@ class Process(BasicLifecycleObject):
         @retval Deferred for send of message
         """
         msgheaders = self._prepare_message(headers)
+        message = dict(recipient=recv, operation=operation,
+                       content=content, headers=msgheaders)
         if reply:
-            send = self.id
+            d = self.receiver.send(**message)
         else:
-            send = self.backend_id
-
-        return pu.send(None, send, recv, operation, content, msgheaders)
+            d = self.backend_receiver.send(**message)
+        return d
 
     def _prepare_message(self, headers):
         msgheaders = {}
@@ -527,6 +563,12 @@ class Process(BasicLifecycleObject):
 
     def __str__(self):
         return "Process(id=%s,name=%s)" % (self.id, self.proc_name)
+
+class AppInterceptor(Interceptor):
+    def process(self, invocation):
+        assert invocation.path == Invocation.PATH_IN
+        defer.maybeDeferred(self.before, invocation)
+        return invocation
 
 # ============================================================================
 

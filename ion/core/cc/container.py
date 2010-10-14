@@ -22,13 +22,16 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 from ion.core.cc.container_api import IContainer
 from ion.core.id import Id
+from ion.core.intercept.interceptor_system import InterceptorSystem
 from ion.core.messaging.exchange import ExchangeManager
 from ion.core.pack.application import AppLoader
 from ion.core.pack.app_manager import AppManager
 from ion.core.process.proc_manager import ProcessManager
 from ion.util.state_object import BasicLifecycleObject
+from ion.util.config import Config
 
 CONF = ioninit.config(__name__)
+CF_is_config = Config(CONF.getValue('interceptor_system')).getObject()
 
 class Container(BasicLifecycleObject):
     """
@@ -58,6 +61,10 @@ class Container(BasicLifecycleObject):
         # AppManager instance
         self.app_manager = None
 
+        # InterceptorSystem
+        self.interceptor_system = None
+
+    @defer.inlineCallbacks
     def on_initialize(self, config, *args, **kwargs):
         """
         Initializes the instance of a container. Actions include
@@ -70,15 +77,16 @@ class Container(BasicLifecycleObject):
         Container.args = self.config.get('args', None)
 
         self.exchange_manager = ExchangeManager(self)
-        self.exchange_manager.initialize(config, *args, **kwargs)
+        yield self.exchange_manager.initialize(config, *args, **kwargs)
 
         self.proc_manager = ProcessManager(self)
-        self.proc_manager.initialize(config, *args, **kwargs)
+        yield self.proc_manager.initialize(config, *args, **kwargs)
 
         self.app_manager = AppManager(self)
-        self.app_manager.initialize(config, *args, **kwargs)
+        yield self.app_manager.initialize(config, *args, **kwargs)
 
-        return defer.succeed(None)
+        self.interceptor_system = InterceptorSystem()
+        yield self.interceptor_system.initialize(CF_is_config)
 
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
@@ -89,6 +97,8 @@ class Container(BasicLifecycleObject):
         @retval Deferred
         """
         Container._started = True
+
+        yield self.interceptor_system.activate()
 
         yield self.exchange_manager.activate()
 
@@ -113,6 +123,8 @@ class Container(BasicLifecycleObject):
         yield self.proc_manager.terminate()
 
         yield self.exchange_manager.terminate()
+
+        yield self.interceptor_system.terminate()
 
         log.info("Container closed")
         Container._started = False

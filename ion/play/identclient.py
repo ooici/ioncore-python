@@ -253,7 +253,7 @@ class FindUser(resource.Resource):
 
 
 def main(ns={}):
-    #print "STARTING...."
+    print "STARTING...."
     from ion.services.coi import identity_registry
     from ion.data import dataobject
     from ion.resources import coi_resource_descriptions as coi
@@ -272,5 +272,5 @@ def main(ns={}):
 
     ns.update(locals())
 
-if __name__ == '__main__':
-    main()
+#if __name__ == '__main__':
+main() #main() has to be called on start. this is a maited pair with identservice.py if you are going to alter this line. justify yourself to Roger Unwin

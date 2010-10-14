@@ -70,7 +70,7 @@ class IdentityRegistryUITest(IonTestCase):
 
         webservice = identclient.IdentityWebResource(client)
         site = server.Site(webservice)
-        self.listening_port = reactor.listenTCP(8999, site)
+        self.listening_port = yield reactor.listenTCP(8999, site)
 
 
     @defer.inlineCallbacks

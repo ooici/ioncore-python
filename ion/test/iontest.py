@@ -40,6 +40,7 @@ class IonTestCase(unittest.TestCase):
     # Set timeout for Trial tests
     timeout = 20
     procRegistry = process.procRegistry
+    container = None
 
     @defer.inlineCallbacks
     def _start_container(self):
@@ -87,11 +88,13 @@ class IonTestCase(unittest.TestCase):
         log.info("Closing ION container")
         self.test_sup = None
         dcs = reactor.getDelayedCalls()
-        log.info("Cancelling %s delayed reactor calls!" % len(dcs))
+        if len(dcs) > 0:
+            log.debug("Cancelling %s delayed reactor calls!" % len(dcs))
         for dc in dcs:
             # Cancel the registered delayed call (this is non-async)
             dc.cancel()
-        yield self.container.terminate()
+        if self.container:
+            yield self.container.terminate()
         bootstrap.reset_container()
         log.info("============ION container closed============")
 
@@ -139,7 +142,7 @@ class ReceiverProcess(Process):
         self.inbox = defer.DeferredQueue()
         self.inbox_count = 0
 
-    def _dispatch_message(self, payload, msg, target, conv):
+    def _dispatch_message(self, payload, msg, conv):
         """
         Dispatch of messages to operations within this process instance. The
         default behavior is to dispatch to 'op_*' functions, where * is the
@@ -157,3 +160,42 @@ class ReceiverProcess(Process):
         @retval Deferred for arriving message
         """
         return self.inbox.get()
+
+# Stuff for testing: Stubs, mock objects
+fakeStore = Store()
+
+class FakeMessage(object):
+    """Instances of this object are given to receive functions and handlers
+    by test cases, in lieu of carrot BaseMessage instances. Production code
+    detects these and no send is done.
+    """
+    def __init__(self, payload=None):
+        self.payload = payload
+
+    @defer.inlineCallbacks
+    def send(self, to, msg):
+        self.sendto = to
+        self.sendmsg = msg
+        # Need to be a generator
+        yield fakeStore.put('fake','fake')
+
+class FakeSpawnable(object):
+    def __init__(self, id=None):
+        self.id = id or Id('fakec','fakep')
+
+class FakeReceiver(object):
+    """Instances of this object are given to send/spawn functions
+    by test cases, in lieu of ion.core.messaging.receiver.Receiver instances.
+    Production code detects these and no send is done.
+    """
+    def __init__(self, id=None):
+        self.payload = None
+        self.process = FakeSpawnable()
+        self.group = 'fake'
+
+    @defer.inlineCallbacks
+    def send(self, to, msg):
+        self.sendto = to
+        self.sendmsg = msg
+        # Need to be a generator
+        yield fakeStore.put('fake','fake')

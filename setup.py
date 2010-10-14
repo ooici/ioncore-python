@@ -5,6 +5,7 @@
 @author Paul Hubbard
 @author Michael Meisinger
 @brief setup file for OOI ION Capability Container and Core Modules
+@see http://peak.telecommunity.com/DevCenter/setuptools
 """
 
 #from ion.core.ionconst import VERSION
@@ -32,14 +33,16 @@ setupdict = {
 try:
     from setuptools import setup, find_packages
     setupdict['packages'] = find_packages()
+
+    setupdict['dependency_links'] = ['http://ooici.net/packages']
     setupdict['packages'].extend(['twisted/plugins'])
-    setupdict['test_suite'] = 'lcaarch.test'
+    setupdict['test_suite'] = 'ion'
     setupdict['install_requires'] = ['Twisted', 'carrot', 'txamqp', 'pycassa', 'numpy',
                                      'Paste', 'Pydap', 'simplejson', 'httplib2',
                                      'pydap.handlers.netcdf','pydap.handlers.nca',
                                      'pydap.responses.netcdf',
                                      'msgpack-python','gviz_api.py',
-                                     'nimboss','txrabbitmq']
+                                     'nimboss','txrabbitmq', 'Telephus']
     setupdict['include_package_data'] = True
     setup(**setupdict)
 

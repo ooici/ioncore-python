@@ -78,11 +78,11 @@ class ProcessTest(IonTestCase):
     @defer.inlineCallbacks
     def test_process(self):
         # Also test the ReceiverProcess helper class
-        print "p1"
+        log.debug('Spawning p1')
         p1 = ReceiverProcess(spawnargs={'proc-name':'p1'})
         pid1 = yield p1.spawn()
 
-        print "others"
+        log.debug('Spawning other processes')
         processes = [
             {'name':'echo','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
         ]
