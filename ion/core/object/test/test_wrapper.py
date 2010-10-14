@@ -17,9 +17,9 @@ from ion.test.iontest import IonTestCase
 
 from net.ooici.play import addressbook_pb2
 
-from ion.play.betaobject import gpb_wrapper
-from ion.play.betaobject import repository
-from ion.play.betaobject import workbench
+from ion.core.object import gpb_wrapper
+from ion.core.object import repository
+from ion.core.object import workbench
 
 
 class WrapperMethodsTest(unittest.TestCase):
@@ -29,7 +29,7 @@ class WrapperMethodsTest(unittest.TestCase):
         
         wb = workbench.WorkBench('No Process Test')
         
-        repo, ab = wb.init(addressbook_pb2.AddressBook)
+        repo, ab = wb.init_repository(addressbook_pb2.AddressBook)
             
         ab.person.add()
         ab.person.add()
@@ -58,7 +58,7 @@ class NodeLinkTest(unittest.TestCase):
         def setUp(self):
             wb = workbench.WorkBench('No Process Test')
             
-            repo, ab = wb.init(addressbook_pb2.AddressLink)
+            repo, ab = wb.init_repository(addressbook_pb2.AddressLink)
             
             self.repo = repo
             self.ab = ab
@@ -108,7 +108,7 @@ class RecurseCommitTest(unittest.TestCase):
     def test_simple_commit(self):
         wb = workbench.WorkBench('No Process Test')
             
-        repo, ab = wb.init(addressbook_pb2.AddressLink)
+        repo, ab = wb.init_repository(addressbook_pb2.AddressLink)
         
         ab.person.add()
         

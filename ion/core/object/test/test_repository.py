@@ -18,9 +18,9 @@ from ion.test.iontest import IonTestCase
 
 from net.ooici.play import addressbook_pb2
 
-from ion.play.betaobject import gpb_wrapper
-from ion.play.betaobject import repository
-from ion.play.betaobject import workbench
+from ion.core.object import gpb_wrapper
+from ion.core.object import repository
+from ion.core.object import workbench
 
 
 class RepositoryTest(unittest.TestCase):
@@ -33,7 +33,7 @@ class RepositoryTest(unittest.TestCase):
             
     def test_simple_commit(self):
         
-        repo, ab = self.wb.init(addressbook_pb2.AddressLink)
+        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
 
                         
         p = repo.create_wrapped_object(addressbook_pb2.Person)

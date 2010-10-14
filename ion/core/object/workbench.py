@@ -3,7 +3,7 @@
 @Brief Workbench for operating on GPB backed objects
 """
 
-from ion.play.betaobject import repository
+from ion.core.object import repository
 
 class WorkBench(object):
  
@@ -29,7 +29,7 @@ class WorkBench(object):
         # rpc_send - datastore, clone, ID_REf
         
         
-    def init(self, rootclass, name=None):
+    def init_repository(self, rootclass, name=None):
         """
         Initialize a new repository
         Factory method for creating a repository - this is the responsibility

@@ -8,7 +8,7 @@ from net.ooici.core.link import link_pb2
 from net.ooici.core.mutable import mutable_pb2
 from net.ooici.core.container import container_pb2
 
-from ion.play.betaobject import gpb_wrapper
+from ion.core.object import gpb_wrapper
 
 from ion.util import procutils as pu
 
