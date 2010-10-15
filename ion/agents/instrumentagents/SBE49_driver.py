@@ -34,6 +34,20 @@ import ion.util.procutils as pu
 
 from ion.core.process.process import ProcessFactory
 
+#
+# DHE: need to do something like: instCmdTranslator = SBE49_InstCommandXlator()
+#
+
+class SBE49_instCommandXlator():
+    commands = {
+        'ds' : 'ds',
+        'ts' : 'ts',
+        'baud' : 'baud',
+    }
+
+    def translate(self, command):
+        return(self.commands[command])
+
 class InstrumentClient(Protocol):
     """
     The InstrumentClient class; inherits from Protocol.  Override dataReceived
@@ -88,6 +102,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.publish_to = None
         self.dataQueue = []
     
+        self.instCmdXlator = SBE49_instCommandXlator()
+        
         #
         # DHE: trying to objectize the hsm stuff...
         #
@@ -596,8 +612,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 log.error("Invalid Command")
                 yield self.reply_err(msg, "Invalid Command")
             else:
+                self.testcommand = self.instCmdXlator.translate(command)
+                log.debug("op_execute would send command: %s to instrument" % self.testcommand)
                 log.debug("op_execute sending command: %s to instrument" % command)
                 self.command = command + "\r\n"
+                #self.command + "\r\n"
          
                 """
                 Send the command received event.  This should kick off the
