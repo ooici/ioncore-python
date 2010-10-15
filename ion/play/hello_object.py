@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/hello_process.py
+@file ion/play/hello_object.py
 @author David Stuebe
-@brief An example process definition that can be used as template.
+@brief An example process definition that can be used as template for object communication.
 """
 
 import ion.util.ionlog
@@ -14,11 +14,13 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory, Process, ProcessClient
 #from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-class HelloProcess(Process):
-    """
-    Example process
-    """
+from net.ooici.play import addressbook_pb2
 
+
+class HelloObject(Process):
+    """
+    Example process sends objects
+    """
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
@@ -33,7 +35,7 @@ class HelloProcess(Process):
         yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
 
 
-class HelloProcessClient(ProcessClient):
+class HelloObjectClient(ProcessClient):
     """
     This is an exemplar process client that calls the hello process. It
     makes service calls RPC style.
@@ -42,12 +44,21 @@ class HelloProcessClient(ProcessClient):
     @defer.inlineCallbacks
     def hello(self, text='Hi there'):
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('hello', text)
+        
+        repo, ab = self.proc.workbench.init_repository(addressbook_pb2.AddressBook)
+        p = ab.person.add()
+        p.name = 'david'
+        p.id = 59
+        p.email = 'stringgggg'
+        
+        print 'AdressBook!',ab
+        
+        (content, headers, msg) = yield self.rpc_send('hello', ab)
         log.info('Process replied: '+str(content))
         defer.returnValue(str(content))
 
 # Spawn of the process using the module name
-factory = ProcessFactory(HelloProcess)
+factory = ProcessFactory(HelloObject)
 
 
 

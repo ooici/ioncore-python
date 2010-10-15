@@ -176,14 +176,21 @@ class Wrapper(object):
 
     
     def _set_parents_modifed(self):
-        self.modified = True
-                
-        self.myid = self.repository.new_id()
-                
-        for link in self._parent_links:
-            # Tricky - set the message directly and call modified!
-            link._gpbMessage.key = self.myid
-            link.modified()
+        """
+        This method probably needs work - and testing!
+        """
+        if not self.modified:        
+            self.modified = True
+            
+            new_id = self.repository.new_id()
+            self.repository._workspace[new_id] = self.root
+            del self.repository._workspace[self.myid]
+            self.myid = new_id
+                    
+            for link in self._parent_links:
+                    # Tricky - set the message directly and call modified!
+                link._gpbMessage.key = self.myid
+                link._set_parents_modified()
     
     def _set_structure_read_only(self):
         """

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/test/test_hello_process.py
-@test ion.play.hello_process Example unit tests for sample code.
+@file ion/play/test/test_hello_object.py
+@test ion.play.hello_object Example unit tests for sample code.
 @author David Stuebe
 """
 import ion.util.ionlog
@@ -10,7 +10,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-from ion.play.hello_process import HelloProcessClient
+from ion.play.hello_object import HelloObjectClient
 from ion.test.iontest import IonTestCase
 
 from ion.core.process.process import Process, ProcessClient, ProcessDesc
@@ -33,7 +33,7 @@ class HelloProcessTest(IonTestCase):
     def test_hello(self):
 
 
-        pd1 = {'name':'hello1','module':'ion.play.hello_process','class':'HelloProcess'}
+        pd1 = {'name':'hello1','module':'ion.play.hello_object','class':'HelloObject'}
 
         proc1 = ProcessDesc(**pd1)
 
@@ -46,13 +46,13 @@ class HelloProcessTest(IonTestCase):
         
         
         log.info('Calling hello there with hc(sup1)')
-        hc1 = HelloProcessClient(proc=sup1,target=proc1_id)
+        hc1 = HelloObjectClient(proc=sup1,target=proc1_id)
         yield hc1.hello("Hi there, hello1")
 
 
-        log.info('Calling hello there with hc(sup2)')
-        hc2 = HelloProcessClient(proc=sup2,target=proc1_id)
-        yield hc2.hello("Hi there, hello1")
+        #log.info('Calling hello there with hc(sup2)')
+        #hc2 = HelloObjectClient(proc=sup2,target=proc1_id)
+        #yield hc2.hello("Hi there, hello1")
 
 
         log.info('Tada!')

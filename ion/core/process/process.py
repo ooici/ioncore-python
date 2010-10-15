@@ -24,6 +24,8 @@ from ion.interact.message import Message
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject
 
+from ion.core.object import workbench
+
 CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
 
@@ -119,6 +121,9 @@ class Process(BasicLifecycleObject):
 
         # List of ProcessDesc instances of defined and spawned child processes
         self.child_procs = []
+
+        #The Workbench for all object repositories used by this process
+        self.workbench = workbench.WorkBench(self)
 
         log.debug("NEW Process instance [%s]: id=%s, sup-id=%s, sys-name=%s" % (
                 self.proc_name, self.id, self.proc_supid, self.sys_name))
