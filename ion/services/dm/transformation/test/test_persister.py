@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/preservation/test/test_persister.py
+@file ion/services/dm/transformation/test/test_persister.py
 @test ion.services.dm.persister Persister unit tests
 @author Paul Hubbard
+@author Matt Rodriguez
 @date 6/7/10
 """
 
