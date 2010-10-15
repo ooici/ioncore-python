@@ -41,7 +41,7 @@ from ion.core.process.process import ProcessFactory
 class SBE49_instCommandXlator():
     commands = {
         'ds' : 'ds',
-        'ts' : 'ts',
+        'getsample' : 'ts',
         'baud' : 'baud',
     }
 
@@ -329,8 +329,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
             @todo Need a queue of commands from which to pull commands
             """
             # if command pending
-            if self.command:
-               self.instrument.transport.write(self.command)
+            if self.testcommand:
+               self.instrument.transport.write(self.testcommand)
             return 0
         elif caller.tEvt['sType'] == "entry":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
@@ -341,8 +341,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "eventCommandReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
             # if command pending
-            if self.command:
-               self.instrument.transport.write(self.command)
+            if self.testcommand:
+               self.instrument.transport.write(self.testcommand)
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
@@ -614,8 +614,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
             else:
                 self.testcommand = self.instCmdXlator.translate(command)
                 log.debug("op_execute would send command: %s to instrument" % self.testcommand)
-                log.debug("op_execute sending command: %s to instrument" % command)
-                self.command = command + "\r\n"
+                #log.debug("op_execute sending command: %s to instrument" % command)
+                self.testcommand += "\r\n"
                 #self.command + "\r\n"
          
                 """
@@ -624,7 +624,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 """
                 self.hsm.onEvent('eventCommandReceived')
 
-                commands.append(command)
+                #commands.append(command)
+                commands.append(self.testcommand)
         yield self.reply_ok(msg, commands)
 
 
