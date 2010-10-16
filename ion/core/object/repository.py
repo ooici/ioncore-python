@@ -218,40 +218,10 @@ class Repository(object):
                 
             self._hashed_elements.update(structure)
                 
-            # Now add a Commit Ref     
-            cref = self.create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
-            cref.date = pu.currenttime()
-
-            # If this is the first commit to a new repository the current branch is a dummy
-            if self._current_branch.IsInitialized():            
-                brnch = cref.ancestors.add()
-                brnch._gpbMessage.CopyFrom(self._current_branch._gpbMessage)
-            
-            for mrgd in self._merged_from:
-                brnch = cref.ancestors.add()
-                brnch._gpbMessage.CopyFrom(mrgd._gpbMessage)
-            
-            cref.comment = comment
-            cref.objectroot = self._workspace_root
-            
-            # Set this link as a leaf - that way its content is not automagically loaded!
-            # This is probably not the right way to do this?
-            cref._gpbMessage.objectroot.isleaf = True
-            
-            
-            # Add the CRef to the hashed elements
-            structure={}
-            cref._recurse_commit(structure)
-            self._hashed_elements.update(structure)
-            
-            # Add the cref to the active commit objects - for convienance
-            self._commit_index[cref.myid] = cref
+            cref = self._create_commit_ref(comment=comment)
             
             # Update the head of the current branch
             self._current_branch.commitref = cref
-                
-            # set the cref to be readonly
-            cref.readonly = True
                 
         elif self.status == self.UPTODATE:
             pass
@@ -260,6 +230,54 @@ class Repository(object):
         
         # Like git, return the commit id 
         return self._current_branch._gpbMessage.commitref.key
+            
+            
+    
+    def _create_commit_ref(self, comment='', date=None):
+    
+        # Now add a Commit Ref     
+        cref = self.create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
+        
+        if not date:
+            date = pu.currenttime()
+            
+        cref.date = date
+
+        # If this is the first commit to a new repository the current branch is a dummy
+        if not self._current_branch.IsInitialized():
+            # This branch is bogus - you have not ancestors
+            pass
+        else:
+            # This branch is real - add it to our ancestors
+            brnch = cref.ancestors.add()
+            brnch._gpbMessage.CopyFrom(self._current_branch._gpbMessage)
+        
+        # For each branch that we merged from copy that reference
+        for mrgd in self._merged_from:
+            brnch = cref.ancestors.add()
+            brnch._gpbMessage.CopyFrom(mrgd._gpbMessage)
+        
+        cref.comment = comment
+        cref.objectroot = self._workspace_root
+            
+        # Set this link as a leaf - that way its content is not automagically loaded!
+        # This is probably not the right way to do this?
+        cref._gpbMessage.objectroot.isleaf = True
+        
+        
+        # Add the CRef to the hashed elements
+        structure={}
+        cref._recurse_commit(structure)
+        self._hashed_elements.update(structure)
+        
+        # Add the cref to the active commit objects - for convienance
+        self._commit_index[cref.myid] = cref
+
+        # set the cref to be readonly
+        cref.readonly = True
+        
+        return cref
+    
             
         
     def merge(self, branch=None, commit_id = None, older_than=None):
@@ -307,6 +325,7 @@ class Repository(object):
             # Set the new branch to point at the commit
             brnch.commitref = cref
             
+            # Making a new branch re-attaches to a head!
             if self._detached_head:
                 self._workspace_root._set_structure_read_write()
                 self._detached_head = False

@@ -52,6 +52,8 @@ class HelloObjectClient(ProcessClient):
         p.email = 'stringgggg'
         
         print 'AdressBook!',ab
+        #repo.commit('My addresbook test')
+
         
         (content, headers, msg) = yield self.rpc_send('hello', ab)
         log.info('Process replied: '+str(content))

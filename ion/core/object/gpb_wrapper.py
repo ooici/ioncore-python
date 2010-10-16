@@ -309,9 +309,15 @@ class Wrapper(object):
             # This object is already committed!
             return
         
+        # Create the Structure Element in which the binary blob will be stored
+        se = StructureElement()
+        
         for link in self._child_links:
             child = self.repository.get_linked_object(link)
             child._recurse_commit(structure)
+            
+            # Save the link info as a convience for sending!
+            se._child_links.add(child.myid)
             
             # Determine whether this is a leaf node
             if len(child._child_links)==0:
@@ -320,7 +326,7 @@ class Wrapper(object):
                         # Hack through the wrapper to set isleaf
                         link._gpbMessage.isleaf = True
         
-        se = StructureElement()
+        
         
         se.value = self.SerializeToString()
         se.key = sha1hex(se.value)
@@ -618,7 +624,21 @@ class StructureElement(object):
     def key(self,value):
         self._element.key = value
         
-        
+    #def SerializeToString(self):
+    #    """Serializes the protocol message to a binary string.
+    #    
+    #    Returns:
+    #      A binary string representation of the message if all of the required
+    #    fields in the message are set (i.e. the message is initialized).
+    #    
+    #    Raises:
+    #      message.EncodeError if the message isn't initialized.
+    #    """
+    #    return self._element.SerializeToString()
+    #
+    #def ParseFromString(self, serialized):
+    #    """Clear the message and read from serialized."""
+    #    self._element.ParseFromString(serialized)
         
     
 class ContainerWrapper(object):

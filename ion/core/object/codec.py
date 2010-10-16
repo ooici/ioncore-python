@@ -16,6 +16,8 @@ from ion.core.intercept.interceptor import EnvelopeInterceptor
 import ion.util.procutils as pu
 
 from ion.core.object import gpb_wrapper
+from net.ooici.play import addressbook_pb2
+ION_R1_GPB = 'ION R1 GPB'
 
 
 class ObjectCodecInterceptor(EnvelopeInterceptor):
@@ -31,7 +33,13 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         print 'status', invocation.status
         print 'route', invocation.route
         print 'note', invocation.note
-    
+        print 'workbench', invocation.workbench
+        
+        if ION_R1_GPB == invocation.content['encoding']:
+            content = invocation.content['content']
+            invocation.content['content'] = invocation.workbench.unpack_structure(content)
+            invocation.content['content'].ParseFromString(content)
+        
         
         return invocation
 
@@ -44,13 +52,12 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         print 'status', invocation.status
         print 'route', invocation.route
         print 'note', invocation.note
-        
-        content = invocation.message['content']
-        print 'DNMDNDNDNDNDNDND', content, type(content)
-        if isinstance(content, gpb_wrapper.Wrapper):
-            print 'EJHEEHEHEHEHEHEHEHEHEHEHEEHHE'
-            invocation.message['content']= content.SerializeToString()
+        print 'workbench', invocation.workbench
 
-        
+        content = invocation.message['content']
+        if isinstance(content, gpb_wrapper.Wrapper):
+            invocation.message['content'] = invocation.workbench.pack_structure(content)
+                     
+            invocation.message['encoding'] = ION_R1_GPB        
         
         return invocation
