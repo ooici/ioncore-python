@@ -30,9 +30,19 @@ class HelloObject(Process):
     def op_hello(self, content, headers, msg):
         log.info('op_hello: '+str(content))
 
-
+        ab = content
+        
+        print 'dir ab', dir(ab)
+        
+        p = ab.person.add()
+        p.name = 'John'
+        p.id = 109
+        p.email = 'john@doe.com'
+        
+        print 'AB', ab
+        
         # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
+        yield self.reply(msg, 'result', ab)
 
 
 class HelloObjectClient(ProcessClient):

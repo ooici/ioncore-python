@@ -179,19 +179,19 @@ class Repository(object):
         
         self._detached_head = detached
         if detached:
-            self.current_branch = self.create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
-            self.current_branch.commitref = cref
-            self.current_branch.branchname = 'detached head'
+            self._current_branch = self.create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
+            self._current_branch.commitref = cref
+            self._current_branch.branchname = 'detached head'
             
             rootobj._set_structure_read_only()
             
         else:
-            self.current_branch = branch
+            self._current_branch = branch
         return rootobj
         
     def reset(self):
         
-        cref = self.current_branch.commitref
+        cref = self._current_branch.commitref
         
         # Do some clean up!
         self._workspace = {}
@@ -349,7 +349,7 @@ class Repository(object):
         obj._root = obj
         obj._parent_links = set()
         obj._child_links = set()
-        obj._readonly = False
+        obj._read_only = False
         obj._myid = obj_id
         obj._modified = True     
 
@@ -419,8 +419,7 @@ class Repository(object):
             'The sha1 key does not match the value. The data is corrupted!'
         
         cls = self._load_class_from_type(element.type)
-                
-                
+                                
         # Do not automatically load it into a particular space...
         obj = self.create_wrapped_object(cls, obj_id=element.key, addtoworkspace=False)
             
@@ -435,13 +434,17 @@ class Repository(object):
         return obj
         
     def _load_class_from_type(self,ltype):
+    
         module = ltype.protofile.split('.')[0] + '_pb2'
-        cls_name = ltype.cls
                 
-        temp= __import__(ltype.package, fromlist=module)
+        cls_name = ltype.cls
+        
+        temp= __import__(str(ltype.package), fromlist=str(module))
         
         mod = getattr(temp,module)
+        
         cls = getattr(mod, cls_name)
+        
         return cls
         
         

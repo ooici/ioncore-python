@@ -152,12 +152,12 @@ class Wrapper(object):
     
     @property
     def readonly(self):
-        self._root._readonly
+        return self._root._read_only
         
     @readonly.setter
     def readonly(self,value):
         assert isinstance(value, bool), 'readonly is a boolen property'
-        self._root._readonly = value
+        self._root._read_only = value
     
     @property
     def modified(self):
@@ -175,7 +175,7 @@ class Wrapper(object):
     
 
     
-    def _set_parents_modifed(self):
+    def _set_parents_modified(self):
         """
         This method probably needs work - and testing!
         """
@@ -189,6 +189,11 @@ class Wrapper(object):
                     
             for link in self._parent_links:
                     # Tricky - set the message directly and call modified!
+                    
+                # When you hit the commit ref which is reaonly - stop!                    
+                if link.readonly:
+                    continue
+                    
                 link._gpbMessage.key = self.myid
                 link._set_parents_modified()
     
@@ -287,7 +292,7 @@ class Wrapper(object):
                 setattr(gpb, key, value)
                 
             if not self.modified:
-                self._set_parents_modifed()
+                self._set_parents_modified()
                 
         else:
             v = object.__setattr__(self, key, value)

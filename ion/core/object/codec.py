@@ -37,9 +37,7 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         
         if ION_R1_GPB == invocation.content['encoding']:
             content = invocation.content['content']
-            invocation.content['content'] = invocation.workbench.unpack_structure(content)
-            invocation.content['content'].ParseFromString(content)
-        
+            invocation.content['content'] = invocation.workbench.unpack_structure(content)        
         
         return invocation
 
@@ -55,6 +53,9 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         print 'workbench', invocation.workbench
 
         content = invocation.message['content']
+        
+        print 'CONTENT',type(content),content
+        
         if isinstance(content, gpb_wrapper.Wrapper):
             invocation.message['content'] = invocation.workbench.pack_structure(content)
                      

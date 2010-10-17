@@ -40,7 +40,7 @@ class WorkBench(object):
         """
         if not name:
             name = 'repo_%s' % self._repo_cntr
-            self._repo_cntr + 1
+            self._repo_cntr += 1
             
         if name in self._repos.keys():
             raise Exception, 'Can not initialize a new repository with an existing name'
@@ -198,7 +198,6 @@ class WorkBench(object):
         name based on the 
         """
         
-        print 'EYEYEYEYEYEYEEYEYYE'
         obj_list, mutablehead = self._unpack_container(serialized_container)
         
         if mutablehead:
@@ -216,28 +215,24 @@ class WorkBench(object):
             repo, none = self.init_repository()
                 
                 
-            print 'HEEHEHEHEHEHEHE'
             # Get the root object - the first in the list
             se = self._hashed_elements.get(obj_list[0])
-            repo._workspace_root = repo._load_element(se)
             
-            print 'HEEHEHEHEHEHEHE2'
+            # Load the object and set it as the workspace root
+            root_obj = repo._load_element(se)
+            repo._workspace_root = root_obj
 
             # Use the helper method to make a commit ref to our new object root
             cref = repo._create_commit_ref(comment='Message for you Sir!')
-            print 'HEEHEHEHEHEHEHE3'
-
+            
             # Set the current (master) branch to point at this commit
             brnch = repo._current_branch
             brnch.commitref = cref
             
-            print 'HEEHEHEHEHEHEHE4'
-
-            # Now use the reset method to checkout the commit we just forged
-            root_obj = repo.reset()
+            # Now load the rest of the linked objects - down to the leaf nodes.
+            repo._load_links(root_obj)
             
-            print 'HEEHEHEHEHEHEHE5'
-
+        
             return root_obj
         
         
