@@ -11,7 +11,7 @@ from twisted.trial import unittest
 from ion.test import iontest
 
 from ion.services.coi import objstore
-from ion.data.datastore import cas
+from ion.services.dm.preservation import cas
 from ion.data.datastore.test import test_cas
 
 

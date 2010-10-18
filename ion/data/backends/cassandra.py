@@ -23,7 +23,7 @@ from telephus.protocol import ManagedCassandraClientFactory
 from telephus.cassandra.ttypes import NotFoundException
 
 from ion.core import ioninit
-from ion.data.store import IStore
+from ion.services.dm.preservation.store import IStore
 
 import uuid
 
