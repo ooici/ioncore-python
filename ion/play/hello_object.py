@@ -28,16 +28,30 @@ class HelloObject(Process):
 
     @defer.inlineCallbacks
     def op_hello(self, content, headers, msg):
-        log.info('op_hello: '+str(content))
+        log.info('op_hello: ')
 
         ab = content
+                
+        p = ab.person[0]
         
-        print 'dir ab', dir(ab)
+        assert p.name == 'david', 'Not reading right!'
         
-        p = ab.person.add()
+        print 'Print Test'
+        for person in ab.person:
+            print 'person',person
+        print 'owner',ab.owner
+        
+        
+        
+        ab.person.add()
+        p = ab.repository.create_wrapped_object(addressbook_pb2.Person)
         p.name = 'John'
         p.id = 109
         p.email = 'john@doe.com'
+        
+        ab.person[1] = p
+        
+        ab.owner = p
         
         print 'AB', ab
         
@@ -55,19 +69,33 @@ class HelloObjectClient(ProcessClient):
     def hello(self, text='Hi there'):
         yield self._check_init()
         
-        repo, ab = self.proc.workbench.init_repository(addressbook_pb2.AddressBook)
-        p = ab.person.add()
+        repo, ab = self.proc.workbench.init_repository(addressbook_pb2.AddressLink)
+        
+        ab.person.add()
+
+        p = repo.create_wrapped_object(addressbook_pb2.Person)
         p.name = 'david'
         p.id = 59
         p.email = 'stringgggg'
+        ab.person[0] = p
         
         print 'AdressBook!',ab
         #repo.commit('My addresbook test')
 
         
         (content, headers, msg) = yield self.rpc_send('hello', ab)
-        log.info('Process replied: '+str(content))
-        defer.returnValue(str(content))
+        log.info('Process replied: ')
+        
+        for key,item in content.repository._workspace.items():
+            print 'WORKSPACE,',key,item
+        
+        for person in content.person:
+            print 'person',person
+        print 'owner',content.owner
+        
+        #print 'LinkClassType',ab.LinkClassType
+        
+        defer.returnValue(content)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(HelloObject)

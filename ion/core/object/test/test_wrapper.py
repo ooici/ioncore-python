@@ -78,7 +78,7 @@ class NodeLinkTest(unittest.TestCase):
             
             wL = self.ab.person.add()
             
-            self.assertEqual(wL._gpbMessage.DESCRIPTOR.full_name, wL.LinkClassName)
+            self.assertEqual(wL.GPBType, wL.LinkClassType)
             
             p = self.repo.create_wrapped_object(addressbook_pb2.Person)
             

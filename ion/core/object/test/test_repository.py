@@ -74,3 +74,9 @@ class RepositoryTest(unittest.TestCase):
         print ab.person[0]
         print ab.person[1]
         
+        
+        for person in ab.person:
+            print 'person',person
+        print 'owner',ab.owner
+        
+        

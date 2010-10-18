@@ -217,7 +217,7 @@ class WorkBench(object):
                 
             # Get the root object - the first in the list
             se = self._hashed_elements.get(obj_list[0])
-            
+                        
             # Load the object and set it as the workspace root
             root_obj = repo._load_element(se)
             repo._workspace_root = root_obj
@@ -232,7 +232,6 @@ class WorkBench(object):
             # Now load the rest of the linked objects - down to the leaf nodes.
             repo._load_links(root_obj)
             
-        
             return root_obj
         
         
@@ -251,8 +250,10 @@ class WorkBench(object):
                 
         obj_list=[]
         for se in cs.items:
-            self._hashed_elements[se.key]=se
-            obj_list.append(se.key)
+            wse = gpb_wrapper.StructureElement.wrap_structure_element(se)
+            
+            self._hashed_elements[wse.key]=wse
+            obj_list.append(wse.key)
         
         mh = None
         if cs.HasField('mutablehead'):

@@ -7,6 +7,7 @@
 from net.ooici.core.link import link_pb2
 from net.ooici.core.mutable import mutable_pb2
 from net.ooici.core.container import container_pb2
+from net.ooici.core.type import type_pb2
 
 from ion.core.object import gpb_wrapper
 
@@ -398,7 +399,7 @@ class Repository(object):
     def _load_links(self, obj, loadleaf=False):
         """
         Load the child objects into the work space
-        """
+        """        
         if loadleaf:
             
             for link in obj._child_links:
@@ -445,6 +446,7 @@ class Repository(object):
         
         cls = getattr(mod, cls_name)
         
+        
         return cls
         
         
@@ -457,9 +459,10 @@ class Repository(object):
         ltype.cls = msg.DESCRIPTOR.name
         
         
+        
     def set_linked_object(self,field, value):        
         # If it is a link - set a link to the value in the wrapper
-        if field._gpb_full_name == field.LinkClassName:
+        if field.GPBType == field.LinkClassType:
             
             #@Todo Change assertions to Exceptions?
             

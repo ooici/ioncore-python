@@ -9,7 +9,9 @@ from google.protobuf import message
 from google.protobuf.internal import containers
     
 from net.ooici.core.container import container_pb2
-from net.ooici.core.link import link_pb2    
+from net.ooici.core.link import link_pb2
+from net.ooici.core.type import type_pb2
+
 import hashlib
 
     
@@ -68,8 +70,11 @@ class Wrapper(object):
     
     '''
     # Change this to a type message to be more precise?
-    LinkClassName = link_pb2.CASRef.DESCRIPTOR.full_name
-    
+    LinkClassType = type_pb2.GPBType()
+    LinkClassType.protofile = link_pb2.CASRef.DESCRIPTOR.file.name.split('/')[-1]
+    LinkClassType.package = link_pb2.CASRef.DESCRIPTOR.file.package
+    LinkClassType.cls = link_pb2.CASRef.DESCRIPTOR.name
+        
     def __init__(self, gpbMessage):
         """
         Initialize the Wrapper class and set up it message type.
@@ -90,7 +95,11 @@ class Wrapper(object):
             for enum_value in enum_type.values:
                 field_names.append(enum_value.name)
         
-        self._gpb_full_name = gpbMessage.DESCRIPTOR.full_name
+        self._gpb_type = type_pb2.GPBType()
+        self._gpb_type.protofile = gpbMessage.DESCRIPTOR.file.name.split('/')[-1]
+        self._gpb_type.package = gpbMessage.DESCRIPTOR.file.package
+        self._gpb_type.cls = gpbMessage.DESCRIPTOR.name
+        
         
         self._parent_links=None
         """
@@ -136,6 +145,11 @@ class Wrapper(object):
     @property
     def isroot(self):
         return self is self._root
+    
+    @property
+    def GPBType(self):
+        return self._gpb_type
+    
     
     @property
     def root(self):
@@ -244,18 +258,18 @@ class Wrapper(object):
         gpbfields = object.__getattribute__(self,'_gpbFields')
         
         if key in gpbfields:
-            #print '__getattribute__: self, key:', object.__getattribute__(self,'_gpb_full_name'), key
+            #print '__getattribute__: self, key:', object.__getattribute__(self,'_gpb_type'), key
             gpb = self._gpbMessage
             value = getattr(gpb,key)
+                        
+            #print 'Type, Value:',type(value), value
                         
             if isinstance(value, containers.RepeatedCompositeFieldContainer):
                 value = ContainerWrapper(self, value)
             elif isinstance(value, message.Message):
-                if value.DESCRIPTOR.full_name == self.LinkClassName:
+                value = self.rewrap(value)
+                if value.GPBType == self.LinkClassType:
                     value = self.repository.get_linked_object(value)
-                    
-                else:
-                    value = self.rewrap(value)
                 
         else:
             value = object.__getattribute__(self, key)
@@ -367,31 +381,33 @@ class Wrapper(object):
             if field.message_type:
                 
                 # Get the field of type message
-                sub_gpb = getattr(gpb,field.name)
+                gpb_field = getattr(gpb,field.name)
                                 
-                # if this field is of type link message - add its links
-                if field.message_type.full_name == self.LinkClassName:
+                
+                # If it is a repeated container type
+                if isinstance(gpb_field, containers.RepeatedCompositeFieldContainer):
+                    container = ContainerWrapper(self, gpb_field)
                     
-                    # if it is repeated!
-                    if isinstance(sub_gpb, containers.RepeatedCompositeFieldContainer):
-                        for link in sub_gpb:    
-                            self._child_links.add(self.rewrap(link))
-                    else:
-                        self._child_links.add(self.rewrap(sub_gpb))
-
-                # Recursively search the composite structure
+                    for item in container:
+                        if item.GPBType == item.LinkClassType:
+                            self._child_links.add(item)
+                        else:
+                            item._find_child_links()
+                                
+                # IF it is a standard message field
                 else:
-                    if isinstance(sub_gpb, containers.RepeatedCompositeFieldContainer):
-                        container = ContainerWrapper(self, sub_gpb)
-                        for sub_self in container:
-                            sub_self._find_child_links()
-                            
+                    if not gpb_field.IsInitialized():
+                        # if it is an optional field which is not initialized
+                        # it can not hold any links!
+                        continue
+                    
+                    item = self.rewrap(gpb_field)
+                    if item.GPBType == item.LinkClassType:
+                        self._child_links.add(item)
                     else:
-                        sub_self = self.rewrap(sub_gpb)                        
-                        sub_self._find_child_links()
-
-
-
+                        item._find_child_links()
+                    
+                    
     
     def __eq__(self, other):
         if not isinstance(other, Wrapper):
@@ -606,6 +622,13 @@ class StructureElement(object):
         
         self._child_links = set()
         
+    @classmethod
+    def wrap_structure_element(cls,se):
+        inst = cls()
+        inst._element = se
+        return inst
+        
+        
     @property
     def type(self):
         return self._element.type
@@ -652,6 +675,10 @@ class ContainerWrapper(object):
     It is not needed for repeated scalars!
     """
     
+    LinkClassType = type_pb2.GPBType()
+    LinkClassType.protofile = link_pb2.CASRef.DESCRIPTOR.file.name.split('/')[-1]
+    LinkClassType.package = link_pb2.CASRef.DESCRIPTOR.file.package
+    LinkClassType.cls = link_pb2.CASRef.DESCRIPTOR.name
     
     def __init__(self, wrapper, gpbcontainer):
         # Be careful - this is a hard link
@@ -659,6 +686,8 @@ class ContainerWrapper(object):
         assert isinstance(gpbcontainer, containers.RepeatedCompositeFieldContainer), \
             'The Container Wrapper is only for use with Repeated Composit Field Containers'
         self._gpbcontainer = gpbcontainer
+        self.repository = wrapper.repository # Hack - make uniform interface to repository
+        
     
     def __setitem__(self, key, value):
         """Sets the item on the specified position."""
@@ -666,10 +695,12 @@ class ContainerWrapper(object):
             'To set an item, the value must be a Wrapper'
         
         item = self._gpbcontainer.__getitem__(key)
-        if item and item.DESCRIPTOR.full_name == self._wrapper.LinkClassName:
-            
-            item = self._wrapper.rewrap(item)
-            self._wrapper.repository.set_linked_object(item, value)
+        item = self._wrapper.rewrap(item)
+        if item.GPBType == self.LinkClassType:
+            self.repository.set_linked_object(item, value)
+        else:
+            raise Exception, 'It is illegal to set a value of a repeated composit field unless it is a CASRef - Link'
+         
          
         # Don't want to expose SetItem for composits!        
         #else:
@@ -678,10 +709,10 @@ class ContainerWrapper(object):
             
     def __getitem__(self, key):
         """Retrieves item by the specified key."""
-        value = self._wrapper.rewrap(self._gpbcontainer[key])
-        
-        if value._gpbMessage.DESCRIPTOR.full_name == self._wrapper.LinkClassName:
-            value = self._wrapper.repository.get_linked_object(value)
+        value = self._gpbcontainer.__getitem__(key)
+        value = self._wrapper.rewrap(value)
+        if value.GPBType == self.LinkClassType:
+            value = self.repository.get_linked_object(value)
         return value
     
     def __len__(self):
@@ -723,10 +754,9 @@ class ContainerWrapper(object):
     
     def __getslice__(self, start, stop):
         """Retrieves the subset of items from between the specified indices."""
-        gpbs = self._gpbcontainer.__getslice__(start, stop)
         wrapper_list=[]
-        for item in gpbs:
-            wrapper_list.append(self._wrapper.rewrap(item))
+        for index in range(start,stop):
+            wrapper_list.append(self.__getitem__(index))
         return wrapper_list
     
     def __delitem__(self, key):

@@ -25,10 +25,10 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
     Interceptor that assembles the headers in the ION message format.
     """
     def before(self, invocation):
-        print 'Hello from BEFORE Davids Codec!'
-        print 'args', invocation.args
+        print '======= Hello from BEFORE Davids Codec!============'
+        #print 'args', invocation.args
         print 'path', invocation.path
-        print 'message', invocation.message
+        #print 'message', invocation.message
         print 'content', invocation.content
         print 'status', invocation.status
         print 'route', invocation.route
@@ -39,13 +39,15 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
             content = invocation.content['content']
             invocation.content['content'] = invocation.workbench.unpack_structure(content)        
         
+        print '======= End BEFORE Davids Codec!============'
+        
         return invocation
 
     def after(self, invocation):
-        print 'Hello from AFTER Davids Codec!'
-        print 'args', invocation.args
+        print '======= Hello from AFTER Davids Codec! ================'
+        #print 'args', invocation.args
         print 'path', invocation.path
-        print 'message', invocation.message
+        #print 'message', invocation.message
         print 'content', invocation.content
         print 'status', invocation.status
         print 'route', invocation.route
@@ -53,12 +55,13 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         print 'workbench', invocation.workbench
 
         content = invocation.message['content']
-        
-        print 'CONTENT',type(content),content
-        
+            
         if isinstance(content, gpb_wrapper.Wrapper):
             invocation.message['content'] = invocation.workbench.pack_structure(content)
                      
             invocation.message['encoding'] = ION_R1_GPB        
+        
+        print '======= End AFTER Davids Codec! ================'
+
         
         return invocation
