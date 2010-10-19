@@ -311,7 +311,7 @@ class Repository(object):
         
     def branch(self, name):
         """
-        Create a new branch from the current commit and switch the workspace to the new branch.
+        @brief Create a new branch from the current commit and switch the workspace to the new branch.
         """
         ## Need to check and then clear the workspace???
         #if not self.status == self.UPTODATE:

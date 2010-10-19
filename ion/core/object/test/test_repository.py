@@ -9,17 +9,13 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from uuid import uuid4
+
 
 from twisted.trial import unittest
-#from twisted.internet import defer
 
 from ion.test.iontest import IonTestCase
 
 from net.ooici.play import addressbook_pb2
-
-from ion.core.object import gpb_wrapper
-from ion.core.object import repository
 from ion.core.object import workbench
 
 
@@ -29,10 +25,29 @@ class RepositoryTest(unittest.TestCase):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb
         
+    def test_branch_checkout(self):
+        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)   
+        repo.commit()
+        repo.branch("Arthur")
+        repo.checkout(branch_name="Arthur")
+        
+    def test_branch_no_commit(self):
+        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
+        try:
+            repo.branch("Arthur")
+        except Exception, ex:
+            log.debug(str(ex))
+            
+                
+    def test_branch(self):
+        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
+        repo.commit()
+        repo.branch("Arthur")   
+        
     def test_create_commit_ref(self):
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
-        cref = repo._create_commit_ref()
-        print cref
+        cref = repo._create_commit_ref(comment="Cogent Comment")
+        assert(cref.comment == "Cogent Comment")
             
     def test_checkout_commit_id(self):
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)  
