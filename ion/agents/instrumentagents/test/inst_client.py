@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 """
 @file ion/agents/instrumentagents/test/inst_client.py
-@brief This module is a simple client to test instruments/simulators, and is run as a stand alone command line application.
+@brief This module is a simple client to test instruments/simulators, and is run
+ as a stand alone command line application.
 @author Bill Bollenbacher
 @date 10/15/10
 """
 
 from twisted.internet import stdio, reactor, protocol
 import re
-from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
 
 class DataForwardingProtocol(protocol.Protocol):
     """
@@ -63,13 +63,19 @@ class StdioProxyFactory(protocol.ClientFactory):
 
 if __name__ == '__main__':
     import sys
-    if len(sys.argv) < 3 or len(sys.argv) > 4 or (len(sys.argv) == 4 and sys.argv[3] != 'sim'):
-        print "Usage: %s host port [sim]" % __file__
+    if len(sys.argv) < 3 or len(sys.argv) > 4 or \
+       (len(sys.argv) == 4 and not sys.argv[3].startswith('sim')):
+        print "Usage: %s host port [sim_INSTRUMENT-NAME]" % __file__
         sys.exit(1)
 
     if len(sys.argv) == 4:
-       simulator = Simulator(sys.argv[1], int(sys.argv[2]))
-       simulator.start()
+        try:
+            exec ('from ion.agents.instrumentagents.simulators.{0} import Simulator'.format(sys.argv[3]))
+        except:
+            print 'ERROR while trying to import Simulator from module {0}'.format(sys.argv[3])
+            sys.exit(1)
+        simulator = Simulator(sys.argv[1], int(sys.argv[2]))
+        simulator.start()
 
     reactor.connectTCP(sys.argv[1], int(sys.argv[2]), StdioProxyFactory( ))
 
