@@ -155,6 +155,7 @@ class Repository(object):
             
             # This is dangerous, but lets do it anyway - for now!
             if self._hashed_elements.has_key(commit_id):
+                element = self._hashed_elements[commit_id]
                 cref = self._load_element(element)
                 
                 detached = True

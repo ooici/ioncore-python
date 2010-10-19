@@ -29,7 +29,10 @@ class RepositoryTest(unittest.TestCase):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb
         
-        
+    def test_checkout_commit_id(self):
+        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)  
+        commit_ref = repo.commit()
+        repo.checkout(commit_id=commit_ref)
             
     def test_simple_commit(self):
         
