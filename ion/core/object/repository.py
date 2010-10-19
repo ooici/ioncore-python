@@ -236,7 +236,13 @@ class Repository(object):
             
     
     def _create_commit_ref(self, comment='', date=None):
-    
+        """
+        @brief internal method to create commit references
+        @param comment a string that describes this commit
+        @param date the date to associate with this commit. If not given then 
+        the current time is used.
+        @retval a string which is the commit reference
+        """
         # Now add a Commit Ref     
         cref = self.create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
         
@@ -246,10 +252,8 @@ class Repository(object):
         cref.date = date
 
         # If this is the first commit to a new repository the current branch is a dummy
-        if not self._current_branch.IsInitialized():
-            # This branch is bogus - you have not ancestors
-            pass
-        else:
+        if self._current_branch.IsInitialized():
+            
             # This branch is real - add it to our ancestors
             brnch = cref.ancestors.add()
             brnch._gpbMessage.CopyFrom(self._current_branch._gpbMessage)
