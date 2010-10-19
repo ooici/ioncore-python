@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/preservation/persister.py
+@file ion/services/dm/transformation/persister.py
 @author Paul Hubbard
 @author David Stuebe
 @author Matt Rodriguez

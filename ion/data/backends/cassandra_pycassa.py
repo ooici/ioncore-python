@@ -19,7 +19,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit
-from ion.data.store import IStore
+from ion.services.dm.preservation.store import IStore
 import pycassa
 import uuid
 
