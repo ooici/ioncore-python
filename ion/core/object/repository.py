@@ -53,7 +53,7 @@ class Repository(object):
         self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
-        It is not 'stored' anywhere - pass in a throwaway dictionary
+        It is not 'stored' in the index - it lives in the workspace
         """
         
         self._current_branch = None
