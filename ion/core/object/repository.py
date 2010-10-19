@@ -3,11 +3,11 @@
 
 """
 @Brief Repository for managing data structures
+@author David Stuebe
+@author Matt Rodriguez
 """
-from net.ooici.core.link import link_pb2
 from net.ooici.core.mutable import mutable_pb2
-from net.ooici.core.container import container_pb2
-from net.ooici.core.type import type_pb2
+
 
 from ion.core.object import gpb_wrapper
 
@@ -93,7 +93,7 @@ class Repository(object):
         detached = False
         
         if older_than and commit_id:
-            raise Excpetion, 'Checkout called with both commit_id and older_than!'
+            raise Exception, 'Checkout called with both commit_id and older_than!'
         
         
         if branch_name:
@@ -163,7 +163,7 @@ class Repository(object):
                 raise Exception, 'Can not checkout an id that does not exist!'
             
         else:
-            raise Excpetion, 'Checkout must specify a branch_name or a commit_id'
+            raise Exception, 'Checkout must specify a branch_name or a commit_id'
         
         # Do some clean up!
         self._workspace = {}
@@ -227,7 +227,7 @@ class Repository(object):
         elif self.status == self.UPTODATE:
             pass
         else:
-            raise Excpetion, 'Repository in invalid state to commit'
+            raise Exception, 'Repository in invalid state to commit'
         
         # Like git, return the commit id 
         return self._current_branch._gpbMessage.commitref.key
