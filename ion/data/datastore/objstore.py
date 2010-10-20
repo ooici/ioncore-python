@@ -17,7 +17,7 @@ from twisted.internet import defer
 from twisted.python import reflect
 
 from ion.data import dataobject
-from ion.data.datastore import cas
+from ion.services.dm.preservation import cas
 
 NULL_CHR = '\x00'
 

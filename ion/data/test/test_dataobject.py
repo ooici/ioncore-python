@@ -17,7 +17,7 @@ from twisted.internet import defer
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.data.datastore import cas
+from ion.services.dm.preservation import cas
 
 """
 Define some data objects for testing
