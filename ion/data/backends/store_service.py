@@ -15,7 +15,7 @@ from twisted.internet import defer
 
 from ion.core import ioninit
 from ion.core.process.process import ProcessFactory
-from ion.data.store import Store, IStore
+from ion.services.dm.preservation.store import Store, IStore
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 

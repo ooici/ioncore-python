@@ -17,7 +17,7 @@ from ion.core.cc.container import Container
 from ion.core.cc.modloader import ModuleLoader
 from ion.core.process import process
 from ion.core.process.process import Process, ProcessDesc
-from ion.data.store import Store
+from ion.services.dm.preservation.store import Store
 from ion.data.datastore import registry
 from ion.resources import description_utility
 from ion.services.coi import service_registry
