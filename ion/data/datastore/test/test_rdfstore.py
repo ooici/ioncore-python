@@ -12,9 +12,9 @@ import ion.util.ionlog
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.data import store
+from ion.services.dm.preservation import store
 from ion.data import set_store
-from ion.data.datastore import cas
+from ion.services.dm.preservation import cas
 from ion.data.datastore import objstore
 from ion.data.datastore import rdfstore
 

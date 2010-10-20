@@ -18,7 +18,7 @@ from ion.core.cc import container
 from ion.core.cc.container import Id, Container
 from ion.core.process import process
 from ion.core.process.process import IProcess, Process
-from ion.data.store import Store
+from ion.services.dm.preservation.store import Store
 import ion.util.procutils as pu
 
 from ion.resources import description_utility

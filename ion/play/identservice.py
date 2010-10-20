@@ -45,4 +45,4 @@ def main():
 main() has to be called on start. this is a mated pair with identclient.py if you are going
 to alter this line then justify yourself to Roger Unwin.
 """
-main()
+#main()

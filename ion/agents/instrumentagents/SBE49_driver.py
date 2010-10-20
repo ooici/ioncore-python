@@ -81,7 +81,7 @@ class InstrumentClient(Protocol):
         elif data == '?CMD':
             log.info("Seabird doesn't understand command.")
         else:
-            log.debug("dataReceived()!")
+            log.debug("dataReceived()! %s" % data)
             #self.factory.data_received(data)
             self.parent.gotData(data)
 
