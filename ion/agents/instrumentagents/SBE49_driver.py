@@ -43,6 +43,8 @@ class SBE49_instCommandXlator():
         'ds' : 'ds',
         'getsample' : 'ts',
         'baud' : 'baud',
+        'start' : 'startnow',
+        'stop' : 'stop',
     }
 
     def translate(self, command):
@@ -606,12 +608,14 @@ class SBE49InstrumentDriver(InstrumentDriver):
             yield self.reply_err(msg, "Empty command")
             return
         commands = []
+        agentCommands = []
         for command_set in content:
             command = command_set[0]
             if command not in instrument_commands:
                 log.error("Invalid Command")
                 yield self.reply_err(msg, "Invalid Command")
             else:
+                log.debug("op_execute translating command: %s" % command)
                 self.testcommand = self.instCmdXlator.translate(command)
                 log.debug("op_execute would send command: %s to instrument" % self.testcommand)
                 #log.debug("op_execute sending command: %s to instrument" % command)
@@ -626,7 +630,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
                 #commands.append(command)
                 commands.append(self.testcommand)
-        yield self.reply_ok(msg, commands)
+                agentCommands.append(command)
+        #yield self.reply_ok(msg, commands)
+        yield self.reply_ok(msg, agentCommands)
 
 
     @defer.inlineCallbacks
