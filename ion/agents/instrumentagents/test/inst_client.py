@@ -54,7 +54,10 @@ class StdioProxyFactory(protocol.ClientFactory):
     protocol = StdioProxyProtocol
 
     def clientConnectionLost(self, transport, reason):
-        reactor.stop( )
+        if len(sys.argv) == 4:
+           simulator.stop()
+        print ""    # output LF to cleanup after ctrl-C
+
 
     def clientConnectionFailed(self, transport, reason):
         print reason.getErrorMessage( )
