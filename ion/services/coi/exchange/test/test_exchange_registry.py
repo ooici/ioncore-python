@@ -97,9 +97,6 @@ class ExchangeClientTest(IonTestCase):
         tofind.name = values['name']
         
         found = yield self.exchange_registry_client.find_amqpmapping(tofind,regex=True,ignore_defaults=True,attnames=[AMQPMapping.name])
-        print found 
-        print tofind
-        print '----'
         
         self.assertEquals(registered.RegistryIdentity,retrieved.RegistryIdentity)
 

@@ -11,7 +11,7 @@ import os
 import zlib
 import time
 
-from ion.data.datastore import cas
+from ion.services.dm.preservation import cas
 
 class GitObjectStore(object):
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/preservation/test/test_persister.py
+@file ion/services/dm/transformation/test/test_persister.py
 @test ion.services.dm.persister Persister unit tests
 @author Paul Hubbard
+@author Matt Rodriguez
 @date 6/7/10
 """
 
@@ -18,7 +19,7 @@ from twisted.trial import unittest
 from ion.core import bootstrap
 from ion.services.dm.distribution import base_consumer
 
-from ion.services.dm.preservation import persister
+from ion.services.dm.transformation import persister
 
 from ion.data import dataobject
 from ion.test.iontest import IonTestCase

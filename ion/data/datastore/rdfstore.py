@@ -13,7 +13,7 @@ import ion.util.ionlog
 from twisted.internet import defer
 from twisted.python import reflect
 
-from ion.data.datastore import cas
+from ion.services.dm.preservation import cas
 from ion.data.datastore import objstore
 #from ion.data import resource
 
@@ -318,7 +318,7 @@ from ion.data.datastore import objstore
 #
 #@defer.inlineCallbacks
 #def _test(ns):
-#    from ion.data import store
+#    from ion.services.dm.preservation import store
 #    from ion.data import set_store
 #    s = yield store.Store.create_store()
 #
