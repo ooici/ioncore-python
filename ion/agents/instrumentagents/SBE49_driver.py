@@ -641,8 +641,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 #commands.append(command)
                 commands.append(self.testcommand)
                 agentCommands.append(command)
-        #yield self.reply_ok(msg, commands)
-        yield self.reply_ok(msg, agentCommands)
+                # DHE right now a 1-1 correspondence
+                #yield self.reply_ok(msg, commands)
+                yield self.reply_ok(msg, agentCommands)
 
 
     @defer.inlineCallbacks
