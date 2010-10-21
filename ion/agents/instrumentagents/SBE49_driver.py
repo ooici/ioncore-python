@@ -242,6 +242,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "exit":
             log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
             return 0
+        elif caller.tEvt['sType'] == "eventDisconnectComplete":
+            log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
+            return 0
         return caller.tEvt['sType']
 
     def stateDisconnecting(self, caller):
@@ -308,6 +311,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             log.debug("!!!!!!!!!!!!! sending crlf!!!")
             self.instrument.transport.write("\r\n")
             return 0
+        # Don't think I should get this here...candidate for deletion
         elif caller.tEvt['sType'] == "eventDataReceived":
             log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
             #
@@ -320,6 +324,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 caller.stateTran(self.stateConnected)
             else:
                 log.debug("Did not receive prompt")
+            return 0
+        elif caller.tEvt['sType'] == "eventPromptReceived":
+            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
+            caller.stateTran(self.stateConnected)
             return 0
         return caller.tEvt['sType']
 
@@ -357,6 +365,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
             else:
                 log.debug("Did not receive prompt")
             return 0
+        elif caller.tEvt['sType'] == "eventPromptReceived":
+            return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
             #
@@ -369,10 +379,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
     @defer.inlineCallbacks
     def plc_init(self):
         self.instrument_id = self.spawn_args.get('instrument-id', '123')
-        #self.instrument_ipaddr = self.spawn_args.get('ipaddr', "localhost")
-        #self.instrument_ipport = self.spawn_args.get('ipport', 9000)
-        self.instrument_ipaddr = self.spawn_args.get('ipaddr', "137.110.112.119")
-        self.instrument_ipport = self.spawn_args.get('ipport', 4001)
+        self.instrument_ipaddr = self.spawn_args.get('ipaddr', "localhost")
+        self.instrument_ipport = self.spawn_args.get('ipport', 9000)
+        #self.instrument_ipaddr = self.spawn_args.get('ipaddr', "137.110.112.119")
+        #self.instrument_ipport = self.spawn_args.get('ipport', 4001)
 
         # DHE Testing HSM
         log.debug("!!!!!!!!!!!!!!!!!! Calling onStart!")
