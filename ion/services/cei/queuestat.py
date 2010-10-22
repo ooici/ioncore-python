@@ -19,6 +19,7 @@ from txrabbitmq.service import RabbitMQControlService
 import twotp.node
 
 DEFAULT_INTERVAL_SECONDS = 3.0
+DEFAULT_COOKIE_PATH = '~/.erlang.cookie'
 
 class QueueStatService(ServiceProcess):
     """Queue stat subscription service
@@ -146,11 +147,12 @@ class QueueStatClient(ServiceClient):
         log.debug("Sending QueueStat unwatch request: %s", message)
         yield self.send('unwatch_queue', message)
 
-def read_cookie(path='~/.erlang_cookie'):
+def read_cookie(path=None):
     """Reads Erlang cookie file
     """
-    log.debug('Reading erlang cookie from ' + path)
-    f = open(os.path.expanduser(path))
+    cookie_path = path or DEFAULT_COOKIE_PATH
+    log.debug('Reading erlang cookie from ' + cookie_path)
+    f = open(os.path.expanduser(cookie_path))
     try:
         return f.read().strip()
     finally:
