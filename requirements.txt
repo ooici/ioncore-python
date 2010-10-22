@@ -23,7 +23,6 @@ simplejson==2.1.1
 telephus==0.6.3
 twotp==0.7
 txAMQP==0.3
-txrabbitmq==0.2
 wsgiref==0.1.2
 zope.interface==3.6.1
 
@@ -31,3 +30,4 @@ zope.interface==3.6.1
 numpy
 Pydap
 nimboss>=0.3pre44
+txrabbitmq
