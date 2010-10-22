@@ -30,7 +30,35 @@ class WorkBench(object):
         Check out the head or 
         """
         # rpc_send - datastore, clone, ID_REf
+    
+    def _load_repo_from_mutable(self,mutable):
+        """
+        Load a repository from a mutable - helper for clone and other methods
+        that send and receive an entire repo.
+        mutable is a raw (unwrapped) gpb message
+        """
+        name = None
+        if mutable.HasField('name') and mutable.name not in self._repos.keys():
+            name = mutable.name
+        else:
+            name = 'repo_%s' % self._repo_cntr
+            self._repo_cntr += 1
         
+        repo = repository.Repository(mutable)
+                
+        repo._workbench = self
+            
+        repo._hashed_elements = self._hashed_elements
+        
+        # Load all of the commit refs that came with this head.
+        repo._load_links(repo._dotgit)
+        
+        self._repos[name] = repo
+        
+        return repo 
+            
+    
+    
         
     def init_repository(self, rootclass=None, name=None):
         """
@@ -88,7 +116,7 @@ class WorkBench(object):
         """
         Fetch the linked objects from the data store service
         """
-        return None
+        raise Exception, 'Fetch Linked Objects is not implemented!'
     
     
     def get_repository(self,name):
@@ -109,7 +137,6 @@ class WorkBench(object):
         links if include_leaf=False.
         Return the content as a container object.
         """
-        
         assert isinstance(wrapper, gpb_wrapper.Wrapper), 'Pack Structure received a wrapper argument which is not a wrapper?'
         
         repo = wrapper.repository
@@ -117,16 +144,34 @@ class WorkBench(object):
         
         if not repo.status == repo.UPTODATE:
             repo.commit(comment='Sending message with wrapper %s'% wrapper.myid)
-            
+        
         obj_set=set()
+        root_obj = None
+        mutable = None
+        obj_list = []
         
-        root_obj = self._hashed_elements.get(wrapper.myid,None)
+        if wrapper is repo._dotgit:
+            mutable = wrapper
+            items = set()
+            for branch in mutable.branches:
+                cref = branch.commitref
+                obj = self._hashed_elements.get(cref.myid,None)
+                if not obj:
+                    # Debugging exception - remove later
+                    raise Exception, 'Hashed CREF not found! Please call David'
+                items.add(obj)
+            
+        else:
+            root_obj = self._hashed_elements.get(wrapper.myid,None)
+            items = set([root_obj])
+
         
-        # Recurse through the Dag and add the keys to a set - obj_set.
-        items = set([root_obj])
+        # Recurse through the DAG and add the keys to a set - obj_set.
         while len(items) > 0:
             child_items = set()
             for item in items:
+                
+                print 'ITEM', item
                 if len(item._child_links) >0:
                     
                     obj_set.add(item.key)    
@@ -145,18 +190,19 @@ class WorkBench(object):
                     
             items = child_items
 
-        #Make a list in the right order        
-        obj_list=[root_obj.key] # Start with the root!
-        obj_set.discard(root_obj.key)
+        if root_obj:
+            #Make a list in the right order        
+            obj_list=[root_obj.key] # Start with the root!
+            obj_set.discard(root_obj.key)
+
         for key in obj_set:
             obj_list.append(key)
         
+        print 'OBJLIST',obj_list
         
-        serialized = self._pack_container(obj_list)
+        serialized = self._pack_container(obj_list, mutable)
         
         return serialized
-        
-        
         
     
     def _pack_container(self, object_keys, mutable=None):
@@ -169,7 +215,7 @@ class WorkBench(object):
         
         if mutable:
             # Hack this for now...
-            cs.mutablehead.CopyFrom(mutable)
+            cs.mutablehead.CopyFrom(mutable._gpbMessage)
         
         
         for key in object_keys:
@@ -205,7 +251,9 @@ class WorkBench(object):
             # This is a pull or clone and we don't know the context here.
             # Return the mutable head as the content and let the process
             # operation figure out what to do with it!
-            return mutablehead
+            repo = self._load_repo_from_mutable(mutablehead)
+            
+            return repo
         
         else:
             

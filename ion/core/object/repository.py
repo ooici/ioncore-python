@@ -19,7 +19,7 @@ class Repository(object):
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet'
     
-    def __init__(self):
+    def __init__(self, mutable=None):
         
         self._object_counter=1
         """
@@ -50,7 +50,11 @@ class Repository(object):
         or sent in a message.
         """
         
-        self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
+        if mutable:
+            self._dotgit = self._wrap_message_object(mutable, addtoworkspace = False)   
+        else:
+            self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
+            self._dotgit.key = pu.create_guid()
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
         It is not 'stored' in the index - it lives in the workspace
@@ -323,6 +327,7 @@ class Repository(object):
             
         brnch = self._dotgit.branches.add()    
         brnch.branchname = name
+        
 
         if self._current_branch:
             # Get the linked commit
@@ -336,7 +341,6 @@ class Repository(object):
                 self._workspace_root._set_structure_read_write()
                 self._detached_head = False
                 
-                
         self._current_branch = brnch
         
         
@@ -348,9 +352,17 @@ class Repository(object):
         
     def create_wrapped_object(self, rootclass, obj_id=None, addtoworkspace=True):        
         
+        message = rootclass()
+            
+        obj = self._wrap_message_object(message, obj_id, addtoworkspace)
+            
+        return obj
+        
+    def _wrap_message_object(self, message, obj_id=None, addtoworkspace=True):
+        
         if not obj_id:
             obj_id = self.new_id()
-        obj = gpb_wrapper.Wrapper(rootclass())
+        obj = gpb_wrapper.Wrapper(message)
         obj._repository = self
         obj._root = obj
         obj._parent_links = set()
@@ -372,6 +384,9 @@ class Repository(object):
         return str(self._object_counter)
      
     def get_linked_object(self, link):
+                
+        if not link.HasField('key'):
+            return None
                 
         if self._workspace.has_key(link.key):
             return self._workspace.get(link.key)

@@ -29,10 +29,6 @@ class WorkBenchTest(unittest.TestCase):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb
         
-        
-            
-    def test_simple_commit(self):
-        
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
 
                         
@@ -60,13 +56,30 @@ class WorkBenchTest(unittest.TestCase):
         
         ab.person[1] = p
         
-        cref = repo.commit(comment='testing commit')
+        self.ab = ab
+        self.repo = repo
+        
+        
+            
+    def test_simple_commit(self):
+        
+        cref = self.repo.commit(comment='testing commit')
         print 'Commited',cref
         
-        container = self.wb.pack_structure(ab)
+        
+    def test_pack_root(self):
+        
+        container = self.wb.pack_structure(self.ab)
         
         print container
+            
+    
+    def test_pack_mutable(self):
         
+        container = self.wb.pack_structure(self.repo._dotgit)
+        
+        print container
+            
         
         
         
