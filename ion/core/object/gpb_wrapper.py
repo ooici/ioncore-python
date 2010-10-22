@@ -155,32 +155,38 @@ class Wrapper(object):
     def root(self):
         return self._root
     
-    @property
-    def myid(self):
+    #@property
+    def get_myid(self):
         return self._root._myid
     
-    @myid.setter
-    def myid(self,value):
+    #@myid.setter
+    def set_myid(self,value):
         assert isinstance(value, str), 'myid is a string property'
         self._root._myid = value
+
+    myid = property(get_myid, set_myid)
     
-    @property
-    def readonly(self):
+    #@property
+    def get_readonly(self):
         return self._root._read_only
         
-    @readonly.setter
-    def readonly(self,value):
+    #@readonly.setter
+    def set_readonly(self,value):
         assert isinstance(value, bool), 'readonly is a boolen property'
         self._root._read_only = value
+
+    readonly = property(get_readonly, set_readonly)
     
-    @property
-    def modified(self):
+    #@property
+    def get_modified(self):
         return self._root._modified
 
-    @modified.setter
-    def modified(self,value):
+    #@modified.setter
+    def set_modified(self,value):
         assert isinstance(value, bool), 'modified is a boolen property'
         self._root._modified = value
+
+    modified = property(get_modified, set_modified)
     
     
     @property
@@ -636,21 +642,25 @@ class StructureElement(object):
     #@type.setter
     #def type(self,value):
      
-    @property
-    def value(self):
+    #@property
+    def get_value(self):
         return self._element.value
         
-    @value.setter
-    def value(self,value):
+    #@value.setter
+    def set_value(self,value):
         self._element.value = value
+
+    value = property(get_value, set_value)
         
-    @property
-    def key(self):
+    #@property
+    def get_key(self):
         return self._element.key
         
-    @key.setter
-    def key(self,value):
+    #@key.setter
+    def set_key(self,value):
         self._element.key = value
+
+    key = property(get_key, set_key)
         
     #def SerializeToString(self):
     #    """Serializes the protocol message to a binary string.
