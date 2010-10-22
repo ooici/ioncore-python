@@ -12,85 +12,61 @@
 """
 
 import re
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
+
+from zope.interface import Interface
+from zope.interface import implements
 
 from twisted.internet import defer
 
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
-class IStore(object):
+
+
+class IStore(Interface):
     """
-    Interface and abstract base class for all store backend implementations.
+    Interface all store backend implementations.
     All operations are returning deferreds and operate asynchronously.
-
-    @note Pure virtual abstract base class - must override methods!
     """
-    def __init__(self, **kwargs):
-        """
-        @brief Initializes store instance
-        @param kwargs arbitrary keyword arguments interpreted by the subclass
-        """
-        pass
 
-    @classmethod
-    def create_store(cls, **kwargs):
-        """
-        @brief Factory method to create an instance of the store.
-        @param kwargs arbitrary keyword arguments interpreted by the subclass to
-                configure the store.
-        @retval Deferred, for IStore instance.
-        """
-        instance = cls(**kwargs)
-        instance.kwargs = kwargs
-        return defer.succeed(instance)
-
-    def clear_store(self):
-        """
-        """
-        raise NotImplementedError, "Abstract Interface Not Implemented"
-        
-
-    def get(self, key):
+    def get(key):
         """
         @param key  an immutable key associated with a value
         @retval Deferred, for value associated with key, or None if not existing.
         """
-        raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def put(self, key, value):
+    def put(key, value):
         """
         @param key  an immutable key to be associated with a value
         @param value  an object to be associated with the key. The caller must
                 not modify this object after it was
         @retval Deferred, for success of this operation
         """
-        raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def query(self, regex):
+    def query(regex):
         """
-        @param regex  regular expression matching zero or more keys
+        @param regex regular expression matching zero or more keys
         @retval Deferred, for list of values for keys matching the regex
+        @NOTE In question for removal.
         """
-        raise NotImplementedError, "Abstract Interface Not Implemented"
 
-    def remove(self, key):
+    def remove(key):
         """
         @param key  an immutable key associated with a value
         @retval Deferred, for success of this operation
         """
-        raise NotImplementedError, "Abstract Interface Not Implemented"
 
 
-class Store(IStore):
+class Store(object):
     """
     Memory implementation of an asynchronous key/value store, using a dict.
+    Simulates typical usage of using a client connection to a backend
+    technology.
     """
+    implements(IStore)
+
     def __init__(self, **kwargs):
         self.kvs = {}
-
-    def clear_store(self):
-        self.kvs = {}
-        return defer.succeed(None)
 
     def get(self, key):
         """
