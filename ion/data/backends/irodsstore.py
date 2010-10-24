@@ -8,12 +8,12 @@
 @
 """
 
-import re
+#import re
 import sys
 import logging
 logging = logging.getLogger(__name__)
 
-from twisted.internet import defer
+#from twisted.internet import defer
 
 from ion.core import ioninit
 from ion.data.store import IStore
@@ -43,6 +43,14 @@ class IrodsStore(IStore):
         self.conn = None
 
     @classmethod
+    def get_config(self, key):
+        try:
+            value = CONF[key]
+        except:
+            value = None
+        return value
+
+    @classmethod
     def create_store(cls, **kwargs):
         """
         @brief actory method to create an create an instance of the irods store 
@@ -53,22 +61,31 @@ class IrodsStore(IStore):
         inst = cls(**kwargs)
         inst.kwargs = kwargs
 
-        if not kwargs:
-            inst.hostname = CONF['irodsHost']
-            inst.port_num = CONF['irodsPort']
-            inst.default_resc = CONF['rodsDefResource']
-            inst.obj_home = CONF['irodsOOIHome']
-            inst.user_name = CONF['irodsUserName']
-            inst.user_passwd = CONF['irodsUserPasswd']
-            inst.zone = CONF['irodsZone']
-        else:   # get connection info from config
-            inst.hostname = kwargs.get('irodsHost', None)
-            inst.port_num = kwargs.get('irodsPort', None)
-            inst.default_resc = kwargs.get('rodsDefResource', None)
-            inst.obj_home = kwargs.get('irodsOOIHome', None)
-            inst.user_name = kwargs.get('irodsUserName', None)
-            inst.user_passwd = kwargs.get('irodsUserPasswd', None)
-            inst.zone = kwargs.get('irodsZone', None)
+        # get values from config file first
+        inst.hostname = inst.get_config('irodsHost')
+        inst.port_num = inst.get_config('irodsPort')
+        inst.default_resc = inst.get_config('rodsDefResource')
+        inst.obj_home = inst.get_config('irodsOOIHome')
+        inst.user_name = inst.get_config('irodsUserName')
+        inst.user_passwd = inst.get_config('irodsUserPasswd')
+        inst.zone = inst.get_config('irodsZone')
+
+        # can be overridden by args
+        if kwargs:
+            if kwargs.get('irodsHost', None):
+                inst.hostname = kwargs.get('irodsHost', None)
+            if kwargs.get('irodsPort', None):
+                inst.port_num = kwargs.get('irodsPort', None)
+            if kwargs.get('rodsDefResource', None):
+                inst.default_resc = kwargs.get('rodsDefResource', None)
+            if kwargs.get('irodsOOIHome', None):
+                inst.obj_home = kwargs.get('irodsOOIHome', None)
+            if kwargs.get('irodsUserName', None):
+                inst.user_name = kwargs.get('irodsUserName', None)
+            if kwargs.get('irodsUserPasswd', None):
+                inst.user_passwd = kwargs.get('irodsUserPasswd', None)
+            if kwargs.get('irodsZone', None):
+                inst.zone = kwargs.get('irodsZone', None)
         
         inst.conn, errMsg = rcConnect(inst.hostname, int(inst.port_num), inst.user_name, inst.zone)
 
@@ -145,8 +162,8 @@ class IrodsStore(IStore):
         fname = self.get_irods_fname_by_key(key)
         f = iRodsOpen(self.conn, fname, 'w', self.default_resc)
         if not f:
-            logging.info('Failed to open file for write: ' + irods_fname)
-            raise Exception('Failed to open file for write: ' + irods_fname)
+            logging.info('Failed to open file for write: ' + fname)
+            raise Exception('Failed to open file for write: ' + fname)
 
         f.write(value)
         f.close()
