@@ -21,6 +21,9 @@ class Repository(object):
     
     def __init__(self, mutable=None):
         
+        
+        #self.status  is a property determined by the workspace root object status
+        
         self._object_counter=1
         """
         A counter object used by this class to identify content objects untill
@@ -62,7 +65,7 @@ class Repository(object):
         
         self._current_branch = None
         """
-        The current branch object
+        The current branch object of the mutable head
         Branch names are generallly nonsense (uuid or some such)
         """
         
@@ -72,6 +75,8 @@ class Repository(object):
         self._merged_from = []
         """
         Keep track of branches which were merged into this one!
+        Like _current_brach, _merged_from is a list of links - not the actual
+        commit refs
         """
         
         self._stash = {}
@@ -209,7 +214,7 @@ class Repository(object):
         self._workspace_root = rootobj
         
         self._load_links(rootobj)
-        
+                
         return rootobj
         
         
@@ -221,21 +226,29 @@ class Repository(object):
         if self.status == self.MODIFIED:
             structure={}
             self._workspace_root._recurse_commit(structure)
-                
-            self._hashed_elements.update(structure)
-                
+                                
             cref = self._create_commit_ref(comment=comment)
-            
-            # Update the head of the current branch
-            self._current_branch.commitref = cref
                 
+            # Add the CRef to the hashed elements
+            cref._recurse_commit(structure)
+            
+            # set the cref to be readonly
+            cref.readonly = True
+            
+            # Add the cref to the active commit objects - for convienance
+            self._commit_index[cref.myid] = cref
+
+            # update the hashed elements
+            self._hashed_elements.update(structure)
+                            
         elif self.status == self.UPTODATE:
             pass
         else:
             raise Exception, 'Repository in invalid state to commit'
         
-        # Like git, return the commit id 
-        return self._current_branch._gpbMessage.commitref.key
+        # Like git, return the commit id
+        branch = self._current_branch
+        return branch.get_link('commitref').key
             
             
     
@@ -255,36 +268,29 @@ class Repository(object):
             
         cref.date = date
 
+        branch = self._current_branch
+
         # If this is the first commit to a new repository the current branch is a dummy
-        if self._current_branch.IsInitialized():
+        # If it is initialized it is real and we need to link to it!
+        if branch.IsInitialized():
             
             # This branch is real - add it to our ancestors
-            brnch = cref.ancestors.add()
-            brnch._gpbMessage.CopyFrom(self._current_branch._gpbMessage)
+            cref_b = cref.ancestors.add()
+            cref_b.name = branch.name
+            parent = branch.commitref # get the commit ref
+            cref_b.set_link_by_name('commitref',parent)
         
-        # For each branch that we merged from copy that reference
+        # For each branch that we merged from - add a  reference
         for mrgd in self._merged_from:
-            brnch = cref.ancestors.add()
-            brnch._gpbMessage.CopyFrom(mrgd._gpbMessage)
+            cref_b = cref.ancestors.add()
+            cref_b.name = mrgd.name
+            parent = mrgd.commitref # Get teh commit ref
+            cref_b.set_link_by_name('commitref',parent)
         
         cref.comment = comment
-        cref.objectroot = self._workspace_root
-            
-        # Set this link as a leaf - that way its content is not automagically loaded!
-        # This is probably not the right way to do this?
-        cref._gpbMessage.objectroot.isleaf = True
+        cref.set_link_by_name('objectroot', self._workspace_root)            
         
-        
-        # Add the CRef to the hashed elements
-        structure={}
-        cref._recurse_commit(structure)
-        self._hashed_elements.update(structure)
-        
-        # Add the cref to the active commit objects - for convienance
-        self._commit_index[cref.myid] = cref
-
-        # set the cref to be readonly
-        cref.readonly = True
+        branch.set_link_by_name('commitref',cref)
         
         return cref
     
@@ -334,7 +340,8 @@ class Repository(object):
             cref = self._current_branch.commitref
             
             # Set the new branch to point at the commit
-            brnch.commitref = cref
+            brnch.set_link_by_name('commitref',cref)
+            
             
             # Making a new branch re-attaches to a head!
             if self._detached_head:
@@ -446,9 +453,13 @@ class Repository(object):
             
         obj.ParseFromString(element.value)
         
-        obj._find_child_links()
+        # If it is not a leafe element - find its child links
+        if not element.isleaf:
+            obj._find_child_links()
+
         obj.modified = False
         
+        # Make a note in the element of the child links as well!
         for child in obj._child_links:
             element._child_links.add(child.key)
         
@@ -471,12 +482,10 @@ class Repository(object):
         
         
     def _set_type_from_obj(self, ltype, wrapped_obj):
-        
-        msg = wrapped_obj._gpbMessage
                 
-        ltype.protofile = msg.DESCRIPTOR.file.name.split('/')[-1]        
-        ltype.package = msg.DESCRIPTOR.file.package        
-        ltype.cls = msg.DESCRIPTOR.name
+        ltype.protofile = wrapped_obj._gpb_type.protofile      
+        ltype.package = wrapped_obj._gpb_type.package        
+        ltype.cls = wrapped_obj._gpb_type.cls
         
         
         
@@ -494,8 +503,8 @@ class Repository(object):
             
             
             #Make sure the link is in the objects set of child links
-            field._child_links.add(field)
-            value._parent_links.add(field)
+            field._child_links.add(field) # Adds to the fields root wrapper!
+            value._parent_links.add(field) 
             
             # If the link is currently set
             if field.key:

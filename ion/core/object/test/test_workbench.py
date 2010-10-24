@@ -75,10 +75,20 @@ class WorkBenchTest(unittest.TestCase):
             
     
     def test_pack_mutable(self):
-        
-        container = self.wb.pack_structure(self.repo._dotgit)
+        container = self.wb.pack_structure(self.repo._dotgit,include_leaf=False)
         
         print container
+        
+        
+    def test_pack_root_eq_unpack(self):
+        
+        container = self.wb.pack_structure(self.ab)
+            
+        res = self.wb.unpack_structure(container)
+        
+        self.assertEqual(res,self.ab)
+        
+        
             
         
         

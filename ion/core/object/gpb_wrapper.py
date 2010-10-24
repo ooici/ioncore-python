@@ -282,6 +282,15 @@ class Wrapper(object):
         return value
     
 
+    def get_link(self,linkname):
+            
+        gpb = self._gpbMessage
+        link = getattr(gpb,linkname)
+        link = self.rewrap(link)
+        assert link._gpb_type == self.LinkClassType, 'The field "%s" is not a link!' % linkname
+        return link
+        
+
 
     def __setattr__(self,key,value):
 
@@ -311,11 +320,22 @@ class Wrapper(object):
             else:
                 setattr(gpb, key, value)
                 
-            if not self.modified:
-                self._set_parents_modified()
+            # Set this object and it parents to be modified
+            self._set_parents_modified()
                 
         else:
             v = object.__setattr__(self, key, value)
+            
+    def set_link(self,value):
+        assert self.GPBType == self.LinkClassType, 'Can not set link for non link type!'
+        self.repository.set_linked_object(self,value)
+        if not self.modified:
+            self._set_parents_modified()
+        
+    def set_link_by_name(self,linkname,value):
+        link = self.get_link(linkname)
+        link.set_link(value)
+        
             
     def inparents(self,value):
         '''
@@ -335,28 +355,44 @@ class Wrapper(object):
             return
         
         # Create the Structure Element in which the binary blob will be stored
-        se = StructureElement()
+        se = StructureElement()        
         
         for link in self._child_links:
-            child = self.repository.get_linked_object(link)
-            child._recurse_commit(structure)
+                        
+            # Test to see if it is already serialized!
+            if self.repository._hashed_elements.has_key(link.key):
+                child_se = self.repository._hashed_elements.get(link.key)
+
+                # Set the links is leaf property
+                link.isleaf = child_se.isleaf
+                
+            else:
+                child = self.repository.get_linked_object(link)
+                
+                # Determine whether this is a leaf node
+                if len(child._child_links)==0:
+                    #Only change to true - do not set False!
+                    link.isleaf = True
+                else:
+                    link.isleaf = False
+            
+                child._recurse_commit(structure)
             
             # Save the link info as a convience for sending!
-            se._child_links.add(child.myid)
-            
-            # Determine whether this is a leaf node
-            if len(child._child_links)==0:
-                for parent in child._parent_links:
-                    if parent._root is self:
-                        # Hack through the wrapper to set isleaf
-                        link._gpbMessage.isleaf = True
-        
-        
-        
+            se._child_links.add(link.key)
+                    
         se.value = self.SerializeToString()
         se.key = sha1hex(se.value)
-        # This is confusing and probably not a great idea...
-        self.repository._set_type_from_obj(se.type,self)
+
+        # Structure element wrapper provides for setting type!
+        se.type = self
+        
+        # Determine whether I am a leaf
+        if len(self._child_links)==0:
+            se.isleaf=True
+        else:
+            se.isleaf = False
+            
         
         if self.repository._workspace.has_key(self.myid):
             del self.repository._workspace[self.myid]
@@ -364,13 +400,12 @@ class Wrapper(object):
         
         self.myid = se.key
         
-        
-        for link in self._parent_links:
-            # Hack through the wrapper to set key
-            link._gpbMessage.key = self.myid
-        
         self.modified = False
-        
+       
+        # Set the key value for parent links!
+        for link in self._parent_links:
+            link.key = self.myid
+            
         structure[se.key] = se
         
         
@@ -431,74 +466,7 @@ class Wrapper(object):
     def __str__(self):
         return self._gpbMessage.__str__()
         
-        
-    #def MergeFrom(self, other):
-    #    """Merges the contents of the specified message into current message.
-    #    
-    #    This method merges the contents of the specified message into the current
-    #    message. Singular fields that are set in the specified message overwrite
-    #    the corresponding fields in the current message. Repeated fields are
-    #    appended. Singular sub-messages and groups are recursively merged.
-    #    
-    #    Args:
-    #        other_msg: Message to merge into the current message.
-    #    """
-    #    if self is other:
-    #        return
-    #    
-    #    assert isinstance(other, Wrapper), \
-    #        'MergeFrom can only be performed on another Wrapper Object'
-    #    
-    #    assert self._gpb_full_name == other._gpb_full_name, \
-    #        'MergeFrom can only operate on two wrapped objects of the same type'
-    #    
-    #    self._gpbMessage.MergeFrom(other._gpbMessage)
-    #
-    #def CopyFrom(self, other):
-    #    """Copies the content of the specified message into the current message.
-    #    
-    #    The method clears the current message and then merges the specified
-    #    message using MergeFrom.
-    #    
-    #    Args:
-    #        other_msg: Message to copy into the current one.
-    #    """
-    #    if self is other:
-    #        return
-    #    assert isinstance(other, Wrapper), \
-    #        'CopyFrom can only be performed on another Wrapper Object'
-    #    
-    #    assert self._gpb_full_name == other._gpb_full_name, \
-    #        'CopyFrom can only operate on two wrapped objects of the same type'
-    #    
-    #    
-    #    self.Clear()
-    #    self.MergeFrom(other_msg)
-    #    
-    #
-    #
-    #def Clear(self):
-    #    """Clears all data that was set in the message."""
-    #        
-    #    if self.isroot():
-    #        self._workspace={}
-    #    
-    #    self._gpbMessage.Clear()
-    #
-    #    for key, linked_node in self._workspace.items():
-    #        stillmine = False
-    #        for link in linked_node._links:
-    #            if link.id == '-1':
-    #                # if it is no longer 'set' remove it
-    #                linked_node.links.remove(link)
-    #            elif link._root == self._root:
-    #                stillmine = True
-    #                
-    #        if not stillmine:
-    #            del self._workspace[key]
-                
-                
-                    
+
     def IsInitialized(self):
         """Checks if the message is initialized.
         
@@ -635,12 +603,17 @@ class StructureElement(object):
         return inst
         
         
-    @property
-    def type(self):
+    #@property
+    def get_type(self):
         return self._element.type
         
     #@type.setter
-    #def type(self,value):
+    def set_type(self,value):
+        self._element.type.protofile = value._gpb_type.protofile
+        self._element.type.package = value._gpb_type.package
+        self._element.type.cls = value._gpb_type.cls        
+     
+    type = property(get_type, set_type)
      
     #@property
     def get_value(self):
@@ -661,6 +634,16 @@ class StructureElement(object):
         self._element.key = value
 
     key = property(get_key, set_key)
+    
+    def set_isleaf(self,value):
+        self._element.isleaf = value
+        
+    def get_isleaf(self):
+        return self._element.isleaf
+    
+    isleaf = property(get_isleaf, set_isleaf)
+    
+    
         
     #def SerializeToString(self):
     #    """Serializes the protocol message to a binary string.
@@ -700,7 +683,8 @@ class ContainerWrapper(object):
         
     
     def __setitem__(self, key, value):
-        """Sets the item on the specified position."""
+        """Sets the item on the specified position.
+        Depricated"""
         assert isinstance(value, Wrapper), \
             'To set an item, the value must be a Wrapper'
         
@@ -711,11 +695,25 @@ class ContainerWrapper(object):
         else:
             raise Exception, 'It is illegal to set a value of a repeated composit field unless it is a CASRef - Link'
          
+        self._wrapper._set_parents_modified()
          
         # Don't want to expose SetItem for composits!        
         #else:
         #    item.CopyFrom(value)
         
+    def set_link(self,key,value):
+        assert isinstance(value, Wrapper), \
+            'To set an item, the value must be a Wrapper'
+        
+        item = self._gpbcontainer.__getitem__(key)
+        item = self._wrapper.rewrap(item)
+        if item.GPBType == self.LinkClassType:
+            self.repository.set_linked_object(item, value)
+        else:
+            raise Exception, 'It is illegal to set a value of a repeated composit field unless it is a CASRef - Link'
+         
+        self._wrapper._set_parents_modified()
+         
             
     def __getitem__(self, key):
         """Retrieves item by the specified key."""

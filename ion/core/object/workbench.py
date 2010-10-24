@@ -7,8 +7,18 @@ from ion.core.object import repository
 from ion.core.object import gpb_wrapper
 
 from net.ooici.core.container import container_pb2
+from net.ooici.core.mutable import mutable_pb2
+from net.ooici.core.type import type_pb2
 
 class WorkBench(object):
+ 
+ 
+ 
+    MutableClassType = type_pb2.GPBType()
+    MutableClassType.protofile = mutable_pb2.MutableNode.DESCRIPTOR.file.name.split('/')[-1]
+    MutableClassType.package = mutable_pb2.MutableNode.DESCRIPTOR.file.package
+    MutableClassType.cls = mutable_pb2.MutableNode.DESCRIPTOR.name
+ 
  
     def __init__(self, process):   
     
@@ -147,13 +157,16 @@ class WorkBench(object):
         
         obj_set=set()
         root_obj = None
-        mutable = None
         obj_list = []
         
+        # If we are sending the mutable head object
         if wrapper is repo._dotgit:
-            mutable = wrapper
+            structure = {}
+            wrapper._recurse_commit(structure)
+            root_obj = structure.get(wrapper.myid)
+            
             items = set()
-            for branch in mutable.branches:
+            for branch in wrapper.branches:
                 cref = branch.commitref
                 obj = self._hashed_elements.get(cref.myid,None)
                 if not obj:
@@ -162,6 +175,7 @@ class WorkBench(object):
                 items.add(obj)
             
         else:
+            # Else we are sending just the commited root object
             root_obj = self._hashed_elements.get(wrapper.myid,None)
             items = set([root_obj])
 
@@ -171,7 +185,6 @@ class WorkBench(object):
             child_items = set()
             for item in items:
                 
-                print 'ITEM', item
                 if len(item._child_links) >0:
                     
                     obj_set.add(item.key)    
@@ -190,22 +203,21 @@ class WorkBench(object):
                     
             items = child_items
 
-        if root_obj:
+        if root_obj.key in obj_set:
             #Make a list in the right order        
-            obj_list=[root_obj.key] # Start with the root!
             obj_set.discard(root_obj.key)
 
         for key in obj_set:
             obj_list.append(key)
         
-        print 'OBJLIST',obj_list
+        #print 'OBJLIST',obj_list
         
-        serialized = self._pack_container(obj_list, mutable)
+        serialized = self._pack_container(root_obj, obj_list)
         
         return serialized
         
     
-    def _pack_container(self, object_keys, mutable=None):
+    def _pack_container(self, head, object_keys):
         """
         Helper for the sender to pack message content into a container in order
         """
@@ -213,11 +225,11 @@ class WorkBench(object):
         # An unwrapped GPB Structure message to put stuff into!
         cs = container_pb2.Structure()
         
-        if mutable:
-            # Hack this for now...
-            cs.mutablehead.CopyFrom(mutable._gpbMessage)
-        
-        
+        cs.head.key = head._element.key
+        cs.head.type.CopyFrom(head._element.type)
+        cs.head.isleaf = head._element.isleaf
+        cs.head.value = head._element.value
+            
         for key in object_keys:
             hashed_obj = self._hashed_elements.get(key)         
             gpb_obj = hashed_obj._element
@@ -227,8 +239,11 @@ class WorkBench(object):
         
             # Can not set the pointer directly... must set the components
             se.key = gpb_obj.key
+            se.isleaf = gpb_obj.isleaf
             se.type.CopyFrom(gpb_obj.type) # Copy is okay - this is small
             se.value = gpb_obj.value # Let python's object manager keep track of the pointer to the big things!
+        
+        print 'CS', cs
         
         serialized = cs.SerializeToString()
         
@@ -244,14 +259,14 @@ class WorkBench(object):
         name based on the 
         """
         
-        obj_list, mutablehead = self._unpack_container(serialized_container)
+        head, obj_list = self._unpack_container(serialized_container)
         
-        if mutablehead:
+        if head.type == self.MutableClassType:
             
             # This is a pull or clone and we don't know the context here.
             # Return the mutable head as the content and let the process
             # operation figure out what to do with it!
-            repo = self._load_repo_from_mutable(mutablehead)
+            repo = self._load_repo_from_mutable(head)
             
             return repo
         
@@ -262,12 +277,9 @@ class WorkBench(object):
             # Create a new repository for the structure in the container
             repo, none = self.init_repository()
                 
-                
-            # Get the root object - the first in the list
-            se = self._hashed_elements.get(obj_list[0])
-                        
+           
             # Load the object and set it as the workspace root
-            root_obj = repo._load_element(se)
+            root_obj = repo._load_element(head)
             repo._workspace_root = root_obj
 
             # Use the helper method to make a commit ref to our new object root
@@ -303,9 +315,8 @@ class WorkBench(object):
             self._hashed_elements[wse.key]=wse
             obj_list.append(wse.key)
         
-        mh = None
-        if cs.HasField('mutablehead'):
-            mh = cs.mutablehead
+        head = gpb_wrapper.StructureElement.wrap_structure_element(cs.head)
+        self._hashed_elements[head.key]=head
     
-        return obj_list, mh
+        return head, obj_list
         
