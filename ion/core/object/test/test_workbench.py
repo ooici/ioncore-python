@@ -75,9 +75,7 @@ class WorkBenchTest(unittest.TestCase):
             
     
     def test_pack_mutable(self):
-        container = self.wb.pack_structure(self.repo._dotgit,include_leaf=False)
-        
-        print container
+        container = self.wb.pack_structure(self.repo._dotgit)
         
         
     def test_pack_root_eq_unpack(self):
@@ -89,6 +87,14 @@ class WorkBenchTest(unittest.TestCase):
         self.assertEqual(res,self.ab)
         
         
+    def test_pack_mutable_eq_unpack(self):
+            
+        container = self.wb.pack_structure(self.repo._dotgit)
+            
+        repo = self.wb.unpack_structure(container)
+        
+        self.assertEqual(repo._dotgit, self.repo._dotgit)
+            
             
         
         
