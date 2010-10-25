@@ -120,7 +120,7 @@ class QueueStatClient(ServiceClient):
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "dtrs"
+            kwargs['targetname'] = "queuestat"
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
