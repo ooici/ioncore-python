@@ -35,7 +35,7 @@ class TestQueueStatService(IonTestCase):
                 'class':'QueueStatService', 
                 'spawnargs' : {'interval_seconds' : 0.1}},
                 ]
-        yield self._spawn_processes(procs)
+        self.sup = yield self._spawn_processes(procs)
         
         id = str(uuid.uuid4())
         id = id[id.rfind('-')+1:] # shorter id
@@ -68,11 +68,19 @@ class TestQueueStatService(IonTestCase):
         yield pu.asleep(0.3)
         assert subscriber.queue_length[self.queuename] == 8
 
+        yield pu.asleep(0.3)
+        yield queuestat_client.unwatch_queue(self.queuename, str(subId), 'stat')
+        
+        yield self._add_messages(3)
+        yield pu.asleep(0.3)
+        assert subscriber.queue_length[self.queuename] == 8
+
 
     @defer.inlineCallbacks
     def _add_messages(self, count):
         for i in range(count):
-            yield self.send(self.queuename, 'work', 'this is a fake message')
+            yield self.sup.send(self.queuename, 'work', 
+                {'deal' : 'this is a fake message'})
 
 
 class TestSubscriber(Process):

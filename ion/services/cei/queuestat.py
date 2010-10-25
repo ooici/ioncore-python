@@ -103,10 +103,10 @@ class QueueStatService(ServiceProcess):
             if not subscribers:
                 continue
             queue_length = info['messages']
-            log.debug('Length of queue %s: %s messages' % name, queue_length)
+            log.debug('Length of queue %s: %s messages', name, queue_length)
 
             message = {'queue_name' : name, 'queue_length' : queue_length}
-            yield self._notify_subscribers(subscribers, message)
+            yield self._notify_subscribers(list(subscribers), message)
 
     @defer.inlineCallbacks
     def _notify_subscribers(self, subscribers, message):
