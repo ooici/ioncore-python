@@ -69,33 +69,55 @@ class WorkBenchTest(unittest.TestCase):
         
     def test_pack_root(self):
         
-        container = self.wb.pack_structure(self.ab)
+        serialized = self.wb.pack_structure(self.ab)
         
-        print container
+        print serialized
             
     
     def test_pack_mutable(self):
-        container = self.wb.pack_structure(self.repo._dotgit)
+        serialized = self.wb.pack_structure(self.repo._dotgit)
         
         
     def test_pack_root_eq_unpack(self):
         
-        container = self.wb.pack_structure(self.ab)
+        serialized = self.wb.pack_structure(self.ab)
             
-        res = self.wb.unpack_structure(container)
+        res = self.wb.unpack_structure(serialized)
         
         self.assertEqual(res,self.ab)
         
         
     def test_pack_mutable_eq_unpack(self):
             
-        container = self.wb.pack_structure(self.repo._dotgit)
+        serialized = self.wb.pack_structure(self.repo._dotgit)
             
-        repo = self.wb.unpack_structure(container)
+        repo = self.wb.unpack_structure(serialized)
         
         self.assertEqual(repo._dotgit, self.repo._dotgit)
+        
+        ab=repo.checkout(branch_name='master')
+        
+        self.assertEqual(ab, self.ab)
             
             
+        
+    def test_pack_repository_commits(self):
+        
+        self.repo.commit('testing repository packing')
+        
+        serialized = self.wb.pack_repository_commits(self.repo)
+        
+        repo = self.wb.unpack_structure(serialized)
+        
+        self.assertEqual(repo._dotgit, self.repo._dotgit)
+        
+        commit = repo._dotgit.branches[0].commitref
+        
+        
+        #Check that the commit came through
+        self.assertEqual(commit, self.repo._current_branch.commitref)
+        
+        
         
         
         

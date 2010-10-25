@@ -5,6 +5,12 @@
 @Brief Repository for managing data structures
 @author David Stuebe
 @author Matt Rodriguez
+
+TODO
+Remove name from branch
+Create ancestor iterator
+Create pretty print for ancestors
+
 """
 from net.ooici.core.mutable import mutable_pb2
 
@@ -19,7 +25,7 @@ class Repository(object):
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet'
     
-    def __init__(self, mutable=None):
+    def __init__(self, head=None):
         
         
         #self.status  is a property determined by the workspace root object status
@@ -53,15 +59,6 @@ class Repository(object):
         or sent in a message.
         """
         
-        if mutable:
-            self._dotgit = self._wrap_message_object(mutable, addtoworkspace = False)   
-        else:
-            self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
-            self._dotgit.key = pu.create_guid()
-        """
-        A specially wrapped Mutable GPBObject which tracks branches and commits
-        It is not 'stored' in the index - it lives in the workspace
-        """
         
         self._current_branch = None
         """
@@ -88,6 +85,19 @@ class Repository(object):
         """
         The work bench which this repository belongs to...
         """
+
+        if head:
+            self._dotgit = self._load_element(head)
+        else:
+           
+            self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
+            self._dotgit.key = pu.create_guid()
+        """
+        A specially wrapped Mutable GPBObject which tracks branches and commits
+        It is not 'stored' in the index - it lives in the workspace
+        """
+        
+        
         
     def checkout(self, branch_name=None, commit_id=None, older_than=None):
         """
@@ -453,7 +463,7 @@ class Repository(object):
             
         obj.ParseFromString(element.value)
         
-        # If it is not a leafe element - find its child links
+        # If it is not a leaf element - find its child links
         if not element.isleaf:
             obj._find_child_links()
 

@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 """
 @Brief Test implementation of a wrapper for Google Protocol Buffer Message Classes.
+
+TODO:
+Test Repeated Container for non composit fields
 """
 
 from ion.util import procutils as pu
@@ -204,6 +207,7 @@ class Wrapper(object):
             
             new_id = self.repository.new_id()
             self.repository._workspace[new_id] = self.root
+            
             del self.repository._workspace[self.myid]
             self.myid = new_id
                     

@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 """
 @Brief Workbench for operating on GPB backed objects
+
+TODO
+Remove repository name - what to do instead?
+
 """
 
 from ion.core.object import repository
@@ -13,16 +17,15 @@ from net.ooici.core.type import type_pb2
 class WorkBench(object):
  
  
- 
     MutableClassType = type_pb2.GPBType()
     MutableClassType.protofile = mutable_pb2.MutableNode.DESCRIPTOR.file.name.split('/')[-1]
     MutableClassType.package = mutable_pb2.MutableNode.DESCRIPTOR.file.package
     MutableClassType.cls = mutable_pb2.MutableNode.DESCRIPTOR.name
  
  
-    def __init__(self, process):   
+    def __init__(self, myprocess):   
     
-        self._process = process
+        self._process = myprocess
         
         self._repos = {}
         
@@ -31,7 +34,7 @@ class WorkBench(object):
         self._hashed_elements={}
         """
         A shared dictionary for hashed objects
-        """
+        """            
         
         
     def clone(self, ID_Ref, name=None):
@@ -41,12 +44,25 @@ class WorkBench(object):
         """
         # rpc_send - datastore, clone, ID_REf
     
-    def _load_repo_from_mutable(self,mutable):
+    def _load_repo_from_mutable(self,head):
         """
         Load a repository from a mutable - helper for clone and other methods
         that send and receive an entire repo.
         mutable is a raw (unwrapped) gpb message
         """
+        
+        
+        repo = repository.Repository(head)
+                
+        repo._workbench = self
+            
+        repo._hashed_elements = self._hashed_elements
+        
+        
+        mutable = repo._dotgit
+        # Load all of the commit refs that came with this head.
+        repo._load_links(mutable)
+        
         name = None
         if mutable.HasField('name') and mutable.name not in self._repos.keys():
             name = mutable.name
@@ -54,14 +70,6 @@ class WorkBench(object):
             name = 'repo_%s' % self._repo_cntr
             self._repo_cntr += 1
         
-        repo = repository.Repository(mutable)
-                
-        repo._workbench = self
-            
-        repo._hashed_elements = self._hashed_elements
-        
-        # Load all of the commit refs that came with this head.
-        repo._load_links(repo._dotgit)
         
         self._repos[name] = repo
         
@@ -109,11 +117,15 @@ class WorkBench(object):
         Fork the structure in the wrapped gpb object into a new repository.
         """
         
-        
+    @defer.inlineCallbacks
     def push(self, name):
         """
         Push the current state of the repository
         """
+        (content, headers, msg) = yield self._process.rpc_send('datastore','hello', 'testing')
+        
+        print 'CONTENT',content
+        
         
     def pull(self,name):
         """
@@ -140,6 +152,55 @@ class WorkBench(object):
         Simple list tool for repository names
         """
         return self._repos.keys()
+        
+    def pack_repository_commits(self,repo, depth=5):
+        """
+        pack just the mutable head and the commits!
+        """
+
+        assert repo in self._repos.values(), 'This repository is not in the process workbench!'
+        
+        mutable = repo._dotgit
+        # Get the Structure Element for the mutable head
+        structure = {}
+        mutable._recurse_commit(structure)
+        root_obj = structure.get(mutable.myid)
+            
+        cref_set = set()
+        for branch in mutable.branches:
+            cref = branch.commitref
+            
+            # Keep track of the commits
+            cref_set.add(cref)
+            
+        obj_set = set()
+            
+        assert isinstance(depth, (int, long)), 'Pack_Repository_Commits: Depth must be an integer type'
+
+        while depth != 0:
+                
+            new_set = set()
+                
+            for commit in cref_set:
+                obj_set.add(cref.myid)
+                    
+                for anc in commit.ancestors:
+                    new_set.add(anc.commitref)
+            
+            # Now recurse on the ancestors    
+            cref_set = new_set
+            
+            depth -= 1
+            
+        obj_list = []
+        for key in obj_set:
+            obj_list.append(key)
+                
+        serialized = self._pack_container(root_obj, obj_list)
+        
+        return serialized
+                
+        
         
     def pack_structure(self, wrapper, include_leaf=True):
         """
@@ -243,7 +304,7 @@ class WorkBench(object):
             se.type.CopyFrom(gpb_obj.type) # Copy is okay - this is small
             se.value = gpb_obj.value # Let python's object manager keep track of the pointer to the big things!
         
-        print 'CS', cs
+        
         
         serialized = cs.SerializeToString()
         
@@ -266,6 +327,7 @@ class WorkBench(object):
             # This is a pull or clone and we don't know the context here.
             # Return the mutable head as the content and let the process
             # operation figure out what to do with it!
+                        
             repo = self._load_repo_from_mutable(head)
             
             return repo
@@ -281,6 +343,7 @@ class WorkBench(object):
             # Load the object and set it as the workspace root
             root_obj = repo._load_element(head)
             repo._workspace_root = root_obj
+            repo._workspace[root_obj.myid] = root_obj
 
             # Use the helper method to make a commit ref to our new object root
             cref = repo._create_commit_ref(comment='Message for you Sir!')
