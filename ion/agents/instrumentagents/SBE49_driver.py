@@ -103,6 +103,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.setTopicDefined(False)
         self.publish_to = None
         self.dataQueue = []
+        self.proto = None
     
         self.instCmdXlator = SBE49_instCommandXlator()
         
@@ -251,8 +252,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
         log.debug("!!!!!!!!!!!!!!!  In stateDisconnecting state")
         if caller.tEvt['sType'] == "init":
             log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
-            log.debug("disconnecting from instrument")
-            self.proto.transport.loseConnection()
+            if (self.proto):
+                log.debug("disconnecting from instrument")
+                self.proto.transport.loseConnection()
+            else:
+                log.debug("no proto instance: cannot disconnect")
             return 0
         elif caller.tEvt['sType'] == "entry":
             log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
@@ -310,6 +314,13 @@ class SBE49InstrumentDriver(InstrumentDriver):
             #caller.stateTran(self.stateConnected)
             log.debug("!!!!!!!!!!!!! sending crlf!!!")
             self.instrument.transport.write("\r\n")
+            return 0
+        elif caller.tEvt['sType'] == "eventDisconnectReceived":
+            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
+            #
+            # Transition to the stateDisconnecting state
+            #
+            caller.stateTran(self.stateDisconnecting)
             return 0
         # Don't think I should get this here...candidate for deletion
         elif caller.tEvt['sType'] == "eventDataReceived":
@@ -447,7 +458,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         cc = ClientCreator(reactor, InstrumentClient, self)
         log.info("Driver connecting to instrument ipaddr: %s, ipport: %s" %(self.instrument_ipaddr, self.instrument_ipport))
         #self.proto = yield cc.connectTCP("localhost", self.instrument_ipport)
-        self.proto = yield cc.connectTCP(self.instrument_ipaddr, self.instrument_ipport)
+        self.proto = yield cc.connectTCP(self.instrument_ipaddr, int(self.instrument_ipport))
         log.info("Driver connected to instrument")
 
     def gotConnected(self, instrument):
@@ -687,12 +698,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
         if 'ipaddr' in params:
             self.instrument_ipaddr = params['ipaddr']
         else:
-            log.debug("%%%%%%%% No ipaddr in params")
+            log.debug("%%%%%%%% No ipaddr in params: defaulting to: %s" %self.instrument_ipaddr)
             
         if 'ipport' in params:
-            self.instrument_ipportr = params['ipport']
+            self.instrument_ipport = params['ipport']
         else:
-            log.debug("%%%%%%%% No ipport in params")
+            log.debug("%%%%%%%% No ipport in params: defaulting to: %s" %self.instrument_ipport)
             
         if 'publish-to' in params:
             self.publish_to = params['publish-to']
