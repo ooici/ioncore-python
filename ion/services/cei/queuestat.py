@@ -48,6 +48,10 @@ class QueueStatService(ServiceProcess):
         # a dict of sets of (subscriber,op) tuples
         self.watched_queues = {}
 
+    def plc_terminate(self):
+        log.debug('Shutdown triggered')
+        self.rabbitmq.shutdown()
+
     def op_watch_queue(self, content, headers, msg):
         """Start watching a queue for updates. If queue is already being
         watched by this subscriber, this operation does nothing.

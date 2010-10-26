@@ -15,6 +15,7 @@ from twisted.internet import defer
 
 from ion.core.process.process import Process
 import ion.util.procutils as pu
+import ion.test.iontest
 from ion.test.iontest import IonTestCase
 from ion.services.cei.queuestat import QueueStatClient
 
@@ -28,6 +29,10 @@ class TestQueueStatService(IonTestCase):
 
         if not os.path.exists(os.path.expanduser('~/.erlang.cookie')):
             raise unittest.SkipTest('Needs a RabbitMQ server on localhost')
+
+        log.debug('Temporarily changing broker_host to 127.0.0.1')
+        self.other_broker_host = ion.test.iontest.CONF.obj['broker_host']
+        ion.test.iontest.CONF.obj['broker_host'] = '127.0.0.1'
 
         yield self._start_container()
         procs = [
@@ -47,7 +52,11 @@ class TestQueueStatService(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        yield self._shutdown_processes()
         yield self._stop_container()
+
+        log.debug('Resetting broker_host')
+        ion.test.iontest.CONF.obj['broker_host'] = self.other_broker_host
 
     @defer.inlineCallbacks
     def test_queue_stat(self):
