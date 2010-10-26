@@ -13,6 +13,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 from ion.core.id import Id
 import ion.util.procutils as pu
+from ion.core.process.process import ProcessDesc
 
 # The shell namespace
 namespace = None
