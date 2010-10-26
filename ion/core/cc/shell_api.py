@@ -174,14 +174,14 @@ def kill(id):
     """
 
 
-def _get_target(name):
-    mod = name
-    for p in control.cc.svcs.keys():
-        if p.startswith(name):
-            mod = control.cc.svcs[p]['class'].__module__
-            name = p
-            break
-    return (mod, name)
+#def _get_target(name):
+#    mod = name
+#    for p in control.cc.svcs.keys():
+#        if p.startswith(name):
+#            mod = control.cc.svcs[p]['class'].__module__
+#            name = p
+#            break
+#    return (mod, name)
 def _get_node(node=None):
     agent = namespace['agent']
     if type(node) is int:
