@@ -144,6 +144,7 @@ def _get_node(node=None):
                 break
     return node
 
+@defer.inlineCallbacks
 def spawn(module, node=None, spawnargs=None, space=None):
     """spawn something (function or module).
     Space is message space; container has a default space
