@@ -157,7 +157,7 @@ def spawn(module, node=None, spawnargs=None, space=None):
     elif type(module) is str:
         modstr = module
 
-    (mod,name) = _get_target(name)
+    (mod,name) = _get_target(modstr)
     if node != None:
         node = _get_node(node)
         sup.send(node,'spawn',{'module':mod})
