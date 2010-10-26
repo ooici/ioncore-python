@@ -223,7 +223,7 @@ class Instrument(protocol.Protocol):
                 self.transport.write("?CMD")
 
     def connectionLost(self, reason):
-        log.debug("Simmulator connection now closed")
+        log.debug("Simulator connection now closed")
         self.factory.connections.remove(self)
 
     def testSampler(self):
