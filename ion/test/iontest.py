@@ -95,6 +95,8 @@ class IonTestCase(unittest.TestCase):
             dc.cancel()
         if self.container:
             yield self.container.terminate()
+        elif ioninit.container_instance:
+            yield ioninit.container_instance.terminate()
         bootstrap.reset_container()
         log.info("============ION container closed============")
 
