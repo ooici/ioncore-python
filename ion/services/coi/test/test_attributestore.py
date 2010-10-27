@@ -82,7 +82,10 @@ class AttrStoreServiceTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_default(self):
+    def test_defaults(self):
+        """
+        See what happens if you take the defaults (no spawnargs)
+        """
         services = [
             {'name':'Junk1',
              'module':'ion.services.coi.attributestore',
@@ -90,6 +93,7 @@ class AttrStoreServiceTest(IonTestCase):
             ]
 
         sup = yield self._spawn_processes(services)
+        # No interactions, just startup/shutdown
 
     @defer.inlineCallbacks
     def test_put_common_backend(self):
