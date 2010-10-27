@@ -7,8 +7,14 @@ Remove repository name - what to do instead?
 
 """
 
+from twisted.internet import defer
+
 from ion.core.object import repository
 from ion.core.object import gpb_wrapper
+
+
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 from net.ooici.core.container import container_pb2
 from net.ooici.core.mutable import mutable_pb2
@@ -118,13 +124,23 @@ class WorkBench(object):
         """
         
     @defer.inlineCallbacks
-    def push(self, name):
+    def push(self, name, target):
         """
         Push the current state of the repository
         """
-        (content, headers, msg) = yield self._process.rpc_send('datastore','hello', 'testing')
+        #targetname = self._process.get_scoped_name('system', target)
+        #print 'TARGET NAME', targetname
+        (content, headers, msg) = yield self._process.rpc_send(target,'push', self._repos[name])
         
-        print 'CONTENT',content
+        print 'CONTENT',type(content), content
+        
+    @defer.inlineCallbacks
+    def op_push(self, content, headers, msg):
+        log.info('op_push: '+str(content))
+        
+
+        # The following line shows how to reply to a message
+        yield self._process.reply(msg, 'result',{'value':'Hello there, '+str(content)}, {})
         
         
     def pull(self,name):

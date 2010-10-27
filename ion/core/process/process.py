@@ -387,10 +387,12 @@ class Process(BasicLifecycleObject):
                 op = payload['op']
                 content = payload.get('content','')
                 opname = 'op_' + str(op)
-
                 # dynamically invoke the operation in the given class
                 if hasattr(self, opname):
                     opf = getattr(self, opname)
+                    return defer.maybeDeferred(opf, content, payload, msg)
+                elif hasattr(self.workbench,opname):
+                    opf = getattr(self.workbench, opname)                    
                     return defer.maybeDeferred(opf, content, payload, msg)
                 elif hasattr(self,'op_none'):
                     return defer.maybeDeferred(self.op_none, content, payload, msg)

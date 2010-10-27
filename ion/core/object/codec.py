@@ -16,6 +16,7 @@ from ion.core.intercept.interceptor import EnvelopeInterceptor
 import ion.util.procutils as pu
 
 from ion.core.object import gpb_wrapper
+from ion.core.object import repository
 from net.ooici.play import addressbook_pb2
 ION_R1_GPB = 'ION R1 GPB'
 
@@ -58,6 +59,9 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
             
         if isinstance(content, gpb_wrapper.Wrapper):
             invocation.message['content'] = invocation.workbench.pack_structure(content)
+        
+        elif isinstance(content, repository.Repository):
+            invocation.wb.pack_repository_commits(content)
                      
             invocation.message['encoding'] = ION_R1_GPB        
         

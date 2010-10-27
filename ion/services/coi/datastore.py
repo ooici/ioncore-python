@@ -13,6 +13,9 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
+from ion.services.dm.preservation import store
+
+
 class DataStoreService(ServiceProcess):
     """
     Example service interface
@@ -24,19 +27,27 @@ class DataStoreService(ServiceProcess):
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
+        
+        #assert isinstance(backend, store.IStore)
+        #self.backend = backend
+        
+        
         ServiceProcess.__init__(self, *args, **kwargs)
         log.info('DataStoreService.__init__()')
+        
+        
+        
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
 
-    @defer.inlineCallbacks
-    def op_hello(self, content, headers, msg):
-        log.info('op_hello: '+str(content))
+    #@defer.inlineCallbacks
+    #def op_push(self, content, headers, msg):
+    #    log.info('op_hello: '+str(content))
 
         # The following line shows how to reply to a message
-        yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
+    #    yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
 
 
 class DataStoreServiceClient(ServiceClient):

@@ -13,7 +13,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.process.process import Process, ProcessClient
+from ion.core.process.process import Process, ProcessClient, ProcessFactory
 from ion.core.cc.container import Container
 from ion.core.messaging.receiver import ServiceWorkerReceiver
 import ion.util.procutils as pu
@@ -157,6 +157,7 @@ class ServiceProcess(Process):
         log.debug("Service-declare: %s" % (kwargs))
         return kwargs
 
+factory = ProcessFactory(ServiceProcess)
 
 class ServiceClient(ProcessClient):
     """
