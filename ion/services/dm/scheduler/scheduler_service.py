@@ -49,8 +49,6 @@ class SchedulerService(ServiceProcess):
         """
         try:
             task_id = str(uuid4())
-            target = content['target']
-            msg_payload = content['payload']
             msg_interval = float(content['interval'])
         except KeyError, ke:
             log.exception('Required keys in payload not found!')
@@ -94,8 +92,6 @@ class SchedulerService(ServiceProcess):
         """
         Query tasks registered, returns a maybe-empty list
         """
-        task_regex = content
-
         log.debug('Looking for matching tasks')
         tlist = yield self.store.query(content)
 
