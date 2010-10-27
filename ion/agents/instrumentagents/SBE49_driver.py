@@ -103,6 +103,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.setTopicDefined(False)
         self.publish_to = None
         self.dataQueue = []
+        self.cmdQueue = []
         self.proto = None
     
         self.instCmdXlator = SBE49_instCommandXlator()
@@ -229,6 +230,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
             log.info("!!!!!! transitioning to stateConfigured! idle-%s;" %(caller.tEvt['sType']))
             self.hsm.stateTran(self.stateConfigured)
             return 0
+        elif caller.tEvt['sType'] == "eventCommandReceived":
+            log.debug("idle-%s;" %(caller.tEvt['sType']))
+            return 0
         return caller.tEvt['sType']
 
     def stateConfigured(self, caller):
@@ -284,6 +288,13 @@ class SBE49InstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "exit":
             log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             return 0
+        elif caller.tEvt['sType'] == "eventConnectionComplete":
+            log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
+            # Send crlf, then transition to stateConnecting
+            self.sendCmd("\r\n")
+            caller.stateTran(self.stateConnecting)
+            return 0
+        # Get rid of this; not valid, shouldn't happen
         elif caller.tEvt['sType'] == "eventCommandReceived":
             log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             #
@@ -311,9 +322,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             # DHE: Don't transition to the stateConnected state
             # until we get the prompt.
             #
-            #caller.stateTran(self.stateConnected)
-            log.debug("!!!!!!!!!!!!! sending crlf!!!")
-            self.instrument.transport.write("\r\n")
+            self.sendCmd("\r\n")
             return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
             log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
@@ -349,9 +358,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
             """
             @todo Need a queue of commands from which to pull commands
             """
-            # if command pending
-            if self.testcommand:
-               self.instrument.transport.write(self.testcommand)
+            if self.cmdPending():
+               self.sendCmd(self.dequeueCmd())
             return 0
         elif caller.tEvt['sType'] == "entry":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
@@ -361,9 +369,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
-            # if command pending
-            if self.testcommand:
-               self.instrument.transport.write(self.testcommand)
+            if self.cmdPending():
+               self.sendCmd(self.dequeueCmd())
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
@@ -436,7 +443,23 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
     def dequeueData(self):
         return self.dataQueue.pop()
+        
+    def enqueueCmd(self, cmd):
+        self.cmdQueue.append(cmd)
 
+    def dequeueCmd(self):
+        return self.cmdQueue.pop()
+
+    def cmdPending(self):
+        if len(self.cmdQueue) > 0:
+            return True
+        else:
+            return False
+        
+    def sendCmd(self, cmd):
+        log.debug("Sending Command: %s" %cmd)
+        self.instrument.transport.write(cmd)
+        
     @defer.inlineCallbacks
     def getConnected(self):
         """
@@ -457,7 +480,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
         # single connection.
         cc = ClientCreator(reactor, InstrumentClient, self)
         log.info("Driver connecting to instrument ipaddr: %s, ipport: %s" %(self.instrument_ipaddr, self.instrument_ipport))
-        #self.proto = yield cc.connectTCP("localhost", self.instrument_ipport)
         self.proto = yield cc.connectTCP(self.instrument_ipaddr, int(self.instrument_ipport))
         log.info("Driver connected to instrument")
 
@@ -473,10 +495,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
         log.debug("gotConnected!!!")
 
         self.instrument = instrument
+
+        #
+        # Don't need this anymore
+        #
         self.setConnected(True)
         
-        # NEW NEW
-        # DHE: Moving this to after gotPromt
         self.hsm.onEvent('eventConnectionComplete')
 
 
@@ -490,8 +514,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         log.debug("gotDisconnected!!!")
 
-        # NEW NEW
         self.hsm.onEvent('eventDisconnectComplete')
+
+        #
+        # Don't need this anymore
+        #
         self.setConnected(False)
 
     def gotData(self, data):
@@ -512,23 +539,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.hsm.onEvent('eventDataReceived')
         
     def gotPrompt(self, instrument):
-        """
-        This needs to be the general receive routine for the instrument driver
-        """
         log.debug("gotPrompt()")
-        #self.instrument = instrument
-        #self.setConnected(True)
-
-        # NEW NEW
-        #
-        # We need to not transition from the connected state until we get the eventPromptReceived.
-        #
         self.hsm.onEvent('eventPromptReceived')
 
-        """
-        Do we need some sort of state machine so we'll know what data we're
-        supposed to send here?  Right now it's working without...
-        """
 
     @defer.inlineCallbacks
     def publish(self, data, topic):
@@ -588,31 +601,42 @@ class SBE49InstrumentDriver(InstrumentDriver):
             list?
         """
 
-        """
-        This connection stuff could be abstracted into a communications object.
-        """
-        if self.isConnected() == False:
-            log.debug("yielding for connect")
-            yield self.getConnected()
-            log.debug("connect returned")
-
         assert(isinstance(content, dict))
         log.debug("op_set_params content: %s, keys: %s" %(str(content), str(content.keys)))
 
+        error_msg = None
         for param in content.keys():
             if (param not in self.__instrument_parameters):
-                yield self.reply_err(msg, "Could not set %s" % param)
+                # Getting rid of this
+                #yield self.reply_err(msg, "Could not set %s" % param)
+                error_msg = "Could not set " + str(param)
+                log.error(error_msg)
+                # NEED TO BREAK OUT HERE: don't send multiple responses
+                break;
             else:
                 self.__instrument_parameters[param] = content[param]
                 if param in self.sbeParmCommands:
-                    if self.isConnected():
-                        log.info("current param is: %s" %str(param))
-                        command = self.sbeParmCommands[param] + "=" + str(content[param])
-                        log.debug("op_set_params sending %s to instrument"  %str(command))
-                        self.instrument.transport.write(command)
+                    log.info("current param is: %s" %str(param))
+                    command = self.sbeParmCommands[param] + "=" + str(content[param])
+                    log.debug("op_set_params sending %s to instrument"  %str(command))
+                    #self.instrument.transport.write(command)
+                    # THIS NEEDS TO GO: STATE MACHINE WILL DO THIS
+                    #self.sendCommand(command)
+                    """
+                    Send the command received event.  This should kick off the
+                    appropriate sequence of events to get the command sent.
+                    """
+                    self.enqueueCmd(command)
+                    self.hsm.onEvent('eventCommandReceived')
                 else:
-                    log.error("%s is not a settable parameter" % str(param))
-        yield self.reply_ok(msg, content)
+                    error_msg = str(param) + " is not a settable parameter"
+                    #log.error("%s is not a settable parameter" % str(param))
+                    log.error(error_msg)
+                    
+        if error_msg:
+            yield self.reply_err(msg, error_msg)
+        else:            
+            yield self.reply_ok(msg, content)
 
     @defer.inlineCallbacks
     def op_execute(self, content, headers, msg):
@@ -639,9 +663,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 log.debug("op_execute translating command: %s" % command)
                 self.testcommand = self.instCmdXlator.translate(command)
                 log.debug("op_execute would send command: %s to instrument" % self.testcommand)
-                #log.debug("op_execute sending command: %s to instrument" % command)
                 self.testcommand += "\r\n"
-                #self.command + "\r\n"
          
                 """
                 Send the command received event.  This should kick off the
@@ -650,7 +672,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 self.hsm.onEvent('eventCommandReceived')
 
                 #commands.append(command)
+                #
+                # DHE: get rid of this command thing ASAP
+                #
                 commands.append(self.testcommand)
+                self.enqueueCmd(self.testcommand)
                 agentCommands.append(command)
                 # DHE right now a 1-1 correspondence
                 #yield self.reply_ok(msg, commands)
