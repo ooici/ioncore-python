@@ -13,7 +13,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-from ion.data import store
+from ion.services.dm.preservation import store
 from ion.data import dataobject
 from ion.data.datastore import objstore
 

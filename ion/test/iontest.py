@@ -18,7 +18,7 @@ from ion.core.cc import container
 from ion.core.cc.container import Id, Container
 from ion.core.process import process
 from ion.core.process.process import IProcess, Process
-from ion.data.store import Store
+from ion.services.dm.preservation.store import Store
 import ion.util.procutils as pu
 
 from ion.resources import description_utility
@@ -95,6 +95,8 @@ class IonTestCase(unittest.TestCase):
             dc.cancel()
         if self.container:
             yield self.container.terminate()
+        elif ioninit.container_instance:
+            yield ioninit.container_instance.terminate()
         bootstrap.reset_container()
         log.info("============ION container closed============")
 
