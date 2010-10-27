@@ -52,7 +52,7 @@ class PreservationService(ServiceProcess):
         """
         # Spawn persister to topic/file name
         persister={'name':'persister 1', # Give it a new name?
-                 'module':'ion.services.dm.preservation.persister',
+                 'module':'ion.services.dm.transformation.persister',
                  'procclass':'Persister',
                  'spawnargs':{'attach':[topic.queue.name],
                               'process parameters':{'fname':arc.name}}}
