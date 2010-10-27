@@ -36,7 +36,7 @@ class StoreService(ServiceProcess):
     @defer.inlineCallbacks
     def slc_init(self):
         # use spawn args to determine backend class, second config file
-        backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.data.store.Store'))
+        backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.services.dm.preservation.store.Store'))
         backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', default={}))
 
         self.backend = None
