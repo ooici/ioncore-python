@@ -10,7 +10,6 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
@@ -65,9 +64,14 @@ factory = ProcessFactory(HelloService)
 """
 from ion.play import hello_service as h
 spawn(h)
+
+# TODO:
+# supervisor process is #1, our hello_service should be #2.
+# sending to 1 results in a callback with no data, sending to 2 does not
+# ever call back.
 send(1, {'op':'hello','content':'Hello you there!'})
 
 from ion.play.hello_service import HelloServiceClient
-hc = HelloServiceClient(1)
+hc = HelloServiceClient()
 hc.hello()
 """
