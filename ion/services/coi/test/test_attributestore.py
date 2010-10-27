@@ -10,11 +10,9 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from twisted.trial import unittest
 
-from ion.services.coi.attributestore import AttributeStoreService, AttributeStoreClient
+from ion.services.coi.attributestore import AttributeStoreClient
 from ion.test.iontest import IonTestCase
-import ion.util.procutils as pu
 
 
 class AttrStoreServiceTest(IonTestCase):
@@ -39,7 +37,7 @@ class AttrStoreServiceTest(IonTestCase):
             'class':'AttributeStoreService',
             'spawnargs':{
                 'servicename':'as1',
-                'backend_class':'ion.data.store.Store',
+                'backend_class':'ion.services.dm.preservation.store.Store',
                 'backend_args':{}
                     }
                 },
@@ -48,7 +46,7 @@ class AttrStoreServiceTest(IonTestCase):
             'class':'AttributeStoreService',
             'spawnargs':{
                 'servicename':'as2',
-                'backend_class':'ion.data.store.Store',
+                'backend_class': 'ion.services.dm.preservation.store.Store',
                 'backend_args':{}
                     }
                 },
