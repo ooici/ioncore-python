@@ -26,8 +26,12 @@ del sys
 
 # Configure logging system (console, logfile, other loggers)
 # NOTE: Console logging is appended to Twisted log output prefix!!
-logging.config.fileConfig(ic.LOGCONF_FILENAME)
-
+if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
+    altpath = os.environ.get(ic.ION_ALTERNATE_LOGGING_CONF)
+    logging.config.fileConfig(altpath)
+else:
+    logging.config.fileConfig(ic.LOGCONF_FILENAME)
+    
 # Load configuration properties for any module to access
 ion_config = Config(ic.ION_CONF_FILENAME)
 
