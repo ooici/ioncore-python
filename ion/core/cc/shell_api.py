@@ -13,6 +13,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 from ion.core.id import Id
 import ion.util.procutils as pu
+from ion.core.process.process import ProcessDesc
 
 # The shell namespace
 namespace = None
@@ -104,8 +105,8 @@ def send(to_name, op, content=None, headers=None, **kwargs):
         content = {}
 
     _update()
-    procs = namespace['procs']
-    if to_name in procs: recv = procs[to_name]
+    #procs = namespace['procs']
+    #if to_name in procs: recv = procs[to_name]
 
     sup = yield ioninit.container_instance.proc_manager.create_supervisor()
     yield sup.send(to_name, op, content, headers, **kwargs)
@@ -119,8 +120,8 @@ def rpc_send(to_name, op, content=None, headers=None, **kwargs):
         content = {}
 
     _update()
-    procs = namespace['procs']
-    if to_name in procs: recv = procs[to_name]
+    #procs = namespace['procs']
+    #if to_name in procs: recv = procs[to_name]
 
     sup = yield ioninit.container_instance.proc_manager.create_supervisor()
     yield sup.rpc_send(to_name, op, content, headers, **kwargs)
@@ -135,14 +136,17 @@ def _get_target(name):
             name = p
             break
     return (mod, name)
+
 def _get_node(node=None):
+    agent = namespace['agent']
     if type(node) is int:
-        for cid in self.containers.keys():
+        for cid in agent.containers.keys():
             if cid.find(str(node)) >= 0:
-                node = str(self.containers[cid]['agent'])
+                node = str(agent.containers[cid]['agent'])
                 break
     return node
 
+@defer.inlineCallbacks
 def spawn(module, node=None, spawnargs=None, space=None):
     """spawn something (function or module).
     Space is message space; container has a default space
@@ -157,12 +161,12 @@ def spawn(module, node=None, spawnargs=None, space=None):
     elif type(module) is str:
         modstr = module
 
-    (mod,name) = _get_target(name)
+    (mod,name) = _get_target(modstr)
     if node != None:
         node = _get_node(node)
         sup.send(node,'spawn',{'module':mod})
     else:
-        d = sup.spawn_child(ProcessDesc(name=name, module=mod))
+        sup.spawn_child(ProcessDesc(name=name, module=mod))
     #
     #return ioninit.container_instance.proc_manager.spawn_process_local(
     #        modstr, space, spawnargs)
@@ -173,23 +177,6 @@ def kill(id):
      - delete
     """
 
-
-def _get_target(name):
-    mod = name
-    for p in control.cc.svcs.keys():
-        if p.startswith(name):
-            mod = control.cc.svcs[p]['class'].__module__
-            name = p
-            break
-    return (mod, name)
-def _get_node(node=None):
-    agent = namespace['agent']
-    if type(node) is int:
-        for cid in agent.containers.keys():
-            if cid.find(str(node)) >= 0:
-                node = str(agent.containers[cid]['agent'])
-                break
-    return node
 def nodes():
     agent = namespace['agent']
     nodes = {}
@@ -222,5 +209,5 @@ def _update():
         namespace['procs'] = process.procRegistry.kvs
         namespace['svcs'] = process.processes
 
-    except Exception, ex:
+    except Exception:
         log.exception("Error updating CC shell namespace")

@@ -35,6 +35,7 @@ class IdentityRegistryClient(BaseRegistryClient):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "identity_service"
         ServiceClient.__init__(self, proc, **kwargs)
+        log.error("IDENTITY REGISTRY STARTED!!!!")
 
 
     def clear_identity_registry(self):

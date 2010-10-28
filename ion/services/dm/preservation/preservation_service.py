@@ -4,20 +4,18 @@
 """
 @file ion/services/dm/preservation/preservation_service.py
 @author David Stuebe
-@brief service controling preservation of OOI Data
+@author Matt Rodriguez
+@brief service controlling preservation of OOI Data
 """
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-
 from ion.services.dm.preservation import preservation_registry
 
-from ion.resources import dm_resource_descriptions
 
 class PreservationService(ServiceProcess):
     """Preservation Service interface
@@ -52,7 +50,7 @@ class PreservationService(ServiceProcess):
         """
         # Spawn persister to topic/file name
         persister={'name':'persister 1', # Give it a new name?
-                 'module':'ion.services.dm.preservation.persister',
+                 'module':'ion.services.dm.transformation.persister',
                  'procclass':'Persister',
                  'spawnargs':{'attach':[topic.queue.name],
                               'process parameters':{'fname':arc.name}}}

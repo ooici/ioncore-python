@@ -112,7 +112,7 @@ class AddUser(resource.Resource):
 
         def _cb(result):
             request.write('<html><body>')
-            request.write("User " + result.first_name + " " + result.last_name + " ( " + result.name + " ) added.")
+            request.write("User " + result.name + " added.")
             user = IdentityResource.create_new_resource()
             request.write(wrap_form(give_form(user) + '<INPUT TYPE="submit" NAME="add" VALUE="Add User" /><p/>\n', "/add_user"))
             request.write(give_links())
@@ -179,7 +179,7 @@ class FindUser(resource.Resource):
                 request.write("Found " + str(len(result)) + " matches<br/>\n")
 
                 for i in result:
-                    request.write('<dd/><a href="/find_user?ooi_id=' +  i.RegistryIdentity + '&branch=' + i.RegistryBranch + '&commit=' + i.RegistryCommit +'">' + i.first_name + ' ' + i.last_name + '(' + i.name + ')</a><br/>\n')
+                    request.write('<dd/><a href="/find_user?ooi_id=' +  i.RegistryIdentity + '&branch=' + i.RegistryBranch + '&commit=' + i.RegistryCommit +'">' + i.name + '</a><br/>\n')
 
                 user = result[0]
                 request.write("<hr>")
@@ -227,7 +227,8 @@ class FindUser(resource.Resource):
                     user_description = coi_resource_descriptions.IdentityResource()
 
                     attnames = []
-                    #print "************ " + str(request.args)
+                    print "************ " + str(request.args)
+                    print "+++++++++++" + str(user_description.attributes)
                     for field_name in user_description.attributes:
                         if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle")):
                             if (len(request.args[field_name]) > 0) and (len(request.args[field_name][0]) > 0) :
