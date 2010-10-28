@@ -9,6 +9,7 @@
 
 from twisted.internet import stdio, reactor, protocol
 import re
+from ion.agents.instrumentagents.simulators.Simulator_constants import NO_PORT_NUMBER_FOUND
 
 class DataForwardingProtocol(protocol.Protocol):
     """
@@ -78,9 +79,13 @@ if __name__ == '__main__':
             print 'ERROR while trying to import Simulator from module {0}'.format(sys.argv[3])
             sys.exit(1)
         simulator = Simulator(sys.argv[1], int(sys.argv[2]))
-        simulator.start()
+        SimulatorPort = simulator.start()
 
-    reactor.connectTCP(sys.argv[1], int(sys.argv[2]), StdioProxyFactory( ))
+    if SimulatorPort == NO_PORT_NUMBER_FOUND:
+        print "Can't start simulator: no port available"
+        sys.exit(1)
+    print 'Connected to %s simulator at %s:%s' %(sys.argv[3], sys.argv[1], SimulatorPort)
+    reactor.connectTCP(sys.argv[1], SimulatorPort, StdioProxyFactory( ))
 
     reactor.run( )
 
