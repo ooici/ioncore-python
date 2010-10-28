@@ -28,6 +28,7 @@ from ion.util.state_object import BasicLifecycleObject
 CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
 CF_fail_fast = CONF['fail_fast']
+CF_rpc_timeout = CONF['rpc_timeout']
 
 # @todo CHANGE: Dict of "name" to process (service) declaration
 processes = {}
@@ -297,7 +298,6 @@ class Process(BasicLifecycleObject):
     def _receive_rpc(self, payload, msg):
         """
         Handling of RPC reply messages.
-        @todo: Handle the error case
         """
         fromname = payload['sender']
         if 'sender-name' in payload:
@@ -305,6 +305,10 @@ class Process(BasicLifecycleObject):
         log.info('>>> [%s] receive(): RPC reply from [%s] <<<' % (self.proc_name, fromname))
         rpc_deferred = self.rpc_conv.pop(payload['conv-id'])
         content = payload.get('content', None)
+        if type(rpc_deferred) is str:
+            log.error("Message received after process %s RPC conv-id=%s timed out=%s: %s" % (
+                self.proc_name, payload['conv-id'], rpc_deferred, payload))
+            return
         res = (content, payload, msg)
         if not type(content) is dict:
             log.error('RPC reply is not well formed. Use reply_ok or reply_err')
@@ -390,7 +394,7 @@ class Process(BasicLifecycleObject):
         """
         The method called if operation callback operation is not defined
         """
-        log.info('Catch message op=%s' % headers.get('op',None))
+        log.error('Process does not define op=%s' % headers.get('op',None))
 
     # --- Outgoing message handling
 
@@ -404,11 +408,12 @@ class Process(BasicLifecycleObject):
         # Create a new deferred that the caller can yield on to wait for RPC
         rpc_deferred = defer.Deferred()
         # Timeout handling
-        timeout = float(kwargs.get('timeout',0))
+        timeout = float(kwargs.get('timeout', CF_rpc_timeout))
         def _timeoutf(d, convid, *args, **kwargs):
-            log.info("RPC on conversation %s timed out! "%(convid))
+            log.warn("Process %s RPC conv-id=%s timed out! " % (self.proc_name,convid))
             # Remove RPC. Delayed result will go to catch operation
             d = self.rpc_conv.pop(convid)
+            self.rpc_conv[convid] = "TIMEOUT:%s" % pu.currenttime_ms()
             d.errback(defer.TimeoutError())
         if timeout:
             rpc_deferred.setTimeout(timeout, _timeoutf, convid)

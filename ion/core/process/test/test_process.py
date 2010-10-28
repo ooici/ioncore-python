@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/core/test/test_baseprocess.py
+@file ion/core/process/test/test_baseprocess.py
 @author Michael Meisinger
 @brief test case for process base class
 """
@@ -222,6 +222,15 @@ class ProcessTest(IonTestCase):
         sup = yield self._spawn_processes(processes)
 
         yield self._shutdown_processes()
+
+    @defer.inlineCallbacks
+    def test_rpc_timeout(self):
+        sup = self.test_sup
+        try:
+            yield sup.rpc_send('big_void', 'noop', 'arbitrary', timeout=1)
+            self.fail("TimeoutError expected")
+        except defer.TimeoutError, te:
+            log.info('Timeout received')
 
 
 class EchoProcess(Process):
