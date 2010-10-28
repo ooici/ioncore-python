@@ -9,6 +9,9 @@
 # Name of central logginf configuration file
 LOGCONF_FILENAME = 'res/logging/ionlogging.conf'
 
+# Name of environment variable to override logging configuration
+ION_ALTERNATE_LOGGING_CONF = "ION_ALTERNATE_LOGGING_CONF"
+
 # Name of central ION configuration file (not to be changed)
 ION_CONF_FILENAME = 'res/config/ion.config'
 
