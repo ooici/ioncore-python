@@ -14,6 +14,7 @@ from ion.services.cei.epucontroller import Control
 from ion.services.cei.epucontroller import State
 from ion.services.cei.epucontroller import StateItem
 import ion.services.cei.states as InstanceStates
+from ion.services.cei.epucontroller import PROVISIONER_VARS_KEY
 
 # -------
 # HARNESS
@@ -70,21 +71,32 @@ class DeeControl(Control):
         super(DeeControl, self).__init__()
         self.sleep_seconds = 5.0
         self.deestate = deestate
-
+        self.prov_vars = None
         # mini "mock" framework
         self.num_launched = 0
 
     def configure(self, parameters):
         """Control API method"""
-        if parameters and parameters.has_key("timed-pulse-irregular"):
+        if not parameters:
+            log.info("Control is configured, no parameters")
+            return
+            
+        if parameters.has_key("timed-pulse-irregular"):
             sleep_ms = int(parameters["timed-pulse-irregular"])
             self.sleep_seconds = sleep_ms / 1000.0
-        log.info("Control is configured")
+            log.info("Configured to pulse every %.2f seconds" % self.sleep_seconds)
+            
+        if parameters.has_key(PROVISIONER_VARS_KEY):
+            self.prov_vars = parameters[PROVISIONER_VARS_KEY]
+            log.info("Configured with new provisioner vars:\n%s" % self.prov_vars)
 
-    def launch(self, deployable_type_id, launch_description):
+
+    def launch(self, deployable_type_id, launch_description, extravars=None):
         """Control API method"""
         launch_id = uuid.uuid4()
         log.info("Request for DP '%s' is a new launch with id '%s'" % (deployable_type_id, launch_id))
+        if extravars:
+            log.info("Extra vars: %s" % extravars)
         for group,item in launch_description.iteritems():
             log.info(" - %s is %d %s from %s" % (group, item.num_instances, item.allocation_id, item.site))
             for i in range(item.num_instances):
