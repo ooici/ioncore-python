@@ -49,6 +49,12 @@ class WorkBench(object):
         Check out the head or 
         """
         # rpc_send - datastore, clone, ID_REf
+        
+    def op_clone(self, content, headers, msg):
+        """
+        The operation which responds to a clone
+        """
+        
     
     def _load_repo_from_mutable(self,head):
         """
@@ -69,15 +75,8 @@ class WorkBench(object):
         # Load all of the commit refs that came with this head.
         repo._load_links(mutable)
         
-        name = None
-        if mutable.HasField('name') and mutable.name not in self._repos.keys():
-            name = mutable.name
-        else:
-            name = 'repo_%s' % self._repo_cntr
-            self._repo_cntr += 1
         
-        
-        self._repos[name] = repo
+        self.put_repository(repo)
         
         return repo 
             
@@ -90,12 +89,6 @@ class WorkBench(object):
         Factory method for creating a repository - this is the responsibility
         of the workbench.
         """
-        if not name:
-            name = 'repo_%s' % self._repo_cntr
-            self._repo_cntr += 1
-            
-        if name in self._repos.keys():
-            raise Exception, 'Can not initialize a new repository with an existing name'
         
         repo = repository.Repository()
         repo._workbench = self
@@ -103,7 +96,7 @@ class WorkBench(object):
         repo._hashed_elements = self._hashed_elements
             
         # Set the default branch
-        repo.branch('master')
+        repo.branch()
            
         if rootclass:
             rootobj = repo.create_wrapped_object(rootclass)
@@ -113,7 +106,7 @@ class WorkBench(object):
         else:
             rootobj = None
         
-        self._repos[name] = repo
+        self.put_repository(repo)
         
         return repo, rootobj
 
@@ -136,6 +129,9 @@ class WorkBench(object):
         
     @defer.inlineCallbacks
     def op_push(self, content, headers, msg):
+        """
+        The Operation which responds to a push
+        """
         log.info('op_push: '+str(content))
         
 
@@ -147,7 +143,11 @@ class WorkBench(object):
         """
         Pull the current state of the repository
         """
-        
+    
+    def op_pull(self,content, headers, msg):
+        """
+        The operation which responds to a pull 
+        """
     
         
     def fetch_linked_objects(self, links):
@@ -157,17 +157,22 @@ class WorkBench(object):
         raise Exception, 'Fetch Linked Objects is not implemented!'
     
     
-    def get_repository(self,name):
+    def get_repository(self,identity):
         """
         Simple getter for the repository dictionary
         """
-        return self._repos.get(name,None)
+        return self._repos.get(identity,None)
         
     def list_repositories(self):
         """
         Simple list tool for repository names
         """
         return self._repos.keys()
+        
+    def put_repository(self,repo):
+        
+        self._repos[repo._dotgit.objectkey] = repo
+        
         
     def pack_repository_commits(self,repo, depth=5):
         """

@@ -60,6 +60,8 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         if isinstance(content, gpb_wrapper.Wrapper):
             invocation.message['content'] = invocation.workbench.pack_structure(content)
         
+            invocation.message['encoding'] = ION_R1_GPB      
+        
         elif isinstance(content, repository.Repository):
             invocation.wb.pack_repository_commits(content)
                      

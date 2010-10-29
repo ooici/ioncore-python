@@ -391,9 +391,9 @@ class Process(BasicLifecycleObject):
                 if hasattr(self, opname):
                     opf = getattr(self, opname)
                     return defer.maybeDeferred(opf, content, payload, msg)
-                elif hasattr(self.workbench,opname):
-                    opf = getattr(self.workbench, opname)                    
-                    return defer.maybeDeferred(opf, content, payload, msg)
+                #elif hasattr(self.workbench,opname):
+                #    opf = getattr(self.workbench, opname)                    
+                #    return defer.maybeDeferred(opf, content, payload, msg)
                 elif hasattr(self,'op_none'):
                     return defer.maybeDeferred(self.op_none, content, payload, msg)
                 else:

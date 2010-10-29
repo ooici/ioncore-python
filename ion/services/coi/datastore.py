@@ -35,19 +35,26 @@ class DataStoreService(ServiceProcess):
         ServiceProcess.__init__(self, *args, **kwargs)
         log.info('DataStoreService.__init__()')
         
-        
-        
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
 
-    #@defer.inlineCallbacks
-    #def op_push(self, content, headers, msg):
-    #    log.info('op_hello: '+str(content))
+    op_push = self.workbench.op_push
+    
+    op_pull = self.workbench.op_pull
+    
+    op_clone = self.workbench.op_clone
 
-        # The following line shows how to reply to a message
-    #    yield self.reply_ok(msg, {'value':'Hello there, '+str(content)}, {})
+
+    push = self.workbench.push
+    
+    pull = self.workbench.pull
+    
+    clone = self.workbench.clone
+
+
+
 
 
 class DataStoreServiceClient(ServiceClient):
