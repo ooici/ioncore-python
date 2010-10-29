@@ -79,6 +79,7 @@ class IdentityRegistryUITest(IonTestCase):
         """
         yield self._stop_container()
         yield self.listening_port.stopListening()
+        print "done shutting down the service"
 
     @defer.inlineCallbacks
     def test_register_user(self):
