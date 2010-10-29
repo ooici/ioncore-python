@@ -134,6 +134,10 @@ To compile all code to see if there are Python compile errors anywhere:
 Change log:
 ===========
 
+2010-10-28:
+- Set RPC default timeout to 15 secs (see ion.config).
+  Use a different secs value in in rpc_send(..., ..., timeout=5)
+
 2010-10-05:
 - REFACTORING OF BASE CLASSES CONTINUED
 - Changed ion.core.base_process.BaseProcess to ion.core.process.process.Process

@@ -8,9 +8,6 @@
 """
 
 from twisted.internet import defer
-from twisted.trial import unittest
-
-from ion.core.process.service_process import ServiceProcess
 
 from ion.services.dm.scheduler.scheduler_service import SchedulerServiceClient
 from ion.services.dm.scheduler.test.receiver import STClient
@@ -48,7 +45,6 @@ class SchedulerTest(IonTestCase):
     def tearDown(self):
         yield self._stop_container()
 
-
     def test_service_init(self):
         # Just run the setup/teardown code
         pass
@@ -80,6 +76,9 @@ class SchedulerTest(IonTestCase):
         rc = yield sc.rm_task(task_id)
         self.failUnlessEqual(rc['value'], 'OK')
         log.debug(rc)
+        """
+        @bug For some reason, the container fails unless we delay for a bit here.
+        """
         yield asleep(1.0)
 
     @defer.inlineCallbacks
