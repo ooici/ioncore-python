@@ -79,7 +79,6 @@ class IdentityRegistryUITest(IonTestCase):
         """
         yield self._stop_container()
         yield self.listening_port.stopListening()
-        print "done shutting down the service"
 
     @defer.inlineCallbacks
     def test_register_user(self):
@@ -183,5 +182,5 @@ class IdentityRegistryUITest(IonTestCase):
         #
         confirm_erase_all_load = yield client.getPage("http://localhost:9001/erase_registry?confirm=Confirm") #8999
         self.failUnlessSubstring('Registry cleared.<br/>', confirm_erase_all_load)
-        print "got to end of test"
+   
         
