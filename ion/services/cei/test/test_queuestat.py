@@ -9,7 +9,7 @@
 
 import os
 import uuid
-import unittest
+from twisted.trial import unittest
 
 from twisted.internet import defer
 
