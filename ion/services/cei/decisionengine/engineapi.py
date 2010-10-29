@@ -33,6 +33,21 @@ class Engine(object):
         """
         raise NotImplementedError
 
+    def reconfigure(self, control, newconf):
+        """
+        Give the engine a new configuration.
+        
+        @note There must not be a decide call in progress when this is called,
+        and there must not be a new decide call while this is in progress.
+        
+        @param control instance of Control, used to request changes to system
+        @param newconf None or dict of key/value pairs
+        @exception Exception if engine cannot reach a sane state
+        @exception NotImplementedError if engine does not support this
+        
+        """
+        raise NotImplementedError
+
     def decide(self, control, state):
         """
         Give the engine a chance to act on the current state of the system.
