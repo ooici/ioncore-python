@@ -149,7 +149,6 @@ class TestSBE49(IonTestCase):
 
         log.info('Defined subscription: '+str(subscription))
 
-        # DHE: trying something here
         #config_vals = {'ipaddr':'137.110.112.119', 'ipport':'4001'}
         config_vals = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort}
         result = yield self.driver_client.configure_driver(config_vals)

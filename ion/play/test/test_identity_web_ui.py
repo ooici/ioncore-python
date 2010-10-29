@@ -149,7 +149,7 @@ class IdentityRegistryUITest(IonTestCase):
 
         actual_load_user_result = yield client.getPage("http://localhost:9001/find_user?" + result[0]) #8999
         self.failUnlessSubstring('Roger Unwin', actual_load_user_result)
-        print "5"
+        
         
         #
         # Test update
@@ -160,12 +160,12 @@ class IdentityRegistryUITest(IonTestCase):
                 'country=changed_test&' + \
                 'domain_component=changed_test&trust_provider=changed_test&expiration_date=changed_test&lifecycle=new&' + \
                 'common_name=changed_test&' + base_args
-        print "5.5"
+        
         update_user_result = yield client.getPage("http://localhost:9001/find_user?" + post) #8999
-        print "5.6"
+        
 
         self.failUnlessSubstring('changed_test', update_user_result)
-        print "6"
+        
        
 
         #
@@ -176,9 +176,11 @@ class IdentityRegistryUITest(IonTestCase):
 <INPUT TYPE="submit" NAME="confirm" VALUE="Confirm" /> <INPUT TYPE="submit" NAME="abort" VALUE="Abort" /><p/>
 <br><a href="/add_user">Add User</a> <a href="/find_user">Find User</a> <a href="/erase_registry">Erase All User</a> </FORM></body></html>"""
         self.assertEqual(reference_erase_all_load, erase_all_load)
-        print "7"
+        
         #
         # Test confirm erase all
         #
         confirm_erase_all_load = yield client.getPage("http://localhost:9001/erase_registry?confirm=Confirm") #8999
         self.failUnlessSubstring('Registry cleared.<br/>', confirm_erase_all_load)
+   
+        

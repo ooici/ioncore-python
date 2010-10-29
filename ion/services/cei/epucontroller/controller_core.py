@@ -8,6 +8,7 @@ from ion.services.cei.decisionengine import EngineLoader
 import ion.services.cei.states as InstanceStates
 from ion.services.cei import cei_events
 from twisted.internet.task import LoopingCall
+from twisted.internet import defer
 
 from forengine import Control
 from forengine import State
@@ -25,7 +26,12 @@ class ControllerCore(object):
         if conf:
             if conf.has_key(PROVISIONER_VARS_KEY):
                 prov_vars = conf[PROVISIONER_VARS_KEY]
-
+                
+        # There can only ever be one 'reconfigure' or 'decide' engine call run
+        # at ANY time.  The 'decide' call is triggered via timed looping call
+        # and 'reconfigure' is triggered asynchronously at any moment.  
+        self.busy = defer.DeferredSemaphore(1)
+        
         self.control = ControllerCoreControl(provisioner_client, self.state, prov_vars)
         self.engine = EngineLoader().load(engineclass)
         self.engine.initialize(self.control, self.state, conf)
@@ -48,9 +54,16 @@ class ControllerCore(object):
         """
         log.debug('Starting engine decision loop - %s second interval',
                 self.control.sleep_seconds)
-        self.control_loop = LoopingCall(self.engine.decide, self.control,
-                self.state)
+        self.control_loop = LoopingCall(self.run_decide)
         self.control_loop.start(self.control.sleep_seconds, now=False)
+        
+    @defer.inlineCallbacks
+    def run_decide(self):
+        yield self.busy.run(self.engine.decide, self.control, self.state)
+        
+    @defer.inlineCallbacks
+    def run_reconfigure(self, conf):
+        yield self.busy.run(self.engine.reconfigure, self.control, conf)
 
 class ControllerCoreState(State):
     """Keeps data, also what is passed to decision engine.
@@ -195,12 +208,20 @@ class ControllerCoreControl(Control):
         @retval None
         @exception Exception illegal/unrecognized input
         """
-        if parameters and parameters.has_key("timed-pulse-irregular"):
+        if not parameters:
+            log.info("ControllerCoreControl is configured, no parameters")
+            return
+            
+        if parameters.has_key("timed-pulse-irregular"):
             sleep_ms = int(parameters["timed-pulse-irregular"])
             self.sleep_seconds = sleep_ms / 1000.0
-        log.info("ControllerCoreControl is configured")
+            log.info("Configured to pulse every %.2f seconds" % self.sleep_seconds)
+            
+        if parameters.has_key(PROVISIONER_VARS_KEY):
+            self.prov_vars = conf[PROVISIONER_VARS_KEY]
+            log.info("Configured with new provisioner vars:\n%s" % self.prov_vars)
 
-    def launch(self, deployable_type_id, launch_description):
+    def launch(self, deployable_type_id, launch_description, extravars=None):
         """Choose instance IDs for each instance desired, a launch ID and send
         appropriate message to Provisioner.
 
@@ -208,6 +229,7 @@ class ControllerCoreControl(Control):
 
         @param deployable_type_id string identifier of the DP to launch
         @param launch_description See engine implementer's guide
+        @param extravars Optional, see engine implementer's guide
         @retval tuple (launch_id, launch_description), see guide
         @exception Exception illegal input
         @exception Exception message not sent
@@ -223,9 +245,17 @@ class ControllerCoreControl(Control):
                 self.state.new_launch(new_instance_id)
                 item.instance_ids.append(new_instance_id)
                 new_instance_id_list.append(new_instance_id)
-
+        
+        if extravars:
+            vars_send = self.prov_vars.copy()
+            vars_send.update(extravars)
+        else:
+            vars_send = self.prov_vars
+            
+        log.debug("Launching with parameters:\n%s" % str(vars_send))
+            
         self.provisioner.provision(launch_id, deployable_type_id,
-                launch_description, vars=self.prov_vars)
+                launch_description, vars=vars_send)
         extradict = {"launch_id":launch_id,
                      "new_instance_ids":new_instance_id_list}
         cei_events.event("controller", "new_launch",

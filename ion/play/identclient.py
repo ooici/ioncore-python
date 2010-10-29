@@ -209,7 +209,7 @@ class FindUser(resource.Resource):
             if ('update' in request.args.keys()):
                 updated_user = coi_resource_descriptions.IdentityResource()
                 for field_name in updated_user.attributes:
-                    if (field_name not in ("lifecycle")):
+                    if (field_name not in ("lifecycle", "name", "RegistryCommit")):
                         if (len(request.args[field_name]) > 0):
                             setattr(updated_user, field_name, request.args[field_name][0])
 
@@ -227,10 +227,10 @@ class FindUser(resource.Resource):
                     user_description = coi_resource_descriptions.IdentityResource()
 
                     attnames = []
-                    print "************ " + str(request.args)
-                    print "+++++++++++" + str(user_description.attributes)
+                    
                     for field_name in user_description.attributes:
-                        if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle")):
+                        # (Future Roger, here is a message from past Roger) You have aged horribly, and note when funky unexplained shit shows up, add it in the line below to safely ignore it 
+                        if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle", "name")):
                             if (len(request.args[field_name]) > 0) and (len(request.args[field_name][0]) > 0) :
                                 setattr(user_description, field_name, request.args[field_name][0])
                                 attnames.append(field_name)
@@ -268,10 +268,10 @@ def main(ns={}):
     ns.update(locals())
     webservice = IdentityWebResource(client)
     site = server.Site(webservice)
-    reactor.listenTCP(8999, site)
+    #reactor.listenTCP(8999, site) # might need to change to 9001
 
 
     ns.update(locals())
 
 #if __name__ == '__main__':
-#main() #main() has to be called on start. this is a maited pair with identservice.py if you are going to alter this line. justify yourself to Roger Unwin
+main() #main() has to be called on start. this is a maited pair with identservice.py if you are going to alter this line. justify yourself to Roger Unwin

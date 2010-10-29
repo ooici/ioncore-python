@@ -21,7 +21,8 @@ Decision engine implementations must inherit from:
     ion.services.cei.decisionengine.Engine
 
 ... and implement all of the methods with the semantics outlined in this
-document and the relevant docstrings.
+document and the relevant docstrings.  The exception is the "reconfigure"
+method which may or may not be implementable.
 
 The abc (abstract base class) module is not present in Python 2.5 but Engine
 should be treated as such.  It is not meant to be instantiated directly.
@@ -131,6 +132,22 @@ The decision engine must use the instance of 'control' and 'state' passed to the
 object references and use them at other times (via forking a thread, etc.).
 
 
+-----------
+Reconfigure
+-----------
+
+The controller has a remote operation "reconfigure" which will pass along a
+new set of configurations to the decision engine.  The decision engine may
+or may not be implemented with the ability to be reconfigured.  If it is not,
+the response must be a not-implemented exception.
+
+The decision engine's "reconfigure" method will not be invoked during one of
+the call's to "decide", only between them.
+
+As with the initialization method, the engine can reject a configuration with
+exceptions (other than not-implemented).
+
+
 -----
 State
 -----
@@ -225,6 +242,17 @@ a launch of a particular deployable type:
     
     data: This is a dict of arbitrary key/value data that will be passed in to
     each node in this group using the contextualization opaque data mechanism. 
+
+
+----------------
+Launch Extravars
+----------------
+
+Normally, every launch of a deployable type would get the same parameters
+which are configured via "provisioner_vars".  Using the optional "extravars"
+parameter to the launch method, you can add variables to this specific
+launch.  Keeping track of what launch has what unique variables etc. is up
+to the caller (the decision engine implementation).
 
 
 -------------

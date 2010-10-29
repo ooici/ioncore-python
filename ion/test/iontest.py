@@ -100,7 +100,7 @@ class IonTestCase(unittest.TestCase):
         bootstrap.reset_container()
         # Temporary delay between tests with messaging to allow for complete
         # close of connection (BUG: deferred/amqp client/missing yield?)
-        yield pu.asleep(0.1)
+        #yield pu.asleep(0.1)
         log.info("============ION container closed============")
 
     def _shutdown_processes(self, proc=None):
