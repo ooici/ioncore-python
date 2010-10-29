@@ -29,6 +29,7 @@ from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriver, InstrumentAgentClient
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient
 from ion.agents.instrumentagents.SBE49_constants import instrument_commands
+from ion.agents.instrumentagents.SBE49_constants import instrument_prompts
 
 import ion.util.procutils as pu
 
@@ -73,16 +74,15 @@ class InstrumentClient(Protocol):
         of state machine or something; for instance, the agent sends a getStatus
         command, we need to know that we're expecting a status message.
         """
-        log.debug("dataReceived!")
-        if data == 'S>':
+        log.debug("dataReceived! Length: %s" %len(data))
+        if data == instrument_prompts.INST_PROMPT or \
+                 data == instrument_prompts.INST_SLEEPY_PROMPT:
             log.debug("received Seabird prompt.")
-            #self.factory.prompt_received(self)
             self.parent.gotPrompt(self)
-        elif data == '?CMD':
+        elif data == instrument_prompts.INST_CONFUSED:
             log.info("Seabird doesn't understand command.")
         else:
             log.debug("dataReceived()! %s" % data)
-            #self.factory.data_received(data)
             self.parent.gotData(data)
 
 class SBE49InstrumentHsm(InstrumentHsm):
@@ -128,14 +128,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
         # --------------------------------------------------------------------
         self.hsm.addState ( "idle",           self.idle,               None)
         #
-        # DHE!!! This did not work...how am I going to be able to have a base HSM and then
-        # specialize it???
-        #self.hsm.addState ( "idle",           self.hsm.idle,               None)
         self.hsm.addState ( "stateConfigured",  self.stateConfigured,     self.idle)
         self.hsm.addState ( "stateDisconnecting",  self.stateDisconnecting,     self.stateConfigured)
         self.hsm.addState ( "stateDisconnected",  self.stateDisconnected,     self.stateConfigured)
         self.hsm.addState ( "stateConnecting",  self.stateConnecting,     self.stateConfigured)
         self.hsm.addState ( "stateConnected",  self.stateConnected,     self.stateConfigured)
+        self.hsm.addState ( "statePrompted",  self.statePrompted,     self.stateConnected)
         self.hsm.addState ( "stateDisconnecting",  self.stateDisconnecting,     self.stateConfigured)
     
         """
@@ -192,25 +190,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         InstrumentDriver.__init__(self, *args, **kwargs)
 
-    def top(self, caller):
-        log.debug("!!!!!!!!!!!!!!! In top state")
-        if caller.tEvt['sType'] == "init":
-            # display event
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
-            # transition to state idle
-            caller.stateStart(self.idle)
-            # returning a 0 indicates event was handled
-            return 0
-        elif caller.tEvt['sType'] == "entry":
-            # display event, do nothing 
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
-            return 0
-        elif caller.tEvt['sType'] == "exit":
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
-            self.tEvt['nFoo'] = 0
-            return 0
-        return caller.tEvt['sType']
-
+    # Change this to stateIdle
     def idle(self, caller):
         log.debug("!!!!!!!!!!!!!!!  In idle state")
         if caller.tEvt['sType'] == "init":
@@ -231,7 +211,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
             self.hsm.stateTran(self.stateConfigured)
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
+            log.debug("idle state: ignoring event %s;" %(caller.tEvt['sType']))
+            return 0
+        elif caller.tEvt['sType'] == "eventDataReceived":
+            log.debug("idle state: ignoring event %s;" %(caller.tEvt['sType']))
+            data = self.dequeueData()            
+            log.debug("stateIdle received %s." % (data))
             return 0
         return caller.tEvt['sType']
 
@@ -291,10 +276,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "eventConnectionComplete":
             log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             # Send crlf, then transition to stateConnecting
-            self.sendCmd("\r\n")
+            self.sendCmd(instrument_prompts.PROMPT_INST)
+            #self.sendCmd("\r\n")
             caller.stateTran(self.stateConnecting)
             return 0
-        # Get rid of this; not valid, shouldn't happen
+        # A command has been received from the agent
+        # Move to stateConnecting
         elif caller.tEvt['sType'] == "eventCommandReceived":
             log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             #
@@ -322,7 +309,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
             # DHE: Don't transition to the stateConnected state
             # until we get the prompt.
             #
-            self.sendCmd("\r\n")
+            self.sendCmd(instrument_prompts.PROMPT_INST)
+            # move to stateConnected
+            caller.stateTran(self.stateConnected)
             return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
             log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
@@ -332,19 +321,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
             caller.stateTran(self.stateDisconnecting)
             return 0
         # Don't think I should get this here...candidate for deletion
-        elif caller.tEvt['sType'] == "eventDataReceived":
-            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
-            #
-            # Transition to the stateConnected state
-            #
-            data = self.dequeueData()            
-            log.debug("stateConnecting() %s." % (data))
-            if 'S>' in data:
-                log.debug("received Seabird prompt.")
-                caller.stateTran(self.stateConnected)
-            else:
-                log.debug("Did not receive prompt")
-            return 0
         elif caller.tEvt['sType'] == "eventPromptReceived":
             log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
             caller.stateTran(self.stateConnected)
@@ -358,8 +334,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             """
             @todo Need a queue of commands from which to pull commands
             """
-            if self.cmdPending():
-               self.sendCmd(self.dequeueCmd())
+            # Should we send the prompt here?
             return 0
         elif caller.tEvt['sType'] == "entry":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
@@ -369,24 +344,72 @@ class SBE49InstrumentDriver(InstrumentDriver):
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
-            if self.cmdPending():
-               self.sendCmd(self.dequeueCmd())
+            # We got a command from the agent; need to get the prompt
+            # before sending
+            self.sendCmd(PROMPT_INST)
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
 
             # send this up to the agent to publish.
             data = self.dequeueData()            
+            log.debug("gotData() Calling publish.")
+            self.publish(data, self.publish_to)
             if 'S>' in data:
-                log.debug("gotData() Calling publish.")
-                self.publish(data, self.publish_to)
+                caller.stateTran(self.statePrompted)
             else:
                 log.debug("Did not receive prompt")
             return 0
         elif caller.tEvt['sType'] == "eventPromptReceived":
+            #
+            # Transition to the stateDisconnecting state
+            #
+            caller.stateTran(self.statePrompted)
             return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
+            #
+            # Transition to the stateDisconnecting state
+            #
+            caller.stateTran(self.stateDisconnecting)
+            return 0
+        return caller.tEvt['sType']
+
+    def statePrompted(self, caller):
+        log.debug("!!!!!!!!!!!!!!!  In statePrompted state")
+        if caller.tEvt['sType'] == "init":
+            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
+            """
+            @todo Need a queue of commands from which to pull commands
+            """
+            if self.cmdPending():
+               self.sendCmd(self.dequeueCmd())
+            return 0
+        elif caller.tEvt['sType'] == "entry":
+            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
+            return 0
+        elif caller.tEvt['sType'] == "exit":
+            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
+            return 0
+        elif caller.tEvt['sType'] == "eventCommandReceived":
+            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
+            if self.cmdPending():
+               self.sendCmd(self.dequeueCmd())
+            return 0
+        elif caller.tEvt['sType'] == "eventDataReceived":
+            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
+
+            # send this up to the agent to publish.
+            data = self.dequeueData()            
+            log.debug("gotData() Calling publish.")
+            self.publish(data, self.publish_to)
+            if 'S>' not in data:
+                caller.stateTran(self.stateConnected)
+            return 0
+        elif caller.tEvt['sType'] == "eventPromptReceived":
+            return 0
+        elif caller.tEvt['sType'] == "eventDisconnectReceived":
+            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
             #
             # Transition to the stateDisconnecting state
             #
@@ -663,7 +686,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 log.debug("op_execute translating command: %s" % command)
                 self.testcommand = self.instCmdXlator.translate(command)
                 log.debug("op_execute would send command: %s to instrument" % self.testcommand)
-                self.testcommand += "\r\n"
+                self.testcommand += instrument_prompts.PROMPT_INST
+                #self.testcommand += "\r\n"
          
                 """
                 Send the command received event.  This should kick off the
