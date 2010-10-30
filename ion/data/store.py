@@ -56,6 +56,31 @@ class IStore(Interface):
         @retval Deferred, for success of this operation
         """
 
+class IStoreManager(Interface):
+    """
+    @brief Administrative functionality for backend store configuration. 
+    """
+
+    def makeNamespace(name):
+        """
+        @brief 
+        @param name
+        @retval
+        """
+
+    def removeNamespace(name):
+        """
+        """
+
+    def listNamespaces():
+        """
+        """
+
+class IStoreFactory(Interface):
+    """
+    """
+
+
 
 class Store(object):
     """
@@ -104,3 +129,6 @@ class Store(object):
         if self.kvs.has_key(key):
             del self.kvs[key]
         return defer.succeed(None)
+
+
+

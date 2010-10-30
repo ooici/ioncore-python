@@ -12,20 +12,23 @@
 """
 
 import re
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
+import uuid
 
 from twisted.internet import defer
 from twisted.internet import reactor
+from twisted.python import components
+
+from zope.interface import implements
 
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
 from telephus.cassandra.ttypes import NotFoundException
 
 from ion.core import ioninit
-from ion.data.store import IStore
+from ion.data import store 
 
-import uuid
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 CONF = ioninit.config(__name__)
 CF_default_keyspace = CONF['default_keyspace']
@@ -35,20 +38,51 @@ CF_default_namespace = CONF['default_namespace']
 CF_default_key = CONF['default_key']
 
 
-class CassandraStore(IStore):
+class CassandraFactory(object):
+    """
+    """
+
+
+    def __init__(self, keyspace, host='127.1.0.1', port=9160, process=None):
+        """
+        @param keyspace Cassandra specific option (use 'ion' ?)
+        @param host defaults to localhost
+        @param port 9160 is the cassandra default
+        """
+        self.host = host
+        self.port = port
+        self.keyspace = None
+
+    def buildStore(self, keyspace):
+        """
+        The keyspace could be an arg here.
+        """
+        f = ManagedCassandraClientFactory()
+        client = CassandraClient(f, self.keyspace) 
+        connector = reactor.connectTCP(self.host, self.port, f)
+
+class CassandraStore(object):
     """
     Store interface for interacting with the Cassandra key/value store
-    @see http://github.com/vomjom/pycassa
+    A Cassandra client connects to a particular Keyspace within a Cassandra
+    server at a particular Host/Port.
     @note Default behavior is to use a random super column name space!
+    @todo Provide explanation of the cassandra options 
+     - keyspace
+       Outer-most level of organization. Usually the name of the
+       application (e.g. Twitter, Ion). 
+     - column family
+       A column family is like a database table. The Store namespace maps
+       to the name of a column family (column path).
     """
-    def __init__(self, **kwargs):
-        self.kvs = None
-        self.cass_host_list = None
-        self.keyspace = None
-        self.colfamily = None
-        self.cf_super = True
-        self.namespace = None
-        self.key=None
+
+    implements(store.IStore)
+
+    def __init__(self, client):
+        """functional wrapper around active client instance
+        """
+        self.client = client
+
 
     @classmethod
     def create_store(cls, **kwargs):
@@ -94,35 +128,16 @@ class CassandraStore(IStore):
         log.info("Created Cassandra store")
         return defer.succeed(inst)               
 
-    @defer.inlineCallbacks
-    def clear_store(self):
-        """
-        @brief Delete the super column namespace.
-        @retval Deferred, None
-        """
-        if self.cf_super:
-            yield self.client.remove(self.key, self.colfamily, super_column=self.namespace)
-        else:
-            log.info('Can not clear root of persistent store!')
-        defer.returnValue(None)
-        
-    @defer.inlineCallbacks
-    def get(self, col):
+    def get(self, key):
         """
         @brief Return a value corresponding to a given key
-        @param col Cassandra column
-        @retval Deferred, for value from the ion dictionary, or None
+        @param key 
+        @retval Deferred that fires with the value of key
         """
         
-        log.info("CassandraStore: Calling get on col %s " % col)
+        log.info("CassandraStore: Calling get on col %s " % key)
         try:
-            if self.cf_super:
-                log.info("super_col: Calling get on col %s " % col)
-                value = yield self.client.get(self.key, self.colfamily, column=col, super_column=self.namespace)
-                log.info("super_col: Calling get on col %s " % value)
-            else:
-                log.info("standard_col: Calling get on col %s " % col)
-                value = yield self.client.get(self.key, self.colfamily, column=col)
+            value = yield self.client.get(key, self.colfamily, column='value')
         except NotFoundException:
             log.info("Didn't find the col: %s. Returning None" % col)     
             defer.returnValue(None)
