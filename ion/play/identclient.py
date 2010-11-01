@@ -274,4 +274,4 @@ def main(ns={}):
     ns.update(locals())
 
 #if __name__ == '__main__':
-main() #main() has to be called on start. this is a maited pair with identservice.py if you are going to alter this line. justify yourself to Roger Unwin
+#main() #main() has to be called on start. this is a maited pair with identservice.py if you are going to alter this line. justify yourself to Roger Unwin
