@@ -75,15 +75,7 @@ class InstrumentClient(Protocol):
         command, we need to know that we're expecting a status message.
         """
         log.debug("dataReceived! Length: %s" %len(data))
-        if data == instrument_prompts.INST_PROMPT or \
-                 data == instrument_prompts.INST_SLEEPY_PROMPT:
-            log.debug("received Seabird prompt.")
-            self.parent.gotPrompt(self)
-        elif data == instrument_prompts.INST_CONFUSED:
-            log.info("Seabird doesn't understand command.")
-        else:
-            log.debug("dataReceived()! %s" % data)
-            self.parent.gotData(data)
+        self.parent.gotData(data)
 
 class SBE49InstrumentHsm(InstrumentHsm):
     def someFunction():
@@ -353,7 +345,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
             # send this up to the agent to publish.
             data = self.dequeueData()            
-            log.debug("gotData() Calling publish.")
+            log.debug("stateConnected() Calling publish.")
             self.publish(data, self.publish_to)
             if 'S>' in data:
                 caller.stateTran(self.statePrompted)
@@ -383,7 +375,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             @todo Need a queue of commands from which to pull commands
             """
             if self.cmdPending():
-               self.sendCmd(self.dequeueCmd())
+                self.sendCmd(self.dequeueCmd())
             return 0
         elif caller.tEvt['sType'] == "entry":
             log.info("statePrompted-%s;" %(caller.tEvt['sType']))
@@ -394,14 +386,16 @@ class SBE49InstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "eventCommandReceived":
             log.info("statePrompted-%s;" %(caller.tEvt['sType']))
             if self.cmdPending():
-               self.sendCmd(self.dequeueCmd())
+                self.sendCmd(self.dequeueCmd())
+            else:
+                log.error("statePrompted: No command to send!")
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
             log.info("statePrompted-%s;" %(caller.tEvt['sType']))
 
             # send this up to the agent to publish.
             data = self.dequeueData()            
-            log.debug("gotData() Calling publish.")
+            log.debug("statePrompted() Calling publish.")
             self.publish(data, self.publish_to)
             if 'S>' not in data:
                 caller.stateTran(self.stateConnected)
@@ -419,6 +413,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
     @defer.inlineCallbacks
     def plc_init(self):
+        log.debug("SBE49InstrumentDriver.plc_init: spawn_args: %s" %str(self.spawn_args))
         self.instrument_id = self.spawn_args.get('instrument-id', '123')
         self.instrument_ipaddr = self.spawn_args.get('ipaddr', "localhost")
         self.instrument_ipport = self.spawn_args.get('ipport', 9000)
@@ -465,13 +460,18 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.dataQueue.append(data)
 
     def dequeueData(self):
-        return self.dataQueue.pop()
+        data = self.dataQueue.pop()
+        #log.debug("dequeueCmd: dequeueing command: %s" %data)
+        return data
         
     def enqueueCmd(self, cmd):
+        log.debug("enqueueCmd: enqueueing command: %s" %cmd)
         self.cmdQueue.append(cmd)
 
     def dequeueCmd(self):
-        return self.cmdQueue.pop()
+        cmd = self.cmdQueue.pop()
+        #log.debug("dequeueCmd: dequeueing command: %s" %cmd)
+        return cmd
 
     def cmdPending(self):
         if len(self.cmdQueue) > 0:
@@ -547,19 +547,20 @@ class SBE49InstrumentDriver(InstrumentDriver):
     def gotData(self, data):
         """
         @brief The instrument protocol object has received data from the
-        instrument.  It should already be sanitized and ready for consumption;
-        publish the data.
+        instrument. 
         @param data
         @retval none
         """
-        # send this up to the agent to publish.
-        # DHE: don't publish here; send event to state machine
-        #log.debug("gotData() %s Calling publish." % (data))
-        #self.publish(data, self.publish_to)
-        
-        log.debug("gotData() %s." % (data))
-        self.enqueueData(data)
-        self.hsm.onEvent('eventDataReceived')
+        if data == instrument_prompts.INST_PROMPT or \
+                 data == instrument_prompts.INST_SLEEPY_PROMPT:
+            log.debug("gotPrompt()")
+            self.hsm.onEvent('eventPromptReceived')
+        elif data == instrument_prompts.INST_CONFUSED:
+            log.info("Seabird doesn't understand command.")
+        else:
+            log.debug("gotData() %s." % (data))
+            self.enqueueData(data)
+            self.hsm.onEvent('eventDataReceived')
         
     def gotPrompt(self, instrument):
         log.debug("gotPrompt()")
@@ -641,10 +642,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 if param in self.sbeParmCommands:
                     log.info("current param is: %s" %str(param))
                     command = self.sbeParmCommands[param] + "=" + str(content[param])
-                    log.debug("op_set_params sending %s to instrument"  %str(command))
-                    #self.instrument.transport.write(command)
-                    # THIS NEEDS TO GO: STATE MACHINE WILL DO THIS
-                    #self.sendCommand(command)
                     """
                     Send the command received event.  This should kick off the
                     appropriate sequence of events to get the command sent.
@@ -675,35 +672,27 @@ class SBE49InstrumentDriver(InstrumentDriver):
         if ((content == ()) or (content == [])):
             yield self.reply_err(msg, "Empty command")
             return
-        commands = []
         agentCommands = []
         for command_set in content:
             command = command_set[0]
             if command not in instrument_commands:
-                log.error("Invalid Command")
+                log.error("Invalid Command: %s" %command)
                 yield self.reply_err(msg, "Invalid Command")
             else:
                 log.debug("op_execute translating command: %s" % command)
-                self.testcommand = self.instCmdXlator.translate(command)
-                log.debug("op_execute would send command: %s to instrument" % self.testcommand)
-                self.testcommand += instrument_prompts.PROMPT_INST
-                #self.testcommand += "\r\n"
-         
+                instCommand = self.instCmdXlator.translate(command)
+                log.debug("op_execute would send command: %s to instrument" % instCommand)
+                instCommand += instrument_prompts.PROMPT_INST
+
+                self.enqueueCmd(instCommand)
+
                 """
                 Send the command received event.  This should kick off the
                 appropriate sequence of events to get the command sent.
                 """
                 self.hsm.onEvent('eventCommandReceived')
 
-                #commands.append(command)
-                #
-                # DHE: get rid of this command thing ASAP
-                #
-                commands.append(self.testcommand)
-                self.enqueueCmd(self.testcommand)
                 agentCommands.append(command)
-                # DHE right now a 1-1 correspondence
-                #yield self.reply_ok(msg, commands)
                 yield self.reply_ok(msg, agentCommands)
 
 
