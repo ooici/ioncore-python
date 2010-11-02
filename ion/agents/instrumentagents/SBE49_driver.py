@@ -19,7 +19,8 @@ from ion.core.process.service_process import ServiceProcess
 import miros
 from instrument_hsm import InstrumentHsm
 
-from twisted.internet.protocol import Protocol, ClientFactory, ClientCreator
+from ion.agents.instrumentagents.instrument_connection import InstrumentConnection
+from twisted.internet.protocol import ClientCreator
 
 from ion.core.process.process import Process
 from ion.data.dataobject import ResourceReference
@@ -50,32 +51,6 @@ class SBE49_instCommandXlator():
 
     def translate(self, command):
         return(self.commands[command])
-
-class InstrumentClient(Protocol):
-    """
-    The InstrumentClient class; inherits from Protocol.  Override dataReceived
-    and call the factory data_received() method to get the data to the agent.
-    """
-    def __init__(self, parent):
-        self.parent = parent
-
-    def connectionMade(self):
-        log.debug("connectionMade, calling gotConnected().")
-        self.parent.gotConnected(self)
-
-    def connectionLost(self, reason):
-        log.debug("connectionLost, calling gotDisconnected()")
-        self.parent.gotDisconnected(self)
-
-    def dataReceived(self, data):
-        """
-        Filter the data; the instrument will send the
-        prompt, which we don't care about, I'm assuming.  We might need a sort
-        of state machine or something; for instance, the agent sends a getStatus
-        command, we need to know that we're expecting a status message.
-        """
-        log.debug("dataReceived! Length: %s" %len(data))
-        self.parent.gotData(data)
 
 class SBE49InstrumentHsm(InstrumentHsm):
     def someFunction():
@@ -486,22 +461,16 @@ class SBE49InstrumentDriver(InstrumentDriver):
     @defer.inlineCallbacks
     def getConnected(self):
         """
-        @brief A method to get connected to the instrument device server.  Right
-        now this assumes the device is connected via a TCP/IP device server.
-        We probably need to come up with a more flexible way of doing this; like
-        getting a connection object that abstracts the details of the protocol.
-        Not sure how easy that would be with Twisted and Python.
+        @brief A method to get connected to the instrument device server via
+        a TCP/IP device server.  We need to come up with a more flexible way of
+        doing this; like getting a connection object that abstracts the details
+        of the protocol. Not sure how easy that would be with Twisted and
+        Python.
 
-        Gets a deferred object passes it to the InstrumentClientFactory, which
-        uses it to acess callbacks.  Was trying to use this to make the
-        connection process more managable.  Not sure if that's the case or  not
-        yet.
-        @retval The deferred object.
+        @retval None.
         """
 
-        # Now thinking I might try clientcreator since this will only be a
-        # single connection.
-        cc = ClientCreator(reactor, InstrumentClient, self)
+        cc = ClientCreator(reactor, InstrumentConnection, self)
         log.info("Driver connecting to instrument ipaddr: %s, ipport: %s" %(self.instrument_ipaddr, self.instrument_ipport))
         self.proto = yield cc.connectTCP(self.instrument_ipaddr, int(self.instrument_ipport))
         log.info("Driver connected to instrument")
