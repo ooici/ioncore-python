@@ -30,9 +30,21 @@ class DataStoreService(ServiceProcess):
         
         #assert isinstance(backend, store.IStore)
         #self.backend = backend
-        
-        
         ServiceProcess.__init__(self, *args, **kwargs)
+        
+        self.op_push = self.workbench.op_push
+        self.op_pull = self.workbench.op_pull
+        self.op_clone = self.workbench.op_clone
+        self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
+
+        self.push = self.workbench.push
+        
+        self.pull = self.workbench.pull
+        
+        self.clone = self.workbench.clone
+
+        self.fetch_linked_objects = self.workbench.fetch_linked_objects
+
         log.info('DataStoreService.__init__()')
         
 
@@ -40,18 +52,18 @@ class DataStoreService(ServiceProcess):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
 
-    op_push = self.workbench.op_push
+    #op_push = ServiceProcess.workbench.op_push
     
-    op_pull = self.workbench.op_pull
+    #op_pull = ServiceProcess.workbench.op_pull
     
-    op_clone = self.workbench.op_clone
+    #op_clone = ServiceProcess.workbench.op_clone
 
 
-    push = self.workbench.push
+    #push = ServiceProcess.workbench.push
     
-    pull = self.workbench.pull
+    #pull = ServiceProcess.workbench.pull
     
-    clone = self.workbench.clone
+    #clone = ServiceProcess.workbench.clone
 
 
 

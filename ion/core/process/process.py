@@ -124,7 +124,7 @@ class Process(BasicLifecycleObject):
 
         #The Workbench for all object repositories used by this process
         self.workbench = workbench.WorkBench(self)
-
+        
         log.debug("NEW Process instance [%s]: id=%s, sup-id=%s, sys-name=%s" % (
                 self.proc_name, self.id, self.proc_supid, self.sys_name))
 
@@ -302,17 +302,28 @@ class Process(BasicLifecycleObject):
         d = self.rpc_conv.pop(payload['conv-id'])
         content = payload.get('content', None)
         res = (content, payload, msg)
-        if not type(content) is dict:
-            log.error('RPC reply is not well formed. Use reply_ok or reply_err')
+        #if not type(content) is dict:
+        #    log.error('RPC reply is not well formed. Use reply_ok or reply_err')
         # @todo is it OK to ack the response at this point already?
         d1 = msg.ack()
-        if payload.get('status','OK') == 'ERROR':
+        
+        print 'PAYLOAD', payload
+        print 'CONTENT', content
+        
+        status = payload.get('status',None)
+        if not status == 'OK' or status == 'ERROR':
+            log.error('RPC reply is not well formed. Use reply_ok or reply_err')
+            status = 'OK'
+        
+        if status == 'ERROR':
             def _cb(result):
                 log.warn('RPC reply is an ERROR: '+str(content.get('value',None)))
                 raise ReceivedError(payload, content)
             d1.addCallback(_cb)
         else:
             d1.addCallback(lambda res1: d.callback(res))
+            
+            
         d1.addErrback(lambda c: d.errback(c))
         return d1
 
@@ -487,7 +498,7 @@ class Process(BasicLifecycleObject):
             headers['conv-seq'] = int(ionMsg.get('conv-seq',0)) + 1
             return self.send(pu.get_process_id(recv), operation, content, headers, reply=True)
 
-    def reply_ok(self, msg, content=None, headers=None):
+    def reply_ok(self, msg, content=None, headers={}):
         """
         Boilerplate method that replies to a given message with a success
         message and a given result value
@@ -495,11 +506,10 @@ class Process(BasicLifecycleObject):
         @retval Deferred for send of reply
         """
         # Note: Header status=OK is automatically set
-        if not type(content) is dict:
-            content = dict(value=content, status='OK')
+        headers['status'] = 'OK'
         return self.reply(msg, 'result', content, headers)
 
-    def reply_err(self, msg, content=None, headers=None, exception=None):
+    def reply_err(self, msg, content=None, headers={}, exception=None):
         """
         Boilerplate method for reply to a message with an error message and
         an indication of the error.
@@ -507,15 +517,22 @@ class Process(BasicLifecycleObject):
         @exception an instance of Exception
         @retval Deferred for send of reply
         """
-        reshdrs = dict(status='ERROR')
-        if headers != None:
-            reshdrs.update(headers)
-        if not type(content) is dict:
-            content = dict(value=content, status='ERROR')
-            if exception:
-                # @todo Add more info from exception
-                content['errmsg'] = str(exception)
-        return self.reply(msg, 'result', content, reshdrs)
+        
+        headers['status'] = 'ERROR'
+        
+        if exception:
+            headers['errmsg'] = str(exception)
+        
+        #reshdrs = dict(status='ERROR')
+        #if headers != None:
+        #    reshdrs.update(headers)
+        #if not type(content) is dict:
+        #    content = dict(value=content, status='ERROR')
+        #    if exception:
+        #        # @todo Add more info from exception
+        #        content['errmsg'] = str(exception)
+        
+        return self.reply(msg, 'result', content, headers)
 
     def get_conversation(self, headers):
         convid = headers.get('conv-id', None)

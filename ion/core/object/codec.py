@@ -17,7 +17,9 @@ import ion.util.procutils as pu
 
 from ion.core.object import gpb_wrapper
 from ion.core.object import repository
-from net.ooici.play import addressbook_pb2
+#from net.ooici.play import addressbook_pb2
+from net.ooici.core.container import container_pb2
+
 ION_R1_GPB = 'ION R1 GPB'
 
 
@@ -63,9 +65,15 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
             invocation.message['encoding'] = ION_R1_GPB      
         
         elif isinstance(content, repository.Repository):
-            invocation.wb.pack_repository_commits(content)
+            invocation.message['content'] = invocation.workbench.pack_repository_commits(content)
                      
-            invocation.message['encoding'] = ION_R1_GPB        
+            invocation.message['encoding'] = ION_R1_GPB
+            
+        elif isinstance(content, container_pb2.Structure):
+            serialized = content.SerializeToString()
+            invocation.message['content'] = serialized
+            
+            invocation.message['encoding'] = ION_R1_GPB
         
         print '======= End AFTER Davids Codec! ================'
 

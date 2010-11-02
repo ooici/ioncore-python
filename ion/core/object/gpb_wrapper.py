@@ -153,6 +153,10 @@ class Wrapper(object):
     def GPBType(self):
         return self._gpb_type
     
+    @property
+    def GPBMessage(self):
+        return self._gpbMessage
+    
     
     @property
     def root(self):
@@ -291,7 +295,7 @@ class Wrapper(object):
         gpb = self._gpbMessage
         link = getattr(gpb,linkname)
         link = self.rewrap(link)
-        assert link._gpb_type == self.LinkClassType, 'The field "%s" is not a link!' % linkname
+        assert link.GPBType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
         return link
         
 
@@ -419,7 +423,7 @@ class Wrapper(object):
         Find all of the links in this composit structure
         All of the objects worked on in this method are raw proto buffers messages!
         """
-        gpb = self._gpbMessage
+        gpb = self.GPBMessage
         # For each field in the protobuffer message
         for field in gpb.DESCRIPTOR.fields:
             # if the field is a composite - another message
@@ -431,13 +435,15 @@ class Wrapper(object):
                 
                 # If it is a repeated container type
                 if isinstance(gpb_field, containers.RepeatedCompositeFieldContainer):
-                    container = ContainerWrapper(self, gpb_field)
+                    #container = ContainerWrapper(self, gpb_field)                    
                     
-                    for item in container:
-                        if item.GPBType == item.LinkClassType:
-                            self._child_links.add(item)
+                    for item in gpb_field:
+                        
+                        wrapped_item = self.rewrap(item)
+                        if wrapped_item.GPBType == wrapped_item.LinkClassType:
+                            self._child_links.add(wrapped_item)
                         else:
-                            item._find_child_links()
+                            wrapped_item._find_child_links()
                                 
                 # IF it is a standard message field
                 else:
@@ -613,9 +619,9 @@ class StructureElement(object):
         
     #@type.setter
     def set_type(self,value):
-        self._element.type.protofile = value._gpb_type.protofile
-        self._element.type.package = value._gpb_type.package
-        self._element.type.cls = value._gpb_type.cls        
+        self._element.type.protofile = value.GPBType.protofile
+        self._element.type.package = value.GPBType.package
+        self._element.type.cls = value.GPBType.cls        
      
     type = property(get_type, set_type)
      

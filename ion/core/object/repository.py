@@ -14,16 +14,32 @@ Create pretty print for ancestors
 """
 from net.ooici.core.mutable import mutable_pb2
 
+from twisted.internet import defer
 
 from ion.core.object import gpb_wrapper
 
 from ion.util import procutils as pu
+
+from net.ooici.core.type import type_pb2
+from net.ooici.core.link import link_pb2
+
 
 class Repository(object):
     
     UPTODATE='up to date'
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet'
+    
+    CommitClassType = type_pb2.GPBType()
+    CommitClassType.protofile = mutable_pb2.CommitRef.DESCRIPTOR.file.name.split('/')[-1]
+    CommitClassType.package = mutable_pb2.CommitRef.DESCRIPTOR.file.package
+    CommitClassType.cls = mutable_pb2.CommitRef.DESCRIPTOR.name
+
+    LinkClassType = type_pb2.GPBType()
+    LinkClassType.protofile = link_pb2.CASRef.DESCRIPTOR.file.name.split('/')[-1]
+    LinkClassType.package = link_pb2.CASRef.DESCRIPTOR.file.package
+    LinkClassType.cls = link_pb2.CASRef.DESCRIPTOR.name
+
     
     def __init__(self, head=None):
         
@@ -66,6 +82,11 @@ class Repository(object):
         Branch names are generallly nonsense (uuid or some such)
         """
         
+        self.branchnicknames = {}
+        """
+        Nick names for the branches of this repository - these are purely local!
+        """
+        
         self._detached_head = False
         
         
@@ -91,22 +112,31 @@ class Repository(object):
         else:
            
             self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
-            self._dotgit.key = pu.create_guid()
+            self._dotgit.repositorykey = pu.create_guid()
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
         It is not 'stored' in the index - it lives in the workspace
         """
+    
+    @property
+    def repository_key(self):
+        return self._dotgit.repositorykey
+    
+    @property
+    def branches(self):
+        return self._dotgit.branches
         
         
-        
-    def checkout(self, branch_name=None, commit_id=None, older_than=None):
+    def checkout(self, branch=None, commit_id=None, older_than=None):
         """
         Check out a particular branch
-        Specify a commit_id or a date
+        Specify a branch, a branch and commit_id or a date
+        Branch can be either a local nick name or a global branch key
         """
         
         if self.status == self.MODIFIED:
             raise Exception, 'Can not checkout while the workspace is dirty'
+            #What to do for uninitialized? 
         
         #Declare that it is a detached head!
         detached = False
@@ -115,15 +145,20 @@ class Repository(object):
             raise Exception, 'Checkout called with both commit_id and older_than!'
         
         
-        if branch_name:
+        if branch:
+                        
+            branchkey = self.branchnicknames.get(branch,None)
+            if not branchkey:
+                branchkey = branch
+            
             for item in self._dotgit.branches:
-                if item.branchname == branch_name:
+                if item.branchkey == branchkey:
                     branch = item
                     head_ref = item.commitref # THIS WILL LOAD THE CREF!
                     cref = head_ref
                     break
             else:
-                raise Exception, 'Branch name: %s, does not exist!' % branch_name
+                raise Exception, 'Branch Key: %s, does not exist!' % branchkey
             
             if commit_id:
                 
@@ -133,18 +168,18 @@ class Repository(object):
                     
                     detached = True
                     ref = head_ref 
-                    while len(ref.ancestors) >0:
-                        for anc in ref.ancestors:
-                            if anc.branchname == branch_name:
-                                ref = anc.commitref
-                                break # There should be only one ancestor from a branch
+                    while len(ref.parentrefs) >0:
+                        for pref in ref.parentrefs:
+                            if pref.relationship == pref.parent:
+                                ref = pref.commitref
+                                break # There should be only one parent ancestor from a branch
                         else:
-                            raise Exception, 'End of Branch: No matching ancestor found on branch name: %s, commit_id: %s' % (branch_name, commit_id)
+                            raise Exception, 'End of Branch: No parent found on branch name: %s, commit_id: %s' % (branch_name, commit_id)
                         if ref.myid == commit_id:
                             cref = ref
                             break
                     else:
-                        raise Exception, 'End of Ancestors: No matching ancestor found in commit history on branch name %s, commit_id: %s' % (branch_name, commit_id)
+                        raise Exception, 'End of Ancestors: No matching reference found in commit history on branch name %s, commit_id: %s' % (branch_name, commit_id)
                         
                 
                 
@@ -157,10 +192,10 @@ class Repository(object):
                     
                     detached = True
                     ref = head_ref 
-                    while len(ref.ancestors) >0:
-                        for anc in ref.ancestors:
-                            if anc.branchname == branch_name:
-                                ref = anc.commitref
+                    while len(ref.parentrefs) >0:
+                        for pref in ref.parentrefs:
+                            if pref.relationship == pref.Parent:
+                                ref = pref.commitref
                                 break # There should be only one ancestor from a branch
                         else:
                             raise Exception, 'End of Branch: No matching ancestor found on branch name: %s, older_than: %s' % (branch_name, older_than)
@@ -168,7 +203,7 @@ class Repository(object):
                             cref = ref
                             break
                     else:
-                        raise Exception, 'End of Ancestors: No matching ancestor found in commit history on branch name %s, older_than: %s' % (branch_name, older_than)
+                        raise Exception, 'End of Ancestors: No matching commit found in commit history on branch name %s, older_than: %s' % (branch_name, older_than)
                         
         elif commit_id:
             
@@ -183,7 +218,7 @@ class Repository(object):
                 raise Exception, 'Can not checkout an id that does not exist!'
             
         else:
-            raise Exception, 'Checkout must specify a branch_name or a commit_id'
+            raise Exception, 'Checkout must specify a branch or a commit_id'
         
         # Do some clean up!
         self._workspace = {}
@@ -197,12 +232,11 @@ class Repository(object):
         self._load_links(rootobj)
         
         
-        
         self._detached_head = detached
         if detached:
             self._current_branch = self.create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
-            self._current_branch.commitref = cref
-            self._current_branch.branchname = 'detached head'
+            self._current_branch.set_link_by_name('commitref', cref)
+            self._current_branch.branchkey = 'detached head'
             
             rootobj._set_structure_read_only()
             
@@ -211,6 +245,10 @@ class Repository(object):
         return rootobj
         
     def reset(self):
+        
+        if self.status != self.MODIFIED:
+            # What about not initialized
+            return
         
         cref = self._current_branch.commitref
         
@@ -261,7 +299,6 @@ class Repository(object):
         return branch.get_link('commitref').key
             
             
-    
     def _create_commit_ref(self, comment='', date=None):
         """
         @brief internal method to create commit references
@@ -277,7 +314,7 @@ class Repository(object):
             date = pu.currenttime()
             
         cref.date = date
-
+        
         branch = self._current_branch
 
         # If this is the first commit to a new repository the current branch is a dummy
@@ -285,21 +322,22 @@ class Repository(object):
         if branch.IsInitialized():
             
             # This branch is real - add it to our ancestors
-            cref_b = cref.ancestors.add()
-            cref_b.name = branch.name
-            parent = branch.commitref # get the commit ref
-            cref_b.set_link_by_name('commitref',parent)
+            pref = cref.parentrefs.add()
+            parent = branch.commitref # get the parent commit ref
+            pref.set_link_by_name('commitref',parent)
+            pref.relationship = pref.Parent
         
         # For each branch that we merged from - add a  reference
         for mrgd in self._merged_from:
-            cref_b = cref.ancestors.add()
-            cref_b.name = mrgd.name
-            parent = mrgd.commitref # Get teh commit ref
-            cref_b.set_link_by_name('commitref',parent)
-        
+            pref = cref.ancestors.add()
+            merged_commit = mrgd.commitref # Get the commit ref of the merged item
+            pref.set_link_by_name('commitref',merged_commit)
+            pref.relationship = pref.MergedFrom
+            
         cref.comment = comment
         cref.set_link_by_name('objectroot', self._workspace_root)            
         
+        # Update the cref in the branch
         branch.set_link_by_name('commitref',cref)
         
         return cref
@@ -308,7 +346,7 @@ class Repository(object):
         
     def merge(self, branch=None, commit_id = None, older_than=None):
         """
-        merge the named 
+        merge the named branch in to the current branch
         """
         
         
@@ -329,7 +367,7 @@ class Repository(object):
             return self.NOTINITIALIZED
         
         
-    def branch(self, name):
+    def branch(self, nickname=None):
         """
         @brief Create a new branch from the current commit and switch the workspace to the new branch.
         """
@@ -337,13 +375,13 @@ class Repository(object):
         #if not self.status == self.UPTODATE:
         #    raise Exception, 'Can not create new branch while the workspace is dirty'
         
-        for brnch in self._dotgit.branches:
-            if brnch.branchname == name:                
-                raise Exception, 'Branch already exists'
-            
         brnch = self._dotgit.branches.add()    
-        brnch.branchname = name
+        brnch.branchkey = pu.create_guid()
         
+        
+        
+        if nickname:
+            self.branchnicknames[nickname]=brnch.branchkey
 
         if self._current_branch:
             # Get the linked commit
@@ -402,6 +440,10 @@ class Repository(object):
      
     def get_linked_object(self, link):
                 
+        if link.GPBType != self.LinkClassType:
+            raise Exception, 'Illegal argument type in get_linked_object.'
+                
+                
         if not link.HasField('key'):
             return None
                 
@@ -422,7 +464,7 @@ class Repository(object):
             
             obj = self._load_element(element)
             
-            if obj._gpbMessage.DESCRIPTOR == 'net.ooici.core.mutable.CommitRef':
+            if obj.GPBType == self.CommitClassType:
                 self._commit_index[obj.myid]=obj
                 obj.readonly = True
             else:
@@ -431,7 +473,8 @@ class Repository(object):
             return obj
             
         else:
-            return self._workbench.fetch_linked_objects(link)
+            raise Exception, 'Object not in workbench! You must pull the leaf elements!'
+            #return self._workbench.fetch_linked_objects(link)
             
     def _load_links(self, obj, loadleaf=False):
         """
@@ -440,13 +483,13 @@ class Repository(object):
         if loadleaf:
             
             for link in obj._child_links:
-                child = self.get_linked_object(link)        
+                child = self.get_linked_object(link)  
                 self._load_links(child, loadleaf=loadleaf)
         else:
             for link in obj._child_links:
                 
-                if not link._gpbMessage.isleaf:
-                    child = self.get_linked_object(link)        
+                if not link.isleaf:
+                    child = self.get_linked_object(link)      
                     self._load_links(child, loadleaf=loadleaf)
         
         
@@ -493,9 +536,9 @@ class Repository(object):
         
     def _set_type_from_obj(self, ltype, wrapped_obj):
                 
-        ltype.protofile = wrapped_obj._gpb_type.protofile      
-        ltype.package = wrapped_obj._gpb_type.package        
-        ltype.cls = wrapped_obj._gpb_type.cls
+        ltype.protofile = wrapped_obj.GPBType.protofile      
+        ltype.package = wrapped_obj.GPBType.package        
+        ltype.cls = wrapped_obj.GPBType.cls
         
         
         

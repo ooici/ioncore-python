@@ -28,8 +28,8 @@ class RepositoryTest(unittest.TestCase):
     def test_branch_checkout(self):
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)   
         repo.commit()
-        repo.branch("Arthur")
-        repo.checkout(branch_name="Arthur")
+        repo.branch(nickname="Arthur")
+        repo.checkout(branch="Arthur")
         
     def test_branch_no_commit(self):
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
@@ -92,7 +92,7 @@ class RepositoryTest(unittest.TestCase):
         p = None
         ab = None
         
-        ab = repo.checkout(branch_name='master')
+        ab = repo.checkout(branch='master')
         print 'ab after checkout',ab
         
         print ab.person[0]

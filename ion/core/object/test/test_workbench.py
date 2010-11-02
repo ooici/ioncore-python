@@ -95,7 +95,7 @@ class WorkBenchTest(unittest.TestCase):
         
         self.assertEqual(repo._dotgit, self.repo._dotgit)
         
-        ab=repo.checkout(branch_name='master')
+        ab=repo.checkout(branch='master')
         
         self.assertEqual(ab, self.ab)
             

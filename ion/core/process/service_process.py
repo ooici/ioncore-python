@@ -60,6 +60,7 @@ class ServiceProcess(Process):
                 name=self.svc_name,
                 scope='system',
                 group=self.receiver.group,
+                process=self, # David added this - is it a good idea?
                 handler=self.receive)
         self.add_receiver(self.svc_receiver)
 
