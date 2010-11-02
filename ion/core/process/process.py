@@ -307,9 +307,6 @@ class Process(BasicLifecycleObject):
         # @todo is it OK to ack the response at this point already?
         d1 = msg.ack()
         
-        print 'PAYLOAD', payload
-        print 'CONTENT', content
-        
         status = payload.get('status',None)
         if not status == 'OK' or status == 'ERROR':
             log.error('RPC reply is not well formed. Use reply_ok or reply_err')

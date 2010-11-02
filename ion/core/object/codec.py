@@ -28,6 +28,7 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
     Interceptor that assembles the headers in the ION message format.
     """
     def before(self, invocation):
+        """
         print '======= Hello from BEFORE Davids Codec!============'
         #print 'args', invocation.args
         print 'path', invocation.path
@@ -37,16 +38,17 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         print 'route', invocation.route
         print 'note', invocation.note
         print 'workbench', invocation.workbench
-        
+        """
         if ION_R1_GPB == invocation.content['encoding']:
             content = invocation.content['content']
             invocation.content['content'] = invocation.workbench.unpack_structure(content)        
         
-        print '======= End BEFORE Davids Codec!============'
+        #print '======= End BEFORE Davids Codec!============'
         
         return invocation
 
     def after(self, invocation):
+        """
         print '======= Hello from AFTER Davids Codec! ================'
         #print 'args', invocation.args
         print 'path', invocation.path
@@ -56,7 +58,7 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         print 'route', invocation.route
         print 'note', invocation.note
         print 'workbench', invocation.workbench
-
+        """
         content = invocation.message['content']
             
         if isinstance(content, gpb_wrapper.Wrapper):
@@ -75,7 +77,7 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
             
             invocation.message['encoding'] = ION_R1_GPB
         
-        print '======= End AFTER Davids Codec! ================'
+        #print '======= End AFTER Davids Codec! ================'
 
         
         return invocation
