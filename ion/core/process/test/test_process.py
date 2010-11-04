@@ -99,7 +99,8 @@ class ProcessTest(IonTestCase):
         log.info('Received echo message')
 
         self.assertEquals(msg.payload['op'], 'result')
-        self.assertEquals(msg.payload['content']['value'], 'content123')
+        #self.assertEquals(msg.payload['content']['value'], 'content123')
+        self.assertEquals(msg.payload['content'], 'content123')
 
         yield sup.terminate()
         self.assertEquals(sup._get_state(), "TERMINATED")
@@ -114,7 +115,8 @@ class ProcessTest(IonTestCase):
         pid2 = yield p1.spawn_child(child)
 
         (cont,hdrs,msg) = yield p1.rpc_send(pid2,'echo','content123')
-        self.assertEquals(cont['value'], 'content123')
+        #self.assertEquals(cont['value'], 'content123')
+        self.assertEquals(cont, 'content123')
 
         yield p1.terminate()
         self.assertEquals(p1._get_state(), "TERMINATED")
@@ -132,7 +134,8 @@ class ProcessTest(IonTestCase):
         log.info('Process 1 spawned and initd correctly')
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo','content123')
-        self.assertEquals(cont['value'], 'content123')
+        #self.assertEquals(cont['value'], 'content123')
+        self.assertEquals(cont, 'content123')
         log.info('Process 1 responsive correctly')
 
         # The following tests the process attaching a second receiver
@@ -142,7 +145,8 @@ class ProcessTest(IonTestCase):
         log.info('Created new receiver %s' % (msgName))
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(msgName,'echo','content456')
-        self.assertEquals(cont['value'], 'content456')
+        #self.assertEquals(cont['value'], 'content456')
+        self.assertEquals(cont, 'content456')
         log.info('Process 1 responsive correctly on second receiver')
 
 
@@ -171,7 +175,8 @@ class ProcessTest(IonTestCase):
         self.assertEquals(proc1.inbox_count, 1)
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid2,'echo','content123')
-        self.assertEquals(cont['value'], 'content123')
+        #self.assertEquals(cont['value'], 'content123')
+        self.assertEquals(cont, 'content123')
         log.info('Process 1 responsive correctly after init')
 
     @defer.inlineCallbacks
@@ -208,7 +213,8 @@ class ProcessTest(IonTestCase):
 
         msg = yield p1.await_message()
         log.info('Received byte-string')
-        self.assertEquals(msg.payload['content']['value'], byte_string)
+        #self.assertEquals(msg.payload['content']['value'], byte_string)
+        self.assertEquals(msg.payload['content'], byte_string)
 
         yield sup.shutdown()
 

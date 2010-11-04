@@ -310,15 +310,22 @@ class Process(BasicLifecycleObject):
                 self.proc_name, payload['conv-id'], rpc_deferred, payload))
             return
         res = (content, payload, msg)
-        if not type(content) is dict:
-            log.error('RPC reply is not well formed. Use reply_ok or reply_err')
+        #if not type(content) is dict:
+        #    log.error('RPC reply is not well formed. Use reply_ok or reply_err')
 
         yield msg.ack()
-        if payload.get('status','OK') == 'ERROR':
-            log.warn('RPC reply is an ERROR: '+str(content.get('value',None)))
+        
+        status = payload.get('status', None)
+        if status == 'OK':
+            rpc_deferred.callback(res)
+                
+        elif status == 'ERROR':
+            log.warn('RPC reply is an ERROR: '+str(content))
             err = failure.Failure(ReceivedError(payload, content))
             rpc_deferred.errback(err)
+
         else:
+            log.error('RPC reply is not well formed. Use reply_ok or reply_err')
             rpc_deferred.callback(res)
 
     @defer.inlineCallbacks
@@ -483,8 +490,8 @@ class Process(BasicLifecycleObject):
         @retval Deferred for send of reply
         """
         # Note: Header status=OK is automatically set
-        if not type(content) is dict:
-            content = dict(value=content, status='OK')
+        #if not type(content) is dict:
+        #    content = dict(value=content, status='OK')
         return self.reply(msg, 'result', content, headers)
 
     def reply_err(self, msg, content=None, headers=None, exception=None):
@@ -498,11 +505,18 @@ class Process(BasicLifecycleObject):
         reshdrs = dict(status='ERROR')
         if headers != None:
             reshdrs.update(headers)
-        if not type(content) is dict:
-            content = dict(value=content, status='ERROR')
-            if exception:
-                # @todo Add more info from exception
-                content['errmsg'] = str(exception)
+            
+        #if not type(content) is dict:
+        #    content = dict(value=content, status='ERROR')
+        #    if exception:
+        #        # @todo Add more info from exception
+        #        content['errmsg'] = str(exception)
+                
+        if exception:
+            # @todo Add more info from exception
+            reshdrs['errmsg'] = str(exception)
+                
+                
         return self.reply(msg, 'result', content, reshdrs)
 
     def get_conversation(self, headers):
