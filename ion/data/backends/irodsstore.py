@@ -3,7 +3,7 @@
 @file ion/data/backends/irodsstore.py
 @author Bing Zhu
 @brief Implementation of ion.data.store.IStore using PyIrods to interface a
-       iRODS datastore backend in a single iRODS zone
+       iRODS backend storage servers.
 @Note Test cases for the iRODS backend are in ion.data.backends.test.test_irodsstore 
 @Note The Python iRODS library package can be installed with: easy_install --find-links http://ooici.net/packages pyrods-irods
 @
@@ -35,7 +35,7 @@ class IrodsStore(IStore):
     """
     def __init__(self, **kwargs):
         """
-        @brief constructor to read fedault iRODS info from the 'ion' config file
+        @brief constructor to read iRODS info from args or the 'ion' config file
         """
         self.hostname = self.get_config('irodsHost')
         self.port_num = self.get_config('irodsPort')
