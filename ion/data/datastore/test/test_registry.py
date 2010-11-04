@@ -11,7 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.data import store
+from ion.services.dm.preservation import store
 from ion.data.backends import cassandra
 from ion.data.datastore import registry
 from ion.data import dataobject

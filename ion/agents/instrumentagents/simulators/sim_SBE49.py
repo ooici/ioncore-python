@@ -21,6 +21,12 @@ from twisted.internet import reactor
 from twisted.internet import task
 from twisted.internet import defer
 
+from ion.agents.instrumentagents.simulators.Simulator_constants import portNumbers
+from ion.agents.instrumentagents.simulators.Simulator_constants import NO_PORT_NUMBER_FOUND
+from ion.agents.instrumentagents.simulators.Simulator_constants import NUMBER_OF_PORTS_AVAILABLE
+
+INSTRUMENT_ID = "123"
+
 class Instrument(protocol.Protocol):
     """
     The instrument protocol class. Simulate a Seabird SBE49 by receiving
@@ -223,7 +229,7 @@ class Instrument(protocol.Protocol):
                 self.transport.write("?CMD")
 
     def connectionLost(self, reason):
-        log.debug("Simmulator connection now closed")
+        log.debug("Simulator connection now closed")
         self.factory.connections.remove(self)
 
     def testSampler(self):
@@ -270,25 +276,25 @@ class Instrument(protocol.Protocol):
         # stop the autonomous sample timer
         self.lc_autoSampler.stop()
 
-INSTRUMENT_ID = "123"
-SIM_PORT = 9100
-
 class Simulator(object):
 
-    sim_count = 0
     all_simulators = []
 
     def __init__(self, instrument_id=INSTRUMENT_ID, port=None):
-        self.instrument_id = instrument_id
-        if not port:
-            port = SIM_PORT + Simulator.sim_count
-            Simulator.sim_count += 1
-
-        self.port = port
         self.state = "NEW"
         self.factory = protocol.Factory()
         self.factory.protocol = Instrument
+        self.instrument_id = instrument_id
         self.factory.connections = []
+        parsed = __file__.rpartition('/')
+        parsed = parsed[2].partition('.')
+        SimulatorName = parsed[0]
+        if not port:
+            if not SimulatorName in portNumbers:
+                port = NO_PORT_NUMBER_FOUND
+            else:
+                port = portNumbers[SimulatorName]
+        self.port = port
         Simulator.all_simulators.append(self)
 
     def start(self):
@@ -300,11 +306,24 @@ class Simulator(object):
         if an new client connects while another is connected, the client variable
         in the factory will be overwritten).
         """
+        if self.port == NO_PORT_NUMBER_FOUND:
+            log.error("Failed to start SBE49 simulator, no default port number")
+            return NO_PORT_NUMBER_FOUND
         assert (self.state == "NEW" or self.state == "STOPPED")
-        log.info("Starting SBE49 simulator for ID %s on port %d" % (self.instrument_id, self.port))
-
+        Listening = False
+        StartingPortNumber = self.port
+        while not Listening:
+            try:
+                self.listenport = reactor.listenTCP(self.port, self.factory)
+                Listening = True
+            except:
+                self.port = self.port + 1
+                if self.port == StartingPortNumber + NUMBER_OF_PORTS_AVAILABLE:
+                    log.error("Failed to start SBE49 simulator, no ports available")
+                    return NO_PORT_NUMBER_FOUND
         self.state = "STARTED"
-        self.listenport = reactor.listenTCP(self.port, self.factory)
+        log.info("Started SBE49 simulator for ID %s on port %d" % (self.instrument_id, self.port))
+        return self.port
 
     @defer.inlineCallbacks
     def stop(self):

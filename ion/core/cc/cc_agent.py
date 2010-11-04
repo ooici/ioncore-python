@@ -16,20 +16,26 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.agents.resource_agent import ResourceAgent
 from ion.core import ionconst, ioninit
 from ion.core.ioninit import ion_config
-from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 from ion.core.cc.container import Container
 from ion.core.messaging.receiver import Receiver, FanoutReceiver
+from ion.core.pack import app_supervisor
+from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 import ion.util.procutils as pu
 
+CONF = ioninit.config(__name__)
+CF_announce = CONF.getValue('announce', False)
 
 class CCAgent(ResourceAgent):
+
+    instance = None
+
     """
     Capability Container agent process interface
     """
     def plc_init(self):
+        assert not CCAgent.instance, "CC agent already started"
+        CCAgent.instance = self
         # Init self and container
-        annName = 'cc_announce'
-        self.ann_name = self.get_scoped_name('system', annName)
         self.start_time = pu.currenttime_ms()
         self.containers = {}
         self.contalive = {}
@@ -39,20 +45,27 @@ class CCAgent(ResourceAgent):
     def plc_activate(self):
         # Declare CC announcement name
         annName = 'cc_announce'
-        log.info("Declared CC anounce name: "+str(self.ann_name))
 
         # Attach to CC announcement name
-        self.ann_receiver = FanoutReceiver(name=self.ann_name,
+        self.ann_receiver = FanoutReceiver(name=annName,
                                            label=annName+'.'+self.receiver.label,
                                            scope=FanoutReceiver.SCOPE_SYSTEM,
                                            group=self.receiver.group,
                                            handler=self.receive)
-        annid = yield self.ann_receiver.attach()
-        log.info("Listening to CC anouncements: "+str(annid))
+        self.ann_name = yield self.ann_receiver.attach()
 
-        # Start with an identify request. Will lead to an announce by myself
-        #@todo - Can not send a message to a base process which is not initialized!
-        yield self.send(self.ann_name, 'identify', 'started', {'quiet':True})
+        log.info("Listening to CC anouncements: "+str(self.ann_name))
+
+        if CF_announce:
+            # Start with an identify request. Will lead to an announce by myself
+            #@todo - Can not send a message to a base process which is not initialized!
+
+            yield self._send_announcement('initialize')
+
+    @defer.inlineCallbacks
+    def plc_terminate(self):
+        if CF_announce:
+            yield self._send_announcement('terminate')
 
     @defer.inlineCallbacks
     def _send_announcement(self, event):
@@ -60,7 +73,7 @@ class CCAgent(ResourceAgent):
         Send announce message to CC broadcast name
         """
         cdesc = {'node':str(os.uname()[1]),
-                 'container-id':str(Container.id),
+                 'container-id':str(ioninit.container_instance.id),
                  'agent':str(self.id.full),
                  'version':ionconst.VERSION,
                  'start-time':self.start_time,
@@ -75,7 +88,7 @@ class CCAgent(ResourceAgent):
         log.info("op_announce(): Received CC announcement: " + repr(content))
         contid = content['container-id']
         event = content['event']
-        if event == 'started' or event == 'identify':
+        if event == 'initialize' or event == 'identify':
             self.containers[contid] = content
             self.contalive[contid] = int(pu.currenttime_ms())
         elif event == 'terminate':
@@ -157,6 +170,32 @@ class CCAgent(ResourceAgent):
 
 # Spawn of the process using the module name
 factory = ProcessFactory(CCAgent)
+
+
+# --- CC Application interface
+
+# Functions required
+@defer.inlineCallbacks
+def start(container, starttype, app_definition, *args, **kwargs):
+    agent_proc = [
+        {'name':'ccagent','module':__name__},
+    ]
+
+    appsup_desc = ProcessDesc(name='app-supervisor-'+app_definition.name,
+                              module=app_supervisor.__name__,
+                              spawnargs={'spawn-procs':agent_proc})
+    supid = yield appsup_desc.spawn()
+
+    res = (supid.full, [appsup_desc])
+    defer.returnValue(res)
+
+@defer.inlineCallbacks
+def stop(container, state):
+    print "state", state
+    supdesc = state[0]
+    log.info("Terminating CC agent")
+    yield supdesc.terminate()
+    CCAgent.instance = None
 
 """
 twistd -n --pidfile t1.pid cc -h amoeba.ucsd.edu -a sysname=mm res/scripts/newcc.py

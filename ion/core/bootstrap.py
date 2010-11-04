@@ -17,7 +17,7 @@ from ion.core.cc.container import Container
 from ion.core.cc.modloader import ModuleLoader
 from ion.core.process import process
 from ion.core.process.process import Process, ProcessDesc
-from ion.data.store import Store
+from ion.services.dm.preservation.store import Store
 from ion.data.datastore import registry
 from ion.resources import description_utility
 from ion.services.coi import service_registry
@@ -143,5 +143,7 @@ def reset_container():
     # The following is extremely hacky. Reset static module and classvariables
     # to their defaults. Even further, reset imported names in other modules
     # to the new objects.
-    process.procRegistry = Store()
-    process.processes = {}
+    process.procRegistry.kvs.clear()
+    process.processes.clear()
+    from ion.core.cc.cc_agent import CCAgent
+    CCAgent.instance = None

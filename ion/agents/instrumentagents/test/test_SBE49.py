@@ -35,20 +35,23 @@ from twisted.trial import unittest
 
 
 class TestSBE49(IonTestCase):
+    
+    SimulatorPort = 0
 
 
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
 
-        self.simulator = Simulator("123", 9000)
-        self.simulator.start()
+        self.simulator = Simulator("123", 9100)
+        self.SimulatorPort = self.simulator.start()
+        self.assertNotEqual(self.SimulatorPort, 0)
 
         services = [
             {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
             {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
 
-            {'name':'SBE49_Driver','module':'ion.agents.instrumentagents.SBE49_driver','class':'SBE49InstrumentDriver'}
+            {'name':'SBE49_Driver','module':'ion.agents.instrumentagents.SBE49_driver','class':'SBE49InstrumentDriver','spawnargs':{'ipport':self.SimulatorPort}}
             ]
 
         self.sup = yield self._spawn_processes(services)
@@ -80,17 +83,18 @@ class TestSBE49(IonTestCase):
         self.topic = yield dpsc.define_topic(self.topic)
 
 
-        print 'TADA!'
+        log.debug('TADA!')
 
 
     @defer.inlineCallbacks
     def test_initialize(self):
         result = yield self.driver_client.initialize('some arg')
-        print 'TADA!'
+        log.debug('TADA!')
 
     @defer.inlineCallbacks
     def test_driver_load(self):
-        config_vals = {'addr':'127.0.0.1', 'port':'9000'}
+        #config_vals = {'addr':'127.0.0.1', 'port':'9000'}
+        config_vals = {'addr':'137.110.112.119', 'port':self.SimulatorPort}
         result = yield self.driver_client.configure_driver(config_vals)
         self.assertEqual(result['addr'], config_vals['addr'])
         self.assertEqual(result['port'], config_vals['port'])
@@ -145,13 +149,18 @@ class TestSBE49(IonTestCase):
 
         log.info('Defined subscription: '+str(subscription))
 
+        #config_vals = {'ipaddr':'137.110.112.119', 'ipport':'4001'}
+        config_vals = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort}
+        result = yield self.driver_client.configure_driver(config_vals)
+
         cmd1 = [['ds', 'now']]
         #cmd1 = [['start', 'now']]
         #cmd2 = [['stop', 'now']]
         #cmd2 = [['pumpoff', '3600', '1']]
+        yield pu.asleep(5)
         result = yield self.driver_client.execute(cmd1)
         # DHE: wait a while...
-        yield pu.asleep(1)
+        yield pu.asleep(5)
         #result = yield self.driver_client.execute(cmd2)
 
 
@@ -218,5 +227,6 @@ class DataConsumer(Process):
         """
         Data has been received.  Increment the receive_cnt
         """
+        log.debug("@@@@@@@@@@@@@@@@@@@@@@@@ data received: %s" %s(str(self.received_msg)))
         self.receive_cnt += 1
         self.received_msg.append(content)

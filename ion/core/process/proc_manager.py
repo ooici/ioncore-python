@@ -17,7 +17,7 @@ from ion.core import ioninit
 from ion.core.process import process
 from ion.core.process.process import Process
 from ion.core.process.process import IProcess, ProcessDesc, ProcessInstantiator
-from ion.data.store import Store
+from ion.services.dm.preservation.store import Store
 from ion.util.state_object import BasicLifecycleObject
 import ion.util.procutils as pu
 
@@ -76,7 +76,7 @@ class ProcessManager(BasicLifecycleObject):
             sup = yield self.create_supervisor()
 
         assert IProcess.providedBy(sup), "Parent must provide IProcess"
-        assert sup._get_state() == "ACTIVE", "Illegal parent process state"
+        assert sup._get_state() in ("READY", "ACTIVE"), "Illegal parent process state"
 
         log.info("Spawning %s child processes for sup=[%s]" % (len(children), sup.proc_name))
         for child in children:
@@ -95,6 +95,9 @@ class ProcessManager(BasicLifecycleObject):
         @param node the container id where process should be spawned; None for local
         @retval Deferred -> Id with process id
         """
+        if not parent:
+            parent = yield self.create_supervisor()
+            procdesc.sup_process = parent
         assert isinstance(procdesc, ProcessDesc), "procdesc must be ProcessDesc"
         assert IProcess.providedBy(parent), "parent must be IProcess"
 

@@ -51,15 +51,24 @@ class AppLoader(object):
         if not (hasattr(appmod, "start") and hasattr(appmod, "stop")):
             raise ConfigurationError("App module malformed")
 
-        res = yield appmod.start(container, START_PERMANENT, *modargs)
-        (status, supid, state) = res
+        log.debug("Application '%s' starting" % appdef.name)
+        try:
+            res = yield defer.maybeDeferred(appmod.start,
+                                container, START_PERMANENT, appdef, *modargs)
+        except Exception, ex:
+            log.exception("Application %s start failed" % appdef.name)
+            appdef._state = None
+            return
 
-        if not status == "OK":
-            log.error("Error starting app %s: %s" % (appdef.name, status))
+        if res and type(res) in (list,tuple) and len(res) == 2:
+            (appdef._supid, appdef._state) = res
+        else:
+            raise ConfigurationError("Application %s start() result invalid: %s" %(
+                    appdef.name, res))
 
-        appdef._supid = supid
-        appdef._state = state
         appdef._mod_loaded = appmod
+        log.info("Application '%s' started successfully. Root sup-id=%s" % (
+                appdef.name, appdef._supid))
 
     @classmethod
     @defer.inlineCallbacks
@@ -67,7 +76,12 @@ class AppLoader(object):
         assert IContainer.providedBy(container)
         assert isinstance(appdef, AppDefinition)
 
-        yield appdef._mod_loaded.stop(container, appdef._state)
+        log.debug("Application '%s' stopping" % appdef.name)
+        try:
+            yield defer.maybeDeferred(appdef._mod_loaded.stop,
+                                      container, appdef._state)
+        except Exception, ex:
+            log.exception("Application %s stop failed" % appdef.name)
 
 class AppDefinition(object):
     """

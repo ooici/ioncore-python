@@ -26,8 +26,12 @@ del sys
 
 # Configure logging system (console, logfile, other loggers)
 # NOTE: Console logging is appended to Twisted log output prefix!!
-logging.config.fileConfig(ic.LOGCONF_FILENAME)
-
+if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
+    altpath = os.environ.get(ic.ION_ALTERNATE_LOGGING_CONF)
+    logging.config.fileConfig(altpath)
+else:
+    logging.config.fileConfig(ic.LOGCONF_FILENAME)
+    
 # Load configuration properties for any module to access
 ion_config = Config(ic.ION_CONF_FILENAME)
 
@@ -135,11 +139,11 @@ def clean_twisted_logging():
     from twisted.python import log, util
     obs0 = log.theLogPublisher.observers[0]
     ro = log.removeObserver
-    if not hasattr(obs0.__self__,'write'):
+    if not hasattr(obs0.im_self,'write'):
         # In case of trial testcases this hack does not work.
         return
-    fdwrite = obs0.__self__.write
-    fdflush = obs0.__self__.flush
+    fdwrite = obs0.im_self.write
+    fdflush = obs0.im_self.flush
     def log_emit(eventDict):
         text = log.textFromEventDict(eventDict)
         if text is None:

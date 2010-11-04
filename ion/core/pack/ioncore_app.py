@@ -15,14 +15,11 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import bootstrap
 
 @defer.inlineCallbacks
-def start(container, starttype, *args, **kwargs):
-    log.info("ioncore starting")
-    res = ('OK', 'pid', [])
-
+def start(container, starttype, app_definition, *args, **kwargs):
     yield bootstrap.init_ioncore()
 
+    res = (None,[])
     defer.returnValue(res)
 
 def stop(container, state):
-    log.info("ioncore stopping")
     return defer.succeed(None)

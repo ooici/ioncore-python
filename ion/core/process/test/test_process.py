@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/core/test/test_baseprocess.py
+@file ion/core/process/test/test_baseprocess.py
 @author Michael Meisinger
 @brief test case for process base class
 """
@@ -78,13 +78,13 @@ class ProcessTest(IonTestCase):
     @defer.inlineCallbacks
     def test_process(self):
         # Also test the ReceiverProcess helper class
-        print "p1"
+        log.debug('Spawning p1')
         p1 = ReceiverProcess(spawnargs={'proc-name':'p1'})
         pid1 = yield p1.spawn()
 
-        print "others"
+        log.debug('Spawning other processes')
         processes = [
-            {'name':'echo','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
+            {'name':'echo','module':'ion.core.process.test.test_process','class':'EchoProcess'},
         ]
         sup = yield self._spawn_processes(processes, sup=p1)
         assert sup == p1
@@ -110,7 +110,7 @@ class ProcessTest(IonTestCase):
         p1 = Process()
         pid1 = yield p1.spawn()
 
-        child = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
+        child = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
         pid2 = yield p1.spawn_child(child)
 
         (cont,hdrs,msg) = yield p1.rpc_send(pid2,'echo','content123')
@@ -121,13 +121,13 @@ class ProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_spawn_child(self):
-        child1 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
+        child1 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
         self.assertEquals(child1._get_state(),'INIT')
 
         pid1 = yield self.test_sup.spawn_child(child1)
         self.assertEquals(child1._get_state(),'ACTIVE')
         proc = self._get_procinstance(pid1)
-        self.assertEquals(str(proc.__class__),"<class 'ion.core.test.test_baseprocess.EchoProcess'>")
+        self.assertEquals(str(proc.__class__),"<class 'ion.core.process.test.test_process.EchoProcess'>")
         self.assertEquals(pid1, proc.id)
         log.info('Process 1 spawned and initd correctly')
 
@@ -152,7 +152,7 @@ class ProcessTest(IonTestCase):
         pid1 = yield p1.spawn()
         proc1 = self._get_procinstance(pid1)
 
-        child2 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
+        child2 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
         pid2 = yield self.test_sup.spawn_child(child2, activate=False)
         self.assertEquals(child2._get_state(), 'READY')
         proc2 = self._get_procinstance(pid2)
@@ -176,7 +176,7 @@ class ProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_error_in_op(self):
-        child1 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
+        child1 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
         pid1 = yield self.test_sup.spawn_child(child1)
 
         try:
@@ -195,7 +195,7 @@ class ProcessTest(IonTestCase):
         pid1 = yield p1.spawn()
 
         processes = [
-            {'name':'echo','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
+            {'name':'echo','module':'ion.core.process.test.test_process','class':'EchoProcess'},
         ]
         sup = yield self._spawn_processes(processes, sup=p1)
 
@@ -215,13 +215,22 @@ class ProcessTest(IonTestCase):
     @defer.inlineCallbacks
     def test_shutdown(self):
         processes = [
-            {'name':'echo1','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
-            {'name':'echo2','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
-            {'name':'echo3','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
+            {'name':'echo1','module':'ion.core.process.test.test_process','class':'EchoProcess'},
+            {'name':'echo2','module':'ion.core.process.test.test_process','class':'EchoProcess'},
+            {'name':'echo3','module':'ion.core.process.test.test_process','class':'EchoProcess'},
         ]
         sup = yield self._spawn_processes(processes)
 
         yield self._shutdown_processes()
+
+    @defer.inlineCallbacks
+    def test_rpc_timeout(self):
+        sup = self.test_sup
+        try:
+            yield sup.rpc_send('big_void', 'noop', 'arbitrary', timeout=1)
+            self.fail("TimeoutError expected")
+        except defer.TimeoutError, te:
+            log.info('Timeout received')
 
 
 class EchoProcess(Process):

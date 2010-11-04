@@ -180,24 +180,26 @@ class TestInstrumentAgent(IonTestCase):
 
         try:
 
-            response = yield self.IAClient.execute_instrument([['start','now', 1],
-                                                               ['stop']])
-            print "response ", response
+            #response = yield self.IAClient.execute_instrument([['start','now', 1],
+            #                                                   ['stop']])
+            response = yield self.IAClient.execute_instrument([['start','now', 1]])
+            log.debug("response: %s " % response)
             self.assert_(isinstance(response, dict))
             self.assert_('start' in response['value'])
-            self.assert_('stop' in response['value'])
+            #self.assert_('stop' in response['value'])
+            yield pu.asleep(3)
 
             try:
                 response = yield self.IAClient.execute_instrument([['badcommand',
                                                                 'now','1']])
                 self.fail("ReceivedError expected")
-            except ReceivedError, re:
+            except ReceivedError:
                 pass
 
             try:
                 response = yield self.IAClient.execute_instrument([])
                 self.fail("ReceivedError expected")
-            except ReceivedError, re:
+            except ReceivedError:
                 pass
 
         finally:

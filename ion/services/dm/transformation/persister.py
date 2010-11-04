@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/preservation/persister.py
+@file ion/services/dm/transformation/persister.py
 @author Paul Hubbard
 @author David Stuebe
 @author Matt Rodriguez
@@ -110,7 +110,6 @@ class PersisterConsumer(base_consumer.BaseConsumer):
         # Later - these will be sent to a historical log for the dataset...
         #notification = datamessage.notification
         #timestamp = datamessage.timestamp
-        
 
     def _create_nca_configfile(self,base_name):
         """

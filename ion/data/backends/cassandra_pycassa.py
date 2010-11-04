@@ -19,7 +19,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit
-from ion.data.store import IStore
+from ion.services.dm.preservation.store import IStore
 import pycassa
 import uuid
 
@@ -61,10 +61,10 @@ class CassandraStore(IStore):
         inst.colfamily = kwargs.get('colfamily', CF_default_colfamily)
         inst.cf_super = kwargs.get('cf_super', CF_default_cf_super)
         inst.key = kwargs.get('key', CF_default_key)
-        
+
         if not inst.key:
             inst.key = str(uuid.uuid4())
-        
+
         if inst.cf_super:
             inst.namespace = kwargs.get('namespace', CF_default_namespace)
             if inst.namespace == None:
@@ -95,14 +95,14 @@ class CassandraStore(IStore):
     def clear_store(self):
         """
         @brief Delete the super column namespace. Do not touch default namespace!
-        @note This is complicated by the persistence across many 
+        @note This is complicated by the persistence across many
         """
         if self.cf_super:
             self.kvs.remove(self.key,super_column=self.namespace)
         else:
             log.info('Can not clear root of persistent store!')
         return defer.succeed(None)
-        
+
 
     def get(self, col):
         """
@@ -141,9 +141,9 @@ class CassandraStore(IStore):
                 self.kvs.insert(self.key, {self.namespace:{col:value}})
             else:
                 self.kvs.insert(self.key, {col:value})
-        except pycassa.connection.NoServerAvailable, ex: 
+        except pycassa.connection.NoServerAvailable, ex:
             log.info("Problem with the put col: %s value %s " % (col, value))
-            print ex.argskw
+            log.debug(ex.argskw)
             #log.info("Exception with put: %s" % ex.args)
         return defer.succeed(None)
 
