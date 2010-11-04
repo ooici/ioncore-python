@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 """
-@file ion/data/backends/cassandra.py
+@file ion/data/backends/irodsstore.py
 @author Bing Zhu
-@brief Implementation of ion.data.store.IStore using pyirods to interface a
-       iRODS datastore backend for a single iRODS zone
+@brief Implementation of ion.data.store.IStore using PyIrods to interface a
+       iRODS datastore backend in a single iRODS zone
 @Note Test cases for the iRODS backend are in ion.data.backends.test.test_irodsstore 
+@Note The Python iRODS library package can be installed with: easy_install --find-links http://ooici.net/packages pyrods-irods
 @
 """
 
 #import re
-import sys
+#import sys
 import logging
 logging = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ logging = logging.getLogger(__name__)
 from ion.core import ioninit
 from ion.data.store import IStore
 
-import uuid
+#import uuid
 
 from irods import *
 from irods_error import *
@@ -28,21 +29,40 @@ CONF = ioninit.config(__name__)
 
 class IrodsStore(IStore):
     """
-    Store interface for interacting with the Cassandra key/value store
-    @see http://github.com/vomjom/pycassa
-    @Note Default behavior is to use a random super column name space!
+    Store interface for interacting with the iRODS distributed storage system
+    @see http://www.irods.org 
+    @Note The login info is stored in the ion config file.
     """
     def __init__(self, **kwargs):
-        self.hostname = None
-        self.port_num = None
-        self.default_resc = None
-        self.obj_home = None
-        self.user_name = None
-        self.user_passwd = None
-        self.zone = None
+        """
+        @brief constructor to read fedault iRODS info from the 'ion' config file
+        """
+        self.hostname = self.get_config('irodsHost')
+        self.port_num = self.get_config('irodsPort')
+        self.default_resc = self.get_config('rodsDefResource')
+        self.obj_home = self.get_config('irodsOoiCollection')
+        self.user_name = self.get_config('irodsUserName')
+        self.user_passwd = self.get_config('irodsUserPasswd')
+        self.zone = self.get_config('irodsZone')
         self.conn = None
 
-    @classmethod
+        # can be overridden by args individually
+        if kwargs:
+            if kwargs.get('irodsHost', None):
+                self.hostname = kwargs.get('irodsHost', None)
+            if kwargs.get('irodsPort', None):
+                self.port_num = kwargs.get('irodsPort', None)
+            if kwargs.get('rodsDefResource', None):
+                self.default_resc = kwargs.get('rodsDefResource', None)
+            if kwargs.get('irodsOoiCollection', None):
+                self.obj_home = kwargs.get('irodsOoiCollection', None)
+            if kwargs.get('irodsUserName', None):
+                self.user_name = kwargs.get('irodsUserName', None)
+            if kwargs.get('irodsUserPasswd', None):
+                self.user_passwd = kwargs.get('irodsUserPasswd', None)
+            if kwargs.get('irodsZone', None):
+                self.zone = kwargs.get('irodsZone', None)
+
     def get_config(self, key):
         try:
             value = CONF[key]
@@ -50,68 +70,64 @@ class IrodsStore(IStore):
             value = None
         return value
 
-    @classmethod
-    def create_store(cls, **kwargs):
+    def connect_to_irods(self):
         """
-        @brief actory method to create an create an instance of the irods store 
-        @param from kwargs or from config file.
-        @param cass_host_list List of hostname:ports for cassandra host or cluster
-        @retval Deferred, for IStore instance.
+        @brief creates a client connection with an iRODS server
         """
-        inst = cls(**kwargs)
-        inst.kwargs = kwargs
-
-        # get values from config file first
-        inst.hostname = inst.get_config('irodsHost')
-        inst.port_num = inst.get_config('irodsPort')
-        inst.default_resc = inst.get_config('rodsDefResource')
-        inst.obj_home = inst.get_config('irodsOOIHome')
-        inst.user_name = inst.get_config('irodsUserName')
-        inst.user_passwd = inst.get_config('irodsUserPasswd')
-        inst.zone = inst.get_config('irodsZone')
-
-        # can be overridden by args
-        if kwargs:
-            if kwargs.get('irodsHost', None):
-                inst.hostname = kwargs.get('irodsHost', None)
-            if kwargs.get('irodsPort', None):
-                inst.port_num = kwargs.get('irodsPort', None)
-            if kwargs.get('rodsDefResource', None):
-                inst.default_resc = kwargs.get('rodsDefResource', None)
-            if kwargs.get('irodsOOIHome', None):
-                inst.obj_home = kwargs.get('irodsOOIHome', None)
-            if kwargs.get('irodsUserName', None):
-                inst.user_name = kwargs.get('irodsUserName', None)
-            if kwargs.get('irodsUserPasswd', None):
-                inst.user_passwd = kwargs.get('irodsUserPasswd', None)
-            if kwargs.get('irodsZone', None):
-                inst.zone = kwargs.get('irodsZone', None)
-        
-        inst.conn, errMsg = rcConnect(inst.hostname, int(inst.port_num), inst.user_name, inst.zone)
-
-        if not inst.conn:
+        self.conn, errMsg = rcConnect(self.hostname, int(self.port_num), self.user_name, self.zone)
+        if not self.conn:
             logging.info('rcConnect() error: ' + errMsg)
             raise Exception('rcConnect error', errMsg)
 
-        status = clientLoginWithPassword(inst.conn, inst.user_passwd)
+        status = clientLoginWithPassword(self.conn, self.user_passwd)
         if status < 0:
+            self.conn = None
             errName, subErrName = rodsErrorName(status)
             errMsg = str(status) + ':' + errName + ' ' + subErrName
             logging.info('rcConnect() error: ' + errMsg)
             raise Exception('clientLoginWithPassword() error', errMsg)
 
-        irods_info = 'irods connection succeeded: ' + inst.hostname + '/' + inst.port_num
+        irods_info = 'irods connection succeeded: ' + self.hostname + '/' + self.port_num
         logging.info(irods_info)
+
+    @classmethod
+    def create_store(cls, **kwargs):
+        """
+        @brief factory method to create an create an instance of the irods store 
+        @param from optional kwargs 
+        @retval IStore instance or None
+        """
+        inst = cls(**kwargs)
+
+        inst.kwargs = kwargs
+
+        try:
+            inst.connect_to_irods()
+        except Exception:
+            pass
 
         return (inst)
 
+    def disconnect_from_irods(self):
+        """
+        @brief close the TCP connection with the iRODS server
+        """
+        rcDisconnect(self.conn)
 
     def clear_store(self):
         """
-        @brief Delete the super column namespace. Do not touch default namespace!
-        @note This is complicated by the persistence across many 
+        @brief Clean the iRODS collection and disonnect from iRODS
         """
-        rcDisconnect(self.conn)
+        if not self.conn:
+            return
+
+        collinp = collInp_t()
+        collinp.setCollName(self.obj_home)
+        collinp.addCondInputKeyVal(RECURSIVE_OPR__KW, '')
+        collinp.addCondInputKeyVal(FORCE_FLAG_KW, '')
+        rcRmColl(self.conn, collinp, 0)
+
+        self.disconnect_from_irods()
 
     def get_irods_fname_by_key(self, key):
         """
@@ -125,10 +141,13 @@ class IrodsStore(IStore):
         """
         @brief Return a RODS value (the content of the file) corresponding to a given key
         @param key The sha1 hash key from OOI repository
-        @retval Deferred, the content of the irods file, or None
+        @retval the content of the irods file, or None
         """
-
         logging.debug('reading value from iRODS for key %s' % (key))
+
+        if not self.conn:
+            print '\n\n get() the conn  is null.\n'
+            return None
 
         value = None
         try:
@@ -154,10 +173,23 @@ class IrodsStore(IStore):
         @param key 
         @param value Corresponding value
         @note Value is composed into iRODS under 'irods_ooi_home' with filename of the key value.
-        @retval Deferred for success
+        @retval None for success
         """
 
         logging.debug('writing data %s into iRODS' % (key))
+
+        if not self.conn:
+            return None
+
+        #create the collection 'obj_home' if it does not exist.
+        collinp = collInp_t()
+        collinp.setCollName(self.obj_home)
+        status = collinp.addCondInputKeyVal(RECURSIVE_OPR__KW, "")
+        status = rcCollCreate(self.conn, collinp)
+        if status < 0:
+            errMsg = self.get_errmsg_by_status(status)
+            logging.info('rcCollCreate() error: ' + errMsg)
+            raise Exception('rcCollCreate() error', errMsg)
 
         fname = self.get_irods_fname_by_key(key)
         f = iRodsOpen(self.conn, fname, 'w', self.default_resc)
@@ -170,12 +202,16 @@ class IrodsStore(IStore):
 
         return (None)
 
+    def get_errmsg_by_status(self, t):
+        errName, subErrName = rodsErrorName(t)
+        errMsg = str(t) + ':' + errName + ' ' + subErrName
+        return errMsg
+
     def remove(self, key):
         """
-        @brief delete a key/value pair
+        @brief delete an iRODS file by OOICI key
         @param key Key to delete
-        @retval Deferred, for success of operation
-        @note Deletes are lazy, so key may still be visible for some time.
+        @retval None for success of operation
         """
  
         logging.debug('deleting data %s from iRODS' % (key))
@@ -188,46 +224,9 @@ class IrodsStore(IStore):
         t = rcDataObjUnlink(self.conn, dataObjInp)
 
         if t < 0:
-            errName, subErrName = rodsErrorName(t)
-            errMsg = str(t) + ':' + errName + ' ' + subErrName
+            errMsg = self.get_errmsg_by_status(t)
             logging.info('rcDataObjUnlink() error: ' + errMsg)
             raise Exception('rcDataObjUnlink() error', errMsg)
 
         return (None)
 
-# for test purpose only
-if __name__ == '__main__':
-    irods_config = {'irodsHost':'ec2-204-236-151-209.us-west-1.compute.amazonaws.com', \
-                  'irodsPort':'1247', \
-                  'irodsOOIHome':'/tempZone/home/bzhu/OOI', \
-                  'irodsUserName':'bzhu', \
-                  'irodsUserPasswd':'bzhubzhu', \
-                  'irodsZone':'tempZone', \
-                  'rodsDefResource':'demoResc2'}
-
-    if len(sys.argv) < 2:
-        print 'Usage: ' + sys.argv[0] + ' key'
-        sys.exit(0)
-
-    key = sys.argv[1]
-
-    sys.stderr.write('creating the store object ...\n')
-    irods = IrodsStore.create_store(**irods_config)
-
-    sys.stderr.write('put method ...\n')
-    irods.put(key, 'ABCDEFGHIJK') 
-
-    sys.stderr.write('get method ...\n')
-    s = irods.get(key)
- 
-    sys.stderr.write('The content of the object -->\n')
-    sys.stdout.write(s)
-    sys.stdout.write('\n')
-
-    import time
-    time.sleep(1)
-    
-    sys.stderr.write('delete the object...\n')
-    irods.remove(key)
-
-    sys.stderr.write('test done.\n')
