@@ -12,9 +12,6 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from uuid import uuid4
 from ion.data.backends.irodsstore import IrodsStore
-#from ion.data.backends import irodsstore
-from twisted.internet import defer
-import time
 
 
 class TestIrodsDataStoreInterface(unittest.TestCase):
