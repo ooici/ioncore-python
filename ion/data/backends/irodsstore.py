@@ -9,17 +9,12 @@
 @
 """
 
-#import re
-#import sys
 import logging
 logging = logging.getLogger(__name__)
 
-#from twisted.internet import defer
 
 from ion.core import ioninit
 from ion.data.store import IStore
-
-#import uuid
 
 from irods import *
 from irods_error import *
@@ -29,21 +24,21 @@ CONF = ioninit.config(__name__)
 
 class IrodsStore(IStore):
     """
-    Store interface for interacting with the iRODS distributed storage system
-    @see http://www.irods.org 
+    @brief Store interface for interacting with the iRODS distributed storage system
+    @Note see http://www.irods.org 
     @Note The login info is stored in the ion config file.
     """
     def __init__(self, **kwargs):
         """
         @brief constructor to read iRODS info from args or the 'ion' config file
         """
-        self.hostname = self.get_config('irodsHost')
-        self.port_num = self.get_config('irodsPort')
-        self.default_resc = self.get_config('rodsDefResource')
-        self.obj_home = self.get_config('irodsOoiCollection')
-        self.user_name = self.get_config('irodsUserName')
-        self.user_passwd = self.get_config('irodsUserPasswd')
-        self.zone = self.get_config('irodsZone')
+        self.hostname = self._get_config('irodsHost')
+        self.port_num = self._get_config('irodsPort')
+        self.default_resc = self._get_config('rodsDefResource')
+        self.obj_home = self._get_config('irodsOoiCollection')
+        self.user_name = self._get_config('irodsUserName')
+        self.user_passwd = self._get_config('irodsUserPasswd')
+        self.zone = self._get_config('irodsZone')
         self.conn = None
 
         # can be overridden by args individually
@@ -63,7 +58,7 @@ class IrodsStore(IStore):
             if kwargs.get('irodsZone', None):
                 self.zone = kwargs.get('irodsZone', None)
 
-    def get_config(self, key):
+    def _get_config(self, key):
         try:
             value = CONF[key]
         except:
@@ -187,7 +182,7 @@ class IrodsStore(IStore):
         status = collinp.addCondInputKeyVal(RECURSIVE_OPR__KW, "")
         status = rcCollCreate(self.conn, collinp)
         if status < 0:
-            errMsg = self.get_errmsg_by_status(status)
+            errMsg = self._get_errmsg_by_status(status)
             logging.info('rcCollCreate() error: ' + errMsg)
             raise Exception('rcCollCreate() error', errMsg)
 
@@ -202,7 +197,7 @@ class IrodsStore(IStore):
 
         return (None)
 
-    def get_errmsg_by_status(self, t):
+    def _get_errmsg_by_status(self, t):
         errName, subErrName = rodsErrorName(t)
         errMsg = str(t) + ':' + errName + ' ' + subErrName
         return errMsg
@@ -224,7 +219,7 @@ class IrodsStore(IStore):
         t = rcDataObjUnlink(self.conn, dataObjInp)
 
         if t < 0:
-            errMsg = self.get_errmsg_by_status(t)
+            errMsg = self._get_errmsg_by_status(t)
             logging.info('rcDataObjUnlink() error: ' + errMsg)
             raise Exception('rcDataObjUnlink() error', errMsg)
 
