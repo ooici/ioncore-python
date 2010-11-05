@@ -14,7 +14,7 @@ logging = logging.getLogger(__name__)
 
 
 from ion.core import ioninit
-from ion.data.store import IStore
+from ion.services.dm.preservation.store import IStore
 
 from irods import *
 from irods_error import *
