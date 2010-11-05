@@ -381,11 +381,11 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         log.debug("Sending Command: %s" %cmd)
         self.instrument.transport.write(cmd)
         
-    def sendBreak(self, cmd):
+    def sendBreak(self):
         if self.instrument_ipaddr == "localhost" or self.instrument_ipaddr == "127.0.0.1":
             # localhost(127.0.0.1) implies the use of the instrument simulator so just send a simple CR/LF
-            log.debug("Sending CR/LF to simulator")
-            self.instrument.transport.write(PROMPT_INST)
+            log.info("Sending CR/LF to simulator")
+            self.instrument.transport.write(instrument_prompts.PROMPT_INST)
         else:
             log.info("Sending break to instrument ipaddr: %s, ipport: %s" %(self.instrument_ipaddr, self.instrument_ipportCmd))      
             try:
@@ -466,7 +466,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         @param data
         @retval none
         """
-        if INST_PROMPT in data:
+        if instrument_prompts.INST_PROMPT in data:
             log.debug("gotPrompt()")
             self.hsm.onEvent('eventPromptReceived')
         log.debug("gotData() %s." % (data))
