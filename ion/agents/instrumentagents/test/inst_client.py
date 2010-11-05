@@ -87,12 +87,12 @@ if __name__ == '__main__':
         reactor.connectTCP(sys.argv[1], Port, StdioProxyFactory( ))
         print 'Connected to %s simulator at %s:%s' %(sys.argv[3], sys.argv[1], Port)
     else:
-        #try:
+        try:
             reactor.connectTCP(sys.argv[1], int(sys.argv[2]), StdioProxyFactory( ))
-        #except:
-        #    print 'ERROR while trying to connect to instrument at %s:%s' %(sys.argv[1], sys.argv[2])
-        #    sys.exit(1)
-        #print 'Connected to instrument at %s:%s' %(sys.argv[1], sys.argv[2])
+        except:
+            print 'ERROR while trying to connect to instrument at %s:%s' %(sys.argv[1], sys.argv[2])
+            sys.exit(1)
+        print 'Connected to instrument at %s:%s' %(sys.argv[1], sys.argv[2])
          
     reactor.run( )
 
