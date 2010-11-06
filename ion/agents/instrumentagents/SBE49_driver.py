@@ -241,6 +241,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "eventConnectionComplete":
+            # TODO: can this happen?????
             log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             # Send crlf, then transition to stateConnecting
             self.sendCmd(instrument_prompts.PROMPT_INST)
@@ -249,6 +250,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
             return 0
         # A command has been received from the agent
         # Move to stateConnecting
+        #
+        # Maybe this can't happen...try removing and testing...
         elif caller.tEvt['sType'] == "eventCommandReceived":
             log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             #
@@ -313,7 +316,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
             # We got a command from the agent; need to get the prompt
             # before sending
-            self.sendCmd(PROMPT_INST)
+            self.sendCmd(instrument_prompts.PROMPT_INST)
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
@@ -329,7 +332,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             return 0
         elif caller.tEvt['sType'] == "eventPromptReceived":
             #
-            # Transition to the stateDisconnecting state
+            # Transition to the statePrompted state
             #
             caller.stateTran(self.statePrompted)
             return 0
@@ -372,8 +375,14 @@ class SBE49InstrumentDriver(InstrumentDriver):
             data = self.dequeueData()            
             log.debug("statePrompted() Calling publish.")
             self.publish(data, self.publish_to)
-            if 'S>' not in data:
-                caller.stateTran(self.stateConnected)
+            # TODO
+            # Use CONSTANT STRING HERE
+            # What if we go back to connected every time??? Don't think this
+            # will work for autonomous mode...need to think about that.
+            # Might need to have a separate state for auto mode.
+            caller.stateTran(self.stateConnected)
+            #if 'S>' not in data:
+            #    caller.stateTran(self.stateConnected)
             return 0
         elif caller.tEvt['sType'] == "eventPromptReceived":
             return 0
