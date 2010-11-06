@@ -67,6 +67,7 @@ class StdioProxyFactory(protocol.ClientFactory):
 
 if __name__ == '__main__':
     import sys
+    
     if len(sys.argv) < 3 or len(sys.argv) > 4 or \
        (len(sys.argv) == 4 and not sys.argv[3].startswith('sim')):
         print "Usage: %s host port [sim_INSTRUMENT-NAME]" % __file__
@@ -79,13 +80,19 @@ if __name__ == '__main__':
             print 'ERROR while trying to import Simulator from module {0}'.format(sys.argv[3])
             sys.exit(1)
         simulator = Simulator(sys.argv[1], int(sys.argv[2]))
-        SimulatorPort = simulator.start()
-
-    if SimulatorPort == NO_PORT_NUMBER_FOUND:
-        print "Can't start simulator: no port available"
-        sys.exit(1)
-    print 'Connected to %s simulator at %s:%s' %(sys.argv[3], sys.argv[1], SimulatorPort)
-    reactor.connectTCP(sys.argv[1], SimulatorPort, StdioProxyFactory( ))
-
+        Port = simulator.start()
+        if Port == NO_PORT_NUMBER_FOUND:
+           print "Can't start simulator: no port available"
+           sys.exit(1)
+        reactor.connectTCP(sys.argv[1], Port, StdioProxyFactory( ))
+        print 'Connected to %s simulator at %s:%s' %(sys.argv[3], sys.argv[1], Port)
+    else:
+        try:
+            reactor.connectTCP(sys.argv[1], int(sys.argv[2]), StdioProxyFactory( ))
+        except:
+            print 'ERROR while trying to connect to instrument at %s:%s' %(sys.argv[1], sys.argv[2])
+            sys.exit(1)
+        print 'Connected to instrument at %s:%s' %(sys.argv[1], sys.argv[2])
+         
     reactor.run( )
 
