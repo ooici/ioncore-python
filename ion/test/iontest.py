@@ -121,8 +121,8 @@ class IonTestCase(unittest.TestCase):
 
         log.info("============ION container closed============")
 
-        #if msgstr:
-        #    raise RuntimeError("Unexpected message processed during container shutdown: "+msgstr)
+        if msgstr:
+            raise RuntimeError("Unexpected message processed during container shutdown: "+msgstr)
 
     def _shutdown_processes(self, proc=None):
         """
