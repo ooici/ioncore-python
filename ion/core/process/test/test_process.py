@@ -7,7 +7,8 @@
 """
 
 import os
-import sha
+import hashlib
+
 
 from twisted.trial import unittest
 from twisted.internet import defer
@@ -16,6 +17,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
+from ion.core.messaging import ion_reply_codes
 from ion.core.process.process import Process, ProcessDesc, ProcessFactory
 from ion.core.cc.container import Container
 from ion.core.exception import ReceivedError
@@ -116,6 +118,7 @@ class ProcessTest(IonTestCase):
 
         (cont,hdrs,msg) = yield p1.rpc_send(pid2,'echo','content123')
         #self.assertEquals(cont['value'], 'content123')
+        self.assertEqual(hdrs.get(p1.MSG_STATUS),'OK')
         self.assertEquals(cont, 'content123')
 
         yield p1.terminate()
@@ -185,7 +188,7 @@ class ProcessTest(IonTestCase):
         pid1 = yield self.test_sup.spawn_child(child1)
 
         try:
-            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echofail2','content123')
+            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo_exception','content123')
             self.fail("ReceivedError expected")
         except ReceivedError, re:
             log.info('Process 1 responded to error correctly')
@@ -206,8 +209,9 @@ class ProcessTest(IonTestCase):
 
         pid2 = p1.get_child_id('echo')
 
-        byte_string = sha.sha('test').digest()
-
+        #byte_string = sha.sha('test').digest()
+        byte_string = hashlib.sha1('test').digest()
+        
         yield p1.send(pid2, 'echo', byte_string)
         log.info('Sent byte-string')
 
@@ -250,19 +254,22 @@ class EchoProcess(Process):
     @defer.inlineCallbacks
     def op_echo(self, content, headers, msg):
         log.info("Message received: "+str(content))
-        yield self.reply_ok(msg, content)
+        yield self.reply(msg, content=content)
 
     @defer.inlineCallbacks
-    def op_echofail1(self, content, headers, msg):
+    def op_echo_fail(self, content, headers, msg):
         log.info("Message received: "+str(content))
         ex = RuntimeError("I'm supposed to fail")
-        yield self.reply_err(msg, ex)
+        # Reply as though we caught an exception!
+        yield self.reply(msg,content=None, exception=ex, response_code=ion_reply_codes.APP_INVALID_KEY)
 
     @defer.inlineCallbacks
-    def op_echofail2(self, content, headers, msg):
+    def op_echo_exception(self, content, headers, msg):
         log.info("Message received: "+str(content))
         raise RuntimeError("I'm supposed to fail")
-        yield self.reply_ok(msg, content)
+        
+        # This is never reached!
+        yield self.reply(msg, content=content)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(EchoProcess)
