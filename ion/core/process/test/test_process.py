@@ -261,7 +261,7 @@ class EchoProcess(Process):
         log.info("Message received: "+str(content))
         ex = RuntimeError("I'm supposed to fail")
         # Reply as though we caught an exception!
-        yield self.reply(msg,content=None, exception=ex, response_code=ion_reply_codes.APP_INVALID_KEY)
+        yield self.reply(msg,content=None, exception=ex, response_code=self.APP_INVALID_KEY)
 
     @defer.inlineCallbacks
     def op_echo_exception(self, content, headers, msg):

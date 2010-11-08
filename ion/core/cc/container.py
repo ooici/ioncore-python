@@ -122,9 +122,9 @@ class Container(BasicLifecycleObject):
 
         yield self.proc_manager.terminate()
 
-        yield self.exchange_manager.terminate()
-
         yield self.interceptor_system.terminate()
+
+        yield self.exchange_manager.terminate()
 
         log.info("Container closed")
         Container._started = False

@@ -6,7 +6,7 @@
 @brief base classes for processes within a capability container
 """
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from twisted.python import failure
 from zope.interface import implements, Interface
 
@@ -18,7 +18,7 @@ from ion.core.exception import ReceivedError
 from ion.core.id import Id
 from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
-from ion.core.messaging import ion_reply_codes
+from ion.core.messaging.ion_reply_codes import ResponseCodes
 from ion.core.process.cprocess import IContainerProcess, ContainerProcess
 from ion.services.dm.preservation.store import Store
 from ion.interact.conversation import Conversation
@@ -42,7 +42,7 @@ class IProcess(Interface):
     Interface for all capability container application processes
     """
 
-class Process(BasicLifecycleObject):
+class Process(BasicLifecycleObject,ResponseCodes):
     """
     This is the base class for all processes. Processes can be spawned and
     have a unique identifier. Each process has one main process receiver and can
@@ -56,14 +56,7 @@ class Process(BasicLifecycleObject):
     # @todo CHANGE: Conversation ID counter
     convIdCnt = 0
     
-    """
-    Define some constants used in messaging:
-    """
-    MSG_STATUS = 'status'
-    MSG_RESULT = 'result'
-    MSG_RESPONSE = 'response'
-    MSG_EXCEPTION = 'exception'    
-
+    
     def __init__(self, receiver=None, spawnargs=None, **kwargs):
         """
         Initialize process using an optional receiver and optional spawn args
@@ -233,7 +226,7 @@ class Process(BasicLifecycleObject):
         try:
             yield self.terminate()
             if msg != None:
-                yield self.reply_ok(msg)
+                yield self.reply(msg)
         except Exception, ex:
             if msg != None:
                 yield self.reply_uncaught_err(msg, content=None, exception=ex, response_code = "Process %s TERMINATE ERROR" % (self.id))
@@ -301,7 +294,7 @@ class Process(BasicLifecycleObject):
         except Exception, ex:
             log.exception('Error in process %s receive ' % self.proc_name)
             if msg and msg.payload['reply-to']:
-                yield self.reply_uncaught_err(msg, content=None, exception=ex, response_code=ion_reply_codes.ION_RECEIVER_ERROR)
+                yield self.reply_uncaught_err(msg, content=None, exception=ex, response_code=self.ION_RECEIVER_ERROR)
 
     @defer.inlineCallbacks
     def _receive_rpc(self, payload, msg):
@@ -319,22 +312,27 @@ class Process(BasicLifecycleObject):
                 self.proc_name, payload['conv-id'], rpc_deferred, payload))
             return
         res = (content, payload, msg)
-        
+
         yield msg.ack()
         
         status = payload.get(self.MSG_STATUS, None)
-        if status == ion_reply_codes.ION_OK:
-            rpc_deferred.callback(res)
+        if status == self.ION_OK:
+            #Cannot do the callback right away, because the message is not yet handled
+            reactor.callLater(0, lambda: rpc_deferred.callback(res))
                 
-        elif status == ion_reply_codes.ION_ERROR:
+        elif status == self.ION_ERROR:
             log.warn('RPC reply is an ERROR: '+str(payload.get(self.MSG_RESPONSE)))
             log.debug('RPC reply ERROR Content: '+str(content))
             err = failure.Failure(ReceivedError(payload, content))
-            rpc_deferred.errback(err)
-
+            #rpc_deferred.errback(err)
+            # Cannot do the callback right away, because the message is not yet handled
+            reactor.callLater(0, lambda: rpc_deferred.errback(err))
+            
+            
         else:
             log.error('RPC reply is not well formed. Header "status" must be set!')
-            rpc_deferred.callback(res)
+            #Cannot do the callback right away, because the message is not yet handled
+            reactor.callLater(0, lambda: rpc_deferred.callback(res))
 
     @defer.inlineCallbacks
     def _receive_msg(self, payload, msg):
@@ -356,7 +354,7 @@ class Process(BasicLifecycleObject):
             log.exception("*****Error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             if msg and msg.payload['reply-to']:
-                yield self.reply_uncaught_err(msg, content=None, exception = str(ex), response_code=ion_reply_codes.ION_RECEIVER_ERROR)
+                yield self.reply_uncaught_err(msg, content=None, exception = str(ex), response_code=self.ION_RECEIVER_ERROR)
 
             if CF_fail_fast:
                 yield self.terminate()
@@ -424,14 +422,14 @@ class Process(BasicLifecycleObject):
         rpc_deferred = defer.Deferred()
         # Timeout handling
         timeout = float(kwargs.get('timeout', CF_rpc_timeout))
-        def _timeoutf(d, convid, *args, **kwargs):
+        def _timeoutf():
             log.warn("Process %s RPC conv-id=%s timed out! " % (self.proc_name,convid))
             # Remove RPC. Delayed result will go to catch operation
             d = self.rpc_conv.pop(convid)
             self.rpc_conv[convid] = "TIMEOUT:%s" % pu.currenttime_ms()
             d.errback(defer.TimeoutError())
         if timeout:
-            rpc_deferred.setTimeout(timeout, _timeoutf, convid)
+            reactor.callLater(timeout, _timeoutf)
         self.rpc_conv[convid] = rpc_deferred
         d = self.send(recv, operation, content, msgheaders)
         # d is a deferred. The actual send of the request message will happen
@@ -494,12 +492,12 @@ class Process(BasicLifecycleObject):
         reshdrs = dict()
         
         if not response_code:
-            response_code = ion_reply_codes.ION_SUCCESS
+            response_code = self.ION_SUCCESS
         reshdrs[self.MSG_RESPONSE] = str(response_code)
         reshdrs[self.MSG_EXCEPTION] = str(exception)
         
         # MSG STATUS is set automatically!
-        #reshdrs[self.MSG_STATUS] = ion_reply_codes.ION_OK
+        #reshdrs[self.MSG_STATUS] = self.ION_OK
                 
         reshdrs.update(headers)
             
@@ -532,7 +530,7 @@ class Process(BasicLifecycleObject):
         @retval Deferred for send of reply
         """
         reshdrs = dict()
-        reshdrs[self.MSG_STATUS] = str(ion_reply_codes.ION_ERROR)
+        reshdrs[self.MSG_STATUS] = str(self.ION_ERROR)
         reshdrs[self.MSG_RESPONSE] = str(response_code)
         reshdrs[self.MSG_EXCEPTION] = str(exception)
         
@@ -553,7 +551,7 @@ class Process(BasicLifecycleObject):
     #    """
     #    reshdrs = dict()
     #    # The status is still OK - this is for handled exceptions!
-    #    reshdrs[self.MSG_STATUS] = str(ion_reply_codes.ION_OK)
+    #    reshdrs[self.MSG_STATUS] = str(self.ION_OK)
     #    reshdrs[self.MSG_APP_ERROR] = str(response_code)
     #    reshdrs[self.MSG_EXCEPTION] = str(exception)
     #    
@@ -624,7 +622,7 @@ class AppInterceptor(Interceptor):
 
 # ============================================================================
 
-class ProcessClient(object):
+class ProcessClient(object,ResponseCodes):
     """
     This is the base class for a process client. A process client is code that
     executes in the process space of a calling process. If no calling process
