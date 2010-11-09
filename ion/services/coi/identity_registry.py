@@ -3,7 +3,7 @@
 """
 @file ion/services/coi/identity_registry.py
 @author Roger Unwin
-@brief service for registering and authenticating identities
+@brief service for storing identities
 """
 
 import ion.util.ionlog
