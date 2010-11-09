@@ -6,7 +6,7 @@
 @brief base classes for processes within a capability container
 """
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from twisted.python import failure
 from zope.interface import implements, Interface
 
@@ -313,13 +313,16 @@ class Process(BasicLifecycleObject):
         if not type(content) is dict:
             log.error('RPC reply is not well formed. Use reply_ok or reply_err')
 
+
         yield msg.ack()
         if payload.get('status','OK') == 'ERROR':
             log.warn('RPC reply is an ERROR: '+str(content.get('value',None)))
             err = failure.Failure(ReceivedError(payload, content))
-            rpc_deferred.errback(err)
+            # Cannot do the callback right away, because the message is not yet handled
+            reactor.callLater(0, lambda: rpc_deferred.errback(err))
         else:
-            rpc_deferred.callback(res)
+            # Cannot do the callback right away, because the message is not yet handled
+            reactor.callLater(0, lambda: rpc_deferred.callback(res))
 
     @defer.inlineCallbacks
     def _receive_msg(self, payload, msg):
@@ -409,14 +412,14 @@ class Process(BasicLifecycleObject):
         rpc_deferred = defer.Deferred()
         # Timeout handling
         timeout = float(kwargs.get('timeout', CF_rpc_timeout))
-        def _timeoutf(d, convid, *args, **kwargs):
+        def _timeoutf():
             log.warn("Process %s RPC conv-id=%s timed out! " % (self.proc_name,convid))
             # Remove RPC. Delayed result will go to catch operation
             d = self.rpc_conv.pop(convid)
             self.rpc_conv[convid] = "TIMEOUT:%s" % pu.currenttime_ms()
             d.errback(defer.TimeoutError())
         if timeout:
-            rpc_deferred.setTimeout(timeout, _timeoutf, convid)
+            reactor.callLater(timeout, _timeoutf)
         self.rpc_conv[convid] = rpc_deferred
         d = self.send(recv, operation, content, msgheaders)
         # d is a deferred. The actual send of the request message will happen

@@ -15,10 +15,11 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 from ion.core.cc.container import Container
 from ion.core.cc.modloader import ModuleLoader
+from ion.core.messaging.receiver import Receiver
 from ion.core.process import process
 from ion.core.process.process import Process, ProcessDesc
-from ion.services.dm.preservation.store import Store
 from ion.data.datastore import registry
+from ion.services.dm.preservation.store import Store
 from ion.resources import description_utility
 from ion.services.coi import service_registry
 
@@ -145,5 +146,7 @@ def reset_container():
     # to the new objects.
     process.procRegistry.kvs.clear()
     process.processes.clear()
+    Receiver.rec_messages.clear()
+    Receiver.rec_shutoff = False
     from ion.core.cc.cc_agent import CCAgent
     CCAgent.instance = None
