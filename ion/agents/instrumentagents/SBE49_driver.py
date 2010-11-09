@@ -22,6 +22,8 @@ from instrument_hsm import InstrumentHsm
 from ion.agents.instrumentagents.instrument_connection import InstrumentConnection
 from twisted.internet.protocol import ClientCreator
 
+from collections import deque
+
 from ion.core.process.process import Process
 from ion.data.dataobject import ResourceReference
 from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource, DAPMessageObject
@@ -69,8 +71,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.setConnected(False)
         self.setTopicDefined(False)
         self.publish_to = None
-        self.dataQueue = []
-        self.cmdQueue = []
+        self.dataQueue = deque()
+        self.cmdQueue = deque()
         self.proto = None
     
         self.instCmdXlator = SBE49_instCommandXlator()
@@ -444,7 +446,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.dataQueue.append(data)
 
     def dequeueData(self):
-        data = self.dataQueue.pop()
+        data = self.dataQueue.popleft()
         #log.debug("dequeueCmd: dequeueing command: %s" %data)
         return data
         
@@ -453,7 +455,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.cmdQueue.append(cmd)
 
     def dequeueCmd(self):
-        cmd = self.cmdQueue.pop()
+        cmd = self.cmdQueue.popleft()
         #log.debug("dequeueCmd: dequeueing command: %s" %cmd)
         return cmd
 
