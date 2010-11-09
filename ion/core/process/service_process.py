@@ -138,18 +138,6 @@ class ServiceProcess(Process):
         #yield defer.maybeDeferred(self.slc_stop)
         #yield defer.maybeDeferred(self.slc_shutdown)
 
-    def slc_stop(self):
-        """
-        Place holder for SLC_STOP method
-        Need to clarify terminate, stop and shutdown!
-        """
-
-    def slc_shutdown(self):
-        """
-        Place holder for SLC_SHUTDOWN method
-        Need to clarify terminate, stop and shutdown!
-        """
-
     def slc_terminate(self):
         """
         Service life cycle event: final shutdown of service process. Will be
