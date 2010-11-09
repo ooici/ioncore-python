@@ -6,6 +6,12 @@
     between the instrument driver and instrument agent.
 """
 
+class instrument_prompts:
+    PROMPT_INST = "\r\n"
+    INST_SLEEPY_PROMPT = "\0SBE 37-SM\r\nS>"
+    INST_PROMPT = "\r\nS>"
+    INST_CONFUSED = "\r\n?cmd S>"
+
 instrument_commands = (
     "setdefaults",
     "ds",

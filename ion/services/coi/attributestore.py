@@ -4,18 +4,17 @@
 @file ion/services/coi/attributestore.py
 @author Michael Meisinger
 @author David Stuebe
+@author Matt Rodriguez
 @brief service for storing and retrieving key/value pairs.
 """
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
 
 from ion.core import ioninit
 from ion.core.process.process import ProcessFactory
 from ion.data.backends import store_service
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-import ion.util.procutils as pu
 
 CONF = ioninit.config(__name__)
 
@@ -33,7 +32,7 @@ class AttributeStoreService(store_service.StoreService):
         # Service class initializer. Basic config, but no yields allowed.
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        self.spawn_args['backend_class'] = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.data.store.Store'))
+        self.spawn_args['backend_class'] = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.services.dm.preservation.store.Store'))
         self.spawn_args['backend_args'] = self.spawn_args.get('backend_args', CONF.getValue('backend_args', default={}))
 
         log.info('AttributeStoreService.__init__()')

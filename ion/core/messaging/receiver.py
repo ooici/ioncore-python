@@ -45,6 +45,10 @@ class Receiver(BasicLifecycleObject):
     SCOPE_SYSTEM = 'system'
     SCOPE_LOCAL = 'local'
 
+    # Debugging information
+    rec_messages = {}
+    rec_shutoff = False
+
     def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, raw=False):
         """
         @param label descriptive label for the receiver
@@ -165,6 +169,14 @@ class Receiver(BasicLifecycleObject):
         @note is called from carrot as normal method; no return expected
         @param msg instance of carrot.backends.txamqp.Message
         """
+        if self.rec_shutoff:
+            log.warn("MESSAGE RECEIVED AFTER SHUTOFF - DROPPED")
+            log.warn("Dropped message: "+str(msg.payload))
+            return
+
+        assert not id(msg) in self.rec_messages, "Message already consumed"
+        self.rec_messages[id(msg)] = msg
+
         data = msg.payload
         if not self.raw:
             wb = None
@@ -177,8 +189,15 @@ class Receiver(BasicLifecycleObject):
             inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
             msg = inv1.message
             data = inv1.content
-        for handler in self.handlers:
-            yield defer.maybeDeferred(handler, data, msg)
+
+        # Make the calls into the application code (e.g. process receive)
+        try:
+            for handler in self.handlers:
+                yield defer.maybeDeferred(handler, data, msg)
+        finally:
+            if msg._state == "RECEIVED":
+                log.error("Message has not been ACK'ed at the end of processing")
+            del self.rec_messages[id(msg)]
 
     @defer.inlineCallbacks
     def send(self, **kwargs):

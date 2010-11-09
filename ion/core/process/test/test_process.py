@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 """
-@file ion/core/test/test_baseprocess.py
+@file ion/core/process/test/test_baseprocess.py
 @author Michael Meisinger
 @brief test case for process base class
 """
 
 import os
-import sha
+import hashlib
+
 
 from twisted.trial import unittest
 from twisted.internet import defer
@@ -16,6 +17,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
+from ion.core.messaging import ion_reply_codes
 from ion.core.process.process import Process, ProcessDesc, ProcessFactory
 from ion.core.cc.container import Container
 from ion.core.exception import ReceivedError
@@ -84,7 +86,7 @@ class ProcessTest(IonTestCase):
 
         log.debug('Spawning other processes')
         processes = [
-            {'name':'echo','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
+            {'name':'echo','module':'ion.core.process.test.test_process','class':'EchoProcess'},
         ]
         sup = yield self._spawn_processes(processes, sup=p1)
         assert sup == p1
@@ -99,7 +101,8 @@ class ProcessTest(IonTestCase):
         log.info('Received echo message')
 
         self.assertEquals(msg.payload['op'], 'result')
-        self.assertEquals(msg.payload['content']['value'], 'content123')
+        #self.assertEquals(msg.payload['content']['value'], 'content123')
+        self.assertEquals(msg.payload['content'], 'content123')
 
         yield sup.terminate()
         self.assertEquals(sup._get_state(), "TERMINATED")
@@ -110,29 +113,32 @@ class ProcessTest(IonTestCase):
         p1 = Process()
         pid1 = yield p1.spawn()
 
-        child = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
+        child = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
         pid2 = yield p1.spawn_child(child)
 
         (cont,hdrs,msg) = yield p1.rpc_send(pid2,'echo','content123')
-        self.assertEquals(cont['value'], 'content123')
+        #self.assertEquals(cont['value'], 'content123')
+        self.assertEqual(hdrs.get(p1.MSG_STATUS),'OK')
+        self.assertEquals(cont, 'content123')
 
         yield p1.terminate()
         self.assertEquals(p1._get_state(), "TERMINATED")
 
     @defer.inlineCallbacks
     def test_spawn_child(self):
-        child1 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
+        child1 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
         self.assertEquals(child1._get_state(),'INIT')
 
         pid1 = yield self.test_sup.spawn_child(child1)
         self.assertEquals(child1._get_state(),'ACTIVE')
         proc = self._get_procinstance(pid1)
-        self.assertEquals(str(proc.__class__),"<class 'ion.core.test.test_baseprocess.EchoProcess'>")
+        self.assertEquals(str(proc.__class__),"<class 'ion.core.process.test.test_process.EchoProcess'>")
         self.assertEquals(pid1, proc.id)
         log.info('Process 1 spawned and initd correctly')
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo','content123')
-        self.assertEquals(cont['value'], 'content123')
+        #self.assertEquals(cont['value'], 'content123')
+        self.assertEquals(cont, 'content123')
         log.info('Process 1 responsive correctly')
 
         # The following tests the process attaching a second receiver
@@ -142,7 +148,8 @@ class ProcessTest(IonTestCase):
         log.info('Created new receiver %s' % (msgName))
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(msgName,'echo','content456')
-        self.assertEquals(cont['value'], 'content456')
+        #self.assertEquals(cont['value'], 'content456')
+        self.assertEquals(cont, 'content456')
         log.info('Process 1 responsive correctly on second receiver')
 
 
@@ -152,7 +159,7 @@ class ProcessTest(IonTestCase):
         pid1 = yield p1.spawn()
         proc1 = self._get_procinstance(pid1)
 
-        child2 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
+        child2 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
         pid2 = yield self.test_sup.spawn_child(child2, activate=False)
         self.assertEquals(child2._get_state(), 'READY')
         proc2 = self._get_procinstance(pid2)
@@ -171,16 +178,17 @@ class ProcessTest(IonTestCase):
         self.assertEquals(proc1.inbox_count, 1)
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid2,'echo','content123')
-        self.assertEquals(cont['value'], 'content123')
+        #self.assertEquals(cont['value'], 'content123')
+        self.assertEquals(cont, 'content123')
         log.info('Process 1 responsive correctly after init')
 
     @defer.inlineCallbacks
     def test_error_in_op(self):
-        child1 = ProcessDesc(name='echo', module='ion.core.test.test_baseprocess')
+        child1 = ProcessDesc(name='echo', module='ion.core.process.test.test_process')
         pid1 = yield self.test_sup.spawn_child(child1)
 
         try:
-            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echofail2','content123')
+            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo_exception','content123')
             self.fail("ReceivedError expected")
         except ReceivedError, re:
             log.info('Process 1 responded to error correctly')
@@ -195,33 +203,44 @@ class ProcessTest(IonTestCase):
         pid1 = yield p1.spawn()
 
         processes = [
-            {'name':'echo','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
+            {'name':'echo','module':'ion.core.process.test.test_process','class':'EchoProcess'},
         ]
         sup = yield self._spawn_processes(processes, sup=p1)
 
         pid2 = p1.get_child_id('echo')
 
-        byte_string = sha.sha('test').digest()
-
+        #byte_string = sha.sha('test').digest()
+        byte_string = hashlib.sha1('test').digest()
+        
         yield p1.send(pid2, 'echo', byte_string)
         log.info('Sent byte-string')
 
         msg = yield p1.await_message()
         log.info('Received byte-string')
-        self.assertEquals(msg.payload['content']['value'], byte_string)
+        #self.assertEquals(msg.payload['content']['value'], byte_string)
+        self.assertEquals(msg.payload['content'], byte_string)
 
         yield sup.shutdown()
 
     @defer.inlineCallbacks
     def test_shutdown(self):
         processes = [
-            {'name':'echo1','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
-            {'name':'echo2','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
-            {'name':'echo3','module':'ion.core.test.test_baseprocess','class':'EchoProcess'},
+            {'name':'echo1','module':'ion.core.process.test.test_process','class':'EchoProcess'},
+            {'name':'echo2','module':'ion.core.process.test.test_process','class':'EchoProcess'},
+            {'name':'echo3','module':'ion.core.process.test.test_process','class':'EchoProcess'},
         ]
         sup = yield self._spawn_processes(processes)
 
         yield self._shutdown_processes()
+
+    @defer.inlineCallbacks
+    def test_rpc_timeout(self):
+        sup = self.test_sup
+        try:
+            yield sup.rpc_send('big_void', 'noop', 'arbitrary', timeout=1)
+            self.fail("TimeoutError expected")
+        except defer.TimeoutError, te:
+            log.info('Timeout received')
 
 
 class EchoProcess(Process):
@@ -235,19 +254,22 @@ class EchoProcess(Process):
     @defer.inlineCallbacks
     def op_echo(self, content, headers, msg):
         log.info("Message received: "+str(content))
-        yield self.reply_ok(msg, content)
+        yield self.reply(msg, content=content)
 
     @defer.inlineCallbacks
-    def op_echofail1(self, content, headers, msg):
+    def op_echo_fail(self, content, headers, msg):
         log.info("Message received: "+str(content))
         ex = RuntimeError("I'm supposed to fail")
-        yield self.reply_err(msg, ex)
+        # Reply as though we caught an exception!
+        yield self.reply(msg,content=None, exception=ex, response_code=self.APP_INVALID_KEY)
 
     @defer.inlineCallbacks
-    def op_echofail2(self, content, headers, msg):
+    def op_echo_exception(self, content, headers, msg):
         log.info("Message received: "+str(content))
         raise RuntimeError("I'm supposed to fail")
-        yield self.reply_ok(msg, content)
+        
+        # This is never reached!
+        yield self.reply(msg, content=content)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(EchoProcess)

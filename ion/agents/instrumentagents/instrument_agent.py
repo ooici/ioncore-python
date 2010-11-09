@@ -170,7 +170,7 @@ class InstrumentDriverClient(ProcessClient):
         @retval Result code of some sort
         """
         #assert(isinstance(command, dict))
-        log.debug("DHE: in disconnect!")
+        log.debug("DHE: in IDC disconnect!")
         (content, headers, message) = yield self.rpc_send('disconnect',
                                                           command)
         defer.returnValue(content)
@@ -331,6 +331,7 @@ class InstrumentAgent(ResourceAgent):
         @return ACK message with response on success, ERR message with string
             indicating code and response message on fail
         """
+        log.debug("DHE: IA in op_disconnect!")
         assert(isinstance(content, list))
         assert(self.driver != None)
         execResult = self.driver.disconnect(content)
@@ -338,8 +339,10 @@ class InstrumentAgent(ResourceAgent):
         (errorCode, response) = execResult
         assert(isinstance(errorCode, int))
         if errorCode == 1:
+            log.debug("DHE: errorCode is 1")
             yield self.reply_ok(msg, response)
         else:
+            log.debug("DHE: errorCode is NOT 1")
             yield self.reply_err(msg,
                                  "Error code %s, response: %s" % (errorCode,
                                                                   response))
@@ -447,6 +450,7 @@ class InstrumentAgentClient(ResourceAgentClient):
         """
         Disconnect from the instrument
         """
+        log.debug("DHE: IAC in op_disconnect!")
         assert(isinstance(argList, list))
         (content, headers, message) = yield self.rpc_send('disconnect',
                                                               argList)

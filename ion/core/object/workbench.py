@@ -55,12 +55,19 @@ class WorkBench(object):
         """            
         
         
-    def clone(self, ID_Ref, name=None):
+    def clone(self, origin, ID_Ref, nickname=None):
         """
         Clone a repository from the data store
-        Check out the head or 
+        Check out the head
+        Start with simple case - a UUID String
         """
-        # rpc_send - datastore, clone, ID_REf
+        targetname = self._process.get_scoped_name('system', origin)
+        content, headers, msg = yield self._process.rpc_send(targetname,'clone', ID_REF)
+        
+        
+        
+        
+        
         
     def op_clone(self, content, headers, msg):
         """
@@ -260,11 +267,9 @@ class WorkBench(object):
         """
         Push the current state of the repository
         """
-        
-        
         targetname = self._process.get_scoped_name('system', target)
         repo = self.get_repository(name)
-        (content, headers, msg) = yield self._process.rpc_send(targetname,'push', repo)
+        content, headers, msg = yield self._process.rpc_send(targetname,'push', repo)
         
         status = headers.get('status',None)
         if status == 'OK':
@@ -318,6 +323,9 @@ class WorkBench(object):
             
             # Get the objects we don't have
             yield self.fetch_linked_objects(headers.get('reply-to'), objs_to_get)
+            
+            # Would like to have fetch use reply to - to keep the conversation context but does not work yet...
+            #yield self.fetch_linked_objects(msg, objs_to_get)
 
             for link in objs_to_get:
                 if not link.isleaf:
@@ -329,10 +337,8 @@ class WorkBench(object):
             objs_to_get = new_links
             
 
-
-
         # The following line shows how to reply to a message
-        yield self._process.reply_ok(msg)
+        yield self._process.reply(msg)
          
         
     def pull(self,name):
@@ -346,11 +352,10 @@ class WorkBench(object):
         """
     
     @defer.inlineCallbacks
-    def fetch_linked_objects(self, send_to, links):
+    def fetch_linked_objects(self, address, links):
         """
         Fetch the linked objects from the data store service
         """     
-            
             
         cs = container_pb2.Structure()
             
@@ -364,8 +369,12 @@ class WorkBench(object):
             se.isleaf = link.isleaf # What does this mean in this context?
             se.type.CopyFrom(link.GPBType) # Copy is okay - this is small
             
-        (objs, headers, msg) = yield self._process.rpc_send(send_to,'fetch_linked_objects', cs)
-                        
+        if isinstance(address, str):
+            objs, headers, msg = yield self._process.rpc_send(address,'fetch_linked_objects', cs)
+        elif hasattr(address, 'payload'):
+            # Would like to have fetch use reply to - to keep the conversation context but does not work yet...
+            objs, headers, reply_msg = yield self._process.reply(address, operation='fetch_linked_objects', content=cs)
+        
         for obj in objs:
             self._hashed_elements[obj.key]=obj
         return
@@ -403,7 +412,7 @@ class WorkBench(object):
             se.type.CopyFrom(item.type) # Copy is okay - this is small
         
         
-        yield self._process.reply_ok(message,cs)
+        yield self._process.reply(message,content=cs)
     
     
     

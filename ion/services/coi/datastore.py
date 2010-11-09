@@ -52,21 +52,6 @@ class DataStoreService(ServiceProcess):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
 
-    #op_push = ServiceProcess.workbench.op_push
-    
-    #op_pull = ServiceProcess.workbench.op_pull
-    
-    #op_clone = ServiceProcess.workbench.op_clone
-
-
-    #push = ServiceProcess.workbench.push
-    
-    #pull = ServiceProcess.workbench.pull
-    
-    #clone = ServiceProcess.workbench.clone
-
-
-
 
 
 class DataStoreServiceClient(ServiceClient):

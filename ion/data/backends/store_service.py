@@ -6,7 +6,7 @@
 @author David Stuebe
 @author Matt Rodriguez
 @brief service for storing and retrieving key/value pairs.
-@note Test cases for the store service backend are now in ion.data.test.test_store
+@note Test cases for the store service backend are now in ion.services.dm.preservation.test.test_store
 """
 
 import ion.util.ionlog
@@ -36,7 +36,7 @@ class StoreService(ServiceProcess):
     @defer.inlineCallbacks
     def slc_init(self):
         # use spawn args to determine backend class, second config file
-        backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.data.store.Store'))
+        backendcls = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.services.dm.preservation.store.Store'))
         backendargs = self.spawn_args.get('backend_args', CONF.getValue('backend_args', default={}))
 
         self.backend = None
@@ -59,17 +59,24 @@ class StoreService(ServiceProcess):
 
 
     
-    def slc_stop(self):
+    def slc_deactivate(self):
         """
-        @brief Shutdown the Store twisted connection
+        @brief Deactivate the Store twisted connection
         
         @note if the store is as CassandraStore then tell the factory to shutdown the connection.
         This breaks the Store abstraction
         """
-        log.info("In StoreService slc_stop")
+        log.info("In StoreService slc_deactivate")
         if isinstance(self.store, cassandra.CassandraStore):
             log.info("Shutting down StoreService")
             self.store.manager.shutdown()
+            
+    def slc_terminate(self):
+        """
+        @brief This method is called when the service is terminated. The store service does not need to do anything yet, when 
+        it is shutdown.
+        """
+        pass
             
     @defer.inlineCallbacks
     def op_put(self, content, headers, msg):

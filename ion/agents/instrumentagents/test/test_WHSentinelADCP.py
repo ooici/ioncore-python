@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """
-@file ion/agents/instrumentagents/test/test_SBE49.py
-@brief This module has test cases to test out SeaBird SBE49 instrument software
-    including the driver. This assumes that generic InstrumentAgent code has
-    been tested by another test case
-@author Steve Foley
+@file ion/agents/instrumentagents/test/test_WHSentinelADCP.py
+@brief This module has test cases to test out the Workhorse Sentinel ADCP
+    instrument software of the driver. This assumes that generic InstrumentAgent
+    code has been tested by another test case
+@author Bill Bollenbacher
 @see ion.agents.instrumentagents.test.test_instrument
 """
 import ion.util.ionlog
@@ -13,9 +13,9 @@ from twisted.internet import defer
 
 from ion.test.iontest import IonTestCase
 
-from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriverClient
-from ion.agents.instrumentagents.SBE49_driver import SBE49InstrumentDriver
-from ion.agents.instrumentagents.simulators.sim_SBE49 import Simulator
+from ion.agents.instrumentagents.WHSentinelADCP_driver import WHSentinelADCPInstrumentDriverClient
+from ion.agents.instrumentagents.WHSentinelADCP_driver import WHSentinelADCPInstrumentDriver
+from ion.agents.instrumentagents.simulators.sim_WHSentinelADCP import Simulator
 from ion.core import bootstrap
 
 from ion.core.messaging.receiver import Receiver
@@ -34,13 +34,13 @@ from ion.resources.dm_resource_descriptions import Publication, PublisherResourc
 from twisted.trial import unittest
 
 
-class TestSBE49(IonTestCase):
+class TestWHSentinelADCP(IonTestCase):
     
     SimulatorPort = 0
 
-
     @defer.inlineCallbacks
     def setUp(self):
+        log.debug("In TestWHSentinelADCP.setUp()")
         yield self._start_container()
 
         self.simulator = Simulator("123", 9100)
@@ -51,22 +51,22 @@ class TestSBE49(IonTestCase):
             {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
             {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
 
-            {'name':'SBE49_Driver','module':'ion.agents.instrumentagents.SBE49_driver','class':'SBE49InstrumentDriver','spawnargs':{'ipport':self.SimulatorPort}}
+            {'name':'WHSentinelADCP_Driver','module':'ion.agents.instrumentagents.WHSentinelADCP_driver','class':'WHSentinelADCPInstrumentDriver','spawnargs':{'ipport':self.SimulatorPort,'ipportCmd':967}}
             ]
 
         self.sup = yield self._spawn_processes(services)
 
-        self.driver_pid = yield self.sup.get_child_id('SBE49_Driver')
+        self.driver_pid = yield self.sup.get_child_id('WHSentinelADCP_Driver')
         log.debug("Driver pid %s" % (self.driver_pid))
 
-        self.driver_client = SBE49InstrumentDriverClient(proc=self.sup,
+        self.driver_client = WHSentinelADCPInstrumentDriverClient(proc=self.sup,
                                                          target=self.driver_pid)
 
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.simulator.stop()
 
-        # stop_SBE49_simulator(self.simproc)
+        # stop_WHSentinelADCP_simulator(self.simproc)
         yield self._stop_container()
 
     @defer.inlineCallbacks
@@ -79,9 +79,8 @@ class TestSBE49(IonTestCase):
         DHE: not sure the driver should be creating the topic; for right
         now I'll have the test case do it.
         """
-        self.topic = PubSubTopicResource.create('SBE49 Topic',"oceans, oil spill")
+        self.topic = PubSubTopicResource.create('WHSentinelADCP Topic',"oceans, oil spill")
         self.topic = yield dpsc.define_topic(self.topic)
-
 
         log.debug('TADA!')
 
@@ -93,22 +92,21 @@ class TestSBE49(IonTestCase):
 
     @defer.inlineCallbacks
     def test_driver_load(self):
-        #config_vals = {'addr':'127.0.0.1', 'port':'9000'}
-        config_vals = {'addr':'137.110.112.119', 'port':self.SimulatorPort}
+        #config_vals = {'ipaddr':'127.0.0.1', 'ipport':'9000'}
+        config_vals = {'ipaddr':'137.110.112.119', 'ipport':self.SimulatorPort}
         result = yield self.driver_client.configure_driver(config_vals)
-        self.assertEqual(result['addr'], config_vals['addr'])
-        self.assertEqual(result['port'], config_vals['port'])
+        self.assertEqual(result['ipaddr'], config_vals['ipaddr'])
+        self.assertEqual(result['ipport'], config_vals['ipport'])
 
 
     @defer.inlineCallbacks
     def test_fetch_set(self):
-        params = {'outputformat':'2'}
-        result = yield self.driver_client.set_params(params)
-
         params = {'baudrate':'19200'}
         result = yield self.driver_client.set_params(params)
 
         """
+        params = {'outputformat':'2'}
+        result = yield self.driver_client.set_params(params)
         params = {'baudrate':'19200', 'outputsal':'N'}
         result = yield self.driver_client.fetch_params(params.keys())
         self.assertNotEqual(params, result)
@@ -135,7 +133,7 @@ class TestSBE49(IonTestCase):
         dpsc = DataPubsubClient(self.sup)
 
         subscription = SubscriptionResource()
-        subscription.topic1 = PubSubTopicResource.create('SBE49 Topic','')
+        subscription.topic1 = PubSubTopicResource.create('WHSentinelADCP Topic','')
         #subscription.topic2 = PubSubTopicResource.create('','oceans')
 
         subscription.workflow = {
@@ -149,17 +147,16 @@ class TestSBE49(IonTestCase):
 
         log.info('Defined subscription: '+str(subscription))
 
-        #config_vals = {'ipaddr':'137.110.112.119', 'ipport':'4001'}
-        config_vals = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort}
+        #config_vals = {'ipaddr':'137.110.112.119', 'ipport':'4002', 'ipportCmd':967}
+        config_vals = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort, 'ipportCmd':967}
         result = yield self.driver_client.configure_driver(config_vals)
 
-        cmd1 = [['ds', 'now']]
-        #cmd1 = [['start', 'now']]
-        #cmd2 = [['stop', 'now']]
-        #cmd2 = [['pumpoff', '3600', '1']]
+
+        cmd1 = [['cr', '1']]
         yield pu.asleep(5)
+
         result = yield self.driver_client.execute(cmd1)
-        # DHE: wait a while...
+        # wait a while...
         yield pu.asleep(5)
         #result = yield self.driver_client.execute(cmd2)
 
@@ -168,12 +165,13 @@ class TestSBE49(IonTestCase):
         result = yield self.driver_client.disconnect(['some arg'])
 
 
+    """
     @defer.inlineCallbacks
     def test_sample(self):
         result = yield self.driver_client.initialize('some arg')
 
         dpsc = DataPubsubClient(self.sup)
-        topicname = 'SBE49 Topic'
+        topicname = 'WHSentinelADCP Topic'
         topic = PubSubTopicResource.create(topicname,"")
 
         # Use the service to create a queue and register the topic
@@ -203,6 +201,7 @@ class TestSBE49(IonTestCase):
         yield pu.asleep(1)
 
         result = yield self.driver_client.disconnect(['some arg'])
+    """
 
 class DataConsumer(Process):
     """
