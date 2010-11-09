@@ -44,6 +44,7 @@ class MessageSpace(BasicLifecycleObject):
 
     def on_terminate(self, *args, **kwargs):
         # @note Carrot has a different close() on the BrokerConnection
+        # @note lostConnection does not return anything
         return self.connection._connection.transport.loseConnection()
 
     def on_error(self, *args, **kwargs):
