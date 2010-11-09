@@ -134,8 +134,9 @@ class ServiceProcess(Process):
             log.exception('----- Service %s process %s TERMINATE ERROR -----' % (self.svc_name, self.id))
             raise ex
 
-        yield defer.maybeDeferred(self.slc_stop)
-        yield defer.maybeDeferred(self.slc_shutdown)
+        # These appear to be left over from a previous verison of the code
+        #yield defer.maybeDeferred(self.slc_stop)
+        #yield defer.maybeDeferred(self.slc_shutdown)
 
     def slc_stop(self):
         """
@@ -152,7 +153,7 @@ class ServiceProcess(Process):
     def slc_terminate(self):
         """
         Service life cycle event: final shutdown of service process. Will be
-        called after a slc_stop before the actual termination of the process.
+        called after a slc_deactivate before the actual termination of the process.
         No further asyncronous activities are allowed by the process after
         reply from this function.
         """
