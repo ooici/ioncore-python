@@ -309,6 +309,7 @@ class Process(BasicLifecycleObject):
             log.error("Message received after process %s RPC conv-id=%s timed out=%s: %s" % (
                 self.proc_name, payload['conv-id'], rpc_deferred, payload))
             return
+        rpc_deferred.rpc_call.cancel()
         res = (content, payload, msg)
         if not type(content) is dict:
             log.error('RPC reply is not well formed. Use reply_ok or reply_err')
@@ -419,7 +420,8 @@ class Process(BasicLifecycleObject):
             self.rpc_conv[convid] = "TIMEOUT:%s" % pu.currenttime_ms()
             d.errback(defer.TimeoutError())
         if timeout:
-            reactor.callLater(timeout, _timeoutf)
+            callto = reactor.callLater(timeout, _timeoutf)
+            rpc_deferred.rpc_call = callto
         self.rpc_conv[convid] = rpc_deferred
         d = self.send(recv, operation, content, msgheaders)
         # d is a deferred. The actual send of the request message will happen
