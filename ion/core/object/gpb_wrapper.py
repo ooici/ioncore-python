@@ -19,7 +19,7 @@ import hashlib
 
     
 def sha1hex(val):
-    return hashlib.sha1(val).hexdigest()
+    return hashlib.sha1(val).hexdigest().upper()
 
 def sha1bin(val):
     return hashlib.sha1(val).digest()
@@ -38,6 +38,20 @@ def sha1_to_hex(bytes):
     almosthex = map(hex, hex_bytes)
     return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
 
+def set_type_from_obj(obj):
+    
+    gpbtype = type_pb2.GPBType()
+    
+    # Take just the file name
+    gpbtype.protofile = obj.DESCRIPTOR.file.name.split('/')[-1]
+    # Get rid of the .proto
+    gpbtype.protofile = gpbtype.protofile.split('.')[0]
+
+    gpbtype.package = obj.DESCRIPTOR.file.package
+    gpbtype.cls = obj.DESCRIPTOR.name
+    
+    return gpbtype
+    
     
     
 class Wrapper(object):
@@ -72,11 +86,8 @@ class Wrapper(object):
     
     
     '''
-    # Change this to a type message to be more precise?
-    LinkClassType = type_pb2.GPBType()
-    LinkClassType.protofile = link_pb2.CASRef.DESCRIPTOR.file.name.split('/')[-1]
-    LinkClassType.package = link_pb2.CASRef.DESCRIPTOR.file.package
-    LinkClassType.cls = link_pb2.CASRef.DESCRIPTOR.name
+        
+    LinkClassType = set_type_from_obj(link_pb2.CASRef())
         
     def __init__(self, gpbMessage):
         """
@@ -98,10 +109,7 @@ class Wrapper(object):
             for enum_value in enum_type.values:
                 field_names.append(enum_value.name)
         
-        self._gpb_type = type_pb2.GPBType()
-        self._gpb_type.protofile = gpbMessage.DESCRIPTOR.file.name.split('/')[-1]
-        self._gpb_type.package = gpbMessage.DESCRIPTOR.file.package
-        self._gpb_type.cls = gpbMessage.DESCRIPTOR.name
+        self._gpb_type = set_type_from_obj(gpbMessage)
         
         
         self._parent_links=None
@@ -653,6 +661,9 @@ class StructureElement(object):
     
     isleaf = property(get_isleaf, set_isleaf)
     
+    def __str__(self):
+        return self._element.__str__()
+    
     
         
     #def SerializeToString(self):
@@ -678,10 +689,7 @@ class ContainerWrapper(object):
     It is not needed for repeated scalars!
     """
     
-    LinkClassType = type_pb2.GPBType()
-    LinkClassType.protofile = link_pb2.CASRef.DESCRIPTOR.file.name.split('/')[-1]
-    LinkClassType.package = link_pb2.CASRef.DESCRIPTOR.file.package
-    LinkClassType.cls = link_pb2.CASRef.DESCRIPTOR.name
+    LinkClassType = set_type_from_obj(link_pb2.CASRef())
     
     def __init__(self, wrapper, gpbcontainer):
         # Be careful - this is a hard link

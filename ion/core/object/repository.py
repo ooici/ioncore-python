@@ -12,6 +12,12 @@ Create ancestor iterator
 Create pretty print for ancestors
 
 """
+
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
+import sys
+
 from net.ooici.core.mutable import mutable_pb2
 
 from twisted.internet import defer
@@ -29,17 +35,9 @@ class Repository(object):
     UPTODATE='up to date'
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet'
-    
-    CommitClassType = type_pb2.GPBType()
-    CommitClassType.protofile = mutable_pb2.CommitRef.DESCRIPTOR.file.name.split('/')[-1]
-    CommitClassType.package = mutable_pb2.CommitRef.DESCRIPTOR.file.package
-    CommitClassType.cls = mutable_pb2.CommitRef.DESCRIPTOR.name
 
-    LinkClassType = type_pb2.GPBType()
-    LinkClassType.protofile = link_pb2.CASRef.DESCRIPTOR.file.name.split('/')[-1]
-    LinkClassType.package = link_pb2.CASRef.DESCRIPTOR.file.package
-    LinkClassType.cls = link_pb2.CASRef.DESCRIPTOR.name
-
+    CommitClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.CommitRef())
+    LinkClassType = gpb_wrapper.set_type_from_obj(link_pb2.CASRef())
     
     def __init__(self, head=None):
         
@@ -496,8 +494,12 @@ class Repository(object):
             
     def _load_element(self, element):
         
-        assert element.key == gpb_wrapper.sha1hex(element.value), \
-            'The sha1 key does not match the value. The data is corrupted!'
+        #log.debug('_load_element' + str(element))
+        
+        mysha1 = gpb_wrapper.sha1hex(element.value)
+        assert element.key == mysha1, \
+            'The sha1 key does not match the value. The data is corrupted! \n' +\
+            'Element key %s, Calculated key %s' % (element.key, mysha1)
         
         cls = self._load_class_from_type(element.type)
                                 
@@ -520,25 +522,38 @@ class Repository(object):
         
     def _load_class_from_type(self,ltype):
     
-        module = ltype.protofile.split('.')[0] + '_pb2'
+        module = str(ltype.protofile) + '_pb2'
                 
-        cls_name = ltype.cls
+        cls_name = str(ltype.cls)
         
-        temp= __import__(str(ltype.package), fromlist=str(module))
+        package = str(ltype.package)
         
-        mod = getattr(temp,module)
+        log.debug('Loading Class from Type: Package - %s, Module - %s, Class - %s'\
+            % (package, module, cls_name))
+        
+        path = package + '.' + module
+        __import__(path)
+        
+        mod = sys.modules[package+'.'+module]
         
         cls = getattr(mod, cls_name)
-        
-        
+                
         return cls
         
         
     def _set_type_from_obj(self, ltype, wrapped_obj):
-                
-        ltype.protofile = wrapped_obj.GPBType.protofile      
-        ltype.package = wrapped_obj.GPBType.package        
-        ltype.cls = wrapped_obj.GPBType.cls
+            
+        obj = wrapped_obj
+        if isinstance(obj, gpb_wrapper.Wrapper):
+            obj = obj.GPBMessage
+            
+        gpbtype = gpb_wrapper.set_type_from_obj(obj)
+        
+        thetype = ltype
+        if isinstance(thetype, gpb_wrapper.Wrapper):
+            thetype=ltype.GPBMessage
+            
+        thetype.CopyFrom(gpbtype)
         
         
         

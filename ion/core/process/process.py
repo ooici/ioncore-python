@@ -318,6 +318,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
             return
         res = (content, payload, msg)
 
+
         yield msg.ack()
         
         status = payload.get(self.MSG_STATUS, None)
@@ -344,7 +345,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
         """
         Handling of non-RPC messages. Messages are dispatched according to
         message attributes.
-        """
+        """        
         fromname = payload['sender']
         if 'sender-name' in payload:
             fromname = payload['sender-name']
@@ -573,7 +574,13 @@ class Process(BasicLifecycleObject,ResponseCodes):
     # --- Process and child process management
 
     def get_scoped_name(self, scope, name):
-        return pu.get_scoped_name(name, scope)
+        
+        # Proposed modificaiton to get_scoped_name to only add the scope if needed?
+        prefix = pu.get_scoped_name('', scope)
+        if prefix in name:
+            return name
+        else:
+            return pu.get_scoped_name(name, scope)
 
     # OTP style functions for working with processes and modules/apps
 

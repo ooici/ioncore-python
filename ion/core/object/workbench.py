@@ -24,22 +24,9 @@ from net.ooici.core.link import link_pb2
 
 class WorkBench(object):
  
- 
-    MutableClassType = type_pb2.GPBType()
-    MutableClassType.protofile = mutable_pb2.MutableNode.DESCRIPTOR.file.name.split('/')[-1]
-    MutableClassType.package = mutable_pb2.MutableNode.DESCRIPTOR.file.package
-    MutableClassType.cls = mutable_pb2.MutableNode.DESCRIPTOR.name
- 
-    LinkClassType = type_pb2.GPBType()
-    LinkClassType.protofile = link_pb2.CASRef.DESCRIPTOR.file.name.split('/')[-1]
-    LinkClassType.package = link_pb2.CASRef.DESCRIPTOR.file.package
-    LinkClassType.cls = link_pb2.CASRef.DESCRIPTOR.name
- 
-    CommitClassType = type_pb2.GPBType()
-    CommitClassType.protofile = mutable_pb2.CommitRef.DESCRIPTOR.file.name.split('/')[-1]
-    CommitClassType.package = mutable_pb2.CommitRef.DESCRIPTOR.file.package
-    CommitClassType.cls = mutable_pb2.CommitRef.DESCRIPTOR.name
- 
+    MutableClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.MutableNode())
+    LinkClassType = gpb_wrapper.set_type_from_obj(link_pb2.CASRef())
+    CommitClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.CommitRef())
  
     def __init__(self, myprocess):   
     
@@ -53,27 +40,6 @@ class WorkBench(object):
         """
         A shared dictionary for hashed objects
         """            
-        
-        
-    def clone(self, origin, ID_Ref, nickname=None):
-        """
-        Clone a repository from the data store
-        Check out the head
-        Start with simple case - a UUID String
-        """
-        targetname = self._process.get_scoped_name('system', origin)
-        content, headers, msg = yield self._process.rpc_send(targetname,'clone', ID_REF)
-        
-        
-        
-        
-        
-        
-    def op_clone(self, content, headers, msg):
-        """
-        The operation which responds to a clone
-        """
-        
     
     def _load_repo_from_mutable(self,head):
         """
@@ -226,7 +192,7 @@ class WorkBench(object):
             
         
         
-    def init_repository(self, rootclass=None, name=None):
+    def init_repository(self, rootclass=None, nickname=None):
         """
         Initialize a new repository
         Factory method for creating a repository - this is the responsibility
@@ -251,10 +217,12 @@ class WorkBench(object):
         
         self.put_repository(repo)
         
-        if name:
-            self._repository_nicknames[name] = repo._dotgit.repositorykey
+        if nickname:
+            self.set_repository_nickname(repo.repository_key, nickname)
         
         return repo, rootobj
+
+
 
         
     def fork(self, structure, name):
@@ -263,19 +231,82 @@ class WorkBench(object):
         """
         
     @defer.inlineCallbacks
+    def clone(self, origin, ID_Ref, nickname=None):
+        """
+        Clone a repository from the data store
+        Check out the head
+        Start with simple case - a UUID String
+        """
+        targetname = self._process.get_scoped_name('system', origin)
+        
+        print 'CLONE Targetname: ', targetname
+        print 'CLONE ID Ref: ', ID_Ref
+        
+        content, headers, msg = yield self._process.rpc_send(targetname,'clone', ID_Ref)
+            
+        response = headers.get(self._process.MSG_RESPONSE)
+        exception = headers.get(self._process.MSG_EXCEPTION)
+            
+        status = headers.get(self._process.MSG_STATUS)
+            
+        if status == 'OK':
+            log.info( 'Clone Returned:'+response)
+            
+            # Set the nickname for the cloned repository if asked for...
+            if nickname:
+                self.set_repository_nickname(ID_Ref, nickname)
+                
+            defer.returnValue((response, exception))
+        else:
+            raise Exception, 'Push returned an exception!' % exception
+        
+    @defer.inlineCallbacks
+    def op_clone(self, content, headers, msg):
+        """
+        The operation which responds to a clone
+        """
+        log.info('op_clone: received content type, %s' % type(content))
+
+        print 'REPLY_TO', headers['reply-to']
+        print 'CONTENT', content
+        
+        response, ex = yield self.push(headers['reply-to'],content)
+        
+        yield self._process.reply(msg, response_code=response, exception=ex)
+        log.info('op_clone: Complete!')
+        
+        
+        
+    @defer.inlineCallbacks
     def push(self, target, name):
         """
         Push the current state of the repository
         """
         targetname = self._process.get_scoped_name('system', target)
         repo = self.get_repository(name)
-        content, headers, msg = yield self._process.rpc_send(targetname,'push', repo)
+
+        if repo:
+            
+            print 'PUSH TARGET: ',targetname
+            content, headers, msg = yield self._process.rpc_send(targetname,'push', repo)
         
-        status = headers.get('status',None)
+            response = headers.get(self._process.MSG_RESPONSE)
+            exception = headers.get(self._process.MSG_EXCEPTION)
+        
+            status = headers.get(self._process.MSG_STATUS)
+        else:
+            status = 'OK'
+            response = 'Repository name %s not found in work bench to push!' % name
+            exception = ''
+
         if status == 'OK':
-            log.info( 'Push returned Okay!')
-        elif status == 'ERROR':
-            raise Exception, 'Push returned an exception!' % headers.get('errmsg',None)
+            log.info( 'Push returned:'+response)
+            defer.returnValue((response, exception))
+
+        else:
+            raise Exception, 'Push returned an exception!' % exception
+            
+        
         
         
     @defer.inlineCallbacks
@@ -283,7 +314,7 @@ class WorkBench(object):
         """
         The Operation which responds to a push
         """
-        log.info('op_push: content type, %s' % type(repo))
+        log.info('op_push: received content type, %s' % type(repo))
                 
         cref_links = set()
         for branch in repo.branches:
@@ -326,7 +357,8 @@ class WorkBench(object):
             
             # Would like to have fetch use reply to - to keep the conversation context but does not work yet...
             #yield self.fetch_linked_objects(msg, objs_to_get)
-
+            
+            print 'HEHEEHEHEHEHEHEHEHEHEHE'
             for link in objs_to_get:
                 if not link.isleaf:
                     obj = repo.get_linked_object(link)
@@ -339,6 +371,8 @@ class WorkBench(object):
 
         # The following line shows how to reply to a message
         yield self._process.reply(msg)
+        log.info('op_push: Complete!')
+
          
         
     def pull(self,name):
@@ -385,6 +419,7 @@ class WorkBench(object):
         """
         Send a linked object back to a requestor if you have it!
         """
+        log.info('op_fetch_linked_objects: received content type, %s' % type(elements))
         cs = container_pb2.Structure()
                 
         for se in elements:
@@ -411,10 +446,13 @@ class WorkBench(object):
             se.isleaf = item.isleaf # What does this mean in this context?
             se.type.CopyFrom(item.type) # Copy is okay - this is small
         
-        
         yield self._process.reply(message,content=cs)
+        log.info('op_fetch_linked_objects: Complete!')
+
     
-    
+    def set_repository_nickname(self,repositorykey, nickname):
+        self._repository_nicknames[nickname] = repositorykey
+        
     
     def get_repository(self,key):
         """
