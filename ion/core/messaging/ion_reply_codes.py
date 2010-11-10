@@ -48,4 +48,6 @@ class ResponseCodes():
     APP_INVALID_KEY = 'APPLICATION ERROR: Invalid Key'
     APP_RESOURCE_STATE_DIVERGED = 'APPLICATION ERROR: Resource State Has Diverged' # A branch of this resource is in a divergent state and must be merged.
 
+    APP_RESOURCE_NOT_FOUND = 'APPLICATION ERROR: Resource Not Found'
+
     APP_FAILED = 'APPLICATION ERROR: A failure message for demo purposes' # Do not create generic failures!

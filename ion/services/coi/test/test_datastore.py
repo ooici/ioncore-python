@@ -131,7 +131,7 @@ class DataStoreTest(IonTestCase):
         
         
     @defer.inlineCallbacks
-    def test_clone(self):
+    def test_pull(self):
 
 
         child_ds1 = yield self.sup.get_child_id('ds1')
@@ -171,22 +171,22 @@ class DataStoreTest(IonTestCase):
     
         repo.commit()
 
-        print 'BEFORE CLONE!'
+        print 'BEFORE PULL!'
 
         print 'PROC_DS1 HASHED OBJECTS', proc_ds1.workbench._hashed_elements.keys()
         print 'PROC_DS2 HASHED OBJECTS', proc_ds2.workbench._hashed_elements.keys()
 
 
-        response, ex = yield proc_ds2.clone('ps1','addressbook','addressbook')
+        response, ex = yield proc_ds2.pull('ps1','addressbook')
 
         self.assertEqual(response, proc_ds1.ION_SUCCESS)
 
-        print 'AFTER CLONE!'
+        print 'AFTER PULL!'
         print 'PROC_DS1 HASHED OBJECTS', proc_ds1.workbench._hashed_elements.keys()
         print 'PROC_DS2 HASHED OBJECTS', proc_ds2.workbench._hashed_elements.keys()
 
         
-        repo_ds2 = proc_ds2.workbench.get_repository('addressbook')
+        repo_ds2 = proc_ds2.workbench.get_repository(repo.repository_key)
         
         
         self.assertEqual(repo_ds2._dotgit, repo._dotgit)
@@ -198,9 +198,9 @@ class DataStoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_load_data(self):
-
-        
-
+        """
+        This is an easy way to make a test for loading data from a file...
+        """
         child_ds1 = yield self.sup.get_child_id('ds1')
         log.debug('Process ID:' + str(child_ds1))
         proc_ds1 = self._get_procinstance(child_ds1)
@@ -209,15 +209,20 @@ class DataStoreTest(IonTestCase):
         log.debug('Process ID:' + str(child_ds2))
         proc_ds2 = self._get_procinstance(child_ds2)
         
-        f = open(self.FileLocation, "rb")
+        try:
+            f = open(self.FileLocation, "rb")
+        except IOError as ex:
+            log.info('Test data file not found: %s'\
+                % self.FileLocation)
+            return
         
         wb = proc_ds1.workbench
         dataset = wb.unpack_structure(f.read())
         f.close()
         
-        print 'dataset:',dataset
+        log.info('dataset: \n' + str(dataset))
         
-        print 'rootGroup',dataset.rootGroup
+        log.info('rootGroup: \n' +str(dataset.rootGroup))
         
         
         

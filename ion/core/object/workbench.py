@@ -176,9 +176,6 @@ class WorkBench(object):
             
         # This is a non fastforward merge!
         # The branch has diverged and must be reconciled!
-            
-        # It is also possible that the new_repo just did not include all of its
-        # commit history as an optimization! This is a problem!
         
         mor = existing_branch.mergeonread.add()
         
@@ -275,14 +272,55 @@ class WorkBench(object):
         yield self._process.reply(msg, response_code=response, exception=ex)
         log.info('op_clone: Complete!')
         
+
+         
+    @defer.inlineCallbacks
+    def pull(self, origin, repo_name):
+        """
+        Pull the current state of the repository
+        """
+        targetname = self._process.get_scoped_name('system', origin)
+        
+        print 'PULL Targetname: ', targetname
+        print 'PULL RepoName: ', repo_name
+        
+        repo, headers, msg = yield self._process.rpc_send(targetname,'pull', repo_name)
+        
+        response = headers.get(self._process.MSG_RESPONSE)
+        exception = headers.get(self._process.MSG_EXCEPTION)
+        status = headers.get(self._process.MSG_STATUS)
+        
+        # Handle the response if the repo was not found
+        if response != self._process.ION_SUCCESS:
+            defer.returnValue((response, exception))
+            
+        
+        # should have a return value to make sure this worked... ?
+        yield self._fetch_repo_objects(repo, headers.get('reply-to'))
+        
+        
+        defer.returnValue((response, exception))
+        
+    @defer.inlineCallbacks
+    def op_pull(self,content, headers, msg):
+        """
+        The operation which responds to a pull 
+        """
+        
+        repo = self.get_repository(content)
+        
+        if repo:
+            yield self._process.reply(msg,content=repo)
+        else:
+            yield self._process.reply(msg,response_code=self._process.APP_RESOURCE_NOT_FOUND)
         
         
     @defer.inlineCallbacks
-    def push(self, target, name):
+    def push(self, origin, name):
         """
         Push the current state of the repository
         """
-        targetname = self._process.get_scoped_name('system', target)
+        targetname = self._process.get_scoped_name('system', origin)
         repo = self.get_repository(name)
 
         if repo:
@@ -306,8 +344,7 @@ class WorkBench(object):
         else:
             raise Exception, 'Push returned an exception!' % exception
             
-        
-        
+
         
     @defer.inlineCallbacks
     def op_push(self, repo, headers, msg):
@@ -316,6 +353,18 @@ class WorkBench(object):
         """
         log.info('op_push: received content type, %s' % type(repo))
                 
+        yield self._fetch_repo_objects(repo, headers.get('reply-to'))
+            
+        # The following line shows how to reply to a message
+        yield self._process.reply(msg)
+        log.info('op_push: Complete!')
+
+        
+    @defer.inlineCallbacks
+    def _fetch_repo_objects(self, repo, origin):
+        """
+        This method does not have a return value? What should it be?
+        """
         cref_links = set()
         for branch in repo.branches:
             cref_links.add(branch.get_link('commitref'))
@@ -353,12 +402,11 @@ class WorkBench(object):
             new_links = set()
             
             # Get the objects we don't have
-            yield self.fetch_linked_objects(headers.get('reply-to'), objs_to_get)
+            yield self.fetch_linked_objects(origin, objs_to_get)
             
             # Would like to have fetch use reply to - to keep the conversation context but does not work yet...
             #yield self.fetch_linked_objects(msg, objs_to_get)
             
-            print 'HEHEEHEHEHEHEHEHEHEHEHE'
             for link in objs_to_get:
                 if not link.isleaf:
                     obj = repo.get_linked_object(link)
@@ -367,23 +415,6 @@ class WorkBench(object):
                             new_links.add(child_link)
             
             objs_to_get = new_links
-            
-
-        # The following line shows how to reply to a message
-        yield self._process.reply(msg)
-        log.info('op_push: Complete!')
-
-         
-        
-    def pull(self,name):
-        """
-        Pull the current state of the repository
-        """
-    
-    def op_pull(self,content, headers, msg):
-        """
-        The operation which responds to a pull 
-        """
     
     @defer.inlineCallbacks
     def fetch_linked_objects(self, address, links):
@@ -661,8 +692,6 @@ class WorkBench(object):
                 self._hashed_elements[item.key]=item
             
             repo = self._load_repo_from_mutable(head)
-            
-            
             
             return repo
         
