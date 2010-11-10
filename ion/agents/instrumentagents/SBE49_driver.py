@@ -55,8 +55,23 @@ class SBE49_instCommandXlator():
         return(self.commands[command])
 
 class SBE49InstrumentHsm(InstrumentHsm):
-    def someFunction():
-        log.debug("some function")
+
+    hsmEvents = [
+        'eventConfigured',
+        'eventDisconnectComplete',
+        'eventCommandReceived',
+        'eventConnectionComplete',
+        'eventDisconnectReceived',
+        'eventDataReceived',
+        'eventPromptReceived'
+    ]
+
+    def sendEvent(self, event):
+        if event in self.hsmEvents:
+            self.onEvent(event)
+        else:
+            log.critical("Invalid Event: %s" %event)
+        
 
 class SBE49InstrumentDriver(InstrumentDriver):
     """
@@ -90,20 +105,20 @@ class SBE49InstrumentDriver(InstrumentDriver):
         #
         #self.hsm = miros.Hsm()
 
-        # --------------------------------------------------------------------
-        #             name                               parent's
-        #              of              event             event
-        #             state            handler           handler
-        # --------------------------------------------------------------------
-        self.hsm.addState ( "idle",           self.idle,               None)
-        #
-        self.hsm.addState ( "stateConfigured",  self.stateConfigured,     self.idle)
-        self.hsm.addState ( "stateDisconnecting",  self.stateDisconnecting,     self.stateConfigured)
-        self.hsm.addState ( "stateDisconnected",  self.stateDisconnected,     self.stateConfigured)
-        self.hsm.addState ( "stateConnecting",  self.stateConnecting,     self.stateConfigured)
-        self.hsm.addState ( "stateConnected",  self.stateConnected,     self.stateConfigured)
-        self.hsm.addState ( "statePrompted",  self.statePrompted,     self.stateConnected)
-        self.hsm.addState ( "stateDisconnecting",  self.stateDisconnecting,     self.stateConfigured)
+        # ---------------------------------------------------------------------------
+        #                  name                                              parent's
+        #                  of                     event                      event
+        #                  state                  handler                    handler
+        # ---------------------------------------------------------------------------
+        self.hsm.addState ( "stateBase",           self.stateBase,           None)
+        self.hsm.addState ( "stateUnconfigured",   self.stateUnconfigured,   self.stateBase)
+        self.hsm.addState ( "stateConfigured",     self.stateConfigured,     self.stateBase)
+        self.hsm.addState ( "stateDisconnecting",  self.stateDisconnecting,  self.stateConfigured)
+        self.hsm.addState ( "stateDisconnected",   self.stateDisconnected,   self.stateConfigured)
+        self.hsm.addState ( "stateConnecting",     self.stateConnecting,     self.stateConfigured)
+        self.hsm.addState ( "stateConnected",      self.stateConnected,      self.stateConfigured)
+        self.hsm.addState ( "statePrompted",       self.statePrompted,       self.stateConnected)
+        self.hsm.addState ( "stateDisconnecting",  self.stateDisconnecting,  self.stateConfigured)
     
         """
         A translation dictionary to translate from the commands being sent
@@ -159,33 +174,47 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         InstrumentDriver.__init__(self, *args, **kwargs)
 
-    # Change this to stateIdle
-    def idle(self, caller):
-        log.debug("!!!!!!!!!!!!!!!  In idle state")
+    def stateBase(self, caller):
+        log.debug("!!!!!!!!!!!!!!!  In stateBase state")
         if caller.tEvt['sType'] == "init":
             # display event
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
+            log.debug("stateBase-%s;" %(caller.tEvt['sType']))
+            caller.stateStart(self.stateUnconfigured)
             return 0
         elif caller.tEvt['sType'] == "entry":
             # display event, do nothing 
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
+            log.debug("stateBase-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
-            self.tEvt['nFoo'] = 0
-            return 0
-        elif caller.tEvt['sType'] == "configured":
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
-            log.info("!!!!!! transitioning to stateConfigured! idle-%s;" %(caller.tEvt['sType']))
-            self.hsm.stateTran(self.stateConfigured)
+            log.debug("stateBase-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
-            log.debug("idle state: ignoring event %s;" %(caller.tEvt['sType']))
+            log.debug("stateUnconfigured state: ignoring event %s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
-            log.debug("idle state: ignoring event %s;" %(caller.tEvt['sType']))
+            log.debug("stateUnconfigured state: ignoring event %s;" %(caller.tEvt['sType']))
             data = self.dequeueData()            
-            log.debug("stateIdle received %s." % (data))
+            log.debug("statestateUnconfigured received %s." % (data))
+            return 0
+        return caller.tEvt['sType']
+
+    def stateUnconfigured(self, caller):
+        log.debug("!!!!!!!!!!!!!!!  In stateUnconfigured state")
+        if caller.tEvt['sType'] == "init":
+            # display event
+            log.debug("stateUnconfigured-%s;" %(caller.tEvt['sType']))
+            return 0
+        elif caller.tEvt['sType'] == "entry":
+            # display event, do nothing 
+            log.debug("stateUnconfigured-%s;" %(caller.tEvt['sType']))
+            return 0
+        elif caller.tEvt['sType'] == "exit":
+            log.debug("stateUnconfigured-%s;" %(caller.tEvt['sType']))
+            return 0
+        elif caller.tEvt['sType'] == "eventConfigured":
+            log.debug("stateUnconfigured-%s;" %(caller.tEvt['sType']))
+            log.info("!!!!!! transitioning to stateConfigured! stateUnconfigured-%s;" %(caller.tEvt['sType']))
+            self.hsm.stateTran(self.stateConfigured)
             return 0
         return caller.tEvt['sType']
 
@@ -408,7 +437,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         # DHE Testing HSM
         log.debug("!!!!!!!!!!!!!!!!!! Calling onStart!")
-        self.hsm.onStart(self.idle)
+        self.hsm.onStart(self.stateUnconfigured)
 
         yield self._configure_driver(self.spawn_args)
 
@@ -420,7 +449,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         log.debug("Instrument driver initialized")
 
         log.debug("!!!!!!!!!!! Sending configured event");
-        self.hsm.onEvent('configured');
+        #self.hsm.onEvent('configured');
+        self.hsm.sendEvent('eventConfigured');
 
     @defer.inlineCallbacks
     def plc_terminate(self):
@@ -504,7 +534,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         #
         self.setConnected(True)
         
-        self.hsm.onEvent('eventConnectionComplete')
+        #self.hsm.onEvent('eventConnectionComplete')
+        self.hsm.sendEvent('eventConnectionComplete')
 
 
     def gotDisconnected(self, instrument):
@@ -517,7 +548,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         log.debug("gotDisconnected!!!")
 
-        self.hsm.onEvent('eventDisconnectComplete')
+        #self.hsm.onEvent('eventDisconnectComplete')
+        self.hsm.sendEvent('eventDisconnectComplete')
 
         #
         # Don't need this anymore
@@ -534,17 +566,20 @@ class SBE49InstrumentDriver(InstrumentDriver):
         if data == instrument_prompts.INST_PROMPT or \
                  data == instrument_prompts.INST_SLEEPY_PROMPT:
             log.debug("gotPrompt()")
-            self.hsm.onEvent('eventPromptReceived')
+            #self.hsm.onEvent('eventPromptReceived')
+            self.hsm.sendEvent('eventPromptReceived')
         elif data == instrument_prompts.INST_CONFUSED:
             log.info("Seabird doesn't understand command.")
         else:
             log.debug("gotData() %s." % (data))
             self.enqueueData(data)
-            self.hsm.onEvent('eventDataReceived')
+            #self.hsm.onEvent('eventDataReceived')
+            self.hsm.sendEvent('eventDataReceived')
         
     def gotPrompt(self, instrument):
         log.debug("gotPrompt()")
-        self.hsm.onEvent('eventPromptReceived')
+        #self.hsm.onEvent('eventPromptReceived')
+        self.hsm.sendEvent('eventPromptReceived')
 
 
     @defer.inlineCallbacks
@@ -578,7 +613,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
     @defer.inlineCallbacks
     def op_disconnect(self, content, headers, msg):
         log.debug("in Instrument Driver op_disconnect!")
-        self.hsm.onEvent('eventDisconnectReceived')
+        #self.hsm.onEvent('eventDisconnectReceived')
+        self.hsm.sendEvent('eventDisconnectReceived')
         if msg:
             yield self.reply_ok(msg, content)
 
@@ -627,7 +663,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
                     appropriate sequence of events to get the command sent.
                     """
                     self.enqueueCmd(command)
-                    self.hsm.onEvent('eventCommandReceived')
+                    #self.hsm.onEvent('eventCommandReceived')
+                    self.hsm.sendEvent('eventCommandReceived')
                 else:
                     error_msg = str(param) + " is not a settable parameter"
                     #log.error("%s is not a settable parameter" % str(param))
@@ -670,7 +707,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
                 Send the command received event.  This should kick off the
                 appropriate sequence of events to get the command sent.
                 """
-                self.hsm.onEvent('eventCommandReceived')
+                #self.hsm.onEvent('eventCommandReceived')
+                self.hsm.sendEvent('eventCommandReceived')
 
                 agentCommands.append(command)
                 yield self.reply_ok(msg, agentCommands)
@@ -728,8 +766,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
             self.publish_to = params['publish-to']
             log.debug("Configured publish-to=" + self.publish_to)
             self.setTopicDefined(True)
+            
+            # Instantiate a pubsub client
             self.dpsc = DataPubsubClient(proc=self)
+            
             self.topic = ResourceReference(RegistryIdentity=self.publish_to, RegistryBranch='master')
+            
             self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
             self.publisher = yield self.dpsc.define_publisher(self.publisher)
         else:
