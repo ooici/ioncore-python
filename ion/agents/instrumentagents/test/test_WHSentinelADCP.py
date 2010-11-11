@@ -147,8 +147,8 @@ class TestWHSentinelADCP(IonTestCase):
 
         log.info('Defined subscription: '+str(subscription))
 
-        #config_vals = {'ipaddr':'137.110.112.119', 'ipport':'4002', 'ipportCmd':967}
-        config_vals = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort, 'ipportCmd':967}
+        config_vals = {'ipaddr':'137.110.112.119', 'ipport':'4002', 'ipportCmd':967}
+        #config_vals = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort, 'ipportCmd':967}
         result = yield self.driver_client.configure_driver(config_vals)
 
 

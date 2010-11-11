@@ -35,7 +35,10 @@ from ion.core.process.process import ProcessFactory
 
 import time
 from socket import *
+import sys
+from threading import Timer
 
+RESPONSE_TIMEOUT = 2   # 2 second timeout for response from instrument
 
 class WHSentinelADCP_instCommandXlator():
     commands = {
@@ -61,10 +64,12 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         self.setConnected(False)
         self.setTopicDefined(False)
         self.publish_to = None
-        self.dataQueue = []
+        self.dataQueue = ""
         self.cmdQueue = []
         self.proto = None
-    
+        self.TimeOut = None
+        NoResponseIsError = False
+        
         self.instCmdXlator = WHSentinelADCP_instCommandXlator()
         
         self.hsm = InstrumentHsm()
@@ -180,8 +185,6 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             return 0
         elif caller.tEvt['sType'] == "eventConnectionComplete":
             log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
-            # send a break to wake up the ADCP
-            self.sendBreak()
             # move to stateConnected
             caller.stateTran(self.stateConnected)
             return 0
@@ -206,7 +209,8 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             """
             @todo Need a queue of commands from which to pull commands
             """
-            # Should we send the prompt here?
+            if self.cmdPending():
+                self.sendBreak()
             return 0
         elif caller.tEvt['sType'] == "entry":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
@@ -214,24 +218,29 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "exit":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
             return 0
+        elif caller.tEvt['sType'] == "eventResponseTimeout":
+            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
+            self.ProcessWakeupResponseTimeout()
+            return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
-            # We got a command from the agent; need to get the prompt
-            # before sending
-            self.sendBreak()
+            if self.TimeOut == None:
+                # We got a command from the agent; need to get the prompt
+                # before sending
+                self.sendBreak()
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
             log.info("stateConnected-%s;" %(caller.tEvt['sType']))
-
-            # send this up to the agent to publish.
-            data = self.dequeueData()            
-            log.debug("stateConnected() Calling publish.")
-            self.publish(data, self.publish_to)
+            if self.TimeOut != None:
+                self.TimeOut.cancel()
+                self.TimeOut = None
+            self.ProcessRcvdData()
             return 0
         elif caller.tEvt['sType'] == "eventPromptReceived":
-            #
-            # Transition to the stateDisconnecting state
-            #
+            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
+            if self.TimeOut != None:
+                self.TimeOut.cancel()
+                self.TimeOut = None
             caller.stateTran(self.statePrompted)
             return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
@@ -248,10 +257,11 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         if caller.tEvt['sType'] == "init":
             log.info("statePrompted-%s;" %(caller.tEvt['sType']))
             """
-            @todo Need a queue of commands from which to pull commands
+            @TODO Need a queue of commands from which to pull commands
             """
             if self.cmdPending():
-                self.sendCmd(self.dequeueCmd())
+                self.sendCmd(self.cmdQueue[0])
+                self.NoResponseIsError = True
             return 0
         elif caller.tEvt['sType'] == "entry":
             log.info("statePrompted-%s;" %(caller.tEvt['sType']))
@@ -259,20 +269,21 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "exit":
             log.info("statePrompted-%s;" %(caller.tEvt['sType']))
             return 0
+        elif caller.tEvt['sType'] == "eventResponseTimeout":
+            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
+            self.ProcessCmdResponseTimeout()
+            caller.stateTran(self.stateConnected)
+            return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
             log.info("statePrompted-%s;" %(caller.tEvt['sType']))
             if self.cmdPending():
-                self.sendCmd(self.dequeueCmd())
+                self.sendCmd(self.cmdQueue[0])
             else:
                 log.error("statePrompted: No command to send!")
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
             log.info("statePrompted-%s;" %(caller.tEvt['sType']))
-
-            # send this up to the agent to publish.
-            data = self.dequeueData()            
-            log.debug("statePrompted() Calling publish.")
-            self.publish(data, self.publish_to)
+            self.ProcessRcvdData()
             return 0
         elif caller.tEvt['sType'] == "eventPromptReceived":
             return 0
@@ -354,14 +365,6 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
     def setAgentService(self, agent):
         self.agent = agent
         
-    def enqueueData(self, data):
-        self.dataQueue.append(data)
-
-    def dequeueData(self):
-        data = self.dataQueue.pop()
-        #log.debug("dequeueCmd: dequeueing command: %s" %data)
-        return data
-        
     def enqueueCmd(self, cmd):
         log.debug("enqueueCmd: enqueueing command: %s" %cmd)
         self.cmdQueue.append(cmd)
@@ -377,32 +380,74 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         else:
             return False
         
+    def TimeoutCallback(self):
+        log.info("TimeoutCallback()")
+        if self.TimeOut != None:
+            self.TimeOut = None
+            self.hsm.onEvent('eventResponseTimeout')
+        
+    def ProcessCmdResponseTimeout(self):
+        log.error("No response from instrument for cammand \'%s\'" % self.cmdQueue[0])
+        self.cmdQueue = []
+        self.publish("No response from instrument for cammand \'%s\'".format(self.cmdQueue[0]), self.publish_to)
+
+    def ProcessWakeupResponseTimeout(self):
+        log.error("No response from instrument for wakeup")
+        self.cmdQueue = []
+        self.publish("No response from instrument for wakeup", self.publish_to)
+      
     def sendCmd(self, cmd):
         log.debug("Sending Command: %s" %cmd)
         self.instrument.transport.write(cmd)
+        self.TimeOut = Timer(RESPONSE_TIMEOUT, self.TimeoutCallback)
+        self.TimeOut.start()
         
-    def sendBreak(self, cmd):
+        
+    def sendBreak(self):
         if self.instrument_ipaddr == "localhost" or self.instrument_ipaddr == "127.0.0.1":
             # localhost(127.0.0.1) implies the use of the instrument simulator so just send a simple CR/LF
-            log.debug("Sending CR/LF to simulator")
-            self.instrument.transport.write(PROMPT_INST)
+            log.info("Sending CR/LF to simulator")
+            self.instrument.transport.write(instrument_prompts.PROMPT_INST)
         else:
             log.info("Sending break to instrument ipaddr: %s, ipport: %s" %(self.instrument_ipaddr, self.instrument_ipportCmd))      
             try:
                 s = socket(AF_INET, SOCK_STREAM)    # create a TCP socket   
                 s.settimeout(2)                     # set timeout to 2 seconds for reads
-                s.connect(self.instrument_ipaddr, int(self.instrument_ipportCmd))
+                s.connect((self.instrument_ipaddr, self.instrument_ipportCmd))
                 s.send('\x21\x00')                  # start sending break
                 data = s.recv(1024)                 # receive up to 1K bytes
                 if data != '\x21OK':
                     raise RuntimeError('OK response not received')
+                log.debug("Rcvd OK response for 'start break' cmd")
                 time.sleep (1)
                 s.send('\x22\x00')                  # stop sending break
                 data = s.recv(1024)                 # receive up to 1K bytes
                 if data != '\x22OK':
                     raise RuntimeError('OK response not received')
+                log.debug("Rcvd OK response for 'stop break' cmd")
             except:
-                log.error("Send break failed: sys.exc_info()[0]")
+                log.error("Send break failed: %s" % sys.exc_info()[1])
+                return
+        self.TimeOut = Timer(RESPONSE_TIMEOUT, self.TimeoutCallback)
+        self.TimeOut.start()
+
+                
+    def ProcessRcvdData(self):
+        # for now, publish a complete line at a time
+        if instrument_prompts.PROMPT_INST in self.dataQueue:
+            partition = self.dataQueue.partition(instrument_prompts.PROMPT_INST)
+            self.dataQueue = partition[2]
+            if self.cmdQueue[0] in partition[0]:
+                log.debug("Command \'%s\' received" % self.cmdQueue[0])
+                self.cmdQueue.pop()
+                if self.TimeOut != None:
+                    self.TimeOut.cancel()
+                    self.TimeOut = None
+            # send this up to the agent to publish.
+            log.info("Calling publish with \"%s\"" %partition[0])
+            self.publish(partition[0], self.publish_to)
+            
+
         
     @defer.inlineCallbacks
     def getConnected(self):
@@ -466,11 +511,16 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         @param data
         @retval none
         """
-        if INST_PROMPT in data:
-            log.debug("gotPrompt()")
+        if instrument_prompts.INST_PROMPT in data:
+            log.info("gotData(): prompt seen")
             self.hsm.onEvent('eventPromptReceived')
-        log.debug("gotData() %s." % (data))
-        self.enqueueData(data)
+        DataAsHex = ""
+        for i in range(len(data)):
+            if len(DataAsHex) > 0:
+                DataAsHex += ","
+            DataAsHex += "{0:X}".format(ord(data[i]))
+        log.debug("gotData() [%s] [%s]" % (data, DataAsHex))
+        self.dataQueue += data
         self.hsm.onEvent('eventDataReceived')
         
 
