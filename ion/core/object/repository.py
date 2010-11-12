@@ -542,6 +542,11 @@ class Repository(object):
         
         
     def _set_type_from_obj(self, ltype, wrapped_obj):
+        """
+        This method is a bit of a mess - do we really need it?
+        
+        It opperates directly on unwrapped GPB objects
+        """
             
         obj = wrapped_obj
         if isinstance(obj, gpb_wrapper.Wrapper):

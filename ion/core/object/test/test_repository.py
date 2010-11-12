@@ -26,10 +26,26 @@ class RepositoryTest(unittest.TestCase):
         self.wb = wb
         
     def test_branch_checkout(self):
-        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)   
+        repo, ab = self.wb.init_repository(addressbook_pb2.AddressBook)   
+        p = ab.person.add()
+        p.name = 'David'
+        p.id = 1
         repo.commit()
+        
         repo.branch(nickname="Arthur")
-        repo.checkout(branch="Arthur")
+        self.assertEqual(p.name,'David')
+        p.name = 'John'
+        repo.commit()
+
+        ab = repo.checkout(branch="master")
+        
+        self.assertEqual(ab.person[0].name, 'David')
+        
+        ab = repo.checkout(branch="Arthur")
+        
+        self.assertEqual(ab.person[0].name, 'John')
+        
+        
         
     def test_branch_no_commit(self):
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
@@ -50,9 +66,31 @@ class RepositoryTest(unittest.TestCase):
         assert(cref.comment == "Cogent Comment")
             
     def test_checkout_commit_id(self):
-        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)  
-        commit_ref = repo.commit()
-        repo.checkout(commit_id=commit_ref)
+        repo, ab = self.wb.init_repository(addressbook_pb2.AddressBook)
+        
+        commit_ref1 = repo.commit()
+
+        p = ab.person.add()
+        p.id = 1
+        p.name = 'Uma'
+            
+        commit_ref2 = repo.commit()
+            
+        p.name = 'alpha'
+        commit_ref3 = repo.commit()
+            
+        ab = repo.checkout(commit_id=commit_ref1)
+        self.assertEqual(len(ab.person),0)
+            
+        ab = repo.checkout(commit_id=commit_ref2)
+        self.assertEqual(ab.person[0].id,1)
+        self.assertEqual(ab.person[0].name,'Uma')
+        
+        ab = repo.checkout(commit_id=commit_ref3)
+        self.assertEqual(ab.person[0].id,1)
+        self.assertEqual(ab.person[0].name,'alpha')
+        
+        
         
             
     def test_simple_commit(self):

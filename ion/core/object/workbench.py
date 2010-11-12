@@ -227,50 +227,52 @@ class WorkBench(object):
         Fork the structure in the wrapped gpb object into a new repository.
         """
         
-    @defer.inlineCallbacks
-    def clone(self, origin, ID_Ref, nickname=None):
-        """
-        Clone a repository from the data store
-        Check out the head
-        Start with simple case - a UUID String
-        """
-        targetname = self._process.get_scoped_name('system', origin)
-        
-        print 'CLONE Targetname: ', targetname
-        print 'CLONE ID Ref: ', ID_Ref
-        
-        content, headers, msg = yield self._process.rpc_send(targetname,'clone', ID_Ref)
-            
-        response = headers.get(self._process.MSG_RESPONSE)
-        exception = headers.get(self._process.MSG_EXCEPTION)
-            
-        status = headers.get(self._process.MSG_STATUS)
-            
-        if status == 'OK':
-            log.info( 'Clone Returned:'+response)
-            
-            # Set the nickname for the cloned repository if asked for...
-            if nickname:
-                self.set_repository_nickname(ID_Ref, nickname)
-                
-            defer.returnValue((response, exception))
-        else:
-            raise Exception, 'Push returned an exception!' % exception
-        
-    @defer.inlineCallbacks
-    def op_clone(self, content, headers, msg):
-        """
-        The operation which responds to a clone
-        """
-        log.info('op_clone: received content type, %s' % type(content))
-
-        print 'REPLY_TO', headers['reply-to']
-        print 'CONTENT', content
-        
-        response, ex = yield self.push(headers['reply-to'],content)
-        
-        yield self._process.reply(msg, response_code=response, exception=ex)
-        log.info('op_clone: Complete!')
+    # Clone should be based on Pull not on push!
+    #@defer.inlineCallbacks
+    #def clone(self, origin, ID_Ref, nickname=None):
+    #    """
+    #    Clone a repository from the data store
+    #    Check out the head
+    #    Start with simple case - a UUID String
+    #    """
+    #    targetname = self._process.get_scoped_name('system', origin)
+    #    
+    #    print 'CLONE Targetname: ', targetname
+    #    print 'CLONE ID Ref: ', ID_Ref
+    #    
+    #    content, headers, msg = yield self._process.rpc_send(targetname,'clone', ID_Ref)
+    #        
+    #    response = headers.get(self._process.MSG_RESPONSE)
+    #    exception = headers.get(self._process.MSG_EXCEPTION)
+    #        
+    #    status = headers.get(self._process.MSG_STATUS)
+    #        
+    #    if status == 'OK':
+    #        log.info( 'Clone Returned:'+response)
+    #        
+    #        # Set the nickname for the cloned repository if asked for...
+    #        if nickname:
+    #            self.set_repository_nickname(ID_Ref, nickname)
+    #            
+    #        defer.returnValue((response, exception))
+    #    else:
+    #        raise Exception, 'Push returned an exception!' % exception
+    #    
+    #@defer.inlineCallbacks
+    #def op_clone(self, content, headers, msg):
+    #    """
+    #    The operation which responds to a clone
+    #    """
+    #    log.info('op_clone: received content type, %s' % type(content))
+    #
+    #    print 'REPLY_TO', headers['reply-to']
+    #    print 'CONTENT', content
+    #
+    #    # Cant use push here - both receivers get blocked!
+    #    response, ex = yield self.push(headers['reply-to'],content)
+    #    
+    #    yield self._process.reply(msg, response_code=response, exception=ex)
+    #    log.info('op_clone: Complete!')
         
 
          

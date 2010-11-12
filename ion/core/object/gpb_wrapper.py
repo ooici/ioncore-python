@@ -212,26 +212,25 @@ class Wrapper(object):
     
     def _set_parents_modified(self):
         """
-        This method probably needs work - and testing!
+        This method recursively changes an objects parents to a modified state
+        All links are reset as they are no longer hashed values
         """
         if not self.modified:        
             self.modified = True
-            
+                        
             new_id = self.repository.new_id()
             self.repository._workspace[new_id] = self.root
             
             del self.repository._workspace[self.myid]
             self.myid = new_id
                     
-            for link in self._parent_links:
-                    # Tricky - set the message directly and call modified!
+            # When you hit the commit ref - stop!                   
+            if not self.root is self.repository._workspace_root:
                     
-                # When you hit the commit ref which is reaonly - stop!                    
-                if link.readonly:
-                    continue
-                    
-                link._gpbMessage.key = self.myid
-                link._set_parents_modified()
+                for link in self._parent_links:
+                    # Tricky - set the message directly and call modified!                    
+                    link._gpbMessage.key = self.myid
+                    link._set_parents_modified()
     
     def _set_structure_read_only(self):
         """
@@ -419,8 +418,9 @@ class Wrapper(object):
         self.modified = False
        
         # Set the key value for parent links!
-        for link in self._parent_links:
-            link.key = self.myid
+        if not self.root is self.repository._workspace_root:
+            for link in self._parent_links:
+                link.key = self.myid
             
         structure[se.key] = se
         

@@ -67,12 +67,6 @@ class WorkBenchTest(unittest.TestCase):
         print 'Commited',cref
         
         
-    def test_pack_root(self):
-        
-        serialized = self.wb.pack_structure(self.ab)
-        
-        print serialized
-            
     
     def test_pack_mutable(self):
         serialized = self.wb.pack_structure(self.repo._dotgit)
@@ -113,12 +107,96 @@ class WorkBenchTest(unittest.TestCase):
         
         commit = repo._dotgit.branches[0].commitref
         
-        
         #Check that the commit came through
         self.assertEqual(commit, self.repo._current_branch.commitref)
         
         
+    def test_init_repo(self):
+            
+        # Try it with no arguments
+        repo, rootobj = self.wb.init_repository()
+            
+        rkey = repo.repository_key
+        self.assertEqual(repo, self.wb.get_repository(rkey))
+        self.assertEqual(rootobj, None)
+            
+            
+        # Try it with a root object this time
+        repo, rootobj = self.wb.init_repository(rootclass=addressbook_pb2.AddressBook)
+            
+        rkey = repo.repository_key
+        self.assertEqual(repo, self.wb.get_repository(rkey))
+        self.assertIsInstance(rootobj, gpb_wrapper.Wrapper)
+            
+        # Try it with a nickname for the repository
+        repo, rootobj = self.wb.init_repository(rootclass=addressbook_pb2.AddressBook, nickname='David')
+            
+        self.assertEqual(repo, self.wb.get_repository('David'))
+        self.assertIsInstance(rootobj, gpb_wrapper.Wrapper)
         
         
+        
+class WorkBenchMergeTest(unittest.TestCase):
+        
+    def test_merge(self):
+        wb1 = workbench.WorkBench('No Process Test')
+        
+        repo1, ab = wb1.init_repository(addressbook_pb2.AddressBook)
+        
+        commit_ref1 = repo1.commit()
+        p = ab.person.add()
+        p.id = 1
+        p.name = 'Uma'
+            
+        commit_ref2 = repo1.commit()
+            
+        p.name = 'alpha'
+        commit_ref3 = repo1.commit()
+            
+        ab = repo1.checkout(commit_id=commit_ref1)
+        self.assertEqual(len(ab.person),0)
+            
+        ab = repo1.checkout(commit_id=commit_ref2)
+        self.assertEqual(ab.person[0].id,1)
+        self.assertEqual(ab.person[0].name,'Uma')
+        
+        ab = repo1.checkout(branch='master')
+        self.assertEqual(ab.person[0].id,1)
+        self.assertEqual(ab.person[0].name,'alpha')
+
+        # Serialize it
+        serialized = wb1.pack_repository_commits(repo1)
+        
+        # Create a new, separate work bench and read it!
+        wb2 = workbench.WorkBench('No Process Test')
+        repo2 = wb2.unpack_structure(serialized)
+        
+        print 'BRANCHES', repo2.branches[0]
+        
+        # Can't pull the objects from the other repository! Because it is not a process!
+        ab = repo2.checkout(branch='master')
+        
+        print 'AB',ab
+        
+        ab = repo2.checkout(commit_id=commit_ref1)
+        self.assertEqual(len(ab.person),0)
+            
+        ab = repo2.checkout(commit_id=commit_ref2)
+        self.assertEqual(ab.person[0].id,1)
+        self.assertEqual(ab.person[0].name,'Uma')
+        
+        ab = repo2.checkout(commit_id=commit_ref3)
+        self.assertEqual(ab.person[0].id,1)
+        self.assertEqual(ab.person[0].name,'alpha')
+        
+        # Back to WB1 - add some more commits!
+        
+        ab = repo1.checkout(commit_id=commit_ref3)
+        
+        
+        
+        
+        
+                        
         
         

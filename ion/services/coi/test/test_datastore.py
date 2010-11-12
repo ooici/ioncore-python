@@ -19,23 +19,14 @@ class DataStoreTest(IonTestCase):
     """
     Testing example hello service.
     """
-    FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/01184000_0.protostruct'
-
+    
+    # This is a temporary way to test communication between python and java using GPBs...
+    #FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/01184000_0.protostruct'
+    FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/grid.protostruct'
 
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-
-        """
-        services = [
-            {'name':'ds1','module':'ion.core.process.process','class':'Process',
-             'spawnargs':{'proc-name':'ps1'}
-                },
-            {'name':'ds2','module':'ion.core.process.process','class':'Process',
-             'spawnargs':{'proc-name':'ps2'}
-                }
-        ]
-        """
 
         services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
@@ -205,9 +196,6 @@ class DataStoreTest(IonTestCase):
         log.debug('Process ID:' + str(child_ds1))
         proc_ds1 = self._get_procinstance(child_ds1)
         
-        child_ds2 = yield self.sup.get_child_id('ds2')
-        log.debug('Process ID:' + str(child_ds2))
-        proc_ds2 = self._get_procinstance(child_ds2)
         
         try:
             f = open(self.FileLocation, "rb")
@@ -224,6 +212,47 @@ class DataStoreTest(IonTestCase):
         
         log.info('rootGroup: \n' +str(dataset.rootGroup))
         
+        def log_atts(atts, tab=''):
+            
+            for att in atts:
+                attstring = tab+'Attribute:\n %s \n %s \n' % (tab+str(att), tab+str(att.array))
+                log.info(attstring)        
+        
+        def log_dims(dims, tab=''):
+            for dim in dims:
+                dimstring = tab+'Dimension:\n %s \n' % (tab+str(dim))
+                log.info(dimstring) 
+        
+        def log_vars(vars):
+            
+            for var in vars:
+                varstring = 'Variable: \n %s \n Content: \n ' % (str(var))
+                varstring += print_bounded_array(var.content)
+                log.info(varstring)
+                
+                log_atts(var.attributes, tab='    ')
+                log_dims(var.shape, tab='    ')
+                
+        def print_bounded_array(bounded_arrays):
+            ba_string = ''
+            for ba in bounded_arrays:
+                ba_string += str(ba)+'\n'
+                
+                if len(ba.ndarray.value) <= 25:
+                    ba_string += str(ba.ndarray.value)+'\n'
+                else:
+                    ba_string += str(ba.ndarray.value[:25])+'\n'
+            return ba_string
+                
+        log_dims(dataset.rootGroup.dimensions)
+        log_atts(dataset.rootGroup.attributes)
+        log_vars(dataset.rootGroup.variables)
         
         
+        
+        #for var in dataset.rootGroup.variables:
+        #   log.info('Variables: \n' + str(var))
+            
+            
+
 

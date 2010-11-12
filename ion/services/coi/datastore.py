@@ -34,15 +34,12 @@ class DataStoreService(ServiceProcess):
         
         self.op_push = self.workbench.op_push
         self.op_pull = self.workbench.op_pull
-        self.op_clone = self.workbench.op_clone
+        #self.op_clone = self.workbench.op_clone
         self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
 
         self.push = self.workbench.push
-        
         self.pull = self.workbench.pull
-        
-        self.clone = self.workbench.clone
-
+        #self.clone = self.workbench.clone
         self.fetch_linked_objects = self.workbench.fetch_linked_objects
 
         log.info('DataStoreService.__init__()')
