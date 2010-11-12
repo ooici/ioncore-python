@@ -59,8 +59,10 @@ class WorkBench(object):
         # Load all of the commit refs that came with this head.
         
         for branch in new_repo.branches:
-            link = branch.get_link('commitref')
-            self._load_commits(new_repo,link)
+
+            # Check for merge on read condition!            
+            for link in branch.commitrefs.get_links():
+                self._load_commits(new_repo,link)
             
             
         # Check and see if we already have one of these repositorys
@@ -106,9 +108,9 @@ class WorkBench(object):
             for parent in cref.parentrefs:
                 link = parent.get_link('commitref')
                 # Call this method recursively for each link
-                self._load_commits(link)
+                self._load_commits(repo, link)
         else:
-            
+            log.info('Commit id not found: %s' % link.key)
             # This commit ref was not actually sent!
             return
     
@@ -135,8 +137,9 @@ class WorkBench(object):
                 
                 branch.branchkey = new_branchkey
                 # Get the cref and then link it in the existing repository
-                cref = new_branch.commitref 
-                branch.commitref = cref
+                for cref in new_branch.commitrefs:
+                    bref = branch.commitref.add()
+                    bref.set_link(cref)
                 
             
         return existing_repo
@@ -144,44 +147,45 @@ class WorkBench(object):
     
     def _resolve_branch_state(self, existing_branch, new_branch):
         """
-        I don't think this code is tested yet!
+        Move everything in new into an updated existing!
         """
-        
-        new_link = new_branch.get_link('commitref')
-        existing_link = existing_branch.get_link('commitref')
+        for new_link in new_branch.commitrefs.get_links():
             
-        # test to see if we need to merge
-        if new_link == existing_link:
-            # If these branches have the same state we are good.
-            return
+            for existing_link in existing_branch.commitrefs.get_links():
+            
+                # test to see if we these are the same head ref!
+                if new_link == existing_link:
+                    # If these branches have the same state we are good - continue to the next new cref in the new branch. 
+                    break
 
-        # Get the repositories we are working from
-        existing_repo = existing_branch.repository
-        new_repo = new_branch.repository
+                # Get the repositories we are working from
+                existing_repo = existing_branch.repository
+                new_repo = new_branch.repository
         
-        # Look in the commit index of the existing repo to see if the new link is an old commit to existing
-        common_cref = existing_repo._commit_index.get(new_link.key, None)
-        if common_cref:
-            # The branch in new_repo is out of date with what exists here.
-            return    
+                # Look in the commit index of the existing repo to see if the new link is an old commit to existing
+                common_cref = existing_repo._commit_index.get(new_link.key, None)
+                if common_cref:
+                    # The branch in new_repo is out of date with what exists here.
+                    break   
         
-        # Look in the commit index of the new repo to see if the existing link is an old commit in new
-        common_cref = new_repo._commit_index.get(existing_link.key, None)
-        if common_cref:
-            # The existing repo can be fast forwarded to the new state!
-            existing_branch.commitref = common_ref
-            link = existing_branch.get_link('commitref')
-            self._load_commits(existing_repo, link) # Load the new ancestors!
-            return
-            
-        # This is a non fastforward merge!
-        # The branch has diverged and must be reconciled!
-        
-        mor = existing_branch.mergeonread.add()
-        
-        new_cref = new_repo._commit_index.get(new_link.key)
-        
-        mor.set_link(new_ref)
+                # Look in the commit index of the new repo to see if the existing link is an old commit in new repository
+                common_cref = new_repo._commit_index.get(existing_link.key, None)
+                if common_cref:
+                    # The existing repo can be fast forwarded to the new state!
+
+                    existing_link.key = new_link.key # Cheat and just copy the key!
+
+                    self._load_commits(existing_repo, new_link) # Load the new ancestors!
+                    break
+                    
+                # This is a non fastforward merge!
+                # The branch has diverged and must be reconciled!
+                    
+                bref = existing_branch.commitrefs.add()
+                    
+                new_cref = new_repo._commit_index.get(new_link.key)
+                    
+                bref.set_link(new_cref)
             
         # Note this in the branches merge on read field and punt this to some
         # other part of the process.
@@ -369,7 +373,9 @@ class WorkBench(object):
         """
         cref_links = set()
         for branch in repo.branches:
-            cref_links.add(branch.get_link('commitref'))
+            
+            for cref_link in branch.commitrefs.get_links():
+                cref_links.add(cref_link)
             
         objs_to_get = set()
         refs_touched = set()
@@ -438,9 +444,9 @@ class WorkBench(object):
             
         if isinstance(address, str):
             objs, headers, msg = yield self._process.rpc_send(address,'fetch_linked_objects', cs)
-        elif hasattr(address, 'payload'):
-            # Would like to have fetch use reply to - to keep the conversation context but does not work yet...
-            objs, headers, reply_msg = yield self._process.reply(address, operation='fetch_linked_objects', content=cs)
+        #elif hasattr(address, 'payload'):
+        #    # Would like to have fetch use reply to - to keep the conversation context but does not work yet...
+        #    objs, headers, reply_msg = yield self._process.reply(address, operation='fetch_linked_objects', content=cs)
         
         for obj in objs:
             self._hashed_elements[obj.key]=obj
@@ -506,7 +512,7 @@ class WorkBench(object):
         
     def put_repository(self,repo):
         
-        self._repos[repo._dotgit.repositorykey] = repo
+        self._repos[repo.repository_key] = repo
         
         
     def pack_repository_commits(self,repo):
@@ -527,26 +533,26 @@ class WorkBench(object):
             
         cref_set = set()
         for branch in mutable.branches:
-            cref = branch.commitref
             
-            # Keep track of the commits
-            cref_set.add(cref)
+            for cref in branch.commitrefs:
+                cref_set.add(cref)
             
         obj_set = set()
             
         while len(cref_set)>0:                
             new_set = set()
-            
-            for commit in cref_set:
+                        
+            for cref in cref_set:
                 obj_set.add(cref.myid)
                     
-                for prefs in commit.parentrefs:
+                for prefs in cref.parentrefs:
                     new_set.add(prefs.commitref)
             
             # Now recurse on the ancestors    
             cref_set = new_set
             
             
+        # Now make a list of just the keys that we want to send!
         obj_list = []
         for key in obj_set:
             obj_list.append(key)
@@ -583,12 +589,13 @@ class WorkBench(object):
             
             items = set()
             for branch in wrapper.branches:
-                cref = branch.commitref
-                obj = self._hashed_elements.get(cref.myid,None)
-                if not obj:
-                    # Debugging exception - remove later
-                    raise Exception, 'Hashed CREF not found! Please call David'
-                items.add(obj)
+                
+                for cref in branch.commitrefs:
+                    obj = self._hashed_elements.get(cref.myid,None)
+                    if not obj:
+                        # Debugging exception - remove later
+                        raise Exception, 'Hashed CREF not found! Please call David'
+                    items.add(obj)
             
         else:
             # Else we are sending just the commited root object
@@ -645,12 +652,11 @@ class WorkBench(object):
         cs.head.type.CopyFrom(head._element.type)
         cs.head.isleaf = head._element.isleaf
         cs.head.value = head._element.value
-            
+                        
         for key in object_keys:
             hashed_obj = self._hashed_elements.get(key)         
             gpb_obj = hashed_obj._element
-            
-            
+                        
             se = cs.items.add()
         
             # Can not set the pointer directly... must set the components
@@ -716,7 +722,8 @@ class WorkBench(object):
             
             # Set the current (master) branch to point at this commit
             brnch = repo._current_branch
-            brnch.commitref = cref
+            bref = brnch.commitrefs.add() 
+            bref.set_link(cref)
             
             # Now load the rest of the linked objects - down to the leaf nodes.
             repo._load_links(root_obj)

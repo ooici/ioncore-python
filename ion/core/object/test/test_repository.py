@@ -33,15 +33,19 @@ class RepositoryTest(unittest.TestCase):
         repo.commit()
         
         repo.branch(nickname="Arthur")
+        
         self.assertEqual(p.name,'David')
         p.name = 'John'
+        
+        
+        
         repo.commit()
 
-        ab = repo.checkout(branch="master")
+        ab = repo.checkout(branchname="master")
         
         self.assertEqual(ab.person[0].name, 'David')
         
-        ab = repo.checkout(branch="Arthur")
+        ab = repo.checkout(branchname="Arthur")
         
         self.assertEqual(ab.person[0].name, 'John')
         
@@ -91,6 +95,17 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(ab.person[0].name,'alpha')
         
         
+    def test_log(self):
+        wb1 = workbench.WorkBench('No Process Test')
+        
+        repo1, ab = self.wb.init_repository(addressbook_pb2.AddressBook)
+        
+        commit_ref1 = repo1.commit(comment='a')
+        commit_ref2 = repo1.commit(comment='b')
+        commit_ref3 = repo1.commit(comment='c')
+            
+            
+        repo1.log_commits('master')
         
             
     def test_simple_commit(self):
@@ -130,7 +145,7 @@ class RepositoryTest(unittest.TestCase):
         p = None
         ab = None
         
-        ab = repo.checkout(branch='master')
+        ab = repo.checkout(branchname='master')
         print 'ab after checkout',ab
         
         print ab.person[0]

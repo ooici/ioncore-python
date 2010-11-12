@@ -89,7 +89,7 @@ class WorkBenchTest(unittest.TestCase):
         
         self.assertEqual(repo._dotgit, self.repo._dotgit)
         
-        ab=repo.checkout(branch='master')
+        ab=repo.checkout(branchname='master')
         
         self.assertEqual(ab, self.ab)
             
@@ -105,10 +105,10 @@ class WorkBenchTest(unittest.TestCase):
         
         self.assertEqual(repo._dotgit, self.repo._dotgit)
         
-        commit = repo._dotgit.branches[0].commitref
+        commit = repo.branches[0].commitrefs[0]
         
-        #Check that the commit came through
-        self.assertEqual(commit, self.repo._current_branch.commitref)
+        #Check that the commit came through in the current branch
+        self.assertEqual(commit, self.repo._current_branch.commitrefs[0])
         
         
     def test_init_repo(self):
@@ -138,32 +138,17 @@ class WorkBenchTest(unittest.TestCase):
         
 class WorkBenchMergeTest(unittest.TestCase):
         
-    def test_merge(self):
+    def test_fastforward_merge(self):
         wb1 = workbench.WorkBench('No Process Test')
         
         repo1, ab = wb1.init_repository(addressbook_pb2.AddressBook)
         
-        commit_ref1 = repo1.commit()
-        p = ab.person.add()
-        p.id = 1
-        p.name = 'Uma'
+        commit_ref1 = repo1.commit(comment='a')
+        commit_ref2 = repo1.commit(comment='b')
+        commit_ref3 = repo1.commit(comment='c')
             
-        commit_ref2 = repo1.commit()
+        repo1.log_commits('master')
             
-        p.name = 'alpha'
-        commit_ref3 = repo1.commit()
-            
-        ab = repo1.checkout(commit_id=commit_ref1)
-        self.assertEqual(len(ab.person),0)
-            
-        ab = repo1.checkout(commit_id=commit_ref2)
-        self.assertEqual(ab.person[0].id,1)
-        self.assertEqual(ab.person[0].name,'Uma')
-        
-        ab = repo1.checkout(branch='master')
-        self.assertEqual(ab.person[0].id,1)
-        self.assertEqual(ab.person[0].name,'alpha')
-
         # Serialize it
         serialized = wb1.pack_repository_commits(repo1)
         
@@ -171,31 +156,25 @@ class WorkBenchMergeTest(unittest.TestCase):
         wb2 = workbench.WorkBench('No Process Test')
         repo2 = wb2.unpack_structure(serialized)
         
-        print 'BRANCHES', repo2.branches[0]
+        repo2.log_commits('master')
         
-        # Can't pull the objects from the other repository! Because it is not a process!
-        ab = repo2.checkout(branch='master')
+        # Show that the state of the heads is the same
+        self.assertEqual(repo2._dotgit, repo1._dotgit)
         
-        print 'AB',ab
+        # Add more commits in repo 1
+        commit_ref4 = repo1.commit(comment='d')
+        commit_ref5 = repo1.commit(comment='e')
+        commit_ref6 = repo1.commit(comment='f')
         
-        ab = repo2.checkout(commit_id=commit_ref1)
-        self.assertEqual(len(ab.person),0)
-            
-        ab = repo2.checkout(commit_id=commit_ref2)
-        self.assertEqual(ab.person[0].id,1)
-        self.assertEqual(ab.person[0].name,'Uma')
+        # Serialize it
+        serialized = wb1.pack_repository_commits(repo1)
         
-        ab = repo2.checkout(commit_id=commit_ref3)
-        self.assertEqual(ab.person[0].id,1)
-        self.assertEqual(ab.person[0].name,'alpha')
+        # Create a new, separate work bench and read it!
+        repo2 = wb2.unpack_structure(serialized)
         
-        # Back to WB1 - add some more commits!
+        repo2.log_commits('master')
         
-        ab = repo1.checkout(commit_id=commit_ref3)
-        
-        
-        
-        
+        self.assertEqual(repo2._dotgit, repo1._dotgit)
         
                         
         

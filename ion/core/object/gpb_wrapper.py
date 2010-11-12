@@ -215,17 +215,26 @@ class Wrapper(object):
         This method recursively changes an objects parents to a modified state
         All links are reset as they are no longer hashed values
         """
-        if not self.modified:        
+        if self.modified:
+            # Be clear about what we are doing here!
+            return
+        else:
+            
             self.modified = True
                         
             new_id = self.repository.new_id()
             self.repository._workspace[new_id] = self.root
             
-            del self.repository._workspace[self.myid]
+            if self.repository._workspace.has_key(self.myid):
+                del self.repository._workspace[self.myid]
             self.myid = new_id
-                    
+              
             # When you hit the commit ref - stop!                   
-            if not self.root is self.repository._workspace_root:
+            if self.root is self.repository._workspace_root:
+                # The commit is on longer really your parent!
+                self.root._parent_links=set()
+                
+            else:
                     
                 for link in self._parent_links:
                     # Tricky - set the message directly and call modified!                    
@@ -418,9 +427,8 @@ class Wrapper(object):
         self.modified = False
        
         # Set the key value for parent links!
-        if not self.root is self.repository._workspace_root:
-            for link in self._parent_links:
-                link.key = self.myid
+        for link in self._parent_links:
+            link.key = self.myid
             
         structure[se.key] = se
         
@@ -740,6 +748,23 @@ class ContainerWrapper(object):
         if value.GPBType == self.LinkClassType:
             value = self.repository.get_linked_object(value)
         return value
+    
+    
+    def get_link(self,key):
+            
+        link = self._gpbcontainer.__getitem__(key)
+        link = self._wrapper.rewrap(link)
+        assert link.GPBType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
+        return link
+        
+    def get_links(self):
+        wrapper_list=[]            
+        links = self._gpbcontainer[:] # Get all the links!
+        for link in links:
+            link = self._wrapper.rewrap(link)
+            assert link.GPBType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
+            wrapper_list.append(link)
+        return wrapper_list
     
     def __len__(self):
         """Returns the number of elements in the container."""

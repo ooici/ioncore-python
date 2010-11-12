@@ -124,8 +124,26 @@ class Repository(object):
     def branches(self):
         return self._dotgit.branches
         
+    def get_branch(self,name):
+        branchkey = self.branchnicknames.get(name,None)
+        if not branchkey:
+            branchkey = name
         
-    def checkout(self, branch=None, commit_id=None, older_than=None):
+        branch = None
+        for item in self.branches:
+            if item.branchkey == branchkey:
+                branch = item
+                break
+        else:
+            log.info('Branch %s not found!' % name)
+            
+        return branch
+            
+        
+        
+        
+        
+    def checkout(self, branchname=None, commit_id=None, older_than=None):
         """
         Check out a particular branch
         Specify a branch, a branch and commit_id or a date
@@ -143,20 +161,17 @@ class Repository(object):
             raise Exception, 'Checkout called with both commit_id and older_than!'
         
         
-        if branch:
-                        
-            branchkey = self.branchnicknames.get(branch,None)
-            if not branchkey:
-                branchkey = branch
+        if branchname:
             
-            for item in self._dotgit.branches:
-                if item.branchkey == branchkey:
-                    branch = item
-                    head_ref = item.commitref # THIS WILL LOAD THE CREF!
-                    cref = head_ref
-                    break
-            else:
+            branch = self.get_branch(branchname)
+            if not branch:
                 raise Exception, 'Branch Key: %s, does not exist!' % branchkey
+            
+            if len(branch.commitrefs)==0:
+                raise Exception, 'This branch is empty - there is nothing to checkout!'
+            
+            head_ref = branch.commitrefs[0]
+            cref = head_ref
             
             if commit_id:
                 
@@ -233,7 +248,8 @@ class Repository(object):
         self._detached_head = detached
         if detached:
             self._current_branch = self.create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
-            self._current_branch.set_link_by_name('commitref', cref)
+            bref = self._current_branch.commitrefs.add()
+            bref.set_link(cref)
             self._current_branch.branchkey = 'detached head'
             
             rootobj._set_structure_read_only()
@@ -248,7 +264,10 @@ class Repository(object):
             # What about not initialized
             return
         
-        cref = self._current_branch.commitref
+        if len(self._current_branch.commitrefs)==0:
+            raise Exception, 'This current branch is empty - there is nothing to reset too!!'
+        
+        cref = self._current_branch.commitrefs[0]
         
         # Do some clean up!
         self._workspace = {}
@@ -268,8 +287,9 @@ class Repository(object):
         """
         Commit the current workspace structure
         """
-            
-        if self.status == self.MODIFIED:
+        
+        # If the repo is in a valid state - make the commit even if it is up to date
+        if self.status == self.MODIFIED or self.status == self.UPTODATE:
             structure={}
             self._workspace_root._recurse_commit(structure)
                                 
@@ -287,14 +307,12 @@ class Repository(object):
             # update the hashed elements
             self._hashed_elements.update(structure)
                             
-        elif self.status == self.UPTODATE:
-            pass
         else:
             raise Exception, 'Repository in invalid state to commit'
         
         # Like git, return the commit id
         branch = self._current_branch
-        return branch.get_link('commitref').key
+        return branch.commitrefs.get_link(0).key
             
             
     def _create_commit_ref(self, comment='', date=None):
@@ -317,17 +335,22 @@ class Repository(object):
 
         # If this is the first commit to a new repository the current branch is a dummy
         # If it is initialized it is real and we need to link to it!
-        if branch.IsInitialized():
+        if len(branch.commitrefs)==1:
             
             # This branch is real - add it to our ancestors
             pref = cref.parentrefs.add()
-            parent = branch.commitref # get the parent commit ref
+            parent = branch.commitrefs[0] # get the parent commit ref
             pref.set_link_by_name('commitref',parent)
             pref.relationship = pref.Parent
+        elif len(branch.commitrefs)>1:
+            raise Excpetion, 'The Branch is in an invalid state and should have been merged on read!'
+        else:
+            # This is a new branch and we must add a place for the commit ref!
+            branch.commitrefs.add()
         
         # For each branch that we merged from - add a  reference
         for mrgd in self._merged_from:
-            pref = cref.ancestors.add()
+            pref = cref.parentrefs.add()
             merged_commit = mrgd.commitref # Get the commit ref of the merged item
             pref.set_link_by_name('commitref',merged_commit)
             pref.relationship = pref.MergedFrom
@@ -336,7 +359,7 @@ class Repository(object):
         cref.set_link_by_name('objectroot', self._workspace_root)            
         
         # Update the cref in the branch
-        branch.set_link_by_name('commitref',cref)
+        branch.commitrefs.set_link(0,cref)
         
         return cref
     
@@ -373,20 +396,24 @@ class Repository(object):
         #if not self.status == self.UPTODATE:
         #    raise Exception, 'Can not create new branch while the workspace is dirty'
         
-        brnch = self._dotgit.branches.add()    
+        brnch = self.branches.add()    
         brnch.branchkey = pu.create_guid()
-        
-        
         
         if nickname:
             self.branchnicknames[nickname]=brnch.branchkey
 
         if self._current_branch:
             # Get the linked commit
-            cref = self._current_branch.commitref
             
-            # Set the new branch to point at the commit
-            brnch.set_link_by_name('commitref',cref)
+            if len(brnch.commitrefs)>1:
+                raise Exception, 'Branch should merge on read. Invalid state!'
+            elif len(brnch.commitrefs)==1:                
+                cref = self._current_branch.commitrefs[0]
+            
+                bref = brnch.commitrefs.add()
+            
+                # Set the new branch to point at the commit
+                bref.set_link(cref)
             
             
             # Making a new branch re-attaches to a head!
@@ -396,8 +423,23 @@ class Repository(object):
                 
         self._current_branch = brnch
         
+    def log_commits(self,branchname):
         
-    
+        branch = self.get_branch(branchname)
+        
+        
+        for cref in branch.commitrefs:
+                
+            print cref
+        
+            while len(cref.parentrefs) >0:
+                for pref in cref.parentrefs:
+                    if pref.relationship == pref.Parent:
+                            cref = pref.commitref
+                            print cref
+                            break # There should be only one parent ancestor from a branch
+                
+        
     def stash(self, name):
         """
         Stash the current workspace for later reference
