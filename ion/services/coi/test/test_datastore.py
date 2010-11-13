@@ -13,7 +13,7 @@ from ion.services.coi.datastore import DataStoreServiceClient
 from ion.test.iontest import IonTestCase
 
 from net.ooici.play import addressbook_pb2
-
+from ion.util import procutils as pu
 
 class DataStoreTest(IonTestCase):
     """
@@ -21,8 +21,8 @@ class DataStoreTest(IonTestCase):
     """
     
     # This is a temporary way to test communication between python and java using GPBs...
-    #FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/01184000_0.protostruct'
-    FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/grid.protostruct'
+    FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/01184000_0.protostruct'
+    #FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/grid.protostruct'
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -118,7 +118,105 @@ class DataStoreTest(IonTestCase):
 
         self.assertNotEqual(response, proc_ds1.ION_SUCCESS)
         
+    @defer.inlineCallbacks
+    def test_merge_push(self):
+            
+        child_ds1 = yield self.sup.get_child_id('ds1')
+        log.debug('Process ID:' + str(child_ds1))
+        proc_ds1 = self._get_procinstance(child_ds1)
+            
+        child_ds2 = yield self.sup.get_child_id('ds2')
+        log.debug('Process ID:' + str(child_ds2))
+        proc_ds2 = self._get_procinstance(child_ds2)
+            
+        repo1, ab1 = proc_ds1.workbench.init_repository(addressbook_pb2.AddressLink,'addressbook')
+            
+           
+        pa1 = repo1.create_wrapped_object(addressbook_pb2.Person)
+        pa1.name='David'
+        pa1.id = 5
+        pa1.email = 'd@s.com'
+        ph = pa1.phone.add()
+        ph.type = pa1.WORK
+        ph.number = '123 456 7890'
+            
+        ab1.owner = pa1
+            
+        ab1.person.add()
+        ab1.person[0] = pa1
+            
+        pb1 = repo1.create_wrapped_object(addressbook_pb2.Person)
+        pb1.name='John'
+        pb1.id = 222
+        pb1.email = 'd222@s.com'
+        ph = pb1.phone.add()
+        ph.type = pb1.WORK
+        ph.number = '321 456 7890'
+            
+        ab1.person.add()
+        ab1.person[1] = pb1    
+            
+        repo1.commit()
+            
+        response, ex = yield proc_ds1.push('ps2','addressbook')
+            
+        self.assertEqual(response, proc_ds1.ION_SUCCESS)
+            
+        # Get the uuid for the repository
+        repo_key = repo1.repository_key
+            
+        # Get the repository out on the second process
+        repo2 = proc_ds2.workbench.get_repository(repo_key)
+            
+        self.assertEqual(repo2._dotgit, repo1._dotgit)
+            
+        ab2 = repo2.checkout('master')
+            
+        self.assertEqual(ab2, ab1)
+            
+        # Now modify and commit on both data stores! - Divergence!
+            
+        pa2 = ab2.owner
+        pa2.email = 'process2@gmail.com'
+            
+        # Show off that it changed in both places - it is a real DAG!
+        self.assertIdentical(ab2.owner, ab2.person[0])
+        # Commit on repo2    
+        repo2.commit()
+            
+        # wait one second to make sure that the commits can be sorted by time stamp
+        yield pu.asleep(1)
+        # Modify repo1
+        pa1.email = 'process1@gmail.com'
+        repo1.commit()
+            
+            
+        response, ex = yield proc_ds2.push('ps1',repo_key)
+            
+        self.assertEqual(response, proc_ds2.ION_SUCCESS)
+            
+        # Assert that the Divergence was recorded!
+        self.assertEqual(len(repo1.branches[0].commitrefs),2)
+            
+        # Merge on Read
+        ab1 = repo1.checkout('master')
+            
+        # Assert that the Divergence was repaired!
+        self.assertEqual(len(repo1.branches[0].commitrefs),1)
+        self.assertEqual(ab1.owner.email, 'process1@gmail.com')
         
+        # Now push back to ps2 and show that the state is repaired in both locations
+        response, ex = yield proc_ds1.push('ps2',repo_key)
+            
+        self.assertEqual(response, proc_ds2.ION_SUCCESS)
+        # Assert that the Divergence was repaired!
+        self.assertEqual(len(repo2.branches[0].commitrefs),1)
+        # Checkout the current state
+        ab2 = repo2.checkout('master')
+        
+        # The state is repaired here too
+        self.assertEqual(ab2.owner.email, 'process1@gmail.com')
+        self.assertEqual(repo2._dotgit, repo1._dotgit)
         
         
     @defer.inlineCallbacks

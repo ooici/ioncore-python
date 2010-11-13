@@ -264,7 +264,7 @@ class Repository(object):
             else:
                 log.warn('BRANCH STATE HAS DIVERGED - MERGING') 
                 
-                cref = self.merge_by_date(branch.commitrefs[:])
+                cref = self.merge_by_date(branch)
                 
                 
         
@@ -281,6 +281,7 @@ class Repository(object):
         
         
         self._detached_head = detached
+        
         if detached:
             self._current_branch = self.create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
             bref = self._current_branch.commitrefs.add()
@@ -293,14 +294,52 @@ class Repository(object):
         return rootobj
         
         
-    def merge_by_date(self, crefs):
+    def merge_by_date(self, branch):
+        
+        crefs=branch.commitrefs[:]
         
         newest = -999.99
         for cref in crefs:
-            newest = max(newest, cref.date)
+            if cref.date > newest:
+                head_cref = cref
+                newest = cref.date
             
-        print 'TETETETETEETETETETETETETETETETETETETETETETETETETETETE'
+        # Deal with the newest ref seperately
+        crefs.remove(head_cref)
+            
+        cref = self.create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
+                    
+        cref.date = pu.currenttime()
+
+        pref = cref.parentrefs.add()
+        pref.set_link_by_name('commitref',head_cref)
+        pref.relationship = pref.Parent
+
+        cref.set_link_by_name('objectroot', head_cref.objectroot)
+
+        cref.comment = 'Merged divergent branch by date keeping the newest value'
+
+        for ref in crefs:
+            pref = cref.parentrefs.add()
+            pref.set_link_by_name('commitref',ref)
+            pref.relationship = pref.MergedFrom
         
+        structure={}                            
+        # Add the CRef to the hashed elements
+        cref._recurse_commit(structure)
+        
+        # set the cref to be readonly
+        cref.readonly = True
+        
+        # Add the cref to the active commit objects - for convienance
+        self._commit_index[cref.myid] = cref
+
+        # update the hashed elements
+        self._hashed_elements.update(structure)
+        
+        del branch.commitrefs[:]
+        bref = branch.commitrefs.add()
+        bref.set_link(cref)
         
         return cref
         

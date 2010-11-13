@@ -217,7 +217,7 @@ class WorkBenchMergeTest(unittest.TestCase):
         # Serialize it
         serialized = wb1.pack_structure(repo1._dotgit)
         
-        # Create a new, separate work bench and read it!
+        # Read it in the other work bench!
         repo2 = wb2.unpack_structure(serialized)
         
         repo2.log_commits('master')
@@ -226,7 +226,25 @@ class WorkBenchMergeTest(unittest.TestCase):
         self.assertEqual(repo2.branches[0].branchkey, repo1.branches[0].branchkey)
         self.assertEqual(repo2.branches[0].commitrefs[1], repo1.branches[0].commitrefs[0])
         
+        # Merge the coflict
         ab2 = repo2.checkout('master')
+        
+        # add a commit on repo2!
+        commit_ref_d2 = repo2.commit(comment='g2')
+        
+        
+        # Serialize it - to push back to repo1
+        serialized = wb2.pack_structure(repo2._dotgit)
+        
+        # Read it in the other work bench!
+        repo1 = wb1.unpack_structure(serialized)
+        
+        log.info('Showing merged history!')
+        repo1.log_commits('master')
+        
+        # Show that the state of the heads is the same
+        self.assertEqual(repo2._dotgit, repo1._dotgit)
+        
         
         
                         
