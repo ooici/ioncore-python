@@ -160,78 +160,113 @@ class Repository(object):
         if older_than and commit_id:
             raise Exception, 'Checkout called with both commit_id and older_than!'
         
+        if not branchname:
+            raise Exception, 'Checkout must specify a branchname!'
+            
+            
+        branch = self.get_branch(branchname)
+        if not branch:
+            raise Exception, 'Branch Key: "%s" does not exist!' % branchkey
+            
+        if len(branch.commitrefs)==0:
+            raise Exception, 'This branch is empty - there is nothing to checkout!'
+            
         
-        if branchname:
+        # Set the current branch now!
+        self._current_branch = branch
+        
+        cref = None
             
-            branch = self.get_branch(branchname)
-            if not branch:
-                raise Exception, 'Branch Key: %s, does not exist!' % branchkey
+        if commit_id:
             
-            if len(branch.commitrefs)==0:
-                raise Exception, 'This branch is empty - there is nothing to checkout!'
+            # IF you are checking out a specific commit ID it is always a detached head!
+            detached = True
             
-            head_ref = branch.commitrefs[0]
-            cref = head_ref
-            
-            if commit_id:
+            # Use this set to make sure we only examine each commit once!
+            touched_refs = set()
                 
-                if head_ref.myid == commit_id:
-                    cref = head_ref
-                else:
+            crefs = branch.commitrefs[:]
+            
+            while len(crefs) >0:
+                new_set = set()
                     
-                    detached = True
-                    ref = head_ref 
-                    while len(ref.parentrefs) >0:
-                        for pref in ref.parentrefs:
-                            if pref.relationship == pref.parent:
-                                ref = pref.commitref
-                                break # There should be only one parent ancestor from a branch
-                        else:
-                            raise Exception, 'End of Branch: No parent found on branch name: %s, commit_id: %s' % (branch_name, commit_id)
-                        if ref.myid == commit_id:
-                            cref = ref
-                            break
-                    else:
-                        raise Exception, 'End of Ancestors: No matching reference found in commit history on branch name %s, commit_id: %s' % (branch_name, commit_id)
+                for ref in crefs:
                         
-                
-                
-            elif older_than:
-                
-                if head_ref.date <= older_than:
-                    cref = head_ref
-                    # Not sure this is really the spirit of the thing?
-                else:
+                    if ref.myid == commit_id:
+                        
+                        # Empty the crefs set to exit the while loop!
+                        crefs = set()
+                        # Save the CRef!
+                        cref = ref
+                        break # Break to ref in crefs
+                        
+                    # For each child reference...
+                    for pref in ref.parentrefs:
+                        # If we have not already looked at this one...
+                        p_commit = pref.commitref
+                        if not p_commit in touched_refs:                            
+                            new_set.add(p_commit)
+                            touched_refs.add(p_commit)    
                     
-                    detached = True
-                    ref = head_ref 
-                    while len(ref.parentrefs) >0:
-                        for pref in ref.parentrefs:
-                            if pref.relationship == pref.Parent:
-                                ref = pref.commitref
-                                break # There should be only one ancestor from a branch
-                        else:
-                            raise Exception, 'End of Branch: No matching ancestor found on branch name: %s, older_than: %s' % (branch_name, older_than)
-                        if ref.date <= older_than:
-                            cref = ref
-                            break
-                    else:
-                        raise Exception, 'End of Ancestors: No matching commit found in commit history on branch name %s, older_than: %s' % (branch_name, older_than)
-                        
-        elif commit_id:
-            
-            # This is dangerous, but lets do it anyway - for now!
-            if self._hashed_elements.has_key(commit_id):
-                element = self._hashed_elements[commit_id]
-                cref = self._load_element(element)
-                
-                detached = True
+                else:
+                    crefs = new_set                    
             else:
-                # Check more places? Ask for it from the repository?
-                raise Exception, 'Can not checkout an id that does not exist!'
+                if not cref:
+                    raise Exception, 'End of Ancestors: No matching reference found in commit history on branch name %s, commit_id: %s' % (branch_name, commit_id)
+                
             
+            
+        elif older_than:
+            
+            # IF you are checking out a specific commit date it is always a detached head!
+            detached = True
+            
+            # Need to make sure we get the closest commit to the older_than date!
+            younger_than = -9999.99
+            
+            # Use this set to make sure we only examine each commit once!
+            touched_refs = set()
+            
+            crefs = branch.commitrefs[:]
+            
+            while len(crefs) >0:
+                
+                new_set = set()
+                
+                for ref in crefs:
+                        
+                    if ref.date <= older_than & ref.date > younger_than:
+                        cref = ref
+                        younger_than = ref.date
+                        
+                    # Only keep looking at parent references if they are to young
+                    elif ref.date > older_than:
+                        # For each child reference...
+                        for pref in ref.parentrefs:
+                            # If we have not already looked at this one...
+                            if not pref in touched_refs:                            
+                                new_set.add(pref)
+                                touched_refs.add(pref)    
+                       
+                crefs = new_set
+                       
+            else:
+                if not cref:
+                    raise Exception, 'End of Ancestors: No matching commit found in commit history on branch name %s, older_than: %s' % (branch_name, older_than)
+                
+        # Just checking out the current head - need to make sure it has not diverged! 
         else:
-            raise Exception, 'Checkout must specify a branch or a commit_id'
+            
+            if len(branch.commitrefs) ==1:
+                
+                cref = branch.commitrefs[0]
+                
+            else:
+                log.warn('BRANCH STATE HAS DIVERGED - MERGING') 
+                
+                cref = self.merge_by_date(branch.commitrefs[:])
+                
+                
         
         # Do some clean up!
         self._workspace = {}
@@ -254,9 +289,20 @@ class Repository(object):
             
             rootobj._set_structure_read_only()
             
-        else:
-            self._current_branch = branch
+            
         return rootobj
+        
+        
+    def merge_by_date(self, crefs):
+        
+        newest = -999.99
+        for cref in crefs:
+            newest = max(newest, cref.date)
+            
+        print 'TETETETETEETETETETETETETETETETETETETETETETETETETETETE'
+        
+        
+        return cref
         
     def reset(self):
         
@@ -370,6 +416,8 @@ class Repository(object):
         merge the named branch in to the current branch
         """
         
+
+        
         
     @property
     def status(self):
@@ -426,17 +474,19 @@ class Repository(object):
     def log_commits(self,branchname):
         
         branch = self.get_branch(branchname)
-        
-        
+        log.info('$$ Logging commits on Branch %s $$' % branchname)
+        cntr = 0
         for cref in branch.commitrefs:
-                
-            print cref
+            cntr+=1
+            log.info('$$ Branch Head Commit # %s $$' % cntr)
+            
+            log.info('Commit: \n' + str(cref))
         
             while len(cref.parentrefs) >0:
                 for pref in cref.parentrefs:
                     if pref.relationship == pref.Parent:
                             cref = pref.commitref
-                            print cref
+                            log.info('Commit: \n' + str(cref))
                             break # There should be only one parent ancestor from a branch
                 
         

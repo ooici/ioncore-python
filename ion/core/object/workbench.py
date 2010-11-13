@@ -151,41 +151,57 @@ class WorkBench(object):
         """
         for new_link in new_branch.commitrefs.get_links():
             
+            # An indicator for a fast forward merge made on the existing branch
+            found = False
             for existing_link in existing_branch.commitrefs.get_links():
+            
+                # Get the repositories we are working from
+                existing_repo = existing_branch.repository
+                new_repo = new_branch.repository
             
                 # test to see if we these are the same head ref!
                 if new_link == existing_link:
                     # If these branches have the same state we are good - continue to the next new cref in the new branch. 
                     break
-
-                # Get the repositories we are working from
-                existing_repo = existing_branch.repository
-                new_repo = new_branch.repository
-        
+                    
                 # Look in the commit index of the existing repo to see if the new link is an old commit to existing
-                common_cref = existing_repo._commit_index.get(new_link.key, None)
-                if common_cref:
+                elif existing_repo._commit_index.has_key(new_link.key):
                     # The branch in new_repo is out of date with what exists here.
+                    # We can completely ignore the new link!
                     break   
-        
-                # Look in the commit index of the new repo to see if the existing link is an old commit in new repository
-                common_cref = new_repo._commit_index.get(existing_link.key, None)
-                if common_cref:
+                    
+                # Look in the commit index of the new repo to see if the existing link is an old commit in new repository 
+                elif new_repo._commit_index.has_key(existing_link.key):
                     # The existing repo can be fast forwarded to the new state!
-
+                    # But we must keep looking through the existing_links to see if the push merges our state!
+                    found = True
                     existing_link.key = new_link.key # Cheat and just copy the key!
-
                     self._load_commits(existing_repo, new_link) # Load the new ancestors!
-                    break
-                    
-                # This is a non fastforward merge!
+                
+            else:
+                
+                # This is a non fastforward merge!  
                 # The branch has diverged and must be reconciled!
-                    
-                bref = existing_branch.commitrefs.add()
-                    
-                new_cref = new_repo._commit_index.get(new_link.key)
-                    
-                bref.set_link(new_cref)
+                if not found:
+                    bref = existing_branch.commitrefs.add()
+                    new_cref = new_repo._commit_index.get(new_link.key)                    
+                    bref.set_link(new_cref)
+                
+                
+        key_set = set()
+        duplicates = []
+        # Merge any commit refs which have been resolved!
+        for i in range(len(existing_branch.commitrefs)):
+            ref_link = existing_branch.commitrefs.get_link(i)
+            if ref_link.key in key_set:
+                duplicates.append(i)
+            else:
+                key_set.add(ref_link.key)
+                
+        # Delete them in reverse order!
+        duplicates.sort(reverse= True)
+        for dup in duplicates:
+            del existing_branch.commitrefs[dup]
             
         # Note this in the branches merge on read field and punt this to some
         # other part of the process.

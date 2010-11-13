@@ -83,14 +83,14 @@ class RepositoryTest(unittest.TestCase):
         p.name = 'alpha'
         commit_ref3 = repo.commit()
             
-        ab = repo.checkout(commit_id=commit_ref1)
+        ab = repo.checkout(branchname='master', commit_id=commit_ref1)
         self.assertEqual(len(ab.person),0)
             
-        ab = repo.checkout(commit_id=commit_ref2)
+        ab = repo.checkout(branchname='master', commit_id=commit_ref2)
         self.assertEqual(ab.person[0].id,1)
         self.assertEqual(ab.person[0].name,'Uma')
         
-        ab = repo.checkout(commit_id=commit_ref3)
+        ab = repo.checkout(branchname='master', commit_id=commit_ref3)
         self.assertEqual(ab.person[0].id,1)
         self.assertEqual(ab.person[0].name,'alpha')
         

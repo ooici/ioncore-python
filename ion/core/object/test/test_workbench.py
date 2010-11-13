@@ -176,6 +176,59 @@ class WorkBenchMergeTest(unittest.TestCase):
         
         self.assertEqual(repo2._dotgit, repo1._dotgit)
         
+        
+        
+    def test_divergent_merge(self):
+        wb1 = workbench.WorkBench('No Process Test')
+        
+        repo1, ab1 = wb1.init_repository(addressbook_pb2.AddressBook)
+        
+        commit_ref_a1 = repo1.commit(comment='a1')
+        commit_ref_b1 = repo1.commit(comment='b1')
+        commit_ref_c1 = repo1.commit(comment='c1')
+            
+        #repo1.log_commits('master')
+            
+        # Serialize it
+        #serialized = wb1.pack_repository_commits(repo1)
+        serialized = wb1.pack_structure(repo1._dotgit)
+        
+        
+        # Create a new, separate work bench and read it!
+        wb2 = workbench.WorkBench('No Process Test')
+        repo2 = wb2.unpack_structure(serialized)
+        
+        #repo2.log_commits('master')
+        
+        ab2 = repo2.checkout('master')
+        
+        # Show that the state of the heads is the same
+        self.assertEqual(repo2._dotgit, repo1._dotgit)
+        
+        # add a commit on repo2!
+        commit_ref_d2 = repo2.commit(comment='d2')
+        
+        
+        # Add more commits in repo 1
+        commit_ref_d1 = repo1.commit(comment='d1')
+        commit_ref_e1 = repo1.commit(comment='e1')
+        commit_ref_f1 = repo1.commit(comment='f1')
+        
+        # Serialize it
+        serialized = wb1.pack_structure(repo1._dotgit)
+        
+        # Create a new, separate work bench and read it!
+        repo2 = wb2.unpack_structure(serialized)
+        
+        repo2.log_commits('master')
+        
+        self.assertEqual(repo2.repository_key, repo1.repository_key)
+        self.assertEqual(repo2.branches[0].branchkey, repo1.branches[0].branchkey)
+        self.assertEqual(repo2.branches[0].commitrefs[1], repo1.branches[0].commitrefs[0])
+        
+        ab2 = repo2.checkout('master')
+        
+        
                         
         
         

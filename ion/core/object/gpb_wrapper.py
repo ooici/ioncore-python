@@ -806,6 +806,7 @@ class ContainerWrapper(object):
     def __getslice__(self, start, stop):
         """Retrieves the subset of items from between the specified indices."""
         wrapper_list=[]
+        stop = min(stop, len(self))
         for index in range(start,stop):
             wrapper_list.append(self.__getitem__(index))
         return wrapper_list
