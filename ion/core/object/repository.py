@@ -7,9 +7,8 @@
 @author Matt Rodriguez
 
 TODO
-Remove name from branch
-Create ancestor iterator
-Create pretty print for ancestors
+Create exception class and move stuff to a object utils module
+Make sure delete works for these objects the way we expect!
 
 """
 

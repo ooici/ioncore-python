@@ -4,6 +4,7 @@
 
 TODO:
 Test Repeated Container for non composit fields
+Test what happens if you try to use a old reference to a wrapper after checkout
 """
 
 from ion.util import procutils as pu

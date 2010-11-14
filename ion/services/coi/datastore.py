@@ -3,6 +3,9 @@
 """
 @file ion/services/coi/datastore.py
 @author David Stuebe
+
+@TODO
+use persistent key:value store in work bench to persist push and get pull!
 """
 
 import ion.util.ionlog

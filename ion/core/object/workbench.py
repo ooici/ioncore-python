@@ -3,8 +3,7 @@
 @Brief Workbench for operating on GPB backed objects
 
 TODO
-Remove repository name - what to do instead?
-
+Add persistent store to the work bench. Use it fetch linked objects
 """
 
 from twisted.internet import defer
@@ -37,6 +36,10 @@ class WorkBench(object):
         self._repository_nicknames = {}
                 
         self._hashed_elements={}
+        
+        self._blob_store = None
+        
+        self._commit_store = None
         """
         A shared dictionary for hashed objects
         """            
