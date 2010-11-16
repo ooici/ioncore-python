@@ -7,6 +7,8 @@
 """
 
 class instrument_prompts:
+    ADCP_LINE_TERMINATOR = "\r\n"
+    DRIVER_LINE_TERMINATOR = "\r"
     PROMPT_INST = "\r\n"
     INST_PROMPT = ">"
 

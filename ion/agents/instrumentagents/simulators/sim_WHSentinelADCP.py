@@ -41,31 +41,31 @@ class Instrument(protocol.Protocol):
 
     # The following are class static variables (USED AS CONSTANTS)
     prompt = '>'
-    out_of_bounds_error = ' ERR 001:  PARAMETER OUT OF BOUNDS\n' + prompt
-    numeral_expected_error = ' ERR 002:  NUMERAL EXPECTED\n' + prompt
-    binary_expected_error = ' ERR 004:  BINARY NUMERAL EXPECTED\n' + prompt
-    extra_parameters_error = ' ERR 005:  EXTRA PARAMETERS ENCOUNTERED\n' + prompt
-    unrecognized_cmd_error = ' ERR 010:  UNRECOGNIZED COMMAND\n' + prompt
-    bad_parameters_error = ' ERR :  Bad command parameters\n' + prompt
-    set_to_factory = '[Parameters set to FACTORY defaults]\n' + prompt
-    set_to_user = '[Parameters set to USER defaults]\n' + prompt
+    out_of_bounds_error = ' ERR 001:  PARAMETER OUT OF BOUNDS\r\n' + prompt
+    numeral_expected_error = ' ERR 002:  NUMERAL EXPECTED\r\n' + prompt
+    binary_expected_error = ' ERR 004:  BINARY NUMERAL EXPECTED\r\n' + prompt
+    extra_parameters_error = ' ERR 005:  EXTRA PARAMETERS ENCOUNTERED\r\n' + prompt
+    unrecognized_cmd_error = ' ERR 010:  UNRECOGNIZED COMMAND\r\n' + prompt
+    bad_parameters_error = ' ERR :  Bad command parameters\r\n' + prompt
+    set_to_factory = '[Parameters set to FACTORY defaults]\r\n' + prompt
+    set_to_user = '[Parameters set to USER defaults]\r\n' + prompt
     simple_commands = {
-        'ck' : '[Parameters saved as USER defaults]\n' + prompt,
-        'experton' : 'Expert Mode is ON\n' + prompt,
-        'expertoff' : 'Expert Mode is OFF\n' + prompt,
-        'ol' : '                               FEATURES\n' +
-               '---------------------------------------------------------------------\n' +
-               'Feature                                                     Installed\n' +
-               '---------------------------------------------------------------------\n' +
-               'Bottom Track                                                    Yes\n' +
-               'Water Profile                                                   Yes\n' +
-               'High Resolution Water Modes                                      No\n' +
-               'Lowered ADCP                                                     No\n' +
-               'Wave Gauge Acquisition                                           No\n' +
-               'Shallow Bottom Mode                                              No\n' +
-               'High Rate Pinging                                                No\n\n' +
-               'See your technical manual or contact RDI for information on how to\n' +
-               'install additional capability in your WorkHorse.\n\n' + prompt,
+        'ck' : '[Parameters saved as USER defaults]\r\n' + prompt,
+        'experton' : 'Expert Mode is ON\r\n' + prompt,
+        'expertoff' : 'Expert Mode is OFF\r\n' + prompt,
+        'ol' : '                               FEATURES\r\n' +
+               '---------------------------------------------------------------------\r\n' +
+               'Feature                                                     Installed\r\n' +
+               '---------------------------------------------------------------------\r\n' +
+               'Bottom Track                                                    Yes\r\n' +
+               'Water Profile                                                   Yes\r\n' +
+               'High Resolution Water Modes                                      No\r\n' +
+               'Lowered ADCP                                                     No\r\n' +
+               'Wave Gauge Acquisition                                           No\r\n' +
+               'Shallow Bottom Mode                                              No\r\n' +
+               'High Rate Pinging                                                No\n\r\n' +
+               'See your technical manual or contact RDI for information on how to\r\n' +
+               'install additional capability in your WorkHorse.\n\r\n' + prompt,
         '' : prompt,
     }
     testCommands = {
@@ -96,7 +96,6 @@ class Instrument(protocol.Protocol):
         @param none
         @retval none
         """
-        self.transport.write(self.prompt)
         self.factory.connections.append(self)
 
     def dataReceived(self, data):
@@ -106,9 +105,21 @@ class Instrument(protocol.Protocol):
         @param Data from client.
         @retval none
         """
+        DataAsHex = ""
+        for i in range(len(data)):
+            if len(DataAsHex) > 0:
+                DataAsHex += ","
+            DataAsHex += "{0:X}".format(ord(data[i]))
+        log.info("dataReceived() [%s] [%s]" % (data, DataAsHex))
+        
+        # don't know how line was terminated, so remove whatever it was first
+        data = data.strip("\r")  # strip off any CRs
+        data = data.strip("\n")  # strip off any LFs
+        if len(data) != 0:
+            # echo the string like the ADCP does
+            self.transport.write(data + "\r\n")
 
-        # Strip off the newlines and other extraneous whitespace, and convert
-        # to lower case.
+        # Strip off the extraneous whitespace, and convert to lower case.
         data = data.strip()
         data = data.lower()
 
@@ -118,6 +129,7 @@ class Instrument(protocol.Protocol):
             on return key: just return the prompt (just as Worckhorse Sentinel
             ADCP would).
             """
+            log.debug("no command seen, so sending just a prompt")
             self.transport.write(self.prompt)
 
         else:

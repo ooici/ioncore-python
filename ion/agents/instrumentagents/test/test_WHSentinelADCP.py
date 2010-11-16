@@ -42,7 +42,8 @@ class TestWHSentinelADCP(IonTestCase):
     def setUp(self):
         log.debug("In TestWHSentinelADCP.setUp()")
         yield self._start_container()
-
+        
+        log.debug("Starting simulator")
         self.simulator = Simulator("123", 9100)
         self.SimulatorPort = self.simulator.start()
         self.assertNotEqual(self.SimulatorPort, 0)
@@ -132,6 +133,14 @@ class TestWHSentinelADCP(IonTestCase):
 
         dpsc = DataPubsubClient(self.sup)
 
+        """
+        topicname = 'WHSentinelADCP Topic'
+        topic = PubSubTopicResource.create(topicname,"")
+
+        # Use the service to create a queue and register the topic
+        topic = yield dpsc.define_topic(topic)
+        """
+        
         subscription = SubscriptionResource()
         subscription.topic1 = PubSubTopicResource.create('WHSentinelADCP Topic','')
         #subscription.topic2 = PubSubTopicResource.create('','oceans')
@@ -147,25 +156,26 @@ class TestWHSentinelADCP(IonTestCase):
 
         log.info('Defined subscription: '+str(subscription))
 
-        config_vals = {'ipaddr':'137.110.112.119', 'ipport':'4002', 'ipportCmd':967}
-        #config_vals = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort, 'ipportCmd':967}
-        result = yield self.driver_client.configure_driver(config_vals)
-
+        #params = {'ipaddr':'137.110.112.119', 'ipport':'4002', 'ipportCmd':967}    # for actual instrument
+        params = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort}   # for simulator
+        #params['publish-to'] = topic.RegistryIdentity
+        result = yield self.driver_client.configure_driver(params)
 
         cmd1 = [['cr', '1']]
-        yield pu.asleep(5)
+        cmd2 = [['ck', '']]
 
         result = yield self.driver_client.execute(cmd1)
-        # wait a while...
-        yield pu.asleep(5)
-        #result = yield self.driver_client.execute(cmd2)
+        result = yield self.driver_client.execute(cmd2)
+         # wait a while...
+        yield pu.asleep(8)
 
 
+        log.info("test_execute: disconnecting.")
         # DHE: disconnecting; a connect would probably be good.
         result = yield self.driver_client.disconnect(['some arg'])
+        log.info("test_execute completed.")
 
 
-    """
     @defer.inlineCallbacks
     def test_sample(self):
         result = yield self.driver_client.initialize('some arg')
@@ -191,17 +201,21 @@ class TestWHSentinelADCP(IonTestCase):
 
         log.info('Defined subscription: '+str(subscription))
 
-        params = {}
+        params = {'ipaddr':'137.110.112.119', 'ipport':'4002', 'ipportCmd':967}    # for actual instrument
+        #params = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort}   # for simulator
         params['publish-to'] = topic.RegistryIdentity
         yield self.driver_client.configure_driver(params)
 
-        cmd1 = [['ds', 'now']]
+        cmd1 = [['cs', '']]
         result = yield self.driver_client.execute(cmd1)
 
-        yield pu.asleep(1)
-
+        log.info("getting current time")
+        StartTime = pu.currenttime()
+        log.info("StartTime = %s" %StartTime)
+        while StartTime + 15 > pu.currenttime():
+            log.info("sleeping 5 seconds")
+            yield pu.asleep(5)
         result = yield self.driver_client.disconnect(['some arg'])
-    """
 
 class DataConsumer(Process):
     """
