@@ -73,10 +73,14 @@ class ConsoleManhole(manhole.ColoredManhole):
     def connectionLost(self, reason):
 
         # save the last 25 lines of history to the history buffer
-        f = open(os.path.join(os.environ["HOME"], '.cchistory'), 'w')
-        outhistory = "\n".join(self.historyLines[-25:])
-        f.writelines(outhistory)
-        f.close()
+        if not self.namespace['cc'].config['no_history']:
+            try:
+                f = open(os.path.join(os.environ["HOME"], '.cchistory'), 'w')
+                outhistory = "\n".join(self.historyLines[-25:])
+                f.writelines(outhistory)
+                f.close()
+            except IOError:
+                pass
 
         self.factory.stop()
 
@@ -84,11 +88,17 @@ class ConsoleManhole(manhole.ColoredManhole):
         manhole.ColoredManhole.connectionMade(self)
 
         # read in history from history file on disk, set internal history/position
-        f = open(os.path.join(os.environ["HOME"], '.cchistory'), 'r')
-        for line in f:
-            self.historyLines.append(line.rstrip('\n'))
+        if not self.namespace['cc'].config['no_history']:
+            try:
+                f = open(os.path.join(os.environ["HOME"], '.cchistory'), 'r')
+                for line in f:
+                    self.historyLines.append(line.rstrip('\n'))
 
-        self.historyPosition = len(self.historyLines)
+                f.close()
+
+                self.historyPosition = len(self.historyLines)
+            except IOError:
+                pass
 
 def makeNamespace():
     from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify
