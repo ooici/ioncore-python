@@ -181,6 +181,9 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "eventConnectionComplete":
             caller.stateTran(self.stateConnected)
             return 0
+        elif caller.tEvt['sType'] == "eventDisconnectReceived":
+            caller.stateTran(self.stateDisconnecting)
+            return 0
         return caller.tEvt['sType']
 
     def stateConnected(self, caller):
@@ -247,6 +250,9 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "eventPromptReceived":
             log.info("statePrompted - Explicitly ignoring PromptReceived event")
             return 0
+        elif caller.tEvt['sType'] == "eventDisconnectReceived":
+            caller.stateTran(self.stateDisconnecting)
+            return 0
         return caller.tEvt['sType']
 
     def stateDisconnecting(self, caller):
@@ -294,6 +300,9 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
 
     @defer.inlineCallbacks
     def plc_terminate(self):
+        if self.TimeOut != None:
+            self.TimeOut.cancel()
+            self.TimeOut = None
         self.hsm.sendEvent('eventDisconnectReceived')
 
 
@@ -516,6 +525,9 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
     @defer.inlineCallbacks
     def op_disconnect(self, content, headers, msg):
         log.debug("in Instrument Driver op_disconnect!")
+        if self.TimeOut != None:
+            self.TimeOut.cancel()
+            self.TimeOut = None
         self.hsm.sendEvent('eventDisconnectReceived')
         if msg:
             yield self.reply_ok(msg, content)

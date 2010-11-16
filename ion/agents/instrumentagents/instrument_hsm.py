@@ -26,4 +26,6 @@ class InstrumentHsm(Hsm):
             self.onEvent(event)
         else:
             log.critical(" INVALID EVENT: %s" %event)
+            raise RuntimeError(" InstrumentHsm:  INVALID EVENT: %s" %event)
+
             
