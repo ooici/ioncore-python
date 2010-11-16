@@ -35,12 +35,15 @@ from ion.agents.instrumentagents.SBE49_constants import instrument_commands
 from ion.agents.instrumentagents.SBE49_constants import instrument_prompts
 
 import ion.util.procutils as pu
+from threading import Timer
 
 from ion.core.process.process import ProcessFactory
 
 #
 # DHE: need to do something like: instCmdTranslator = SBE49_InstCommandXlator()
 #
+
+RESPONSE_TIMEOUT = 2   # 2 second timeout for response from instrument
 
 class SBE49_instCommandXlator():
     commands = {
@@ -63,7 +66,8 @@ class SBE49InstrumentHsm(InstrumentHsm):
         'eventConnectionComplete',
         'eventDisconnectReceived',
         'eventDataReceived',
-        'eventPromptReceived'
+        'eventPromptReceived',
+        'eventResponseTimeout'
     ]
 
     def sendEvent(self, event):
@@ -189,12 +193,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
             log.debug("stateBase-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
-            log.debug("stateUnconfigured state: ignoring event %s;" %(caller.tEvt['sType']))
+            log.info("stateBase state: ignoring event %s;" %(caller.tEvt['sType']))
             return 0
-        elif caller.tEvt['sType'] == "eventDataReceived":
-            log.debug("stateUnconfigured state: ignoring event %s;" %(caller.tEvt['sType']))
-            data = self.dequeueData()            
-            log.debug("statestateUnconfigured received %s." % (data))
+        else:
+            log.error("stateBase state: unhandled event %s;" %(caller.tEvt['sType']))
             return 0
         return caller.tEvt['sType']
 
@@ -228,9 +230,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
             log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
-            return 0
-        elif caller.tEvt['sType'] == "eventDisconnectComplete":
             log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
             return 0
         return caller.tEvt['sType']
@@ -374,6 +373,10 @@ class SBE49InstrumentDriver(InstrumentDriver):
             #
             caller.stateTran(self.stateDisconnecting)
             return 0
+        elif caller.tEvt['sType'] == "eventResponseTimeout":
+            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
+            self.ProcessWakeupResponseTimeout()
+            return 0
         return caller.tEvt['sType']
 
     def statePrompted(self, caller):
@@ -423,6 +426,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
             # Transition to the stateDisconnecting state
             #
             caller.stateTran(self.stateDisconnecting)
+            return 0
+        elif caller.tEvt['sType'] == "eventResponseTimeout":
+            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
+            self.ProcessCmdResponseTimeout()
+            caller.stateTran(self.stateConnected)
             return 0
         return caller.tEvt['sType']
 
@@ -494,10 +502,29 @@ class SBE49InstrumentDriver(InstrumentDriver):
             return True
         else:
             return False
-        
+
+    def TimeoutCallback(self):
+        log.info("TimeoutCallback()")
+        if self.TimeOut != None:
+            self.TimeOut = None
+            self.hsm.sendEvent('eventResponseTimeout');
+            
+    def ProcessCmdResponseTimeout(self):
+        log.error("No response from instrument for cammand \'%s\'" % self.cmdQueue[0])
+        self.cmdQueue = []
+        self.publish("No response from instrument for cammand \'%s\'".format(self.cmdQueue[0]), self.publish_to)
+
+    def ProcessWakeupResponseTimeout(self):
+        log.error("No response from instrument for wakeup")
+        self.cmdQueue = []
+        self.publish("No response from instrument for wakeup", self.publish_to)
+      
     def sendCmd(self, cmd):
         log.debug("Sending Command: %s" %cmd)
         self.instrument.transport.write(cmd)
+        # TODO: What if self.TimeOut exists and is running?  
+        self.TimeOut = Timer(RESPONSE_TIMEOUT, self.TimeoutCallback)
+        self.TimeOut.start()
         
     @defer.inlineCallbacks
     def getConnected(self):
@@ -551,10 +578,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         #self.hsm.onEvent('eventDisconnectComplete')
         self.hsm.sendEvent('eventDisconnectComplete')
 
-        #
-        # Don't need this anymore
-        #
-        self.setConnected(False)
+        self.proto = None
 
     def gotData(self, data):
         """
@@ -563,8 +587,17 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @param data
         @retval none
         """
+        
+        #
+        # TODO: currently doing this here, but this will change to
+        # where it is discovered that the command is valid
+        #
+        if self.TimeOut != None:
+             self.TimeOut.cancel()
+             self.TimeOut = None
+        
         if data == instrument_prompts.INST_PROMPT or \
-                 data == instrument_prompts.INST_SLEEPY_PROMPT:
+              data == instrument_prompts.INST_SLEEPY_PROMPT:
             log.debug("gotPrompt()")
             #self.hsm.onEvent('eventPromptReceived')
             self.hsm.sendEvent('eventPromptReceived')
