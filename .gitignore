@@ -17,3 +17,28 @@ dist
 .project
 /.settings
 dropin.cache
+
+ion/agents/instrumentagents copy/NportSendBreak.py
+ion/agents/instrumentagents copy/SBE49_IA.py
+ion/agents/instrumentagents copy/SBE49_constants.py
+ion/agents/instrumentagents copy/SBE49_driver.py
+ion/agents/instrumentagents copy/WHSentinelADCP_constants.py
+ion/agents/instrumentagents copy/WHSentinelADCP_driver.py
+ion/agents/instrumentagents copy/__init__.py
+ion/agents/instrumentagents copy/instrument_agent.py
+ion/agents/instrumentagents copy/instrument_connection.py
+ion/agents/instrumentagents copy/instrument_hsm.py
+ion/agents/instrumentagents copy/miros.py
+ion/agents/instrumentagents copy/simulators/Simulator_constants.py
+ion/agents/instrumentagents copy/simulators/__init__.py
+ion/agents/instrumentagents copy/simulators/sim_SBE49.py
+ion/agents/instrumentagents copy/simulators/sim_WHSentinelADCP.py
+ion/agents/instrumentagents copy/test/__init__.py
+ion/agents/instrumentagents copy/test/client_SBE49_sim.py
+ion/agents/instrumentagents copy/test/inst_client.py
+ion/agents/instrumentagents copy/test/inst_consumer.py
+ion/agents/instrumentagents copy/test/test_SBE49.py
+ion/agents/instrumentagents copy/test/test_WHSentinelADCP.py
+ion/agents/instrumentagents copy/test/test_instrument.py
+
+.gitignore
