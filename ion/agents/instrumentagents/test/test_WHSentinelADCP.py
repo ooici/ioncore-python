@@ -93,7 +93,7 @@ class TestWHSentinelADCP(IonTestCase):
 
     @defer.inlineCallbacks
     def test_driver_load(self):
-        #config_vals = {'ipaddr':'127.0.0.1', 'ipport':'9000'}
+        config_vals = {'ipaddr':'127.0.0.1', 'ipport':'9000'}
         #config_vals = {'ipaddr':'137.110.112.119', 'ipport':self.SimulatorPort}
         result = yield self.driver_client.configure_driver(config_vals)
         self.assertEqual(result['ipaddr'], config_vals['ipaddr'])
@@ -167,7 +167,7 @@ class TestWHSentinelADCP(IonTestCase):
         result = yield self.driver_client.execute(cmd1)
         result = yield self.driver_client.execute(cmd2)
          # wait a while...
-        yield pu.asleep(8)
+        yield pu.asleep(4)
 
 
         log.info("test_execute: disconnecting.")
@@ -201,8 +201,8 @@ class TestWHSentinelADCP(IonTestCase):
 
         log.info('Defined subscription: '+str(subscription))
 
-        params = {'ipaddr':'137.110.112.119', 'ipport':'4002', 'ipportCmd':967}    # for actual instrument
-        #params = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort}   # for simulator
+        #params = {'ipaddr':'137.110.112.119', 'ipport':'4002', 'ipportCmd':967}    # for actual instrument
+        params = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort}   # for simulator
         params['publish-to'] = topic.RegistryIdentity
         yield self.driver_client.configure_driver(params)
 
@@ -212,7 +212,7 @@ class TestWHSentinelADCP(IonTestCase):
         log.info("getting current time")
         StartTime = pu.currenttime()
         log.info("StartTime = %s" %StartTime)
-        while StartTime + 15 > pu.currenttime():
+        while StartTime + 5 > pu.currenttime():
             log.info("sleeping 5 seconds")
             yield pu.asleep(5)
         result = yield self.driver_client.disconnect(['some arg'])
