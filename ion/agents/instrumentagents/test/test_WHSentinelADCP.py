@@ -94,7 +94,7 @@ class TestWHSentinelADCP(IonTestCase):
     @defer.inlineCallbacks
     def test_driver_load(self):
         #config_vals = {'ipaddr':'127.0.0.1', 'ipport':'9000'}
-        config_vals = {'ipaddr':'137.110.112.119', 'ipport':self.SimulatorPort}
+        #config_vals = {'ipaddr':'137.110.112.119', 'ipport':self.SimulatorPort}
         result = yield self.driver_client.configure_driver(config_vals)
         self.assertEqual(result['ipaddr'], config_vals['ipaddr'])
         self.assertEqual(result['ipport'], config_vals['ipport'])
@@ -156,10 +156,17 @@ class TestWHSentinelADCP(IonTestCase):
 
         log.info('Defined subscription: '+str(subscription))
 
+<<<<<<< HEAD
         #params = {'ipaddr':'137.110.112.119', 'ipport':'4002', 'ipportCmd':967}    # for actual instrument
         params = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort}   # for simulator
         #params['publish-to'] = topic.RegistryIdentity
         result = yield self.driver_client.configure_driver(params)
+=======
+        #config_vals = {'ipaddr':'137.110.112.119', 'ipport':'4002', 'ipportCmd':967}
+        #config_vals = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort, 'ipportCmd':967}
+        result = yield self.driver_client.configure_driver(config_vals)
+
+>>>>>>> origin/develop
 
         cmd1 = [['cr', '1']]
         cmd2 = [['ck', '']]
