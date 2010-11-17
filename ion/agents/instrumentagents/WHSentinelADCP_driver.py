@@ -9,11 +9,6 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 
-"""
-from ion.data.dataobject import LCStates as LCS
-from ion.core.process.service_process import ServiceProcess
-"""
-
 from instrument_hsm import InstrumentHsm
 
 from ion.agents.instrumentagents.instrument_connection import InstrumentConnection
@@ -37,8 +32,11 @@ import time
 from socket import *
 import sys
 from threading import Timer
-
-RESPONSE_TIMEOUT = 2   # 2 second timeout for response from instrument
+from collections import deque
+import logging
+ 
+CMD_RESPONSE_TIMEOUT = 2     # 2 second timeout for command response from instrument
+BREAK_RESPONSE_TIMEOUT = 4   # 4 second timeout for break response from instrument
 
 class WHSentinelADCP_instCommandXlator():
     commands = {
@@ -58,14 +56,12 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
     """
 
     def __init__(self, *args, **kwargs):
-        self.connected = False
         self.instrument = None
         self.command = None
-        self.setConnected(False)
         self.setTopicDefined(False)
         self.publish_to = None
         self.dataQueue = ""
-        self.cmdQueue = []
+        self.cmdQueue = deque([])
         self.proto = None
         self.TimeOut = None
         NoResponseIsError = False
@@ -74,13 +70,14 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         
         self.hsm = InstrumentHsm()
         
-        # --------------------------------------------------------------------
-        #             name                               parent's
-        #              of              event             event
-        #             state            handler           handler
-        # --------------------------------------------------------------------
-        self.hsm.addState ( "idle",                 self.idle,                  None)
-        self.hsm.addState ( "stateConfigured",      self.stateConfigured,       self.idle)
+        # ------------------------------------------------------------------------------------
+        #                   name                                                parent's
+        #                   of                      event                       event
+        #                   state                   handler                     handler
+        # ------------------------------------------------------------------------------------
+        self.hsm.addState ( "stateBase",            self.stateBase,             None)
+        self.hsm.addState ( "stateUnconfigured",    self.stateUnconfigured,     self.stateBase)
+        self.hsm.addState ( "stateConfigured",      self.stateConfigured,       self.stateBase)
         self.hsm.addState ( "stateDisconnecting",   self.stateDisconnecting,    self.stateConfigured)
         self.hsm.addState ( "stateDisconnected",    self.stateDisconnected,     self.stateConfigured)
         self.hsm.addState ( "stateConnecting",      self.stateConnecting,       self.stateConfigured)
@@ -102,204 +99,165 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
 
         InstrumentDriver.__init__(self, *args, **kwargs)
 
-    # Change this to stateIdle
-    def idle(self, caller):
-        log.debug("!!!!!!!!!!!!!!!  In idle state")
+    def stateBase(self, caller):
+        log.debug("stateBase-%s;" %(caller.tEvt['sType']))
         if caller.tEvt['sType'] == "init":
-            # display event
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "entry":
-            # display event, do nothing 
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
             self.tEvt['nFoo'] = 0
             return 0
         elif caller.tEvt['sType'] == "configured":
-            log.debug("idle-%s;" %(caller.tEvt['sType']))
-            log.info("!!!!!! transitioning to stateConfigured! idle-%s;" %(caller.tEvt['sType']))
             self.hsm.stateTran(self.stateConfigured)
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
-            log.debug("idle state: ignoring event %s;" %(caller.tEvt['sType']))
+            # TODO: Should these comands be flushed from the queue?
+            return 0
+        elif caller.tEvt['sType'] == "eventDisconnectReceived":
+            # since this event may occur at any time because 'process' calls
+            # plc_terminate(), just ignore it if the state doesn't catch it
+            log.info("stateBase - Explicitly ignoring event %s" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
-            log.debug("idle state: ignoring event %s;" %(caller.tEvt['sType']))
-            data = self.dequeueData()            
-            log.debug("stateIdle received %s." % (data))
+            #TODO: Should this data be flushed from queue?
+            return 0
+        else:
+            log.error("stateBase state: ##########********!!!!!!! UNHANDLED event %s !!!!!!!!!********###########" %(caller.tEvt['sType']))
+            return 0
+        return caller.tEvt['sType']
+
+    def stateUnconfigured(self, caller):
+        log.debug("stateUnconfigured-%s;" %(caller.tEvt['sType']))
+        if caller.tEvt['sType'] == "init":
+            return 0
+        elif caller.tEvt['sType'] == "entry":
+            return 0
+        elif caller.tEvt['sType'] == "exit":
+            return 0
+        elif caller.tEvt['sType'] == "eventConfigured":
+            self.hsm.stateTran(self.stateConfigured)
             return 0
         return caller.tEvt['sType']
 
     def stateConfigured(self, caller):
-        log.debug("!!!!!!!!!!!!!!!  In stateConfigured state")
+        log.debug("stateConfigured-%s;" %(caller.tEvt['sType']))
         if caller.tEvt['sType'] == "init":
-            log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
             caller.stateStart(self.stateDisconnected)
             return 0
         elif caller.tEvt['sType'] == "entry":
-            log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
-            return 0
-        elif caller.tEvt['sType'] == "eventDisconnectComplete":
-            log.info("stateConfigured-%s;" %(caller.tEvt['sType']))
             return 0
         return caller.tEvt['sType']
 
     def stateDisconnected(self, caller):
-        log.debug("!!!!!!!!!!!!!!!  In stateDisconnected state")
+        log.debug("stateDisconnected-%s;" %(caller.tEvt['sType']))
         if caller.tEvt['sType'] == "init":
-            log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "entry":
-            log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
             # A command has been received from the agent
-            # Move to stateConnecting to try to connect
-            log.info("stateDisconnected-%s;" %(caller.tEvt['sType']))
-            #
-            # Transition to the stateConnecting state
-            #
+            # Move to stateConnecting to try to connect to instrumment
             caller.stateTran(self.stateConnecting)
             return 0
         return caller.tEvt['sType']
 
     def stateConnecting(self, caller):
-        log.debug("!!!!!!!!!!!!!!!  In stateConnecting state")
+        log.debug("stateConnecting-%s;" %(caller.tEvt['sType']))
         if caller.tEvt['sType'] == "init":
-            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
             self.getConnected()
             return 0
         elif caller.tEvt['sType'] == "entry":
-            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
+            return 0
+        elif caller.tEvt['sType'] == "eventConnectionFailed":
+            caller.stateTran(self.stateDisconnected)
             return 0
         elif caller.tEvt['sType'] == "eventConnectionComplete":
-            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
-            # move to stateConnected
             caller.stateTran(self.stateConnected)
             return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
-            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
-            #
-            # Transition to the stateDisconnecting state
-            #
             caller.stateTran(self.stateDisconnecting)
-            return 0
-        # Don't think I should get this here...candidate for deletion
-        elif caller.tEvt['sType'] == "eventPromptReceived":
-            log.info("stateConnecting-%s;" %(caller.tEvt['sType']))
-            caller.stateTran(self.stateConnected)
             return 0
         return caller.tEvt['sType']
 
     def stateConnected(self, caller):
-        log.debug("!!!!!!!!!!!!!!!  In stateConnected state")
+        log.debug("stateConnected-%s;" %(caller.tEvt['sType']))
         if caller.tEvt['sType'] == "init":
-            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
-            """
-            @todo Need a queue of commands from which to pull commands
-            """
             if self.cmdPending():
                 self.sendBreak()
             return 0
         elif caller.tEvt['sType'] == "entry":
-            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
-            return 0
-        elif caller.tEvt['sType'] == "eventResponseTimeout":
-            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
-            self.ProcessWakeupResponseTimeout()
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
-            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
             if self.TimeOut == None:
                 # We got a command from the agent; need to get the prompt
                 # before sending
                 self.sendBreak()
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
-            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
-            if self.TimeOut != None:
-                self.TimeOut.cancel()
-                self.TimeOut = None
             self.ProcessRcvdData()
             return 0
         elif caller.tEvt['sType'] == "eventPromptReceived":
-            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
             if self.TimeOut != None:
                 self.TimeOut.cancel()
                 self.TimeOut = None
             caller.stateTran(self.statePrompted)
             return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
-            log.info("stateConnected-%s;" %(caller.tEvt['sType']))
-            #
-            # Transition to the stateDisconnecting state
-            #
             caller.stateTran(self.stateDisconnecting)
+            return 0
+        elif caller.tEvt['sType'] == "eventResponseTimeout":
+            self.ProcessWakeupResponseTimeout()
             return 0
         return caller.tEvt['sType']
 
     def statePrompted(self, caller):
-        log.debug("!!!!!!!!!!!!!!!  In statePrompted state")
+        log.debug("statePrompted-%s;" %(caller.tEvt['sType']))
         if caller.tEvt['sType'] == "init":
-            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
-            """
-            @TODO Need a queue of commands from which to pull commands
-            """
             if self.cmdPending():
-                self.sendCmd(self.cmdQueue[0])
+                self.sendCmd(self.PeekCmd())
+                # Only way to get here is from stateConnected after receiving a
+                # prompt, so not getting a response is an error condition
                 self.NoResponseIsError = True
             return 0
         elif caller.tEvt['sType'] == "entry":
-            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "eventResponseTimeout":
-            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
-            self.ProcessCmdResponseTimeout()
+            if self.NoResponseIsError == True:
+                self.ProcessCmdResponseTimeout()
+            # Goto connected state since command response failed
             caller.stateTran(self.stateConnected)
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
-            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
             if self.cmdPending():
-                self.sendCmd(self.cmdQueue[0])
+                self.sendCmd(self.PeekCmd())
             else:
                 log.error("statePrompted: No command to send!")
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
-            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
-            self.ProcessRcvdData()
-            return 0
+             self.ProcessRcvdData()
+             return 0
         elif caller.tEvt['sType'] == "eventPromptReceived":
+            log.info("statePrompted - Explicitly ignoring PromptReceived event")
             return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
-            log.info("statePrompted-%s;" %(caller.tEvt['sType']))
-            #
-            # Transition to the stateDisconnecting state
-            #
             caller.stateTran(self.stateDisconnecting)
             return 0
         return caller.tEvt['sType']
 
     def stateDisconnecting(self, caller):
-        log.debug("!!!!!!!!!!!!!!!  In stateDisconnecting state")
+        log.debug("stateDisconnecting-%s;" %(caller.tEvt['sType']))
         if caller.tEvt['sType'] == "init":
-            log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
             if (self.proto):
                 log.debug("disconnecting from instrument")
                 self.proto.transport.loseConnection()
@@ -307,19 +265,14 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
                 log.debug("no proto instance: cannot disconnect")
             return 0
         elif caller.tEvt['sType'] == "entry":
-            log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "exit":
-            log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
             return 0
         elif caller.tEvt['sType'] == "eventDisconnectComplete":
-            log.info("stateDisconnecting-%s;" %(caller.tEvt['sType']))
-            #
-            # Transition to the stateConnected state
-            #
             caller.stateTran(self.stateDisconnected)
             return 0
         return caller.tEvt['sType']
+
 
     @defer.inlineCallbacks
     def plc_init(self):
@@ -329,9 +282,8 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         self.instrument_ipport = self.spawn_args.get('ipport', 9000)
         self.instrument_ipportCmd = self.spawn_args.get('ipportCmd', 967)
 
-        # DHE Testing HSM
         log.debug("!!!!!!!!!!!!!!!!!! Calling onStart!")
-        self.hsm.onStart(self.idle)
+        self.hsm.onStart(self.stateUnconfigured)
 
         yield self._configure_driver(self.spawn_args)
 
@@ -343,36 +295,48 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         log.debug("Instrument driver initialized")
 
         log.debug("!!!!!!!!!!! Sending configured event");
-        self.hsm.onEvent('configured');
+        self.hsm.sendEvent('eventConfigured');
+
 
     @defer.inlineCallbacks
     def plc_terminate(self):
-        yield self.op_disconnect(None, None, None)
+        if self.TimeOut != None:
+            self.TimeOut.cancel()
+            self.TimeOut = None
+        self.hsm.sendEvent('eventDisconnectReceived')
 
-    def isConnected(self):
-        return self.connected
-
-    def setConnected(self, value):
-        self.connected = value;
 
     def isTopicDefined(self):
         return self.topicDefined
+
 
     def setTopicDefined(self, value):
         log.info("*******setting topicDefined to %s:" %str(value))
         self.topicDefined = value;
 
+
     def setAgentService(self, agent):
         self.agent = agent
         
+
     def enqueueCmd(self, cmd):
         log.debug("enqueueCmd: enqueueing command: %s" %cmd)
         self.cmdQueue.append(cmd)
 
+
     def dequeueCmd(self):
-        cmd = self.cmdQueue.pop()
-        #log.debug("dequeueCmd: dequeueing command: %s" %cmd)
-        return cmd
+        if len(self.cmdQueue) > 0:     
+            cmd = self.cmdQueue.popleft()
+            log.info("dequeueCmd: dequeueing command: %s" %cmd)
+            return cmd
+
+
+    def PeekCmd(self):
+        if len(self.cmdQueue) > 0:     
+            return self.cmdQueue[0]
+        else:
+            return ""
+
 
     def cmdPending(self):
         if len(self.cmdQueue) > 0:
@@ -380,34 +344,39 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         else:
             return False
         
+
     def TimeoutCallback(self):
         log.info("TimeoutCallback()")
         if self.TimeOut != None:
             self.TimeOut = None
-            self.hsm.onEvent('eventResponseTimeout')
+            self.hsm.sendEvent('eventResponseTimeout')
         
+
     def ProcessCmdResponseTimeout(self):
         log.error("No response from instrument for cammand \'%s\'" % self.cmdQueue[0])
-        self.cmdQueue = []
         self.publish("No response from instrument for cammand \'%s\'".format(self.cmdQueue[0]), self.publish_to)
+        self.cmdQueue = []
+        self.NoResponseIsError = False
+ 
 
     def ProcessWakeupResponseTimeout(self):
         log.error("No response from instrument for wakeup")
-        self.cmdQueue = []
         self.publish("No response from instrument for wakeup", self.publish_to)
+        self.cmdQueue = []
       
+
     def sendCmd(self, cmd):
-        log.debug("Sending Command: %s" %cmd)
-        self.instrument.transport.write(cmd)
-        self.TimeOut = Timer(RESPONSE_TIMEOUT, self.TimeoutCallback)
+        log.info("Sending Command: %s" %cmd)
+        self.instrument.transport.write(cmd + instrument_prompts.DRIVER_LINE_TERMINATOR)
+        self.TimeOut = Timer(CMD_RESPONSE_TIMEOUT, self.TimeoutCallback)
         self.TimeOut.start()
         
         
     def sendBreak(self):
         if self.instrument_ipaddr == "localhost" or self.instrument_ipaddr == "127.0.0.1":
             # localhost(127.0.0.1) implies the use of the instrument simulator so just send a simple CR/LF
-            log.info("Sending CR/LF to simulator")
-            self.instrument.transport.write(instrument_prompts.PROMPT_INST)
+            log.info("Sending CR to simulator")
+            self.instrument.transport.write(instrument_prompts.DRIVER_LINE_TERMINATOR)
         else:
             log.info("Sending break to instrument ipaddr: %s, ipport: %s" %(self.instrument_ipaddr, self.instrument_ipportCmd))      
             try:
@@ -428,26 +397,30 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             except:
                 log.error("Send break failed: %s" % sys.exc_info()[1])
                 return
-        self.TimeOut = Timer(RESPONSE_TIMEOUT, self.TimeoutCallback)
+        self.TimeOut = Timer(BREAK_RESPONSE_TIMEOUT, self.TimeoutCallback)
         self.TimeOut.start()
 
                 
     def ProcessRcvdData(self):
         # for now, publish a complete line at a time
-        if instrument_prompts.PROMPT_INST in self.dataQueue:
-            partition = self.dataQueue.partition(instrument_prompts.PROMPT_INST)
+        while instrument_prompts.ADCP_LINE_TERMINATOR in self.dataQueue:
+            partition = self.dataQueue.partition(instrument_prompts.ADCP_LINE_TERMINATOR)
             self.dataQueue = partition[2]
-            if self.cmdQueue[0] in partition[0]:
-                log.debug("Command \'%s\' received" % self.cmdQueue[0])
-                self.cmdQueue.pop()
-                if self.TimeOut != None:
-                    self.TimeOut.cancel()
-                    self.TimeOut = None
+            if len(self.cmdQueue) > 0:
+                Cmd = self.PeekCmd()
+                log.debug("looking for command %s in %s" % (Cmd, partition[0]))
+                if Cmd in partition[0]:
+                    if self.TimeOut != None:
+                        self.TimeOut.cancel()
+                        self.TimeOut = None
+                    log.info("Response to command \'%s\' received" % Cmd)
+                    self.dequeueCmd()
+                    if self.cmdPending():
+                        self.sendCmd(self.PeekCmd())
             # send this up to the agent to publish.
             log.info("Calling publish with \"%s\"" %partition[0])
             self.publish(partition[0], self.publish_to)
-            
-
+          
         
     @defer.inlineCallbacks
     def getConnected(self):
@@ -464,14 +437,19 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         cc = ClientCreator(reactor, InstrumentConnection, self)
         log.info("Driver connecting to instrument ipaddr: %s, ipport: %s" %(self.instrument_ipaddr, self.instrument_ipport))
         self.proto = yield cc.connectTCP(self.instrument_ipaddr, int(self.instrument_ipport))
-        log.info("Driver connected to instrument")
+        if self.instrument == None:
+            log.error("Driver failed to connect to instrument")
+            self.hsm.sendEvent('eventConnectionFailed')
+        else:
+            log.info("Driver connected to instrument")
+            self.hsm.sendEvent('eventConnectionComplete')
+
 
     def gotConnected(self, instrument):
         """
         @brief This method is called when a connection has been made to the
         instrument device server.  The instrument protocol object is passed
-        as a parameter, and a reference to it is saved.  Call setConnected
-        with True argument.
+        as a parameter, and a reference to it is saved.  
         @param reference to instrument protocol object.
         @retval none
         """
@@ -479,30 +457,19 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
 
         self.instrument = instrument
 
-        #
-        # Don't need this anymore
-        #
-        self.setConnected(True)
-        
-        self.hsm.onEvent('eventConnectionComplete')
-
 
     def gotDisconnected(self, instrument):
         """
         @brief This method is called when a connection to the instrument
         device server has been lost.  The instrument protocol object is passed
-        as a parameter.  Call setConnected with False argument.
+        as a parameter.  
         @param reference to instrument protocol object.
         @retval none
         """
         log.debug("gotDisconnected!!!")
 
-        self.hsm.onEvent('eventDisconnectComplete')
+        self.hsm.sendEvent('eventDisconnectComplete')
 
-        #
-        # Don't need this anymore
-        #
-        self.setConnected(False)
 
     def gotData(self, data):
         """
@@ -511,17 +478,19 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         @param data
         @retval none
         """
+        
+        if log.getEffectiveLevel() == logging.DEBUG:
+            DataAsHex = ""
+            for i in range(len(data)):
+                if len(DataAsHex) > 0:
+                    DataAsHex += ","
+                DataAsHex += "{0:X}".format(ord(data[i]))
+            log.debug("gotData() [%s] [%s]" % (data, DataAsHex))
         if instrument_prompts.INST_PROMPT in data:
             log.info("gotData(): prompt seen")
-            self.hsm.onEvent('eventPromptReceived')
-        DataAsHex = ""
-        for i in range(len(data)):
-            if len(DataAsHex) > 0:
-                DataAsHex += ","
-            DataAsHex += "{0:X}".format(ord(data[i]))
-        log.debug("gotData() [%s] [%s]" % (data, DataAsHex))
+            self.hsm.sendEvent('eventPromptReceived')
         self.dataQueue += data
-        self.hsm.onEvent('eventDataReceived')
+        self.hsm.sendEvent('eventDataReceived')
         
 
     @defer.inlineCallbacks
@@ -552,12 +521,17 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
 
         yield self.reply_ok(msg, content)
 
+
     @defer.inlineCallbacks
     def op_disconnect(self, content, headers, msg):
         log.debug("in Instrument Driver op_disconnect!")
-        self.hsm.onEvent('eventDisconnectReceived')
+        if self.TimeOut != None:
+            self.TimeOut.cancel()
+            self.TimeOut = None
+        self.hsm.sendEvent('eventDisconnectReceived')
         if msg:
             yield self.reply_ok(msg, content)
+
 
     @defer.inlineCallbacks
     def op_fetch_params(self, content, headers, msg):
@@ -570,6 +544,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         for param in content:
             result[param] = self.__instrument_parameters[param]
         yield self.reply_ok(msg, result)
+
 
     @defer.inlineCallbacks
     def op_set_params(self, content, headers, msg):
@@ -604,7 +579,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
                     appropriate sequence of events to get the command sent.
                     """
                     self.enqueueCmd(command)
-                    self.hsm.onEvent('eventCommandReceived')
+                    self.hsm.sendEvent('eventCommandReceived')
                 else:
                     error_msg = str(param) + " is not a settable parameter"
                     #log.error("%s is not a settable parameter" % str(param))
@@ -614,6 +589,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             yield self.reply_err(msg, error_msg)
         else:            
             yield self.reply_ok(msg, content)
+
 
     @defer.inlineCallbacks
     def op_execute(self, content, headers, msg):
@@ -640,16 +616,14 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
                 log.debug("op_execute translating command: %s" % command)
                 instCommand = self.instCmdXlator.translate(command)
                 instCommand += value
-                log.debug("op_execute would send command: %s to instrument" % instCommand)
-                instCommand += instrument_prompts.PROMPT_INST
-
+                log.info("op_execute queueing command: %s to instrument" % instCommand)
                 self.enqueueCmd(instCommand)
 
                 """
                 Send the command received event.  This should kick off the
                 appropriate sequence of events to get the command sent.
                 """
-                self.hsm.onEvent('eventCommandReceived')
+                self.hsm.sendEvent('eventCommandReceived')
 
                 agentCommands.append(command)
                 yield self.reply_ok(msg, agentCommands)
@@ -668,6 +642,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         """
         yield self.reply_ok(msg, "a-ok")
 
+
     @defer.inlineCallbacks
     def op_configure_driver(self, content, headers, msg):
         """
@@ -684,6 +659,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         yield self._configure_driver(content)
         # Do something here, then adjust test case
         yield self.reply_ok(msg, content)
+
 
     @defer.inlineCallbacks
     def _configure_driver(self, params):
@@ -717,6 +693,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             self.publisher = yield self.dpsc.define_publisher(self.publisher)
         else:
             log.debug("%%%%%%%% No publish-to in params")
+
 
 class WHSentinelADCPInstrumentDriverClient(InstrumentDriverClient):
     """
