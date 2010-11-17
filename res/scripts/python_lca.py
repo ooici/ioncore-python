@@ -14,7 +14,6 @@ import random
 import logging
 from twisted.internet import defer
 
-from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core import ioninit
 from ion.core import bootstrap
 
@@ -48,18 +47,18 @@ def start():
     startsvcs = []
     #startsvcs.extend(dm_services)
     sup = yield bootstrap.bootstrap(ion_messaging, startsvcs)
-        
+
     print 'STARTSVCS',startsvcs
     print 'ION_MESSAGING',ion_messaging
     print 'CONT_ARGS',ioninit.cont_args
-    
+
     #yield create_producer(sup)
-        
+
     dpsc = pubsub_service.DataPubsubClient(proc=sup)
-    
+
     subscription = SubscriptionResource()
     subscription.topic1 = PubSubTopicResource.create('Inst/RAW','')
-    
+
     # Use the example consumer to create events... graph the number of events
     '''
     subscription.workflow = {
@@ -68,9 +67,9 @@ def start():
                 'consumerclass':'LoggingConsumer',\
                 'attach':'topic1'}
         }
-    
-    
-    
+
+
+
     '''
     subscription.workflow = {
         'consumer1':
@@ -83,15 +82,15 @@ def start():
                 'attach':[['consumer1','queue']],
                 'process parameters':{'port':8180}
             }
-                
+
         }
-    
-    
+
+
     subscription = yield dpsc.define_subscription(subscription)
     linfo = '\n================================================\n'
     linfo+= 'Open your web browser and look at: http://127.0.0.1:8180/ \n'
     linfo+= '================================================\n'
-    logging.info(linfo)    
+    logging.info(linfo)
 
 
 
@@ -105,7 +104,3 @@ Container 2
 twistd --pidfile=ps2 -n magnet -a sysname=lcademo1 -h amoeba.ucsd.edu  res/scripts/python_lca.py
 
 '''
-
-
-
-

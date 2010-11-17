@@ -14,7 +14,6 @@ import random
 import logging
 from twisted.internet import defer
 
-from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core import ioninit
 from ion.core import bootstrap
 
@@ -39,14 +38,14 @@ dm_services = ioninit.get_config('services_cfg', CONF)
 
 @defer.inlineCallbacks
 def create_producer(proc):
-    
+
     dpsc = pubsub_service.DataPubsubClient(proc=proc)
-    
-    
+
+
     topic = PubSubTopicResource.create('time series','dap grid, timeseries, data')
     topic = yield dpsc.define_topic(topic)
 
-            
+
     dspname = 'data_timeseries_stream_producer'
     dsp={'name':dspname,
             'module':'ion.services.dm.util.dap_grid_timeseries_producer',
@@ -54,7 +53,7 @@ def create_producer(proc):
             'spawnargs':{'delivery queue':topic.queue.name,
                          'delivery interval':5}
         }
-        
+
     child = ProcessDesc(**dsp)
     child_id = yield proc.spawn_child(child)
 
@@ -67,18 +66,18 @@ def start():
     startsvcs = []
     startsvcs.extend(dm_services)
     sup = yield bootstrap.bootstrap(ion_messaging, startsvcs)
-        
+
     print 'STARTSVCS',startsvcs
     print 'ION_MESSAGING',ion_messaging
     print 'CONT_ARGS',ioninit.cont_args
-    
+
     yield create_producer(sup)
-        
+
     dpsc = pubsub_service.DataPubsubClient(proc=sup)
-    
+
     subscription = SubscriptionResource()
     subscription.topic1 = PubSubTopicResource.create('time series','')
-    
+
     # Use the example consumer to create events... graph the number of events
     subscription.workflow = {
         'consumer1':
@@ -91,17 +90,16 @@ def start():
                 'attach':[['consumer1','queue']],
                 'process parameters':{'port':8180}
             }
-                
+
         }
-    
-    
+
+
     subscription = yield dpsc.define_subscription(subscription)
     linfo = '\n================================================\n'
     linfo+= 'Open your web browser and look at: http://127.0.0.1:8180/ \n'
     linfo+= '================================================\n'
-    logging.info(linfo)    
+    logging.info(linfo)
 
 
 
 start()
-
