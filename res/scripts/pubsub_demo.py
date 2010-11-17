@@ -14,7 +14,6 @@ import random
 import logging
 from twisted.internet import defer
 
-from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core import ioninit
 from ion.core import bootstrap
 
@@ -47,12 +46,11 @@ def start():
     startsvcs = []
     startsvcs.extend(dm_services)
     sup = yield bootstrap.bootstrap(ion_messaging, startsvcs)
-        
+
     print 'STARTSVCS',startsvcs
     print 'ION_MESSAGING',ion_messaging
     print 'CONT_ARGS',ioninit.cont_args
-    
-    
+
+
 
 start()
-
