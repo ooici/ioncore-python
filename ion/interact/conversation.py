@@ -11,14 +11,27 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.data.dataobject import DataObject
+from ion.util.state_object import FSMFactory, StateObject, BasicStates
+
+class ConversationRole(StateObject):
+    """
+    @brief A conversation as seen from one participant (=role binding).
+        Encapsulates an FSM that keeps track of the state of the conversation
+        of the participant.
+    """
+    def __init__(self):
+        StateObject.__init__(self)
+        factory = self.factory()
+        fsm = factory.create_fsm(self)
+        self._so_set_fsm(fsm)
 
 class Conversation(DataObject):
     """An instance of a conversation type. Identifies the entities by name
-    that bind to roles.  
+    that bind to roles.
     """
     def __init__(self, id=None, roleBindings=None, convType=None):
         """Initializes the core attributes of a conversation (instance.
-        
+
         @param id    Unique registry identifier of a conversation
         @param roleBindings Mapping of names to role identifiers
         @param convType  Identifier for the conversation type
@@ -26,14 +39,14 @@ class Conversation(DataObject):
         self.id = id
         self.roleBindings = roleBindings
         self.convType = convType
-   
+
 class ConversationType(DataObject):
     """Represents a conversation type. Also known as protocol, interaction
-    pattern, session type. 
+    pattern, session type.
     """
     def __init__(self, name=None, id=None, roles=None, spec=None, desc=None):
         """Initializes the core attributes of a conversation type.
-        
+
         @param name  Descriptive name of a conversation type
         @param id    Unique registry identifier of a conversation type
         @param roles List of interacting roles in an interaction pattern that
@@ -51,4 +64,3 @@ class ConversationTypeSpec(DataObject):
     """Represents a conversation type specification. Base class for specific
     specification languages, such as Scribble, MSC etc.
     """
-    
