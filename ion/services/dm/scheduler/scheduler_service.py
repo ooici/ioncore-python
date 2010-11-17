@@ -11,6 +11,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 import time
+import threading
 import re
 from uuid import uuid4
 
@@ -33,6 +34,8 @@ class SchedulerService(ServiceProcess):
     def slc_init(self):
         # @note Might want to start another AS instance with a different target name
         self.store = AttributeStoreClient(targetname='attributestore')
+        # Mutex for remove operation
+        self.rm_lock = threading.Lock()
 
     def slc_stop(self):
         log.debug('SLC stop of Scheduler')
@@ -85,7 +88,10 @@ class SchedulerService(ServiceProcess):
             self.reply_err(msg, {'value': err})
             return
 
+        self.rm_lock.acquire()
         yield self.store.remove(task_id)
+        self.rm_lock.release()
+
         yield self.reply_ok(msg, {'value': 'OK'})
 
     @defer.inlineCallbacks
@@ -110,10 +116,14 @@ class SchedulerService(ServiceProcess):
         and should abort the run.
         """
         log.debug('Worker activated for task %s' % task_id)
+        self.rm_lock.acquire()
+
         tdef = yield self.store.get(task_id)
         if tdef == None:
             log.info('Task ID missing in store, assuming removal and aborting')
+            self.rm_lock.release()
             return
+
 
         payload = tdef['payload']
         target_id = tdef['target']
@@ -131,6 +141,7 @@ class SchedulerService(ServiceProcess):
         self.store.put(task_id, tdef)
         log.debug('Task %s rescheduled for %f seconds OK' % (task_id, interval))
 
+        self.rm_lock.release()
 
 class SchedulerServiceClient(ServiceClient):
     """
