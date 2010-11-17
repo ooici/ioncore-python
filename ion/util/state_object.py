@@ -3,7 +3,7 @@
 """
 @file ion/util/state_object.py
 @author Michael Meisinger
-@brief base class for objects that are controlled by an underlying state machine
+@brief base classes for objects that are controlled by an underlying state machine
 """
 
 from twisted.internet import defer
@@ -14,21 +14,38 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.util.fsm import FSM
 
 class Actionable(object):
+    """
+    @brief Provides an object that supports the execution of actions as consequence
+        of FSM transitions.
+    """
 
     def _action(self, action, fsm):
+        """
+        @brief Execute action identified by argument
+        @param action A str with the action to execute
+        @param fsm the FSM instance that triggered the action.
+        @retval Maybe a Deferred
+        """
         raise NotImplementedError("Not implemented")
 
 class StateObject(Actionable):
     """
-    This is the class that specialized classes inherit from.
+    @brief Base class for an object instance that has an underlying FSM that
+        determines which inputs are allowed at any given time; inputs trigger
+        actions as defined by the FSM.
+        This is the class that specialized classes inherit from.
+        The underlying FSM can be set explicitly.
     """
 
     def __init__(self):
+        # The FSM instance
         self.__fsm = None
+
+    # Function prefix _so is for StateObject control functions
 
     def _so_set_fsm(self, fsm_inst):
         """
-        Set the "engine" FSM that drives the calling of the _action functions
+        @brief Set the "engine" FSM that drives the calling of the _action functions
         """
         assert not self.__fsm, "FSM already set"
         assert isinstance(fsm_inst, FSM), "Given object not a FSM"
@@ -36,15 +53,19 @@ class StateObject(Actionable):
 
     def _so_process(self, event, *args, **kwargs):
         """
-        Trigger the FSM with an event. Leads to action functions being called.
-        The complication is to make it deferred and non-deferred compliant.
-        The downside is now a dependency on Twisted. Alternative: subclass
+        @brief Trigger the FSM with an event. Leads to action functions being called.
+            The complication is to make it deferred and non-deferred compliant.
+            The downside is now a dependency on Twisted. Alternative: subclass
+        @retval Maybe a Deferred, or result of FSM process
+        @todo Improve the error catching, forwarding and reporting
         """
         assert self.__fsm, "FSM not set"
         self.__fsm.input_args = args
         self.__fsm.input_kwargs = kwargs
         self.__fsm.error_cause = None
         try:
+            # This is the main invocation of the FSM. It will lead to calls to
+            # the _action function in normal configuration.
             res = self.__fsm.process(event)
             if isinstance(res, defer.Deferred):
                 d1 = defer.Deferred()
@@ -52,9 +73,9 @@ class StateObject(Actionable):
                     d1.callback(result)
                 def _err(result):
                     #print "In exception processing, %r" % (result)
+                    # @todo Improve the error catching, forwarding and reporting
                     try:
-                        self.__fsm.error_cause = result
-                        d2 = self.__fsm.process(BasicStates.E_ERROR)
+                        d2 = self._so_error(result)
                         if isinstance(d2, defer.Deferred):
                             # FSM error action deferred too
                             def _cb2(result1):
@@ -69,14 +90,24 @@ class StateObject(Actionable):
                 res = d1
         except StandardError, ex:
             # This catches only if not deferred
-            self.__fsm.error_cause = ex
-            res = self.__fsm.process(BasicStates.E_ERROR)
+            # @todo Improve the error catching, forwarding and reporting
+            res = self._so_error(ex)
             raise ex
         return res
 
+    def _so_error(self, error=None):
+        """
+        @brief Brings the StateObject explicitly into the error state, because
+            of some action error.
+        """
+        self.__fsm.error_cause = error
+        return self.__fsm.process(BasicStates.E_ERROR)
+
     def _action(self, action, fsm):
-        fname = "on_%s" % action
-        func = getattr(self, fname)
+        """
+        Generic action function that invokes.
+        """
+        func = getattr(self, action)
         args = self.__fsm.input_args
         kwargs = self.__fsm.input_kwargs
         if action == BasicStates.E_ERROR:
@@ -107,12 +138,18 @@ class FSMFactory(object):
         return fsm
 
 class BasicStates(object):
+    """
+    @brief Defines constants for basic state and lifecycle FSMs.
+    """
+    # States
+    # Note: The INIT state is active before the initialize input is received
     S_INIT = "INIT"
     S_READY = "READY"
     S_ACTIVE = "ACTIVE"
     S_TERMINATED = "TERMINATED"
     S_ERROR = "ERROR"
 
+    # Input events
     E_INITIALIZE = "initialize"
     E_ACTIVATE = "activate"
     E_DEACTIVATE = "deactivate"
@@ -123,12 +160,13 @@ class BasicFSMFactory(FSMFactory):
     """
     A FSM factory for FSMs with basic state model.
     """
+
     def _create_action_func(self, target, action):
         """
         @retval a function with a closure with the action name
         """
         def action_target(fsm):
-            return target(action, fsm)
+            return target("on_%s" % action, fsm)
         return action_target
 
     def create_fsm(self, target, memory=None):
@@ -147,10 +185,11 @@ class BasicFSMFactory(FSMFactory):
 
         actionfct = self._create_action_func(actf, BasicStates.E_TERMINATE)
         fsm.add_transition(BasicStates.E_TERMINATE, BasicStates.S_READY, actionfct, BasicStates.S_TERMINATED)
+        # @todo This is unclear. Is the action the same for terminate from READY and ACTIVE?
         fsm.add_transition(BasicStates.E_TERMINATE, BasicStates.S_ACTIVE, actionfct, BasicStates.S_TERMINATED)
 
         actionfct = self._create_action_func(actf, BasicStates.E_ERROR)
-        fsm.set_default_transition (actionfct, BasicStates.S_ERROR)
+        fsm.set_default_transition(actionfct, BasicStates.S_ERROR)
 
         return fsm
 
@@ -158,6 +197,7 @@ class BasicLifecycleObject(StateObject):
     """
     A StateObject with a basic life cycle, as determined by the BasicFSMFactory.
     @see BasicFSMFactory
+    @todo Add precondition checker
     """
 
     def __init__(self):

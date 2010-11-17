@@ -400,6 +400,32 @@ class Process(BasicLifecycleObject):
         """
         log.error('Process does not define op=%s' % headers.get('op',None))
 
+    # --- Interaction pattern
+
+    def request(self, message, **kwargs):
+        """
+        @brief Sends a request message to the recipient. Instantiates the
+            FIPA request interaction pattern. The recipient needs to responde
+            with either "refuse" or "agree". In case of "agree", a second
+            "failure", "inform-done", "inform-result" message must follow. This
+            function checks for timeouts.
+            Synchronous call.
+        @exception Various exceptions for different failures
+        """
+        pass
+
+    def request_async(self, message, **kwargs):
+        """
+        @brief Sends a request message to the recipient. Asynchronous call.
+        """
+        pass
+
+    def p_request(self, message):
+        """
+        @brief Receives a new request for action as "Participant" role.
+            Instantiates the FIPA request interaction pattern.
+        """
+
     # --- Outgoing message handling
 
     def rpc_send(self, recv, operation, content, headers=None, **kwargs):
