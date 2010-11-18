@@ -71,7 +71,39 @@ class ConsoleManhole(manhole.ColoredManhole):
         # then what?
 
     def connectionLost(self, reason):
+
+        # save the last 25 lines of history to the history buffer
+        if not self.namespace['cc'].config['no_history']:
+            try:
+                outhistory = "\n".join(self.historyLines[-25:])
+
+                f = open(os.path.join(os.environ["HOME"], '.cchistory'), 'w')
+                f.writelines(outhistory)
+                f.close()
+            except (IOError, TypeError):
+                # i've seen sporadic TypeErrors when joining the history lines - complaining
+                # about seeing a list when expecting a string. Can't figure out how to reproduce
+                # it consistently, but it deals with exiting the shell just after an error in the
+                # REPL. In any case, don't worry about it, and don't clobber history.
+                pass
+
         self.factory.stop()
+
+    def connectionMade(self):
+        manhole.ColoredManhole.connectionMade(self)
+
+        # read in history from history file on disk, set internal history/position
+        if not self.namespace['cc'].config['no_history']:
+            try:
+                f = open(os.path.join(os.environ["HOME"], '.cchistory'), 'r')
+                for line in f:
+                    self.historyLines.append(line.rstrip('\n'))
+
+                f.close()
+
+                self.historyPosition = len(self.historyLines)
+            except IOError:
+                pass
 
 def makeNamespace():
     from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify

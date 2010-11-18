@@ -10,11 +10,9 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
-from twisted.trial import unittest
 
-from ion.services.coi.attributestore import AttributeStoreService, AttributeStoreClient
+from ion.services.coi.attributestore import AttributeStoreClient
 from ion.test.iontest import IonTestCase
-import ion.util.procutils as pu
 
 
 class AttrStoreServiceTest(IonTestCase):
@@ -39,7 +37,7 @@ class AttrStoreServiceTest(IonTestCase):
             'class':'AttributeStoreService',
             'spawnargs':{
                 'servicename':'as1',
-                'backend_class':'ion.data.store.Store',
+                'backend_class':'ion.services.dm.preservation.store.Store',
                 'backend_args':{}
                     }
                 },
@@ -48,7 +46,7 @@ class AttrStoreServiceTest(IonTestCase):
             'class':'AttributeStoreService',
             'spawnargs':{
                 'servicename':'as2',
-                'backend_class':'ion.data.store.Store',
+                'backend_class': 'ion.services.dm.preservation.store.Store',
                 'backend_args':{}
                     }
                 },
@@ -84,6 +82,20 @@ class AttrStoreServiceTest(IonTestCase):
 
 
     @defer.inlineCallbacks
+    def test_defaults(self):
+        """
+        See what happens if you take the defaults (no spawnargs)
+        """
+        services = [
+            {'name':'Junk1',
+             'module':'ion.services.coi.attributestore',
+             'class':'AttributeStoreService'},
+            ]
+
+        sup = yield self._spawn_processes(services)
+        # No interactions, just startup/shutdown
+
+    @defer.inlineCallbacks
     def test_put_common_backend(self):
         # Test with cassandra store backend where both services can access common values!
         services = [
@@ -116,17 +128,17 @@ class AttrStoreServiceTest(IonTestCase):
         sup = yield self._spawn_processes(services)
 
         asc1 = AttributeStoreClient(proc=sup, targetname='as1')
-        
-        
+
+
         res1 = yield asc1.put('key1','value1')
         log.info('Result1 put: '+str(res1))
-        
-        
+
+
         res2 = yield asc1.get('key1')
         log.info('Result2 get: '+str(res2))
         self.assertEqual(res2, 'value1')
-    
-        
+
+
         res3 = yield asc1.put('key1','value2')
 
         res4 = yield asc1.get('key1')
