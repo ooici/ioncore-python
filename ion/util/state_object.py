@@ -125,6 +125,14 @@ class FSMFactory(object):
     A factory for FSMs to be used in StateObjects
     """
 
+    def _create_action_func(self, target, action):
+        """
+        @retval a function with a closure with the action name
+        """
+        def action_target(fsm):
+            return target(action, fsm)
+        return action_target
+
     def create_fsm(self, target, memory=None):
         """
         @param a StateObject that is the

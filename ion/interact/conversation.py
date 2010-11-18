@@ -51,7 +51,6 @@ class ConversationType(DataObject):
     def __init__(self, name=None, id=None, roles=None, spec=None, desc=None):
         """
         @brief Initializes the core attributes of a conversation type.
-
         @param name  Descriptive name of a conversation type
         @param id    Unique registry identifier of a conversation type
         @param roles List of interacting roles in an interaction pattern that

@@ -68,7 +68,6 @@ class Request_Initiator(ConversationRole):
 class Request_Participant(ConversationRole):
     factory = RequestFSMFactory()
 
-
 class Request(Conversation):
     pass
 
