@@ -27,6 +27,10 @@ service_procs = [
 
 # Startup arguments
 INSTRUMENT_ID = None
+#INSTRUMENT_IPADDR = '137.110.112.119'
+#INSTRUMENT_IPPORT = 4001
+INSTRUMENT_IPADDR = 'localhost'
+INSTRUMENT_IPPORT = 9000
 
 def eval_start_arguments():
     global INSTRUMENT_ID
@@ -49,11 +53,12 @@ def main():
 
     eval_start_arguments()
 
-    simulator = Simulator(INSTRUMENT_ID, 9000)
+    simulator = Simulator(INSTRUMENT_ID, INSTRUMENT_IPPORT)
     simulator.start()
 
     ia_procs = [
-        {'name':'SBE49IA','module':'ion.agents.instrumentagents.SBE49_IA','class':'SBE49InstrumentAgent','spawnargs':{'instrument-id':INSTRUMENT_ID}},
+        {'name':'SBE49IA','module':'ion.agents.instrumentagents.SBE49_IA','class':'SBE49InstrumentAgent',
+         'spawnargs':{'instrument-id':INSTRUMENT_ID,'driver-args':{'ipaddr':INSTRUMENT_IPADDR,'ipport':INSTRUMENT_IPPORT}}}
     ]
     yield bootstrap.spawn_processes(ia_procs, sup=sup)
 

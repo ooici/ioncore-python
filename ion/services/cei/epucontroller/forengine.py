@@ -29,13 +29,14 @@ class Control(object):
         """
         raise NotImplementedError
     
-    def launch(self, deployable_type_id, launch_description):
+    def launch(self, deployable_type_id, launch_description, extravars=None):
         """
         Choose instance IDs for each instance desired, a launch ID and send
         appropriate message to Provisioner.
         
         @param deployable_type_id string identifier of the DP to launch
         @param launch_description See engine implementer's guide
+        @param extravars Optional, see engine implementer's guide
         @retval tuple (launch_id, launch_description), see guide
         @exception Exception illegal input
         @exception Exception message not sent

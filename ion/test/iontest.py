@@ -16,6 +16,7 @@ from ion.core import bootstrap, ioninit
 from ion.core import ioninit
 from ion.core.cc import container
 from ion.core.cc.container import Id, Container
+from ion.core.messaging.receiver import Receiver
 from ion.core.process import process
 from ion.core.process.process import IProcess, Process
 from ion.services.dm.preservation.store import Store
@@ -87,21 +88,41 @@ class IonTestCase(unittest.TestCase):
         """
         log.info("Closing ION container")
         self.test_sup = None
+        # Cancel any delayed calls, such as timeouts, looping calls etc.
         dcs = reactor.getDelayedCalls()
         if len(dcs) > 0:
             log.debug("Cancelling %s delayed reactor calls!" % len(dcs))
         for dc in dcs:
             # Cancel the registered delayed call (this is non-async)
             dc.cancel()
+
+        # The following is waiting a bit for any currently consumed messages
+        # It also prevents the arrival of new messages
+        Receiver.rec_shutoff = True
+        msgstr = ""
+        if len(Receiver.rec_messages) > 0:
+            for msg in Receiver.rec_messages.values():
+                msgstr += str(msg.payload) + ", \n"
+            #log.warn("Content rec_messages: "+str(Receiver.rec_messages))
+            log.warn("%s messages still being processed: %s" % (len(Receiver.rec_messages), msgstr))
+
+        num_wait = 0
+        while len(Receiver.rec_messages) > 0 and num_wait<10:
+            yield pu.asleep(0.2)
+            num_wait += 1
+
         if self.container:
             yield self.container.terminate()
         elif ioninit.container_instance:
             yield ioninit.container_instance.terminate()
+
+        # Reset static module values back to initial state for next test case
         bootstrap.reset_container()
-        # Temporary delay between tests with messaging to allow for complete
-        # close of connection (BUG: deferred/amqp client/missing yield?)
-        yield pu.asleep(0.1)
+
         log.info("============ION container closed============")
+
+        if msgstr:
+            raise RuntimeError("Unexpected message processed during container shutdown: "+msgstr)
 
     def _shutdown_processes(self, proc=None):
         """
