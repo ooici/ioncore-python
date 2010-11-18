@@ -319,6 +319,12 @@ class NpreservingEngine(Engine):
         if conf and conf.has_key("force_site"):
             self.available_sites = [conf["force_site"]]
         
+        if conf and conf.has_key("epuworker_type"):
+            self.available_types = [conf["epuworker_type"]]
+            
+        if conf and conf.has_key("epuworker_allocation"):
+            self.available_types = [conf["epuworker_allocation"]]
+        
         if not conf:
             # This will start at zero, the engine will do nothing until
             # reconfiguration.
