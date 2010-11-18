@@ -43,7 +43,7 @@ from ion.core.process.process import ProcessFactory
 # DHE: need to do something like: instCmdTranslator = SBE49_InstCommandXlator()
 #
 
-RESPONSE_TIMEOUT = 2   # 2 second timeout for response from instrument
+RESPONSE_TIMEOUT = 5   # 5 second timeout for response from instrument
 
 class SBE49_instCommandXlator():
     commands = {
@@ -93,6 +93,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.dataQueue = deque()
         self.cmdQueue = deque()
         self.proto = None
+        self.TimeOut = None
     
         self.instCmdXlator = SBE49_instCommandXlator()
         
@@ -282,7 +283,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
             # DHE: Don't transition to the stateConnected state
             # until we get the prompt.
             #
-            self.sendCmd(instrument_prompts.PROMPT_INST)
+            #self.sendCmd(instrument_prompts.PROMPT_INST)
+            self.sendWakeup()
             # move to stateConnected
             caller.stateTran(self.stateConnected)
             return 0
@@ -314,6 +316,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             # We got a command from the agent; need to get the prompt
             # before sending
             self.sendCmd(instrument_prompts.PROMPT_INST)
+            #self.sendWakeup()
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
             # send this up to the agent to publish.
@@ -439,8 +442,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.dataQueue.append(data)
 
     def dequeueData(self):
+        log.debug("dequeueCmd: dequeueing command")
         data = self.dataQueue.popleft()
-        #log.debug("dequeueCmd: dequeueing command: %s" %data)
+        log.debug("dequeueCmd: dequeued command: %s" %data)
         return data
         
     def enqueueCmd(self, cmd):
@@ -483,6 +487,13 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.TimeOut = Timer(RESPONSE_TIMEOUT, self.TimeoutCallback)
         self.TimeOut.start()
         
+    def sendWakeup(self):
+        log.debug("Sending Wakeup")
+        self.instrument.transport.write(instrument_prompts.PROMPT_INST)
+        # TODO: What if self.TimeOut exists and is running?  
+        #self.TimeOut = Timer(RESPONSE_TIMEOUT, self.TimeoutCallback)
+        #self.TimeOut.start()
+        
     @defer.inlineCallbacks
     def getConnected(self):
         """
@@ -498,7 +509,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
         cc = ClientCreator(reactor, InstrumentConnection, self)
         log.info("Driver connecting to instrument ipaddr: %s, ipport: %s" %(self.instrument_ipaddr, self.instrument_ipport))
         self.proto = yield cc.connectTCP(self.instrument_ipaddr, int(self.instrument_ipport))
-        log.info("Driver connected to instrument")
+        if self.instrument == None:
+            log.error("Driver failed to connect to instrument")
+            self.hsm.sendEvent('eventConnectionFailed')
+        else:
+            log.info("Driver connected to instrument")
+            self.hsm.sendEvent('eventConnectionComplete')
 
     def gotConnected(self, instrument):
         """
@@ -518,7 +534,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         #
         self.setConnected(True)
         
-        self.hsm.sendEvent('eventConnectionComplete')
+        #self.hsm.sendEvent('eventConnectionComplete')
 
 
     def gotDisconnected(self, instrument):
@@ -548,8 +564,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
         # where it is discovered that the command is valid
         #
         if self.TimeOut != None:
-             self.TimeOut.cancel()
-             self.TimeOut = None
+            log.debug("gotData: cancelling timer.")
+            self.TimeOut.cancel()
+            self.TimeOut = None
+        else:
+            log.debug("gotData: NOT cancelling timer")
         
         if data == instrument_prompts.INST_PROMPT or \
               data == instrument_prompts.INST_SLEEPY_PROMPT:
@@ -562,11 +581,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
             self.enqueueData(data)
             self.hsm.sendEvent('eventDataReceived')
         
-    def gotPrompt(self, instrument):
-        log.debug("gotPrompt()")
-        self.hsm.sendEvent('eventPromptReceived')
-
-
     @defer.inlineCallbacks
     def publish(self, data, topic):
         """
