@@ -56,7 +56,7 @@ class SchedulerTest(IonTestCase):
         """
         sc = SchedulerServiceClient(proc=self.sup)
 
-        reply = yield sc.add_task(self.dest, 0.4, 'pingtest bar')
+        reply = yield sc.add_task(self.dest, 0.3, 'pingtest bar')
         task_id = reply['value']
         log.debug(task_id)
         self.failIf(task_id == None)

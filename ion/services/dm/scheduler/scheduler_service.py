@@ -86,7 +86,9 @@ class SchedulerService(ServiceProcess):
             self.reply_err(msg, {'value': err})
             return
 
+        log.debug('Removing task_id %s from store...' % task_id)
         yield self.store.remove(task_id)
+        log.debug('Removal completed')
         yield self.reply_ok(msg, {'value': 'OK'})
 
     @defer.inlineCallbacks
@@ -126,10 +128,15 @@ class SchedulerService(ServiceProcess):
 
         reactor.callLater(interval, self._send_and_reschedule, task_id)
 
-        # Update last-invoked timestamp in registry
-        log.debug('Updating last-run time')
-        tdef['last_run'] = time.time()
-        self.store.put(task_id, tdef)
+        """
+        Update last-invoked timestamp in registry
+        @bug This code is commented out as it causes a run-time race condition with op_rm_task -
+        splitting the read and this write fails quite often.
+
+#        log.debug('Updating last-run time')
+#        tdef['last_run'] = time.time()
+#        self.store.put(task_id, tdef)
+        """
         log.debug('Task %s rescheduled for %f seconds OK' % (task_id, interval))
 
 class SchedulerServiceClient(ServiceClient):
