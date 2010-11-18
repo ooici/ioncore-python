@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """
 @file ion/data/store.py
 @package ion.data.IStore Pure virtual base class for CRUD
@@ -27,6 +25,8 @@ class IStore(Interface):
     """
     Interface all store backend implementations.
     All operations are returning deferreds and operate asynchronously.
+
+    @var namespace
     """
 
     def get(key):
@@ -58,6 +58,7 @@ class IStore(Interface):
 
 class IStoreManager(Interface):
     """
+    @note Proposed class to fulfill preservation service management?
     @brief Administrative functionality for backend store configuration. 
     """
 
@@ -76,9 +77,28 @@ class IStoreManager(Interface):
         """
         """
 
-class IStoreFactory(Interface):
+class BackendBuilder(object):
     """
+    All store client connections need:
+        - host
+        - port
+    All stores have:
+        - namespace
+
+    See if a generic process TCP connector makes sense.
+    Any implementation of IStore must operate in the ion framework, and
+    therefore it only makes sense for the life cycle of the class instance
+    and the connection of the backend client to be carried out in concert
+    with an ion process.
     """
+
+    def __init__(self, host, port, process):
+        """
+        @param process the process instance
+        """
+        self.host = host
+        self.port = port
+        self.process = process
 
 
 

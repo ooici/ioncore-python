@@ -7,6 +7,7 @@
 """
 
 from twisted.internet import defer
+from twisted.internet import reactor
 from zope.interface import implements, Interface
 
 import ion.util.ionlog
@@ -115,6 +116,10 @@ class Process(BasicLifecycleObject):
         # List of ProcessDesc instances of defined and spawned child processes
         self.child_procs = []
 
+        # TCP Connectors and Listening Ports
+        self.connectors = []
+        self.listeners = []
+
         log.debug("NEW Process instance [%s]: id=%s, sup-id=%s, sys-name=%s" % (
                 self.proc_name, self.id, self.proc_supid, self.sys_name))
 
@@ -125,6 +130,16 @@ class Process(BasicLifecycleObject):
     # initialize, activate, deactivate, terminate: (Super class) State management API
     # on_XXX: State management API action callbacks
     # plc_XXX: Callback hooks for subclass processes
+
+    def connectTCP(self, host, port, factory, timeout=30, bindAddress=None):
+        connector = reactor.connectTCP(host, port, factory, timeout, bindAddress)
+        self.connectors.append(connector)
+        return connector
+
+    def listenTCP(self, port, factory, backlog=50, interface=''):
+        port = reactor.listenTCP(port, factory, backlog, interface)
+        self.listeners.append(port)
+        return port
 
     @defer.inlineCallbacks
     def spawn(self):
@@ -226,6 +241,13 @@ class Process(BasicLifecycleObject):
         """
         @retval Deferred
         """
+        # Clean up all TCP connections and listening ports
+        for connector in self.connectors:
+            # XXX What is the best way to unit test this?
+            connector.disconnect()
+        for port in self.listeners:
+            yield port.stopListening()
+
         if len(self.child_procs) > 0:
             log.info("Shutting down child processes")
         while len(self.child_procs) > 0:

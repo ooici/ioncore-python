@@ -30,50 +30,28 @@ from ion.data import store
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-CONF = ioninit.config(__name__)
-CF_default_keyspace = CONF['default_keyspace']
-CF_default_colfamily = CONF['default_colfamily']
-CF_default_cf_super = CONF['default_cf_super']
-CF_default_namespace = CONF['default_namespace']
-CF_default_key = CONF['default_key']
+# Moving to not use CONF. In the store service module, spawn args can be
+# used to pass appropriate configuration parameters.
+#CONF = ioninit.config(__name__)
+#CF_default_keyspace = CONF['default_keyspace']
+#CF_default_colfamily = CONF['default_colfamily']
+#CF_default_cf_super = CONF['default_cf_super']
+#CF_default_namespace = CONF['default_namespace']
+#CF_default_key = CONF['default_key']
 
 
-class CassandraFactory(object):
-    """
-    """
-
-
-    def __init__(self, keyspace, host='127.1.0.1', port=9160, process=None):
-        """
-        @param keyspace Cassandra specific option (use 'ion' ?)
-        @param host defaults to localhost
-        @param port 9160 is the cassandra default
-        """
-        self.host = host
-        self.port = port
-        self.keyspace = None
-
-    def buildStore(self, keyspace):
-        """
-        The keyspace could be an arg here.
-        """
-        f = ManagedCassandraClientFactory()
-        client = CassandraClient(f, self.keyspace) 
-        connector = reactor.connectTCP(self.host, self.port, f)
 
 class CassandraStore(object):
     """
-    Store interface for interacting with the Cassandra key/value store
-    A Cassandra client connects to a particular Keyspace within a Cassandra
-    server at a particular Host/Port.
-    @note Default behavior is to use a random super column name space!
+    An Adapter class that implements the IStore interface by way of a
+    cassandra client connection. As an adapter, this assumes an active
+    client (it implements/provides no means of connection management).
+    The same client instance could be used by another adapter class that
+    implements another interface.
+
     @todo Provide explanation of the cassandra options 
-     - keyspace
-       Outer-most level of organization. Usually the name of the
-       application (e.g. Twitter, Ion). 
-     - column family
-       A column family is like a database table. The Store namespace maps
-       to the name of a column family (column path).
+     - keyspace: Outermost context within a Cassandra server (like vhost).
+     - column family: Like a database table. 
     """
 
     implements(store.IStore)
@@ -83,51 +61,7 @@ class CassandraStore(object):
         """
         self.client = client
 
-
-    @classmethod
-    def create_store(cls, **kwargs):
-        """
-        @brief Factory method to create an instance of the cassandra store.
-        @param kwargs keyword arguments to configure the store.
-        @param cass_host_list List of hostname:ports for cassandra host or cluster
-        @retval Deferred, for IStore instance.
-        """
-        log.info('In create_store method')
-        inst = cls(**kwargs)
-        inst.kwargs = kwargs
-        inst.cass_host_list = kwargs.get('cass_host_list', None)
-        inst.keyspace = kwargs.get('keyspace', CF_default_keyspace)
-        inst.colfamily = kwargs.get('colfamily', CF_default_colfamily)
-        inst.cf_super = kwargs.get('cf_super', CF_default_cf_super)
-        inst.key = kwargs.get('key', CF_default_key)
-        
-        if not inst.key:
-            inst.key = str(uuid.uuid4())
-        
-        if inst.cf_super:
-            inst.namespace = kwargs.get('namespace', CF_default_namespace)
-            if inst.namespace == None:
-                # Must change behavior to set a random namespace so that test don't interfere!
-                inst.namespace = ':'
-        else:
-            if inst.namespace:
-                log.info('Ignoring namespace argument in non super column cassandra store')
-            inst.namespace=None
-        
-        if  inst.cass_host_list is None:
-            port = 9160
-            host = 'amoeba.ucsd.edu'
-        else:
-            port = int(inst.cass_host_list[0].split(":")[1])
-            host = inst.cass_host_list[0].split(":")[0]
-            log.info("Got host %s and port %d from cass_host_list" % (host, port))
-                
-        inst.manager = ManagedCassandraClientFactory()
-        inst.client = CassandraClient(inst.manager, inst.keyspace) 
-        inst.connector = reactor.connectTCP(host, port, inst.manager, timeout=1)
-        log.info("Created Cassandra store")
-        return defer.succeed(inst)               
-
+    @defer.inlineCallbacks
     def get(self, key):
         """
         @brief Return a value corresponding to a given key
@@ -137,7 +71,7 @@ class CassandraStore(object):
         
         log.info("CassandraStore: Calling get on col %s " % key)
         try:
-            value = yield self.client.get(key, self.colfamily, column='value')
+            value = yield self.client.get(key, self.namespace, column='value')
         except NotFoundException:
             log.info("Didn't find the col: %s. Returning None" % col)     
             defer.returnValue(None)
@@ -213,3 +147,60 @@ class CassandraStore(object):
         else:
             yield self.client.remove(self.key, self.colfamily, column=col)
         defer.returnValue(None)
+
+
+class CassandraFactory(object):
+    """
+    The store class attribute is the IStore adapter class that will be used
+    to Adapt the cassandra client instance.
+
+    @note Design note: This is more of an Adapter than a pure Factory. The
+    intended use is not necessarily to create an arbitrary number of
+    cassandra client instances, but really to automate the creation of one
+    client, and then adapt that client to conform to the IStore interface.
+    """
+    
+    # This is the Adapter class. The default, CassandraStore, implements
+    # the IStore interface. You can assign other Adapters here, if you want
+    # something besides IStore.
+    store = CassandraStore
+
+    def __init__(self, host='127.1.0.1', port=9160, namespace='default'):
+        """
+        @param host defaults to localhost
+        @param port 9160 is the cassandra default
+        @param namespace Maps to Cassandra specific Keyspace option
+        @todo Decide on good default for namespace
+        @note Design Note: These are standard parameters that any StoreFactory 
+        would need. In particular, the namespace parameter is an
+        implementation choice to fulfill a [not fully articulated]
+        architectural need.
+        """
+        self.host = host
+        self.port = port
+        # @note The cassandra KeySpace is used to implement the IStore namespace
+        # concept.
+        self.keyspace = namespace
+
+    def buildStore(self, process):
+        """
+        @param process instance of ion process. If you are calling from an
+        ion Service, then pass in 'self'. If you need to, you can pass in
+        the reactor object.
+        @note This is an experimental idea
+        """
+        f = ManagedCassandraClientFactory()
+        client = CassandraClient(f, self.keyspace) 
+        process.connectTCP(self.host, self.port, f)
+        # What we have with this
+        # CassandraFactory class is a mixture of a Factory pattern and an
+        # Adapter pattern. s is our IStore providing instance the user of
+        # the factory expects. If we were to make a general "StoreFactory"
+        # or maybe even an "IStoreFactory" interface, it's behavior would
+        # be to build/carryout the mechanics of a TCP client connection AND
+        # then Adapting it and returning the result as an IStore providing
+        # instance.
+        s = self.store(client)
+        return s
+
+
