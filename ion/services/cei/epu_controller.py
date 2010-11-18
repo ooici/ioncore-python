@@ -67,9 +67,38 @@ class EPUControllerService(ServiceProcess):
         if not self.laterinitialized:
             log.error("message got here without the later-init")
         self.core.new_sensor_info(content)
+        
+    def op_reconfigure(self, content, headers, msg):
+        log.info("EPU Controller: reconfigure: '%'" % content)
+        self.core.run_reconfigure(content)
 
     def op_cei_test(self, content, headers, msg):
         log.info('EPU Controller: CEI test'+ content)
+
+class EPUControllerClient(ServiceClient):
+    """
+    Client for sending messages directly to an EPU Controller
+    """
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "epu_controller"
+        ServiceClient.__init__(self, proc, **kwargs)
+
+    @defer.inlineCallbacks
+    def reconfigure(self, newconf):
+        """Triggers a reconfigure option.  This might not be implemented by
+        the decision engine implementation that the EPU Controller is
+        configured with.  The new configuration is interpreted in a very
+        specific way, see the comments and/or documentation for the EPU
+        controller (and in particular the decision engine that it is
+        expected to be implemented with).
+        
+        @param newconf None or dict of key/value pairs
+        """
+        yield self._check_init()
+        log.debug("Sending reconfigure request to EPU controller: '%s'" % self.target)
+        yield self.send('reconfigure', None)
+
 
 # Direct start of the service as a process with its default name
 factory = ProcessFactory(EPUControllerService)
