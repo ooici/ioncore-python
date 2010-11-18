@@ -25,6 +25,7 @@ twotp==0.7
 txAMQP==0.3
 wsgiref==0.1.2
 zope.interface==3.6.1
+pyrods-irods>=2.4.1
 
 # non specific
 numpy
