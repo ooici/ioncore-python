@@ -50,36 +50,33 @@ class SchedulerTest(IonTestCase):
         pass
 
     @defer.inlineCallbacks
-    def test_add_only(self):
+    def test_complete_usecase(self):
+        """
+        Add a task, get a message, remove same.
+        """
         sc = SchedulerServiceClient(proc=self.sup)
 
-        reply = yield sc.add_task(self.dest, 1.0, 'pingtest bar')
+        reply = yield sc.add_task(self.dest, 0.3, 'pingtest bar')
         task_id = reply['value']
         log.debug(task_id)
         self.failIf(task_id == None)
 
-        # Wait for a message to go through the system - delay is 2x the cycle time of the scheduled task.
-        yield asleep(2.0)
+        # Wait for a message to go through the system
+        yield asleep(0.5)
         mc = yield self.client.get_count()
         self.failUnless(int(mc['value']) >= 1)
 
-        """
-        @bug For some reason, the container fails unless we delay for a bit here.
-        """
-        yield asleep(1.0)
+        rc = yield sc.rm_task(task_id)
+        self.failUnlessEqual(rc['value'], 'OK')
 
     @defer.inlineCallbacks
     def test_add_remove(self):
         sc = SchedulerServiceClient(proc=self.sup)
 
-        task_id = yield sc.add_task(self.dest, 1.0, 'pingtest foo')
+        task_id = yield sc.add_task(self.dest, 10.5, 'pingtest foo')
         rc = yield sc.rm_task(task_id)
         self.failUnlessEqual(rc['value'], 'OK')
         log.debug(rc)
-        """
-        @bug For some reason, the container fails unless we delay for a bit here.
-        """
-        yield asleep(1.0)
 
     @defer.inlineCallbacks
     def test_query(self):
