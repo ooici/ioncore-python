@@ -50,11 +50,11 @@ class KeyValueStoreService(service_process.ServiceProcess):
         port = self.spawn_args["port"]
         namespace = self.spawn_args["namespace"]
         process = self
-        store_factory = self.storeFactory(host, port, namespace)
+        store_factory = self.storeFactory(host, port, self)
         # The buildStore method uses connectTCP, and therefore is not a
         # deferred function. This means there is not a guarantee the store
         # will be connected by the time messages arrive to the service.
-        self.store = store_factory.buildStore(process) #Not sure if this is the best way
+        self.store = store_factory.buildStore(namespace) #Not sure if this is the best way
                                           #pass in the process instance;
                                           #trying it for now. Comments
                                           #welcome

@@ -56,6 +56,9 @@ class CassandraStore(object):
 
     implements(store.IStore)
 
+    namespace = 'default' # implemented as cassandra column family
+                          # (Telephus columnPath)
+
     def __init__(self, client):
         """functional wrapper around active client instance
         """
@@ -69,15 +72,14 @@ class CassandraStore(object):
         @retval Deferred that fires with the value of key
         """
         
-        log.info("CassandraStore: Calling get on col %s " % key)
+        log.debug("CassandraStore: Calling get on col %s " % key)
         try:
-            value = yield self.client.get(key, self.namespace, column='value')
+            result = yield self.client.get(key, self.namespace, column='value')
+            value = result.column.value
         except NotFoundException:
-            log.info("Didn't find the col: %s. Returning None" % col)     
-            defer.returnValue(None)
-            
-        column_value = value.column.value 
-        defer.returnValue(column_value)
+            log.debug("Didn't find the key: %s. Returning None" % col)     
+            value = None
+        defer.returnValue(value)
 
     @defer.inlineCallbacks
     def put(self, col, value):
@@ -165,11 +167,16 @@ class CassandraFactory(object):
     # something besides IStore.
     store = CassandraStore
 
-    def __init__(self, host='127.1.0.1', port=9160, namespace='default'):
+    cassandraKeyspace = "Keyspace1"
+
+    def __init__(self, host='127.1.0.1', port=9160, process=None):
         """
         @param host defaults to localhost
         @param port 9160 is the cassandra default
-        @param namespace Maps to Cassandra specific Keyspace option
+        @param process instance of ion process. If you are calling from an
+        ion Service, then pass in 'self'. If you need to, you can pass in
+        the reactor object.
+        @note This is an experimental idea
         @todo Decide on good default for namespace
         @note Design Note: These are standard parameters that any StoreFactory 
         would need. In particular, the namespace parameter is an
@@ -178,20 +185,21 @@ class CassandraFactory(object):
         """
         self.host = host
         self.port = port
+        if process is None:
+            process = reactor
+        self.process = process
+
+    def buildStore(self, namespace):
+        """
+        @param namespace Maps to Cassandra specific columnFamily option
+        @note For cassandra, there needs to be a conventionaly used
+        Keyspace option.
+        """
         # @note The cassandra KeySpace is used to implement the IStore namespace
         # concept.
-        self.keyspace = namespace
-
-    def buildStore(self, process):
-        """
-        @param process instance of ion process. If you are calling from an
-        ion Service, then pass in 'self'. If you need to, you can pass in
-        the reactor object.
-        @note This is an experimental idea
-        """
         f = ManagedCassandraClientFactory()
-        client = CassandraClient(f, self.keyspace) 
-        process.connectTCP(self.host, self.port, f)
+        client = CassandraClient(f, keyspace=self.cassandraKeyspace) 
+        self.process.connectTCP(self.host, self.port, f)
         # What we have with this
         # CassandraFactory class is a mixture of a Factory pattern and an
         # Adapter pattern. s is our IStore providing instance the user of
@@ -201,6 +209,7 @@ class CassandraFactory(object):
         # then Adapting it and returning the result as an IStore providing
         # instance.
         s = self.store(client)
+        s.namespace = namespace
         return s
 
 
