@@ -386,6 +386,15 @@ class SBE49InstrumentDriver(InstrumentDriver):
             #
             caller.stateTran(self.stateDisconnecting)
             return 0
+        elif caller.tEvt['sType'] == "eventDisconnectComplete":
+            # TODO: cleanup??
+            #
+            # Transition to the stateDisconnected state
+            #
+            log.info("Connection terminated by server!")
+            self.__cleanUp()
+            caller.stateTran(self.stateDisconnected)
+            return 0
         elif caller.tEvt['sType'] == "eventResponseTimeout":
             self.ProcessCmdResponseTimeout()
             caller.stateTran(self.stateConnected)
@@ -422,6 +431,12 @@ class SBE49InstrumentDriver(InstrumentDriver):
             
         yield self.op_disconnect(None, None, None)
 
+    def __cleanUp(self):
+        if self.TimeOut != None:
+            log.debug("Timer active: cancelling")
+            self.TimeOut.cancel()
+            self.TimeOut = None
+
     def isConnected(self):
         return self.connected
 
@@ -442,9 +457,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.dataQueue.append(data)
 
     def dequeueData(self):
-        log.debug("dequeueCmd: dequeueing command")
+        log.debug("dequeueData: dequeueing command")
         data = self.dataQueue.popleft()
-        log.debug("dequeueCmd: dequeued command: %s" %data)
+        log.debug("dequeueData: dequeued command: %s" %data)
         return data
         
     def enqueueCmd(self, cmd):
