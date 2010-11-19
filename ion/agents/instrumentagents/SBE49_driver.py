@@ -97,13 +97,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
     
         self.instCmdXlator = SBE49_instCommandXlator()
         
-        #
-        # DHE: trying to objectize the hsm stuff...
-        #
-        
-        #self.Testhsm = instrument_hsm.InstrumentHsm()
-        #self.hsm = InstrumentHsm()
-        self.hsm = SBE49InstrumentHsm()
+        self.hsm = InstrumentHsm()
         
         #
         # DHE: Testing miros FSM.
@@ -392,7 +386,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
             # Transition to the stateDisconnected state
             #
             log.info("Connection terminated by server!")
-            self.__cleanUp()
             caller.stateTran(self.stateDisconnected)
             return 0
         elif caller.tEvt['sType'] == "eventResponseTimeout":
@@ -425,17 +418,19 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
     @defer.inlineCallbacks
     def plc_terminate(self):
-        if self.TimeOut != None:
-            self.TimeOut.cancel()
-            self.TimeOut = None
+        self.__terminateTimer()
             
         yield self.op_disconnect(None, None, None)
 
-    def __cleanUp(self):
+    def __cleanUpConnection(self):
+        self.__terminateTimer()
+            
+    def __terminateTimer(self):
         if self.TimeOut != None:
             log.debug("Timer active: cancelling")
             self.TimeOut.cancel()
             self.TimeOut = None
+        
 
     def isConnected(self):
         return self.connected
@@ -562,6 +557,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         log.debug("gotDisconnected.")
 
+        self.__cleanUpConnection()
         self.hsm.sendEvent('eventDisconnectComplete')
 
         self.proto = None
