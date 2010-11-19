@@ -43,13 +43,6 @@ class IStore(Interface):
         @retval Deferred, for success of this operation
         """
 
-    def query(regex):
-        """
-        @param regex regular expression matching zero or more keys
-        @retval Deferred, for list of values for keys matching the regex
-        @NOTE In question for removal.
-        """
-
     def remove(key):
         """
         @param key  an immutable key associated with a value
@@ -124,22 +117,6 @@ class Store(object):
         @see IStore.put
         """
         return defer.maybeDeferred(self.kvs.update, {key:value})
-
-    def query(self, regex):
-        """
-        @see IStore.query
-        """
-        return defer.maybeDeferred(self._query, regex)
-
-    def _query(self, regex):
-        #keys = [re.search(regex,m).group() for m in self.kvs.keys() if re.search(regex,m)]
-        match_list=[]
-        for s in self.kvs.keys():
-            #m = re.search(regex, s)
-            m = re.findall(regex, s)
-            if m:
-                match_list.extend(m)
-        return match_list
 
     def remove(self, key):
         """
