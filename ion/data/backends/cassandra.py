@@ -77,12 +77,12 @@ class CassandraStore(object):
             result = yield self.client.get(key, self.namespace, column='value')
             value = result.column.value
         except NotFoundException:
-            log.debug("Didn't find the key: %s. Returning None" % col)     
+            log.debug("Didn't find the key: %s. Returning None" % key)     
             value = None
         defer.returnValue(value)
 
     @defer.inlineCallbacks
-    def put(self, col, value):
+    def put(self, key, value):
         """
         @brief Write a key/value pair into cassandra
         @param key Lookup key
@@ -90,65 +90,19 @@ class CassandraStore(object):
         @note Value is composed into OOI dictionary under keyname 'value'
         @retval Deferred for success
         """
-        log.info("CassandraStore: Calling put on col: %s  value: %s " % (col, value))
-        try:
-            if self.cf_super:
-                log.info("CassandraStore: super_col key %s colfamily %s value %s column %s super_column %s " % (self.key, self.colfamily, value, col, self.namespace))
-                yield self.client.insert(self.key, self.colfamily, value, column=col, super_column=self.namespace) 
-            else:
-                yield self.client.insert(self.key, self.colfamily, value, column=col)
-        except:
-            log.info("CassandraStore: Exception was thrown during the put")
-        defer.returnValue(None)
+        log.debug("CassandraStore: Calling put on key: %s  value: %s " % (key, value))
+        # @todo what exceptions need to be handled for an insert?
+        yield self.client.insert(key, self.namespace, value, column='value')
 
     @defer.inlineCallbacks
-    def query(self, regex):
-        """
-        @brief Search by regular expression
-        @param regex Regular expression to match against the keys
-        @retval Deferred, for list, possibly empty, of keys that match.
-        @note Uses get_range generator of unknown efficiency.
-        """
-        log.info("searching for regex %s" % regex)
-        matched_list = []
-        if self.cf_super:
-            klist = yield self.client.get(self.key, self.colfamily, super_column=self.namespace)
-        else:
-            klist = yield self.client.get_slice(self.key, self.colfamily)
-        
-        #This code could probably be refactored. The data structures returned are different if
-        #it is called with a column or super_column. Another possibility is that the code 
-        #is removed when the IStore interface doesn't use the query interface.
-        if self.cf_super:
-            columns = klist.super_column.columns
-            for col in columns:
-            
-                m = re.findall(regex, str(col.name))
-                
-                if m: 
-                    matched_list.extend(m)
-        else:
-            for col in klist:
-                m = re.findall(regex, str(col.column.name))
-                if m:
-                    matched_list.extend(m)
-
-        log.info("matched_list %s" % matched_list)
-        defer.returnValue(matched_list)
-
-    @defer.inlineCallbacks
-    def remove(self, col):
+    def remove(self, key):
         """
         @brief delete a key/value pair
         @param key Key to delete
         @retval Deferred, for success of operation
         @note Deletes are lazy, so key may still be visible for some time.
         """
-        if self.cf_super:
-            yield self.client.remove(self.key, self.colfamily, column=col, super_column=self.namespace)
-        else:
-            yield self.client.remove(self.key, self.colfamily, column=col)
-        defer.returnValue(None)
+        yield self.client.remove(key, self.namespace, column='value')
 
 
 class CassandraFactory(object):
@@ -169,7 +123,7 @@ class CassandraFactory(object):
 
     cassandraKeyspace = "Keyspace1"
 
-    def __init__(self, host='127.1.0.1', port=9160, process=None):
+    def __init__(self, host='localhost', port=9160, process=None):
         """
         @param host defaults to localhost
         @param port 9160 is the cassandra default
@@ -197,8 +151,8 @@ class CassandraFactory(object):
         """
         # @note The cassandra KeySpace is used to implement the IStore namespace
         # concept.
-        f = ManagedCassandraClientFactory()
-        client = CassandraClient(f, keyspace=self.cassandraKeyspace) 
+        f = ManagedCassandraClientFactory(keyspace=self.cassandraKeyspace)
+        client = CassandraClient(f)
         self.process.connectTCP(self.host, self.port, f)
         # What we have with this
         # CassandraFactory class is a mixture of a Factory pattern and an
