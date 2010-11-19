@@ -13,10 +13,12 @@ class instrument_prompts:
     INST_PROMPT = ">"
 
 instrument_commands = (
+    "break",
     "cf",
     "ck",
     "cr",
     "cs",
+    "cz",
     "ea",
     "ed",
     "es",

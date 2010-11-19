@@ -28,16 +28,47 @@ import ion.util.procutils as pu
 
 from ion.core.process.process import ProcessFactory
 
+import logging
 import time
 from socket import *
 import sys
-from threading import Timer
+from threading import Timer, BoundedSemaphore
 from collections import deque
-import logging
- 
-CMD_RESPONSE_TIMEOUT = 2     # 2 second timeout for command response from instrument
+from twisted.internet.protocol import Protocol
+                       
+CMD_RESPONSE_TIMEOUT = 3     # 2 second timeout for command response from instrument
 BREAK_RESPONSE_TIMEOUT = 4   # 4 second timeout for break response from instrument
 
+class CmdPort(Protocol):
+    
+    def __init__(self, parent):
+        self.parent = parent
+        log.info("CmdPort __init__")
+
+    def connectionMade(self):
+        """
+        @brief A client has made a connection:
+        """
+        log.info("CmdPort connectionMade")
+        self.parent.gotCmdConnected(self)
+
+    def dataReceived(self, data):
+        if log.getEffectiveLevel() == logging.DEBUG:
+            DataAsHex = ""
+            for i in range(len(data)):
+                if len(DataAsHex) > 0:
+                    DataAsHex += ","
+                DataAsHex += "{0:X}".format(ord(data[i]))
+            log.debug("CmdPort dataReceived [%s] [%s]" % (data, DataAsHex))
+        else:
+            log.info("CmdPort dataReceived [%s]" % data)
+        self.parent.gotCmdData(data)
+            
+    def connectionLost(self, reason):
+        #log.debug("CmdPort connectionLost - %s" % reason)
+        log.debug("CmdPort connectionLost")
+
+        
 class WHSentinelADCP_instCommandXlator():
     commands = {
        ' ' : ' '
@@ -50,13 +81,14 @@ class WHSentinelADCP_instCommandXlator():
             return(command)
 
 class WHSentinelADCPInstrumentDriver(InstrumentDriver):
-    """
+    """                 
     Maybe some day these values are looked up from a registry of common
     controlled vocabulary
     """
-
     def __init__(self, *args, **kwargs):
+        self.SendingBreak = False
         self.instrument = None
+        self.CmdInstrument = None
         self.command = None
         self.setTopicDefined(False)
         self.publish_to = None
@@ -223,7 +255,8 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         log.debug("statePrompted-%s;" %(caller.tEvt['sType']))
         if caller.tEvt['sType'] == "init":
             if self.cmdPending():
-                self.sendCmd(self.PeekCmd())
+                if (self.TimeOut == None) and (self.SendingBreak == False):
+                    self.sendCmd(self.PeekCmd())
                 # Only way to get here is from stateConnected after receiving a
                 # prompt, so not getting a response is an error condition
                 self.NoResponseIsError = True
@@ -240,7 +273,8 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
             if self.cmdPending():
-                self.sendCmd(self.PeekCmd())
+                if (self.TimeOut == None) and (self.SendingBreak == False):
+                    self.sendCmd(self.PeekCmd())
             else:
                 log.error("statePrompted: No command to send!")
             return 0
@@ -345,8 +379,11 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             return False
         
 
-    def TimeoutCallback(self):
-        log.info("TimeoutCallback()")
+    def TimeoutCallback(self, Reason):
+        if Reason == "C":
+            log.info("TimeoutCallback() for Command")
+        else:
+            log.info("TimeoutCallback() for Break")
         if self.TimeOut != None:
             self.TimeOut = None
             self.hsm.sendEvent('eventResponseTimeout')
@@ -367,40 +404,51 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
 
     def sendCmd(self, cmd):
         log.info("Sending Command: %s" %cmd)
-        self.instrument.transport.write(cmd + instrument_prompts.DRIVER_LINE_TERMINATOR)
-        self.TimeOut = Timer(CMD_RESPONSE_TIMEOUT, self.TimeoutCallback)
-        self.TimeOut.start()
-        
-        
-    def sendBreak(self):
-        if self.instrument_ipaddr == "localhost" or self.instrument_ipaddr == "127.0.0.1":
-            # localhost(127.0.0.1) implies the use of the instrument simulator so just send a simple CR/LF
-            log.info("Sending CR to simulator")
-            self.instrument.transport.write(instrument_prompts.DRIVER_LINE_TERMINATOR)
+        if cmd == "break":
+            self.sendBreak()
         else:
-            log.info("Sending break to instrument ipaddr: %s, ipport: %s" %(self.instrument_ipaddr, self.instrument_ipportCmd))      
-            try:
-                s = socket(AF_INET, SOCK_STREAM)    # create a TCP socket   
-                s.settimeout(2)                     # set timeout to 2 seconds for reads
-                s.connect((self.instrument_ipaddr, self.instrument_ipportCmd))
-                s.send('\x21\x00')                  # start sending break
-                data = s.recv(1024)                 # receive up to 1K bytes
-                if data != '\x21OK':
-                    raise RuntimeError('OK response not received')
-                log.debug("Rcvd OK response for 'start break' cmd")
-                time.sleep (1)
-                s.send('\x22\x00')                  # stop sending break
-                data = s.recv(1024)                 # receive up to 1K bytes
-                if data != '\x22OK':
-                    raise RuntimeError('OK response not received')
-                log.debug("Rcvd OK response for 'stop break' cmd")
-            except:
-                log.error("Send break failed: %s" % sys.exc_info()[1])
-                return
-        self.TimeOut = Timer(BREAK_RESPONSE_TIMEOUT, self.TimeoutCallback)
+            self.instrument.transport.write(cmd + instrument_prompts.DRIVER_LINE_TERMINATOR)
+            self.TimeOut = Timer(CMD_RESPONSE_TIMEOUT, self.TimeoutCallback, "C")
+            self.TimeOut.start()
+        
+        
+    @defer.inlineCallbacks
+    def sendBreak(self):
+        if self.SendingBreak == True:
+            log.debug("already sending break")
+            return
+        else:
+            self.SendingBreak = True
+        Cmdcc = ClientCreator(reactor, CmdPort, self)
+        log.info("Driver connecting to instrument command port ipaddr: %s, ipportCmd: %s" %(self.instrument_ipaddr, self.instrument_ipportCmd))
+        self.Cmdproto = yield Cmdcc.connectTCP(self.instrument_ipaddr, int(self.instrument_ipportCmd))
+        if self.CmdInstrument == None:
+            log.error("Driver failed to connect to instrument command port")
+            return
+        else:
+            log.info("Driver connected to instrument command port")
+        log.info("Sending break to instrument ipaddr: %s, ipport: %s" %(self.instrument_ipaddr, self.instrument_ipportCmd))
+        self.CmdData = ""
+        try:
+            self.CmdInstrument.transport.write('\x21\x00')   # start sending break
+            yield pu.asleep(1)
+            #if self.CmdData != '\x21OK':
+            #    raise RuntimeError('OK response not received')
+            #log.debug("Rcvd OK response for 'start break' cmd")
+            self.CmdInstrument.transport.write('\x22\x00')   # stop sending break
+            #if self.CmdData != '\x22OK':
+            #    raise RuntimeError('OK response not received')
+            #log.debug("Rcvd OK response for 'stop break' cmd")
+        except:
+            log.error("Send break failed: %s" % sys.exc_info()[1])
+            self.Cmdproto.transport.loseConnection()
+            return
+        self.Cmdproto.transport.loseConnection()
+        self.TimeOut = Timer(BREAK_RESPONSE_TIMEOUT, self.TimeoutCallback, "B")
         self.TimeOut.start()
-
+        self.SendingBreak = False
                 
+
     def ProcessRcvdData(self):
         # for now, publish a complete line at a time
         while instrument_prompts.ADCP_LINE_TERMINATOR in self.dataQueue:
@@ -409,7 +457,8 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             if len(self.cmdQueue) > 0:
                 Cmd = self.PeekCmd()
                 log.debug("looking for command %s in %s" % (Cmd, partition[0]))
-                if Cmd in partition[0]:
+                if (((Cmd == "break") and ("BREAK Wakeup A" in partition[0])) or
+                    (Cmd in partition[0])):
                     if self.TimeOut != None:
                         self.TimeOut.cancel()
                         self.TimeOut = None
@@ -422,6 +471,36 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             self.publish(partition[0], self.publish_to)
           
         
+    def gotCmdConnected(self, instrument):
+        """
+        @brief This method is called when a connection has been made to the
+        instrument device server.  The instrument protocol object is passed
+        as a parameter, and a reference to it is saved.  
+        @param reference to instrument protocol object.
+        @retval none
+        """
+        log.debug("gotCmdConnected!!!")
+
+        self.CmdInstrument = instrument
+
+
+    def gotCmdData(self, data):
+        """
+        @brief The instrument command object has received data from the
+        instrument command port. 
+        @param data
+        @retval none
+        """
+        
+        if log.getEffectiveLevel() == logging.DEBUG:
+            DataAsHex = ""
+            for i in range(len(data)):
+                if len(DataAsHex) > 0:
+                    DataAsHex += ","
+                DataAsHex += "{0:X}".format(ord(data[i]))
+            log.debug("gotCmdData() [%s] [%s]" % (data, DataAsHex))
+        self.CmdData = data
+
     @defer.inlineCallbacks
     def getConnected(self):
         """
@@ -468,6 +547,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         """
         log.debug("gotDisconnected!!!")
 
+        self.instrument = None
         self.hsm.sendEvent('eventDisconnectComplete')
 
 
@@ -618,15 +698,15 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
                 instCommand += value
                 log.info("op_execute queueing command: %s to instrument" % instCommand)
                 self.enqueueCmd(instCommand)
-
+                # respond to command
+                agentCommands.append(command)
+                yield self.reply_ok(msg, agentCommands)
                 """
                 Send the command received event.  This should kick off the
                 appropriate sequence of events to get the command sent.
                 """
                 self.hsm.sendEvent('eventCommandReceived')
 
-                agentCommands.append(command)
-                yield self.reply_ok(msg, agentCommands)
 
 
     @defer.inlineCallbacks

@@ -9,6 +9,7 @@ instrument agents and drivers. This program can be fleshed out as needed.
 @date 10-19-10
 """
 
+import logging
 import ion.util.ionlog
 import random
 import math
@@ -26,6 +27,40 @@ from ion.agents.instrumentagents.simulators.Simulator_constants import NUMBER_OF
 
 INSTRUMENT_ID = "456"
 
+class CmdPort(protocol.Protocol):
+    
+    def __init__(self):
+        log.info("CmdPort __init__")
+        
+    def connectionMade(self):
+        """
+        @brief A client has made a connection:
+        """
+        log.info("CmdPort connectionMade")
+        self.factory.connections.append(self)
+
+    def dataReceived(self, data):
+        if log.getEffectiveLevel() == logging.DEBUG:
+            DataAsHex = ""
+            for i in range(len(data)):
+                if len(DataAsHex) > 0:
+                    DataAsHex += ","
+                DataAsHex += "{0:X}".format(ord(data[i]))
+            log.debug("CmdPort dataReceived [%s] [%s]" % (data, DataAsHex))
+        else:
+            log.info("CmdPort dataReceived [%s]" % data)
+        if data == "\x21\x00":
+            log.debug("responding to 21")
+            self.transport.write("\x21OK")
+        if data == "\x22\x00":
+            log.debug("responding to 22")
+            self.transport.write("\x22OK")
+            self.factory.parent.InstrumentRef.BreakReceived()
+            
+    def connectionLost(self, reason):
+        #log.debug("CmdPort connectionLost - %s" % reason)
+        self.factory.connections.remove(self)
+        
 class Instrument(protocol.Protocol):
     """
     The instrument protocol class. Simulate a Teledyne Worckhorse Sentinel ADCP
@@ -49,8 +84,13 @@ class Instrument(protocol.Protocol):
     bad_parameters_error = ' ERR :  Bad command parameters\r\n' + prompt
     set_to_factory = '[Parameters set to FACTORY defaults]\r\n' + prompt
     set_to_user = '[Parameters set to USER defaults]\r\n' + prompt
+    Wakeup = '[BREAK Wakeup A]\r\n' + \
+             'WorkHorse Broadband ADCP Version 16.30\r\n' + \
+             'Teledyne RD Instruments (c) 1996-2007\r\n' + \
+             'All Rights Reserved.' + prompt
     simple_commands = {
         'ck' : '[Parameters saved as USER defaults]\r\n' + prompt,
+        'cz' : 'Powering Down\r\n' + prompt,
         'experton' : 'Expert Mode is ON\r\n' + prompt,
         'expertoff' : 'Expert Mode is OFF\r\n' + prompt,
         'ol' : '                               FEATURES\r\n' +
@@ -78,17 +118,25 @@ class Instrument(protocol.Protocol):
     }
 
     def __init__(self):
+        log.debug("instrument __init__")
         self.lc_testSampler = task.LoopingCall(self.testSampler)
         self.lc_autoSampler = task.LoopingCall(self.autoSampler)
 
         self.numTestSamples = 0  # variable to hold number of test samples taken
         self.maxTestSamples = 10 # maximumm number of test stamples to take
         self.testInterval = 1    # interval in seconds between samples in test commands (TT, etc.)
-        self.autoInterval = 20    # interval in seconds between samples in autonomous mode
+        self.autoInterval = 6    # interval in seconds between samples in autonomous mode
         self.testRunning = 'false'
         self.autoRunning = 'false'
         self.sample_cnt = 0
 
+    def BreakReceived(self):
+        self.transport.write(self.Wakeup)
+        if self.autoRunning == 'true':
+            log.info("Stopping auto samples")
+            self.stopAutoSamples()
+            self.autoRunning = 'false'
+  
     def connectionMade(self):
         """
         @brief A client has made a connection: call factory to pass
@@ -97,6 +145,8 @@ class Instrument(protocol.Protocol):
         @retval none
         """
         self.factory.connections.append(self)
+        self.factory.parent.InstrumentRef = self
+
 
     def dataReceived(self, data):
         """
@@ -112,6 +162,15 @@ class Instrument(protocol.Protocol):
             DataAsHex += "{0:X}".format(ord(data[i]))
         log.info("dataReceived() [%s] [%s]" % (data, DataAsHex))
         
+        """
+        If anything is received, and the Worckhorse Sentinel ADCP is in autonomous
+        mode stop sending samples at the configured interval.
+        """
+        if self.autoRunning == 'true':
+            log.info("Stopping auto samples")
+            self.stopAutoSamples()
+            self.autoRunning = 'false'
+            
         # don't know how line was terminated, so remove whatever it was first
         data = data.strip("\r")  # strip off any CRs
         data = data.strip("\n")  # strip off any LFs
@@ -154,38 +213,6 @@ class Instrument(protocol.Protocol):
                     self.startTestSamples()
                     self.testRunning = 'true'
                     
-            elif command == "cs":    # start command
-                """
-                @note If start command is received, and the Worckhorse Sentinel ADCP is
-                not already running a test or sending samples, start sending samples at the configured interval.
-                """
-                if len(value) != 0:
-                    self.transport.write(self.extra_parameters_error)
-                    return
-                if self.testRunning == 'false' and self.autoRunning == 'false':
-                    log.debug("Starting auto samples")
-                    self.autoRunning = 'true'
-                    # The factory handles the sending at intervals.
-                    self.startAutoSamples()
-                else:
-                    # Currently we don't simulate auto/polled: we just handle the
-                    # start/stop as if we're in auto mode (mode defaults to auto
-                    # and doesn't change). But, in the future we might want to
-                    # simulate the modes: wouldn't be hard.
-                    self.transport.write(self.commands[command])
-                    
-            elif command == "stop":   # not really an instrument command, added to stop simulation
-                """
-                @note If stop command is received, and the Worckhorse Sentinel ADCP is in autonomous
-                mode stop sending samples at the configured interval.
-                """
-                if self.autoRunning == 'true':
-                    log.debug("Stopping auto samples")
-                    self.stopAutoSamples()
-                    self.autoRunning = 'false'
-                # Print prompt whether we stopped or not
-                self.transport.write(self.prompt)
-                
             elif command == "cf":
                 if not value.isdigit():
                     self.transport.write(self.bad_parameters_error)
@@ -209,6 +236,25 @@ class Instrument(protocol.Protocol):
                     self.transport.write(self.set_to_user)
                 else:
                     self.transport.write(self.out_of_bounds_error)
+                    
+            elif command == "cs":    # start command
+                """
+                @note If start command is received, and the Worckhorse Sentinel ADCP is
+                not already running a test or sending samples, start sending samples at the configured interval.
+                """
+                if len(value) != 0:
+                    self.transport.write(self.extra_parameters_error)
+                    return
+                if self.testRunning == 'false' and self.autoRunning == 'false':
+                    self.autoRunning = 'true'
+                    # The factory handles the sending at intervals.
+                    self.startAutoSamples()
+                else:
+                    # Currently we don't simulate auto/polled: we just handle the
+                    # start/stop as if we're in auto mode (mode defaults to auto
+                    # and doesn't change). But, in the future we might want to
+                    # simulate the modes: wouldn't be hard.
+                    self.transport.write(self.commands[command])
                     
             elif command == "ea":
                 if value[0] == '-':
@@ -288,7 +334,7 @@ class Instrument(protocol.Protocol):
                                 return
                     self.transport.write(self.prompt)
                     
-            elif command == "t9":
+            elif command == "tp":
                 temp = value
                 value = temp.lstrip(':')
                 if not value.isdigit():
@@ -377,6 +423,7 @@ class Instrument(protocol.Protocol):
     def autoSampler(self):
         # Send a sample to the client.  This happens until the client sends a
         # stop command.
+        log.info("autoSampler")
         self.transport.write(self.get_next_sample())
 
     def get_next_sample(self):
@@ -403,7 +450,7 @@ class Instrument(protocol.Protocol):
                '6400000064000000640000006400000064000000640000006400000064000000' + \
                '6400000064000000640000006400000064000000640000006400000064000000' + \
                '6400000064000000640000006400000064000000640000006400000064000000' + \
-               '6400000064000000640000006400C837C277\n'
+               '6400000064000000640000006400C837C277\r\n'
 
     def startTestSamples(self):
         # start the test sample timer
@@ -411,24 +458,35 @@ class Instrument(protocol.Protocol):
 
     def startAutoSamples(self):
         # start the autonomous sample timer
+        log.info("Starting auto samples")
         self.lc_autoSampler.start(self.autoInterval)
 
     def stopAutoSamples(self):
         # stop the autonomous sample timer
         self.lc_autoSampler.stop()
+        
+    def test(self, p):
+        log.debug("in test")
 
 
 
 class Simulator(object):
 
     all_simulators = []
+    InstrumentRef = None
 
     def __init__(self, instrument_id=INSTRUMENT_ID, port=None):
         self.state = "NEW"
         self.factory = protocol.Factory()
         self.factory.protocol = Instrument
-        self.instrument_id = instrument_id
         self.factory.connections = []
+        self.factory.parent = self
+        log.debug("self.factory.parent = %s" % self.factory.parent)
+        self.Cmdfactory = protocol.Factory()
+        self.Cmdfactory.protocol = CmdPort
+        self.Cmdfactory.connections = []
+        self.Cmdfactory.parent = self
+        self.instrument_id = instrument_id
         parsed = __file__.rpartition('/')
         parsed = parsed[2].partition('.')
         SimulatorName = parsed[0]
@@ -437,7 +495,7 @@ class Simulator(object):
                 port = NO_PORT_NUMBER_FOUND
             else:
                 port = portNumbers[SimulatorName]
-        self.port = port
+        self.DataPort = port
         Simulator.all_simulators.append(self)
 
     def start(self):
@@ -449,25 +507,36 @@ class Simulator(object):
         if an new client connects while another is connected, the client variable
         in the factory will be overwritten).
         """
-        if self.port == NO_PORT_NUMBER_FOUND:
+        if self.DataPort == NO_PORT_NUMBER_FOUND:
             log.error("Failed to start Workhorse Sentinel ADCP simulator, no default port number")
-            return NO_PORT_NUMBER_FOUND
+            return [NO_PORT_NUMBER_FOUND, NO_PORT_NUMBER_FOUND]
         assert (self.state == "NEW" or self.state == "STOPPED")
+        StartingPortNumber = self.DataPort
         Listening = False
-        StartingPortNumber = self.port
         while not Listening:
             try:
-                self.listenport = reactor.listenTCP(self.port, self.factory)
+                self.listenport = reactor.listenTCP(self.DataPort, self.factory)
                 Listening = True
             except:
-                self.port = self.port + 1
-                if self.port == StartingPortNumber + NUMBER_OF_PORTS_AVAILABLE:
+                self.DataPort = self.DataPort + 1
+                if self.DataPort == StartingPortNumber + NUMBER_OF_PORTS_AVAILABLE:
                     log.error("Failed to start Workhorse Sentinel ADCP simulator, no ports available")
-                    return NO_PORT_NUMBER_FOUND
+                    return [NO_PORT_NUMBER_FOUND, NO_PORT_NUMBER_FOUND]
+        Listening = False
+        self.CmdPort = self.DataPort + 1
+        while not Listening:
+            try:
+                self.Cmdlistenport = reactor.listenTCP(self.CmdPort, self.Cmdfactory)
+                Listening = True
+            except:
+                self.CmdPort = self.CmdPort + 1
+                if self.CmdPort == StartingPortNumber + NUMBER_OF_PORTS_AVAILABLE:
+                    log.error("Failed to start Workhorse Sentinel ADCP simulator, no ports available")
+                    return [NO_PORT_NUMBER_FOUND, NO_PORT_NUMBER_FOUND]
         self.state = "STARTED"
-        log.info("Started Workhorse Sentinel ADCP simulator for ID %s on port %d" \
-                 % (self.instrument_id, self.port))
-        return self.port
+        log.info("Started Workhorse Sentinel ADCP simulator for ID %s on ports %d %d" \
+                 % (self.instrument_id, self.DataPort, self.CmdPort))
+        return [self.DataPort, self.CmdPort]
 
 
     @defer.inlineCallbacks
@@ -476,7 +545,8 @@ class Simulator(object):
         for conn in self.factory.connections:
             yield conn.transport.loseConnection()
         yield self.listenport.stopListening()
-        log.info("Stopped Workhorse Sentinel ADCP simulator on port %d" % (self.port))
+        yield self.Cmdlistenport.stopListening()
+        log.info("Stopped Workhorse Sentinel ADCP simulator on port %d" % (self.DataPort))
         self.state = "STOPPED"
 
     @classmethod
