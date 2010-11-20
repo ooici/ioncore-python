@@ -44,7 +44,7 @@ class Instrument(protocol.Protocol):
 
     # The following are class static variables (USED AS CONSTANTS)
     prompt = 'S>'
-    pumpInfo = 'SBE 49 FastCAT V 1.3a SERIAL NO. 0055'
+    pumpInfo = 'SBE 49 FastCAT SIMULATOR'
     sampleData = '21.9028,  1.00012,    1.139,   1.0103\n'
     commands = {
         'ds' : pumpInfo + '\n' +
@@ -139,8 +139,8 @@ class Instrument(protocol.Protocol):
         @param none
         @retval none
         """
-        # Print prompt
-        self.transport.write(self.prompt)
+        # Not sending a prompt at startup anymore. 
+        #self.transport.write(self.prompt)
         self.factory.connections.append(self)
 
     def dataReceived(self, data):

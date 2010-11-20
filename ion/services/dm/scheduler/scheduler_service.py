@@ -11,12 +11,14 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 import time
+import threading
 import re
 from uuid import uuid4
 
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.attributestore import AttributeStoreClient
+
 
 class SchedulerService(ServiceProcess):
     """
@@ -33,10 +35,11 @@ class SchedulerService(ServiceProcess):
         # @note Might want to start another AS instance with a different target name
         self.store = AttributeStoreClient(targetname='attributestore')
 
-        # See if this is a restart - any records present?
-        d = self.store.query('.+')
-        d.addCallback(self._maybe_restart)
+    def slc_stop(self):
+        log.debug('SLC stop of Scheduler')
 
+    def slc_shutdown(self):
+        log.debug('SLC shutdown of Scheduler')
 
     @defer.inlineCallbacks
     def op_add_task(self, content, headers, msg):
@@ -83,8 +86,9 @@ class SchedulerService(ServiceProcess):
             self.reply_err(msg, {'value': err})
             return
 
+        log.debug('Removing task_id %s from store...' % task_id)
         yield self.store.remove(task_id)
-        log.debug('Remove completed OK')
+        log.debug('Removal completed')
         yield self.reply_ok(msg, {'value': 'OK'})
 
     @defer.inlineCallbacks
@@ -110,7 +114,7 @@ class SchedulerService(ServiceProcess):
         """
         log.debug('Worker activated for task %s' % task_id)
         tdef = yield self.store.get(task_id)
-        if not tdef:
+        if tdef == None:
             log.info('Task ID missing in store, assuming removal and aborting')
             return
 
@@ -124,32 +128,16 @@ class SchedulerService(ServiceProcess):
 
         reactor.callLater(interval, self._send_and_reschedule, task_id)
 
-        # Update last-invoked timestamp in registry
-        log.debug('Updating last-run time')
-        tdef['last_run'] = time.time()
-        self.store.put(task_id, tdef)
+        """
+        Update last-invoked timestamp in registry
+        @bug This code is commented out as it causes a run-time race condition with op_rm_task -
+        splitting the read and this write fails quite often.
+
+#        log.debug('Updating last-run time')
+#        tdef['last_run'] = time.time()
+#        self.store.put(task_id, tdef)
+        """
         log.debug('Task %s rescheduled for %f seconds OK' % (task_id, interval))
-
-    def _maybe_restart(self, tasklist):
-        """
-        Callback from slc_init, if tasklist is non-null we have to do a restart.
-        """
-        rec_count = len(tasklist)
-        if rec_count > 0:
-            log.warn('%d old scheduler records found in keystore!' % rec_count)
-            self._do_restart()
-        else:
-            log.debug('Clean startup, no records found.')
-
-    @defer.inlineCallbacks
-    def _do_restart(self):
-        """
-        Handle the case of restarting the service, where there are already records
-        in the keystore at startup time. Have to do the reschedule for each of them
-        as per their interval.
-        @todo Implement restart capability!
-        """
-        pass
 
 class SchedulerServiceClient(ServiceClient):
     """
