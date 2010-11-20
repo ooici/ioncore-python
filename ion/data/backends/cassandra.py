@@ -23,6 +23,8 @@ from zope.interface import implements
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
 from telephus.cassandra.ttypes import NotFoundException
+from telephus.cassandra.ttypes import KsDef
+from telephus.cassandra.ttypes import CfDef
 
 from ion.core import ioninit
 from ion.data import store 
@@ -104,6 +106,34 @@ class CassandraStore(object):
         """
         yield self.client.remove(key, self.namespace, column='value')
 
+class CassandraManager(object):
+
+    keyspace = None
+
+    def __init__(self, client):
+        self.client = client
+
+    def _set_keyspace(self, keyspace):
+        """
+        This is for convenience and testing.
+        When the cassandra cluster is deployed, the deploy-er should
+        establish the existence of the keyspace.
+        """
+        ksdef = KsDef(name=keyspace, replication_factor=1,
+                strategy_class='org.apache.cassandra.locator.SimpleStrategy',
+                cf_defs=[])
+        return self.client.system_add_keyspace(ksdef)
+
+    def create(self, name):
+        """
+        """
+        cfdef = CfDef(keyspace=self.keyspace, name=name)
+        return self.client.system_add_column_family(cfdef)
+
+    def remove(self, name):
+        """
+        """
+        return self.system_drop_column_family(name)
 
 class CassandraFactory(object):
     """
