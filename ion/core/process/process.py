@@ -316,6 +316,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
             log.error("Message received after process %s RPC conv-id=%s timed out=%s: %s" % (
                 self.proc_name, payload['conv-id'], rpc_deferred, payload))
             return
+        rpc_deferred.rpc_call.cancel()
         res = (content, payload, msg)
 
 
@@ -435,7 +436,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
             self.rpc_conv[convid] = "TIMEOUT:%s" % pu.currenttime_ms()
             d.errback(defer.TimeoutError())
         if timeout:
-            reactor.callLater(timeout, _timeoutf)
+            callto = reactor.callLater(timeout, _timeoutf)
+            rpc_deferred.rpc_call = callto
         self.rpc_conv[convid] = rpc_deferred
         d = self.send(recv, operation, content, msgheaders)
         # d is a deferred. The actual send of the request message will happen

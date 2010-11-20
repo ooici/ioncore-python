@@ -8,7 +8,7 @@
 
 class instrument_prompts:
     PROMPT_INST = "\r\n"
-    INST_PROMPT = "\r\n>"
+    INST_PROMPT = ">"
 
 instrument_commands = (
     "cf",
