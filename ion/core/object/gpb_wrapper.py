@@ -380,6 +380,7 @@ class Wrapper(object):
     def _recurse_commit(self,structure):
         
         if not self.modified:
+            print 'jsjsjsjsjsjsjsjsjsjsjsjsjsjsjsjsjsjsjsjsj'
             # This object is already committed!
             return
         

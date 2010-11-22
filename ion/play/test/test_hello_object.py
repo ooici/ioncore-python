@@ -45,8 +45,8 @@ class HelloProcessTest(IonTestCase):
         sup2 = yield bootstrap.create_supervisor()
         
         
-        log.info('Calling hello there with hc(sup1)')
-        hc1 = HelloObjectClient(proc=sup1,target=proc1_id)
+        log.info('Calling hello there with hc(sup2)')
+        hc1 = HelloObjectClient(proc=sup2,target=proc1_id)
         yield hc1.hello("Hi there, hello1")
 
 

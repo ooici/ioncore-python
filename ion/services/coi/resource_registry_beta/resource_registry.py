@@ -104,7 +104,7 @@ class ResourceRegistryService(ServiceProcess):
     
         id = yield _register_resource_instance(content)
 
-        yield self.reply(id)
+        yield self.reply(msg, content=id)
 
     
 

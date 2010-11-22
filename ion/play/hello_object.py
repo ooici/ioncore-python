@@ -55,6 +55,12 @@ class HelloObject(Process):
         
         print 'AB', ab
         
+        print 'Commiting.....'
+        
+        ab.repository.commit('adding a commit')
+        
+        print 'Commited, now sending reply'
+        
         # The following line shows how to reply to a message
         yield self.reply(msg, 'result', ab)
 
@@ -80,7 +86,7 @@ class HelloObjectClient(ProcessClient):
         ab.person[0] = p
         
         print 'AdressBook!',ab
-        #repo.commit('My addresbook test')
+        repo.commit('My addresbook test')
 
         
         (content, headers, msg) = yield self.rpc_send('hello', ab)

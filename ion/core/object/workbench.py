@@ -342,9 +342,12 @@ class WorkBench(object):
         The operation which responds to a pull 
         """
         
+        print 'Received pull request, id:', content
+        
         repo = self.get_repository(content)
         
         if repo:
+            print 'HEHREHEHEHEHEHEH'
             yield self._process.reply(msg,content=repo)
         else:
             yield self._process.reply(msg,response_code=self._process.APP_RESOURCE_NOT_FOUND)
@@ -554,11 +557,27 @@ class WorkBench(object):
         # Can not do this once the repo storage is more complex!
         # assert repo in self._repos.values(), 'This repository is not in the process workbench!'
         
+        
         mutable = repo._dotgit
+        
+        
+
         # Get the Structure Element for the mutable head
-        structure = {}
-        mutable._recurse_commit(structure)
-        root_obj = structure.get(mutable.myid)
+        
+        root_obj = self._hashed_elements.get(mutable.myid)
+        
+        if not root_obj:
+
+            # Make sure the mutable appears to be modified
+            mutable.set_modified = True
+            print 'Mutable', mutable
+
+            structure = {}
+            mutable._recurse_commit(structure)
+            print 'structure keys',structure.keys()
+            root_obj = structure.get(mutable.myid)
+
+        print 'ROOT Obj', root_obj
             
         cref_set = set()
         for branch in mutable.branches:
@@ -677,11 +696,13 @@ class WorkBench(object):
         # An unwrapped GPB Structure message to put stuff into!
         cs = container_pb2.Structure()
         
+        print 'Packing head object', head
         cs.head.key = head._element.key
         cs.head.type.CopyFrom(head._element.type)
         cs.head.isleaf = head._element.isleaf
         cs.head.value = head._element.value
                         
+        print 'Packing object list...'
         for key in object_keys:
             hashed_obj = self._hashed_elements.get(key)         
             gpb_obj = hashed_obj._element
@@ -746,14 +767,9 @@ class WorkBench(object):
             repo._workspace_root = root_obj
             repo._workspace[root_obj.myid] = root_obj
 
-            # Use the helper method to make a commit ref to our new object root
-            cref = repo._create_commit_ref(comment='Message for you Sir!')
-            
-            # Set the current (master) branch to point at this commit
-            brnch = repo._current_branch
-            bref = brnch.commitrefs.add() 
-            bref.set_link(cref)
-            
+            # Create a commit to record the state when the message arrived
+            cref = repo.commit(comment='Message for you Sir!')
+
             # Now load the rest of the linked objects - down to the leaf nodes.
             repo._load_links(root_obj)
             

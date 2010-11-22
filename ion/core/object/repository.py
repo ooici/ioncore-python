@@ -427,7 +427,7 @@ class Repository(object):
             pref.set_link_by_name('commitref',parent)
             pref.relationship = pref.Parent
         elif len(branch.commitrefs)>1:
-            raise Excpetion, 'The Branch is in an invalid state and should have been merged on read!'
+            raise Exception, 'The Branch is in an invalid state and should have been merged on read!'
         else:
             # This is a new branch and we must add a place for the commit ref!
             branch.commitrefs.add()
@@ -601,6 +601,7 @@ class Repository(object):
             return obj
             
         else:
+            print 'LINK Not Found: \n', link 
             raise Exception, 'Object not in workbench! You must pull the leaf elements!'
             #return self._workbench.fetch_linked_objects(link)
             
