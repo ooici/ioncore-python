@@ -41,7 +41,8 @@ class Options(usage.Options):
                     ]
     optFlags = [
                 ["no_shell", "n", "Do not start shell"],
-                ]
+                ["no_history", "i", "Do not read/write history file"],
+                    ]
 
     def opt_version(self):
         from ion.core.ionconst import VERSION

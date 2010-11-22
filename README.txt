@@ -35,9 +35,9 @@ This project has several dependencies on libraries and packages. Most of these
 dependencies are resolved automatically using the provided setup script.
 
 Step 1: Virtual env
-   Create a Python virtual environment using virtualenv. This ensures that all
-   libraries and dependencies are installed separately from the Python
-    system libraries.
+    Create a Python virtual environment using virtualenv. This ensures that all
+    libraries and dependencies are installed separately from the Python
+    system libraries
 ::
     mkvirtualenv lcaarch
     workon lcaarch
@@ -46,7 +46,8 @@ Step 2: Core libraries (you can skip this step)
     Install some core libraries first. Sometimes the automatic installer
     produces errors, if these libraries are not present beforehand.
 ::
-    easy_install twisted numpy
+    easy_install numpy
+    easy_install -U twisted
 
 Step 3: Run the setup script
 ::
@@ -74,6 +75,10 @@ Start empty Python Capability Container shell with:
 ::
     bin/start-cc -h amoeba.ucsd.edu
     bin/start-cc   # to run with localhost
+    # Alternatively the direct call to twistd developer
+    twistd -n cc -h amoeba.ucsd.edu
+    # To set a sysname, i.e. a "cluster name" for all containers in a cluster
+    twistd -n cc -h amoeba.ucsd.edu -a sysname=mycluster
 
 (to end a capability container shell, press Ctrl-D Ctrl-C)
 

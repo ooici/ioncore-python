@@ -123,6 +123,10 @@ class TestSBE49(IonTestCase):
         """
 
         #raise unittest.SkipTest('Temporarily skipping')
+        yield pu.asleep(4)
+        #result = yield self.driver_client.execute(cmd2)
+
+        result = yield self.driver_client.disconnect(['some arg'])
 
 
     @defer.inlineCallbacks
@@ -184,14 +188,15 @@ class TestSBE49(IonTestCase):
 
         subscription.workflow = {
             'consumer1':
-                {'module':'ion.services.dm.distribution.consumers.logging_consumer',
+                #{'module':'ion.services.dm.distribution.consumers.logging_consumer',
+                {'module':'ion.agents.instrumentagents.test.inst_consumer',
                  'consumerclass':'LoggingConsumer',\
                  'attach':'topic1'}
                 }
 
         subscription = yield dpsc.define_subscription(subscription)
 
-        log.info('Defined subscription: '+str(subscription))
+        log.info('test_sample: Defined subscription: '+str(subscription))
 
         params = {}
         params['publish-to'] = topic.RegistryIdentity
@@ -204,29 +209,3 @@ class TestSBE49(IonTestCase):
 
         result = yield self.driver_client.disconnect(['some arg'])
 
-class DataConsumer(Process):
-    """
-    A class for spawning as a separate process to consume the responses from
-    the instrument.
-    """
-
-    @defer.inlineCallbacks
-    def attach(self, topic_name):
-        """
-        Attach to the given topic name
-        """
-        self.dataReceiver = Receiver(name=topic_name, handler=self.receive)
-        yield self.dataReceiver.attach()
-
-        self.receive_cnt = 0
-        self.received_msg = []
-        self.ondata = None
-
-    @defer.inlineCallbacks
-    def op_data(self, content, headers, msg):
-        """
-        Data has been received.  Increment the receive_cnt
-        """
-        log.debug("@@@@@@@@@@@@@@@@@@@@@@@@ data received: %s" %s(str(self.received_msg)))
-        self.receive_cnt += 1
-        self.received_msg.append(content)

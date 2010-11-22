@@ -15,7 +15,6 @@ import random
 import logging
 from twisted.internet import defer
 
-from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core import ioninit
 from ion.core import bootstrap
 

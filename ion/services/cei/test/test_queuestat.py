@@ -9,9 +9,9 @@
 
 import os
 import uuid
-from twisted.trial import unittest
 
 from twisted.internet import defer
+from twisted.trial import unittest
 
 from ion.core.process.process import Process
 import ion.util.procutils as pu
