@@ -20,8 +20,8 @@ class DataStoreTest(IonTestCase):
     """
     
     # This is a temporary way to test communication between python and java using GPBs...
-    #FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/01184000_0.protostruct'
-    FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/grid.protostruct'
+    FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/01184000_0.protostruct'
+    #FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/grid.protostruct'
 
     @defer.inlineCallbacks
     def setUp(self):

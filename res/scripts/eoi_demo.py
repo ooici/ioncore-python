@@ -33,7 +33,8 @@ def start():
     services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'datastore'}},
-            {'name':'eoi_ingest1','module':'ion.services.dm.ingestion.eoi_ingester','class':'EOIIngestionService'}]
+            {'name':'eoi_ingest1','module':'ion.services.dm.ingestion.eoi_ingester','class':'EOIIngestionService'},
+            {'name':'javaint','module':'ion.demo.lca.javaint_service','class':'JavaIntegrationService'}]
  
     startsvcs.extend(services)
 
