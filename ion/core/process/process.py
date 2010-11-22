@@ -438,7 +438,13 @@ class Process(BasicLifecycleObject):
         """
         pass
 
-    def p_request(self, message):
+    def perf_request(self, message):
+        """
+        @brief Receives a new request for action as "Participant" role.
+            Instantiates the FIPA request interaction pattern.
+        """
+
+    def perf_inform_done(self, message):
         """
         @brief Receives a new request for action as "Participant" role.
             Instantiates the FIPA request interaction pattern.

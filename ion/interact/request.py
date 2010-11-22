@@ -31,8 +31,8 @@ class RequestFSMFactory(ConversationTypeFSMFactory):
     E_REFUSE = "refuse"
     E_AGREE = "agree"
     E_FAILURE = "failure"
-    E_DONE = "inform-done"
-    E_DONE_RESULT = "inform-result"
+    E_DONE = "inform_done"
+    E_DONE_RESULT = "inform_result"
     E_ERROR = "error"
 
     def create_fsm(self, target, memory=None):
