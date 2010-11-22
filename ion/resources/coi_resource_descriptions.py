@@ -117,13 +117,16 @@ class IdentityResource(StatefulResource):
     """
     # These are the fields that we get from the Trust Provider
     #ooi_id = TypedAttribute(str)
-    common_name = TypedAttribute(str)
-    country = TypedAttribute(str)
-    trust_provider = TypedAttribute(str) # this is the trust provider /O (Organization field)
-    domain_component = TypedAttribute(str)
+    #common_name = TypedAttribute(str)
+    #country = TypedAttribute(str)
+    #trust_provider = TypedAttribute(str) # this is the trust provider /O (Organization field)
+    #domain_component = TypedAttribute(str)
+    #expiration_date = TypedAttribute(str)
+    
+    subject = TypedAttribute(str)
     certificate = TypedAttribute(str)
     rsa_private_key = TypedAttribute(str)
-    expiration_date = TypedAttribute(str)
+    
     # These are the fields we prompt the user for during registration
     #first_name = TypedAttribute(str)
     #last_name = TypedAttribute(str)

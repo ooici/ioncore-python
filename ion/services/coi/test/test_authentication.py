@@ -15,7 +15,7 @@ from ion.core.exception import ReceivedError
 from ion.test.iontest import IonTestCase
 from ion.services.coi.identity_registry import IdentityRegistryClient
 
-import ion.services.coi.authentication
+from ion.services.coi.authentication import Authentication
 
 from ion.resources import coi_resource_descriptions
 
@@ -43,68 +43,101 @@ class AuthenticationTest(IonTestCase):
     @defer.inlineCallbacks
     def test_sign(self):
         """
+        get fresh cert/keys from https://merge.ncsa.uiuc.edu/portal3/
         """
 
 
         user = coi_resource_descriptions.IdentityResource.create_new_resource()
-
+ 
         # initialize the user
-        user.common_name = "Roger Unwin A13"
-        user.country = "US"
-        user.trust_provider = "ProtectNetwork"
-        user.domain_component = "cilogon"
+        #user.common_name = "Roger Unwin A13"
+        #user.country = "US"
+        #user.trust_provider = "ProtectNetwork"
+        #user.domain_component = "cilogon"
+        user.subject = "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254"
         user.certificate =  """-----BEGIN CERTIFICATE-----
-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
+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
-GQYDVQQDExJDSUxvZ29uIEJhc2ljIENBIDEwHhcNMTAxMTAxMTk1OTM1WhcNMTAxMTA1MjAwNDM1
+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
-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
+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
-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
+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
 -----END CERTIFICATE-----"""
         user.rsa_private_key = """-----BEGIN RSA PRIVATE KEY-----
-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
+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
 -----END RSA PRIVATE KEY-----"""
-        user.expiration_date = "Tue Jun 29 23:32:16 PDT 2010"
+        #user.expiration_date = "Tue Jun 29 23:32:16 PDT 2010"
 
 
-
+        authentication = Authentication()
 
         user = yield self.identity_registry_client.register_user(user)
         ooi_id = user.reference()
         
-        sign_message(self, 'this is a test', ooi_id)
+        user = yield self.identity_registry_client.get_user(ooi_id)
+        signed_message = authentication.sign_message('this is a test', user.rsa_private_key)
         
-        self.assertEqual(verify_message(self, 'this is a test', ooi_id), True)
+        self.assertEqual( authentication.verify_message('this is a test', user.certificate, signed_message), True)
+        
+        signed_message_hex = authentication.sign_message_hex('this is a test', user.rsa_private_key)
+        
+        self.assertEqual( authentication.verify_message_hex('this is a test', user.certificate, signed_message_hex), True)
+        
+        # should do negative tests. perhaps later
+        
+        
+        encrypted_message = authentication.private_key_encrypt_message('The Fat Brown Fox Frowned Funnily', user.rsa_private_key)
+        
+        self.assertEqual(authentication.private_key_decrypt_message(encrypted_message, user.rsa_private_key), 'The Fat Brown Fox Frowned Funnily')
+        
+        encrypted_message_hex = authentication.private_key_encrypt_message_hex('The Fat Brown Fox Frowned Funnily', user.rsa_private_key)
+        
+        self.assertEqual(authentication.private_key_decrypt_message_hex(encrypted_message_hex, user.rsa_private_key), 'The Fat Brown Fox Frowned Funnily')
+        
+        
+        pub_enc = authentication.public_encrypt('this is a simple text', user.rsa_private_key)
+        self.assertEqual(authentication.private_decrypt(pub_enc, user.rsa_private_key), 'this is a simple text')
+        pub_enc_hex = authentication.public_encrypt_hex('this is a simple text', user.rsa_private_key)
+        self.assertEqual(authentication.private_decrypt_hex(pub_enc_hex, user.rsa_private_key), 'this is a simple text')
+        
+        print "decode " + str(authentication.decode_certificate(user.certificate))
+        
+        print "verify chain " + str(authentication.verify_certificate_chain(user.certificate))
+        
+        print "within date range " + str(authentication.is_certificate_within_date_range(user.certificate))
+        
+        
+        authentication.register_user(user.certificate, user.rsa_private_key)
