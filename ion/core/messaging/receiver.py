@@ -79,6 +79,11 @@ class Receiver(BasicLifecycleObject):
 
         self.xname = pu.get_scoped_name(self.name, self.scope)
 
+        # A dict of messages in current processing. NOTE: Should be a queue
+        self.processing_messages = {}
+        # A Deferred to await processing completion after of deactivate
+        self.completion_deferred = None
+
     @defer.inlineCallbacks
     def attach(self, *args, **kwargs):
         """
@@ -131,6 +136,7 @@ class Receiver(BasicLifecycleObject):
         """
         yield self.consumer.cancel()
         self.consumer.callbacks.remove(self._receive)
+        self.completion_deferred = defer.Deferred()
 
     @defer.inlineCallbacks
     def on_terminate(self, *args, **kwargs):
@@ -145,6 +151,10 @@ class Receiver(BasicLifecycleObject):
             pass
         else:
             raise RuntimeError("Illegal state change")
+
+    @defer.inlineCallbacks
+    def _await_message_processing(self):
+        return self.completion_deferred
 
     def add_handler(self, callback):
         self.handlers.append(callback)
@@ -172,11 +182,16 @@ class Receiver(BasicLifecycleObject):
         if self.rec_shutoff:
             log.warn("MESSAGE RECEIVED AFTER SHUTOFF - DROPPED")
             log.warn("Dropped message: "+str(msg.payload))
+            # @todo ACK for now. Should be requeue.
+            yield msg.ack()
             return
 
         assert not id(msg) in self.rec_messages, "Message already consumed"
         self.rec_messages[id(msg)] = msg
+        assert not id(msg) in self.processing_messages, "Message already consumed"
+        self.processing_messages[id(msg)] = msg
 
+        org_msg = msg
         data = msg.payload
         if not self.raw:
             inv = Invocation(path=Invocation.PATH_IN,
@@ -191,9 +206,13 @@ class Receiver(BasicLifecycleObject):
             for handler in self.handlers:
                 yield defer.maybeDeferred(handler, data, msg)
         finally:
-            if msg._state == "RECEIVED":
+            if org_msg._state == "RECEIVED":
                 log.error("Message has not been ACK'ed at the end of processing")
-            del self.rec_messages[id(msg)]
+            del self.rec_messages[id(org_msg)]
+            del self.processing_messages[id(org_msg)]
+            if self.completion_deferred and len(self.processing_messages) == 0:
+                self.completion_deferred.callback(None)
+                self.completion_deferred = None
 
     @defer.inlineCallbacks
     def send(self, **kwargs):

@@ -58,7 +58,9 @@ class IONMessageInterceptor(EnvelopeInterceptor):
         #msg['in-reply-to'] = ''
         #msg['reply-by'] = ''
         msg.update(headers)
-        # Operation of the message, aka performative, verb, method
+        # Performative of the message
+        msg['performative'] = message.get('performative','')
+        # Operation = Action request of the message
         msg['op'] = message.get('operation')
         # The actual content
         msg['content'] = message.get('content')

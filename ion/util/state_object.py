@@ -164,6 +164,9 @@ class BasicStates(object):
     E_TERMINATE = "terminate"
     E_ERROR = "error"
 
+    # Actions - in general called the same as the triggering event
+    A_ACTIVE_TERMINATE = "terminate_active"
+
 class BasicFSMFactory(FSMFactory):
     """
     A FSM factory for FSMs with basic state model.
@@ -193,7 +196,8 @@ class BasicFSMFactory(FSMFactory):
 
         actionfct = self._create_action_func(actf, BasicStates.E_TERMINATE)
         fsm.add_transition(BasicStates.E_TERMINATE, BasicStates.S_READY, actionfct, BasicStates.S_TERMINATED)
-        # @todo This is unclear. Is the action the same for terminate from READY and ACTIVE?
+
+        actionfct = self._create_action_func(actf, BasicStates.A_ACTIVE_TERMINATE)
         fsm.add_transition(BasicStates.E_TERMINATE, BasicStates.S_ACTIVE, actionfct, BasicStates.S_TERMINATED)
 
         actionfct = self._create_action_func(actf, BasicStates.E_ERROR)
@@ -237,6 +241,14 @@ class BasicLifecycleObject(StateObject):
 
     def on_deactivate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
+
+    def on_terminate_active(self, *args, **kwargs):
+        """
+        @brief this is a shorthand delegating to on_terminate from the ACTIVE
+            state. Subclasses can override this action handler with more specific
+            functionality
+        """
+        return self.on_terminate(*args, **kwargs)
 
     def on_terminate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")

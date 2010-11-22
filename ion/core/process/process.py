@@ -20,8 +20,9 @@ from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
 from ion.core.process.cprocess import IContainerProcess, ContainerProcess
 from ion.services.dm.preservation.store import Store
-from ion.interact.conversation import Conversation
+from ion.interact.conversation import Conversation, ConversationManager
 from ion.interact.message import Message
+from ion.interact.request import Request
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject
 
@@ -51,9 +52,6 @@ class Process(BasicLifecycleObject):
     plc-* process life cycle events.
     """
     implements(IProcess)
-
-    # @todo CHANGE: Conversation ID counter
-    convIdCnt = 0
 
     def __init__(self, receiver=None, spawnargs=None, **kwargs):
         """
@@ -113,6 +111,9 @@ class Process(BasicLifecycleObject):
         self.receivers = {}
         self.add_receiver(self.receiver)
         self.add_receiver(self.backend_receiver)
+
+        # Delegate class to manage all conversations of this process
+        self.conv_manager = ConversationManager(self)
 
         # Dict of converations by conv-id
         self.conversations = {}
@@ -228,6 +229,20 @@ class Process(BasicLifecycleObject):
         except Exception, ex:
             if msg != None:
                 yield self.reply_err(msg, "Process %s TERMINATE ERROR" % (self.id), exception=ex)
+
+    @defer.inlineCallbacks
+    def on_terminate_active(self, *args, **kwargs):
+        # This is temporary while there is no deactivate for a process (don't)
+        # want to do this right now.
+        yield self.receiver.deactivate()
+        yield self.receiver._await_message_processing()
+
+        # @todo: What about messages still being processed?
+
+        yield self.on_terminate(*args, **kwargs)
+
+        yield self.backend_receiver.deactivate()
+        yield self.backend_receiver._await_message_processing()
 
     @defer.inlineCallbacks
     def on_terminate(self, msg=None, *args, **kwargs):
@@ -402,7 +417,7 @@ class Process(BasicLifecycleObject):
 
     # --- Interaction pattern
 
-    def request(self, message, **kwargs):
+    def request(self, receiver, action, content, headers=None):
         """
         @brief Sends a request message to the recipient. Instantiates the
             FIPA request interaction pattern. The recipient needs to responde
@@ -412,7 +427,10 @@ class Process(BasicLifecycleObject):
             Synchronous call.
         @exception Various exceptions for different failures
         """
-        pass
+        if headers == None:
+            headers = {}
+        headers['performative'] = 'request'
+        return self.rpc_send(recv=receiver, operation=action, content=content, headers=headers, **kwargs)
 
     def request_async(self, message, **kwargs):
         """
@@ -425,6 +443,9 @@ class Process(BasicLifecycleObject):
         @brief Receives a new request for action as "Participant" role.
             Instantiates the FIPA request interaction pattern.
         """
+
+    def _start_new_conversation(self, receiver, performative):
+        pass
 
     # --- Outgoing message handling
 
@@ -458,12 +479,16 @@ class Process(BasicLifecycleObject):
     def send(self, recv, operation, content, headers=None, reply=False):
         """
         @brief Send a message via the process receiver to destination.
-        Starts a new conversation.
+            Starts a new conversation.
         @retval Deferred for send of message
         """
         msgheaders = self._prepare_message(headers)
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders)
+
+        convid = headers['conv-id']
+        #self.conversations[convid] = Conversation()
+
         if reply:
             d = self.receiver.send(**message)
         else:
@@ -476,19 +501,11 @@ class Process(BasicLifecycleObject):
         if headers:
             msgheaders.update(headers)
         if not 'conv-id' in msgheaders:
-            convid = self._create_convid()
+            convid = self.conv_manager.create_conversation_id()
             msgheaders['conv-id'] = convid
             msgheaders['conv-seq'] = 1
             self.conversations[convid] = Conversation()
         return msgheaders
-
-    def _create_convid(self):
-        # Returns a new unique conversation id
-        send = self.id.full
-        Process.convIdCnt += 1
-        convid = "#" + str(Process.convIdCnt)
-        #convid = send + "#" + Process.convIdCnt
-        return convid
 
     def reply(self, msg, operation, content, headers=None):
         """

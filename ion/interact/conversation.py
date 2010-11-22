@@ -85,3 +85,29 @@ class ConversationTypeFSMFactory(FSMFactory):
         def action_target(fsm):
             return target(action, fsm)
         return action_target
+
+class ConversationManager(object):
+    """
+    @brief Oversees a set of conversations, e.g. within a process instance
+    """
+
+    # @todo CHANGE: Conversation ID counter
+    convIdCnt = 0
+
+    def __init__(self, process):
+        self.process = process
+        self.conversations = {}
+
+    def msg_sent(self, message):
+        pass
+
+    def msg_received(self, message):
+        pass
+
+    def create_conversation_id(self):
+        # Returns a new unique conversation id
+        self.convIdCnt += 1
+        convid = "#" + str(self.convIdCnt)
+        #send = self.process.id.full
+        #convid = send + "#" + Process.convIdCnt
+        return convid
