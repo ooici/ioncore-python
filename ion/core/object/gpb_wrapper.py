@@ -40,7 +40,11 @@ def sha1_to_hex(bytes):
     return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
 
 def set_type_from_obj(obj):
+    """
+    Move to object utilities module
     
+    Operates on instances and classes of gpb messages!
+    """
     gpbtype = type_pb2.GPBType()
     
     # Take just the file name
@@ -88,7 +92,7 @@ class Wrapper(object):
     
     '''
         
-    LinkClassType = set_type_from_obj(link_pb2.CASRef())
+    LinkClassType = set_type_from_obj(link_pb2.CASRef)
         
     def __init__(self, gpbMessage):
         """

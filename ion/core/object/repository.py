@@ -35,8 +35,8 @@ class Repository(object):
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet'
 
-    CommitClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.CommitRef())
-    LinkClassType = gpb_wrapper.set_type_from_obj(link_pb2.CASRef())
+    CommitClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.CommitRef)
+    LinkClassType = gpb_wrapper.set_type_from_obj(link_pb2.CASRef)
     
     def __init__(self, head=None):
         

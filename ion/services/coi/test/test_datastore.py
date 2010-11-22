@@ -9,7 +9,6 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.services.coi.datastore import DataStoreServiceClient
 from ion.test.iontest import IonTestCase
 
 from net.ooici.play import addressbook_pb2
