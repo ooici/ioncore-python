@@ -145,7 +145,7 @@ class IdentityRegistryService(BaseRegistryService):
         print "got subject back" + str(user.subject)
 
 
-        yield self.reply_ok(ooi_id)
+        yield self.reply_ok(msg, ooi_id)
 
 
 
