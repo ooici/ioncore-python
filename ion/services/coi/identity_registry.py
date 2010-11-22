@@ -127,7 +127,7 @@ class IdentityRegistryService(BaseRegistryService):
         cert_details = authentication.decode_certificate(content['user_cert'])
         user.subject = cert_details['subject']
         
-        
+        #bogus line
         
         #user = yield self.op_register_user(user)
         #user1 = self.base_register_resource('register_user', user)
