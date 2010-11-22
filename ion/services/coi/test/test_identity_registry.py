@@ -113,7 +113,12 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         ooi_id = yield self.identity_registry_client.register_user_credentials(user.certificate, user.rsa_private_key)
         print ooi_id
-        exit()
+        print "#"
+        print "#"
+        print "#"
+        print "#"
+        print "#"
+        print "#"
         #-----------------
 
         user = yield self.identity_registry_client.register_user(user)

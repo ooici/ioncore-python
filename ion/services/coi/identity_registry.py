@@ -89,7 +89,9 @@ class IdentityRegistryClient(BaseRegistryClient):
         (content, headers, msg) = yield self.rpc_send('register_user_credentials', cont)
         
         log.info('Service reply: ' + str(content))
-
+        
+        #(content, headers, msg) = yield self.rpc_send('register_user', content)
+        
         defer.returnValue(str(content))
 
 
@@ -127,6 +129,10 @@ class IdentityRegistryService(BaseRegistryService):
         cert_details = authentication.decode_certificate(content['user_cert'])
         user.subject = cert_details['subject']
         
+        registered_user = yield self.reg.register_resource(user) # This is performing this... op_regiser_user(user)
+        
+        yield self.reply_ok(msg, user.encode())
+        """
         #bogus line
         
         #user = yield self.op_register_user(user)
@@ -145,8 +151,8 @@ class IdentityRegistryService(BaseRegistryService):
         print "got subject back" + str(user.subject)
 
 
-        yield self.reply_ok(ooi_id)
-
+        yield self.reply_ok(msg, ooi_id)
+        """
 
 
 
