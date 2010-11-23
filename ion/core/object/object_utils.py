@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """
+@file ion/core/object/object_utils.py
 @Brief Tools and utilities for object management 
-@Author David Stuebe
+@author David Stuebe
 """
 
 from ion.util import procutils as pu

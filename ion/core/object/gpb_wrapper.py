@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 """
-@Brief Test implementation of a wrapper for Google Protocol Buffer Message Classes.
-
+@file ion/core/object/gpb_wrapper.py
+@Brief Wrapper for Google Protocol Buffer Message Classes.
+These classes are the lowest level of the object management stack
+@author David Stuebe
 TODO:
 Test Repeated Container for non composit fields
 Test what happens if you try to use a old reference to a wrapper after checkout
@@ -342,7 +344,6 @@ class Wrapper(object):
     def _recurse_commit(self,structure):
         
         if not self.modified:
-            print 'jsjsjsjsjsjsjsjsjsjsjsjsjsjsjsjsjsjsjsjsj'
             # This object is already committed!
             return
         
@@ -513,151 +514,6 @@ class Wrapper(object):
         return self._gpbMessage.ByteSize()
     
     
-    '''
-    Methods not included in the Wrapper:
-
-    def SetInParent(self):
-    """Mark this as present in the parent.
-
-    This normally happens automatically when you assign a field of a
-    sub-message, but sometimes you want to make the sub-message
-    present while keeping it empty.  If you find yourself using this,
-    you may want to reconsider your design."""
-    raise NotImplementedError
-
-    def MergeFromString(self, serialized):
-    """Merges serialized protocol buffer data into this message.
-
-    When we find a field in |serialized| that is already present
-    in this message:
-      - If it's a "repeated" field, we append to the end of our list.
-      - Else, if it's a scalar, we overwrite our field.
-      - Else, (it's a nonrepeated composite), we recursively merge
-        into the existing composite.
-
-    TODO(robinson): Document handling of unknown fields.
-
-    Args:
-      serialized: Any object that allows us to call buffer(serialized)
-        to access a string of bytes using the buffer interface.
-
-    TODO(robinson): When we switch to a helper, this will return None.
-
-    Returns:
-      The number of bytes read from |serialized|.
-      For non-group messages, this will always be len(serialized),
-      but for messages which are actually groups, this will
-      generally be less than len(serialized), since we must
-      stop when we reach an END_GROUP tag.  Note that if
-      we *do* stop because of an END_GROUP tag, the number
-      of bytes returned does not include the bytes
-      for the END_GROUP tag information.
-    """
-    raise NotImplementedError
-
-    def ParseFromString(self, serialized):
-    """Like MergeFromString(), except we clear the object first."""
-    self.Clear()
-    self.MergeFromString(serialized)
-
-    '''
-    
-'''
-Example Usage:
-import GPBObject 
-import addressbook_pb2
-
-w = GPBObject.Wrapper(addressbook_pb2.AddressBook())
-
-# Set stuff through the wrapper
-w.person.add()
-# Notice that all objects returned are wrapped!
-w.person[0].name = 'David'
-
-# Get through the wrapper
-w.person[0].name
-
-# Get from the deligated class!
-w._gpbMessage.person[0].name
-
-
-'''
-class StructureElement(object):
-    
-    def __init__(self):
-            
-        self._element = container_pb2.StructureElement()
-        
-        self._child_links = set()
-        
-    @classmethod
-    def wrap_structure_element(cls,se):
-        inst = cls()
-        inst._element = se
-        return inst
-        
-        
-    #@property
-    def get_type(self):
-        return self._element.type
-        
-    #@type.setter
-    def set_type(self,value):
-        self._element.type.protofile = value.GPBType.protofile
-        self._element.type.package = value.GPBType.package
-        self._element.type.cls = value.GPBType.cls        
-     
-    type = property(get_type, set_type)
-     
-    #@property
-    def get_value(self):
-        return self._element.value
-        
-    #@value.setter
-    def set_value(self,value):
-        self._element.value = value
-
-    value = property(get_value, set_value)
-        
-    #@property
-    def get_key(self):
-        return self._element.key
-        
-    #@key.setter
-    def set_key(self,value):
-        self._element.key = value
-
-    key = property(get_key, set_key)
-    
-    def set_isleaf(self,value):
-        self._element.isleaf = value
-        
-    def get_isleaf(self):
-        return self._element.isleaf
-    
-    isleaf = property(get_isleaf, set_isleaf)
-    
-    def __str__(self):
-        return self._element.__str__()
-    
-    
-        
-    #def SerializeToString(self):
-    #    """Serializes the protocol message to a binary string.
-    #    
-    #    Returns:
-    #      A binary string representation of the message if all of the required
-    #    fields in the message are set (i.e. the message is initialized).
-    #    
-    #    Raises:
-    #      message.EncodeError if the message isn't initialized.
-    #    """
-    #    return self._element.SerializeToString()
-    #
-    #def ParseFromString(self, serialized):
-    #    """Clear the message and read from serialized."""
-    #    self._element.ParseFromString(serialized)
-        
     
 class ContainerWrapper(object):
     """
@@ -763,14 +619,6 @@ class ContainerWrapper(object):
         new_element = self._gpbcontainer.add()
         return self._wrapper.rewrap(new_element)
         
-    #def MergeFrom(self, other):
-    #    """Appends the contents of another repeated field of the same type to this
-    #    one, copying each individual message.
-    #    """
-    #    assert isinstance(other, ContainerWrapper), \
-    #    'Invalid argument to merge from: must be a ContainerWrapper'
-    #    self._gpbcontainer.MergeFrom(other._gpbcontainer)
-    
     def __getslice__(self, start, stop):
         """Retrieves the subset of items from between the specified indices."""
         wrapper_list=[]
@@ -787,5 +635,67 @@ class ContainerWrapper(object):
         """Deletes the subset of items from between the specified indices."""
         self._gpbcontainer.__delslice__(start, stop)
     
+   
+    
+class StructureElement(object):
+    """
+    @Brief Wrapper for the container structure element. These are the objects
+    stored in the hashed elements table. Mostly convience methods are provided
+    here. A set provides references to the child objects so that the content
+    need not be decoded to find them.
+    """
+    def __init__(self):
+            
+        self._element = container_pb2.StructureElement()
+        self._child_links = set()
+        
+    @classmethod
+    def wrap_structure_element(cls,se):
+        inst = cls()
+        inst._element = se
+        return inst
+        
+        
+    #@property
+    def get_type(self):
+        return self._element.type
+        
+    #@type.setter
+    def set_type(self,value):
+        self._element.type.protofile = value.GPBType.protofile
+        self._element.type.package = value.GPBType.package
+        self._element.type.cls = value.GPBType.cls        
+     
+    type = property(get_type, set_type)
+     
+    #@property
+    def get_value(self):
+        return self._element.value
+        
+    #@value.setter
+    def set_value(self,value):
+        self._element.value = value
 
+    value = property(get_value, set_value)
+        
+    #@property
+    def get_key(self):
+        return self._element.key
+        
+    #@key.setter
+    def set_key(self,value):
+        self._element.key = value
+
+    key = property(get_key, set_key)
+    
+    def set_isleaf(self,value):
+        self._element.isleaf = value
+        
+    def get_isleaf(self):
+        return self._element.isleaf
+    
+    isleaf = property(get_isleaf, set_isleaf)
+    
+    def __str__(self):
+        return self._element.__str__()
         
