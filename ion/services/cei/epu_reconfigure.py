@@ -40,7 +40,7 @@ class EPUControllerClientSample(ServiceProcess):
     def send_reconfigure(self):
         newconf = {}
         newconf["preserve_n"] = "%s" % self.spawn_args["preserve_n"]
-        newconf["unique_instances"] = {'b2db408e':{'some_unique_name':'some_unique_value123'}}
+        newconf["unique_instances"] = {'b2db408e':{'some_unique_name':'some_unique_value123'}, '3633541e':{'some_unique_name':'some_other_unique_value456'}}
         self.client.reconfigure(newconf)
 
 factory = ProcessFactory(EPUControllerClientSample)
