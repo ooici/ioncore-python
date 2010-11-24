@@ -321,7 +321,7 @@ class NpreservingEngine(Engine):
             self.available_types = [conf["epuworker_type"]]
             
         if conf and conf.has_key("epuworker_allocation"):
-            self.available_types = [conf["epuworker_allocation"]]
+            self.available_allocations = [conf["epuworker_allocation"]]
         
         if not conf:
             # This will start at zero, the engine will do nothing until
