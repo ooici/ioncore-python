@@ -374,13 +374,9 @@ class Process(BasicLifecycleObject):
 
             self.conv_manager.msg_received(message)
 
-            # Send an agree if a request message
-            if conv_type == RequestType.CONV_TYPE_REQUEST and payload.get('performative',None) == "request":
-                yield self.reply_agree(msg)
-
-        # Perform a dispatch of message by operation
+        # Perform a dispatch of message by performative/operation
         try:
-            res = yield self._dispatch_message(payload, msg, conv)
+            res = yield self._handle_performative(payload, msg, conv)
         except Exception, ex:
             log.exception("*****Error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
@@ -398,13 +394,7 @@ class Process(BasicLifecycleObject):
                 yield msg.ack()
 
     @defer.inlineCallbacks
-    def _dispatch_message(self, payload, msg, conv):
-        """
-        Dispatch of messages to operation handler functions  within this
-        process instance. The default behavior is to dispatch to 'op_*' functions,
-        where * is the 'op' message header.
-        @retval Deferred
-        """
+    def _handle_performative(self, payload, msg, conv, perf=False):
         if not self._get_state() == "ACTIVE":
             text = "Process %s in invalid state %s." % (self.proc_name, self._get_state())
             log.error(text)
@@ -418,19 +408,57 @@ class Process(BasicLifecycleObject):
         # Regular message handling in expected state
         pu.log_message(msg)
 
+        # Check for performative
+        perf = payload.get('performative', None)
+        convid = payload.get('conv-id', None)
+        assert not perf or (perf and convid)
+        conv = self.conv_manager.get_conversation(convid)
+
+        if not perf:
+            perf = "request"
+
+        res = yield self._dispatch_message_perf(payload, msg, conv, perf)
+
+    def _dispatch_message_perf(self, payload, msg, conv, perf):
+        opname = 'perf_' + str(perf)
+        return self._dispatch_message_call(payload, msg, conv, opname)
+
+    @defer.inlineCallbacks
+    def _dispatch_message_call(self, payload, msg, conv, opname):
+        """
+        Dispatch of messages to operation handler functions  within this
+        process instance. The default behavior is to dispatch to 'op_*' functions,
+        where * is the 'op' message header.
+        @retval Deferred
+        """
+        content = payload.get('content','')
+        # dynamically invoke the operation in the given class
+        if hasattr(self, opname):
+            opf = getattr(self, opname)
+            yield defer.maybeDeferred(opf, content, payload, msg)
+        elif hasattr(self,'op_none'):
+            yield defer.maybeDeferred(self.op_none, content, payload, msg)
+        else:
+            log.error("receive() failed. Cannot dispatch to operation")
+
+    @defer.inlineCallbacks
+    def perf_request(self, content, headers, msg):
+        """
+        @brief Receives a new request for action as "Participant" role.
+        """
+        # Send an agree if a request message
+        conv_type = headers.get('protocol', GenericType.CONV_TYPE_GENERIC)
+        if conv_type == RequestType.CONV_TYPE_REQUEST:
+            yield self.reply_agree(msg)
+
+        # Check for operation/action
+        yield self._dispatch_message_op(payload, msg, None)
+
+    def _dispatch_message_op(self, payload, msg, conv):
         if "op" in payload:
             op = payload['op']
-            content = payload.get('content','')
             opname = 'op_' + str(op)
-
-            # dynamically invoke the operation in the given class
-            if hasattr(self, opname):
-                opf = getattr(self, opname)
-                yield defer.maybeDeferred(opf, content, payload, msg)
-            elif hasattr(self,'op_none'):
-                yield defer.maybeDeferred(self.op_none, content, payload, msg)
-            else:
-                log.error("receive() failed. Cannot dispatch to operation")
+            return self._dispatch_message_call(payload, msg, conv, opname)
         else:
             log.error("Invalid message. No 'op' in header", payload)
 
@@ -481,12 +509,6 @@ class Process(BasicLifecycleObject):
         @brief Sends a request message to the recipient. Asynchronous call.
         """
         pass
-
-    def perf_request(self, message):
-        """
-        @brief Receives a new request for action as "Participant" role.
-            Instantiates the FIPA request interaction pattern.
-        """
 
     def perf_inform_done(self, message):
         """
