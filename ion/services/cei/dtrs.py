@@ -21,11 +21,10 @@ from ion.core import ioninit
 
 __all__ = ['DeployableTypeRegistryService', 'DeployableTypeRegistryClient']
 
-#TODO ugggggggggghhhhhhhhh
 _REGISTRY = {}
 CONF = ioninit.config(__name__)
 execfile(ioninit.adjust_dir(CONF['deployable_types']))
-log.debug('Loaded %s deployable types.', len(_REGISTRY))
+log.debug('Loaded %d deployable types.' % len(_REGISTRY))
 
 class DeployableTypeRegistryService(ServiceProcess):
     """Deployable Type Registry service interface

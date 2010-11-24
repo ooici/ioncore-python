@@ -133,6 +133,7 @@ class ProvisionerCore(object):
                     deployable_type, str(e))
             state = states.FAILED
             state_description = "DTRS_LOOKUP_FAILED " + str(e)
+            document = "N/A"
 
         launch_record = {
                 'launch_id' : launch_id,
@@ -242,6 +243,7 @@ class ProvisionerCore(object):
         for launch_spec, launch_nodes in launch_pairs:
             newstate = None
             try:
+                log.info("Launching group:\nlaunch_spec: '%s'\nlaunch_nodes: '%s'") 
                 yield self._launch_one_group(launch_spec, launch_nodes, cluster)
 
             except Exception,e:

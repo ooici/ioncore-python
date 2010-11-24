@@ -59,9 +59,7 @@ class NpreservingEngine(Engine):
     
     For example, you can send this as the payload of a reconfigure operation:
     
-    'engine_conf':{
-       'preserve_n':'3'
-    }
+    {'preserve_n':'3'}
     
     And because the "provisioner_vars" key is not even present, nothing is
     touched from the previous configuration.  If the key was present, the
@@ -318,6 +316,12 @@ class NpreservingEngine(Engine):
         parameters = {"timed-pulse-irregular":5000}
         if conf and conf.has_key("force_site"):
             self.available_sites = [conf["force_site"]]
+        
+        if conf and conf.has_key("epuworker_type"):
+            self.available_types = [conf["epuworker_type"]]
+            
+        if conf and conf.has_key("epuworker_allocation"):
+            self.available_types = [conf["epuworker_allocation"]]
         
         if not conf:
             # This will start at zero, the engine will do nothing until
