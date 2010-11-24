@@ -59,9 +59,7 @@ class NpreservingEngine(Engine):
     
     For example, you can send this as the payload of a reconfigure operation:
     
-    'engine_conf':{
-       'preserve_n':'3'
-    }
+    {'preserve_n':'3'}
     
     And because the "provisioner_vars" key is not even present, nothing is
     touched from the previous configuration.  If the key was present, the
