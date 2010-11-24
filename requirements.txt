@@ -27,6 +27,7 @@ wsgiref==0.1.2
 zope.interface==3.6.1
 
 # non specific
+pyrods-irods>=2.4
 numpy
 Pydap
 nimboss>=0.3pre44
