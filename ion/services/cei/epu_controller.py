@@ -69,7 +69,7 @@ class EPUControllerService(ServiceProcess):
         self.core.new_sensor_info(content)
         
     def op_reconfigure(self, content, headers, msg):
-        log.info("EPU Controller: reconfigure: '%'" % content)
+        log.info("EPU Controller: reconfigure: '%s'" % content)
         self.core.run_reconfigure(content)
 
     def op_cei_test(self, content, headers, msg):
