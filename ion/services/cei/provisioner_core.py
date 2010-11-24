@@ -133,6 +133,7 @@ class ProvisionerCore(object):
                     deployable_type, str(e))
             state = states.FAILED
             state_description = "DTRS_LOOKUP_FAILED " + str(e)
+            document = "N/A"
 
         launch_record = {
                 'launch_id' : launch_id,
