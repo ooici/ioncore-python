@@ -192,7 +192,7 @@ class Repository(object):
                     
                 for ref in crefs:
                         
-                    if ref.myid == commit_id:
+                    if ref.MyId == commit_id:
                         
                         # Empty the crefs set to exit the while loop!
                         crefs = set()
@@ -285,10 +285,10 @@ class Repository(object):
         if detached:
             self._current_branch = self.create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
             bref = self._current_branch.commitrefs.add()
-            bref.set_link(cref)
+            bref.SetLink(cref)
             self._current_branch.branchkey = 'detached head'
             
-            rootobj._set_structure_read_only()
+            rootobj.SetStructureReadOnly()
             
             
         return rootobj
@@ -312,34 +312,34 @@ class Repository(object):
         cref.date = pu.currenttime()
 
         pref = cref.parentrefs.add()
-        pref.set_link_by_name('commitref',head_cref)
+        pref.SetLinkByName('commitref',head_cref)
         pref.relationship = pref.Parent
 
-        cref.set_link_by_name('objectroot', head_cref.objectroot)
+        cref.SetLinkByName('objectroot', head_cref.objectroot)
 
         cref.comment = 'Merged divergent branch by date keeping the newest value'
 
         for ref in crefs:
             pref = cref.parentrefs.add()
-            pref.set_link_by_name('commitref',ref)
+            pref.SetLinkByName('commitref',ref)
             pref.relationship = pref.MergedFrom
         
         structure={}                            
         # Add the CRef to the hashed elements
-        cref._recurse_commit(structure)
+        cref.RecurseCommit(structure)
         
         # set the cref to be readonly
-        cref.readonly = True
+        cref.ReadOnly = True
         
         # Add the cref to the active commit objects - for convienance
-        self._commit_index[cref.myid] = cref
+        self._commit_index[cref.MyId] = cref
 
         # update the hashed elements
         self._hashed_elements.update(structure)
         
         del branch.commitrefs[:]
         bref = branch.commitrefs.add()
-        bref.set_link(cref)
+        bref.SetLink(cref)
         
         return cref
         
@@ -376,18 +376,18 @@ class Repository(object):
         # If the repo is in a valid state - make the commit even if it is up to date
         if self.status == self.MODIFIED or self.status == self.UPTODATE:
             structure={}
-            self._workspace_root._recurse_commit(structure)
+            self._workspace_root.RecurseCommit(structure)
                                 
             cref = self._create_commit_ref(comment=comment)
                 
             # Add the CRef to the hashed elements
-            cref._recurse_commit(structure)
+            cref.RecurseCommit(structure)
             
             # set the cref to be readonly
-            cref.readonly = True
+            cref.ReadOnly = True
             
             # Add the cref to the active commit objects - for convienance
-            self._commit_index[cref.myid] = cref
+            self._commit_index[cref.MyId] = cref
 
             # update the hashed elements
             self._hashed_elements.update(structure)
@@ -397,7 +397,7 @@ class Repository(object):
         
         # Like git, return the commit id
         branch = self._current_branch
-        return branch.commitrefs.get_link(0).key
+        return branch.commitrefs.GetLink(0).key
             
             
     def _create_commit_ref(self, comment='', date=None):
@@ -425,7 +425,7 @@ class Repository(object):
             # This branch is real - add it to our ancestors
             pref = cref.parentrefs.add()
             parent = branch.commitrefs[0] # get the parent commit ref
-            pref.set_link_by_name('commitref',parent)
+            pref.SetLinkByName('commitref',parent)
             pref.relationship = pref.Parent
         elif len(branch.commitrefs)>1:
             raise Exception, 'The Branch is in an invalid state and should have been merged on read!'
@@ -437,14 +437,14 @@ class Repository(object):
         for mrgd in self._merged_from:
             pref = cref.parentrefs.add()
             merged_commit = mrgd.commitref # Get the commit ref of the merged item
-            pref.set_link_by_name('commitref',merged_commit)
+            pref.SetLinkByName('commitref',merged_commit)
             pref.relationship = pref.MergedFrom
             
         cref.comment = comment
-        cref.set_link_by_name('objectroot', self._workspace_root)            
+        cref.SetLinkByName('objectroot', self._workspace_root)            
         
         # Update the cref in the branch
-        branch.commitrefs.set_link(0,cref)
+        branch.commitrefs.SetLink(0,cref)
         
         return cref
     
@@ -467,7 +467,7 @@ class Repository(object):
         """
         
         if self._workspace_root:
-            if self._workspace_root.modified:
+            if self._workspace_root.Modified:
                 return self.MODIFIED
             else:
                 return self.UPTODATE
@@ -500,12 +500,12 @@ class Repository(object):
                 bref = brnch.commitrefs.add()
             
                 # Set the new branch to point at the commit
-                bref.set_link(cref)
+                bref.SetLink(cref)
             
             
             # Making a new branch re-attaches to a head!
             if self._detached_head:
-                self._workspace_root._set_structure_read_write()
+                self._workspace_root.SetStructureReadWrite()
                 self._detached_head = False
                 
         self._current_branch = brnch
@@ -594,11 +594,11 @@ class Repository(object):
             obj = self._load_element(element)
             
             if obj.GPBType == self.CommitClassType:
-                self._commit_index[obj.myid]=obj
-                obj.readonly = True
+                self._commit_index[obj.MyId]=obj
+                obj.ReadOnly = True
             else:
-                self._workspace[obj.myid]=obj
-                obj.readonly = self._detached_head
+                self._workspace[obj.MyId]=obj
+                obj.ReadOnly = self._detached_head
             return obj
             
         else:
@@ -612,11 +612,11 @@ class Repository(object):
         """        
         if loadleaf:
             
-            for link in obj._child_links:
+            for link in obj.ChildLinks:
                 child = self.get_linked_object(link)  
                 self._load_links(child, loadleaf=loadleaf)
         else:
-            for link in obj._child_links:
+            for link in obj.ChildLinks:
                 
                 if not link.isleaf:
                     child = self.get_linked_object(link)      
@@ -642,13 +642,13 @@ class Repository(object):
         
         # If it is not a leaf element - find its child links
         if not element.isleaf:
-            obj._find_child_links()
+            obj.FindChildLinks()
 
-        obj.modified = False
+        obj.Modified = False
         
         # Make a note in the element of the child links as well!
-        for child in obj._child_links:
-            element._child_links.add(child.key)
+        for child in obj.ChildLinks:
+            element.ChildLinks.add(child.key)
         
         return obj
         
@@ -700,28 +700,28 @@ class Repository(object):
             
             #@Todo Change assertions to Exceptions?
             
-            assert value.isroot == True, \
+            assert value.IsRoot == True, \
                 'You can not set a link equal to part of a gpb composite!'
             
-            assert not field.inparents(value), \
+            assert not field.InParents(value), \
                 'You can not create a recursive structure - this value is also a parent of the link you are setting.'
             
             
             #Make sure the link is in the objects set of child links
-            field._child_links.add(field) # Adds to the fields root wrapper!
-            value._parent_links.add(field) 
+            field.ChildLinks.add(field) # Adds to the fields root wrapper!
+            value.ParentLinks.add(field) 
             
             # If the link is currently set
             if field.key:
                                 
-                if field.key == value.myid:
+                if field.key == value.MyId:
                     # Setting it again is a pass...
                     return
                 
                 
                 old_obj = self._workspace.get(field.key,None)
                 if old_obj:
-                    plinks = old_obj._parent_links
+                    plinks = old_obj.ParentLinks
                     plinks.remove(field.key)
                     # If there are no parents left for the object delete it
                     if len(plinks)==0:
@@ -729,7 +729,7 @@ class Repository(object):
                     
                 
                 # Modify the existing link
-                field.key = value.myid
+                field.key = value.MyId
                 
                 # Set the new type
                 tp = field.type
@@ -738,7 +738,7 @@ class Repository(object):
             else:
                 
                 # Set the id of the linked wrapper
-                field.key = value.myid
+                field.key = value.MyId
                 
                 # Set the type
                 tp = field.type

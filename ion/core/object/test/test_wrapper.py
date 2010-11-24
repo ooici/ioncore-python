@@ -126,7 +126,7 @@ class RecurseCommitTest(unittest.TestCase):
             
         strct={}
             
-        ab._recurse_commit(strct)
+        ab.RecurseCommit(strct)
         
         for k,v in strct.items():
             print k,v._element

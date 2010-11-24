@@ -76,7 +76,7 @@ class WorkBench(object):
         for branch in new_repo.branches:
 
             # Check for merge on read condition!            
-            for link in branch.commitrefs.get_links():
+            for link in branch.commitrefs.GetLinks():
                 self._load_commits(new_repo,link)
             
             
@@ -115,13 +115,13 @@ class WorkBench(object):
             cref = repo._load_element(element)
             
             if cref.GPBType == self.CommitClassType:
-                repo._commit_index[cref.myid]=cref
-                cref.readonly = True
+                repo._commit_index[cref.MyId]=cref
+                cref.ReadOnly = True
             else:
                 raise Exception, 'This method should only load commits!'
             
             for parent in cref.parentrefs:
-                link = parent.get_link('commitref')
+                link = parent.GetLink('commitref')
                 # Call this method recursively for each link
                 self._load_commits(repo, link)
         else:
@@ -154,7 +154,7 @@ class WorkBench(object):
                 # Get the cref and then link it in the existing repository
                 for cref in new_branch.commitrefs:
                     bref = branch.commitref.add()
-                    bref.set_link(cref)
+                    bref.SetLink(cref)
                 
             
         return existing_repo
@@ -164,15 +164,15 @@ class WorkBench(object):
         """
         Move everything in new into an updated existing!
         """
-        for new_link in new_branch.commitrefs.get_links():
+        for new_link in new_branch.commitrefs.GetLinks():
             
             # An indicator for a fast forward merge made on the existing branch
             found = False
-            for existing_link in existing_branch.commitrefs.get_links():
+            for existing_link in existing_branch.commitrefs.GetLinks():
             
                 # Get the repositories we are working from
-                existing_repo = existing_branch.repository
-                new_repo = new_branch.repository
+                existing_repo = existing_branch.Repository
+                new_repo = new_branch.Repository
             
                 # test to see if we these are the same head ref!
                 if new_link == existing_link:
@@ -200,14 +200,14 @@ class WorkBench(object):
                 if not found:
                     bref = existing_branch.commitrefs.add()
                     new_cref = new_repo._commit_index.get(new_link.key)                    
-                    bref.set_link(new_cref)
+                    bref.SetLink(new_cref)
                 
                 
         key_set = set()
         duplicates = []
         # Merge any commit refs which have been resolved!
         for i in range(len(existing_branch.commitrefs)):
-            ref_link = existing_branch.commitrefs.get_link(i)
+            ref_link = existing_branch.commitrefs.GetLink(i)
             if ref_link.key in key_set:
                 duplicates.append(i)
             else:
@@ -408,7 +408,7 @@ class WorkBench(object):
         cref_links = set()
         for branch in repo.branches:
             
-            for cref_link in branch.commitrefs.get_links():
+            for cref_link in branch.commitrefs.GetLinks():
                 cref_links.add(cref_link)
             
         objs_to_get = set()
@@ -422,14 +422,14 @@ class WorkBench(object):
                 
                 cref= repo.get_linked_object(ref_link)
                     
-                obj_link = cref.get_link('objectroot')
+                obj_link = cref.GetLink('objectroot')
                 obj = self._hashed_elements.get(obj_link.key,None)
                 
                 if not obj:
                     objs_to_get.add(obj_link)
                     
                     for pref in cref.parentrefs:
-                        ref_link = pref.get_link('commitref')
+                        ref_link = pref.GetLink('commitref')
                         if not ref_link in refs_touched:
                             new_links.add(ref_link)
                 
@@ -452,7 +452,7 @@ class WorkBench(object):
             for link in objs_to_get:
                 if not link.isleaf:
                     obj = repo.get_linked_object(link)
-                    for child_link in obj._child_links:
+                    for child_link in obj.ChildLinks:
                         if not self._hashed_elements.has_key(child_link.key):
                             new_links.add(child_link)
             
@@ -566,7 +566,7 @@ class WorkBench(object):
 
         # Get the Structure Element for the mutable head
         
-        root_obj = self._hashed_elements.get(mutable.myid)
+        root_obj = self._hashed_elements.get(mutable.MyId)
         
         if not root_obj:
 
@@ -575,9 +575,9 @@ class WorkBench(object):
             print 'Mutable', mutable
 
             structure = {}
-            mutable._recurse_commit(structure)
+            mutable.RecurseCommit(structure)
             print 'structure keys',structure.keys()
-            root_obj = structure.get(mutable.myid)
+            root_obj = structure.get(mutable.MyId)
 
         print 'ROOT Obj', root_obj
             
@@ -593,7 +593,7 @@ class WorkBench(object):
             new_set = set()
                         
             for cref in cref_set:
-                obj_set.add(cref.myid)
+                obj_set.add(cref.MyId)
                     
                 for prefs in cref.parentrefs:
                     new_set.add(prefs.commitref)
@@ -621,11 +621,11 @@ class WorkBench(object):
         """
         assert isinstance(wrapper, gpb_wrapper.Wrapper), 'Pack Structure received a wrapper argument which is not a wrapper?'
         
-        repo = wrapper.repository
+        repo = wrapper.Repository
         #assert repo in self._repos.values(), 'This object is not in the process workbench!'
         
         if not repo.status == repo.UPTODATE:
-            repo.commit(comment='Sending message with wrapper %s'% wrapper.myid)
+            repo.commit(comment='Sending message with wrapper %s'% wrapper.MyId)
         
         obj_set=set()
         root_obj = None
@@ -634,14 +634,14 @@ class WorkBench(object):
         # If we are sending the mutable head object
         if wrapper is repo._dotgit:
             structure = {}
-            wrapper._recurse_commit(structure)
-            root_obj = structure.get(wrapper.myid)
+            wrapper.RecurseCommit(structure)
+            root_obj = structure.get(wrapper.MyId)
             
             items = set()
             for branch in wrapper.branches:
                 
                 for cref in branch.commitrefs:
-                    obj = self._hashed_elements.get(cref.myid,None)
+                    obj = self._hashed_elements.get(cref.MyId,None)
                     if not obj:
                         # Debugging exception - remove later
                         raise Exception, 'Hashed CREF not found! Please call David'
@@ -649,7 +649,7 @@ class WorkBench(object):
             
         else:
             # Else we are sending just the commited root object
-            root_obj = self._hashed_elements.get(wrapper.myid,None)
+            root_obj = self._hashed_elements.get(wrapper.MyId,None)
             items = set([root_obj])
 
         
@@ -658,11 +658,11 @@ class WorkBench(object):
             child_items = set()
             for item in items:
                 
-                if len(item._child_links) >0:
+                if len(item.ChildLinks) >0:
                     
                     obj_set.add(item.key)    
                     
-                    for key in item._child_links:
+                    for key in item.ChildLinks:
                     
                         obj = self._hashed_elements.get(key,None)
                         if not obj:
@@ -767,7 +767,7 @@ class WorkBench(object):
             # Load the object and set it as the workspace root
             root_obj = repo._load_element(head)
             repo._workspace_root = root_obj
-            repo._workspace[root_obj.myid] = root_obj
+            repo._workspace[root_obj.MyId] = root_obj
 
             # Create a commit to record the state when the message arrived
             cref = repo.commit(comment='Message for you Sir!')
