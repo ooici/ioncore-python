@@ -6,7 +6,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 from twisted.internet.task import LoopingCall
 
-from ion.core.process.service_process import ServiceProcess
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.process.process import ProcessFactory
 from ion.core import bootstrap
 import ion.util.procutils as pu
@@ -74,31 +74,6 @@ class EPUControllerService(ServiceProcess):
 
     def op_cei_test(self, content, headers, msg):
         log.info('EPU Controller: CEI test'+ content)
-
-class EPUControllerClient(ServiceClient):
-    """
-    Client for sending messages directly to an EPU Controller
-    """
-    def __init__(self, proc=None, **kwargs):
-        if not 'targetname' in kwargs:
-            kwargs['targetname'] = "epu_controller"
-        ServiceClient.__init__(self, proc, **kwargs)
-
-    @defer.inlineCallbacks
-    def reconfigure(self, newconf):
-        """Triggers a reconfigure option.  This might not be implemented by
-        the decision engine implementation that the EPU Controller is
-        configured with.  The new configuration is interpreted in a very
-        specific way, see the comments and/or documentation for the EPU
-        controller (and in particular the decision engine that it is
-        expected to be implemented with).
-        
-        @param newconf None or dict of key/value pairs
-        """
-        yield self._check_init()
-        log.debug("Sending reconfigure request to EPU controller: '%s'" % self.target)
-        yield self.send('reconfigure', None)
-
 
 # Direct start of the service as a process with its default name
 factory = ProcessFactory(EPUControllerService)
