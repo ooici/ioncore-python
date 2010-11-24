@@ -35,8 +35,8 @@ class RequestConvTest(IonTestCase):
     @defer.inlineCallbacks
     def test_request_process(self):
         processes = [
-            {'name':'req1','module':'ion.core.process.test.test_process','class':'EchoProcess'},
-            {'name':'req2','module':'ion.core.process.test.test_process','class':'EchoProcess'},
+            {'name':'req1','module':'ion.interact.test.test_request','class':'ParticipantProcess'},
+            {'name':'req2','module':'ion.interact.test.test_request','class':'ParticipantProcess'},
         ]
         sup = yield self._spawn_processes(processes)
 
@@ -48,16 +48,16 @@ class RequestConvTest(IonTestCase):
 
         req_content = {}
 
-        yield req1proc.request()
+        res = yield req1proc.request(receiver=req2pid, action="action1", content="my request")
 
         yield self._shutdown_processes()
 
 class ParticipantProcess(Process):
 
     @defer.inlineCallbacks
-    def op_echo(self, content, headers, msg):
-        log.info("Message received: "+str(content))
-        yield self.reply_ok(msg, content)
+    def op_action1(self, content, headers, msg):
+        reply_content = "OK"
+        yield self.reply_ok(msg, reply_content)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(ParticipantProcess)

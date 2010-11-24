@@ -15,7 +15,6 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.exception import ConversationError
-from ion.data.dataobject import DataObject
 from ion.util.state_object import FSMFactory, StateObject, BasicStates
 
 CONF = ioninit.config(__name__)
@@ -33,7 +32,7 @@ class IConversation(Interface):
     Interface for all conversation instances
     """
 
-class ConversationType(DataObject):
+class ConversationType(object):
     """
     @brief Represents a conversation type. Also known as protocol, interaction
         pattern, session type. Defines ID and roles of conversation.
@@ -50,7 +49,8 @@ class ConversationType(DataObject):
     def new_conversation(self, **kwargs):
         raise NotImplementedError("Not implemented")
 
-class Conversation(DataObject):
+
+class Conversation(object):
     """
     @brief An instance of a conversation type. Identifies the entities by name
     that bind to roles.
@@ -70,6 +70,10 @@ class Conversation(DataObject):
         self.local_role = None
         self.local_process = None
         self.local_fsm = None
+        # Spot for a Deferred for blocking (RPC style) send/receive
+        self.blocking_deferred = None
+        # Marks a timeout in the conversation processing
+        self.timeout = None
 
     def bind_role_local(self, role_id, process):
         self.bind_role(role_id, process.id)
@@ -120,8 +124,14 @@ class ConversationRole(StateObject):
         fsm = self.factory.create_fsm(self)
         self._so_set_fsm(fsm)
 
+    def _so_process(self, event, *args, **kwargs):
+        log.debug("Processing Conversation event: %s" % event)
+        return StateObject._so_process(self, event, *args, **kwargs)
 
-class ConversationTypeSpec(DataObject):
+    def error(self, *args, **kwargs):
+        log.error("ERROR in Conversation: %s" % str(args))
+
+class ConversationTypeSpec(object):
     """
     Represents a conversation type specification. Base class for specific
     specification languages, such as Scribble, MSC etc.
@@ -197,9 +207,9 @@ class ConversationManager(object):
         #convid = send + "#" + Process.convIdCnt
         return convid
 
-    def new_conversation(self, conv_type_id):
+    def new_conversation(self, conv_type_id, conv_id=None):
         ct_inst = self.get_conversation_type(conv_type_id)
-        conv_id = self.create_conversation_id()
+        conv_id = conv_id or self.create_conversation_id()
 
         conv_inst = ct_inst.new_conversation(conv_type=ct_inst, conv_id=conv_id)
         if not IConversation.providedBy(conv_inst):
@@ -219,16 +229,24 @@ class ProcessConversationManager(object):
         self.conversations = {}
         self.conv_mgr = conv_mgr_instance
 
-    def msg_sent(self, message):
-        pass
+    def msg_send(self, message):
+        conv = self.get_conversation(message['headers']['conv-id'])
+        perf = message['headers'].get('performative', 'error')
+        return conv.local_fsm._so_process(perf, message)
 
     def msg_received(self, message):
-        pass
+        #log.debug("Received %s" % message)
+        conv = message['conversation']
+        perf = message['headers'].get('performative', 'error')
+        return conv.local_fsm._so_process(perf, message)
 
     def create_conversation_id(self):
         return self.conv_mgr.create_conversation_id()
 
-    def new_conversation(self, conv_type_id):
-        conv_inst = self.conv_mgr.new_conversation(conv_type_id)
+    def new_conversation(self, conv_type_id, conv_id=None):
+        conv_inst = self.conv_mgr.new_conversation(conv_type_id, conv_id)
         self.conversations[conv_inst.conv_id] = conv_inst
         return conv_inst
+
+    def get_conversation(self, conv_id):
+        return self.conversations.get(conv_id, None)

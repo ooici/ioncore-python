@@ -9,8 +9,7 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.data.dataobject import DataObject
-from ion.interact.conversation import ConversationType, ConversationTypeSpec, Conversation, ConversationRole, ConversationTypeFSMFactory, RoleSpec
+from ion.interact.conversation import ConversationType, Conversation, ConversationRole, ConversationTypeFSMFactory, RoleSpec
 from ion.util.state_object import BasicStates
 
 
@@ -71,8 +70,34 @@ class Request(Conversation):
 class RequestInitiator(ConversationRole):
     factory = RequestFSMFactory()
 
+    def request(self, *args, **kwargs):
+        log.debug("In Request.request")
+    def refuse(self, *args, **kwargs):
+        log.debug("In Request.refuse")
+    def agree(self, *args, **kwargs):
+        log.debug("In Request.agree")
+    def failure(self, *args, **kwargs):
+        log.debug("In Request.failure")
+    def inform_done(self, *args, **kwargs):
+        log.debug("In Request.inform_done")
+    def inform_result(self, *args, **kwargs):
+        log.debug("In Request.inform_result")
+
 class RequestParticipant(ConversationRole):
     factory = RequestFSMFactory()
+
+    def request(self, *args, **kwargs):
+        log.debug("In Request.request")
+    def refuse(self, *args, **kwargs):
+        log.debug("In Request.refuse")
+    def agree(self, *args, **kwargs):
+        log.debug("In Request.agree")
+    def failure(self, *args, **kwargs):
+        log.debug("In Request.failure")
+    def inform_done(self, *args, **kwargs):
+        log.debug("In Request.inform_done")
+    def inform_result(self, *args, **kwargs):
+        log.debug("In Request.inform_result")
 
 class RequestType(ConversationType):
     """

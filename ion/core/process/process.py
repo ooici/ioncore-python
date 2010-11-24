@@ -20,9 +20,10 @@ from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
 from ion.core.process.cprocess import IContainerProcess, ContainerProcess
 from ion.services.dm.preservation.store import Store
-from ion.interact.conversation import Conversation, ProcessConversationManager
+from ion.interact.conversation import ProcessConversationManager
 from ion.interact.message import Message
-from ion.interact.request import Request, RequestType
+from ion.interact.request import RequestType
+from ion.interact.rpc import RpcType, GenericType
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject
 
@@ -114,12 +115,6 @@ class Process(BasicLifecycleObject):
 
         # Delegate class to manage all conversations of this process
         self.conv_manager = ProcessConversationManager(self)
-
-        # Dict of converations by conv-id
-        self.conversations = {}
-
-        # Conversations by conv-id for currently outstanding RPCs
-        self.rpc_conv = {}
 
         # List of ProcessDesc instances of defined and spawned child processes
         self.child_procs = []
@@ -300,17 +295,22 @@ class Process(BasicLifecycleObject):
         """
         try:
             # Check if this response is in reply to an outstanding RPC call
-            if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
-                yield self._receive_rpc(payload, msg)
-            else:
-                yield self._receive_msg(payload, msg)
+            if 'conv-id' in payload:
+                conv_id = payload['conv-id']
+                conv = self.conv_manager.get_conversation(conv_id)
+                if conv and conv.blocking_deferred:
+                    yield self._receive_rpc(payload, msg, conv)
+                    return
+
+            # The global else case. No blocking call exists
+            yield self._receive_msg(payload, msg)
         except Exception, ex:
             log.exception('Error in process %s receive ' % self.proc_name)
             if msg and msg.payload['reply-to']:
                 yield self.reply_err(msg, 'ERROR in process receive()', exception=ex)
 
     @defer.inlineCallbacks
-    def _receive_rpc(self, payload, msg):
+    def _receive_rpc(self, payload, msg, conv):
         """
         Handling of RPC reply messages.
         """
@@ -318,9 +318,9 @@ class Process(BasicLifecycleObject):
         if 'sender-name' in payload:
             fromname = payload['sender-name']
         log.info('>>> [%s] receive(): RPC reply from [%s] <<<' % (self.proc_name, fromname))
-        rpc_deferred = self.rpc_conv.pop(payload['conv-id'])
+        rpc_deferred = conv.blocking_deferred
         content = payload.get('content', None)
-        if type(rpc_deferred) is str:
+        if conv.timeout:
             log.error("Message received after process %s RPC conv-id=%s timed out=%s: %s" % (
                 self.proc_name, payload['conv-id'], rpc_deferred, payload))
             return
@@ -328,7 +328,6 @@ class Process(BasicLifecycleObject):
         res = (content, payload, msg)
         if not type(content) is dict:
             log.error('RPC reply is not well formed. Use reply_ok or reply_err')
-
 
         yield msg.ack()
         if payload.get('status','OK') == 'ERROR':
@@ -352,7 +351,33 @@ class Process(BasicLifecycleObject):
         log.info('#####>>> [%s] receive(): Message from [%s], dispatching... >>>' % (
                  self.proc_name, fromname))
         convid = payload.get('conv-id', None)
-        conv = self.conversations.get(convid, None) if convid else None
+        conv = None
+        if convid:
+            conv = self.conv_manager.get_conversation(convid)
+            if not conv:
+                conv_type = payload.get('protocol', GenericType.CONV_TYPE_GENERIC)
+                sender = payload.get('sender', None)
+                log.debug("Creating new conversation on incoming message id=%s, type=%s" % (convid, conv_type))
+                conv = self.conv_manager.new_conversation(conv_type, convid)
+                if conv_type == RpcType.CONV_TYPE_RPC:
+                    conv.bind_role_local(RpcType.ROLE_PARTICIPANT.role_id, self)
+                    conv.bind_role(RpcType.ROLE_INITIATOR.role_id, sender)
+                elif conv_type == RequestType.CONV_TYPE_REQUEST:
+                    conv.bind_role_local(RequestType.ROLE_PARTICIPANT.role_id, self)
+                    conv.bind_role(RequestType.ROLE_INITIATOR.role_id, sender)
+
+            message = dict(recipient=payload.get('receiver',None),
+                           operation=payload.get('op',None),
+                           headers=payload,
+                           content=payload.get('content',None),
+                           conversation=conv)
+
+            self.conv_manager.msg_received(message)
+
+            # Send an agree if a request message
+            if conv_type == RequestType.CONV_TYPE_REQUEST and payload.get('performative',None) == "request":
+                yield self.reply_agree(msg)
+
         # Perform a dispatch of message by operation
         try:
             res = yield self._dispatch_message(payload, msg, conv)
@@ -417,7 +442,21 @@ class Process(BasicLifecycleObject):
 
     # --- Interaction pattern
 
-    def request(self, receiver, action, content, headers=None):
+    def rpc_send(self, recv, operation, content, headers=None, **kwargs):
+        """
+        @brief Starts a simple RPC style conversation.
+        """
+        rpc_conv = self.conv_manager.new_conversation(RpcType.CONV_TYPE_RPC)
+        rpc_conv.bind_role_local(RpcType.ROLE_INITIATOR.role_id, self)
+        rpc_conv.bind_role(RpcType.ROLE_PARTICIPANT.role_id, receiver)
+
+        if headers == None:
+            headers = {}
+        headers['protocol'] = RpcType.CONV_TYPE_RPC
+        headers['performative'] = 'request'
+        return self._blocking_send(recv=receiver, operation=action, content=content, headers=headers, conv=rpc_conv, **kwargs)
+
+    def request(self, receiver, action, content, headers=None, **kwargs):
         """
         @brief Sends a request message to the recipient. Instantiates the
             FIPA request interaction pattern. The recipient needs to responde
@@ -428,13 +467,14 @@ class Process(BasicLifecycleObject):
         @exception Various exceptions for different failures
         """
         req_conv = self.conv_manager.new_conversation(RequestType.CONV_TYPE_REQUEST)
-        req_conv.bind_role_local(RequestType.ROLE_INITIATOR, self)
-        req_conv.bind_role(RequestType.ROLE_PARTICIPANT, receiver)
+        req_conv.bind_role_local(RequestType.ROLE_INITIATOR.role_id, self)
+        req_conv.bind_role(RequestType.ROLE_PARTICIPANT.role_id, receiver)
 
         if headers == None:
             headers = {}
+        headers['protocol'] = RequestType.CONV_TYPE_REQUEST
         headers['performative'] = 'request'
-        return self.rpc_send(recv=receiver, operation=action, content=content, headers=headers, **kwargs)
+        return self._blocking_send(recv=receiver, operation=action, content=content, headers=headers, conv=req_conv, **kwargs)
 
     def request_async(self, message, **kwargs):
         """
@@ -454,37 +494,40 @@ class Process(BasicLifecycleObject):
             Instantiates the FIPA request interaction pattern.
         """
 
-    def _start_new_conversation(self, receiver, performative):
-        pass
-
+    #def _start_new_conversation(self, receiver, performative):
+    #    pass
+    #
     # --- Outgoing message handling
 
-    def rpc_send(self, recv, operation, content, headers=None, **kwargs):
+    def _blocking_send(self, recv, operation, content, headers=None, conv=None, **kwargs):
         """
-        @brief Sends a message RPC style and waits for conversation message reply.
+        @brief Sends a message and waits for conversation message reply.
         @retval a Deferred with the message value on receipt
         """
-        msgheaders = self._prepare_message(headers)
-        convid = msgheaders['conv-id']
+        msgheaders = {}
+        if headers:
+            msgheaders.update(headers)
+        assert conv, "Conversation instance must exist for blocking send"
+        msgheaders['conv-id'] = conv.conv_id
+
         # Create a new deferred that the caller can yield on to wait for RPC
-        rpc_deferred = defer.Deferred()
+        conv.blocking_deferred = defer.Deferred()
         # Timeout handling
         timeout = float(kwargs.get('timeout', CF_rpc_timeout))
         def _timeoutf():
-            log.warn("Process %s RPC conv-id=%s timed out! " % (self.proc_name,convid))
+            log.warn("Process %s RPC conv-id=%s timed out! " % (self.proc_name,conv.conv_id))
             # Remove RPC. Delayed result will go to catch operation
-            d = self.rpc_conv.pop(convid)
-            self.rpc_conv[convid] = "TIMEOUT:%s" % pu.currenttime_ms()
-            d.errback(defer.TimeoutError())
+            conv.timeout = str(pu.currenttime_ms())
+            conv.blocking_deferred.errback(defer.TimeoutError())
         if timeout:
             callto = reactor.callLater(timeout, _timeoutf)
-            rpc_deferred.rpc_call = callto
-        self.rpc_conv[convid] = rpc_deferred
+            conv.blocking_deferred.rpc_call = callto
+
         d = self.send(recv, operation, content, msgheaders)
         # d is a deferred. The actual send of the request message will happen
         # after this method returns. This is OK, because functions are chained
         # to call back the caller on the rpc_deferred when the receipt is done.
-        return rpc_deferred
+        return conv.blocking_deferred
 
     def send(self, recv, operation, content, headers=None, reply=False):
         """
@@ -492,30 +535,33 @@ class Process(BasicLifecycleObject):
             Starts a new conversation.
         @retval Deferred for send of message
         """
-        msgheaders = self._prepare_message(headers)
-        message = dict(recipient=recv, operation=operation,
-                       content=content, headers=msgheaders)
+        msgheaders = {}
+        msgheaders['sender-name'] = self.proc_name
+        if headers:
+            msgheaders.update(headers)
 
-        convid = headers['conv-id']
-        #self.conversations[convid] = Conversation()
+        log.debug("****SEND, headers %s" % str(msgheaders))
+        if 'conv-id' in msgheaders:
+            conv = self.conv_manager.get_conversation(msgheaders['conv-id'])
+            print "##########", conv, self.conv_manager.conversations
+        else:
+            # Not a new and not a reply to a conversation
+            conv = self.conv_manager.new_conversation(GenericType.CONV_TYPE_GENERIC)
+            msgheaders['conv-id'] = conv.conv_id
+            msgheaders['protocol'] = GenericType.CONV_TYPE_GENERIC
+
+        message = dict(recipient=recv, operation=operation,
+                       content=content, headers=msgheaders,
+                       conversation=conv)
+
+        # Put the message through the conversation FSM
+        self.conv_manager.msg_send(message)
 
         if reply:
             d = self.receiver.send(**message)
         else:
             d = self.backend_receiver.send(**message)
         return d
-
-    def _prepare_message(self, headers):
-        msgheaders = {}
-        msgheaders['sender-name'] = self.proc_name
-        if headers:
-            msgheaders.update(headers)
-        if not 'conv-id' in msgheaders:
-            convid = self.conv_manager.create_conversation_id()
-            msgheaders['conv-id'] = convid
-            msgheaders['conv-seq'] = 1
-            self.conversations[convid] = Conversation()
-        return msgheaders
 
     def reply(self, msg, operation, content, headers=None):
         """
@@ -530,42 +576,66 @@ class Process(BasicLifecycleObject):
             log.error('No reply-to given for message '+str(msg))
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
-            headers['conv-seq'] = int(ionMsg.get('conv-seq',0)) + 1
             return self.send(pu.get_process_id(recv), operation, content, headers, reply=True)
 
-    def reply_ok(self, msg, content=None, headers=None):
+    def reply_agree(self, msg, content=None, headers=None, status=None):
         """
-        Boilerplate method that replies to a given message with a success
+        @brief Boilerplate method that replies to a given message with an agree
+        @retval Deferred for send of reply
+        """
+        msgheaders = {}
+        if headers != None:
+            msgheaders.update(headers)
+        msgheaders['performative'] = 'agree'
+        msgheaders['protocol'] = msg.payload['protocol']
+
+        return self.reply(msg, 'result', content, msgheaders)
+
+    def reply_ok(self, msg, content=None, headers=None, status=None):
+        """
+        @brief Boilerplate method that replies to a given message with a success
         message and a given result value
         @content any sendable type to be converted to dict, or dict (untouched)
         @retval Deferred for send of reply
         """
+        msgheaders = {}
+        if headers != None:
+            msgheaders.update(headers)
+        msgheaders['performative'] = 'inform_result'
+        msgheaders['protocol'] = msg.payload['protocol']
+
         # Note: Header status=OK is automatically set
         if not type(content) is dict:
             content = dict(value=content, status='OK')
-        return self.reply(msg, 'result', content, headers)
+
+        return self.reply(msg, 'result', content, msgheaders)
 
     def reply_err(self, msg, content=None, headers=None, exception=None):
         """
-        Boilerplate method for reply to a message with an error message and
+        @brief Boilerplate method for reply to a message with an error message and
         an indication of the error.
         @content any sendable type to be converted to dict, or dict (untouched)
         @exception an instance of Exception
         @retval Deferred for send of reply
         """
-        reshdrs = dict(status='ERROR')
+        msgheaders = {}
+        msgheaders['performative'] = 'failure'
+        msgheaders['protocol'] = msg.payload['protocol']
+        msgheaders['status'] = 'ERROR'
+
         if headers != None:
-            reshdrs.update(headers)
+            msgheaders.update(headers)
+
         if not type(content) is dict:
             content = dict(value=content, status='ERROR')
             if exception:
                 # @todo Add more info from exception
                 content['errmsg'] = str(exception)
-        return self.reply(msg, 'result', content, reshdrs)
+        return self.reply(msg, 'result', content, msgheaders)
 
     def get_conversation(self, headers):
         convid = headers.get('conv-id', None)
-        return self.conversations(convid, None)
+        return self.conv_manager.get_conversation(convid)
 
     # --- Process and child process management
 
