@@ -54,175 +54,7 @@ class WorkBench(object):
         initialized with a persistent back end
         """
         self._head_store = None
-                   
-    
-    def _load_repo_from_mutable(self,head):
-        """
-        Load a repository from a mutable - helper for clone and other methods
-        that send and receive an entire repo.
-        head is a raw (unwrapped) gpb message
-        """
-        
-        new_repo = repository.Repository(head)
-            
-                
-        new_repo._workbench = self
-            
-        new_repo._hashed_elements = self._hashed_elements
-        
-        
-        # Load all of the commit refs that came with this head.
-        
-        for branch in new_repo.branches:
-
-            # Check for merge on read condition!            
-            for link in branch.commitrefs.GetLinks():
-                self._load_commits(new_repo,link)
-            
-            
-        # Check and see if we already have one of these repositorys
-        existing_repo = self.get_repository(new_repo.repository_key)
-        if existing_repo:
-            
-            # Merge the existing head with the new one.
-            repo = self._merge_repo_heads(existing_repo, new_repo)
-            
-        else:
-            repo = new_repo
-            
-        if not repo.branchnicknames.has_key('master'):
-            repo.branchnicknames['master']=repo.branches[0].branchkey
-        
-        self.put_repository(repo)
-        
-        return repo 
-            
-    
-    def _load_commits(self, repo, link):
-                
-        if repo._commit_index.has_key(link.key):
-            return repo._commit_index.get(link.key)
-
-        elif repo._hashed_elements.has_key(link.key):
-            
-            element = repo._hashed_elements.get(link.key)
-            
-            
-            if not link.type.package == element.type.package and \
-                    link.type.cls == element.type.cls:
-                raise Exception, 'The link type does not match the element type!'
-            
-            cref = repo._load_element(element)
-            
-            if cref.GPBType == self.CommitClassType:
-                repo._commit_index[cref.MyId]=cref
-                cref.ReadOnly = True
-            else:
-                raise Exception, 'This method should only load commits!'
-            
-            for parent in cref.parentrefs:
-                link = parent.GetLink('commitref')
-                # Call this method recursively for each link
-                self._load_commits(repo, link)
-        else:
-            log.info('Commit id not found: %s' % link.key)
-            # This commit ref was not actually sent!
-            return
-    
-    def _merge_repo_heads(self, existing_repo, new_repo):
-        
-        # examine all the branches in new and merge them into existing
-        for new_branch in new_repo.branches:
-            
-            new_branchkey = new_branch.branchkey
-            
-            for existing_branch in existing_repo.branches:
-                
-                if new_branchkey == existing_branch.branchkey:
-                    # We need to merge the state of these branches
-                    
-                    self._resolve_branch_state(existing_branch, new_branch)
-                        
-                    # We found the new branch in existing - exit the outter for loop
-                    break
-                
-            else:
-                # the branch in new is not in existing - add its head and move on
-                branch = existing_repo.branches.add()
-                
-                branch.branchkey = new_branchkey
-                # Get the cref and then link it in the existing repository
-                for cref in new_branch.commitrefs:
-                    bref = branch.commitref.add()
-                    bref.SetLink(cref)
-                
-            
-        return existing_repo
-    
-    
-    def _resolve_branch_state(self, existing_branch, new_branch):
-        """
-        Move everything in new into an updated existing!
-        """
-        for new_link in new_branch.commitrefs.GetLinks():
-            
-            # An indicator for a fast forward merge made on the existing branch
-            found = False
-            for existing_link in existing_branch.commitrefs.GetLinks():
-            
-                # Get the repositories we are working from
-                existing_repo = existing_branch.Repository
-                new_repo = new_branch.Repository
-            
-                # test to see if we these are the same head ref!
-                if new_link == existing_link:
-                    # If these branches have the same state we are good - continue to the next new cref in the new branch. 
-                    break
-                    
-                # Look in the commit index of the existing repo to see if the new link is an old commit to existing
-                elif existing_repo._commit_index.has_key(new_link.key):
-                    # The branch in new_repo is out of date with what exists here.
-                    # We can completely ignore the new link!
-                    break   
-                    
-                # Look in the commit index of the new repo to see if the existing link is an old commit in new repository 
-                elif new_repo._commit_index.has_key(existing_link.key):
-                    # The existing repo can be fast forwarded to the new state!
-                    # But we must keep looking through the existing_links to see if the push merges our state!
-                    found = True
-                    existing_link.key = new_link.key # Cheat and just copy the key!
-                    self._load_commits(existing_repo, new_link) # Load the new ancestors!
-                
-            else:
-                
-                # This is a non fastforward merge!  
-                # The branch has diverged and must be reconciled!
-                if not found:
-                    bref = existing_branch.commitrefs.add()
-                    new_cref = new_repo._commit_index.get(new_link.key)                    
-                    bref.SetLink(new_cref)
-                
-                
-        key_set = set()
-        duplicates = []
-        # Merge any commit refs which have been resolved!
-        for i in range(len(existing_branch.commitrefs)):
-            ref_link = existing_branch.commitrefs.GetLink(i)
-            if ref_link.key in key_set:
-                duplicates.append(i)
-            else:
-                key_set.add(ref_link.key)
-                
-        # Delete them in reverse order!
-        duplicates.sort(reverse= True)
-        for dup in duplicates:
-            del existing_branch.commitrefs[dup]
-            
-        # Note this in the branches merge on read field and punt this to some
-        # other part of the process.
-        return
-            
-        
+      
         
     def init_repository(self, rootclass=None, nickname=None):
         """
@@ -253,9 +85,31 @@ class WorkBench(object):
             self.set_repository_nickname(repo.repository_key, nickname)
         
         return repo, rootobj
-
-
-
+        
+    def set_repository_nickname(self,repositorykey, nickname):
+        self._repository_nicknames[nickname] = repositorykey    
+        
+    def get_repository(self,key):
+        """
+        Simple getter for the repository dictionary
+        """
+        
+        rkey = self._repository_nicknames.get(key, None)
+        if not rkey:
+            rkey = key
+            
+        return self._repos.get(rkey,None)
+        
+    def list_repositories(self):
+        """
+        Simple list tool for repository names - not sure this will exist?
+        """
+        return self._repos.keys()
+        
+    def put_repository(self,repo):
+        
+        self._repos[repo.repository_key] = repo
+        
         
     def fork(self, structure, name):
         """
@@ -521,33 +375,6 @@ class WorkBench(object):
         
         yield self._process.reply(message,content=cs)
         log.info('op_fetch_linked_objects: Complete!')
-
-    
-    def set_repository_nickname(self,repositorykey, nickname):
-        self._repository_nicknames[nickname] = repositorykey
-        
-    
-    def get_repository(self,key):
-        """
-        Simple getter for the repository dictionary
-        """
-        
-        rkey = self._repository_nicknames.get(key, None)
-        if not rkey:
-            rkey = key
-            
-        return self._repos.get(rkey,None)
-        
-    def list_repositories(self):
-        """
-        Simple list tool for repository names - not sure this will exist?
-        """
-        return self._repos.keys()
-        
-    def put_repository(self,repo):
-        
-        self._repos[repo.repository_key] = repo
-        
         
     def pack_repository_commits(self,repo):
         """
@@ -556,14 +383,7 @@ class WorkBench(object):
         side to deal with merge otherwise.
         """
 
-        # Can not do this once the repo storage is more complex!
-        # assert repo in self._repos.values(), 'This repository is not in the process workbench!'
-        
-        
         mutable = repo._dotgit
-        
-        
-
         # Get the Structure Element for the mutable head
         
         root_obj = self._hashed_elements.get(mutable.MyId)
@@ -723,9 +543,6 @@ class WorkBench(object):
         
         return serialized
         
-        
-        
-        
     def unpack_structure(self, serialized_container):
         """
         Take a container object and load a repository with its contents
@@ -811,3 +628,168 @@ class WorkBench(object):
     
         return head, obj_list
         
+    def _load_repo_from_mutable(self,head):
+        """
+        Load a repository from a mutable - helper for clone and other methods
+        that send and receive an entire repo.
+        head is a raw (unwrapped) gpb message
+        """
+        
+        new_repo = repository.Repository(head)
+            
+                
+        new_repo._workbench = self
+            
+        new_repo._hashed_elements = self._hashed_elements
+        
+        
+        # Load all of the commit refs that came with this head.
+        
+        for branch in new_repo.branches:
+
+            # Check for merge on read condition!            
+            for link in branch.commitrefs.GetLinks():
+                self._load_commits(new_repo,link)
+            
+            
+        # Check and see if we already have one of these repositorys
+        existing_repo = self.get_repository(new_repo.repository_key)
+        if existing_repo:
+            
+            # Merge the existing head with the new one.
+            repo = self._merge_repo_heads(existing_repo, new_repo)
+            
+        else:
+            repo = new_repo
+            
+        if not repo.branchnicknames.has_key('master'):
+            repo.branchnicknames['master']=repo.branches[0].branchkey
+        
+        self.put_repository(repo)
+        
+        return repo 
+            
+    
+    def _load_commits(self, repo, link):
+                
+        if repo._commit_index.has_key(link.key):
+            return repo._commit_index.get(link.key)
+
+        elif repo._hashed_elements.has_key(link.key):
+            
+            element = repo._hashed_elements.get(link.key)
+            
+            
+            if not link.type.package == element.type.package and \
+                    link.type.cls == element.type.cls:
+                raise Exception, 'The link type does not match the element type!'
+            
+            cref = repo._load_element(element)
+            
+            if cref.GPBType == self.CommitClassType:
+                repo._commit_index[cref.MyId]=cref
+                cref.ReadOnly = True
+            else:
+                raise Exception, 'This method should only load commits!'
+            
+            for parent in cref.parentrefs:
+                link = parent.GetLink('commitref')
+                # Call this method recursively for each link
+                self._load_commits(repo, link)
+        else:
+            log.info('Commit id not found: %s' % link.key)
+            # This commit ref was not actually sent!
+            return
+    
+    def _merge_repo_heads(self, existing_repo, new_repo):
+        
+        # examine all the branches in new and merge them into existing
+        for new_branch in new_repo.branches:
+            
+            new_branchkey = new_branch.branchkey
+            
+            for existing_branch in existing_repo.branches:
+                
+                if new_branchkey == existing_branch.branchkey:
+                    # We need to merge the state of these branches
+                    
+                    self._resolve_branch_state(existing_branch, new_branch)
+                        
+                    # We found the new branch in existing - exit the outter for loop
+                    break
+                
+            else:
+                # the branch in new is not in existing - add its head and move on
+                branch = existing_repo.branches.add()
+                
+                branch.branchkey = new_branchkey
+                # Get the cref and then link it in the existing repository
+                for cref in new_branch.commitrefs:
+                    bref = branch.commitref.add()
+                    bref.SetLink(cref)
+                
+            
+        return existing_repo
+    
+    
+    def _resolve_branch_state(self, existing_branch, new_branch):
+        """
+        Move everything in new into an updated existing!
+        """
+        for new_link in new_branch.commitrefs.GetLinks():
+            
+            # An indicator for a fast forward merge made on the existing branch
+            found = False
+            for existing_link in existing_branch.commitrefs.GetLinks():
+            
+                # Get the repositories we are working from
+                existing_repo = existing_branch.Repository
+                new_repo = new_branch.Repository
+            
+                # test to see if we these are the same head ref!
+                if new_link == existing_link:
+                    # If these branches have the same state we are good - continue to the next new cref in the new branch. 
+                    break
+                    
+                # Look in the commit index of the existing repo to see if the new link is an old commit to existing
+                elif existing_repo._commit_index.has_key(new_link.key):
+                    # The branch in new_repo is out of date with what exists here.
+                    # We can completely ignore the new link!
+                    break   
+                    
+                # Look in the commit index of the new repo to see if the existing link is an old commit in new repository 
+                elif new_repo._commit_index.has_key(existing_link.key):
+                    # The existing repo can be fast forwarded to the new state!
+                    # But we must keep looking through the existing_links to see if the push merges our state!
+                    found = True
+                    existing_link.key = new_link.key # Cheat and just copy the key!
+                    self._load_commits(existing_repo, new_link) # Load the new ancestors!
+                
+            else:
+                
+                # This is a non fastforward merge!  
+                # The branch has diverged and must be reconciled!
+                if not found:
+                    bref = existing_branch.commitrefs.add()
+                    new_cref = new_repo._commit_index.get(new_link.key)                    
+                    bref.SetLink(new_cref)
+                
+                
+        key_set = set()
+        duplicates = []
+        # Merge any commit refs which have been resolved!
+        for i in range(len(existing_branch.commitrefs)):
+            ref_link = existing_branch.commitrefs.GetLink(i)
+            if ref_link.key in key_set:
+                duplicates.append(i)
+            else:
+                key_set.add(ref_link.key)
+                
+        # Delete them in reverse order!
+        duplicates.sort(reverse= True)
+        for dup in duplicates:
+            del existing_branch.commitrefs[dup]
+            
+        # Note this in the branches merge on read field and punt this to some
+        # other part of the process.
+        return

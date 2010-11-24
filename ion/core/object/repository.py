@@ -140,9 +140,6 @@ class Repository(object):
         return branch
             
         
-        
-        
-        
     def checkout(self, branchname=None, commit_id=None, older_than=None):
         """
         Check out a particular branch
@@ -266,12 +263,9 @@ class Repository(object):
                 
                 cref = self.merge_by_date(branch)
                 
-                
-        
         # Do some clean up!
         self._workspace = {}
         self._workspace_root = None
-            
             
         # Automatically fetch the object from the hashed dictionary or fetch if needed!
         rootobj = cref.objectroot
@@ -535,7 +529,9 @@ class Repository(object):
         """
         
     def create_wrapped_object(self, rootclass, obj_id=None, addtoworkspace=True):        
-        
+        """
+        Factory method for making wrapped GPB objects from the repository
+        """
         message = rootclass()
             
         obj = self._wrap_message_object(message, obj_id, addtoworkspace)
