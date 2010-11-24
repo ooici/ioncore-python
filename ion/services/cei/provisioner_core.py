@@ -243,6 +243,7 @@ class ProvisionerCore(object):
         for launch_spec, launch_nodes in launch_pairs:
             newstate = None
             try:
+                log.info("Launching group:\nlaunch_spec: '%s'\nlaunch_nodes: '%s'") 
                 yield self._launch_one_group(launch_spec, launch_nodes, cluster)
 
             except Exception,e:
