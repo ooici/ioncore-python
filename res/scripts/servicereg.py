@@ -10,7 +10,6 @@ backend in EC2.
 import logging
 from twisted.internet import defer
 
-#from ion.core.base_process import BaseProcess, ProcessDesc
 from ion.core import ioninit
 from ion.core import bootstrap
 
@@ -35,13 +34,13 @@ def start():
     startsvcs.extend(coi_services)
     #startsvcs.extend(dm_services)
     sup = yield bootstrap.bootstrap(ion_messaging, startsvcs)
-        
+
     logging.info('STARTSVCS ' + str(startsvcs))
     logging.info('ION_MESSAGING' + str(ion_messaging))
     logging.info('CONT_ARGS' + str(ioninit.cont_args))
-    
+
     service_reg_client = service_registry.ServiceRegistryClient(proc=sup)
-    
+
     play_desc = yield service_reg_client.register_service_definition(hello_service.HelloService)
     ref = play_desc.reference()
     svc_desc = yield service_reg_client.get_service_definition(ref)

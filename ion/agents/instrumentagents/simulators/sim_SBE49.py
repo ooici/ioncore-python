@@ -139,8 +139,8 @@ class Instrument(protocol.Protocol):
         @param none
         @retval none
         """
-        # Print prompt
-        self.transport.write(self.prompt)
+        # Not sending a prompt at startup anymore. 
+        #self.transport.write(self.prompt)
         self.factory.connections.append(self)
 
     def dataReceived(self, data):
@@ -184,7 +184,7 @@ class Instrument(protocol.Protocol):
                     log.debug("Starting test samples")
                     self.startTestSamples()
                     self.testRunning = 'true'
-            elif command == "start":
+            elif command == "start" or command == "startnow":
                 """
                 @note If start command is received, and the SBE49 is in autonomous
                 mode, and the instrument is not already running a test, start

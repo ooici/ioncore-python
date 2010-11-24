@@ -123,6 +123,10 @@ class TestSBE49(IonTestCase):
         """
 
         #raise unittest.SkipTest('Temporarily skipping')
+        yield pu.asleep(4)
+        #result = yield self.driver_client.execute(cmd2)
+
+        result = yield self.driver_client.disconnect(['some arg'])
 
 
     @defer.inlineCallbacks
