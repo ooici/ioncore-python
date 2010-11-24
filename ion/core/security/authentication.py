@@ -1,15 +1,13 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/authentication_service.py
+@file ion/core/security/authentication.py
 @author Roger Unwin
-@brief service for registering and authenticating identities
+@author Dorian Raymer
+@brief Functionality for registering and authenticating identities
 """
 
-
-from M2Crypto import EVP, X509, BIO, SMIME, RSA
 import binascii
-import ion.util.ionlog
 import urllib
 import os
 import sys
@@ -17,14 +15,21 @@ import tempfile
 import datetime
 import calendar
 import time
+
+from M2Crypto import EVP, X509, BIO, SMIME, RSA
+
 from twisted.internet import defer
-from ion.resources import coi_resource_descriptions 
+
+import ion.util.ionlog
+#from ion.resources import coi_resource_descriptions 
 
 
 log = ion.util.ionlog.getLogger(__name__)
 
+#XXX @note What is this?
 sys.path.insert(0, "build/lib.linux-i686-2.4/")
 
+#XXX @todo Fix: Should not need absolute paths.
 BASEPATH = os.path.realpath(".")
 CERTIFICATE_PATH = BASEPATH + '/res/certificates/'
 
@@ -32,26 +37,23 @@ class Authentication(object):
     """
     """
 
-    
-    def is_user_registered(self, user_cert, user_private_key):
+    def Xis_user_registered(self, user_cert, user_private_key):
         """
         the subject field from the cert should be the users working unique name.
         """
         cert_info = self.decode_certificate(user_cert)
         print cert_info['subject']
-        
-        
         return None
-    
+
     @defer.inlineCallbacks
-    def register_user(self, user_cert, user_private_key):
+    def Xregister_user(self, user_cert, user_private_key):
         """
         the subject field from the cert should be the users working unique name.
         """
         cert_info = self.decode_certificate(user_cert)
         print cert_info['subject']
         
-        user = coi_resource_descriptions.IdentityResource.create_new_resource()
+        #user = coi_resource_descriptions.IdentityResource.create_new_resource()
         user.certificate = user_cert
         user.private_key = user_private_key
         
@@ -68,23 +70,19 @@ class Authentication(object):
         user0 = yield self.identity_registry_client.get_user(r_ref)
         print "got subject back" + str(user.subject)
         defer.returnValue(ooi_id)
-    
-    def authenticate_user(self, user_cert, user_private_key):
+
+    def Xauthenticate_user(self, user_cert, user_private_key):
         """
         the subject field from the cert should be the users working unique name.
         """
         cert_info = self.decode_certificate(user_cert)
         print cert_info['subject']
-        
-        
         return None
-    
-    
-    
-    
-    
+
+
     def sign_message_hex(self, message, rsa_private_key):
         """
+        @param message byte string
         return a hex encoded signature for a message
         """
         return binascii.hexlify(self.sign_message(message, rsa_private_key))
@@ -93,14 +91,12 @@ class Authentication(object):
         """
         take a message, and return a binary signature of it
         """
-        
         pkey = EVP.load_key_string(rsa_private_key)
         pkey.sign_init()
         pkey.sign_update(message)
         sig = pkey.sign_final()
-        
         return sig
-    
+
     def verify_message_hex(self, message, certificate, signed_message_hex):
         """
         verify a hex encoded signature for a message
@@ -109,11 +105,7 @@ class Authentication(object):
 
     def verify_message(self, message, certificate, signed_message):
         """
-        
-        
         """
-
-        
         x509 = X509.load_cert_string(certificate)
         pubkey = x509.get_pubkey()
         pubkey.verify_init()
@@ -125,36 +117,34 @@ class Authentication(object):
 
     def private_key_encrypt_message_hex(self, message, private_key):
         return binascii.hexlify(self.private_key_encrypt_message(message, private_key))
+
     def private_key_encrypt_message(self, message, private_key):
         """
         """
-
-
         priv = RSA.load_key_string(private_key)
         
         p = getattr(RSA, 'pkcs1_padding')
         ctxt = priv.private_encrypt(message, p)
         return ctxt
-    
+
     def private_key_decrypt_message_hex(self, encrypted_message, private_key):
         return self.private_key_decrypt_message(binascii.unhexlify(encrypted_message), private_key)
+
     def private_key_decrypt_message(self, encrypted_message, private_key):
         """
         """
         priv = RSA.load_key_string(private_key)
         p = getattr(RSA, 'pkcs1_padding')
-        
-        
         ptxt = priv.public_decrypt(encrypted_message, p)
         return ptxt
-    
+
     def public_encrypt_hex(self, message, private_key):
         return binascii.hexlify(self.public_encrypt(message, private_key))
+
     def public_encrypt(self, message, private_key):
         """
         this encrypts messages that will be decrypted using private_decrypt
         """
-        
         priv = RSA.load_key_string(private_key)
       
         p = getattr(RSA, 'pkcs1_padding') # can be either 'pkcs1_padding', 'pkcs1_oaep_padding'
@@ -164,6 +154,7 @@ class Authentication(object):
 
     def private_decrypt_hex(self, encrypted_message, private_key):
         return self.private_decrypt(binascii.unhexlify(encrypted_message), private_key)
+
     def private_decrypt(self, encrypted_message, private_key):
         """
         this decrypts messages encrypted using public_encrypt
@@ -175,7 +166,7 @@ class Authentication(object):
         ptxt = priv.private_decrypt(encrypted_message, p)
         
         return ptxt
-        
+
     def decode_certificate(self, certificate):
         """
         Return a Dict of all known attributes for the certificate
@@ -213,16 +204,16 @@ class Authentication(object):
         
         print str(attributes)
         return attributes
-        
+
     def is_certificate_descended_from(self, user_cert, ca_file_name):
         store = X509.X509_Store()
         store.add_x509(X509.load_cert(CERTIFICATE_PATH + ca_file_name))
         x509 = X509.load_cert_string(user_cert)
         return store.verify_cert(x509)
-        
+
     def is_certificate_valid(self, user_cert):
         return self.verify_certificate_chain(user_cert)
-        
+
     def verify_certificate_chain(self, user_cert):
         """
        
@@ -234,7 +225,7 @@ class Authentication(object):
                 validity = True
                 
         return validity
-    
+
     def get_certificate_level(self, user_cert):
         """
         return what level of trust the certificate comes with
@@ -264,4 +255,4 @@ class Authentication(object):
         if today > nva:
             return False
         return True
-   
+
