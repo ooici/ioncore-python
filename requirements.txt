@@ -12,7 +12,6 @@ carrot==0.10.11-txamqp
 configobj==4.7.2
 gviz-api.py==1.7.0
 httplib2==0.6.0
-ioncore==0.3.0
 msgpack-python==015final
 pupynere==1.0.13
 pycassa==0.3.0

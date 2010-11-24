@@ -1,3 +1,6 @@
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from twisted.internet import defer, reactor
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.process.process import ProcessFactory
@@ -31,11 +34,11 @@ class EPUControllerClientSample(ServiceProcess):
     
     def slc_init(self, proc=None, **kwargs):
         self.client = EPUControllerClient()
-        reactor.callLater(1, self.send_reconfigure)
+        reactor.callLater(5, self.send_reconfigure)
             
     @defer.inlineCallbacks
     def send_reconfigure(self):
-        newconf = {'preserve_n':self.spawn_args["preserve_n"]}
+        newconf = {"engine_conf":{"preserve_n":"%s" % self.spawn_args["preserve_n"]}}
         self.client.reconfigure(newconf)
 
 factory = ProcessFactory(EPUControllerClientSample)
