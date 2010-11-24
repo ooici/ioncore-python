@@ -38,7 +38,9 @@ class EPUControllerClientSample(ServiceProcess):
             
     @defer.inlineCallbacks
     def send_reconfigure(self):
-        newconf = {"preserve_n":"%s" % self.spawn_args["preserve_n"]}
+        newconf = {}
+        newconf["preserve_n"] = "%s" % self.spawn_args["preserve_n"]
+        newconf["unique_instances"] = {'b2db408e':{'some_unique_name':'some_unique_value123'}}
         self.client.reconfigure(newconf)
 
 factory = ProcessFactory(EPUControllerClientSample)
