@@ -23,6 +23,9 @@ class StartupError(IONError):
 class IllegalStateError(IONError):
     pass
 
+class ConversationError(IONError):
+    pass
+
 class ReceivedError(IONError):
 
     def __init__(self, *args, **kwargs):

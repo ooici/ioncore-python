@@ -20,9 +20,9 @@ from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
 from ion.core.process.cprocess import IContainerProcess, ContainerProcess
 from ion.services.dm.preservation.store import Store
-from ion.interact.conversation import Conversation, ConversationManager
+from ion.interact.conversation import Conversation, ProcessConversationManager
 from ion.interact.message import Message
-from ion.interact.request import Request
+from ion.interact.request import Request, RequestType
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject
 
@@ -113,7 +113,7 @@ class Process(BasicLifecycleObject):
         self.add_receiver(self.backend_receiver)
 
         # Delegate class to manage all conversations of this process
-        self.conv_manager = ConversationManager(self)
+        self.conv_manager = ProcessConversationManager(self)
 
         # Dict of converations by conv-id
         self.conversations = {}
@@ -427,6 +427,10 @@ class Process(BasicLifecycleObject):
             Synchronous call.
         @exception Various exceptions for different failures
         """
+        req_conv = self.conv_manager.new_conversation(RequestType.CONV_TYPE_REQUEST)
+        req_conv.bind_role_local(RequestType.ROLE_INITIATOR, self)
+        req_conv.bind_role(RequestType.ROLE_PARTICIPANT, receiver)
+
         if headers == None:
             headers = {}
         headers['performative'] = 'request'

@@ -10,8 +10,9 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.data.dataobject import DataObject
-from ion.interact.conversation import ConversationType, Conversation, ConversationRole, ConversationTypeFSMFactory
+from ion.interact.conversation import ConversationType, ConversationTypeSpec, Conversation, ConversationRole, ConversationTypeFSMFactory, RoleSpec
 from ion.util.state_object import BasicStates
+
 
 class RequestFSMFactory(ConversationTypeFSMFactory):
     """
@@ -36,7 +37,7 @@ class RequestFSMFactory(ConversationTypeFSMFactory):
     E_ERROR = "error"
 
     def create_fsm(self, target, memory=None):
-        fsm = FSMFactory.create_fsm(self, target, memory)
+        fsm = ConversationTypeFSMFactory.create_fsm(self, target, memory)
 
         actf = target._action
 
@@ -62,14 +63,34 @@ class RequestFSMFactory(ConversationTypeFSMFactory):
 
         return fsm
 
-class Request_Initiator(ConversationRole):
-    factory = RequestFSMFactory()
-
-class Request_Participant(ConversationRole):
-    factory = RequestFSMFactory()
-
 class Request(Conversation):
-    pass
+    """
+    @brief Conversation instance for a request
+    """
 
-class RequestSpec(ConversationTypeSpec):
-    pass
+class RequestInitiator(ConversationRole):
+    factory = RequestFSMFactory()
+
+class RequestParticipant(ConversationRole):
+    factory = RequestFSMFactory()
+
+class RequestType(ConversationType):
+    """
+    @brief Defines the conversation type of request with its roles and id.
+    """
+
+    CONV_TYPE_REQUEST = "request"
+
+    ROLE_INITIATOR = RoleSpec(
+                        role_id="initiator",
+                        role_class=RequestInitiator)
+    ROLE_PARTICIPANT = RoleSpec(
+                        role_id="participant",
+                        role_class=RequestParticipant)
+
+    roles = {ROLE_INITIATOR.role_id:ROLE_INITIATOR,
+             ROLE_PARTICIPANT.role_id:ROLE_PARTICIPANT}
+
+    def new_conversation(self, **kwargs):
+        conv = Request(**kwargs)
+        return conv
