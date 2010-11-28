@@ -19,7 +19,7 @@ from nimboss.cluster import ClusterDriver
 from nimboss.nimbus import NimbusClusterDocument, ValidationError
 from libcloud.types import NodeState as NimbossNodeState
 from libcloud.base import Node as NimbossNode
-from libcloud.drivers.ec2 import EC2NodeDriver
+from libcloud.drivers.ec2 import EC2NodeDriver, EC2USWestNodeDriver
 from ion.services.cei.provisioner_store import group_records, calc_record_age
 from ion.services.cei.dtrs import DeployableTypeLookupError
 from ion.services.cei import states
@@ -61,11 +61,13 @@ class ProvisionerCore(object):
         ec2_key = os.environ['AWS_ACCESS_KEY_ID']
         ec2_secret = os.environ['AWS_SECRET_ACCESS_KEY']
         ec2_east_driver = EC2NodeDriver(ec2_key, ec2_secret)
+        ec2_west_driver = EC2USWestNodeDriver(ec2_key, ec2_secret)
 
         self.node_drivers = {
                 'nimbus-test' : nimbus_test_driver,
                 'nimbus-uc' : nimbus_uc_driver,
                 'ec2-east' : ec2_east_driver,
+                'ec2-west' : ec2_west_driver,
                 'magellan' : nimbus_magellan_drv,
                 }
 
@@ -133,6 +135,7 @@ class ProvisionerCore(object):
                     deployable_type, str(e))
             state = states.FAILED
             state_description = "DTRS_LOOKUP_FAILED " + str(e)
+            document = "N/A"
 
         launch_record = {
                 'launch_id' : launch_id,
@@ -242,6 +245,7 @@ class ProvisionerCore(object):
         for launch_spec, launch_nodes in launch_pairs:
             newstate = None
             try:
+                log.info("Launching group:\nlaunch_spec: '%s'\nlaunch_nodes: '%s'") 
                 yield self._launch_one_group(launch_spec, launch_nodes, cluster)
 
             except Exception,e:

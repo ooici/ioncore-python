@@ -3,7 +3,7 @@
 """
 @file ion/services/coi/authentication_service.py
 @author Roger Unwin
-@brief service for registering and authenticating identities
+@brief routines for working with crypto (x509 certificates and private_keys)
 """
 
 
@@ -30,56 +30,9 @@ CERTIFICATE_PATH = BASEPATH + '/res/certificates/'
 
 class Authentication(object):
     """
+    routines for working with crypto (x509 certificates and private_keys)
     """
 
-    
-    def is_user_registered(self, user_cert, user_private_key):
-        """
-        the subject field from the cert should be the users working unique name.
-        """
-        cert_info = self.decode_certificate(user_cert)
-        print cert_info['subject']
-        
-        
-        return None
-    
-    @defer.inlineCallbacks
-    def register_user(self, user_cert, user_private_key):
-        """
-        the subject field from the cert should be the users working unique name.
-        """
-        cert_info = self.decode_certificate(user_cert)
-        print cert_info['subject']
-        
-        user = coi_resource_descriptions.IdentityResource.create_new_resource()
-        user.certificate = user_cert
-        user.private_key = user_private_key
-        
-        cert_details = self.decode_certificate(user_cert)
-        user.subject = cert_details['subject']
-        user = yield self.identity_registry_client.register_user(user)
-
-        ooi_id = user.reference().RegistryIdentity
-        
-        # how to go from ooid back to a field that works for get_user
-        # if cant, then might have to use find user.
-        ResourceReference(RegistryIdentity=ooi_id)
-        r_ref = ResourceReference(RegistryIdentity=ooi_id)
-        user0 = yield self.identity_registry_client.get_user(r_ref)
-        print "got subject back" + str(user.subject)
-        defer.returnValue(ooi_id)
-    
-    def authenticate_user(self, user_cert, user_private_key):
-        """
-        the subject field from the cert should be the users working unique name.
-        """
-        cert_info = self.decode_certificate(user_cert)
-        print cert_info['subject']
-        
-        
-        return None
-    
-    
     
     
     
@@ -109,10 +62,8 @@ class Authentication(object):
 
     def verify_message(self, message, certificate, signed_message):
         """
-        
-        
+        This verifies that the message and the signature are indeed signed by the certificate
         """
-
         
         x509 = X509.load_cert_string(certificate)
         pubkey = x509.get_pubkey()
@@ -124,12 +75,15 @@ class Authentication(object):
             return False
 
     def private_key_encrypt_message_hex(self, message, private_key):
+        """
+        a version of private_key_encrypt_message that returns ascii safe result
+        """
         return binascii.hexlify(self.private_key_encrypt_message(message, private_key))
     def private_key_encrypt_message(self, message, private_key):
         """
+        encrypt a message using the private_key
         """
-
-
+        
         priv = RSA.load_key_string(private_key)
         
         p = getattr(RSA, 'pkcs1_padding')
@@ -137,18 +91,24 @@ class Authentication(object):
         return ctxt
     
     def private_key_decrypt_message_hex(self, encrypted_message, private_key):
+        """
+        a version of private_key_decrypt_message that works with ascii safe encryption string
+        """
         return self.private_key_decrypt_message(binascii.unhexlify(encrypted_message), private_key)
     def private_key_decrypt_message(self, encrypted_message, private_key):
         """
+        decrypt a message using the private_key
         """
         priv = RSA.load_key_string(private_key)
         p = getattr(RSA, 'pkcs1_padding')
-        
         
         ptxt = priv.public_decrypt(encrypted_message, p)
         return ptxt
     
     def public_encrypt_hex(self, message, private_key):
+        """
+        this encrypts messages that will be decrypted using private_decrypt, but using ascii safe result
+        """
         return binascii.hexlify(self.public_encrypt(message, private_key))
     def public_encrypt(self, message, private_key):
         """
@@ -163,6 +123,9 @@ class Authentication(object):
         return ctxt
 
     def private_decrypt_hex(self, encrypted_message, private_key):
+        """
+        this decrypts messages encrypted using public_encrypt, but using ascii safe input
+        """
         return self.private_decrypt(binascii.unhexlify(encrypted_message), private_key)
     def private_decrypt(self, encrypted_message, private_key):
         """
@@ -211,21 +174,26 @@ class Authentication(object):
         attributes['serial_number'] = str(x509.get_serial_number())
         attributes['version'] = str(x509.get_version())
         
-        print str(attributes)
         return attributes
         
     def is_certificate_descended_from(self, user_cert, ca_file_name):
+        """
+        tests if the certificate was issued by the passed in certificate authority
+        """
         store = X509.X509_Store()
         store.add_x509(X509.load_cert(CERTIFICATE_PATH + ca_file_name))
         x509 = X509.load_cert_string(user_cert)
         return store.verify_cert(x509)
         
     def is_certificate_valid(self, user_cert):
+        """
+        This returns if the certificate is valid.
+        """
         return self.verify_certificate_chain(user_cert)
         
     def verify_certificate_chain(self, user_cert):
         """
-       
+        This returns if the certificate is valid.
         """
         #cilogon-basic.pem	cilogon-openid.pem	cilogon-silver.pem
         validity = False

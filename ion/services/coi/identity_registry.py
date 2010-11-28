@@ -38,6 +38,10 @@ class IdentityRegistryClient(BaseRegistryClient):
         ServiceClient.__init__(self, proc, **kwargs)
         
 
+    def ooi_id_to_user_ref(self, ooi_id):
+        ResourceReference(RegistryIdentity=ooi_id)
+        user_ref = ResourceReference(RegistryIdentity=ooi_id)
+        return user_ref
 
     def clear_identity_registry(self):
         return self.base_clear_registry('clear_identity_registry')
@@ -80,7 +84,10 @@ class IdentityRegistryClient(BaseRegistryClient):
     
     @defer.inlineCallbacks
     def register_user_credentials(self, user_cert, user_private_key):
-        print "GOT HERE"
+        """
+        This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
+        It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
+        """
         cont = {
             'user_cert': user_cert,
             'user_private_key': user_private_key,
@@ -88,18 +95,45 @@ class IdentityRegistryClient(BaseRegistryClient):
         
         (content, headers, msg) = yield self.rpc_send('register_user_credentials', cont)
         
-        log.info('Service reply: ' + str(content))
+        defer.returnValue(str(content['value']))
         
-        #(content, headers, msg) = yield self.rpc_send('register_user', content)
+    @defer.inlineCallbacks
+    def is_user_registered(self, user_cert, user_private_key):
+        """
+        This determines if a user is registered by deriving the subject line from the certificate and scanning the registry for that line.
+        It returns True or False
+        """
+        cont = {
+            'user_cert': user_cert,
+            'user_private_key': user_private_key,
+        }
         
-        defer.returnValue(str(content))
+        (content, headers, msg) = yield self.rpc_send('verify_registration', cont)
+        
+        defer.returnValue( content['value'] )
+        
+    @defer.inlineCallbacks
+    def authenticate_user(self, user_cert, user_private_key):
+        """
+        This authenticates that the user exists. If so, the credentials are replaced with the current ones, and a ooi_id is returned. If not, None is returned.
+        """
+        cont = {
+            'user_cert': user_cert,
+            'user_private_key': user_private_key,
+        }
+        
+        (content, headers, msg) = yield self.rpc_send('authenticate_user_credentials', cont)
+        
+        defer.returnValue( content['value'] )
 
+        
 
+        
         
 
 class IdentityRegistryService(BaseRegistryService):
 
-     # Declaration of service
+    # Declaration of service
     declare = ServiceProcess.service_declare(name='identity_service', version='0.1.0', dependencies=[])
 
     op_clear_identity_registry = BaseRegistryService.base_clear_registry
@@ -112,15 +146,12 @@ class IdentityRegistryService(BaseRegistryService):
     @defer.inlineCallbacks
     def op_register_user_credentials(self, content, headers, msg):
         """
-        Need to migrate the three functions from authentication to here. here is a sample of how a function as a serivce works.  taken from exchange_management
-        """
-        """
-        the subject field from the cert should be the users working unique name.
+        This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
+        It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
 
         authentication = Authentication()
         cert_info = authentication.decode_certificate(content['user_cert'])
-        print cert_info['subject']
         
         user = coi_resource_descriptions.IdentityResource.create_new_resource()
         user.certificate = content['user_cert']
@@ -130,31 +161,56 @@ class IdentityRegistryService(BaseRegistryService):
         user.subject = cert_details['subject']
         
         registered_user = yield self.reg.register_resource(user) # This is performing this... op_regiser_user(user)
-        
-        yield self.reply_ok(msg, user.encode())
-        """
-        #bogus line
-        
-        #user = yield self.op_register_user(user)
-        #user1 = self.base_register_resource('register_user', user)
-        (content, headers, msg) = yield self.rpc_send('register_user', user)
-        
-        ooi_id = user1.reference().RegistryIdentity
-        
-        # how to go from ooid back to a field that works for get_user
-        # if cant, then might have to use find user.
-        #ResourceReference(RegistryIdentity=ooi_id)
-        #r_ref = ResourceReference(RegistryIdentity=ooi_id)
-        #user0 = yield self.identity_registry_client.get_user(r_ref)
-        
-        
-        print "got subject back" + str(user.subject)
-
-
+        ooi_id = registered_user.reference().RegistryIdentity
         yield self.reply_ok(msg, ooi_id)
+        
+
+    @defer.inlineCallbacks
+    def op_verify_registration(self, content, headers, msg):
         """
+        This determines if a user is registered by deriving the subject line from the certificate and scanning the registry for that line.
+        It returns True or False
+        """
+        authentication = Authentication()
+        cert_info = authentication.decode_certificate(content['user_cert'])
+        
+        user_description = coi_resource_descriptions.IdentityResource()
+        user_description.subject = cert_info['subject']
+        
+        users = yield self.reg.find_resource(user_description, regex=False) # This is performing this... op_find_user(user)
+        
+        if len(users) > 0:
+            yield self.reply_ok(msg, True)
+        else:
+            yield self.reply_ok(msg, False)
 
-
+    @defer.inlineCallbacks
+    def op_authenticate_user_credentials(self, content, headers, msg):
+        """
+        This authenticates that the user exists. If so, the credentials are replaced with the current ones, and a ooi_id is returned. If not, None is returned.
+        """
+        
+        authentication = Authentication()
+        cert_info = authentication.decode_certificate(content['user_cert'])
+        
+        user_description = coi_resource_descriptions.IdentityResource()
+        user_description.subject = cert_info['subject']
+        
+        users = yield self.reg.find_resource(user_description, regex=False) # This is performing this... op_find_user(user)
+        print len(users)
+        if users[0].subject == cert_info['subject']:
+            users[0].certificate = content['user_cert']
+            users[0].private_key = content['user_private_key']
+            registered_user = yield self.reg.register_resource(users[0]) # This is performing this... op_update_user(user)
+            ooi_id = registered_user.reference().RegistryIdentity
+            
+            yield self.reply_ok(msg, ooi_id)
+        else:
+            yield self.reply_ok(msg, None)
+        
+        
+        
+        
 
 # Spawn of the process using the module name
 factory = ProcessFactory(IdentityRegistryService)

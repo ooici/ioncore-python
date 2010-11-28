@@ -4,7 +4,7 @@
 @brief Python Capability Container shell
 """
 
-import os, sys, tty, termios
+import os, sys, tty, termios, platform
 
 from twisted.internet import stdio
 from twisted.conch.insults import insults
@@ -133,10 +133,11 @@ class Control(object):
         tty.setraw(fd, termios.TCSANOW) # when=now
         self.fd = fd
 
-        # stdout fd
-        outSettings = termios.tcgetattr(fdout)
-        outSettings[1] = 3 # do CR
-        termios.tcsetattr(fdout, termios.TCSANOW, outSettings)
+        # stdout fd (only adjust on OSX)
+        if platform.system() == 'Darwin':
+            outSettings = termios.tcgetattr(fdout)
+            outSettings[1] = 3 # do CR
+            termios.tcsetattr(fdout, termios.TCSANOW, outSettings)
 
         namespace = makeNamespace()
 

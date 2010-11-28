@@ -111,14 +111,26 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
         #-----------------
 
-        ooi_id = yield self.identity_registry_client.register_user_credentials(user.certificate, user.rsa_private_key)
-        print ooi_id
-        print "#"
-        print "#"
-        print "#"
-        print "#"
-        print "#"
-        print "#"
+
+
+
+        found = yield self.identity_registry_client.is_user_registered(user.certificate, user.rsa_private_key)
+        self.assertEqual(found, False)
+        
+        # Register a user
+        ooi_id1 = yield self.identity_registry_client.register_user_credentials(user.certificate, user.rsa_private_key)
+        
+        # Verify we can find it.
+        found = yield self.identity_registry_client.is_user_registered(user.certificate, user.rsa_private_key)
+        self.assertEqual(found, True)
+        
+        # swap them just to test update
+        ooi_id2 = yield self.identity_registry_client.authenticate_user(user.certificate, user.rsa_private_key)
+        
+        self.assertEqual(ooi_id1, ooi_id2)
+        
+        # clear the registry for the tests below
+        yield self.identity_registry_client.clear_identity_registry()
         #-----------------
 
         user = yield self.identity_registry_client.register_user(user)

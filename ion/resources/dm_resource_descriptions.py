@@ -202,6 +202,11 @@ class IRODSPersistentArchive(StatefulResource):
     auth: Authentication information to log into the IRODS instance.
     """
     host = TypedAttribute(str)
+    port = TypedAttribute(int)
+    resource = TypedAttribute(str)
+    collection = TypedAttribute(str)
+    username = TypedAttribute(str)
+    password = TypedAttribute(str)
     ICAT = TypedAttribute(str)
     zone = TypedAttribute(str)
     auth = TypedAttribute(str)

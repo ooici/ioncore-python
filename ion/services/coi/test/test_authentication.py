@@ -130,14 +130,17 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         pub_enc = authentication.public_encrypt('this is a simple text', user.rsa_private_key)
         self.assertEqual(authentication.private_decrypt(pub_enc, user.rsa_private_key), 'this is a simple text')
+        
         pub_enc_hex = authentication.public_encrypt_hex('this is a simple text', user.rsa_private_key)
         self.assertEqual(authentication.private_decrypt_hex(pub_enc_hex, user.rsa_private_key), 'this is a simple text')
         
-        print "decode " + str(authentication.decode_certificate(user.certificate))
+        # Not entirely sure if this is worth testing
+        # authentication.decode_certificate(user.certificate)
         
-        print "verify chain " + str(authentication.verify_certificate_chain(user.certificate))
+        # verify chain Will fail for old certificates
+        # self.assertEqual(authentication.verify_certificate_chain(user.certificate), True)
         
-        print "within date range " + str(authentication.is_certificate_within_date_range(user.certificate))
+        # Verify certificate is within valid date ranve. Will fail for old certificates
+        # self.assertEqual(authentication.is_certificate_within_date_range(user.certificate), True)
         
         
-        authentication.register_user(user.certificate, user.rsa_private_key)
