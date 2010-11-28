@@ -197,7 +197,7 @@ class IdentityRegistryService(BaseRegistryService):
         user_description.subject = cert_info['subject']
         
         users = yield self.reg.find_resource(user_description, regex=False) # This is performing this... op_find_user(user)
-        print len(users)
+        #print len(users)
         if users[0].subject == cert_info['subject']:
             users[0].certificate = content['user_cert']
             users[0].private_key = content['user_private_key']

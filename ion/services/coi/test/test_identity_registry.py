@@ -136,8 +136,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         user = yield self.identity_registry_client.register_user(user)
         
         ooi_id = user.reference()
-        print str(ooi_id)
-        print "saved and got this id back " + str(ooi_id.RegistryIdentity)
+        #print str(ooi_id)
+        #print "saved and got this id back " + str(ooi_id.RegistryIdentity)
         # load the user back
         user0 = yield self.identity_registry_client.get_user(ooi_id)
 
