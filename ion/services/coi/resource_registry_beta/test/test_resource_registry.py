@@ -69,7 +69,7 @@ class ResourceRegistryTest(IonTestCase):
             
         self.assertEqual(resource.identity, res_id)
         
-        self.assertEqual(resource.resource.GPBType, type_obj.GPBMessage)
+        self.assertEqual(resource.resource_object.GPBType, type_obj.GPBMessage)
         
         
         

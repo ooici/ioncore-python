@@ -45,49 +45,16 @@ class ResourceRegistryService(ServiceProcess):
         #assert isinstance(backend, store.IStore)
         #self.backend = backend
         ServiceProcess.__init__(self, *args, **kwargs)
-
+        
         self.push = self.workbench.push
         self.pull = self.workbench.pull
         self.fetch_linked_objects = self.workbench.fetch_linked_objects
         self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
-
+        
+        self.datastore_service = self.spawn_args.get('datastore_service', CONF.getValue('datastore_service', default='No Data Store service name provided!'))
+        
         log.info('ResourceRegistryService.__init__()')
-
-    @defer.inlineCallbacks
-    def _register_resource_instance(self, content):
         
-        # Get the repository that the object is in
-        msg_repo = content.repository
-            
-        # Get the class for this type of resource
-        cls = msg_repo._load_class_from_type(content)
-        
-        # Create a new repository to hold this resource
-        new_repo, resource = self.workbench.init_repository(rootclass=resource_pb2.OOIResource)
-        
-        # Set the identity of the resource
-        resource.identity = new_repo.repository_key
-            
-        # Create the new resources object
-        res_obj = new_repo.create_wrapped_object(cls)
-        # Set the object as the child of the resource
-        resource.set_link_by_name('resource', res_obj)
-        
-        resource.name = res_obj.GPBMessage.DESCRIPTOR.file.name # get name?
-        
-        # State is set to new by default
-        resource.lcs = resource_pb2.New
-        
-        new_repo.commit('Created a new resource!')
-
-        # push the new resource to the data store        
-        response, exception = yield self.push('datastore', resource.identity)
-        
-        assert response == self.ION_SUCCESS, 'Push to datastore failed!'
-            
-        defer.returnValue(resource.identity)
-
-
     @defer.inlineCallbacks
     def op_register_resource_instance(self, content, headers, msg):
         """
@@ -101,12 +68,45 @@ class ResourceRegistryService(ServiceProcess):
         # Check that we got the correct kind of content!
         assert isinstance(content, gpb_wrapper.Wrapper)
         assert content.GPBType == TypeClassType
-    
-        id = yield _register_resource_instance(content)
-
+        
+        id = yield self._register_resource_instance(content)
+        
         yield self.reply(msg, content=id)
+        
+    @defer.inlineCallbacks
+    def _register_resource_instance(self, content):
+        
+        # Get the repository that the object is in
+        msg_repo = content.Repository
+            
+        # Get the class for this type of resource
+        cls = msg_repo._load_class_from_type(content)
+        
+        # Create a new repository to hold this resource
+        new_repo, resource = self.workbench.init_repository(rootclass=resource_pb2.OOIResource)
+        
+        # Set the identity of the resource
+        resource.identity = new_repo.repository_key
+            
+        # Create the new resources object
+        res_obj = new_repo.create_wrapped_object(cls)
+        # Set the object as the child of the resource
+        resource.SetLinkByName('resource_object', res_obj)
+        
+        # Name and Description is set by the resource client
+        resource.name = res_obj.GPBMessage.DESCRIPTOR.file.name # get name?
+        
+        # State is set to new by default
+        resource.lcs = resource_pb2.New
+        
+        new_repo.commit('Created a new resource!')
 
-    
+        # push the new resource to the data store        
+        response, exception = yield self.push(self.datastore_service, resource.identity)
+        
+        assert response == self.ION_SUCCESS, 'Push to datastore failed!'
+            
+        defer.returnValue(resource.identity)
 
 
 
@@ -115,29 +115,31 @@ class ResourceRegistryService(ServiceProcess):
         """
         Service operation: Get a resource instance.
         """
-
-
-
+        raise NotImplementedError, "Interface Method Not Implemented"
 
     def op_register_resource_type(self,content, headers, msg):
         """
         Service operation: Create or update a resource definition with the registry.
         """
+        raise NotImplementedError, "Interface Method Not Implemented"
 
     def op_lookup_resource_type(self,content, headers, msg):
         """
         Service operation: Get a resource definition.
         """
+        raise NotImplementedError, "Interface Method Not Implemented"
 
     def op_find_registered_resource(self,content, headers, msg):
         """
         Service operation: Find the registered definition of a resource
         """
+        raise NotImplementedError, "Interface Method Not Implemented"
 
     def op_find_registered_resource_instance(self,content, headers, msg):
         """
         Service operation: Find the registered instances that matches the service class
         """
+        raise NotImplementedError, "Interface Method Not Implemented"
     
     
     
@@ -160,7 +162,7 @@ class ResourceRegistryClient(ServiceClient):
         """
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('register_resource_instance', resource_type)
-        log.info('Resource Registry Service reply: '+str(content))
+        log.info('Resource Registry Service reply with new resource ID: '+str(content))
         # Return value should be a resource identity
         defer.returnValue(str(content))
         
@@ -172,6 +174,7 @@ class ResourceRegistryClient(ServiceClient):
         @brief Lookup an instance of a resource by the resource ID
         Forward a pull request to the datastore?
         """
+        raise NotImplementedError, "Interface Method Not Implemented"
 
     #@defer.inlineCallbacks
     def register_resource_type(self,resource):
@@ -180,6 +183,7 @@ class ResourceRegistryClient(ServiceClient):
         @param resource can be either an instance of a Resource Description or
         the class object of the resource to be described.
         """
+        raise NotImplementedError, "Interface Method Not Implemented"
 
     #@defer.inlineCallbacks
     def find_registered_resource_instance(self, query):
@@ -187,6 +191,7 @@ class ResourceRegistryClient(ServiceClient):
         @brief find the registered definition of a resoruce
         @param query is a query object
         """
+        raise NotImplementedError, "Interface Method Not Implemented"
 
     #@defer.inlineCallbacks
     def find_registered_resource_type(self, query):
@@ -194,6 +199,7 @@ class ResourceRegistryClient(ServiceClient):
         @brief find all registered resources which match the attributes of description
         @param query object
         """
+        raise NotImplementedError, "Interface Method Not Implemented"
 
 
 # Spawn of the process using the module name

@@ -503,6 +503,8 @@ class Repository(object):
                 self._detached_head = False
                 
         self._current_branch = brnch
+        return brnch.branchkey
+        
         
     def log_commits(self,branchname):
         

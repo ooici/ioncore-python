@@ -87,6 +87,7 @@ class WorkBench(object):
         return repo, rootobj
         
     def set_repository_nickname(self,repositorykey, nickname):
+        # Should this throw an error if that nickname already exists?
         self._repository_nicknames[nickname] = repositorykey    
         
     def get_repository(self,key):
@@ -123,8 +124,8 @@ class WorkBench(object):
         """
         targetname = self._process.get_scoped_name('system', origin)
         
-        print 'PULL Targetname: ', targetname
-        print 'PULL RepoName: ', repo_name
+        #print 'PULL Targetname: ', targetname
+        #print 'PULL RepoName: ', repo_name
         
         repo, headers, msg = yield self._process.rpc_send(targetname,'pull', repo_name)
         
@@ -154,7 +155,6 @@ class WorkBench(object):
         repo = self.get_repository(content)
         
         if repo:
-            print 'HEHREHEHEHEHEHEH'
             yield self._process.reply(msg,content=repo)
         else:
             yield self._process.reply(msg,response_code=self._process.APP_RESOURCE_NOT_FOUND)
