@@ -6,7 +6,11 @@
        iRODS backend storage servers.
 @Note Test cases for the iRODS backend are in ion.data.backends.test.test_irodsstore 
 @Note The Python iRODS library package can be installed with: easy_install --find-links http://ooici.net/packages pyrods-irods
-@
+
+@TODO - all IStore interface methods must returned deferreds! See the IStore.py and the
+python in memory dictionary implementation.
+@TODO - do not generically catch excpetions.
+@TODO - make sure this implementation of the IStore can run the IStore test cases
 """
 
 import logging
@@ -62,6 +66,7 @@ class IrodsStore(IStore):
         try:
             value = CONF[key]
         except:
+            # TODO - do not catch generic exceptions! This should be a key error exception I believe
             value = None
         return value
 
@@ -99,6 +104,7 @@ class IrodsStore(IStore):
         try:
             inst.connect_to_irods()
         except Exception:
+            # TODO - do not catch generic exceptions!
             pass
 
         return (inst)

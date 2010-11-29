@@ -125,6 +125,8 @@ class TestWHSentinelADCP(IonTestCase):
         """
 
         #raise unittest.SkipTest('Temporarily skipping')
+        # DHE: disconnecting; a connect would probably be good.
+        result = yield self.driver_client.disconnect(['some arg'])
 
 
     @defer.inlineCallbacks
@@ -164,6 +166,7 @@ class TestWHSentinelADCP(IonTestCase):
         #params['publish-to'] = topic.RegistryIdentity
         result = yield self.driver_client.configure_driver(params)
         
+        """
         result = yield self.driver_client.execute([['cr', '1']])         # set to factory defaults
         result = yield self.driver_client.execute([['cf', '11211']])     # ascii data format
         result = yield self.driver_client.execute([['wp', '2']])         # number of pings to avg
@@ -171,12 +174,16 @@ class TestWHSentinelADCP(IonTestCase):
         result = yield self.driver_client.execute([['tp', '000100']])    # 1 sec between pings
         result = yield self.driver_client.execute([['ck', '']])          # save setup to RAM
         result = yield self.driver_client.execute([['cs', '']])          # start pinging
-         # wait a while...
+        """
+        result = yield self.driver_client.execute([['start', '']])       # start pinging
+       # wait a while...
         yield pu.asleep(9)
+        result = yield self.driver_client.execute([['stop', '']])       # start pinging
+        """
         result = yield self.driver_client.execute([['break', '']])       # wake up instrument
         result = yield self.driver_client.execute([['cr', '1']])         # set to factory defaults
         result = yield self.driver_client.execute([['cz', '']])          # power down instrument
-
+        """
 
         yield pu.asleep(6)
         log.info("test_execute: disconnecting.")

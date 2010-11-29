@@ -71,7 +71,8 @@ class CmdPort(Protocol):
         
 class WHSentinelADCP_instCommandXlator():
     commands = {
-       ' ' : ' '
+       'start' : ['cr1', 'cf11211', 'wp2', 'te00000300', 'tp000100', 'ck', 'cs'],
+       'stop' : ['break', 'cr1', 'cz']
     }
 
     def translate(self, command):
@@ -122,11 +123,13 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         from the agent to the actual command understood by the instrument.
         """
         self.ParmCommands = {
-            "baudrate" : "Baud"
+            "baudrate" : "cb"
             }
 
         self.__instrument_parameters = {
-            "baudrate": 9600
+            "baudrate": 9600,
+            "parity": 1,
+            "stopBits": 1
         }
 
         InstrumentDriver.__init__(self, *args, **kwargs)
@@ -680,7 +683,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         """
         assert(isinstance(content, (tuple, list)))
 
-        log.debug("op_execute content: %s" %str(content))
+        log.info("op_execute content: %s" %str(content))
 
         if ((content == ()) or (content == [])):
             yield self.reply_err(msg, "Empty command")
@@ -695,9 +698,14 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             else:
                 log.debug("op_execute translating command: %s" % command)
                 instCommand = self.instCmdXlator.translate(command)
-                instCommand += value
-                log.info("op_execute queueing command: %s to instrument" % instCommand)
-                self.enqueueCmd(instCommand)
+                if isinstance(instCommand, list):
+                    for instCmd in instCommand:
+                        log.info("op_execute queueing command: %s" % instCmd)
+                        self.enqueueCmd(instCmd)
+                else:
+                    instCommand += value
+                    log.info("op_execute queueing command: %s" % instCommand)
+                    self.enqueueCmd(instCommand)
                 # respond to command
                 agentCommands.append(command)
                 yield self.reply_ok(msg, agentCommands)

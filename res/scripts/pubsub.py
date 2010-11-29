@@ -12,11 +12,14 @@ an aggregate statement in the log about the number of data events.
 """
 import random
 
-import logging
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit
 from ion.core import bootstrap
+from ion.core.process import process
+
 
 from ion.services.dm.distribution import pubsub_service
 
@@ -64,7 +67,7 @@ def create_producers(proc,n=1):
                     'spawnargs':{'delivery queue':topic.queue.name,
                                  'delivery interval':interval}}
 
-        child = ProcessDesc(**dsp)
+        child = process.ProcessDesc(**dsp)
         child_id = yield proc.spawn_child(child)
 
 @defer.inlineCallbacks
@@ -72,7 +75,7 @@ def start():
     """
     Main function of bootstrap. Starts DM pubsub...
     """
-    logging.info("ION DM PubSub bootstrapping now...")
+    log.info("ION DM PubSub bootstrapping now...")
     startsvcs = []
     startsvcs.extend(dm_services)
     sup = yield bootstrap.bootstrap(ion_messaging, startsvcs)
@@ -104,7 +107,7 @@ def start():
                 'consumerclass':'LoggingConsumer',\
                 'attach':[['consumer1','event_queue']]}
             }
-
+    """
     # Log all the messages created
     subscription.workflow = {
         'consumer1':
@@ -135,13 +138,13 @@ def start():
             }
 
         }
-
+    """
 
     subscription = yield dpsc.define_subscription(subscription)
     linfo = '\n================================================\n'
     linfo+= 'Open your web browser and look at: http://127.0.0.1:8180/ \n'
     linfo+= '================================================\n'
-    logging.info(linfo)
+    log.info(linfo)
 
 
 
