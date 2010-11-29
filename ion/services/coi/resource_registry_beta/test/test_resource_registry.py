@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/coi/resource_registry/test/test_resource_registry.py
+@file ion/services/coi/resource_registry_beta/test/test_resource_registry.py
 @author Michael Meisinger
 @author David Stuebe
 @brief test service for registering resources and client classes

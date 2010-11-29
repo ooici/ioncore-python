@@ -67,7 +67,7 @@ class ResourceRegistryService(ServiceProcess):
         
         # Check that we got the correct kind of content!
         assert isinstance(content, gpb_wrapper.Wrapper)
-        assert content.GPBType == TypeClassType
+        assert content.GPBType == self.TypeClassType
         
         id = yield self._register_resource_instance(content)
         

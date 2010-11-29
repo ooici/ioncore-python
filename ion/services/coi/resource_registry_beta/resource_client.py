@@ -18,7 +18,7 @@ from ion.core.exception import ReceivedError
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject
 from ion.core.messaging.ion_reply_codes import ResponseCodes
-from ino.core.process import process
+from ion.core.process import process
 from ion.core.object import workbench
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
@@ -36,7 +36,7 @@ class ResourceClient(object):
     instances. The api for working with a resource is in the instance. The client
     helps create and manage resources.
     """
-    def __init__(self, proc=None, datastore_service='datastore', registry_service='resource_registry_2'):
+    def __init__(self, proc=None, datastore_service='datastore'):
         """
         Initializes a process client
         @param proc a IProcess instance as originator of messages
@@ -47,19 +47,18 @@ class ResourceClient(object):
         """
         if not proc:
             proc = process.Process()
+        
+        if not hasattr(proc, 'op_fetch_linked_objects'):
+            setattr(proc, 'op_fetch_linked_objects', proc.workbench.op_fetch_linked_objects)
+                        
         self.proc = proc
         
-        self.datastore_service = self.proc.get_scoped_name('system', datastore_service)
-        
-        self.registry_service = self.proc.get_scoped_name('system', registry_service)
-        
+        self.datastore_service = datastore_service
+                
         # The resource client is backed by a process workbench.
         self.workbench = self.proc.workbench        
         
         # What about the name of the index services to use?
-        
-        assert hasattr(self.proc, 'op_fetch_linked_objects'), \
-            'This process can not support a resource client. It must expose the fetch_linked_objects operation '
         
         self.registry_client = ResourceRegistryClient(proc=self.proc)
         
@@ -105,14 +104,14 @@ class ResourceClient(object):
         res_id = yield self.registry_client.register_resource_instance(type_id)
             
         response, exception = yield self.workbench.pull(self.datastore_service, res_id)
-        assert response == self.ION_SUCCESS, 'Push to datastore failed!'
+        assert response == self.proc.ION_SUCCESS, 'Push to datastore failed!'
         
         repo = self.workbench.get_repository(res_id)
         
         self.workbench.set_repository_nickname(res_id, name)
             
         # Get the default branch and set the name and description
-        res_head = repo.checkout(branch='master')
+        res_head = repo.checkout('master')
             
         res_head.name = name
         res_head.description = description
@@ -120,7 +119,7 @@ class ResourceClient(object):
         repo.commit('set resource name and description')
         
         response, exception = yield self.workbench.push(self.datastore_service, name)
-        assert response == self.ION_SUCCESS, 'Push to datastore failed!'
+        assert response == self.proc.ION_SUCCESS, 'Push to datastore failed!'
         
         
         # Create a resource instance to return
@@ -136,16 +135,16 @@ class ResourceClient(object):
         yield self._check_init()
         
         # Pull the repository
-        response, exception = yield self.workbench.pull(self.datastore_service, res_id)
-        assert response == self.ION_SUCCESS, 'Push to datastore failed!'
+        response, exception = yield self.workbench.pull(self.datastore_service, resource_id)
+        assert response == self.proc.ION_SUCCESS, 'Push to datastore failed!'
         
         # Get the repository
-        repo = self.workbench.get_repository(res_id)
+        repo = self.workbench.get_repository(resource_id)
                     
         # Get the default branch and set the nickname
-        res_head = repo.checkout(branch='master')
+        res_head = repo.checkout('master')
             
-        self.workbench.set_repository_nickname(res_id, res_head.name)
+        self.workbench.set_repository_nickname(resource_id, res_head.name)
         
         # Create a resource instance to return
         resource = ResourceInstance(repository=repo, workbench=self.workbench, datastore_service=self.datastore_service)
@@ -190,7 +189,7 @@ class ResourceInstance(object):
         
         self.datastore_service = datastore_service
         
-        self.resource = repo.checkout(branch='master')    
+        self.resource = self.repository.checkout('master')    
     
     @defer.inlineCallbacks
     def read_resource(self, version='master'):
@@ -199,7 +198,7 @@ class ResourceInstance(object):
         At present getting the instance returns the entire resource + history!
         """
         # Checkout may become a deferred method or this may require interaction with the datastore
-        self.resource = self.repository.checkout(branch=version)
+        self.resource = self.repository.checkout(version)
         res_obj = self.resource.resource_object
         defer.returnValue(res_obj)
         
@@ -213,7 +212,7 @@ class ResourceInstance(object):
         self.repository.commit(comment=comment)
         
         response, exception = yield self.workbench.push(self.datastore_service, self.name)
-        assert response == self.ION_SUCCESS, 'Push to datastore failed!'
+        assert response == self.proc.ION_SUCCESS, 'Push to datastore failed!'
         
 #    def save_resource(self, comment=None):
 #        """
@@ -239,7 +238,7 @@ class ResourceInstance(object):
         defer.returnValue(res_obj)
         
     @property
-    def resource_identity(self):
+    def identity(self):
         """
         Return the resource identity
         """
@@ -275,7 +274,29 @@ class ResourceInstance(object):
         """
         Get the life cycle state of the resource
         """
-        return self.resource.lcs
+        state = None
+        if self.resource.lcs == resource_pb2.New:
+            state = self.NEW    
+        
+        elif self.resource.lcs == resource_pb2.Active:
+            state = self.ACTIVE
+            
+        elif self.resource.lcs == resource_pb2.Inactive:
+            state = self.INACTIVE
+            
+        elif self.reource.lcs == resource_pb2.Commissioned:
+            state = self.COMMISSIONED
+            
+        elif self.reource.lcs == resource_pb2.Decommissioned:
+            state = self.DECOMMISSIONED
+            
+        elif self.reource.lcs == resource_pb2.Retired:
+            state = self.RETIRED
+            
+        elif self.reource.lcs == resource_pb2.Developed:
+            state = self.DEVELOPED
+        
+        return state
         
     life_cycle_state = property(_get_life_cycle_state, _set_life_cycle_state)
     
