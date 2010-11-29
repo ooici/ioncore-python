@@ -34,7 +34,7 @@ class IrodsStore(IStore):
         """
         self.hostname = self._get_config('irodsHost')
         self.port_num = self._get_config('irodsPort')
-        self.default_resc = self._get_config('rodsDefResource')
+        self.default_resc = self._get_config('irodsDefResource')
         self.obj_home = self._get_config('irodsOoiCollection')
         self.user_name = self._get_config('irodsUserName')
         self.user_passwd = self._get_config('irodsUserPasswd')
