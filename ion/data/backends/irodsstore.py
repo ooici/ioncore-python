@@ -47,8 +47,8 @@ class IrodsStore(IStore):
                 self.hostname = kwargs.get('irodsHost', None)
             if kwargs.get('irodsPort', None):
                 self.port_num = kwargs.get('irodsPort', None)
-            if kwargs.get('rodsDefResource', None):
-                self.default_resc = kwargs.get('rodsDefResource', None)
+            if kwargs.get('irodsDefResource', None):
+                self.default_resc = kwargs.get('irodsDefResource', None)
             if kwargs.get('irodsOoiCollection', None):
                 self.obj_home = kwargs.get('irodsOoiCollection', None)
             if kwargs.get('irodsUserName', None):
