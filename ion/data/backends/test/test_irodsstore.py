@@ -12,11 +12,25 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from uuid import uuid4
 from ion.data.backends.irodsstore import IrodsStore
+from twisted.internet import defer
 
 
 class TestIrodsDataStoreInterface(unittest.TestCase):
     def setUp(self):
-        self.ds = IrodsStore.create_store()
+        # This will use the iRODS config info in 'ion.config'
+        # self.ds = IrodsStore.create_store()
+
+        # here we use config through args
+        irods_config = {'irodsHost': 'ec2-204-236-137-245.us-west-1.compute.amazonaws.com', \
+                    'irodsPort':'1247', \
+                    'irodsDefResource':'ooi-test-resc1', \
+                    'irodsOoiCollection':'/ooi-test-cluster1/home/testuser/OOI', \
+                    'irodsUserName':'testuser', \
+                    'irodsUserPasswd':'test', \
+                    'irodsZone':'ooi-test-cluster1'}
+        ds = IrodsStore.create_store(**irods_config)
+        self.ds = ds.result
+
         self.key = self._mkey()
         self.value = self._mkey()
 
@@ -29,7 +43,5 @@ class TestIrodsDataStoreInterface(unittest.TestCase):
 
     def test_irods(self):
         self.ds.put(self.key, self.value)
-        self.ds.get(self.key)
-        #time.sleep(1)
-        #self.ds.remove(self.key)
+        value = self.ds.get(self.key)
 
