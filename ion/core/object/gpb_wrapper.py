@@ -22,6 +22,10 @@ from net.ooici.core.type import type_pb2
 
 import hashlib
 
+class OOIObjectError(Exception):
+    """
+    An exception class for errors that occur in the Object Wrapper class
+    """
     
 class Wrapper(object):
     '''
@@ -67,8 +71,10 @@ class Wrapper(object):
         object.__setattr__(self,'_gpbFields',[])
         
         
-        # Set the deligated message and it machinary
-        assert isinstance(gpbMessage, message.Message)
+        # Set the deligated message and its machinary
+        if not isinstance(gpbMessage, message.Message):
+            raise OOIObjectError('Wrapper init argument must be an instance of a GPB message')
+        
         self._gpbMessage = gpbMessage
         self._GPBClass = gpbMessage.__class__
         # Get the GPB Field Names
@@ -213,7 +219,8 @@ class Wrapper(object):
     
     
     def SetLink(self,value):
-        assert self.GPBType == self.LinkClassType, 'Can not set link for non link type!'
+        if not self.GPBType == self.LinkClassType:
+            raise OOIObjectError('Can not set link for non link type!')
         self.Repository.set_linked_object(self,value)
         if not self.Modified:
             self._set_parents_modified()
@@ -227,7 +234,8 @@ class Wrapper(object):
         gpb = self.GPBMessage
         link = getattr(gpb,linkname)
         link = self._rewrap(link)
-        assert link.GPBType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
+        if not link.GPBType == self.LinkClassType:
+            raise OOIObjectError('The field "%s" is not a link!' % linkname)
         return link
          
     def InParents(self,value):
@@ -375,9 +383,6 @@ class Wrapper(object):
         # Over ride the root - rewrap is for instances that derive from the root of a composite gpb
         if hasattr(self,'_root'):
             inst._root = self._root
-            #inst._parent_links = self._root._parent_links
-            #inst._child_links = self._root._child_links
-        
         return inst
 
     def __getattribute__(self, key):
@@ -387,20 +392,20 @@ class Wrapper(object):
         gpbfields = object.__getattribute__(self,'_gpbFields')
         
         if key in gpbfields:
-            #print '__getattribute__: self, key:', object.__getattribute__(self,'_gpb_type'), key
+            # If it is a Field defined by the gpb...
             gpb = self.GPBMessage
-            value = getattr(gpb,key)
-                        
-            #print 'Type, Value:',type(value), value
-                        
+            value = getattr(gpb,key)                        
             if isinstance(value, containers.RepeatedCompositeFieldContainer):
+                # if it is a container field:
                 value = ContainerWrapper(self, value)
             elif isinstance(value, message.Message):
+                # if it is a message field:
                 value = self._rewrap(value)
                 if value.GPBType == self.LinkClassType:
                     value = self.Repository.get_linked_object(value)
                 
         else:
+            # If it is a attribute of this class, use the base class's getattr
             value = object.__getattribute__(self, key)
         return value
 
@@ -409,23 +414,24 @@ class Wrapper(object):
         gpbfields = object.__getattribute__(self,'_gpbFields')
         
         if key in gpbfields:
-            #print '__setattr__: self, key, value:', self._gpb_full_name, key, value
-
+            # If it is a Field defined by the gpb...
             if self.ReadOnly:
-                raise AttributeError, 'This object wrapper is read only!'
+                raise OOIObjectError('This object wrapper is read only!')
                         
             gpb = self.GPBMessage
 
             # If the value we are setting is a Wrapper Object
             if isinstance(value, Wrapper):
             
-                assert value.Repository is self.Repository, \
-                    'Copying complex objects from one repository to another is not yet supported!'
+                if not value.Repository is self.Repository:
+                    raise OOIObjectError('These two objects are not in the same repository. \n \
+                                         Copying complex objects from one repository to another is not yet supported!')
             
                 #Examine the field we are trying to set 
                 field = getattr(gpb,key)
-                assert isinstance(field, message.Message), \
-                  'Only a composit field can be set using another message as a value '
+                if not isinstance(field, message.Message):
+                    raise OOIObjectError('Only a composit field can be set using another message as a value')
+                    
                 wrapped_field = self._rewrap(field) # This will throw an exception if field is not a gpbMessage
                 self.Repository.set_linked_object(wrapped_field,value)
             
@@ -550,8 +556,8 @@ class ContainerWrapper(object):
     def __init__(self, wrapper, gpbcontainer):
         # Be careful - this is a hard link
         self._wrapper = wrapper
-        assert isinstance(gpbcontainer, containers.RepeatedCompositeFieldContainer), \
-            'The Container Wrapper is only for use with Repeated Composit Field Containers'
+        if not isinstance(gpbcontainer, containers.RepeatedCompositeFieldContainer):
+            raise OOIObjectError('The Container Wrapper is only for use with Repeated Composit Field Containers')
         self._gpbcontainer = gpbcontainer
         self.Repository = wrapper.Repository # Hack - make uniform interface to repository
         
@@ -559,15 +565,15 @@ class ContainerWrapper(object):
     def __setitem__(self, key, value):
         """Sets the item on the specified position.
         Depricated"""
-        assert isinstance(value, Wrapper), \
-            'To set an item, the value must be a Wrapper'
+        if not isinstance(value, Wrapper):
+            raise OOIObjectError('To set an item in a repeated field container, the value must be a Wrapper')
         
         item = self._gpbcontainer.__getitem__(key)
         item = self._wrapper._rewrap(item)
         if item.GPBType == self.LinkClassType:
             self.Repository.set_linked_object(item, value)
         else:
-            raise Exception, 'It is illegal to set a value of a repeated composit field unless it is a CASRef - Link'
+            raise OOIObjectError('It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
          
         self._wrapper._set_parents_modified()
          
@@ -576,15 +582,15 @@ class ContainerWrapper(object):
         #    item.CopyFrom(value)
         
     def SetLink(self,key,value):
-        assert isinstance(value, Wrapper), \
-            'To set an item, the value must be a Wrapper'
+        if not isinstance(value, Wrapper):
+            raise OOIObjectError('To set an item in a repeated field container, the value must be a Wrapper')
         
         item = self._gpbcontainer.__getitem__(key)
         item = self._wrapper._rewrap(item)
         if item.GPBType == self.LinkClassType:
             self.Repository.set_linked_object(item, value)
         else:
-            raise Exception, 'It is illegal to set a value of a repeated composit field unless it is a CASRef - Link'
+            raise OOIObjectError('It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
          
         self._wrapper._set_parents_modified()
          
@@ -627,8 +633,7 @@ class ContainerWrapper(object):
         if self is other:
             return True
         if not isinstance(other, self.__class__):
-            raise TypeError('Can only compare repeated composite fields against '
-                          'other repeated composite fields.')
+            raise OOIObjectError('Can only compare repeated composite fields against other repeated composite fields.')
         return self._gpbcontainer == other._gpbcontainer
 
     def __repr__(self):

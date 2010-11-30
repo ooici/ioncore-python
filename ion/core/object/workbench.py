@@ -23,6 +23,11 @@ from net.ooici.core.mutable import mutable_pb2
 from net.ooici.core.type import type_pb2
 from net.ooici.core.link import link_pb2
 
+class WorkBenchError(Exception):
+    """
+    An exception class for errors that occur in the Object WorkBench class
+    """
+
 class WorkBench(object):
  
     MutableClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.MutableNode())
@@ -150,7 +155,7 @@ class WorkBench(object):
         The operation which responds to a pull 
         """
         
-        print 'Received pull request, id:', content
+        #print 'Received pull request, id:', content
         
         repo = self.get_repository(content)
         
@@ -170,7 +175,7 @@ class WorkBench(object):
 
         if repo:
             
-            print 'PUSH TARGET: ',targetname
+            #print 'PUSH TARGET: ',targetname
             content, headers, msg = yield self._process.rpc_send(targetname,'push', repo)
         
             response = headers.get(self._process.MSG_RESPONSE)
@@ -312,10 +317,10 @@ class WorkBench(object):
             item = self._hashed_elements.get(link.key,None)
             
             if not item:
-                raise Exception, 'Requested object not found!'
+                raise WorkBenchError('Requested object not found!')
                     
             assert item.type == link.type, 'Link type does not match item type!'
-            assert item.isleaf == link.isleaf, 'Link islead does not match item isleaf!'
+            assert item.isleaf == link.isleaf, 'Link isleaf does not match item isleaf!'
         
             # Can not set the pointer directly... must set the components
             se.value = item.value
@@ -343,14 +348,14 @@ class WorkBench(object):
 
             # Make sure the mutable appears to be modified
             mutable.set_modified = True
-            print 'Mutable', mutable
+            #print 'Mutable', mutable
 
             structure = {}
             mutable.RecurseCommit(structure)
-            print 'structure keys',structure.keys()
+            #print 'structure keys',structure.keys()
             root_obj = structure.get(mutable.MyId)
 
-        print 'ROOT Obj', root_obj
+        #print 'ROOT Obj', root_obj
             
         cref_set = set()
         for branch in mutable.branches:
@@ -390,10 +395,10 @@ class WorkBench(object):
         links if include_leaf=False.
         Return the content as a container object.
         """
-        assert isinstance(wrapper, gpb_wrapper.Wrapper), 'Pack Structure received a wrapper argument which is not a wrapper?'
+        if not isinstance(wrapper, gpb_wrapper.Wrapper):
+            raise WorkBenchError('Pack Structure received a wrapper argument which is not a wrapper?')
         
         repo = wrapper.Repository
-        #assert repo in self._repos.values(), 'This object is not in the process workbench!'
         
         if not repo.status == repo.UPTODATE:
             repo.commit(comment='Sending message with wrapper %s'% wrapper.MyId)
@@ -415,7 +420,7 @@ class WorkBench(object):
                     obj = self._hashed_elements.get(cref.MyId,None)
                     if not obj:
                         # Debugging exception - remove later
-                        raise Exception, 'Hashed CREF not found! Please call David'
+                        raise WorkBenchError('Hashed CREF not found! Please call David')
                     items.add(obj)
             
         else:
@@ -438,7 +443,7 @@ class WorkBench(object):
                         obj = self._hashed_elements.get(key,None)
                         if not obj:
                             # Debugging exception - remove later
-                            raise Exception, 'Hashed element not found! Please call David'
+                            raise WorkBenchError('Hashed CREF not found! Please call David')
                     
                         child_items.add(obj)
                         
@@ -469,13 +474,11 @@ class WorkBench(object):
         # An unwrapped GPB Structure message to put stuff into!
         cs = container_pb2.Structure()
         
-        print 'Packing head object', head
         cs.head.key = head._element.key
         cs.head.type.CopyFrom(head._element.type)
         cs.head.isleaf = head._element.isleaf
         cs.head.value = head._element.value
                         
-        print 'Packing object list...'
         for key in object_keys:
             hashed_obj = self._hashed_elements.get(key)         
             gpb_obj = hashed_obj._element
@@ -633,7 +636,7 @@ class WorkBench(object):
             
             if not link.type.package == element.type.package and \
                     link.type.cls == element.type.cls:
-                raise Exception, 'The link type does not match the element type!'
+                raise WorkBenchError('The link type does not match the element type!')
             
             cref = repo._load_element(element)
             
@@ -641,7 +644,7 @@ class WorkBench(object):
                 repo._commit_index[cref.MyId]=cref
                 cref.ReadOnly = True
             else:
-                raise Exception, 'This method should only load commits!'
+                raise WorkBenchError('This method should only load commits!')
             
             for parent in cref.parentrefs:
                 link = parent.GetLink('commitref')

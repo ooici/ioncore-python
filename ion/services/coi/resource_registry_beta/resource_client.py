@@ -20,6 +20,7 @@ from ion.util.state_object import BasicLifecycleObject
 from ion.core.messaging.ion_reply_codes import ResponseCodes
 from ion.core.process import process
 from ion.core.object import workbench
+from ion.core.object.repository import RepositoryError
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
 
@@ -198,9 +199,19 @@ class ResourceInstance(object):
         At present getting the instance returns the entire resource + history!
         """
         # Checkout may become a deferred method or this may require interaction with the datastore
-        self.resource = self.repository.checkout(version)
-        res_obj = self.resource.resource_object
-        defer.returnValue(res_obj)
+        try:
+            res = self.repository.checkout(version)
+        except RepositoryError:
+            log.warn('resource named %s has no version %s!' % (self.name, version))
+            res = None
+            
+        if res:
+            self.resource = res
+            res_obj = self.resource.resource_object
+            defer.returnValue(res_obj)
+        else:
+            defer.returnValue(None)
+            
         
     @defer.inlineCallbacks
     def write_resource(self, comment=None):

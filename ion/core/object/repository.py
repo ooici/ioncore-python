@@ -30,6 +30,11 @@ from net.ooici.core.type import type_pb2
 from net.ooici.core.link import link_pb2
 
 
+class RepositoryError(Exception):
+    """
+    An exception class for errors in the object management repository 
+    """
+
 class Repository(object):
     
     UPTODATE='up to date'
@@ -148,25 +153,25 @@ class Repository(object):
         """
         
         if self.status == self.MODIFIED:
-            raise Exception, 'Can not checkout while the workspace is dirty'
+            raise RepositoryError('Can not checkout while the workspace is dirty')
             #What to do for uninitialized? 
         
         #Declare that it is a detached head!
         detached = False
         
         if older_than and commit_id:
-            raise Exception, 'Checkout called with both commit_id and older_than!'
+            raise RepositoryError('Checkout called with both commit_id and older_than!')
         
         if not branchname:
-            raise Exception, 'Checkout must specify a branchname!'
+            raise RepositoryError('Checkout must specify a branchname!')
             
             
         branch = self.get_branch(branchname)
         if not branch:
-            raise Exception, 'Branch Key: "%s" does not exist!' % branchkey
+            raise RepositoryError('Branch Key: "%s" does not exist!' % branchkey)
             
         if len(branch.commitrefs)==0:
-            raise Exception, 'This branch is empty - there is nothing to checkout!'
+            raise RepositoryError('This branch is empty - there is nothing to checkout!')
             
         
         # Set the current branch now!
@@ -209,7 +214,9 @@ class Repository(object):
                     crefs = new_set                    
             else:
                 if not cref:
-                    raise Exception, 'End of Ancestors: No matching reference found in commit history on branch name %s, commit_id: %s' % (branch_name, commit_id)
+                    raise RepositoryError('End of Ancestors: No matching reference \
+                                          found in commit history on branch name %s, \
+                                          commit_id: %s' % (branch_name, commit_id))
                 
             
             
@@ -249,7 +256,9 @@ class Repository(object):
                        
             else:
                 if not cref:
-                    raise Exception, 'End of Ancestors: No matching commit found in commit history on branch name %s, older_than: %s' % (branch_name, older_than)
+                    raise RepositoryError('End of Ancestors: No matching commit \
+                                          found in commit history on branch name %s, \
+                                          older_than: %s' % (branch_name, older_than))
                 
         # Just checking out the current head - need to make sure it has not diverged! 
         else:
@@ -387,7 +396,7 @@ class Repository(object):
             self._hashed_elements.update(structure)
                             
         else:
-            raise Exception, 'Repository in invalid state to commit'
+            raise RepositoryError('Repository in invalid state to commit')
         
         # Like git, return the commit id
         branch = self._current_branch
@@ -422,7 +431,7 @@ class Repository(object):
             pref.SetLinkByName('commitref',parent)
             pref.relationship = pref.Parent
         elif len(branch.commitrefs)>1:
-            raise Exception, 'The Branch is in an invalid state and should have been merged on read!'
+            raise RepositoryError('The Branch is in an invalid state and should have been merged on read!')
         else:
             # This is a new branch and we must add a place for the commit ref!
             branch.commitrefs.add()
@@ -487,7 +496,7 @@ class Repository(object):
             # Get the linked commit
             
             if len(brnch.commitrefs)>1:
-                raise Exception, 'Branch should merge on read. Invalid state!'
+                raise RepositoryError('Branch should merge on read. Invalid state!')
             elif len(brnch.commitrefs)==1:                
                 cref = self._current_branch.commitrefs[0]
             
@@ -568,7 +577,7 @@ class Repository(object):
     def get_linked_object(self, link):
                 
         if link.GPBType != self.LinkClassType:
-            raise Exception, 'Illegal argument type in get_linked_object.'
+            raise RepositoryError('Illegal argument type in get_linked_object.')
                 
                 
         if not link.HasField('key'):
@@ -587,7 +596,7 @@ class Repository(object):
             
             if not link.type.package == element.type.package and \
                     link.type.cls == element.type.cls:
-                raise Exception, 'The link type does not match the element type!'
+                raise RepositoryError('The link type does not match the element type found!')
             
             obj = self._load_element(element)
             
@@ -600,8 +609,8 @@ class Repository(object):
             return obj
             
         else:
-            print 'LINK Not Found: \n', link 
-            raise Exception, 'Object not in workbench! You must pull the leaf elements!'
+            #print 'LINK Not Found: \n', link 
+            raise RepositoryError('Object not in workbench! You must pull the leaf elements!')
             #return self._workbench.fetch_linked_objects(link)
             
     def _load_links(self, obj, loadleaf=False):
@@ -627,9 +636,9 @@ class Repository(object):
         #log.debug('_load_element' + str(element))
         
         mysha1 = gpb_wrapper.sha1hex(element.value)
-        assert element.key == mysha1, \
-            'The sha1 key does not match the value. The data is corrupted! \n' +\
-            'Element key %s, Calculated key %s' % (element.key, mysha1)
+        if not element.key == mysha1:
+            raise RepositoryError('The sha1 key does not match the value. The data is corrupted! \n' +\
+            'Element key %s, Calculated key %s' % (element.key, mysha1))
         
         cls = self._load_class_from_type(element.type)
                                 
@@ -698,11 +707,11 @@ class Repository(object):
             
             #@Todo Change assertions to Exceptions?
             
-            assert value.IsRoot == True, \
-                'You can not set a link equal to part of a gpb composite!'
+            if not value.IsRoot == True:
+                raise RepositoryError('You can not set a link equal to part of a gpb composite!')
             
-            assert not field.InParents(value), \
-                'You can not create a recursive structure - this value is also a parent of the link you are setting.'
+            if field.InParents(value):
+                raise RepositoryError('You can not create a recursive structure - this value is also a parent of the link you are setting.')
             
             
             #Make sure the link is in the objects set of child links
@@ -744,7 +753,7 @@ class Repository(object):
                 
         else:
             
-            raise Exception, 'Can not set a composite field'
+            raise RepositoryError('Can not set a composite field unless it is of type Link')
             #Over ride Protobufs - I want to be able to set a message directly
         #    field.CopyFrom(value)
         
