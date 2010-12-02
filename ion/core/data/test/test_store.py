@@ -70,6 +70,7 @@ class CassandraStoreTest(IStoreTest):
     def _setup_backend(self):
         host = 'amoeba.ucsd.edu'
         host = 'localhost'
+        host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
         port = 9160
         namespace = 'iontest'
         builder = cassandra.CassandraFactory(host, port, reactor)
