@@ -34,6 +34,12 @@ from net.ooici.core.type import type_pb2
 from net.ooici.resource import resource_pb2
 from net.ooici.core.link import link_pb2
 
+
+from google.protobuf import message
+from google.protobuf.internal import containers
+from ion.core.object import gpb_wrapper
+
+
 CONF = ioninit.config(__name__)
 
 
@@ -303,6 +309,38 @@ class ResourceInstance(object):
         self.resource = self.repository.checkout(branch=version, commit_id=commit_id)
         res_obj = self.resource.resource_object
         defer.returnValue(res_obj)
+        
+        
+    def __getattribute__(self, key):
+        """
+        We want to expose the resource and its object through a uniform interface.
+        To do that we have to break all kinds of abstractions and operate deep
+        inside the gpb wrapper. I am not at all happy with this but lets see if
+        we like the interface. If so we can find a better way to do it later.
+        """
+        # Because we have over-riden the default getattribute we must be extremely
+        # careful about how we use it!
+        res_obj = getattr(self, 'object')
+        
+        gpbfields = object.__getattribute__(res_obj,'_gpbFields')
+        
+        if key in gpbfields:
+            # If it is a Field defined by the gpb...
+            gpb = self.object.GPBMessage
+            value = getattr(gpb,key)                        
+            if isinstance(value, containers.RepeatedCompositeFieldContainer):
+                # if it is a container field:
+                value = gpb_wrapper.ContainerWrapper(self.object, value)
+            elif isinstance(value, message.Message):
+                # if it is a message field:
+                value = self.object._rewrap(value)
+                if value.GPBType == self.object.LinkClassType:
+                    value = self.object.Repository.get_linked_object(value)
+                
+        else:
+            # If it is a attribute of this class, use the base class's getattr
+            value = object.__getattribute__(self, key)
+        return value
         
     @property
     def identity(self):

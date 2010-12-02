@@ -61,7 +61,9 @@ class EOIIngestionService(ServiceProcess):
         """
         Push this dataset to the datastore
         """
-        msg_repo = content.repository
+        log.debug('op_ingest recieved content:'+ str(content))
+        
+        msg_repo = content.Repository
         
         response, exception = yield self.push('datastore', msg_repo.repository_key)
         
@@ -77,8 +79,8 @@ class EOIIngestionService(ServiceProcess):
         Return the root group of the dataset
         Content is the unique ID for a particular dataset
         """
-        
-        response, exception = yield self.pull('datastore', content)
+        log.debug('op_retrieve: recieved content:'+ str(content))
+        response, exception = yield self.pull('datastore', str(content))
         
         assert response == self.ION_SUCCESS, 'Push to datastore failed!'
         

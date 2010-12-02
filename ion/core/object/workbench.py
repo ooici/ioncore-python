@@ -503,7 +503,7 @@ class WorkBench(object):
         May want to provide more arguments to give this new repository a special
         name based on the 
         """
-        
+        log.debug('WorkBench: Unpacking Structure')
         head, obj_list = self._unpack_container(serialized_container)
         
         assert len(obj_list) > 0, 'There should be objects in the container!'
@@ -511,6 +511,7 @@ class WorkBench(object):
         
         if not head:
             # Only fetch links should hit this!
+            log.debug('WorkBench: Unpack Structure - returning obj_list:'+str(obj_list))
             return obj_list
         
         if head.type == self.MutableClassType:
@@ -523,7 +524,7 @@ class WorkBench(object):
                 self._hashed_elements[item.key]=item
             
             repo = self._load_repo_from_mutable(head)
-            
+            log.debug('WorkBench: Unpack Structure - returning repository:'+str(repo))
             return repo
         
         else:
@@ -546,6 +547,8 @@ class WorkBench(object):
             # Now load the rest of the linked objects - down to the leaf nodes.
             repo._load_links(root_obj)
             
+            
+            log.debug('WorkBench: Unpack Structure - returning root_obj:'+str(root_obj))
             return root_obj
         
         
@@ -557,6 +560,7 @@ class WorkBench(object):
         hashed elements dictionary
         """
             
+        log.debug('WorkBench: Unpacking Container')
         # An unwrapped GPB Structure message to put stuff into!
         cs = container_pb2.Structure()
             
@@ -579,7 +583,9 @@ class WorkBench(object):
             #obj_list.append(wse.key)
             obj_list.append(wse)
         
-    
+        log.debug('WorkBench: Container Head:'+str(head))
+        log.debug('WorkBench: Container obj_lis:'+str(obj_list))
+        
         return head, obj_list
         
     def _load_repo_from_mutable(self,head):
