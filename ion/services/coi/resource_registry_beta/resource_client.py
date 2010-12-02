@@ -4,6 +4,12 @@
 @file ion/services/coi/resource_registry_beta/resource_client.py
 @author David Stuebe
 @brief base classes for resrouce client
+
+@ TODO
+Implement common interface to the Resource and the resource object
+Complete the object reference creator
+Move the TypeID generator to a seperate location from which objects can be imported
+
 """
 
 from twisted.internet import defer, reactor
@@ -26,10 +32,15 @@ from ion.services.coi.resource_registry_beta.resource_registry import ResourceRe
 
 from net.ooici.core.type import type_pb2
 from net.ooici.resource import resource_pb2
-
+from net.ooici.core.link import link_pb2
 
 CONF = ioninit.config(__name__)
 
+
+class ResourceClientError(Exception):
+    """
+    A class for resource client exceptions
+    """
 
 class ResourceClient(object):
     """
@@ -37,6 +48,7 @@ class ResourceClient(object):
     instances. The api for working with a resource is in the instance. The client
     helps create and manage resources.
     """
+    
     def __init__(self, proc=None, datastore_service='datastore'):
         """
         Initializes a process client
@@ -105,8 +117,10 @@ class ResourceClient(object):
         res_id = yield self.registry_client.register_resource_instance(type_id)
             
         response, exception = yield self.workbench.pull(self.datastore_service, res_id)
-        assert response == self.proc.ION_SUCCESS, 'Push to datastore failed!'
-        
+        if not response == self.proc.ION_SUCCESS:
+            log.warn(exception)
+            raise ResourceClientError('Pull from datastore failed in resource client!')
+            
         repo = self.workbench.get_repository(res_id)
         
         self.workbench.set_repository_nickname(res_id, name)
@@ -135,17 +149,35 @@ class ResourceClient(object):
         """
         yield self._check_init()
         
-        # Pull the repository
-        response, exception = yield self.workbench.pull(self.datastore_service, resource_id)
-        assert response == self.proc.ION_SUCCESS, 'Push to datastore failed!'
+        branch = 'master'
+        reference = None
+        commit = None
+        if hasattr(resource_id, 'GPBType') and resource_id.GPBType == self.IDRefType:
+            if resource_id.branch:
+                branch = resource_id.branch
+                
+            reference = resource_id.key
+            commit = resource_id.commit
+        elif isinstance(resource_id, (str, unicode)):
+            reference = str(resource_id)
+        else:
+            raise ResourceClientError('''Illegal argument type in retrieve_resource_instance:
+                                      \n type: %s \nvalue: %s''' % (type(resource_id), str(resource_id)))
         
+        # Pull the repository
+        response, exception = yield self.workbench.pull(self.datastore_service, reference)
+        if not response == self.proc.ION_SUCCESS:
+            log.warn(exception)
+            raise ResourceClientError('Pull from datastore failed in resource client!')
+            
         # Get the repository
-        repo = self.workbench.get_repository(resource_id)
+        repo = self.workbench.get_repository(reference)
                     
         # Get the default branch and set the nickname
-        res_head = repo.checkout('master')
+        res_head = repo.checkout(branch)
             
-        self.workbench.set_repository_nickname(resource_id, res_head.name)
+        self.workbench.set_repository_nickname(reference, res_head.name)
+        # Is this a good use of the resource name? Is it safe?
         
         # Create a resource instance to return
         resource = ResourceInstance(repository=repo, workbench=self.workbench, datastore_service=self.datastore_service)
@@ -163,6 +195,11 @@ class ResourceClient(object):
         yield self._check_init()
             
         raise NotImplementedError, "Interface Method Not Implemented"
+    
+    
+class ResourceInstanceError(Exception):
+    """
+    """
     
 class ResourceInstance(object):
     """
@@ -190,7 +227,11 @@ class ResourceInstance(object):
         
         self.datastore_service = datastore_service
         
-        self.resource = self.repository.checkout('master')    
+        self.resource = self.repository.checkout('master')
+        
+        self.object = self.resource.resource_object
+        
+        
     
     @defer.inlineCallbacks
     def read_resource(self, version='master'):
@@ -223,7 +264,10 @@ class ResourceInstance(object):
         self.repository.commit(comment=comment)
         
         response, exception = yield self.workbench.push(self.datastore_service, self.name)
-        assert response == self.proc.ION_SUCCESS, 'Push to datastore failed!'
+        
+        if not response == self.proc.ION_SUCCESS:
+            raise ResourceInstanceError('Push to datastore failed!')
+        
         
 #    def save_resource(self, comment=None):
 #        """
@@ -238,6 +282,18 @@ class ResourceInstance(object):
         
         branch_key = self.repository.branch()
         return branch_key
+    
+    def reference_resource(self, current_state=False):
+        
+        if current_state == True:
+            if self.repository.status != self.repository.UPTODATE:
+                raise ResourceInstanceError('Can not reference a resource which has been modified but not written')
+                
+        
+        id_ref = self.repository.create_wrapped_object(link_pb2.IDRef)
+        
+        #ZZZZZZZZ        
+        
         
     @defer.inlineCallbacks
     def load_resource(self, version, commit_id=None):

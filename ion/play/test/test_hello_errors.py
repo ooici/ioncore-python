@@ -11,7 +11,7 @@ from twisted.internet import defer
 
 from ion.play.hello_errors import HelloErrorsClient
 from ion.test.iontest import IonTestCase
-
+from ion.core.exception import ReceivedError
 class HelloErrorsTest(IonTestCase):
     """
     Testing example hello service.
@@ -71,26 +71,27 @@ class HelloErrorsTest(IonTestCase):
         self.assertEqual(response,he.APP_FAILED)
         self.assertEqual(result,'Caught') # The response defined by the service as the content - can be anything that the interceptor knows how to send
         self.assertEqual(ex,'''I'm supposed to fail''')
-        
-        
+                
         # Send a request - and catch an exception
         try:
             response, result, ex = yield he.replytome("Can'tCatchMe")
 
-        except RuntimeError as re: 
-            # Can I catch an exception here?
-            ex = re
+        except ReceivedError, re: 
+            # Why is re a list with a dictionary in it?
+            response =  re[0]['response']
+            result = None
+            ex = re[0]['exception']
         
         # These do not get called - the receiver kills the container.
         # is that what we want?
             
         log.info('Got Response: '+response) # Should always be a string - a defined response code!
         log.info('Got Result: '+str(result))
-        log.info('Got Exception: '+ex)
+        log.info('Got Exception: '+str(ex))
             
-        #self.assertEqual(response,he.APP_FAILED)
-        #self.assertEqual(result,'Caught') # The response defined by the service as the content - can be anything that the interceptor knows how to send
-        #elf.assertEqual(ex,'''I'm supposed to fail''')
+        self.assertEqual(response,he.ION_RECEIVER_ERROR)
+        self.assertEqual(result,None) # The response defined by the service as the content - can be anything that the interceptor knows how to send
+        self.assertEqual(ex,'''I'm an uncaught exception!''')
         
         
         
