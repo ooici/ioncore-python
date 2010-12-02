@@ -7,7 +7,7 @@ PasteDeploy==1.3.4
 PasteScript==1.7.3
 Pydap
 Thrift==0.2.0
-Twisted==10.1.0
+Twisted>=10.1.0
 amqplib==0.6.1
 anyjson==0.2.5
 apache-libcloud==0.3.1
@@ -17,7 +17,6 @@ configobj==4.7.2
 demjson==1.5
 gviz-api.py==1.7.0
 httplib2==0.6.0
-ioncore==0.3.0
 morbid==0.8.7.3
 msgpack-python==015final
 nimboss
@@ -35,6 +34,6 @@ stompservice==0.1.0
 telephus==0.6.3
 twotp==0.7
 txAMQP==0.3
-txrabbitmq==0.1.1
+txrabbitmq==0.3
 wsgiref==0.1.2
 zope.interface==3.6.1
