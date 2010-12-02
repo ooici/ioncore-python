@@ -5,6 +5,9 @@
 @author Michael Meisinger
 @author David Stuebe
 @brief service for registering resources
+
+To test this with the Java CC!
+> bin/start-cc -h amoeba.ucsd.edu -a sysname=eoitest res/scripts/eoi_demo.py
 """
 
 import ion.util.ionlog
