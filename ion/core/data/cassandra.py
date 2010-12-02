@@ -27,7 +27,7 @@ from telephus.cassandra.ttypes import KsDef
 from telephus.cassandra.ttypes import CfDef
 
 from ion.core import ioninit
-from ion.data import store 
+from ion.core.data import store 
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)

@@ -17,8 +17,8 @@ from twisted.trial import unittest
 from twisted.internet import defer
 from twisted.internet import reactor
 
-from ion.data import store
-from ion.data.backends import cassandra
+from ion.core.data import store
+from ion.core.data import cassandra
 
 from ion.test.iontest import IonTestCase
 
