@@ -117,7 +117,9 @@ class IrodsStore(IStore):
         @brief close the TCP connection with the iRODS server
         """
         rcDisconnect(self.conn)
-
+        self.conn = None
+    
+     
     def clear_store(self):
         """
         @brief Clean the iRODS collection and disonnect from iRODS
@@ -132,17 +134,18 @@ class IrodsStore(IStore):
         rcRmColl(self.conn, collinp, 0)
 
         self.disconnect_from_irods()
-
+        
         return defer.succeed(None)
 
-    def get_irods_fname_by_key(self, key):
+    def _get_irods_fname_by_key(self, key):
         """
         @brief Return the irods file name based on the key value. This scheme is used for a single zone and assumes we store all data in a single collection.
         @param key The OOI unique key for an data object
         """
         fname = self.obj_home + '/' + key 
         return fname
-        
+    
+      
     def get(self, key):
         """
         @brief Return a RODS value (the content of the file) corresponding to a given key
@@ -152,18 +155,18 @@ class IrodsStore(IStore):
         logging.debug('reading value from iRODS for key %s' % (key))
 
         value = None
-        self.fname = self.get_irods_fname_by_key(key)
+        self.fname = self._get_irods_fname_by_key(key)
 
         f = iRodsOpen(self.conn, self.fname, "r")
         if not f:
             logging.info('Failed to open file for read: ' + self.fname)
-            raise IrodsStoreError('Failed to open file for read: ' + self.fname)
-
+            #raise IrodsStoreError('Failed to open file for read: ' + self.fname)
+            return defer.succeed(None)
         value = f.read()
         f.close()
-
         return defer.succeed(value)
 
+    
     def put(self, key, value):
         """
         @brief Write a the data into iRODS. 
@@ -188,7 +191,7 @@ class IrodsStore(IStore):
             logging.info('rcCollCreate() error: ' + errMsg)
             raise IrodsStoreError('rcCollCreate() error: ' + errMsg)
 
-        fname = self.get_irods_fname_by_key(key)
+        fname = self._get_irods_fname_by_key(key)
         f = iRodsOpen(self.conn, fname, 'w', self.default_resc)
         if not f:
             logging.info('Failed to open file for write: ' + fname)
@@ -204,6 +207,7 @@ class IrodsStore(IStore):
         errMsg = str(t) + ':' + errName + ' ' + subErrName
         return errMsg
 
+    
     def remove(self, key):
         """
         @brief delete an iRODS file by OOICI key
@@ -213,7 +217,7 @@ class IrodsStore(IStore):
  
         logging.debug('deleting data %s from iRODS' % (key))
 
-        self.fname = self.get_irods_fname_by_key(key)
+        self.fname = self._get_irods_fname_by_key(key)
         dataObjInp = dataObjInp_t()
         dataObjInp.getCondInput().addKeyVal(FORCE_FLAG_KW, "")
         dataObjInp.setObjPath(self.fname)
