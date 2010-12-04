@@ -94,25 +94,9 @@ class ResourceClient(object):
         assert isinstance(self.workbench, workbench.WorkBench), \
         'Process workbench is not initialized'
 
-
-    @defer.inlineCallbacks
-    def create_type_identifier(self, package='', protofile='', cls=''):
-        """
-        Currently not a deferred method but it will be!
-        """
-        yield self._check_init()
-            
-        repo, type_id = self.workbench.init_repository(rootclass=type_pb2.GPBType)
-            
-        type_id.protofile = protofile
-        type_id.package = package
-        type_id.cls = cls
-            
-        defer.returnValue(type_id)
-
     
     @defer.inlineCallbacks
-    def create_resource_instance(self, type_id, name, description=''):
+    def create_instance(self, type_id, name, description=''):
         """
         A Factory Method for Resrouce Instance Objects
         Ask the resource registry to create the instance!
@@ -145,11 +129,12 @@ class ResourceClient(object):
         
         # Create a resource instance to return
         resource = ResourceInstance(repository=repo, workbench=self.workbench, datastore_service=self.datastore_service)
-
+        
         defer.returnValue(resource)
         
+        
     @defer.inlineCallbacks
-    def retrieve_resource_instance(self, resource_id):
+    def open_instance(self, resource_id, version):
         """
         A factory method for resource instances which are already in the data store
         """
@@ -190,6 +175,29 @@ class ResourceClient(object):
             
         defer.returnValue(resource)
 
+    def write_instance(self, resource_id):
+        """
+        """
+
+
+    def new_instance_version(self, resource_id):
+        """
+        """
+        
+    def set_instance_life_cycle_state(self, resource_id, lcs):
+        """
+        """
+        
+    def get_instance_life_cycle_state(self, resource_id):
+        """
+        """
+        
+    
+    def set_instance_name(self, resource_id, name):
+        """
+        """
+        
+        
 
 
     @defer.inlineCallbacks
