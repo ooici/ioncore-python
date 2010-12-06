@@ -118,8 +118,8 @@ class CassandraStoreTestNoSuperCols(IStoreTest):
         ds = cassandra.CassandraStore.create_store(
             cass_host_list=clist,
             cf_super=False,
-            keyspace='Datasets',
-            colfamily='Catalog'
+            keyspace='Datastore',
+            colfamily='Standard1'
             )
         return ds
         
@@ -177,7 +177,7 @@ class CassandraSuperStoreRandomNameSpaceTest(IStoreTest):
         clist = ['ec2-204-236-159-249.us-west-1.compute.amazonaws.com:9160']
         ds = cassandra.CassandraStore.create_store(
             cass_host_list=clist,
-            keyspace='DatastoreTest',
+            keyspace='Datastore',
             colfamily='DS1',
             cf_super=True)
         return ds

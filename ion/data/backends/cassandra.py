@@ -89,7 +89,9 @@ class CassandraStore(IStore):
             log.info("Got host %s and port %d from cass_host_list" % (host, port))
                 
         inst.manager = ManagedCassandraClientFactory()
-        inst.client = CassandraClient(inst.manager, inst.keyspace) 
+        inst.client = CassandraClient(inst.manager)
+        inst.client.set_keyspace(inst.keyspace)
+        log.debug("Connecting to Cassandra") 
         inst.connector = reactor.connectTCP(host, port, inst.manager, timeout=1)
         log.info("Created Cassandra store")
         return defer.succeed(inst)               
@@ -101,7 +103,7 @@ class CassandraStore(IStore):
         @retval Deferred, None
         """
         if self.cf_super:
-            yield self.client.remove(self.key, self.colfamily, super_column=self.namespace)
+            yield self.client.remove(key=self.key, column_family=self.colfamily, super_column=self.namespace)
         else:
             log.info('Can not clear root of persistent store!')
         defer.returnValue(None)
@@ -117,12 +119,13 @@ class CassandraStore(IStore):
         log.info("CassandraStore: Calling get on col %s " % col)
         try:
             if self.cf_super:
-                log.info("super_col: Calling get on col %s " % col)
-                value = yield self.client.get(self.key, self.colfamily, column=col, super_column=self.namespace)
+                log.info("super_col: Calling get on key %s , column_family %s, col %s, super_column %s " % (self.key, self.colfamily, col, self.namespace))
+                value = yield self.client.get(key=self.key, column_family=self.colfamily, column=col, super_column=self.namespace)
+                #value = 'boo'
                 log.info("super_col: Calling get on col %s " % value)
             else:
-                log.info("standard_col: Calling get on col %s " % col)
-                value = yield self.client.get(self.key, self.colfamily, column=col)
+                log.info("standard_col: Calling get with key: %s, column_family: %s, col %s " % (self.key, self.colfamily,col))
+                value = yield self.client.get(key=self.key, column_family=self.colfamily, column=col)
         except NotFoundException:
             log.info("Didn't find the col: %s. Returning None" % col)     
             defer.returnValue(None)
@@ -143,9 +146,9 @@ class CassandraStore(IStore):
         try:
             if self.cf_super:
                 log.info("CassandraStore: super_col key %s colfamily %s value %s column %s super_column %s " % (self.key, self.colfamily, value, col, self.namespace))
-                yield self.client.insert(self.key, self.colfamily, value, column=col, super_column=self.namespace) 
+                yield self.client.insert(key=self.key, column_family=self.colfamily, value=value, column=col, super_column=self.namespace) 
             else:
-                yield self.client.insert(self.key, self.colfamily, value, column=col)
+                yield self.client.insert(key=self.key, column_family=self.colfamily, value=value, column=col)
         except:
             log.info("CassandraStore: Exception was thrown during the put")
         defer.returnValue(None)
