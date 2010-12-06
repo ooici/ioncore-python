@@ -276,7 +276,7 @@ class Repository(object):
         self._workspace = {}
         self._workspace_root = None
             
-        # Automatically fetch the object from the hashed dictionary or fetch if needed!
+        # Automatically fetch the object from the hashed dictionary
         rootobj = cref.objectroot
         self._workspace_root = rootobj
         
@@ -584,10 +584,19 @@ class Repository(object):
             return None
                 
         if self._workspace.has_key(link.key):
-            return self._workspace.get(link.key)
+            
+            obj = self._workspace.get(link.key)
+            # Make sure the 
+            #self.set_linked_object(link, obj)
+            obj.AddParentLink(link)
+            return obj
 
         elif self._commit_index.has_key(link.key):
-            return self._commit_index.get(link.key)
+            # The commit object will be missing its parent links.
+            # Is that a problem?
+            obj = self._commit_index.get(link.key)
+            obj.AddParentLink(link)
+            return obj
 
         elif self._hashed_elements.has_key(link.key):
             
@@ -599,6 +608,10 @@ class Repository(object):
                 raise RepositoryError('The link type does not match the element type found!')
             
             obj = self._load_element(element)
+            
+            # For objects loaded from the hash the parent child relationship must be set
+            #self.set_linked_object(link, obj)
+            obj.AddParentLink(link)
             
             if obj.GPBType == self.CommitClassType:
                 self._commit_index[obj.MyId]=obj
@@ -701,60 +714,50 @@ class Repository(object):
         
         
         
-    def set_linked_object(self,field, value):        
+    def set_linked_object(self,link, value):        
         # If it is a link - set a link to the value in the wrapper
-        if field.GPBType == field.LinkClassType:
-            
-            #@Todo Change assertions to Exceptions?
-            
-            if not value.IsRoot == True:
-                raise RepositoryError('You can not set a link equal to part of a gpb composite!')
-            
-            if field.InParents(value):
-                raise RepositoryError('You can not create a recursive structure - this value is also a parent of the link you are setting.')
-            
-            
-            #Make sure the link is in the objects set of child links
-            field.ChildLinks.add(field) # Adds to the fields root wrapper!
-            value.ParentLinks.add(field) 
-            
-            # If the link is currently set
-            if field.key:
-                                
-                if field.key == value.MyId:
-                    # Setting it again is a pass...
-                    return
-                
-                
-                old_obj = self._workspace.get(field.key,None)
-                if old_obj:
-                    plinks = old_obj.ParentLinks
-                    plinks.remove(field.key)
-                    # If there are no parents left for the object delete it
-                    if len(plinks)==0:
-                        del self._workspace[field.key]
+        if link.GPBType != link.LinkClassType:
+            raise RepositoryError('Can not set a composite field unless it is of type Link')
                     
+        if not value.IsRoot == True:
+            raise RepositoryError('You can not set a link equal to part of a gpb composite!')
+        
+        if link.key == value.MyId:
+                # Add the new link to the list of parents for the object
+                value.AddParentLink(link) 
+                # Setting it again is a pass...
+                return
+        
+        if link.InParents(value):
+            raise RepositoryError('You can not create a recursive structure - this value is also a parent of the link you are setting.')
+
+        # Add the new link to the list of parents for the object
+        value.AddParentLink(link) 
+        
+        # If the link is currently set
+        if link.key:
+                            
+            old_obj = self._workspace.get(link.key,None)
+            if old_obj:
+                plinks = old_obj.ParentLinks
+                plinks.remove(link)
+                # If there are no parents left for the object delete it
+                if len(plinks)==0:
+                    del self._workspace[link.key]
                 
-                # Modify the existing link
-                field.key = value.MyId
-                
-                # Set the new type
-                tp = field.type
-                self._set_type_from_obj(tp, value)
-                    
-            else:
-                
-                # Set the id of the linked wrapper
-                field.key = value.MyId
-                
-                # Set the type
-                tp = field.type
-                self._set_type_from_obj(tp, value)
                 
         else:
             
-            raise RepositoryError('Can not set a composite field unless it is of type Link')
-            #Over ride Protobufs - I want to be able to set a message directly
-        #    field.CopyFrom(value)
+            #Make sure the link is in the objects set of child links
+            link.ChildLinks.add(link) # Adds to the links root wrapper!
+            
         
             
+        # Set the id of the linked wrapper
+        link.key = value.MyId
+        
+        # Set the type
+        tp = link.type
+        self._set_type_from_obj(tp, value)
+            
+    

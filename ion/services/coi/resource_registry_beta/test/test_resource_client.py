@@ -14,6 +14,7 @@ from twisted.trial import unittest
 from net.ooici.core.type import type_pb2
 from net.ooici.play import addressbook_pb2
 from ion.core.object import gpb_wrapper
+from ion.core.object import object_utils
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
@@ -46,25 +47,25 @@ class ResourceClientTest(IonTestCase):
         yield self._stop_container()
         
     @defer.inlineCallbacks
-    def test_register_resource(self):
+    def test_create_resource(self):
         
-        type_id = yield self.rc.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='AddressLink')
+        type_id = object_utils.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='AddressLink')
         
-        resource = yield self.rc.create_resource_instance(type_id, name='Test AddressLink Resource', description='A test resource')
+        resource = yield self.rc.create_instance(type_id, name='Test AddressLink Resource', description='A test resource')
         
         self.assertIsInstance(resource, ResourceInstance)
-        self.assertEqual(resource.life_cycle_state, resource.NEW)
-        self.assertEqual(resource.name, 'Test AddressLink Resource')
-        self.assertEqual(resource.description, 'A test resource')
+        self.assertEqual(resource.ResourceLifeCycleState, resource.NEW)
+        self.assertEqual(resource.ResourceName, 'Test AddressLink Resource')
+        self.assertEqual(resource.ResourceDescription, 'A test resource')
         
     @defer.inlineCallbacks
-    def test_retrieve_resource(self):
+    def test_get_resource(self):
             
-        type_id = yield self.rc.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='AddressLink')
+        type_id = object_utils.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='AddressLink')
             
-        resource = yield self.rc.create_resource_instance(type_id, name='Test AddressLink Resource', description='A test resource')
+        resource = yield self.rc.create_instance(type_id, name='Test AddressLink Resource', description='A test resource')
             
-        res_id = resource.identity
+        res_id = resource.ResourceIdentity
             
         # Spawn a completely separate resource client and see if we can retrieve the resource...
         services = [
@@ -78,45 +79,47 @@ class ResourceClientTest(IonTestCase):
         
         my_rc = ResourceClient(proc=proc_ps1)
             
-        my_resource = yield my_rc.retrieve_resource_instance(res_id)
+        my_resource = yield my_rc.get_instance(res_id)
             
-        self.assertEqual(my_resource.name, 'Test AddressLink Resource')
+        self.assertEqual(my_resource.ResourceName, 'Test AddressLink Resource')
         
-    @defer.inlineCallbacks
-    def test_read_resource(self):
-            
-        type_id = yield self.rc.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='AddressLink')
-            
-        resource = yield self.rc.create_resource_instance(type_id, name='Test AddressLink Resource', description='A test resource')
-            
-        obj = yield resource.read_resource()
-        self.assertEqual(obj.GPBType, type_id)
-            
-        # Test read a version 
-        obj = yield resource.read_resource(version='master')
-        self.assertEqual(obj.GPBType, type_id)
-            
-        # Read an invalid version
-        obj = yield resource.read_resource(version='masterXXX')
-        self.assertEqual(obj.GPBType, None)
     
     @defer.inlineCallbacks
-    def test_read_your_writes_resource(self):
+    def test_read_your_writes(self):
             
-        type_id = yield self.rc.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='AddressLink')
+        type_id = object_utils.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='AddressLink')
             
-        resource = yield self.rc.create_resource_instance(type_id, name='Test AddressLink Resource', description='A test resource')
+        resource = yield self.rc.create_instance(type_id, name='Test AddressLink Resource', description='A test resource')
             
-        obj = yield resource.read_resource()
-        self.assertEqual(obj.GPBType, type_id)
+        self.assertEqual(resource.ResourceType.GPBMessage, type_id)
         
-        p=obj.person.add()
-        p.id=5
-        p.name='David'
+        print resource
         
-        yield resource.write_resource('Testing write...')
+        person_type = object_utils.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='Person')
         
-        res_id = resource.identity
+        person = resource.CreateObject(person_type)
+        resource.person.add()
+        resource.person[0] = person
+        
+        resource.owner = person
+        
+        person.id=5
+        person.name='David'
+        
+        print resource
+        
+        print 'addressbook',resource._object
+        print 'modified', resource._resource.Modified
+        
+        
+        XXXXX
+        self.assertEqual(resource.person[0].name, 'David')
+        
+        yield self.rc.put_instance(resource, 'Testing write...')
+        
+        print resource
+        
+        res_id = resource.ResourceIdentity
         
         # Spawn a completely separate resource client and see if we can retrieve the resource...
         services = [
@@ -130,13 +133,15 @@ class ResourceClientTest(IonTestCase):
         
         my_rc = ResourceClient(proc=proc_ps1)
             
-        my_resource = yield my_rc.retrieve_resource_instance(res_id)
+        my_resource = yield my_rc.get_instance(res_id)
             
-        self.assertEqual(my_resource.name, 'Test AddressLink Resource')
+        self.assertEqual(my_resource.ResourceName, 'Test AddressLink Resource')
         
-        my_obj = yield my_resource.read_resource()
+        my_resource._repository.log_commits('master')
+                
+        print my_resource
         
-        self.assertEqual(obj.person[0].name, 'David')
+        self.assertEqual(my_resource.person[0].name, 'David')
         
         
     @defer.inlineCallbacks

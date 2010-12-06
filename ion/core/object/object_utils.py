@@ -58,8 +58,8 @@ def create_type_identifier(package='', protofile='', cls=''):
     """        
     gpbtype = type_pb2.GPBType()
         
-    type_id.protofile = protofile
-    type_id.package = package
-    type_id.cls = cls
+    gpbtype.protofile = protofile
+    gpbtype.package = package
+    gpbtype.cls = cls
         
-    return type_id
+    return gpbtype

@@ -38,6 +38,7 @@ class ResourceRegistryService(ServiceProcess):
     declare = ServiceProcess.service_declare(name='resource_registry_2', version='0.1.0', dependencies=[])
 
     TypeClassType = gpb_wrapper.set_type_from_obj(type_pb2.GPBType())
+    ResourceDescriptionClassType = gpb_wrapper.set_type_from_obj(resource_pb2.ResourceDescription())
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -67,43 +68,49 @@ class ResourceRegistryService(ServiceProcess):
         
         # Check that we got the correct kind of content!
         assert isinstance(content, gpb_wrapper.Wrapper)
-        assert content.GPBType == self.TypeClassType
+        assert content.GPBType == self.ResourceDescriptionClassType
         
         id = yield self._register_resource_instance(content)
         
         yield self.reply(msg, content=id)
         
     @defer.inlineCallbacks
-    def _register_resource_instance(self, content):
+    def _register_resource_instance(self, resource_description):
         
         # Get the repository that the object is in
-        msg_repo = content.Repository
+        msg_repo = resource_description.Repository
             
         # Get the class for this type of resource
-        cls = msg_repo._load_class_from_type(content)
+        cls = msg_repo._load_class_from_type(resource_description.type)
         
         # Create a new repository to hold this resource
-        new_repo, resource = self.workbench.init_repository(rootclass=resource_pb2.OOIResource)
+        resource_repository, resource = self.workbench.init_repository(rootclass=resource_pb2.OOIResource)
         
         # Set the identity of the resource
-        resource.identity = new_repo.repository_key
+        resource.identity = resource_repository.repository_key
             
-        # Create the new resources object
-        res_obj = new_repo.create_wrapped_object(cls)
+        # Create the new resource object
+        res_obj = resource_repository.create_wrapped_object(cls)
         # Set the object as the child of the resource
         resource.SetLinkByName('resource_object', res_obj)
         
+        print 'RES_OBJ!', res_obj.MyId, res_obj.ParentLinks
+        res_obj.title = 'my string'
+        
         # Name and Description is set by the resource client
-        resource.name = res_obj.GPBMessage.DESCRIPTOR.file.name # get name?
+        resource.name = resource_description.name
+        resource.description = resource_description.description
+        
+        resource_repository._set_type_from_obj(resource.type, res_obj)
         
         # State is set to new by default
         resource.lcs = resource_pb2.New
         
-        new_repo.commit('Created a new resource!')
+        resource_repository.commit('Created a new resource!')
+        print 'RES_OBJ!', res_obj.MyId, res_obj.ParentLinks
 
         # push the new resource to the data store        
         response, exception = yield self.push(self.datastore_service, resource.identity)
-        
         assert response == self.ION_SUCCESS, 'Push to datastore failed!'
             
         defer.returnValue(resource.identity)

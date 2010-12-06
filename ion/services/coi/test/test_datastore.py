@@ -155,7 +155,21 @@ class DataStoreTest(IonTestCase):
         ab1.person.add()
         ab1.person[1] = pb1    
             
+        print 'Addresbook1',ab1, ab1.ChildLinks, ab1.ParentLinks
+        print 'OWNER1',ab1.owner.MyId, ab1.owner.ChildLinks, ab1.owner.ParentLinks
+        print 'Person0-1',ab1.person[0].MyId, ab1.person[0].ChildLinks, ab1.person[0].ParentLinks
+        
+        print 'HEHEHEHEHEHEHEHEEHEHEHEHEH'
+            
         repo1.commit()
+            
+            
+        print 'Addresbook1',ab1, ab1.ChildLinks, ab1.ParentLinks
+        print 'OWNER1',ab1.owner.MyId, ab1.owner.ChildLinks, ab1.owner.ParentLinks
+        print 'Person0-1',ab1.person[0].MyId, ab1.person[0].ChildLinks, ab1.person[0].ParentLinks
+        
+        print 'HEHEHEHEHEHEHEHEEHEHEHEHEH'
+            
             
         response, ex = yield proc_ds1.push('ps2','addressbook')
             
@@ -175,8 +189,19 @@ class DataStoreTest(IonTestCase):
             
         # Now modify and commit on both data stores! - Divergence!
             
+        print 'Addresbook',ab2, ab2.ChildLinks, ab2.ParentLinks
+        print 'OWNER',ab2.owner.MyId, ab2.owner.ChildLinks, ab2.owner.ParentLinks
+        print 'Person0',ab2.person[0].MyId, ab2.person[0].ChildLinks, ab2.person[0].ParentLinks
+        
+        print 'HEHEHEHEHEHEHEHEEHEHEHEHEH'
+            
         pa2 = ab2.owner
         pa2.email = 'process2@gmail.com'
+            
+        print 'Addresbook',ab2, ab2.ChildLinks, ab2.ParentLinks
+        print 'OWNER',ab2.owner.MyId, ab2.owner.ChildLinks, ab2.owner.ParentLinks
+        print 'Person0',ab2.person[0].MyId, ab2.person[0].ChildLinks, ab2.person[0].ParentLinks
+            
             
         # Show off that it changed in both places - it is a real DAG!
         self.assertIdentical(ab2.owner, ab2.person[0])
@@ -282,6 +307,11 @@ class DataStoreTest(IonTestCase):
         ab_2 = repo_ds2.checkout('master')
         
         self.assertEqual(ab_2, ab)
+        
+        p_2 = ab_2.person[0]
+                
+        
+        
 
 
     @defer.inlineCallbacks

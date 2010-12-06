@@ -138,18 +138,87 @@ class RepositoryTest(unittest.TestCase):
         ab.person[1] = p
         
         cref = repo.commit(comment='testing commit')
-        print cref
-        
-        print 'dotgit', repo._dotgit
         
         p = None
         ab = None
         
         ab = repo.checkout(branchname='master')
-        print 'ab after checkout',ab
+
+        print 'AB', ab.ChildLinks
+        for c in ab.ChildLinks:
+            print c.key
+        
+        print 'WORKSPACE:',repo._workspace.keys()
+        
         
         print ab.person[0]
         print ab.person[1]
+        print ab.owner
+
+        mylist =[ab.person[0], ab.owner]
+        print 'MYLIST', mylist
+
+        print 'AB', ab.ChildLinks
+        for c in ab.ChildLinks:
+            print c.key
+
+        print 'Parent Links:',ab.person[0].ParentLinks
+        for item in ab.person[0].ParentLinks:
+            print item.MyId, item.key
+        print 'Parent Links:',ab.person[1].ParentLinks
+        for item in ab.person[1].ParentLinks:
+            print item.MyId, item.key
+        print 'Parent Links:',ab.owner.ParentLinks
+        for item in ab.owner.ParentLinks:
+            print item.MyId, item.key
+        
+        self.assertEqual(len(ab.ChildLinks),3)
+        
+        self.assertEqual(ab.person[0], ab.owner)
+        
+        
+        mylist =[ab.person[0], ab.owner]
+        print 'MYLIST', mylist
+        
+        
+        for person in ab.person:
+            print 'person',person
+        print 'owner',ab.owner
+ 
+        print ab.owner.MyId
+        o_link = ab.GetLink('owner')
+        print o_link
+        
+        print 'PARENT LINKS', ab.owner.ParentLinks
+        for item in ab.owner.ParentLinks:
+            print item
+            
+        print 'Child Links', ab.ChildLinks
+        for item in ab.ChildLinks:
+            print item
+            
+        
+        print 'SETTING MICHAEL!'        
+        ab.owner.name = 'Michael'
+        
+        print 'AB LINKS!', ab
+        
+        print 'PARENT LINKS', ab.owner.ParentLinks
+
+        for item in ab.owner.ParentLinks:
+            print item
+
+        print ab.owner.name
+        print o_link
+
+        print dir(o_link)
+        
+        print ab.owner.MyId
+        self.assertEqual(ab.owner.name, 'Michael')
+        
+        
+        mylist =[ab.person[0], ab.owner]
+        print 'MYLIST', mylist
         
         
         for person in ab.person:
@@ -157,3 +226,9 @@ class RepositoryTest(unittest.TestCase):
         print 'owner',ab.owner
         
         
+        self.assertEqual(ab.person[0].name, 'Michael')
+ 
+ 
+ 
+ 
+ 

@@ -88,6 +88,24 @@ class NodeLinkTest(unittest.TestCase):
             
             self.assertEqual(self.ab.person[0].name ,'David')
             
+        def test_dag(self):
+            
+            self.ab.person.add()
+            
+            p = self.repo.create_wrapped_object(addressbook_pb2.Person)
+            
+            p.name = 'David'
+            p.id = 5
+            
+            self.ab.person[0] = p
+            
+            self.ab.owner = p
+            
+            p.name ='John'
+            
+            self.assertEqual(self.ab.person[0].name ,'John')
+            self.assertEqual(self.ab.owner.name ,'John')
+                        
         # How do I make this a fail unless?   
         #def test_inparents(self):
         #        
