@@ -144,33 +144,6 @@ class RepositoryTest(unittest.TestCase):
         
         ab = repo.checkout(branchname='master')
 
-        print 'AB', ab.ChildLinks
-        for c in ab.ChildLinks:
-            print c.key
-        
-        print 'WORKSPACE:',repo._workspace.keys()
-        
-        
-        print ab.person[0]
-        print ab.person[1]
-        print ab.owner
-
-        mylist =[ab.person[0], ab.owner]
-        print 'MYLIST', mylist
-
-        print 'AB', ab.ChildLinks
-        for c in ab.ChildLinks:
-            print c.key
-
-        print 'Parent Links:',ab.person[0].ParentLinks
-        for item in ab.person[0].ParentLinks:
-            print item.MyId, item.key
-        print 'Parent Links:',ab.person[1].ParentLinks
-        for item in ab.person[1].ParentLinks:
-            print item.MyId, item.key
-        print 'Parent Links:',ab.owner.ParentLinks
-        for item in ab.owner.ParentLinks:
-            print item.MyId, item.key
         
         self.assertEqual(len(ab.ChildLinks),3)
         
