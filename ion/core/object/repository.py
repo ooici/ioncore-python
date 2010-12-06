@@ -273,6 +273,9 @@ class Repository(object):
                 cref = self.merge_by_date(branch)
                 
         # Do some clean up!
+        for item in self._workspace.itervalues():
+            print 'ITEM',item
+            item.Invalidate()
         self._workspace = {}
         self._workspace_root = None
             
@@ -353,11 +356,13 @@ class Repository(object):
             return
         
         if len(self._current_branch.commitrefs)==0:
-            raise Exception, 'This current branch is empty - there is nothing to reset too!!'
+            raise RepositoryError('This current branch is empty - there is nothing to reset too!')
         
         cref = self._current_branch.commitrefs[0]
         
         # Do some clean up!
+        for item in self._workspace:
+            item.Invalidate()
         self._workspace = {}
         self._workspace_root = None
             
@@ -420,6 +425,9 @@ class Repository(object):
         cref.date = date
         
         branch = self._current_branch
+        
+        # Make sure the _dotgit directory is already set to modified!
+        branch.Modified = True
 
         # If this is the first commit to a new repository the current branch is a dummy
         # If it is initialized it is real and we need to link to it!
@@ -436,6 +444,7 @@ class Repository(object):
             # This is a new branch and we must add a place for the commit ref!
             branch.commitrefs.add()
         
+        
         # For each branch that we merged from - add a  reference
         for mrgd in self._merged_from:
             pref = cref.parentrefs.add()
@@ -450,7 +459,6 @@ class Repository(object):
         branch.commitrefs.SetLink(0,cref)
         
         return cref
-    
             
         
     def merge(self, branch=None, commit_id = None, older_than=None):
@@ -485,6 +493,12 @@ class Repository(object):
         ## Need to check and then clear the workspace???
         #if not self.status == self.UPTODATE:
         #    raise Exception, 'Can not create new branch while the workspace is dirty'
+        
+        if self._current_branch != None and len(self._current_branch.commitrefs)==0:
+            # Unless this is an uninitialized repository it is an error to create
+            # a new branch from one which has no commits yet...
+            raise RepositoryError('The current branch is empty - a new one can not be created untill there is a commit!')
+        
         
         brnch = self.branches.add()    
         brnch.branchkey = pu.create_guid()
@@ -560,10 +574,13 @@ class Repository(object):
         obj._child_links = set()
         obj._read_only = False
         obj._myid = obj_id
-        obj._modified = True     
+        obj._modified = True
+        obj._invalid = False
 
         if addtoworkspace:
             self._workspace[obj_id] = obj
+            
+        obj._activated=True
             
         return obj
         

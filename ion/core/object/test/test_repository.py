@@ -18,12 +18,32 @@ from ion.test.iontest import IonTestCase
 from net.ooici.play import addressbook_pb2
 from ion.core.object import workbench
 
+from ion.core.object import repository
 
 class RepositoryTest(unittest.TestCase):
         
     def setUp(self):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb
+        
+    def test_wrapper_properties(self):
+        """
+        Test the basic state of a new wrapper object when it is created
+        """
+        repo, simple = self.wb.init_repository(addressbook_pb2.AddressBook)   
+        
+        self.assertEqual(len(simple.ParentLinks),0)
+        self.assertEqual(len(simple.ChildLinks),0)
+        self.assertEqual(simple.IsRoot, True)
+        self.assertEqual(simple.Modified, True)
+        
+        simple2= repo.create_wrapped_object(addressbook_pb2.AddressLink)
+        
+        self.assertEqual(len(simple2.ParentLinks),0)
+        self.assertEqual(len(simple2.ChildLinks),0)
+        self.assertEqual(simple2.IsRoot, True)
+        self.assertEqual(simple2.Modified, True)
+        
         
     def test_branch_checkout(self):
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressBook)   
@@ -37,32 +57,30 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(p.name,'David')
         p.name = 'John'
         
-        
-        
         repo.commit()
 
-        ab = repo.checkout(branchname="master")
+        ab2 = repo.checkout(branchname="master")
         
-        self.assertEqual(ab.person[0].name, 'David')
+        self.assertEqual(ab2.person[0].name, 'David')
         
-        ab = repo.checkout(branchname="Arthur")
+        ab3 = repo.checkout(branchname="Arthur")
         
-        self.assertEqual(ab.person[0].name, 'John')
-        
+        self.assertEqual(ab3.person[0].name, 'John')
         
         
     def test_branch_no_commit(self):
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
-        try:
-            repo.branch("Arthur")
-        except Exception, ex:
-            log.debug(str(ex))
+        self.assertEqual(len(repo.branches),1)
             
-                
+        self.assertRaises(repository.RepositoryError, repo.branch, 'Arthur')
+        
     def test_branch(self):
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
         repo.commit()
+        self.assertEqual(len(repo.branches),1)
+
         repo.branch("Arthur")   
+        self.assertEqual(len(repo.branches),2)
         
     def test_create_commit_ref(self):
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
@@ -108,10 +126,8 @@ class RepositoryTest(unittest.TestCase):
         repo1.log_commits('master')
         
             
-    def test_simple_commit(self):
-        
+    def test_dag_structure(self):
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
-
                         
         p = repo.create_wrapped_object(addressbook_pb2.Person)
         p.name='David'
@@ -137,6 +153,8 @@ class RepositoryTest(unittest.TestCase):
         
         ab.person[1] = p
         
+        self.assertIdentical(ab.person[0], ab.owner)
+        
         cref = repo.commit(comment='testing commit')
         
         p = None
@@ -158,6 +176,25 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(ab.person[0].name, 'Michael')
  
  
+    def test_lost_objects(self):
+        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
+                        
+        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p.name='David'
+        p.id = 5
+        p.email = 'd@s.com'
+        ph = p.phone.add()
+        ph.type = p.WORK
+        ph.number = '123 456 7890'
+ 
+        ab.owner = p
+        
+        cref = repo.commit(comment='testing commit')
  
  
+        ab2 = repo.checkout(branchname='master')
+
+        ab.owner.name = 'John'
+
+
  
