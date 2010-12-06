@@ -105,14 +105,7 @@ class ResourceClientTest(IonTestCase):
         
         person.id=5
         person.name='David'
-        
-        print resource
-        
-        print 'addressbook',resource._object
-        print 'modified', resource._resource.Modified
-        
-        
-        XXXXX
+
         self.assertEqual(resource.person[0].name, 'David')
         
         yield self.rc.put_instance(resource, 'Testing write...')
@@ -147,20 +140,23 @@ class ResourceClientTest(IonTestCase):
     @defer.inlineCallbacks
     def test_version_resource(self):
             
-        type_id = yield self.rc.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='AddressLink')
+        type_id = object_utils.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='AddressLink')
             
-        resource = yield self.rc.create_resource_instance(type_id, name='Test AddressLink Resource', description='A test resource')
-            
-        obj = yield resource.read_resource()
-        self.assertEqual(obj.GPBType, type_id)
+        resource = yield self.rc.create_instance(type_id, name='Test AddressLink Resource', description='A test resource')
         
-        p=obj.person.add()
-        p.id=5
-        p.name='David'
+        person_type = object_utils.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='Person')
         
-        yield resource.write_resource('Testing write...')
+        person = resource.CreateObject(person_type)
         
-        res_id = resource.identity
+        resource.person.add()
+        person.id=5
+        person.name='David'
+        
+        resource.person[0] = person
+        
+        yield self.rc.put_instance(resource, 'Testing write...')
+        
+        res_id = resource.ResourceIdentity
         
         # Spawn a completely separate resource client and see if we can retrieve the resource...
         services = [
@@ -174,11 +170,10 @@ class ResourceClientTest(IonTestCase):
         
         my_rc = ResourceClient(proc=proc_ps1)
             
-        my_resource = yield my_rc.retrieve_resource_instance(res_id)
+        my_resource = yield my_rc.get_instance(res_id)
             
-        self.assertEqual(my_resource.name, 'Test AddressLink Resource')
+        self.assertEqual(my_resource.ResourceName, 'Test AddressLink Resource')
         
-        my_obj = yield my_resource.read_resource()
         
-        self.assertEqual(obj.person[0].name, 'David')
+        self.assertEqual(my_resource.person[0].name, 'David')
         

@@ -148,56 +148,12 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(len(ab.ChildLinks),3)
         
         self.assertEqual(ab.person[0], ab.owner)
+        self.assertIdentical(ab.person[0], ab.owner)
         
-        
-        mylist =[ab.person[0], ab.owner]
-        print 'MYLIST', mylist
-        
-        
-        for person in ab.person:
-            print 'person',person
-        print 'owner',ab.owner
- 
-        print ab.owner.MyId
-        o_link = ab.GetLink('owner')
-        print o_link
-        
-        print 'PARENT LINKS', ab.owner.ParentLinks
-        for item in ab.owner.ParentLinks:
-            print item
-            
-        print 'Child Links', ab.ChildLinks
-        for item in ab.ChildLinks:
-            print item
-            
-        
-        print 'SETTING MICHAEL!'        
         ab.owner.name = 'Michael'
         
-        print 'AB LINKS!', ab
         
-        print 'PARENT LINKS', ab.owner.ParentLinks
-
-        for item in ab.owner.ParentLinks:
-            print item
-
-        print ab.owner.name
-        print o_link
-
-        print dir(o_link)
-        
-        print ab.owner.MyId
         self.assertEqual(ab.owner.name, 'Michael')
-        
-        
-        mylist =[ab.person[0], ab.owner]
-        print 'MYLIST', mylist
-        
-        
-        for person in ab.person:
-            print 'person',person
-        print 'owner',ab.owner
-        
         
         self.assertEqual(ab.person[0].name, 'Michael')
  

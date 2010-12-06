@@ -315,12 +315,9 @@ class Wrapper(object):
             
         
         if self.Repository._workspace.has_key(self.MyId):
-            print 'RECURSE COMMIT REMOVING AND ADDING TO WORK SPACE!'
             
-            print self.Repository._workspace.keys()
             del self.Repository._workspace[self.MyId]
             self.Repository._workspace[se.key] = self
-            print self.Repository._workspace.keys()
 
         self.MyId = se.key
         
@@ -450,8 +447,7 @@ class Wrapper(object):
                 self.Repository.set_linked_object(wrapped_field,value)
             
             else:
-                print 'EHEHEHEHEHEHEHEHEHEHEHEEHEHEHEHEHEHEHEHEHEH'
-                print key, value
+                
                 setattr(gpb, key, value)
                 
             # Set this object and it parents to be modified
@@ -470,9 +466,6 @@ class Wrapper(object):
             return
         else:
             
-            print 'SET PARENTS MODIFIED!'
-            print self
-            
             self.Modified = True
                         
             new_id = self.Repository.new_id()
@@ -488,9 +481,7 @@ class Wrapper(object):
                 self.ParentLinks=set()
                 
             else:
-                 
-                print 'JDDJDJDJDJDJDJDJDJDJDJDJDJJDJDJDJDJDJ'
-                    
+                
                 for link in self.ParentLinks:
                     # Tricky - set the message directly and call modified!                    
                     link.GPBMessage.key = self.MyId

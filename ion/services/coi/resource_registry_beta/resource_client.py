@@ -188,12 +188,7 @@ class ResourceClient(object):
         # Get the repository
         repository = instance._repository
             
-        print 'STATUS:',repository.status
-            
-        repository.commit(comment=comment)
-            
-        print 'STATUS:',repository.status
-            
+        repository.commit(comment=comment)            
             
         response, exception = yield self.workbench.push(self.datastore_service, repository.repository_key)
         
@@ -243,12 +238,6 @@ class ResourceInstance(object):
         self._resource = self._repository.checkout(version)
         
         self._object = self._resource.resource_object
-        
-        print 'self._resource.MyId', self._resource.MyId
-        print 'self._resource.ParentLinks', self._resource.ParentLinks
-        
-        print 'self._object.MyId', self._object.MyId
-        print 'self._object.ParentLinks', self._object.ParentLinks
         
         
     def __str__(self):
@@ -311,7 +300,6 @@ class ResourceInstance(object):
             # If it is a Field defined by the gpb...
             #value = getattr(res_obj, key)
             value = res_obj.__getattribute__(key)
-
                 
         else:
             # If it is a attribute of this class, use the base class's getattr
@@ -331,9 +319,6 @@ class ResourceInstance(object):
             # If it is a Field defined by the gpb...
             #setattr(res_obj, key, value)
             res_obj.__setattr__(key,value)
-            
-            print 'Parents!', res_obj.ParentLinks
-            print 'MyID', res_obj.MyId
                 
         else:
             v = object.__setattr__(self, key, value)
