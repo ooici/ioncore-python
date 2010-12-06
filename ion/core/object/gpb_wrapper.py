@@ -503,8 +503,12 @@ class Wrapper(object):
         if key in gpbfields:
             # If it is a Field defined by the gpb...
             gpb = self.GPBMessage
-            value = getattr(gpb,key)                        
-            if isinstance(value, containers.RepeatedCompositeFieldContainer):
+            value = getattr(gpb,key)
+            
+            if isinstance(value, containers.RepeatedScalarFieldContainer):
+                value = ScalarContainerWrapper(self, value)
+                
+            elif isinstance(value, containers.RepeatedCompositeFieldContainer):
                 # if it is a container field:
                 value = ContainerWrapper(self, value)
             elif isinstance(value, message.Message):
@@ -692,7 +696,7 @@ class ContainerWrapper(object):
         if not isinstance(gpbcontainer, containers.RepeatedCompositeFieldContainer):
             raise OOIObjectError('The Container Wrapper is only for use with Repeated Composit Field Containers')
         self._gpbcontainer = gpbcontainer
-        self.Repository = wrapper.Repository # Hack - make uniform interface to repository
+        self.Repository = wrapper.Repository
 
     @property
     def Invalid(self):
@@ -841,7 +845,132 @@ class ContainerWrapper(object):
         self._wrapper._set_parents_modified()
         self._gpbcontainer.__delslice__(start, stop)
     
-   
+    
+    
+class ScalarContainerWrapper(object):
+    """
+    This class is only for use with containers.RepeatedCompositeFieldContainer
+    It is not needed for repeated scalars!
+    """
+    
+    LinkClassType = set_type_from_obj(link_pb2.CASRef())
+    
+    def __init__(self, wrapper, gpbcontainer):
+        # Be careful - this is a hard link
+        self._wrapper = wrapper
+        if not isinstance(gpbcontainer, containers.RepeatedScalarFieldContainer):
+            raise OOIObjectError('The Container Wrapper is only for use with Repeated Composit Field Containers')
+        self._gpbcontainer = gpbcontainer
+        self.Repository = wrapper.Repository 
+
+    @property
+    def Invalid(self):
+        return self._wrapper.Invalid
+    
+    def append(self, value):
+        """Appends an item to the list. Similar to list.append()."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+           
+        self._gpbcontainer.append(value)
+        self._wrapper._set_parents_modified()
+
+    def insert(self, key, value):
+        """Inserts the item at the specified position. Similar to list.insert()."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+           
+        self._gpbcontainer.insert(key, value)
+        self._wrapper._set_parents_modified()
+
+    def extend(self, elem_seq):
+        """Extends by appending the given sequence. Similar to list.extend()."""
+        if not elem_seq:
+            return
+        
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+           
+        self._gpbcontainer.extend(elem_seq)
+        self._wrapper._set_parents_modified()
+
+    def remove(self, elem):
+        """Removes an item from the list. Similar to list.remove()."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+           
+        self._gpbcontainer.remove(elem)
+        self._wrapper._set_parents_modified()
+
+    def __setitem__(self, key, value):
+        """Sets the item on the specified position."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+           
+        self._gpbcontainer.__setitem__(key, value)
+        self._wrapper._set_parents_modified()
+
+    def __getslice__(self, start, stop):
+        """Retrieves the subset of items from between the specified indices."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+        return self._gpbcontainer._values[start:stop]
+
+    def __getitem__(self, key):
+        """Retrieves the subset of items from between the specified indices."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+        return self._gpbcontainer._values[key]
+
+    def __setslice__(self, start, stop, values):
+        """Sets the subset of items from between the specified indices."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+           
+        self._gpbcontainer.__setslice__(start, stop, values)
+        self._wrapper._set_parents_modified()
+
+    def __delitem__(self, key):
+        """Deletes the item at the specified position."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+           
+        del self._gpbcontainer._values[key]
+        self._gpbcontainer._message_listener.Modified()
+        self._wrapper._set_parents_modified()
+
+    def __delslice__(self, start, stop):
+        """Deletes the subset of items from between the specified indices."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+            
+        self._gpbcontainer._values.__delslice__(start,stop)
+        self._gpbcontainer._message_listener.Modified()
+        self._wrapper._set_parents_modified()
+
+    def __eq__(self, other):
+        """Compares the current instance with another one."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+        
+        if self is other:
+            return True
+        # Special case for the same type which should be common and fast.
+        if isinstance(other, self.__class__):
+            return other._gpbcontainer._values == self._gpbcontainer._values
+        # We are presumably comparing against some other sequence type.
+        return other == self._gpbcontainer._values
+    
+    def __repr__(self):
+        return repr(self._gpbcontainer._values)
+    
+    
+    
+    
+    
+    
+    
+    
     
 class StructureElement(object):
     """
