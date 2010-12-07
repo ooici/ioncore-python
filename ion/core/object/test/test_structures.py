@@ -168,7 +168,6 @@ class SimpleObjectTest(unittest.TestCase):
         simple = self.repo.checkout('master')
         self.assertEqual(simple.floats, [3.,4.,5.,6.])
         del simple.floats[1:3]
-        print simple.floats
         self.assertEqual(simple.floats, [3.,6.])
         
         
@@ -177,6 +176,19 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(len(simple.ChildLinks),0)
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
+        
+        
+    def test_invalidate(self):
+        
+        simple = self.repo.checkout('master')
+        self.assertEqual(simple.floats, [3.,4.,5.,6.])
+        floats = simple.floats
+        
+        # Checkout to invalidate it
+        simple_2 = self.repo.checkout('master')
+        
+        self.assertEqual(object.__getattribute__(simple,'Invalid'), True)
+        self.assertEqual(object.__getattribute__(floats,'Invalid'), True)
         
         
         

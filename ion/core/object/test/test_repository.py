@@ -178,7 +178,8 @@ class RepositoryTest(unittest.TestCase):
  
     def test_lost_objects(self):
         repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
-                        
+            
+        # Create a resource object    
         p = repo.create_wrapped_object(addressbook_pb2.Person)
         p.name='David'
         p.id = 5
@@ -191,10 +192,12 @@ class RepositoryTest(unittest.TestCase):
         
         cref = repo.commit(comment='testing commit')
  
- 
         ab2 = repo.checkout(branchname='master')
-
-        ab.owner.name = 'John'
+        
+        # This is only for testing - to make sure that the invalid method is
+        # working properly!
+        self.assertEqual(object.__getattribute__(p,'Invalid'), True)
+        self.assertEqual(object.__getattribute__(ab,'Invalid'), True)
 
 
  

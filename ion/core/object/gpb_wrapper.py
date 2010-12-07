@@ -76,15 +76,11 @@ class Wrapper(object):
         on the data elements of the wrapped proto buffer
         """
         
-        object.__setattr__(self,'_activated',False)
+        object.__setattr__(self,'_invalid',False)
         """
-        A property which is set after the init is complete
-        """
-        
-        object.__setattr__(self,'_root',None)
-        """
-        A reference to the root object wrapper for this protobuffer
-        A composit protobuffer object may return 
+        Use this field to invalidate a message wrapper when it should be deleted.
+        This ensures that any references which have not gone out of scope can not
+        cause trouble!
         """
         
         # Set the deligated message and its machinary
@@ -102,21 +98,26 @@ class Wrapper(object):
         
         self._gpb_type = set_type_from_obj(gpbMessage)
         
-        self._invalid=None
+        self._root=None
         """
-        Use this field to invalidate a message wrapper when it should be deleted.
-        This ensures that any references which have not gone out of scope can not
-        cause trouble!
+        A reference to the root object wrapper for this protobuffer
+        A composit protobuffer object may return 
         """
         
         self._parent_links=None
         """
-        A list of all the wrappers which link to me
+        A list of all the other wrapper objects which link to me
         """
         
         self._child_links=None
         """
-        A list of all the wrappers which I link to
+        A list of my child link wrappers
+        """
+        
+        self._derived_wrappers=None
+        """
+        A container for all the wrapper objects which are rewrapped, derived
+        from a root object wrapper
         """
         
         self._myid = None # only exists in the root object
@@ -147,11 +148,23 @@ class Wrapper(object):
         
     @property
     def Invalid(self):
-        if not object.__getattribute__(self,'_activated'):
-            # It can't be invalid yet!
-            return False
-        root = object.__getattribute__(self,'_root')
-        return object.__getattribute__(root,'_invalid')
+        return object.__getattribute__(self,'_invalid')
+    
+    def Invalidate(self):
+        if self.IsRoot:
+            for item in self.DerivedWrappers.values():
+                item.Invalidate()
+            
+        self._derived_wrappers = None
+        self._gpbMessage = None
+        self._parent_links = None
+        self._child_links = None
+        self._myid = None
+        self._repository = None
+        self._root = None
+        object.__setattr__(self,'_gpbFields',[])
+        
+        self._invalid = True
         
     @property
     def Root(self):
@@ -195,6 +208,12 @@ class Wrapper(object):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         return self._root._repository
+    
+    @property
+    def DerivedWrappers(self):
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+        return self._root._derived_wrappers
     
     def _get_myid(self):
         if self.Invalid:
@@ -429,7 +448,6 @@ class Wrapper(object):
                 
                 # If it is a repeated container type
                 if isinstance(gpb_field, containers.RepeatedCompositeFieldContainer):
-                    #container = ContainerWrapper(self, gpb_field)                    
                     
                     for item in gpb_field:
                         
@@ -464,31 +482,25 @@ class Wrapper(object):
             self.ParentLinks.add(link)
         
         
-    def Invalidate(self):
-        
-        self._gpbMessage = None
-        self._parent_links = None
-        self._child_links = None
-        self._myid = None
-        self._repository = None
-        
-        self._invalid = True
-    
-    
     def _rewrap(self, gpbMessage):
         '''
         Factory method to return a new instance of wrapper for a gpbMessage
         from self - used for access to composite structures, it has all the same
         shared variables as the parent wrapper
         '''
-        cls = self.__class__
-        # note - cant use @classmethod because I need context from this message
+        # Check the root wrapper objects list of derived wrappers
+        objhash = gpbMessage.__hash__()
+        if self.DerivedWrappers.has_key(objhash):
+            return self.DerivedWrappers[objhash]
         
-        inst = cls(gpbMessage)
+        inst = Wrapper(gpbMessage)
         # Over ride the root - rewrap is for instances that derive from the root of a composite gpb
         if hasattr(self,'_root'):
             inst._root = self._root
-            inst._activated = True
+            
+        # Add it to the list of objects which derive from the root wrapper
+        self.DerivedWrappers[objhash] = inst
+        
         return inst
 
     def __getattribute__(self, key):
@@ -503,24 +515,31 @@ class Wrapper(object):
         if key in gpbfields:
             # If it is a Field defined by the gpb...
             gpb = self.GPBMessage
-            value = getattr(gpb,key)
             
-            if isinstance(value, containers.RepeatedScalarFieldContainer):
-                value = ScalarContainerWrapper(self, value)
+            # This may be the result we were looking for, in the case of a simple
+            # scalar field
+            field = getattr(gpb,key)
+            
+            # Or it may be something more complex that we need to operate on...        
+            if isinstance(field, containers.RepeatedScalarFieldContainer):
+                result = ScalarContainerWrapper.factory(self, field)
                 
-            elif isinstance(value, containers.RepeatedCompositeFieldContainer):
-                # if it is a container field:
-                value = ContainerWrapper(self, value)
-            elif isinstance(value, message.Message):
-                # if it is a message field:
-                value = self._rewrap(value)
-                if value.GPBType == self.LinkClassType:
-                    value = self.Repository.get_linked_object(value)
+            elif isinstance(field, containers.RepeatedCompositeFieldContainer):
+                result = ContainerWrapper.factory(self, field)
+                
+            elif isinstance(field, message.Message):
+                result = self._rewrap(field)
+                
+                if result.GPBType == self.LinkClassType:
+                    result = self.Repository.get_linked_object(result)
+            else:
+                # Probably bad that the common case comes last!
+                result = field
                 
         else:
             # If it is a attribute of this class, use the base class's getattr
-            value = object.__getattribute__(self, key)
-        return value
+            result = object.__getattribute__(self, key)
+        return result
 
     def __setattr__(self,key,value):
 
@@ -698,9 +717,32 @@ class ContainerWrapper(object):
         self._gpbcontainer = gpbcontainer
         self.Repository = wrapper.Repository
 
+    @classmethod
+    def factory(cls, wrapper, gpbcontainer):
+        
+        # Check the root wrapper objects list of derived wrappers before making a new one
+        objhash = gpbcontainer.__hash__()
+        if wrapper.DerivedWrappers.has_key(objhash):
+            return wrapper.DerivedWrappers[objhash]
+        
+        inst = cls(wrapper, gpbcontainer)
+            
+        # Add it to the list of objects which derive from the root wrapper
+        wrapper.DerivedWrappers[objhash] = inst
+        return inst
+        
+
+
     @property
     def Invalid(self):
-        return self._wrapper.Invalid
+        if not self._wrapper:
+            return True
+        return object.__getattribute__(self._wrapper,'Invalid')
+    
+    def Invalidate(self):
+        self._gpbcontainer = None
+        self._wrapper = False
+        self.Repository = None
     
     def __setitem__(self, key, value):
         """Sets the item on the specified position.
@@ -863,9 +905,33 @@ class ScalarContainerWrapper(object):
         self._gpbcontainer = gpbcontainer
         self.Repository = wrapper.Repository 
 
+    @classmethod
+    def factory(cls, wrapper, gpbcontainer):
+        
+        # Check the root wrapper objects list of derived wrappers before making a new one
+        objhash = gpbcontainer.__hash__()
+        if wrapper.DerivedWrappers.has_key(objhash):
+            return wrapper.DerivedWrappers[objhash]
+        
+        inst = cls(wrapper, gpbcontainer)
+            
+        # Add it to the list of objects which derive from the root wrapper
+        wrapper.DerivedWrappers[objhash] = inst
+        return inst
+
     @property
     def Invalid(self):
-        return self._wrapper.Invalid
+        if not self._wrapper:
+            return True
+        return object.__getattribute__(self._wrapper,'Invalid')
+    
+    def Invalidate(self):
+        self._gpbcontainer = None
+        self._wrapper = None
+        self.Repository = None
+    
+    
+    
     
     def append(self, value):
         """Appends an item to the list. Similar to list.append()."""
@@ -885,9 +951,6 @@ class ScalarContainerWrapper(object):
 
     def extend(self, elem_seq):
         """Extends by appending the given sequence. Similar to list.extend()."""
-        if not elem_seq:
-            return
-        
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
            
@@ -902,6 +965,25 @@ class ScalarContainerWrapper(object):
         self._gpbcontainer.remove(elem)
         self._wrapper._set_parents_modified()
 
+    
+    def __getslice__(self, start, stop):
+        """Retrieves the subset of items from between the specified indices."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+        return self._gpbcontainer._values[start:stop]
+
+    def __len__(self):
+        """Returns the number of elements in the container."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+        return len(self._gpbcontainer._values)
+
+    def __getitem__(self, key):
+        """Retrieves the subset of items from between the specified indices."""
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+        return self._gpbcontainer._values[key]
+
     def __setitem__(self, key, value):
         """Sets the item on the specified position."""
         if self.Invalid:
@@ -909,18 +991,6 @@ class ScalarContainerWrapper(object):
            
         self._gpbcontainer.__setitem__(key, value)
         self._wrapper._set_parents_modified()
-
-    def __getslice__(self, start, stop):
-        """Retrieves the subset of items from between the specified indices."""
-        if self.Invalid:
-            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self._gpbcontainer._values[start:stop]
-
-    def __getitem__(self, key):
-        """Retrieves the subset of items from between the specified indices."""
-        if self.Invalid:
-            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self._gpbcontainer._values[key]
 
     def __setslice__(self, start, stop, values):
         """Sets the subset of items from between the specified indices."""
@@ -960,8 +1030,15 @@ class ScalarContainerWrapper(object):
             return other._gpbcontainer._values == self._gpbcontainer._values
         # We are presumably comparing against some other sequence type.
         return other == self._gpbcontainer._values
-    
+
+    def __ne__(self, other):
+        """Checks if another instance isn't equal to this one."""
+        # The concrete classes should define __eq__.
+        return not self == other
+
     def __repr__(self):
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         return repr(self._gpbcontainer._values)
     
     

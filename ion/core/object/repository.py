@@ -572,6 +572,7 @@ class Repository(object):
         obj._root = obj
         obj._parent_links = set()
         obj._child_links = set()
+        obj._derived_wrappers={}
         obj._read_only = False
         obj._myid = obj_id
         obj._modified = True
