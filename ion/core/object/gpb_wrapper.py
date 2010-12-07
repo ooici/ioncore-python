@@ -493,11 +493,9 @@ class Wrapper(object):
         if self.DerivedWrappers.has_key(objhash):
             return self.DerivedWrappers[objhash]
         
-        inst = Wrapper(gpbMessage)
-        # Over ride the root - rewrap is for instances that derive from the root of a composite gpb
-        if hasattr(self,'_root'):
-            inst._root = self._root
-            
+        inst = Wrapper(gpbMessage)        
+        inst._root = self._root
+        
         # Add it to the list of objects which derive from the root wrapper
         self.DerivedWrappers[objhash] = inst
         

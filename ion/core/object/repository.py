@@ -656,9 +656,12 @@ class Repository(object):
         else:
             for link in obj.ChildLinks:
                 
+                # If a leaf object is referenced by more than one parent it must
+                # be loaded so that both parents can be modified
                 if not link.isleaf:
                     child = self.get_linked_object(link)      
                     self._load_links(child, loadleaf=loadleaf)
+                
         
         
             

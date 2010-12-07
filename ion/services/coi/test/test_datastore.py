@@ -155,21 +155,7 @@ class DataStoreTest(IonTestCase):
         ab1.person.add()
         ab1.person[1] = pb1    
             
-        print 'Addresbook1',ab1, ab1.ChildLinks, ab1.ParentLinks
-        print 'OWNER1',ab1.owner.MyId, ab1.owner.ChildLinks, ab1.owner.ParentLinks
-        print 'Person0-1',ab1.person[0].MyId, ab1.person[0].ChildLinks, ab1.person[0].ParentLinks
-        
-        print 'HEHEHEHEHEHEHEHEEHEHEHEHEH'
-            
         repo1.commit()
-            
-            
-        print 'Addresbook1',ab1, ab1.ChildLinks, ab1.ParentLinks
-        print 'OWNER1',ab1.owner.MyId, ab1.owner.ChildLinks, ab1.owner.ParentLinks
-        print 'Person0-1',ab1.person[0].MyId, ab1.person[0].ChildLinks, ab1.person[0].ParentLinks
-        
-        print 'HEHEHEHEHEHEHEHEEHEHEHEHEH'
-            
             
         response, ex = yield proc_ds1.push('ps2','addressbook')
             
@@ -189,37 +175,41 @@ class DataStoreTest(IonTestCase):
             
         # Now modify and commit on both data stores! - Divergence!
             
-        print 'Addresbook',ab2, ab2.ChildLinks, ab2.ParentLinks
-        print 'OWNER',ab2.owner.MyId, ab2.owner.ChildLinks, ab2.owner.ParentLinks
-        print 'Person0',ab2.person[0].MyId, ab2.person[0].ChildLinks, ab2.person[0].ParentLinks
-        
-        print 'HEHEHEHEHEHEHEHEEHEHEHEHEH'
+        print 'CHILD LINKS', ab2.ChildLinks
+        self.assertIdentical(ab2.owner, ab2.person[0])
             
         pa2 = ab2.owner
+            
+        self.assertEqual(pa2.email,'d@s.com')
+            
         pa2.email = 'process2@gmail.com'
-            
-        print 'Addresbook',ab2, ab2.ChildLinks, ab2.ParentLinks
-        print 'OWNER',ab2.owner.MyId, ab2.owner.ChildLinks, ab2.owner.ParentLinks
-        print 'Person0',ab2.person[0].MyId, ab2.person[0].ChildLinks, ab2.person[0].ParentLinks
-            
-            
         # Show off that it changed in both places - it is a real DAG!
+        print 'CHILD LINKS', ab2.ChildLinks
         self.assertIdentical(ab2.owner, ab2.person[0])
         # Commit on repo2    
         repo2.commit()
+        self.assertEqual(pa2.email,'process2@gmail.com')
+        
             
         # wait one second to make sure that the commits can be sorted by time stamp
         yield pu.asleep(1)
+        
+        self.assertEqual(pa1.email,'d@s.com')
         # Modify repo1
         pa1.email = 'process1@gmail.com'
         repo1.commit()
+        
+        self.assertEqual(pa1.email,'process1@gmail.com')
             
-            
+        print 'REPO1 DOTGIT',repo1._dotgit
+        
         response, ex = yield proc_ds2.push('ps1',repo_key)
             
         self.assertEqual(response, proc_ds2.ION_SUCCESS)
             
         # Assert that the Divergence was recorded!
+        print 'REPO1 DOTGIT',repo1._dotgit
+        print 'REPO2 DOTGIT',repo2._dotgit
         self.assertEqual(len(repo1.branches[0].commitrefs),2)
             
         # Merge on Read
