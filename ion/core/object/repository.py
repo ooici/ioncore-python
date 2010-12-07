@@ -8,7 +8,6 @@
 @author Matt Rodriguez
 
 TODO
-Create exception class and move stuff to a object utils module
 Make sure delete works for these objects the way we expect!
 
 """
@@ -112,6 +111,9 @@ class Repository(object):
 
         if head:
             self._dotgit = self._load_element(head)
+            # Set it to modified and give it a new ID as soon as we get it!
+            self._dotgit.Modified = True
+            self._dotgit.MyId = self.new_id()
         else:
            
             self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
@@ -120,6 +122,14 @@ class Repository(object):
         A specially wrapped Mutable GPBObject which tracks branches and commits
         It is not 'stored' in the index - it lives in the workspace
         """
+    
+    def __repr__(self):
+        output  = '============== Repository (status: %s) ==============\n' % self.status
+        output += str(self._dotgit) + '\n'
+        output += '============== Root Object ==============\n'
+        output += str(self._workspace_root) + '\n'
+        output += '============ End Resource ============\n'
+        return output
     
     @property
     def repository_key(self):
@@ -423,12 +433,9 @@ class Repository(object):
             date = pu.currenttime()
             
         cref.date = date
-        
+            
         branch = self._current_branch
-        
-        # Make sure the _dotgit directory is already set to modified!
-        branch.Modified = True
-
+            
         # If this is the first commit to a new repository the current branch is a dummy
         # If it is initialized it is real and we need to link to it!
         if len(branch.commitrefs)==1:
@@ -644,23 +651,27 @@ class Repository(object):
             raise RepositoryError('Object not in workbench! You must pull the leaf elements!')
             #return self._workbench.fetch_linked_objects(link)
             
-    def _load_links(self, obj, loadleaf=False):
+    def _load_links(self, obj):
         """
         Load the child objects into the work space
-        """        
-        if loadleaf:
-            
-            for link in obj.ChildLinks:
-                child = self.get_linked_object(link)  
-                self._load_links(child, loadleaf=loadleaf)
-        else:
-            for link in obj.ChildLinks:
+        """
+        for link in obj.ChildLinks:
+            child = self.get_linked_object(link)  
+            self._load_links(child)
                 
-                # If a leaf object is referenced by more than one parent it must
-                # be loaded so that both parents can be modified
-                if not link.isleaf:
-                    child = self.get_linked_object(link)      
-                    self._load_links(child, loadleaf=loadleaf)
+        #if loadleaf:
+        #    
+        #    for link in obj.ChildLinks:
+        #        child = self.get_linked_object(link)  
+        #        self._load_links(child, loadleaf=loadleaf)
+        #else:
+        #    for link in obj.ChildLinks:
+        #        
+        #        # If a leaf object is referenced by more than one parent it must
+        #        # be loaded so that both parents can be modified
+        #        if not link.isleaf:
+        #            child = self.get_linked_object(link)      
+        #            self._load_links(child, loadleaf=loadleaf)
                 
         
         
@@ -679,11 +690,16 @@ class Repository(object):
         # Do not automatically load it into a particular space...
         obj = self.create_wrapped_object(cls, obj_id=element.key, addtoworkspace=False)
             
-        obj.ParseFromString(element.value)
-        
-        # If it is not a leaf element - find its child links
-        if not element.isleaf:
+        # If it is a leaf element set the bytes for the object, do not load it
+        # If it is not a leaf element load it and find its child links
+        if element.isleaf:
+            
+            obj._bytes = element.value
+            
+        else:
+            obj.ParseFromString(element.value)
             obj.FindChildLinks()
+
 
         obj.Modified = False
         

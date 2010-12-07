@@ -72,8 +72,6 @@ class NodeLinkTest(unittest.TestCase):
             self.ab.owner = p
             self.assertEqual(self.ab.owner.name ,'David')
             
-            
-            
         def test_composite_link(self):
             
             wL = self.ab.person.add()

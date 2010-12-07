@@ -175,16 +175,12 @@ class DataStoreTest(IonTestCase):
             
         # Now modify and commit on both data stores! - Divergence!
             
-        print 'CHILD LINKS', ab2.ChildLinks
-        self.assertIdentical(ab2.owner, ab2.person[0])
-            
         pa2 = ab2.owner
             
         self.assertEqual(pa2.email,'d@s.com')
             
         pa2.email = 'process2@gmail.com'
         # Show off that it changed in both places - it is a real DAG!
-        print 'CHILD LINKS', ab2.ChildLinks
         self.assertIdentical(ab2.owner, ab2.person[0])
         # Commit on repo2    
         repo2.commit()
@@ -201,15 +197,13 @@ class DataStoreTest(IonTestCase):
         
         self.assertEqual(pa1.email,'process1@gmail.com')
             
-        print 'REPO1 DOTGIT',repo1._dotgit
-        
         response, ex = yield proc_ds2.push('ps1',repo_key)
             
         self.assertEqual(response, proc_ds2.ION_SUCCESS)
             
         # Assert that the Divergence was recorded!
-        print 'REPO1 DOTGIT',repo1._dotgit
-        print 'REPO2 DOTGIT',repo2._dotgit
+        repo1.log_commits('master')
+        
         self.assertEqual(len(repo1.branches[0].commitrefs),2)
             
         # Merge on Read
@@ -298,8 +292,28 @@ class DataStoreTest(IonTestCase):
         
         self.assertEqual(ab_2, ab)
         
-        p_2 = ab_2.person[0]
-                
+        ab_2.person[1].name = 'Not John'
+        
+        repo_ds2.commit('Modify and pull it back!')
+        
+        response, ex = yield proc_ds1.pull('ps2',repo_ds2.repository_key)
+        
+        self.assertEqual(response, proc_ds1.ION_SUCCESS)
+        
+        self.assertNotIn(repo._dotgit.MyId, repo._workspace)
+        
+        ab = repo.checkout('master')
+        
+        print 'DS1:'
+        print str(repo)
+        
+        print 'DS2:'
+        print str(repo_ds2)
+        
+        
+        self.assertEqual(repo_ds2._dotgit, repo._dotgit)
+        self.assertEqual(ab_2, ab)
+        
         
         
 

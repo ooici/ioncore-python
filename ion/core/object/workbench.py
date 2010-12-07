@@ -142,10 +142,8 @@ class WorkBench(object):
         if response != self._process.ION_SUCCESS:
             defer.returnValue((response, exception))
             
-        
         # should have a return value to make sure this worked... ?
         yield self._fetch_repo_objects(repo, headers.get('reply-to'))
-        
         
         defer.returnValue((response, exception))
         
@@ -338,22 +336,17 @@ class WorkBench(object):
         By default send all commits in the history. Too damn complex on the other
         side to deal with merge otherwise.
         """
-
+        log.debug('pack_repository_commits: Packing repository:\n'+str(repo))
         mutable = repo._dotgit
-        # Get the Structure Element for the mutable head
         
-        root_obj = self._hashed_elements.get(mutable.MyId)
-        
-        if not root_obj:
+        # Create the Structure Element for the mutable head
+        structure = {}
+        mutable.RecurseCommit(structure)
+        root_obj = structure.get(mutable.MyId)
+        # Set it back to modified as soon as we are done!
+        mutable.Modified = True
+        mutable.MyId = repo.new_id()
 
-            # Make sure the mutable appears to be modified
-            mutable.set_modified = True
-            #print 'Mutable', mutable
-
-            structure = {}
-            mutable.RecurseCommit(structure)
-            #print 'structure keys',structure.keys()
-            root_obj = structure.get(mutable.MyId)
 
         #print 'ROOT Obj', root_obj
             
@@ -384,7 +377,7 @@ class WorkBench(object):
             obj_list.append(key)
                 
         serialized = self._pack_container(root_obj, obj_list)
-        
+        log.debug('pack_repository_commits: Packing Complete!')
         return serialized
                 
         
@@ -395,6 +388,8 @@ class WorkBench(object):
         links if include_leaf=False.
         Return the content as a container object.
         """
+        log.debug('pack_structure: Packing wrapper:\n'+str(wrapper))
+        
         if not isinstance(wrapper, gpb_wrapper.Wrapper):
             raise WorkBenchError('Pack Structure received a wrapper argument which is not a wrapper?')
         
@@ -462,7 +457,7 @@ class WorkBench(object):
         #print 'OBJLIST',obj_list
         
         serialized = self._pack_container(root_obj, obj_list)
-        
+        log.debug('pack_structure: Packing Complete!')
         return serialized
         
     
@@ -470,7 +465,7 @@ class WorkBench(object):
         """
         Helper for the sender to pack message content into a container in order
         """
-        
+        log.debug('_pack_container: Packing container head and object_keys!')
         # An unwrapped GPB Structure message to put stuff into!
         cs = container_pb2.Structure()
         
@@ -492,7 +487,7 @@ class WorkBench(object):
             se.value = gpb_obj.value # Let python's object manager keep track of the pointer to the big things!
         
         
-        
+        log.debug('_pack_container: Packed container!')
         serialized = cs.SerializeToString()
         
         return serialized
@@ -503,7 +498,7 @@ class WorkBench(object):
         May want to provide more arguments to give this new repository a special
         name based on the 
         """
-        log.debug('WorkBench: Unpacking Structure')
+        log.debug('unpack_structure: Unpacking Structure!')
         head, obj_list = self._unpack_container(serialized_container)
         
         assert len(obj_list) > 0, 'There should be objects in the container!'
@@ -511,7 +506,7 @@ class WorkBench(object):
         
         if not head:
             # Only fetch links should hit this!
-            log.debug('WorkBench: Unpack Structure - returning obj_list:'+str(obj_list))
+            log.debug('unpack_structure: returning obj_list:'+str(obj_list))
             return obj_list
         
         if head.type == self.MutableClassType:
@@ -524,7 +519,7 @@ class WorkBench(object):
                 self._hashed_elements[item.key]=item
             
             repo = self._load_repo_from_mutable(head)
-            log.debug('WorkBench: Unpack Structure - returning repository:'+str(repo))
+            log.debug('unpack_structure: returning repository:'+str(repo))
             return repo
         
         else:
@@ -548,7 +543,7 @@ class WorkBench(object):
             repo._load_links(root_obj)
             
             
-            log.debug('WorkBench: Unpack Structure - returning root_obj:'+str(root_obj))
+            log.debug('unpack_structure: returning root_obj:'+str(root_obj))
             return root_obj
         
         
@@ -560,7 +555,7 @@ class WorkBench(object):
         hashed elements dictionary
         """
             
-        log.debug('WorkBench: Unpacking Container')
+        log.debug('_unpack_container: Unpacking Container')
         # An unwrapped GPB Structure message to put stuff into!
         cs = container_pb2.Structure()
             
@@ -583,8 +578,8 @@ class WorkBench(object):
             #obj_list.append(wse.key)
             obj_list.append(wse)
         
-        log.debug('WorkBench: Container Head:'+str(head))
-        log.debug('WorkBench: Container obj_lis:'+str(obj_list))
+        log.debug('_unpack_container: returning head:\n'+str(head))
+        log.debug('_unpack_container: returning obj_list:\n'+str(obj_list))
         
         return head, obj_list
         
@@ -594,9 +589,8 @@ class WorkBench(object):
         that send and receive an entire repo.
         head is a raw (unwrapped) gpb message
         """
-        
+        log.debug('_load_repo_from_mutable: Loading a repository!')
         new_repo = repository.Repository(head)
-            
                 
         new_repo._workbench = self
             
@@ -612,7 +606,7 @@ class WorkBench(object):
                 self._load_commits(new_repo,link)
             
             
-        # Check and see if we already have one of these repositorys
+        # Check and see if we already have one of these repositories
         existing_repo = self.get_repository(new_repo.repository_key)
         if existing_repo:
             
@@ -626,12 +620,13 @@ class WorkBench(object):
             repo.branchnicknames['master']=repo.branches[0].branchkey
         
         self.put_repository(repo)
-        
+        log.debug('_load_repo_from_mutable: returning repo:\n'+str(repo))
         return repo 
             
     
     def _load_commits(self, repo, link):
                 
+        log.debug('_load_commits: Loading all commits in the repository')
         if repo._commit_index.has_key(link.key):
             return repo._commit_index.get(link.key)
 
@@ -657,12 +652,15 @@ class WorkBench(object):
                 # Call this method recursively for each link
                 self._load_commits(repo, link)
         else:
-            log.info('Commit id not found: %s' % link.key)
+            raise WorkBenchError('Commit id not found: %s' % link.key)
             # This commit ref was not actually sent!
-            return
+        log.debug('_load_commits: Loaded all commits!')
     
     def _merge_repo_heads(self, existing_repo, new_repo):
         
+        log.debug('_merge_repo_heads: merging the state of repository heads!')
+        log.debug('existing repository:\n'+str(existing_repo))
+        log.debug('new_repo:\n'+str(new_repo))
         # examine all the branches in new and merge them into existing
         for new_branch in new_repo.branches:
             
@@ -679,6 +677,7 @@ class WorkBench(object):
                     break
                 
             else:
+                    
                 # the branch in new is not in existing - add its head and move on
                 branch = existing_repo.branches.add()
                 
@@ -688,7 +687,7 @@ class WorkBench(object):
                     bref = branch.commitref.add()
                     bref.SetLink(cref)
                 
-            
+        log.debug('_merge_repo_heads: returning merged repository:\n'+str(existing_repo))
         return existing_repo
     
     
@@ -696,6 +695,7 @@ class WorkBench(object):
         """
         Move everything in new into an updated existing!
         """
+        log.debug('_resolve_branch_state: resolving branch state in repository heads!')
         for new_link in new_branch.commitrefs.GetLinks():
             
             # An indicator for a fast forward merge made on the existing branch
@@ -750,6 +750,7 @@ class WorkBench(object):
         for dup in duplicates:
             del existing_branch.commitrefs[dup]
             
+        log.debug('_resolve_branch_state: resolved branch state in repository heads!')
         # Note this in the branches merge on read field and punt this to some
         # other part of the process.
         return

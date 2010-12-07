@@ -5,10 +5,7 @@
 These classes are the lowest level of the object management stack
 @author David Stuebe
 TODO:
-Add RepeatedScalarField Container!
 Finish test of new Invalid methods using weakrefs - make sure it is deleted!
-Add a wrapper list - stop making new wrappers - keep a dictionary of hashed
-wrappers that the root object has spawned.
 """
 
 from ion.util import procutils as pu
@@ -104,6 +101,12 @@ class Wrapper(object):
         A composit protobuffer object may return 
         """
         
+        self._bytes = None
+        """
+        Used in _load_element to create a proxy object. The bytes are not loaded
+        parsed until the object is needed!
+        """
+        
         self._parent_links=None
         """
         A list of all the other wrapper objects which link to me
@@ -161,6 +164,7 @@ class Wrapper(object):
         self._child_links = None
         self._myid = None
         self._repository = None
+        self._bytes = None
         self._root = None
         object.__setattr__(self,'_gpbFields',[])
         
@@ -201,6 +205,13 @@ class Wrapper(object):
         """
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+            
+        # If this is a proxy object which references its serialized value load it!
+        bytes = self._bytes
+        if  bytes != None:
+            self.ParseFromString(bytes)
+            self._bytes = None
+            
         return self._gpbMessage
         
     @property
@@ -511,6 +522,7 @@ class Wrapper(object):
         gpbfields = object.__getattribute__(self,'_gpbFields')
         
         if key in gpbfields:
+            
             # If it is a Field defined by the gpb...
             gpb = self.GPBMessage
             
@@ -619,7 +631,7 @@ class Wrapper(object):
         if self is other:
             return True
         
-        return self._gpbMessage == other._gpbMessage
+        return self.GPBMessage == other.GPBMessage
     
     def __ne__(self, other):
         # Can't just say self != other_msg, since that would infinitely recurse. :)
@@ -628,8 +640,18 @@ class Wrapper(object):
     def __str__(self):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self._gpbMessage.__str__()
+            
+        return self.GPBMessage.__str__()
         
+    def debug(self):
+        output  = '================== Wrapper (Modified = %s)====================\n' % self.Modified
+        output += 'Wrapper ID: %s \n' % self.MyId
+        output += 'Wrapper ParentLinks: %s \n' % str(self.ParentLinks)
+        output += 'Wrapper ChildLinks: %s \n' % str(self.ChildLinks)
+        output += 'Wrapper current value:\n'
+        output += str(self) + '\n'
+        output += '================== Wrapper Complete ========================='
+        return output
 
     def IsInitialized(self):
         """Checks if the message is initialized.
@@ -641,7 +663,7 @@ class Wrapper(object):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
-        return self.gpbMessage.IsInitialized()
+        return self.GPBMessage.IsInitialized()
         
     def SerializeToString(self):
         """Serializes the protocol message to a binary string.
@@ -655,7 +677,7 @@ class Wrapper(object):
         """
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self._gpbMessage.SerializeToString()
+        return self.GPBMessage.SerializeToString()
     
     def ParseFromString(self, serialized):
         """Clear the message and read from serialized."""
@@ -671,17 +693,17 @@ class Wrapper(object):
         number"""
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self._gpbMessage.ListFields()
+        return self.GPBMessage.ListFields()
 
     def HasField(self, field_name):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self._gpbMessage.HasField(field_name)
+        return self.GPBMessage.HasField(field_name)
     
     def ClearField(self, field_name):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self._gpbMessage.ClearField(field_name)
+        return self.GPBMessage.ClearField(field_name)
         
     #def HasExtension(self, extension_handle):
     #    return self.GPBMessage.HasExtension(extension_handle)
