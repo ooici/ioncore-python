@@ -8,7 +8,8 @@
 @author Matt Rodriguez
 @brief Implementation of ion.data.store.IStore using Telephus to interface a
         Cassandra datastore backend
-@note Test cases for the cassandra backend are now in ion.data.test.test_store
+@note Test cases for the cassandra backend are now 
+in ion.services.dm.preservation.test.test_store
 """
 
 import re
@@ -38,7 +39,7 @@ CF_default_key = CONF['default_key']
 class CassandraStore(IStore):
     """
     Store interface for interacting with the Cassandra key/value store
-    @see http://github.com/vomjom/pycassa
+    @see https://github.com/driftx/Telephus
     @note Default behavior is to use a random super column name space!
     """
     def __init__(self, **kwargs):
