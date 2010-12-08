@@ -102,7 +102,25 @@ class WorkBench(object):
     def put_repository(self,repo):
         
         self._repos[repo.repository_key] = repo
+       
+    def reference_repository(self, repo_key, current_state=False):
+    
+        repo = self.get_repository(repo_key)
         
+        if current_state == True:
+            if repo.status != repo.UPTODATE:
+                raise WorkBenchError('Can not reference the current state of a repository which has been modified but not committed')
+
+        # Create a new repository to hold this data object
+        repository, id_ref = self.init_repository(rootclass=link_pb2.IDRef)
+        
+        id_ref.key = repo.repository_key
+        id_ref.branch = repo._current_branch.branchkey
+        
+        if current_state:
+            id_ref.commit = repo._current_branch.commitrefs[0].MyId
+
+        return id_ref
         
     def fork(self, structure, name):
         """
@@ -671,7 +689,7 @@ class WorkBench(object):
                 branch.branchkey = new_branchkey
                 # Get the cref and then link it in the existing repository
                 for cref in new_branch.commitrefs:
-                    bref = branch.commitref.add()
+                    bref = branch.commitrefs.add()
                     bref.SetLink(cref)
                 
         log.debug('_merge_repo_heads: returning merged repository:\n'+str(existing_repo))

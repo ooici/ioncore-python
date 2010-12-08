@@ -104,7 +104,7 @@ class Repository(object):
         A place to stash the work space under a saved name.
         """
         
-        self._workbench=None
+        #self._workbench=None
         """
         The work bench which this repository belongs to...
         """
@@ -409,6 +409,7 @@ class Repository(object):
 
             # update the hashed elements
             self._hashed_elements.update(structure)
+            log.info('Commited repository - Comment: cref.comment')
                             
         else:
             raise RepositoryError('Repository in invalid state to commit')

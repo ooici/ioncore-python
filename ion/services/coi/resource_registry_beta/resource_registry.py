@@ -60,10 +60,9 @@ class ResourceRegistryService(ServiceProcess):
     def op_register_resource_instance(self, content, headers, msg):
         """
         Service operation: Register a resource instance with the registry.
-        The interceptor will unpack a type object. The registry will create a
-        new resource of this type and return the identifier for it to the process
-        that requested it.
-        
+        The interceptor will unpack a resource description object. The registry
+        will create a new resource of the described type and return the
+        identifier for it to the process that requested it.
         """
         
         # Check that we got the correct kind of content!
@@ -93,10 +92,7 @@ class ResourceRegistryService(ServiceProcess):
         res_obj = resource_repository.create_wrapped_object(cls)
         # Set the object as the child of the resource
         resource.SetLinkByName('resource_object', res_obj)
-        
-        print 'RES_OBJ!', res_obj.MyId, res_obj.ParentLinks
-        res_obj.title = 'my string'
-        
+            
         # Name and Description is set by the resource client
         resource.name = resource_description.name
         resource.description = resource_description.description
@@ -107,7 +103,6 @@ class ResourceRegistryService(ServiceProcess):
         resource.lcs = resource_pb2.New
         
         resource_repository.commit('Created a new resource!')
-        print 'RES_OBJ!', res_obj.MyId, res_obj.ParentLinks
 
         # push the new resource to the data store        
         response, exception = yield self.push(self.datastore_service, resource.identity)

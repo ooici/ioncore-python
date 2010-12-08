@@ -6,10 +6,6 @@
 @brief base classes for resrouce client
 
 @ TODO
-Implement common interface to the Resource and the resource object
-Complete the object reference creator
-Move the TypeID generator to a seperate location from which objects can be imported
-
 """
 
 from twisted.internet import defer, reactor
@@ -38,6 +34,7 @@ from net.ooici.core.link import link_pb2
 from google.protobuf import message
 from google.protobuf.internal import containers
 from ion.core.object import gpb_wrapper
+from ion.core.object import object_utils
 
 
 CONF = ioninit.config(__name__)
@@ -55,14 +52,14 @@ class ResourceClient(object):
     helps create and manage resources.
     """
     
+    IDRefType = object_utils.set_type_from_obj(link_pb2.IDRef)
+    
     def __init__(self, proc=None, datastore_service='datastore'):
         """
         Initializes a process client
         @param proc a IProcess instance as originator of messages
         @param datastore the name of the datastore service with which you wish to
-        interact
-        @param registy the name of the registry services with which you wish to
-        interact
+        interact with the OOICI.
         """
         if not proc:
             proc = process.Process()
@@ -86,7 +83,7 @@ class ResourceClient(object):
     def _check_init(self):
         """
         Called in client methods to ensure that there exists a spawned process
-        to send messages from
+        to send and receive messages
         """
         if not self.proc.is_spawned():
             yield self.proc.spawn()
@@ -98,8 +95,11 @@ class ResourceClient(object):
     @defer.inlineCallbacks
     def create_instance(self, type_id, name, description=''):
         """
-        A Factory Method for Resrouce Instance Objects
-        Ask the resource registry to create the instance!
+        @brief Ask the resource registry to create the instance!
+        @param type_id is a type identifier object
+        @param name is a string, a name for the new resource
+        @param description is a string describing the resource
+        @retval resource is a ResourceInstance object
         """
         yield self._check_init()
         
@@ -124,7 +124,7 @@ class ResourceClient(object):
         
         self.workbench.set_repository_nickname(res_id, name)
             
-        resource = ResourceInstance(repository=repo, version='master')
+        resource = ResourceInstance(repo.checkout('master'))
         
         defer.returnValue(resource)
         
@@ -132,9 +132,11 @@ class ResourceClient(object):
     @defer.inlineCallbacks
     def get_instance(self, resource_id):
         """
-        A factory method for resource instances which are already in the data store
-        This method is used to get the latest state of a resource, by reference
-        (an identity, version and commit) or a string containing just the identity
+        @brief Get the latest version of the identified resource from the data store
+        @param resource_id can be either a string resource identity or an IDRef
+        object which specifies the resource identity as well as optional parameters
+        version and version state.
+        @retval the specified ResourceInstance 
         """
         yield self._check_init()
         
@@ -170,7 +172,7 @@ class ResourceClient(object):
         repo = self.workbench.get_repository(reference)
         
         # Create a resource instance to return
-        resource = ResourceInstance(repository=repo, version=branch)
+        resource = ResourceInstance(repo.checkout(branch))
             
         self.workbench.set_repository_nickname(reference, resource.ResourceName)
         # Is this a good use of the resource name? Is it safe?
@@ -180,7 +182,9 @@ class ResourceClient(object):
     @defer.inlineCallbacks
     def put_instance(self, instance, comment=None):
         """
-        Write the current state of the resource to the data store- returns OK
+        @breif Write the current state of the resource to the data store
+        @param instance is a ResourceInstance object to be written
+        @param comment is a comment to add about the current state of the resource
         """
         if not comment:
             comment = 'Resource client default commit message'
@@ -206,17 +210,32 @@ class ResourceClient(object):
         yield self._check_init()
             
         raise NotImplementedError, "Interface Method Not Implemented"
+        
+    def reference_instance(self, instance, current_state=False):
+        """
+        @brief Reference Resource creates a data object which can be used as a
+        message or part of a message or added to another data object or resource.
+        @param instance is a ResourceInstance object
+        @param current_state is a boolen argument which determines whether you
+        intend to reference exactly the current state of the resource.
+        @retval an Identity Reference object to the resource
+        """
+        
+        return self.workbench.reference_repository(instance.ResourceIdentity, current_state)
+
+    
     
     
 class ResourceInstanceError(Exception):
     """
+    Exceptoin class for Resource Instance Object
     """
     
 class ResourceInstance(object):
     """
-    The instance is the vehicle through which the developer interacts with a
-    particular resource. It hides the git semantics of the data store and deals
-    with resource specific properties.
+    @brief The resoure instance is the vehicle through which the developer
+    interacts with a particular resource. It hides the git semantics of the data
+    store and deals with resource specific properties.
     """
     
     NEW='New'
@@ -227,18 +246,17 @@ class ResourceInstance(object):
     RETIRED='Retired'
     DEVELOPED='Developed'
     
-    def __init__(self, repository, version='master'):
+    def __init__(self, resource):
         """
-        Resource Instance objects are created by the resource client factory methods
+        Resource Instance objects are created by the resource client
         """
         object.__setattr__(self,'_object',None)
         
-        self._repository = repository
+        self._repository = resource.Repository
         
-        self._resource = self._repository.checkout(version)
+        self._resource = resource
         
         self._object = self._resource.resource_object
-        
         
     def __str__(self):
         output  = '============== Resource ==============\n'
@@ -248,45 +266,34 @@ class ResourceInstance(object):
         output += '============ End Resource ============\n'
         return output
         
-    def VersionResource(self,localname=None):
+    def VersionResource(self):
         """
-        Create a new version of this resource - creates a new branch in the objects repository
-        This is purely local until the next push!
+        @brief Create a new version of this resource - creates a new branch in
+        the objects repository. This is purely local until the next push!
+        @retval the key for the new version
         """
         
-        branch_key = self._repository.branch(localname)            
+        branch_key = self._repository.branch()            
         return branch_key
     
     def CreateObject(self, type_id):
+        """
+        @brief CreateObject is used to make new locally create objects which can
+        be added to the resource's data structure.
+        @param type_id is the type_id of the object to be created
+        @retval the new object which can now be attached to the resource
+        """
         
         cls = self._repository._load_class_from_type(type_id)
         obj = self._repository.create_wrapped_object(cls)
         return obj
-    
-    def ReferenceResource(self, current_state=False):
-        """
-        This method is a problem:
-        It returns an object from this resource repository- does that make sense?
-        It uses branchkey, but that may not be in a valid state!
-        """
-        if current_state == True:
-            if self._repository.status != self._repository.UPTODATE:
-                raise ResourceInstanceError('Can not reference a resource which has been modified but not written')
-                
-        
-        id_ref = self._repository.create_wrapped_object(link_pb2.IDRef)
-        id_ref.key = self.ResourceIdentity
-        id_ref.branch = self._repository._current_branch.branchkey
-        
-        return id_ref
         
         
     def __getattribute__(self, key):
         """
-        We want to expose the resource and its object through a uniform interface.
-        To do that we have to break all kinds of abstractions and operate deep
-        inside the gpb wrapper. I am not at all happy with this but lets see if
-        we like the interface. If so we can find a better way to do it later.
+        @brief We want to expose the resource and its object through a uniform
+        interface. To do so we override getattr to expose the data fields of the
+        resource object
         """
         # Because we have over-riden the default getattribute we must be extremely
         # careful about how we use it!
@@ -294,8 +301,8 @@ class ResourceInstance(object):
         
         gpbfields = []
         if res_obj:
-            gpbfields = object.__getattribute__(res_obj,'_gpbFields')
-        
+            #gpbfields = object.__getattribute__(res_obj,'_gpbFields')
+            gpbfields = res_obj._gpbFields
         if key in gpbfields:
             # If it is a Field defined by the gpb...
             #value = getattr(res_obj, key)
@@ -308,12 +315,17 @@ class ResourceInstance(object):
         
         
     def __setattr__(self,key,value):
-        
+        """
+        @brief We want to expose the resource and its object through a uniform
+        interface. To do so we override getattr to expose the data fields of the
+        resource object
+        """
         res_obj = object.__getattribute__(self, '_object')
         
         gpbfields = []
         if res_obj:
-            gpbfields = object.__getattribute__(res_obj,'_gpbFields')
+            #gpbfields = object.__getattribute__(res_obj,'_gpbFields')
+            gpbfields = res_obj._gpbFields
         
         if key in gpbfields:
             # If it is a Field defined by the gpb...
@@ -327,20 +339,21 @@ class ResourceInstance(object):
     @property
     def ResourceIdentity(self):
         """
-        Return the resource identity
+        @brief Return the resource identity as a string
         """
         return self._resource.identity
     
     @property
     def ResourceType(self):
         """
-        Return the resource identity
+        @brief Returns the resource type, at present this is an object, but will
+        be changed to a resource identifier in the near future.
         """
         return self._resource.type
     
     def _set_life_cycle_state(self, state):
         """
-        Set the Life Cycel State of the resource
+        @brief Set the Life Cycel State of the resource
         @param state is a resource life cycle state class variable defined in
         the ResourceInstance class.
         """
@@ -366,7 +379,7 @@ class ResourceInstance(object):
         
     def _get_life_cycle_state(self):
         """
-        Get the life cycle state of the resource
+        @brief Get the life cycle state of the resource
         """
         state = None
         if self._resource.lcs == resource_pb2.New:
@@ -393,7 +406,10 @@ class ResourceInstance(object):
         return state
         
     ResourceLifeCycleState = property(_get_life_cycle_state, _set_life_cycle_state)
-    
+    """
+    @var ResourceLifeCycleState is a getter setter property for the life cycle state of the resource
+    """
+        
     def _set_resource_name(self, name):
         """
         Set the name of the resource object
@@ -406,6 +422,9 @@ class ResourceInstance(object):
         return self._resource.name
     
     ResourceName = property(_get_resource_name, _set_resource_name)
+    """
+    @var ResourceName is a getter setter property for the name of the resource
+    """
     
     def _set_resource_description(self, description):
         """
@@ -419,4 +438,6 @@ class ResourceInstance(object):
         
     
     ResourceDescription = property(_get_resource_description, _set_resource_description)
-    
+    """
+    @var ResourceDescription is a getter setter property for the description of the resource
+    """
