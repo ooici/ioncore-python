@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-@Brief Test implementation of the workbench class
+@brief Test implementation of the workbench class
 
 @file ion/core/object
 @author David Stuebe

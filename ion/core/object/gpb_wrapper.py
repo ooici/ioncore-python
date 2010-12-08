@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 @file ion/core/object/gpb_wrapper.py
-@Brief Wrapper for Google Protocol Buffer Message Classes.
+@brief Wrapper for Google Protocol Buffer Message Classes.
 These classes are the lowest level of the object management stack
 @author David Stuebe
 TODO:
@@ -1085,7 +1085,7 @@ class ScalarContainerWrapper(object):
     
 class StructureElement(object):
     """
-    @Brief Wrapper for the container structure element. These are the objects
+    @brief Wrapper for the container structure element. These are the objects
     stored in the hashed elements table. Mostly convience methods are provided
     here. A set provides references to the child objects so that the content
     need not be decoded to find them.

@@ -3,7 +3,7 @@
 
 """
 @file ion/core/object/repository.py
-@Brief Repository for managing data structures
+@brief Repository for managing data structures
 @author David Stuebe
 @author Matt Rodriguez
 

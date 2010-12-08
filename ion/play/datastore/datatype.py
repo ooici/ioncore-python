@@ -25,7 +25,7 @@ class BasicType(object):
 
     def __init__(self, value=None):
         """
-        @pram value initializer
+        @param value initializer
         """
         self._value = value
 

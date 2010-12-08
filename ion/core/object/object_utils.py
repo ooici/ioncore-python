@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 @file ion/core/object/object_utils.py
-@Brief Tools and utilities for object management 
+@brief Tools and utilities for object management 
 @author David Stuebe
 """
 

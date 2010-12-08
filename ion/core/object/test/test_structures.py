@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-@Brief Test possible data structures
+@brief Test possible data structures
 
 @file ion/core/object/test/test_structures.py
 @author David Stuebe

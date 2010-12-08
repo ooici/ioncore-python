@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-@Brief Test implementation of the repository class
+@brief Test implementation of the repository class
 
 @file ion/play
 @author David Stuebe

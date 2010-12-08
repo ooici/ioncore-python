@@ -2,7 +2,7 @@
 """
 @file ion/core/object/workbench.py
 @author David Stuebe
-@Brief Workbench for operating on GPB backed object structures
+@brief Workbench for operating on GPB backed object structures
 
 TODO
 Add persistent store to the work bench. Use it fetch linked objects

@@ -55,8 +55,8 @@ from ion.data.datastore import objstore
 #    def __init__(self, subject, predicate, object):
 #        """
 #        @PARAM subject, predicate, object are all inherit from class BASEOBJECT
-#        @NOTE The arguments to Tree are entities, associations are different!
-#        @NOTE - Damn - can't have only BASEOBJECTS withour rewiring all of CAS stuff
+#        @note The arguments to Tree are entities, associations are different!
+#        @note - Damn - can't have only BASEOBJECTS withour rewiring all of CAS stuff
 #        """
 #        triple = (subject, predicate, object)
 #        entities = []
