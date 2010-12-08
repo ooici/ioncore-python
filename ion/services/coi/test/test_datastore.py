@@ -84,19 +84,13 @@ class DataStoreTest(IonTestCase):
     
         repo.commit()
 
-        print 'BEFORE PUSH!'
-
-        print 'PROC_DS1 HASHED OBJECTS', proc_ds1.workbench._hashed_elements.keys()
-        print 'PROC_DS2 HASHED OBJECTS', proc_ds2.workbench._hashed_elements.keys()
-
+        log.info('DataStore1 Push addressbook to DataStore1')
 
         response, ex = yield proc_ds1.push('ps2','addressbook')
 
         self.assertEqual(response, proc_ds1.ION_SUCCESS)
 
-        print 'AFTER PUSH!'
-        print 'PROC_DS1 HASHED OBJECTS', proc_ds1.workbench._hashed_elements.keys()
-        print 'PROC_DS2 HASHED OBJECTS', proc_ds2.workbench._hashed_elements.keys()
+        log.info('DataStore1 Push addressbook to DataStore1: complete')
 
 
         name = repo.repository_key
@@ -268,19 +262,14 @@ class DataStoreTest(IonTestCase):
     
         repo.commit()
 
-        print 'BEFORE PULL!'
-
-        print 'PROC_DS1 HASHED OBJECTS', proc_ds1.workbench._hashed_elements.keys()
-        print 'PROC_DS2 HASHED OBJECTS', proc_ds2.workbench._hashed_elements.keys()
+        log.info('DataStore2 Pulls addressbook from DataStore1')
 
 
         response, ex = yield proc_ds2.pull('ps1','addressbook')
 
         self.assertEqual(response, proc_ds1.ION_SUCCESS)
 
-        print 'AFTER PULL!'
-        print 'PROC_DS1 HASHED OBJECTS', proc_ds1.workbench._hashed_elements.keys()
-        print 'PROC_DS2 HASHED OBJECTS', proc_ds2.workbench._hashed_elements.keys()
+        log.info('DataStore2 Pulls addressbook from DataStore1: Complete!')
 
         
         repo_ds2 = proc_ds2.workbench.get_repository(repo.repository_key)
@@ -303,13 +292,6 @@ class DataStoreTest(IonTestCase):
         self.assertNotIn(repo._dotgit.MyId, repo._workspace)
         
         ab = repo.checkout('master')
-        
-        print 'DS1:'
-        print str(repo)
-        
-        print 'DS2:'
-        print str(repo_ds2)
-        
         
         self.assertEqual(repo_ds2._dotgit, repo._dotgit)
         self.assertEqual(ab_2, ab)
