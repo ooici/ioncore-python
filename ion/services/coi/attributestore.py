@@ -39,6 +39,7 @@ class AttributeStoreService(store_service.StoreService):
 
 
 
+
 class AttributeStoreClient(store_service.StoreServiceClient):
     """
     Class for the client accessing the attribute store via Exchange

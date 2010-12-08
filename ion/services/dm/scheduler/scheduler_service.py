@@ -176,6 +176,7 @@ class SchedulerServiceClient(ServiceClient):
         @param taskid Task ID, as returned from add_task
         @retval OK or error
         """
+        #log.info("In SchedulerServiceClient: rm_task")
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('rm_task', taskid)
         defer.returnValue(content)
