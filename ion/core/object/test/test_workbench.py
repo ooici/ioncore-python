@@ -64,8 +64,18 @@ class WorkBenchTest(unittest.TestCase):
     def test_simple_commit(self):
         
         cref = self.repo.commit(comment='testing commit')
-        print 'Commited',cref
+        self.assertEqual(cref, self.repo._current_branch.commitrefs[0].MyId)
         
+        self.assertIn(self.ab.MyId, self.wb._hashed_elements.keys())
+        self.assertIn(self.ab.person[0].MyId, self.wb._hashed_elements.keys())
+        self.assertIn(self.ab.person[1].MyId, self.wb._hashed_elements.keys())
+        self.assertIn(self.ab.owner.MyId, self.wb._hashed_elements.keys())
+        
+        self.assertIn(cref, self.wb._hashed_elements.keys())
+        
+        cref_se = self.wb._hashed_elements.get(cref)
+        self.assertEqual(len(cref_se.ChildLinks),1)
+        self.assertIn(self.ab.MyId, cref_se.ChildLinks)
         
     
     def test_pack_mutable(self):
@@ -198,7 +208,6 @@ class WorkBenchMergeTest(unittest.TestCase):
         wb2 = workbench.WorkBench('No Process Test')
         repo2 = wb2.unpack_structure(serialized)
         
-        print 'DOTGIT MYID', repo2._dotgit.MyId
         self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
         
         #repo2.log_commits('master')
@@ -208,13 +217,11 @@ class WorkBenchMergeTest(unittest.TestCase):
         # Show that the state of the heads is the same
         self.assertEqual(repo2._dotgit, repo1._dotgit)
         
-        print 'DOTGIT MYID', repo2._dotgit.MyId
         self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
         
         # add a commit on repo2!
         commit_ref_d2 = repo2.commit(comment='d2')
         
-        print 'DOTGIT MYID', repo2._dotgit.MyId
         self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
         
         # Add more commits in repo 1
@@ -225,7 +232,6 @@ class WorkBenchMergeTest(unittest.TestCase):
         # Serialize it
         serialized = wb1.pack_structure(repo1._dotgit)
         
-        print 'DOTGIT MYID', repo2._dotgit.MyId
         self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
         
         # Read it in the other work bench!
@@ -238,7 +244,6 @@ class WorkBenchMergeTest(unittest.TestCase):
         self.assertEqual(repo2.branches[0].commitrefs[1], repo1.branches[0].commitrefs[0])
         
         # Merge the coflict
-        print 'DOTGIT MYID', repo2._dotgit.MyId
         self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
         
         ab2 = repo2.checkout('master')

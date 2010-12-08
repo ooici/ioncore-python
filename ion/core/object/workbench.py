@@ -46,19 +46,6 @@ class WorkBench(object):
         A dictionary - shared between repositories for hashed objects
         """  
         self._hashed_elements={}
-        
-        """
-        Blobs of data are persisted here when the workspace is initialized with
-        a persistent back end
-        """
-        self._blob_store = None
-        
-        
-        """
-        The mutable head and the commits are presisted here when the workspace is
-        initialized with a persistent back end
-        """
-        self._head_store = None
       
         
     def init_repository(self, rootclass=None, nickname=None):

@@ -144,6 +144,13 @@ class RecurseCommitTest(unittest.TestCase):
             
         ab.RecurseCommit(strct)
         
-        for k,v in strct.items():
-            print k,v._element
+        self.assertIn(ab.MyId, strct.keys())
+        self.assertIn(p.MyId, strct.keys())
+        
+        # Get the committed structure element
+        ab_se = strct.get(ab.MyId)
+        
+        self.assertEqual(len(ab_se.ChildLinks),1)
+        self.assertIn(p.MyId, ab_se.ChildLinks)
+        
             
