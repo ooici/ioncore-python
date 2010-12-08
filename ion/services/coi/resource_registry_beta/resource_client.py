@@ -3,7 +3,9 @@
 """
 @file ion/services/coi/resource_registry_beta/resource_client.py
 @author David Stuebe
-@brief base classes for resrouce client
+@brief Resource Client and and Resource Instance classes are used to manage
+resource objects in services and processes. They provide a simple interface to
+create, get, put and update resources.
 
 @ TODO
 """
@@ -47,9 +49,9 @@ class ResourceClientError(Exception):
 
 class ResourceClient(object):
     """
-    This is the base class for a resource client. It is a factory for resource
-    instances. The api for working with a resource is in the instance. The client
-    helps create and manage resources.
+    @brief This is the base class for a resource client. It is a factory for resource
+    instances. The resource instance provides the interface for working with resources.
+    The client helps create and manage resource instances.
     """
     
     IDRefType = object_utils.set_type_from_obj(link_pb2.IDRef)
@@ -233,8 +235,8 @@ class ResourceInstanceError(Exception):
     
 class ResourceInstance(object):
     """
-    @brief The resoure instance is the vehicle through which the developer
-    interacts with a particular resource. It hides the git semantics of the data
+    @brief The resoure instance is the vehicle through which a process
+    interacts with a resource instance. It hides the git semantics of the data
     store and deals with resource specific properties.
     """
     
