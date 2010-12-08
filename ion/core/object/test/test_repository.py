@@ -200,4 +200,42 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(object.__getattribute__(ab,'Invalid'), True)
 
 
+    def test_transfer_repository_objects(self):
+        
+        repo1, ab1 = self.wb.init_repository(addressbook_pb2.AddressLink)
+            
+        # Create a resource object    
+        p1 = repo1.create_wrapped_object(addressbook_pb2.Person)
+        p1.name='David'
+        p1.id = 5
+        p1.email = 'd@s.com'
+        ph1 = p1.phone.add()
+        ph1.type = p1.WORK
+        ph1.number = '123 456 7890'
+ 
+        ab1.owner = p1
+        
+        cref = repo1.commit(comment='testing commit')
+ 
+        # Create a second repository and copy from 1 to 2
+        repo2, ab2 = self.wb.init_repository(addressbook_pb2.AddressLink)
+            
+        ab2.person.add()
+        ab2.person[0] = p1
+            
+        self.assertEqual(ab2.person[0].name, 'David')
+            
+        self.assertEqual(ab2.person[0].MyId, ab1.owner.MyId)
+        self.assertEqual(ab2.person[0], ab1.owner)
+        self.assertNotIdentical(ab2.person[0], ab1.owner)
+        self.assertNotIdentical(ab2.person[0].Repository, ab1.owner.Repository)
+        
+        self.assertIdentical(ab2.person[0].Repository, ab2.Repository)
+        
+        
+ 
+ 
+ 
+ 
+ 
  

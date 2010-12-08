@@ -567,11 +567,25 @@ class Wrapper(object):
 
             # If the value we are setting is a Wrapper Object
             if isinstance(value, Wrapper):
-            
+                    
+                if value.Invalid:
+                    raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+                    
                 if not value.Repository is self.Repository:
-                    raise OOIObjectError('These two objects are not in the same repository. \n \
-                                         Copying complex objects from one repository to another is not yet supported!')
-            
+                    if value.Repository.status != self.Repository.UPTODATE:
+                        raise OOIObjectError('Can not move objects from a foreign repository which is in a modified state')
+                    
+                    if len(value.ParentLinks) < 1:
+                        raise OOIObjectError('''Can not move an object from a foreign repository which has no parent links.
+                                             It must have been set as part of the data structure first.''')
+                    
+                    # Get the object from it serialized version in the hash.
+                    obj = self.Repository.get_linked_object(value.ParentLinks[0])
+                    # load all its linked children
+                    self.Repository._load_links(obj)
+                    
+                    value = obj
+                    
                 #Examine the field we are trying to set 
                 field = getattr(gpb,key)
                 if not isinstance(field, message.Message):
