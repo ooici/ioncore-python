@@ -4,15 +4,19 @@
 @brief Python Capability Container shell
 """
 
-import os, sys, tty, termios
-import rlcompleter
+import os
 import re
 import math
+import sys 
+import tty
+import termios
+import rlcompleter
 
 from twisted.application import service
 from twisted.internet import stdio
 from twisted.conch.insults import insults
 from twisted.conch import manhole
+from twisted.python import text
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -35,7 +39,22 @@ def get_virtualenv():
 CTRL_R = "\x12"
 ESC = "\x1b"
 
-class ConsoleManhole(manhole.ColoredManhole):
+
+class PreparseredInterpreter(manhole.ManholeInterpreter):
+    """
+    """
+
+    def push(self, line):
+        """
+        pre parse input lines
+        """
+        if line and line[-1] == '?':
+            line = 'obj_info(%s)' % line[:-1]
+        return manhole.ManholeInterpreter.push(self, line)
+
+
+#class ConsoleManhole(manhole.ColoredManhole):
+class ConsoleManhole(manhole.Manhole):
     ps = ('><> ', '... ')
 
     def initializeScreen(self):
@@ -71,18 +90,71 @@ class ConsoleManhole(manhole.ColoredManhole):
         self.historysearchbuffer = []
         self.historyFail = False
 
-    def Xhandle_TAB(self):
+    def handle_TAB(self):
         completer = rlcompleter.Completer(self.namespace)
-        input_string = ''.join(self.lineBuffer)
-        reName = "([a-zA-Z_][a-zA-Z_0-9]*)$"
-        reAttribute = "([a-zA-Z_][a-zA-Z_0-9]*[.]+[a-zA-Z_.0-9]*)$"
-        nameMatch = re.match(reName, input_string)
-        attMatch = re.match(reAttribute, input_string)
-        if nameMatch:
-            matches = completer.global_matches(input_string)
-        if attMatch:
-            matches = completer.attr_matches(input_string)
-        # print matches
+        head_line, tail_line = self.currentLineBuffer()
+        search_line = head_line
+        cur_buffer = self.lineBuffer
+        cur_index = self.lineBufferIndex
+
+        completer = rlcompleter.Completer(self.namespace)
+
+        def find_term(line):
+            chrs = []
+            attr = False
+            for c in reversed(line):
+                if c == '.':
+                    attr = True
+                if not c.isalnum() and c not in ('_', '.'):
+                    break
+                chrs.insert(0, c)
+            return ''.join(chrs), attr
+
+        search_term, attrQ = find_term(search_line)
+
+        if not search_term:
+            return manhole.Manhole.handle_TAB(self)        
+
+        if attrQ:
+            matches = completer.attr_matches(search_term)
+            matches = list(set(matches))
+            matches.sort()
+        else:
+            matches = completer.global_matches(search_term)
+
+        def same(*args):
+            if len(set(args)) == 1:
+                return args[0]
+            return False
+
+        def progress(rem):
+            letters = []
+            while True:
+                letter = same(*[elm.pop(0) for elm in rem if elm])
+                if letter:
+                    letters.append(letter)
+                else:
+                    return letters
+
+        if matches is not None:
+            rem = [list(s.partition(search_term)[2]) for s in matches]
+            more_letters = progress(rem)
+            n = len(more_letters)
+            lineBuffer = list(head_line) + more_letters + list(tail_line)
+            if len(matches) > 1:
+                match_str = "%s \t\t" * len(matches) % tuple(matches)
+                match_rows = text.greedyWrap(match_str)
+                line = self.lineBuffer
+                self.terminal.nextLine()
+                self.terminal.saveCursor()
+                for row in match_rows:
+                    self.addOutput(row, True)
+                if tail_line:
+                    self.terminal.cursorBackward(len(tail_line))
+                    self.lineBufferIndex -= len(tail_line)
+            self._deliverBuffer(more_letters)
+
+
 
     # def handle_INT(self):
 
@@ -226,6 +298,12 @@ class ConsoleManhole(manhole.ColoredManhole):
         manhole.ColoredManhole.connectionMade(self)
         self.keyHandlers[CTRL_R] = self.handle_CTRLR
         self.keyHandlers[ESC] = self.handle_ESC
+        self.interpreter = PreparseredInterpreter(self, self.namespace)
+
+        self.keyHandlers.update({
+            CTRL_A: self.handle_HOME,
+            CTRL_E: self.handle_END,
+            })
 
         # read in history from history file on disk, set internal history/position
         if not self.namespace['cc'].config['no_history']:
@@ -379,6 +457,39 @@ def makeNamespace():
     #from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify, makeprocess, ping
     from ion.core.cc.shell_api import *
     from ion.core.id import Id
+
+    def obj_info(item, format='print'):
+        """Print useful information about item."""
+        if item == '?':
+            print 'Type <object>? for info on that object.'
+            return
+        _name = 'N/A'
+        _class = 'N/A'
+        _doc = 'No Documentation.'
+        if hasattr(item, '__name__'):
+            _name = item.__name__
+        if hasattr(item, '__class__'):
+            _class = item.__class__.__name__
+        _id = id(item)
+        _type = type(item)
+        _repr = repr(item)
+        if callable(item):
+            _callable = "Yes"
+        else:
+            _callable = "No"
+        if hasattr(item, '__doc__'):
+            maybe_doc = getattr(item, '__doc__')
+            if maybe_doc:
+                _doc = maybe_doc
+            _doc = _doc.strip()   # Remove leading/trailing whitespace.
+        info = {'name':_name, 'class':_class, 'type':_type, 'repr':_repr, 'doc':_doc}
+        if format is 'print':
+            for k,v in info.iteritems():
+                print k.capitalize(),': ', v
+            print '\n\n'
+            return
+        elif format is 'dict':
+            return info
 
     namespace = locals()
     return namespace
