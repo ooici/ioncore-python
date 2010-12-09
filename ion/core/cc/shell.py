@@ -89,10 +89,10 @@ class ConsoleManhole(manhole.ColoredManhole):
 
     def connectionLost(self, reason):
 
-        # save the last 25 lines of history to the history buffer
+        # save the last 2500 lines of history to the history buffer
         if not self.namespace['cc'].config['no_history']:
             try:
-                outhistory = "\n".join(self.historyLines[-25:])
+                outhistory = "\n".join(self.historyLines[-2500:])
 
                 f = open(os.path.join(os.environ["HOME"], '.cchistory'), 'w')
                 f.writelines(outhistory)
