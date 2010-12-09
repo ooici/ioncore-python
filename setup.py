@@ -40,16 +40,10 @@ try:
     setupdict['install_requires'] = ['Twisted', 'carrot', 'txamqp', 'numpy',
                                      'Paste', 'Pydap', 'simplejson', 'httplib2',
                                      'pydap.handlers.netcdf','pydap.handlers.nca',
-<<<<<<< HEAD
-                                     'pydap.responses.netcdf',
-                                     'msgpack-python','gviz_api.py',
-                                     'nimboss','txrabbitmq', 'Telephus', 'pyrods-irods', 'ionproto']
-=======
                                      'pydap.responses.netcdf', 'msgpack-python',
                                      'gviz_api.py','nimboss','txrabbitmq', 'Telephus', 
-                                     'pyrods-irods>=2.4.2', 'M2Crypto-patched']
+                                     'pyrods-irods>=2.4.2', 'M2Crypto-patched', 'ionproto']
     
->>>>>>> develop
     setupdict['include_package_data'] = True
     setup(**setupdict)
 
