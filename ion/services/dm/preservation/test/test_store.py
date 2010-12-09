@@ -100,7 +100,6 @@ class CassandraStoreTestSuperCols(IStoreTest):
 
     def _setup_backend(self):
         clist = ['amoeba.ucsd.edu:9160']
-        clist = ['ec2-204-236-159-249.us-west-1.compute.amazonaws.com:9160']
         d = cassandra.CassandraStore.create_store(cass_host_list=clist)
         return d
     
@@ -114,7 +113,6 @@ class CassandraStoreTestNoSuperCols(IStoreTest):
 
     def _setup_backend(self):
         clist = ['amoeba.ucsd.edu:9160']
-        clist = ['ec2-204-236-159-249.us-west-1.compute.amazonaws.com:9160']
         ds = cassandra.CassandraStore.create_store(
             cass_host_list=clist,
             cf_super=False,
@@ -155,8 +153,7 @@ class CassandraStoreTestNoSuperCols(IStoreTest):
 class CassandraStoreTestSup(IStoreTest):
 
     def _setup_backend(self):
-        #clist = ['amoeba.ucsd.edu:9160']
-        clist = ['ec2-204-236-159-249.us-west-1.compute.amazonaws.com:9160']
+        clist = ['amoeba.ucsd.edu:9160']
         ds = cassandra.CassandraStore.create_store(
             cass_host_list=clist,
             keyspace='Datastore',
@@ -173,8 +170,7 @@ class CassandraStoreTestSup(IStoreTest):
 class CassandraSuperStoreRandomNameSpaceTest(IStoreTest):
 
     def _setup_backend(self):
-        #clist = ['amoeba.ucsd.edu:9160']
-        clist = ['ec2-204-236-159-249.us-west-1.compute.amazonaws.com:9160']
+        clist = ['amoeba.ucsd.edu:9160']
         ds = cassandra.CassandraStore.create_store(
             cass_host_list=clist,
             keyspace='Datastore',

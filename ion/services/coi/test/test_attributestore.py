@@ -105,7 +105,7 @@ class AttrStoreServiceTest(IonTestCase):
              'class':'AttributeStoreService',
              'spawnargs':{'servicename':'as1', # this is the name of the instance!
                             'backend_class':'ion.data.backends.cassandra.CassandraStore',
-                            'backend_args':{'cass_host_list':['ec2-204-236-159-249.us-west-1.compute.amazonaws.com:9160'],
+                            'backend_args':{'cass_host_list':['amoeba.ucsd.edu:9160'],
                                         'keyspace':'Datastore',
                                         'colfamily':'DS1',
                                         'cf_super':True,
@@ -117,7 +117,7 @@ class AttrStoreServiceTest(IonTestCase):
             'class':'AttributeStoreService',
             'spawnargs':{'servicename':'as2', # this is the name of the instance!
                         'backend_class':'ion.data.backends.cassandra.CassandraStore',
-                        'backend_args':{'cass_host_list':['ec2-204-236-159-249.us-west-1.compute.amazonaws.com:9160'],
+                        'backend_args':{'cass_host_list':['amoeba.ucsd.edu:9160'],
                                         'keyspace':'Datastore',
                                         'colfamily':'DS1',
                                         'cf_super':True,
