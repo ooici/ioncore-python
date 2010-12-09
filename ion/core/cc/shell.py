@@ -31,6 +31,10 @@ def get_virtualenv():
         return "[env: %s]" % virtual_env
     return "[env: system]"
 
+
+CTRL_R = "\x12"
+ESC = "\x1b"
+
 class ConsoleManhole(manhole.ColoredManhole):
     ps = ('><> ', '... ')
 
@@ -62,6 +66,10 @@ class ConsoleManhole(manhole.ColoredManhole):
         self.terminal.write('\r\n')
         self.terminal.write(self.ps[self.pn])
         self.setInsertMode()
+
+        self.historysearch = False
+        self.historysearchbuffer = []
+        self.historyFail = False
 
     def Xhandle_TAB(self):
         completer = rlcompleter.Completer(self.namespace)
@@ -106,8 +114,118 @@ class ConsoleManhole(manhole.ColoredManhole):
 
         self.factory.stop()
 
+    def handle_CTRLR(self):
+        if self.historysearch:
+            self.findNextMatch()
+        else:
+            self.historysearch = True
+        self.printHistorySearch()
+
+    def handle_RETURN(self):
+        self.stopHistorySearch()
+        manhole.ColoredManhole.handle_RETURN(self)
+
+    def handle_BACKSPACE(self):
+        if self.historysearch:
+            if len(self.historysearchbuffer):
+                self.historyFail = False
+                self.historysearchbuffer.pop()
+                self.printHistorySearch()
+            # should vbeep on else here
+        else:
+            manhole.ColoredManhole.handle_BACKSPACE(self)
+
+    def handle_UP(self):
+        self.stopHistorySearch()
+        manhole.ColoredManhole.handle_UP(self)
+
+    def handle_DOWN(self):
+        self.stopHistorySearch()
+        manhole.ColoredManhole.handle_DOWN(self)
+
+    def handle_INT(self):
+        self.stopHistorySearch()
+        self.historyPosition = len(self.historyLines)
+        manhole.ColoredManhole.handle_INT(self)
+
+    def handle_RIGHT(self):
+        self.stopHistorySearch()
+        manhole.ColoredManhole.handle_RIGHT(self)
+
+    def handle_LEFT(self):
+        self.stopHistorySearch()
+        manhole.ColoredManhole.handle_LEFT(self)
+
+    def handle_ESC(self):
+        self.stopHistorySearch()
+
+    def stopHistorySearch(self):
+        wassearch = self.historysearch
+        self.historysearch = False
+        self.historysearchbuffer = []
+        if wassearch:
+            self.printHistorySearch()
+
+    def printHistorySearch(self):
+        self.terminal.saveCursor()
+        self.terminal.index()
+        self.terminal.write('\r')
+        self.terminal.cursorPos.x = 0
+        self.terminal.eraseLine()
+        if self.historysearch:
+            if self.historyFail:
+                self.addOutput("failing-")
+            self.addOutput("history-search: " + "".join(self.historysearchbuffer) + "_")
+        self.terminal.restoreCursor()
+
+    def findNextMatch(self):
+        # search from history search pos to 0, uninclusive
+
+        historyslice = self.historyLines[:self.historyPosition-1]
+        cursearch = ''.join(self.historysearchbuffer)
+
+        foundone = False
+        historyslice.reverse()
+        for i in range(len(historyslice)):
+            line = historyslice[i]
+            if cursearch in line:
+                self.historyPosition = len(historyslice) - i
+                self.historysearch = False
+
+                if self.lineBufferIndex > 0:
+                    self.terminal.cursorBackward(self.lineBufferIndex)
+                self.terminal.eraseToLineEnd()
+
+                self.lineBuffer = []
+                self.lineBufferIndex = 0
+                self._deliverBuffer(line)
+
+                # set x to matching coordinate
+                matchidx = line.index(cursearch)
+                self.terminal.cursorBackward(self.lineBufferIndex - matchidx)
+                self.lineBufferIndex = matchidx
+
+                self.historysearch = True
+                foundone = True
+                break
+
+        if not foundone:
+            self.historyFail = True
+
+    def characterReceived(self, ch, moreCharactersComing):
+        if self.historysearch:
+            self.historyFail = False
+            self.historyPosition = len(self.historyLines)
+            self.historysearchbuffer.append(ch)
+            self.findNextMatch()
+            self.printHistorySearch()
+        else:
+            manhole.ColoredManhole.characterReceived(self, ch, moreCharactersComing)
+
     def connectionMade(self):
         manhole.ColoredManhole.connectionMade(self)
+        self.keyHandlers[CTRL_R] = self.handle_CTRLR
+        self.keyHandlers[ESC] = self.handle_ESC
 
         # read in history from history file on disk, set internal history/position
         if not self.namespace['cc'].config['no_history']:
