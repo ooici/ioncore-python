@@ -410,10 +410,13 @@ class Wrapper(object):
             se.ChildLinks.add(link.key)
                     
         se.value = self.SerializeToString()
-        se.key = sha1hex(se.value)
+        #se.key = sha1hex(se.value)
 
         # Structure element wrapper provides for setting type!
         se.type = self
+        
+        # Calculate the sha1 from the serialized value and type!
+        se.key = se.sha1
         
         # Determine whether I am a leaf
         if len(self.ChildLinks)==0:
@@ -660,6 +663,7 @@ class Wrapper(object):
     def debug(self):
         output  = '================== Wrapper (Modified = %s)====================\n' % self.Modified
         output += 'Wrapper ID: %s \n' % self.MyId
+        output += 'Wrapper IsRoot: %s \n' % self.IsRoot
         output += 'Wrapper ParentLinks: %s \n' % str(self.ParentLinks)
         output += 'Wrapper ChildLinks: %s \n' % str(self.ChildLinks)
         output += 'Wrapper current value:\n'
@@ -1101,6 +1105,9 @@ class StructureElement(object):
         inst._element = se
         return inst
         
+    @property
+    def sha1(self):
+        return sha1hex(self.value + self.type.SerializeToString())
         
     #@property
     def _get_type(self):

@@ -664,10 +664,10 @@ class Repository(object):
         
         #log.debug('_load_element' + str(element))
         
-        mysha1 = gpb_wrapper.sha1hex(element.value)
-        if not element.key == mysha1:
+        # check that the caluclated value in element.sha1 matches the stored value
+        if not element.key == element.sha1:
             raise RepositoryError('The sha1 key does not match the value. The data is corrupted! \n' +\
-            'Element key %s, Calculated key %s' % (element.key, mysha1))
+            'Element key %s, Calculated key %s' % (element.key, element.sha1))
         
         cls = self._load_class_from_type(element.type)
                                 

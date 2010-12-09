@@ -280,14 +280,19 @@ class WorkBench(object):
         cs = container_pb2.Structure()
             
         for link in links:
-            se = cs.items.add()
+            se_raw = cs.items.add()
+            
+            se = gpb_wrapper.StructureElement.wrap_structure_element(se_raw)
         
             # Can not set the pointer directly... must set the components
             se.value = link.SerializeToString()
-            
-            se.key = gpb_wrapper.sha1hex(se.value)
-            se.isleaf = link.isleaf # What does this mean in this context?
             se.type.CopyFrom(link.GPBType) # Copy is okay - this is small
+            #se.key = gpb_wrapper.sha1hex(se.value)
+
+            # Calculate the sha1 from the serialized value and type!
+            se.key = se.sha1
+            se.isleaf = link.isleaf # What does this mean in this context?
+            
             
         if isinstance(address, str):
             objs, headers, msg = yield self._process.rpc_send(address,'fetch_linked_objects', cs)
@@ -324,7 +329,8 @@ class WorkBench(object):
                     
             assert item.type == link.type, 'Link type does not match item type!'
             assert item.isleaf == link.isleaf, 'Link isleaf does not match item isleaf!'
-        
+            assert item.key == link.key, 'Link key does not match item key!'
+            
             # Can not set the pointer directly... must set the components
             se.value = item.value
 
