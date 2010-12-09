@@ -6,7 +6,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
 from twisted.internet.task import LoopingCall
 
-from ion.core.process.service_process import ServiceProcess
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.process.process import ProcessFactory
 from ion.core import bootstrap
 import ion.util.procutils as pu
@@ -67,6 +67,10 @@ class EPUControllerService(ServiceProcess):
         if not self.laterinitialized:
             log.error("message got here without the later-init")
         self.core.new_sensor_info(content)
+        
+    def op_reconfigure(self, content, headers, msg):
+        log.info("EPU Controller: reconfigure: '%s'" % content)
+        self.core.run_reconfigure(content)
 
     def op_cei_test(self, content, headers, msg):
         log.info('EPU Controller: CEI test'+ content)

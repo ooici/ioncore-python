@@ -8,7 +8,8 @@
 @author Matt Rodriguez
 @brief Implementation of ion.data.store.IStore using Telephus to interface a
         Cassandra datastore backend
-@note Test cases for the cassandra backend are now in ion.data.test.test_store
+@note Test cases for the cassandra backend are now 
+in ion.services.dm.preservation.test.test_store
 """
 
 import re
@@ -38,7 +39,7 @@ CF_default_key = CONF['default_key']
 class CassandraStore(IStore):
     """
     Store interface for interacting with the Cassandra key/value store
-    @see http://github.com/vomjom/pycassa
+    @see https://github.com/driftx/Telephus
     @note Default behavior is to use a random super column name space!
     """
     def __init__(self, **kwargs):
@@ -89,7 +90,9 @@ class CassandraStore(IStore):
             log.info("Got host %s and port %d from cass_host_list" % (host, port))
                 
         inst.manager = ManagedCassandraClientFactory()
-        inst.client = CassandraClient(inst.manager, inst.keyspace) 
+        inst.client = CassandraClient(inst.manager)
+        inst.client.set_keyspace(inst.keyspace)
+        log.debug("Connecting to Cassandra") 
         inst.connector = reactor.connectTCP(host, port, inst.manager, timeout=1)
         log.info("Created Cassandra store")
         return defer.succeed(inst)               
@@ -117,11 +120,12 @@ class CassandraStore(IStore):
         log.info("CassandraStore: Calling get on col %s " % col)
         try:
             if self.cf_super:
-                log.info("super_col: Calling get on col %s " % col)
+                log.info("super_col: Calling get on key %s , column_family %s, col %s, super_column %s " % (self.key, self.colfamily, col, self.namespace))
                 value = yield self.client.get(self.key, self.colfamily, column=col, super_column=self.namespace)
+                #value = 'boo'
                 log.info("super_col: Calling get on col %s " % value)
             else:
-                log.info("standard_col: Calling get on col %s " % col)
+                log.info("standard_col: Calling get with key: %s, column_family: %s, col %s " % (self.key, self.colfamily,col))
                 value = yield self.client.get(self.key, self.colfamily, column=col)
         except NotFoundException:
             log.info("Didn't find the col: %s. Returning None" % col)     
@@ -143,9 +147,9 @@ class CassandraStore(IStore):
         try:
             if self.cf_super:
                 log.info("CassandraStore: super_col key %s colfamily %s value %s column %s super_column %s " % (self.key, self.colfamily, value, col, self.namespace))
-                yield self.client.insert(self.key, self.colfamily, value, column=col, super_column=self.namespace) 
+                yield self.client.insert(self.key, self.colfamily, value=value, column=col, super_column=self.namespace) 
             else:
-                yield self.client.insert(self.key, self.colfamily, value, column=col)
+                yield self.client.insert(self.key, self.colfamily, value=value, column=col)
         except:
             log.info("CassandraStore: Exception was thrown during the put")
         defer.returnValue(None)

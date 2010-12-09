@@ -25,6 +25,7 @@ class AttrStoreServiceTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        yield self._shutdown_processes()
         yield self._stop_container()
 
 
@@ -103,7 +104,7 @@ class AttrStoreServiceTest(IonTestCase):
              'module':'ion.services.coi.attributestore',
              'class':'AttributeStoreService',
              'spawnargs':{'servicename':'as1', # this is the name of the instance!
-                            'backend_class':'ion.data.backends.cassandra_pycassa.CassandraStore',
+                            'backend_class':'ion.data.backends.cassandra.CassandraStore',
                             'backend_args':{'cass_host_list':['amoeba.ucsd.edu:9160'],
                                         'keyspace':'Datastore',
                                         'colfamily':'DS1',
@@ -115,7 +116,7 @@ class AttrStoreServiceTest(IonTestCase):
             'module':'ion.services.coi.attributestore',
             'class':'AttributeStoreService',
             'spawnargs':{'servicename':'as2', # this is the name of the instance!
-                        'backend_class':'ion.data.backends.cassandra_pycassa.CassandraStore',
+                        'backend_class':'ion.data.backends.cassandra.CassandraStore',
                         'backend_args':{'cass_host_list':['amoeba.ucsd.edu:9160'],
                                         'keyspace':'Datastore',
                                         'colfamily':'DS1',
@@ -126,10 +127,10 @@ class AttrStoreServiceTest(IonTestCase):
                     ]
 
         sup = yield self._spawn_processes(services)
-
+        
         asc1 = AttributeStoreClient(proc=sup, targetname='as1')
 
-
+        
         res1 = yield asc1.put('key1','value1')
         log.info('Result1 put: '+str(res1))
 
@@ -137,8 +138,8 @@ class AttrStoreServiceTest(IonTestCase):
         res2 = yield asc1.get('key1')
         log.info('Result2 get: '+str(res2))
         self.assertEqual(res2, 'value1')
-
-
+        
+        
         res3 = yield asc1.put('key1','value2')
 
         res4 = yield asc1.get('key1')
@@ -146,20 +147,23 @@ class AttrStoreServiceTest(IonTestCase):
 
         res5 = yield asc1.get('non_existing')
         self.assertEqual(res5, None)
-
+        
         asc2 = AttributeStoreClient(proc=sup, targetname='as2')
 
+        
         tres1 = yield asc2.put('tkey1','tvalue1')
         log.info('tResult1 put: '+str(tres1))
 
         tres2 = yield asc2.get('tkey1')
         log.info('tResult2 get: '+str(tres2))
         self.assertEqual(tres2, 'tvalue1')
-
+        
 
         # With common backends the value should be found.
         resx1 = yield asc2.get('key1')
         self.assertEqual(resx1, 'value2',msg='Failed to pull value from second service instance')
-
+        
         yield asc1.clear_store()
         yield asc2.clear_store()
+        
+        

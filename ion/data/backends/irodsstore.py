@@ -4,14 +4,17 @@
 @author Bing Zhu
 @brief Implementation of ion.data.store.IStore using PyIrods to interface a
        iRODS backend storage servers.
+
 @note Test cases for the iRODS backend are in ion.data.backends.test.test_irodsstore 
 @note The Python iRODS library package can be installed with: easy_install --find-links http://ooici.net/packages pyrods-irods
 @
+
 """
 
 import logging
 logging = logging.getLogger(__name__)
 
+from twisted.internet import defer
 
 from ion.core import ioninit
 from ion.services.dm.preservation.store import IStore
@@ -20,6 +23,12 @@ from irods import *
 from irods_error import *
 
 CONF = ioninit.config(__name__)
+
+
+class IrodsStoreError(Exception):
+    """
+    Exception class for IrodsStore
+    """
 
 
 class IrodsStore(IStore):
@@ -34,7 +43,7 @@ class IrodsStore(IStore):
         """
         self.hostname = self._get_config('irodsHost')
         self.port_num = self._get_config('irodsPort')
-        self.default_resc = self._get_config('rodsDefResource')
+        self.default_resc = self._get_config('irodsDefResource')
         self.obj_home = self._get_config('irodsOoiCollection')
         self.user_name = self._get_config('irodsUserName')
         self.user_passwd = self._get_config('irodsUserPasswd')
@@ -47,8 +56,8 @@ class IrodsStore(IStore):
                 self.hostname = kwargs.get('irodsHost', None)
             if kwargs.get('irodsPort', None):
                 self.port_num = kwargs.get('irodsPort', None)
-            if kwargs.get('rodsDefResource', None):
-                self.default_resc = kwargs.get('rodsDefResource', None)
+            if kwargs.get('irodsDefResource', None):
+                self.default_resc = kwargs.get('irodsDefResource', None)
             if kwargs.get('irodsOoiCollection', None):
                 self.obj_home = kwargs.get('irodsOoiCollection', None)
             if kwargs.get('irodsUserName', None):
@@ -61,7 +70,8 @@ class IrodsStore(IStore):
     def _get_config(self, key):
         try:
             value = CONF[key]
-        except:
+        except KeyError:
+            # TODO - do not catch generic exceptions! This should be a key error exception I believe
             value = None
         return value
 
@@ -72,7 +82,7 @@ class IrodsStore(IStore):
         self.conn, errMsg = rcConnect(self.hostname, int(self.port_num), self.user_name, self.zone)
         if not self.conn:
             logging.info('rcConnect() error: ' + errMsg)
-            raise Exception('rcConnect error', errMsg)
+            raise IrodsStoreError('rcConnect error: ' + errMsg)
 
         status = clientLoginWithPassword(self.conn, self.user_passwd)
         if status < 0:
@@ -80,7 +90,7 @@ class IrodsStore(IStore):
             errName, subErrName = rodsErrorName(status)
             errMsg = str(status) + ':' + errName + ' ' + subErrName
             logging.info('rcConnect() error: ' + errMsg)
-            raise Exception('clientLoginWithPassword() error', errMsg)
+            raise IrodsStoreError('clientLoginWithPassword() error:' + errMsg)
 
         irods_info = 'irods connection succeeded: ' + self.hostname + '/' + self.port_num
         logging.info(irods_info)
@@ -96,25 +106,24 @@ class IrodsStore(IStore):
 
         inst.kwargs = kwargs
 
-        try:
-            inst.connect_to_irods()
-        except Exception:
-            pass
+        inst.connect_to_irods()
 
-        return (inst)
+        return defer.succeed(inst)
 
     def disconnect_from_irods(self):
         """
         @brief close the TCP connection with the iRODS server
         """
         rcDisconnect(self.conn)
-
+        self.conn = None
+    
+     
     def clear_store(self):
         """
         @brief Clean the iRODS collection and disonnect from iRODS
         """
         if not self.conn:
-            return
+            return defer.succeed(None)
 
         collinp = collInp_t()
         collinp.setCollName(self.obj_home)
@@ -123,15 +132,18 @@ class IrodsStore(IStore):
         rcRmColl(self.conn, collinp, 0)
 
         self.disconnect_from_irods()
+        
+        return defer.succeed(None)
 
-    def get_irods_fname_by_key(self, key):
+    def _get_irods_fname_by_key(self, key):
         """
         @brief Return the irods file name based on the key value. This scheme is used for a single zone and assumes we store all data in a single collection.
         @param key The OOI unique key for an data object
         """
         fname = self.obj_home + '/' + key 
         return fname
-        
+    
+      
     def get(self, key):
         """
         @brief Return a RODS value (the content of the file) corresponding to a given key
@@ -140,28 +152,19 @@ class IrodsStore(IStore):
         """
         logging.debug('reading value from iRODS for key %s' % (key))
 
-        if not self.conn:
-            print '\n\n get() the conn  is null.\n'
-            return None
-
         value = None
-        try:
-            # get irods obj filename with path from iRODS ICAT
-            # get the content of the irods file
-            self.fname = self.get_irods_fname_by_key(key)
-        except Exception:
-            pass
+        self.fname = self._get_irods_fname_by_key(key)
 
         f = iRodsOpen(self.conn, self.fname, "r")
         if not f:
             logging.info('Failed to open file for read: ' + self.fname)
-            raise Exception('Failed to open file for read: ' + self.fname)
-
+            #raise IrodsStoreError('Failed to open file for read: ' + self.fname)
+            return defer.succeed(None)
         value = f.read()
         f.close()
+        return defer.succeed(value)
 
-        return (value)
-
+    
     def put(self, key, value):
         """
         @brief Write a the data into iRODS. 
@@ -184,24 +187,25 @@ class IrodsStore(IStore):
         if status < 0:
             errMsg = self._get_errmsg_by_status(status)
             logging.info('rcCollCreate() error: ' + errMsg)
-            raise Exception('rcCollCreate() error', errMsg)
+            raise IrodsStoreError('rcCollCreate() error: ' + errMsg)
 
-        fname = self.get_irods_fname_by_key(key)
+        fname = self._get_irods_fname_by_key(key)
         f = iRodsOpen(self.conn, fname, 'w', self.default_resc)
         if not f:
             logging.info('Failed to open file for write: ' + fname)
-            raise Exception('Failed to open file for write: ' + fname)
+            raise IrodsStoreError('Failed to open file for write: ' + fname)
 
         f.write(value)
         f.close()
 
-        return (None)
+        return defer.succeed(None)
 
     def _get_errmsg_by_status(self, t):
         errName, subErrName = rodsErrorName(t)
         errMsg = str(t) + ':' + errName + ' ' + subErrName
         return errMsg
 
+    
     def remove(self, key):
         """
         @brief delete an iRODS file by OOICI key
@@ -211,7 +215,7 @@ class IrodsStore(IStore):
  
         logging.debug('deleting data %s from iRODS' % (key))
 
-        self.fname = self.get_irods_fname_by_key(key)
+        self.fname = self._get_irods_fname_by_key(key)
         dataObjInp = dataObjInp_t()
         dataObjInp.getCondInput().addKeyVal(FORCE_FLAG_KW, "")
         dataObjInp.setObjPath(self.fname)
@@ -221,7 +225,7 @@ class IrodsStore(IStore):
         if t < 0:
             errMsg = self._get_errmsg_by_status(t)
             logging.info('rcDataObjUnlink() error: ' + errMsg)
-            raise Exception('rcDataObjUnlink() error', errMsg)
+            raise IrodsStoreError('rcDataObjUnlink() error: ' + errMsg)
 
-        return (None)
+        return defer.succeed(None)
 

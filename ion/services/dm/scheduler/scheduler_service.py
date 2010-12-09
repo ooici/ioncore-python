@@ -10,8 +10,6 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
-import time
-import threading
 import re
 from uuid import uuid4
 
@@ -37,6 +35,14 @@ class SchedulerService(ServiceProcess):
 
     def slc_stop(self):
         log.debug('SLC stop of Scheduler')
+
+    def slc_deactivate(self):
+        """
+        Called before terminate, this is a good place to tear down the AS and jobs.
+        @todo iterate over the list
+        foreach task in op_query:
+          rm_task(task)
+        """
 
     def slc_shutdown(self):
         log.debug('SLC shutdown of Scheduler')
@@ -170,6 +176,7 @@ class SchedulerServiceClient(ServiceClient):
         @param taskid Task ID, as returned from add_task
         @retval OK or error
         """
+        #log.info("In SchedulerServiceClient: rm_task")
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('rm_task', taskid)
         defer.returnValue(content)

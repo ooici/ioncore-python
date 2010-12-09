@@ -21,11 +21,10 @@ from ion.core import ioninit
 
 __all__ = ['DeployableTypeRegistryService', 'DeployableTypeRegistryClient']
 
-#TODO ugggggggggghhhhhhhhh
 _REGISTRY = {}
 CONF = ioninit.config(__name__)
 execfile(ioninit.adjust_dir(CONF['deployable_types']))
-log.debug('Loaded %s deployable types.', len(_REGISTRY))
+log.debug('Loaded %d deployable types.' % len(_REGISTRY))
 
 class DeployableTypeRegistryService(ServiceProcess):
     """Deployable Type Registry service interface
@@ -36,6 +35,9 @@ class DeployableTypeRegistryService(ServiceProcess):
         self.registry = self.spawn_args.get('registry')
         if self.registry is None:
             self.registry = _REGISTRY
+            
+        for key in self.registry.keys():
+            log.info("Registered type '%s':\n%s" % (key, self.registry[key]))
 
     def op_lookup(self, content, headers, msg):
         """Resolve a depoyable type
@@ -85,7 +87,7 @@ class DeployableTypeRegistryService(ServiceProcess):
                 site_node = sites[node_site][node_name]
             except KeyError:
                 return self._dtrs_error(msg,
-                        'Invalid deployable type site specified: "%s" ' % node_site)
+                    'Invalid deployable type site specified: "%s":"%s" ' % (node_site, node_name))
 
             response_nodes[node_name] = {
                     'iaas_image' : site_node.get('image'),

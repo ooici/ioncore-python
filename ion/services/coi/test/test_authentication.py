@@ -15,9 +15,11 @@ from ion.core.exception import ReceivedError
 from ion.test.iontest import IonTestCase
 from ion.services.coi.identity_registry import IdentityRegistryClient
 
+from ion.services.coi.authentication import Authentication
+
 from ion.resources import coi_resource_descriptions
 
-class UserRegistrationClientTest(IonTestCase):
+class AuthenticationTest(IonTestCase):
     """
     Testing client classes of User Registration
     """
@@ -32,21 +34,21 @@ class UserRegistrationClientTest(IonTestCase):
         supervisor = yield self._spawn_processes(services)
 
         self.identity_registry_client = IdentityRegistryClient(proc=supervisor)
-
-
+        
     @defer.inlineCallbacks
     def tearDown(self):
         yield self.identity_registry_client.clear_identity_registry()
         yield self._stop_container()
 
     @defer.inlineCallbacks
-    def test_register_user(self):
+    def test_sign(self):
         """
+        get fresh cert/keys from https://merge.ncsa.uiuc.edu/portal3/
         """
-    
+
 
         user = coi_resource_descriptions.IdentityResource.create_new_resource()
-
+ 
         # initialize the user
         #user.common_name = "Roger Unwin A13"
         #user.country = "US"
@@ -98,89 +100,47 @@ WJ1c7fBskgAVk8jJzbEgMxuVeurioYqj0Cn7hFQoLc+npdU5byRti+4xjZBXSmmjo4Y7ttXGvBrf
 c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 -----END RSA PRIVATE KEY-----"""
         #user.expiration_date = "Tue Jun 29 23:32:16 PDT 2010"
-        # These are the fields we prompt the user for during registration
-        #user.first_name = "Roger"
-        #user.last_name = "Unwin"
-        #user.phone = "8588675309"
-        #user.fax = "6198675309"
-        #user.email = "unwin@sdsc.edu"
-        #user.organization = "University of California San Diego"
-        #user.department = "San Diego Supercomputing Center"
-        #user.title = "Deep Sea Submarine Captain"
 
 
-        #-----------------
-
-
-
-
-        found = yield self.identity_registry_client.is_user_registered(user.certificate, user.rsa_private_key)
-        self.assertEqual(found, False)
-        
-        # Register a user
-        ooi_id1 = yield self.identity_registry_client.register_user_credentials(user.certificate, user.rsa_private_key)
-        
-        # Verify we can find it.
-        found = yield self.identity_registry_client.is_user_registered(user.certificate, user.rsa_private_key)
-        self.assertEqual(found, True)
-        
-        # swap them just to test update
-        ooi_id2 = yield self.identity_registry_client.authenticate_user(user.certificate, user.rsa_private_key)
-        
-        self.assertEqual(ooi_id1, ooi_id2)
-        
-        # clear the registry for the tests below
-        yield self.identity_registry_client.clear_identity_registry()
-        #-----------------
+        authentication = Authentication()
 
         user = yield self.identity_registry_client.register_user(user)
-        
         ooi_id = user.reference()
-        #print str(ooi_id)
-        #print "saved and got this id back " + str(ooi_id.RegistryIdentity)
-        # load the user back
-        user0 = yield self.identity_registry_client.get_user(ooi_id)
-
-        # Test that we got a Person back
-        self.assertNotEqual(user0, None)
-        self.assertEqual(user0.subject, "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254")
-
-        # Test the ooi_id was properly set within the Person object
-        self.assertEqual(user0.reference(), ooi_id)
-
-        # Test that updates work
-        user0.subject = "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254 CHANGED"
-        user0 = yield self.identity_registry_client.update_user(user0)
-        ooi_id = user0.reference()
-
+        
+        user = yield self.identity_registry_client.get_user(ooi_id)
+        signed_message = authentication.sign_message('this is a test', user.rsa_private_key)
+        
+        self.assertEqual( authentication.verify_message('this is a test', user.certificate, signed_message), True)
+        
+        signed_message_hex = authentication.sign_message_hex('this is a test', user.rsa_private_key)
+        
+        self.assertEqual( authentication.verify_message_hex('this is a test', user.certificate, signed_message_hex), True)
+        
+        # should do negative tests. perhaps later
         
         
-        user1 = yield self.identity_registry_client.get_user(ooi_id)
-        #self.assertEqual("Roger Unwin CHANGED", user1.common_name)
-        self.assertEqual(user1.subject, "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254 CHANGED")
-
-        # Test for user not found handled properly.
-        ooi_id.RegistryIdentity = "bogus-ooi_id"
-        try:
-            result = yield self.identity_registry_client.get_user(ooi_id)
-            self.fail("ReceivedError expected")
-        except ReceivedError, re:
-            log.error('Above error "WARNING:RPC reply is an ERROR: None" is expected.')
-            pass
-
-        # Test if we can find the user we have stuffed in.
-        user_description = coi_resource_descriptions.IdentityResource()
-        user_description.subject = 'oger'
-
-        users1 = yield self.identity_registry_client.find_users(user_description,regex=True)
-        self.assertEqual(len(users1), 1) # should only return 1 match
-        self.assertEqual("/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254 CHANGED", users1[0].subject)
-
-        # Test if we can set the life cycle state
-        self.assertEqual(str(user1.lifecycle), 'new') # Should start as new
-
-        ooi_id = user0.reference(head=True)
-
-        result = yield self.identity_registry_client.set_identity_lcstate_retired(ooi_id) # Wishful thinking Roger!
-        user2 = yield self.identity_registry_client.get_user(ooi_id)
-        self.assertEqual(str(user2.lifecycle), 'retired') # Should be retired now
+        encrypted_message = authentication.private_key_encrypt_message('The Fat Brown Fox Frowned Funnily', user.rsa_private_key)
+        
+        self.assertEqual(authentication.private_key_decrypt_message(encrypted_message, user.rsa_private_key), 'The Fat Brown Fox Frowned Funnily')
+        
+        encrypted_message_hex = authentication.private_key_encrypt_message_hex('The Fat Brown Fox Frowned Funnily', user.rsa_private_key)
+        
+        self.assertEqual(authentication.private_key_decrypt_message_hex(encrypted_message_hex, user.rsa_private_key), 'The Fat Brown Fox Frowned Funnily')
+        
+        
+        pub_enc = authentication.public_encrypt('this is a simple text', user.rsa_private_key)
+        self.assertEqual(authentication.private_decrypt(pub_enc, user.rsa_private_key), 'this is a simple text')
+        
+        pub_enc_hex = authentication.public_encrypt_hex('this is a simple text', user.rsa_private_key)
+        self.assertEqual(authentication.private_decrypt_hex(pub_enc_hex, user.rsa_private_key), 'this is a simple text')
+        
+        # Not entirely sure if this is worth testing
+        # authentication.decode_certificate(user.certificate)
+        
+        # verify chain Will fail for old certificates
+        # self.assertEqual(authentication.verify_certificate_chain(user.certificate), True)
+        
+        # Verify certificate is within valid date ranve. Will fail for old certificates
+        # self.assertEqual(authentication.is_certificate_within_date_range(user.certificate), True)
+        
+        

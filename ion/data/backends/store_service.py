@@ -77,7 +77,7 @@ class StoreService(ServiceProcess):
         it is shutdown.
         """
         pass
-            
+        
     @defer.inlineCallbacks
     def op_put(self, content, headers, msg):
         """

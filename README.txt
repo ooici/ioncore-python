@@ -60,10 +60,12 @@ to run.
 Current dependencies include:
     twisted, carrot, numpy, txamqp, msgpack-python, httplib2, pycassa, simplejson,
     pydap, pydap.handlers.netcdf, pydap.responses.netcdf, pydap.handlers.nca,
-    gviz_api.py, nimboss, txrabbitmq
+    gviz_api.py, nimboss, txrabbitmq, M2Crypto-patched
 
 NOTE: As the project evolves and new code is added, dependencies might change.
 Run the setup script once in a while and when you get errors
+
+*M2Crypto note: requires autoconf, automake, and g++ packages be installed prior.
 
 
 Usage

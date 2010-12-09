@@ -13,6 +13,8 @@ class instrument_prompts:
     INST_PROMPT = ">"
 
 instrument_commands = (
+    "start",
+    "stop",
     "break",
     "cf",
     "ck",

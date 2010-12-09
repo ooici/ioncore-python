@@ -135,7 +135,7 @@ class Control(object):
 
         # stdout fd
         outSettings = termios.tcgetattr(fdout)
-        outSettings[1] = 3 # do CR
+        outSettings[1] = termios.OPOST | termios.ONLCR
         termios.tcsetattr(fdout, termios.TCSANOW, outSettings)
 
         namespace = makeNamespace()
