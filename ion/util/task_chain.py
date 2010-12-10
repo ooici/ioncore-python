@@ -7,6 +7,8 @@
 """
 
 from twisted.internet import defer
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 # Disabling MutableSequence for 2.5 compat -> deriving from list for now.
 # search for MUTABLESEQUENCE to see what needs to be uncommented/fixed.
