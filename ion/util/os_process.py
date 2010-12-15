@@ -156,6 +156,7 @@ class OSProcess(protocol.ProcessProtocol):
         Output on stdout has been received.
         Stores the output in a list.
         """
+        log.debug("SO: %s" % data)
         self.outlines.append(data)
 
     def errReceived(self, data):
@@ -163,6 +164,7 @@ class OSProcess(protocol.ProcessProtocol):
         Output on stderr has been received.
         Stores the output in a list.
         """
+        log.debug("SE: %s" % data)
         self.errlines.append(data)
 
     def processEnded(self, reason):
