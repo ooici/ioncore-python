@@ -9,10 +9,10 @@
 """
 
 setupdict = {
-    'name' : 'lcaarch',
+    'name' : 'ioncore-python',
     'version' : '0.2.0',
     'description' : 'OOI LCA architecture prototype',
-    'url': 'http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project',
+    'url': 'https://github.com/ooici/ioncore-python',
     'download_url' : 'http://ooici.net/packages',
     'license' : 'Apache 2.0',
     'author' : 'Michael Meisinger',
@@ -31,7 +31,7 @@ setupdict = {
 try:
     from setuptools import setup, find_packages
     setupdict['packages'] = find_packages()
-    setupdict['test_suite'] = 'lcaarch.test'
+    setupdict['test_suite'] = 'ion'
     setupdict['install_requires'] = ['Twisted', 'magnet', 'pycassa', 'numpy',
                                      'Paste', 'Pydap', 'simplejson', 'httplib2',
                                      'pydap.handlers.netcdf','pydap.handlers.nca',
@@ -42,5 +42,5 @@ try:
 
 except ImportError:
     from distutils.core import setup
-    setupdict['packages'] = ['lcaarch']
+    setupdict['packages'] = ['ioncore-python']
     setup(**setupdict)
