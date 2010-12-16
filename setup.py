@@ -49,5 +49,5 @@ try:
 
 except ImportError:
     from distutils.core import setup
-    setupdict['packages'] = ['lcaarch']
+    setupdict['packages'] = ['ioncore']
     setup(**setupdict)
