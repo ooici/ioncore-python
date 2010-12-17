@@ -1,6 +1,7 @@
 """
 @author Dorian Raymer
 @author Michael Meisinger
+@author Dave Foster <dfoster@asascience.com>
 @brief Python Capability Container shell
 """
 
@@ -15,7 +16,7 @@ import rlcompleter
 from twisted.application import service
 from twisted.internet import stdio
 from twisted.conch.insults import insults
-from twisted.conch import manhole
+from twisted.conch import manhole, recvline
 from twisted.python import text
 
 import ion.util.ionlog
@@ -194,8 +195,21 @@ class ConsoleManhole(manhole.Manhole):
         self.printHistorySearch()
 
     def handle_RETURN(self):
+        """
+        Handles the Return/Enter key being pressed. We subvert HistoricRecvLine's
+        behavior here becuase it is insufficient, and call the only other override
+        that matters, in RecvLine.
+        """
         self.stopHistorySearch()
-        manhole.ColoredManhole.handle_RETURN(self)
+
+        # only add the current line buffer to the history if it a) exists and b) is distinct
+        # from the previous history line. You don't want 10 entries of the same thing.
+        if self.lineBuffer:
+            curLine = ''.join(self.lineBuffer)
+            if self.historyLines[-1] != curLine:
+                self.historyLines.append(curLine)
+        self.historyPosition = len(self.historyLines)
+        recvline.RecvLine.handle_RETURN(self)
 
     def handle_BACKSPACE(self):
         if self.historysearch:
