@@ -21,16 +21,10 @@ is an early implementation of the OOI Python Capability Container.
 For more information, please see:
 http://www.oceanobservatories.org/spaces/display/syseng/CIAD+COI+SV+Python+Capability+Container
 
-Get LCAarch with
-::
-    git clone git@amoeba.ucsd.edu:lcaarch.git
-    cd lcaarch
-
-
 Dependencies
 ============
 
-LCAarch is compatible with Python 2.5 and higher, but not Python 3.x
+ioncore-python is compatible with Python 2.5 and higher, but not Python 3.x
 This project has several dependencies on libraries and packages. Most of these
 dependencies are resolved automatically using the provided setup script.
 
@@ -39,8 +33,8 @@ Step 1: Virtual env
     libraries and dependencies are installed separately from the Python
     system libraries
 ::
-    mkvirtualenv lcaarch
-    workon lcaarch
+    mkvirtualenv ioncore-python
+    workon ioncore-python
 
 Step 2: Core libraries (you can skip this step)
     Install some core libraries first. Sometimes the automatic installer
@@ -71,7 +65,7 @@ Run the setup script once in a while and when you get errors
 Usage
 =====
 
-(all subsequent steps assume you are in the lcaarch/ root dir)
+(all subsequent steps assume you are in the ioncore-python/ root dir)
 
 Start empty Python Capability Container shell with:
 ::
