@@ -30,7 +30,7 @@ pyrods-irods
 simplejson==2.1.2
 stomper==0.2.4
 stompservice==0.1.0
-telephus==0.7
+telephus==0.7-beta3.3
 twotp==0.7
 txAMQP==0.3
 txrabbitmq==0.3
