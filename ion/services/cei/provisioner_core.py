@@ -287,15 +287,19 @@ class ProvisionerCore(object):
         driver = self.node_drivers[site]
 
         #set some extras in the spec
+        allocstring = "default"
         allocation = one_node.get('iaas_allocation')
         if allocation:
             spec.size = allocation
+            allocstring = str(allocation)
+        keystring = "default"
         sshkeyname = one_node.get('iaas_sshkeyname')
         if sshkeyname:
             spec.keyname = sshkeyname
+            keystring = str(sshkeyname)
 
-        log.debug('Launching group %s - %s nodes (keypair=%s)',
-                spec.name, spec.count, spec.keyname)
+        log.debug('Launching group %s - %s nodes (keypair=%s) (allocation=%s)',
+                spec.name, spec.count, keystring, allocstring)
 
         try:
             iaas_nodes = yield threads.deferToThread(
