@@ -52,7 +52,7 @@ class OSProcess(protocol.ProcessProtocol):
 
         self.binary             = binary            # binary to run; set this in a derived class
         self.spawnargs          = spawnargs         # arguments to spawn after binary
-        self.deferred_exited    = defer.Deferred()  # is called back on process end
+        self.deferred_exited    = defer.Deferred(self._cancel)  # is called back on process end
         self.used               = False             # do not allow anyone to use again
         self.close_timeout      = None
 
@@ -88,6 +88,13 @@ class OSProcess(protocol.ProcessProtocol):
         self.used = True
 
         return self.deferred_exited
+
+    def _cancel(self, deferred):
+        """
+        Default canceller for the process. Will call _close_impl with Force set to
+        true.
+        """
+        self._close_impl(True)
 
     def addCallback(self, callback, **kwargs):
         """
