@@ -58,7 +58,7 @@
   <target name="pipinstall"
         description="Install dependencies using Pip">
     <echo message="Installing dependencies using Pip"/>
-    <exec executable="pip">
+    <exec executable="pip" failonerror="true">
       <arg value="install"/>
       <arg value="--find-links=http://ooici.net/packages"/>
       <arg value="--requirement=requirements.txt"/>
