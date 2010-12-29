@@ -40,7 +40,6 @@ Step 2: Core libraries (you can skip this step)
     Install some core libraries first. Sometimes the automatic installer
     produces errors, if these libraries are not present beforehand.
 ::
-    easy_install numpy
     easy_install -U twisted
 
 Step 3: Run the setup script
@@ -52,8 +51,7 @@ Check the trace output that there are no substantial errors. You are now ready
 to run.
 
 Current dependencies include:
-    twisted, carrot, numpy, txamqp, msgpack-python, httplib2, pycassa, simplejson,
-    pydap, pydap.handlers.netcdf, pydap.responses.netcdf, pydap.handlers.nca,
+    twisted, carrot, txamqp, msgpack-python, httplib2, pycassa, simplejson,
     gviz_api.py, nimboss, txrabbitmq, M2Crypto-patched
 
 NOTE: As the project evolves and new code is added, dependencies might change.

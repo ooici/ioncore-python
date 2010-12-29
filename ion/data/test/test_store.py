@@ -17,7 +17,7 @@ from twisted.trial import unittest
 from twisted.internet import defer
 
 from ion.data.backends import cassandra
-from ion.services.dm.preservation.store import Store
+from ion.data.store import Store
 
 from ion.data.backends import irodsstore 
 
@@ -96,92 +96,92 @@ class IStoreTest(unittest.TestCase):
 
 
 
-class CassandraStoreTestSuperCols(IStoreTest):
-
-    def _setup_backend(self):
-        clist = ['amoeba.ucsd.edu:9160']
-        d = cassandra.CassandraStore.create_store(cass_host_list=clist)
-        return d
-    
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self.ds.clear_store()
-        self.ds.manager.shutdown()
-
-
-class CassandraStoreTestNoSuperCols(IStoreTest):
-
-    def _setup_backend(self):
-        clist = ['amoeba.ucsd.edu:9160']
-        ds = cassandra.CassandraStore.create_store(
-            cass_host_list=clist,
-            cf_super=False,
-            keyspace='Datastore',
-            colfamily='Standard1'
-            )
-        return ds
-        
-    @defer.inlineCallbacks
-    def tearDown(self):
-        log.info("in tearDown")
-        yield self.ds.clear_store()
-        log.info("Calling shutdown")
-        self.ds.manager.shutdown()
-        log.info("Shutdown")
-    
-    @defer.inlineCallbacks  
-    def test_clear_store(self):
-        """
-        @note This doesn't work if I just raise an exception. The problem
-        seems to be that shutdown is called on the protocol factory before
-        a connection has been made. This might be a bug with the Telephus
-        client. I'll investigate further after I get this merged back 
-        into the main branch
-        
-        Matt Rodriguez 9/30/10
-        """
-        yield self.ds.put(self.key, self.value)
-        yield self.ds.remove(self.key)
-        #import twisted.internet.base
-        #twisted.internet.base.DelayedCall.debug = True
-        #raise unittest.SkipTest('Can not clear the persistent store if the name space is not unique')
-    
-    
-        
-    
-
-class CassandraStoreTestSup(IStoreTest):
-
-    def _setup_backend(self):
-        clist = ['amoeba.ucsd.edu:9160']
-        ds = cassandra.CassandraStore.create_store(
-            cass_host_list=clist,
-            keyspace='Datastore',
-            colfamily='DS1',
-            cf_super=True,
-            namespace='n')
-        return ds
-    
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self.ds.clear_store()
-        self.ds.manager.shutdown()
-
-class CassandraSuperStoreRandomNameSpaceTest(IStoreTest):
-
-    def _setup_backend(self):
-        clist = ['amoeba.ucsd.edu:9160']
-        ds = cassandra.CassandraStore.create_store(
-            cass_host_list=clist,
-            keyspace='Datastore',
-            colfamily='DS1',
-            cf_super=True)
-        return ds
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self.ds.clear_store()
-        self.ds.manager.shutdown()
+#class CassandraStoreTestSuperCols(IStoreTest):
+#
+#    def _setup_backend(self):
+#        clist = ['amoeba.ucsd.edu:9160']
+#        d = cassandra.CassandraStore.create_store(cass_host_list=clist)
+#        return d
+#    
+#    @defer.inlineCallbacks
+#    def tearDown(self):
+#        yield self.ds.clear_store()
+#        self.ds.manager.shutdown()
+#
+#
+#class CassandraStoreTestNoSuperCols(IStoreTest):
+#
+#    def _setup_backend(self):
+#        clist = ['amoeba.ucsd.edu:9160']
+#        ds = cassandra.CassandraStore.create_store(
+#            cass_host_list=clist,
+#            cf_super=False,
+#            keyspace='Datastore',
+#            colfamily='Standard1'
+#            )
+#        return ds
+#        
+#    @defer.inlineCallbacks
+#    def tearDown(self):
+#        log.info("in tearDown")
+#        yield self.ds.clear_store()
+#        log.info("Calling shutdown")
+#        self.ds.manager.shutdown()
+#        log.info("Shutdown")
+#    
+#    @defer.inlineCallbacks  
+#    def test_clear_store(self):
+#        """
+#        @note This doesn't work if I just raise an exception. The problem
+#        seems to be that shutdown is called on the protocol factory before
+#        a connection has been made. This might be a bug with the Telephus
+#        client. I'll investigate further after I get this merged back 
+#        into the main branch
+#        
+#        Matt Rodriguez 9/30/10
+#        """
+#        yield self.ds.put(self.key, self.value)
+#        yield self.ds.remove(self.key)
+#        #import twisted.internet.base
+#        #twisted.internet.base.DelayedCall.debug = True
+#        #raise unittest.SkipTest('Can not clear the persistent store if the name space is not unique')
+#    
+#    
+#        
+#    
+#
+#class CassandraStoreTestSup(IStoreTest):
+#
+#    def _setup_backend(self):
+#        clist = ['amoeba.ucsd.edu:9160']
+#        ds = cassandra.CassandraStore.create_store(
+#            cass_host_list=clist,
+#            keyspace='Datastore',
+#            colfamily='DS1',
+#            cf_super=True,
+#            namespace='n')
+#        return ds
+#    
+#    @defer.inlineCallbacks
+#    def tearDown(self):
+#        yield self.ds.clear_store()
+#        self.ds.manager.shutdown()
+#
+#class CassandraSuperStoreRandomNameSpaceTest(IStoreTest):
+#
+#    def _setup_backend(self):
+#        clist = ['amoeba.ucsd.edu:9160']
+#        ds = cassandra.CassandraStore.create_store(
+#            cass_host_list=clist,
+#            keyspace='Datastore',
+#            colfamily='DS1',
+#            cf_super=True)
+#        return ds
+#
+#    @defer.inlineCallbacks
+#    def tearDown(self):
+#        yield self.ds.clear_store()
+#        self.ds.manager.shutdown()
         
 class IRODSStoreTest(IStoreTest):
     

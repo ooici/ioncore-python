@@ -170,28 +170,29 @@ class RegistryTest(unittest.TestCase):
         self.assertIn(res2, results)
 
 
+# This test is depricated and a pain to run!
 
-class RegistryCassandraTest(RegistryTest):
-    """
-    """
-
-    @defer.inlineCallbacks
-    def _setup_backend(self):
-        #clist = ['amoeba.ucsd.edu:9160']
-        clist = ['amoeba.ucsd.edu:9160']
-        s = yield cassandra.CassandraStore.create_store(
-            cass_host_list=clist,
-            cf_super=True,
-            keyspace='Datastore',
-            colfamily='DS1'
-            )
-        self.reg = registry.Registry(s)
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self.reg.clear_registry()
-        log.info("Calling connector.disconnect")
-        self.reg.backend.manager.shutdown()
+#class RegistryCassandraTest(RegistryTest):
+#    """
+#    """
+#
+#    @defer.inlineCallbacks
+#    def _setup_backend(self):
+#        #clist = ['amoeba.ucsd.edu:9160']
+#        clist = ['localhost:9160']
+#        s = yield cassandra.CassandraStore.create_store(
+#            cass_host_list=clist,
+#            cf_super=True,
+#            keyspace='Datastore',
+#            colfamily='DS1'
+#            )
+#        self.reg = registry.Registry(s)
+#
+#    @defer.inlineCallbacks
+#    def tearDown(self):
+#        yield self.reg.clear_registry()
+#        log.info("Calling connector.disconnect")
+#        self.reg.backend.manager.shutdown()
         
 class RegistryServiceTest(IonTestCase, RegistryTest):
     """
