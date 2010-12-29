@@ -8,7 +8,7 @@ from twisted.internet.protocol import ClientCreator
 
 from txredis import protocol
 
-from ion.services.dm.preservation import store
+from ion.data import store
 
 class Store(store.IStore):
     """

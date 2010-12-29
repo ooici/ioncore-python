@@ -201,7 +201,6 @@ class ProcessTest(IonTestCase):
 
         pid2 = p1.get_child_id('echo')
 
-        #byte_string = sha.sha('test').digest()
         byte_string = hashlib.sha1('test').digest()
 
 

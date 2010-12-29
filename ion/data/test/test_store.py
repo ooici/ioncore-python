@@ -16,10 +16,7 @@ from uuid import uuid4
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from ion.data.backends import cassandra
 from ion.data.store import Store
-
-from ion.data.backends import irodsstore 
 
 from ion.data.backends.store_service import StoreServiceClient
 from ion.test.iontest import IonTestCase
@@ -183,30 +180,7 @@ class IStoreTest(unittest.TestCase):
 #        yield self.ds.clear_store()
 #        self.ds.manager.shutdown()
         
-class IRODSStoreTest(IStoreTest):
-    
-    def _setup_backend(self):
-        irods_config = {'irodsHost': 'ec2-204-236-137-245.us-west-1.compute.amazonaws.com', \
-                    'irodsPort':'1247', \
-                    'irodsDefResource':'ooi-test-resc1', \
-                    'irodsOoiCollection':'/ooi-test-cluster1/home/testuser/OOI', \
-                    'irodsUserName':'testuser', \
-                    'irodsUserPasswd':'test', \
-                    'irodsZone':'ooi-test-cluster1'}
-        ds = irodsstore.IrodsStore.create_store(**irods_config)
-        return ds
-     
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self.ds.clear_store()
-               
-    def test_query(self):
-        """
-        @note This isn't implemented in the IRODS store.
-        The query functionality is deprecated in the other store implementations
-        """
-        pass
-        
+
 class StoreServiceTest(IonTestCase, IStoreTest):
     """
     Testing example hello service.

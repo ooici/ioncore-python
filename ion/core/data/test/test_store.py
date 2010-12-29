@@ -19,6 +19,7 @@ from twisted.internet import reactor
 
 from ion.core.data import store
 from ion.core.data import cassandra
+from ion.core.data import irodsstore
 
 from ion.test.iontest import IonTestCase
 
@@ -80,4 +81,19 @@ class CassandraStoreTest(IStoreTest):
     def tearDown(self):
         self.ds.client.manager.shutdown()
 
-
+class IRODSStoreTest(IStoreTest):
+    
+    def _setup_backend(self):
+        irods_config = {'irodsHost': 'ec2-204-236-137-245.us-west-1.compute.amazonaws.com', \
+                    'irodsPort':'1247', \
+                    'irodsDefResource':'ooi-test-resc1', \
+                    'irodsOoiCollection':'/ooi-test-cluster1/home/testuser/OOI', \
+                    'irodsUserName':'testuser', \
+                    'irodsUserPasswd':'test', \
+                    'irodsZone':'ooi-test-cluster1'}
+        ds = irodsstore.IrodsStore.create_store(**irods_config)
+        return ds
+     
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self.ds.clear_store()

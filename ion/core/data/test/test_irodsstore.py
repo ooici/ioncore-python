@@ -11,7 +11,7 @@ from twisted.trial import unittest
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from uuid import uuid4
-from ion.data.backends.irodsstore import IrodsStore
+from ion.core.data.irodsstore import IrodsStore
 from twisted.internet import defer
 
 

@@ -19,7 +19,7 @@ from ion.core.messaging.receiver import Receiver
 from ion.core.process import process
 from ion.core.process.process import Process, ProcessDesc
 from ion.data.datastore import registry
-from ion.services.dm.preservation.store import Store
+from ion.data.store import Store
 from ion.resources import description_utility
 from ion.services.coi import service_registry
 

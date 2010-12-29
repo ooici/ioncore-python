@@ -39,10 +39,10 @@ class WebVizTest(unittest.TestCase):
         #raise unittest.SkipTest('Port causes error on buildbot...')
 
         wviz = web_viz_consumer.WebVizConsumer()
-        wviz.params={'port':8080}
+        wviz.params={'port':2100}
         wviz.customize_consumer()
 
-        page = yield client.getPage('http://127.0.0.1:8080/')
+        page = yield client.getPage('http://127.0.0.1:2100/')
 
         self.failUnlessSubstring('No data yet...', page)
 
@@ -53,17 +53,17 @@ class WebVizTest(unittest.TestCase):
         #raise unittest.SkipTest('Port causes error on buildbot...')
 
         wviz1 = web_viz_consumer.WebVizConsumer()
-        wviz1.params={'port':8080}
+        wviz1.params={'port':8100}
         wviz1.customize_consumer()
 
-        page = yield client.getPage('http://127.0.0.1:8080/')
+        page = yield client.getPage('http://127.0.0.1:8100/')
         self.failUnlessSubstring('No data yet...', page)
 
         wviz2 = web_viz_consumer.WebVizConsumer()
         wviz2.params={'port':2100}
         wviz2.customize_consumer()
 
-        page = yield client.getPage('http://127.0.0.1:8080/')
+        page = yield client.getPage('http://127.0.0.1:8100/')
         self.failUnlessSubstring('No data yet...', page)
 
         page = yield client.getPage('http://127.0.0.1:2100/')
@@ -77,17 +77,17 @@ class WebVizTest(unittest.TestCase):
         #raise unittest.SkipTest('Port causes error on buildbot...')
 
         wviz1 = web_viz_consumer.WebVizConsumer()
-        wviz1.params={'port':8080}
+        wviz1.params={'port':8100}
         wviz1.customize_consumer()
 
-        page = yield client.getPage('http://127.0.0.1:8080/')
+        page = yield client.getPage('http://127.0.0.1:8100/')
         self.failUnlessSubstring('No data yet...', page)
 
         wviz2 = web_viz_consumer.WebVizConsumer()
-        wviz2.params={'port':8080}
+        wviz2.params={'port':8100}
         self.failUnlessRaises(error.CannotListenError, wviz2.customize_consumer)
 
-        page = yield client.getPage('http://127.0.0.1:8080/')
+        page = yield client.getPage('http://127.0.0.1:8100/')
         self.failUnlessSubstring('No data yet...', page)
 
 

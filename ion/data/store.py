@@ -2,8 +2,8 @@
 
 """
 @file ion/data/store.py
-@package ion.services.dm.preservation.store.IStore Pure virtual base class for CRUD
-@package ion.services.dm.preservation.store.Store In-memory implementation of ion.data.IStore
+@package ion.data.store.IStore Pure virtual base class for CRUD
+@package ion.data.store.Store In-memory implementation of ion.data.IStore
 @author Michael Meisinger
 @author David Stuebe
 @author Dorian Raymer
