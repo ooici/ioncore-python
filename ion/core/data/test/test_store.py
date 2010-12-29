@@ -68,16 +68,27 @@ class IStoreTest(unittest.TestCase):
 class CassandraStoreTest(IStoreTest):
 
     def _setup_backend(self):
-        host = 'amoeba.ucsd.edu'
+        #host = 'amoeba.ucsd.edu'
         host = 'localhost'
-        host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
+        #host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
         port = 9160
         namespace = 'iontest'
         builder = cassandra.CassandraFactory(host, port, reactor)
         store = builder.buildStore(namespace)
+        store.namespace = namespace
+        
+        manager_builder = cassandra.CassandraManagerFactory(host, port, reactor)
+        cas_man = manager_builder
+        #cas_man.create(namespace)
+        
+        
         return defer.succeed(store)
 
     def tearDown(self):
+        #cas_man = cassandra.CassandraManager(self.ds.client)
+        #cas_man.remove(self.ds.namespace)
+        
+        
         self.ds.client.manager.shutdown()
 
 

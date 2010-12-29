@@ -770,6 +770,12 @@ class ContainerWrapper(object):
         return inst
         
 
+    @property
+    def Root(self):
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+        return self._wrapper.Root
 
     @property
     def Invalid(self):

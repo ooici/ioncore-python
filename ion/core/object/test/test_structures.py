@@ -190,7 +190,120 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(object.__getattribute__(simple,'Invalid'), True)
         self.assertEqual(object.__getattribute__(floats,'Invalid'), True)
         
+
+
+class ListObjectTest(unittest.TestCase):
+        
+    def setUp(self):
+        self.wb = workbench.WorkBench('No Process Test')
+        
+        self.repo, self.listobj = self.wb.init_repository(basic_pb2.ListObj)
+            
         
         
+    def testfactory(self):
         
+        items1 = self.listobj.items
+        items2 = self.listobj.items
+        
+        self.assertIdentical(items1, items2)
+        
+        self.assertIdentical(items1._wrapper, self.listobj)
+        self.assertIdentical(items1.Root, self.listobj.Root)
+
+        
+    def testsetlink(self):
+        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1.key = 'foo1'
+        kv1.value = 'bar1'
+        
+        items = self.listobj.items
+        
+        item1 = items.add()
+        item1.SetLink(kv1)
+        
+        self.assertEqual(kv1.IsRoot, True)
+        self.assertNotIdentical(kv1.Root, items.Root)
+        
+        self.assertEqual(self.listobj.items[0].key, 'foo1')
+        
+        self.repo.commit('test1')
+        
+        listobj = self.repo.checkout('master')
+        
+        self.assertEqual(items.Invalid, True)
+        self.assertEqual(self.listobj.Invalid, True)
+        self.assertEqual(kv1.Invalid, True)
+        
+        self.assertEqual(self.listobj.items[0].value, 'bar1')
+        
+        
+    def testsetcontainerlink(self):
+        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1.key = 'foo1'
+        kv1.value = 'bar1'
+        
+        items = self.listobj.items
+        
+        item1 = items.add()
+        items.SetLink(0,kv1)
+        
+        self.assertEqual(self.listobj.items[0].key, 'foo1')
+        
+        self.repo.commit('test1')
+        
+        listobj = self.repo.checkout('master')
+        
+        self.assertEqual(items.Invalid, True)
+        self.assertEqual(self.listobj.Invalid, True)
+        self.assertEqual(kv1.Invalid, True)
+        
+        self.assertEqual(self.listobj.items[0].value, 'bar1')
+        
+    def testsetcontainerlink(self):
+        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1.key = 'foo1'
+        kv1.value = 'bar1'
+        
+        items = self.listobj.items
+        
+        item1 = items.add()
+        items[0] = kv1
+        
+        self.assertEqual(self.listobj.items[0].key, 'foo1')
+        
+        self.repo.commit('test1')
+        
+        listobj = self.repo.checkout('master')
+        
+        self.assertEqual(items.Invalid, True)
+        self.assertEqual(self.listobj.Invalid, True)
+        self.assertEqual(kv1.Invalid, True)
+        
+        self.assertEqual(self.listobj.items[0].value, 'bar1')
+        
+        #
+        #
+        #
+        #kv2 = repo.create_wrapped_object(basic_pb2.KeyValue)
+        #kv2.key = 'foo2'
+        #kv2.value = 'bar2'
+        #
+        #kv3 = repo.create_wrapped_object(basic_pb2.KeyValue)
+        #kv3.key = 'foo3'
+        #kv3.value = 'bar3'
+        #
+        #
+        #
+        #
+        #listobject.items.add()
+        #lisgobject.items[1] = kv2
+        #
+        #
+        #repo.commit('First Commit')
+        #self.wb = wb
+        #self.repo = repo
+        #
+        #
+        #
         

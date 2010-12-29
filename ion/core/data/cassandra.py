@@ -193,7 +193,10 @@ class CassandraFactory(object):
         # then Adapting it and returning the result as an IStore providing
         # instance.
         s = self.store(client)
-        s.namespace = namespace
+        #s.namespace = namespace
         return s
 
 
+class CassandraMangerFactory(CassandraFactory):
+    
+    store = CassandraManager
