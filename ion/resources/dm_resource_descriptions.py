@@ -51,13 +51,6 @@ class DataMessageObject(DataObject):
     notification = TypedAttribute(str)
     timestamp = TypedAttribute(float)
 
-
-class DAPMessageObject(DataMessageObject):
-    """Container object for messaging DAP data"""
-    das = TypedAttribute(str)
-    dds = TypedAttribute(str)
-    dods = TypedAttribute(str)
-
 class StringMessageObject(DataMessageObject):
     """Container object for messaging STRING data"""
     data = TypedAttribute(str)

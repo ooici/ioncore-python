@@ -15,8 +15,6 @@ from ion.test.iontest import IonTestCase
 
 from ion.services.dm.distribution.consumers import logging_consumer
 
-from ion.services.dm.util import dap_tools
-
 
 class TestLoggingConsumer(IonTestCase):
     '''
@@ -27,7 +25,6 @@ class TestLoggingConsumer(IonTestCase):
 
     def setUp(self):
 
-        self.dapdata = dap_tools.demo_dataset()
 
         self.dictdata1 = {'data':3.14159,'name':'stuff'}
         self.dictdata2 = {'data':3.14159,'noname':'stuff'}
@@ -50,10 +47,6 @@ class TestLoggingConsumer(IonTestCase):
         lc = logging_consumer.LoggingConsumer()
         lc.ondata(self.dictdata2, self.notification, self.timestamp)
 
-    def test_dapdata(self):
-
-        lc = logging_consumer.LoggingConsumer()
-        lc.ondata(self.dapdata, self.notification, self.timestamp)
 
     def test_strdata(self):
 

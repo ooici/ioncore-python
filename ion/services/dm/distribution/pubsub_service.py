@@ -28,8 +28,6 @@ import ion.util.procutils as pu
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
-from ion.services.dm.util import dap_tools
-from pydap.model import DatasetType
 from ion.services.dm.distribution import base_consumer
 
 
@@ -502,8 +500,6 @@ class DataPubsubClient(ServiceClient):
         #Load the args and pass to the publisher
         if isinstance(data, dm_resource_descriptions.DataMessageObject):
             do = data
-        elif isinstance(data, DatasetType):
-            do = dap_tools.ds2dap_msg(data)
         elif isinstance(data, dict):
             do = dm_resource_descriptions.DictionaryMessageObject()
             do.data=data

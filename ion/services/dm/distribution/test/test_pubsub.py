@@ -25,12 +25,7 @@ from ion.data import dataobject
 from ion.resources.dm_resource_descriptions import PublisherResource,\
     PubSubTopicResource, SubscriptionResource,DataMessageObject
 
-
-
 from ion.services.dm.distribution import base_consumer
-
-
-from ion.services.dm.util import dap_tools
 
 class PubSubEndToEndTest(IonTestCase):
 
@@ -513,143 +508,143 @@ class PubSubTest(IonTestCase):
 
 
 
-
-    @defer.inlineCallbacks
-    def test_exampleconsumer(self):
-        '''
-        @brief Example Consumer is a demonstration of a more complex data consumer.
-        It uses DAP data messages and provides qaqc and event results on two
-        seperate queues.
-        '''
-        dpsc = DataPubsubClient(self.sup)
-
-        #Create and register 3 topics!
-        topic_raw = PubSubTopicResource.create("topic_raw","oceans, oil spill, fun things to do")
-        topic_raw = yield dpsc.define_topic(topic_raw)
-
-
-        #Create and register self.sup as a publisher
-        publisher = PublisherResource.create('Test Publisher', self.sup, topic_raw, 'DataObject')
-        publisher = yield dpsc.define_publisher(publisher)
-
-        log.info('Defined Publisher: '+str(publisher))
-
-        # === Create a Consumer and queues - this will become part of define_subscription.
-
-        #Create two test queues - don't use topics to test the consumer
-        # To be replaced when the subscription service is ready
-        evt_queue=dataobject.create_unique_identity()
-        queue_properties = {evt_queue:{'name_type':'fanout', 'args':{'scope':'global'}}}
-        yield bootstrap.declare_messaging(queue_properties)
-
-        pr_queue=dataobject.create_unique_identity()
-        queue_properties = {pr_queue:{'name_type':'fanout', 'args':{'scope':'global'}}}
-        yield bootstrap.declare_messaging(queue_properties)
-
-        pd1={'name':'example_consumer_1',
-                 'module':'ion.services.dm.distribution.consumers.example_consumer',
-                 'procclass':'ExampleConsumer',
-                 'spawnargs':{'attach':topic_raw.queue.name,\
-                              'Process Parameters':{},\
-                              'delivery queues':\
-                              {'event_queue':evt_queue,\
-                               'processed_queue':pr_queue}}\
-                    }
-
-        child1 = base_consumer.ConsumerDesc(**pd1)
-
-        child1_id = yield self.test_sup.spawn_child(child1)
-
-
-        pd2={'name':'example_consumer_2',
-                 'module':'ion.services.dm.distribution.consumers.logging_consumer',
-                 'procclass':'LoggingConsumer',
-                 'spawnargs':{'attach':evt_queue,\
-                              'Process Parameters':{}}\
-                    }
-        child2 = base_consumer.ConsumerDesc(**pd2)
-
-        child2_id = yield self.test_sup.spawn_child(child2)
-
-        pd3={'name':'example_consumer_3',
-                 'module':'ion.services.dm.distribution.consumers.logging_consumer',
-                 'procclass':'LoggingConsumer',
-                 'spawnargs':{'attach':pr_queue,\
-                              'Process Parameters':{}}\
-                    }
-        child3 = base_consumer.ConsumerDesc(**pd3)
-
-        child3_id = yield self.test_sup.spawn_child(child3)
-
-        # === End of stuff that will be replaced with Subscription method...
-
-
-        # Create an example data message
-        dmsg = dap_tools.simple_datamessage(\
-            {'DataSet Name':'Simple Data','variables':\
-                {'time':{'long_name':'Data and Time','units':'seconds'},\
-                'height':{'long_name':'person height','units':'meters'}}}, \
-            {'time':(101,102,103,104,105,106,107,108,109,110), \
-            'height':(5,2,4,5,-1,9,3,888,3,4)})
-
-        result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
-        if result:
-            log.info('Published Message')
-        else:
-            log.info('Failed to Published Message')
-
-
-        # Need to await the delivery of data messages into the consumers
-        yield pu.asleep(1)
-
-        msg_cnt = yield child1.get_msg_count()
-        received = msg_cnt.get('received',{})
-        sent = msg_cnt.get('sent',{})
-        self.assertEqual(sent.get(evt_queue),2)
-        self.assertEqual(sent.get(pr_queue),1)
-        self.assertEqual(received.get(topic_raw.queue.name),1)
-
-        msg_cnt = yield child2.get_msg_count()
-        received = msg_cnt.get('received',{})
-        sent = msg_cnt.get('sent',{})
-        self.assertEqual(sent,{})
-        self.assertEqual(received.get(evt_queue),2)
-
-        msg_cnt = yield child3.get_msg_count()
-        received = msg_cnt.get('received',{})
-        sent = msg_cnt.get('sent',{})
-        self.assertEqual(sent,{})
-        self.assertEqual(received.get(pr_queue),1)
-
-
-        # Publish a second message with different data
-        dmsg = dap_tools.simple_datamessage(\
-            {'DataSet Name':'Simple Data','variables':\
-                {'time':{'long_name':'Data and Time','units':'seconds'},\
-                'height':{'long_name':'person height','units':'meters'}}}, \
-            {'time':(111,112,123,114,115,116,117,118,119,120), \
-            'height':(8,986,4,-2,-1,5,3,1,4,5)})
-
-        result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
-
-        # Need to await the delivery of data messages into the consumers
-        yield pu.asleep(1)
-
-        msg_cnt = yield child1.get_msg_count()
-        received = msg_cnt.get('received',{})
-        sent = msg_cnt.get('sent',{})
-        self.assertEqual(sent.get(evt_queue),5)
-        self.assertEqual(sent.get(pr_queue),2)
-        self.assertEqual(received.get(topic_raw.queue.name),2)
-
-        msg_cnt = yield child2.get_msg_count()
-        received = msg_cnt.get('received',{})
-        sent = msg_cnt.get('sent',{})
-        self.assertEqual(sent,{})
-        self.assertEqual(received.get(evt_queue),5)
-
-        msg_cnt = yield child3.get_msg_count()
-        received = msg_cnt.get('received',{})
-        sent = msg_cnt.get('sent',{})
-        self.assertEqual(sent,{})
-        self.assertEqual(received.get(pr_queue),2)
+    # This example is invalid till the dap message object is replaced!
+    #@defer.inlineCallbacks
+    #def test_exampleconsumer(self):
+    #    '''
+    #    @brief Example Consumer is a demonstration of a more complex data consumer.
+    #    It uses DAP data messages and provides qaqc and event results on two
+    #    seperate queues.
+    #    '''
+    #    dpsc = DataPubsubClient(self.sup)
+    #
+    #    #Create and register 3 topics!
+    #    topic_raw = PubSubTopicResource.create("topic_raw","oceans, oil spill, fun things to do")
+    #    topic_raw = yield dpsc.define_topic(topic_raw)
+    #
+    #
+    #    #Create and register self.sup as a publisher
+    #    publisher = PublisherResource.create('Test Publisher', self.sup, topic_raw, 'DataObject')
+    #    publisher = yield dpsc.define_publisher(publisher)
+    #
+    #    log.info('Defined Publisher: '+str(publisher))
+    #
+    #    # === Create a Consumer and queues - this will become part of define_subscription.
+    #
+    #    #Create two test queues - don't use topics to test the consumer
+    #    # To be replaced when the subscription service is ready
+    #    evt_queue=dataobject.create_unique_identity()
+    #    queue_properties = {evt_queue:{'name_type':'fanout', 'args':{'scope':'global'}}}
+    #    yield bootstrap.declare_messaging(queue_properties)
+    #
+    #    pr_queue=dataobject.create_unique_identity()
+    #    queue_properties = {pr_queue:{'name_type':'fanout', 'args':{'scope':'global'}}}
+    #    yield bootstrap.declare_messaging(queue_properties)
+    #
+    #    pd1={'name':'example_consumer_1',
+    #             'module':'ion.services.dm.distribution.consumers.example_consumer',
+    #             'procclass':'ExampleConsumer',
+    #             'spawnargs':{'attach':topic_raw.queue.name,\
+    #                          'Process Parameters':{},\
+    #                          'delivery queues':\
+    #                          {'event_queue':evt_queue,\
+    #                           'processed_queue':pr_queue}}\
+    #                }
+    #
+    #    child1 = base_consumer.ConsumerDesc(**pd1)
+    #
+    #    child1_id = yield self.test_sup.spawn_child(child1)
+    #
+    #
+    #    pd2={'name':'example_consumer_2',
+    #             'module':'ion.services.dm.distribution.consumers.logging_consumer',
+    #             'procclass':'LoggingConsumer',
+    #             'spawnargs':{'attach':evt_queue,\
+    #                          'Process Parameters':{}}\
+    #                }
+    #    child2 = base_consumer.ConsumerDesc(**pd2)
+    #
+    #    child2_id = yield self.test_sup.spawn_child(child2)
+    #
+    #    pd3={'name':'example_consumer_3',
+    #             'module':'ion.services.dm.distribution.consumers.logging_consumer',
+    #             'procclass':'LoggingConsumer',
+    #             'spawnargs':{'attach':pr_queue,\
+    #                          'Process Parameters':{}}\
+    #                }
+    #    child3 = base_consumer.ConsumerDesc(**pd3)
+    #
+    #    child3_id = yield self.test_sup.spawn_child(child3)
+    #
+    #    # === End of stuff that will be replaced with Subscription method...
+    #
+    #
+    #    # Create an example data message
+    #    dmsg = dap_tools.simple_datamessage(\
+    #        {'DataSet Name':'Simple Data','variables':\
+    #            {'time':{'long_name':'Data and Time','units':'seconds'},\
+    #            'height':{'long_name':'person height','units':'meters'}}}, \
+    #        {'time':(101,102,103,104,105,106,107,108,109,110), \
+    #        'height':(5,2,4,5,-1,9,3,888,3,4)})
+    #
+    #    result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
+    #    if result:
+    #        log.info('Published Message')
+    #    else:
+    #        log.info('Failed to Published Message')
+    #
+    #
+    #    # Need to await the delivery of data messages into the consumers
+    #    yield pu.asleep(1)
+    #
+    #    msg_cnt = yield child1.get_msg_count()
+    #    received = msg_cnt.get('received',{})
+    #    sent = msg_cnt.get('sent',{})
+    #    self.assertEqual(sent.get(evt_queue),2)
+    #    self.assertEqual(sent.get(pr_queue),1)
+    #    self.assertEqual(received.get(topic_raw.queue.name),1)
+    #
+    #    msg_cnt = yield child2.get_msg_count()
+    #    received = msg_cnt.get('received',{})
+    #    sent = msg_cnt.get('sent',{})
+    #    self.assertEqual(sent,{})
+    #    self.assertEqual(received.get(evt_queue),2)
+    #
+    #    msg_cnt = yield child3.get_msg_count()
+    #    received = msg_cnt.get('received',{})
+    #    sent = msg_cnt.get('sent',{})
+    #    self.assertEqual(sent,{})
+    #    self.assertEqual(received.get(pr_queue),1)
+    #
+    #
+    #    # Publish a second message with different data
+    #    dmsg = dap_tools.simple_datamessage(\
+    #        {'DataSet Name':'Simple Data','variables':\
+    #            {'time':{'long_name':'Data and Time','units':'seconds'},\
+    #            'height':{'long_name':'person height','units':'meters'}}}, \
+    #        {'time':(111,112,123,114,115,116,117,118,119,120), \
+    #        'height':(8,986,4,-2,-1,5,3,1,4,5)})
+    #
+    #    result = yield dpsc.publish(self.sup, topic_raw.reference(), dmsg)
+    #
+    #    # Need to await the delivery of data messages into the consumers
+    #    yield pu.asleep(1)
+    #
+    #    msg_cnt = yield child1.get_msg_count()
+    #    received = msg_cnt.get('received',{})
+    #    sent = msg_cnt.get('sent',{})
+    #    self.assertEqual(sent.get(evt_queue),5)
+    #    self.assertEqual(sent.get(pr_queue),2)
+    #    self.assertEqual(received.get(topic_raw.queue.name),2)
+    #
+    #    msg_cnt = yield child2.get_msg_count()
+    #    received = msg_cnt.get('received',{})
+    #    sent = msg_cnt.get('sent',{})
+    #    self.assertEqual(sent,{})
+    #    self.assertEqual(received.get(evt_queue),5)
+    #
+    #    msg_cnt = yield child3.get_msg_count()
+    #    received = msg_cnt.get('received',{})
+    #    sent = msg_cnt.get('sent',{})
+    #    self.assertEqual(sent,{})
+    #    self.assertEqual(received.get(pr_queue),2)

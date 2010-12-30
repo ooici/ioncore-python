@@ -38,9 +38,7 @@ try:
     setupdict['packages'].extend(['twisted/plugins'])
     setupdict['test_suite'] = 'ion'
     setupdict['install_requires'] = ['Twisted', 'carrot', 'txamqp', 'numpy',
-                                     'Paste', 'Pydap', 'simplejson', 'httplib2',
-                                     'pydap.handlers.netcdf','pydap.handlers.nca',
-                                     'pydap.responses.netcdf', 'msgpack-python',
+                                     'Paste','simplejson', 'httplib2','msgpack-python',
                                      'gviz_api.py','nimboss','txrabbitmq', 'Telephus', 
                                      'pyrods-irods>=2.4.2', 'M2Crypto']
     

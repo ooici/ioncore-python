@@ -14,8 +14,6 @@ from ion.core.process.process import ProcessFactory
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from pydap.model import DatasetType
-
 class LoggingConsumer(base_consumer.BaseConsumer):
     """
         This is an simple consumer to loggin messages on a queue/topic
@@ -24,8 +22,6 @@ class LoggingConsumer(base_consumer.BaseConsumer):
         
         if isinstance(data,str):
             info = 'String Dataset: ' +data
-        elif isinstance(data, DatasetType):
-            info = 'Dap Dataset Name:'+  data.name
         elif isinstance(data, dict):
             info = 'Dict Dataset Name:' + data.get('name','No name attribute in data dictionary?')
         elif data == None:
