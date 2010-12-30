@@ -42,13 +42,13 @@ def get_virtualenv():
         return "[env: %s]" % virtual_env
     return "[env: system]"
 
-class PreparseredInterpreter(manhole.ManholeInterpreter):
+class PreprocessedInterpreter(manhole.ManholeInterpreter):
     """
     """
 
     def __init__(self, handler, locals=None, filename="<console>", preprocess={}):
         """
-        Initializes a PreparseredInterpreter.
+        Initializes a PreprocessedInterpreter.
 
         @param preprocess   A dict mapping Regex expressions (which match lines) to
                             callables. The callables should take a single parameter (a
@@ -358,7 +358,7 @@ class ConsoleManhole(manhole.ColoredManhole):
         manhole.ColoredManhole.connectionMade(self)
 
         preprocess = { re.compile(r'^.*\?$') : self.obj_info }
-        self.interpreter = PreparseredInterpreter(self, self.namespace, preprocess=preprocess)
+        self.interpreter = PreprocessedInterpreter(self, self.namespace, preprocess=preprocess)
 
         self.keyHandlers.update({
             CTRL_A: self.handle_HOME,
