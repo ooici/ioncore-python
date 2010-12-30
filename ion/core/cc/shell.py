@@ -26,6 +26,9 @@ from ion.core import ionconst
 
 CTRL_A = '\x01'
 CTRL_E = '\x05'
+CTRL_R = "\x12"
+CTRL_Q = "\x11"
+ESC = "\x1b"
 
 def get_virtualenv():
     if 'VIRTUAL_ENV' in os.environ:
@@ -35,11 +38,6 @@ def get_virtualenv():
                         'site-packages')
         return "[env: %s]" % virtual_env
     return "[env: system]"
-
-
-CTRL_R = "\x12"
-ESC = "\x1b"
-
 
 class PreparseredInterpreter(manhole.ManholeInterpreter):
     """
@@ -68,7 +66,11 @@ class ConsoleManhole(manhole.Manhole):
 
         @todo Dependency info will be listed in the setup file
         """
-        # self.terminal.reset()
+        self.history_append = True      # controls appending of history
+        self.historysearch = False
+        self.historysearchbuffer = []
+        self.historyFail = False # self.terminal.reset()
+
         self.terminal.write('\r\n')
         msg = """
     ____                ______                    ____        __  __
@@ -83,13 +85,10 @@ class ConsoleManhole(manhole.Manhole):
         self.terminal.write('ION Python Capability Container (version %s)\r\n' % (ionconst.VERSION))
         self.terminal.write('%s \r\n' % get_virtualenv())
         self.terminal.write('[container id: %s@%s.%d] \r\n' % (os.getlogin(), os.uname()[1], os.getpid()))
+        self.printHistoryAppendStatus()
         self.terminal.write('\r\n')
         self.terminal.write(self.ps[self.pn])
         self.setInsertMode()
-
-        self.historysearch = False
-        self.historysearchbuffer = []
-        self.historyFail = False
 
     def handle_TAB(self):
         completer = rlcompleter.Completer(self.namespace)
@@ -194,6 +193,20 @@ class ConsoleManhole(manhole.Manhole):
             self.historysearch = True
         self.printHistorySearch()
 
+    def handle_CTRLQ(self):
+        self.history_append = not self.history_append;
+        self.printHistoryAppendStatus()
+        self.drawInputLine()
+
+    def printHistoryAppendStatus(self):
+        self.terminal.write('\r\n')
+        self.terminal.write('History appending is ')
+        if self.history_append:
+            self.terminal.write('ON')
+        else:
+            self.terminal.write('OFF')
+        self.terminal.write('. Press Ctrl+Q to toggle.\r\n')
+
     def handle_RETURN(self):
         """
         Handles the Return/Enter key being pressed. We subvert HistoricRecvLine's
@@ -206,7 +219,7 @@ class ConsoleManhole(manhole.Manhole):
         # from the previous history line. You don't want 10 entries of the same thing.
         if self.lineBuffer:
             curLine = ''.join(self.lineBuffer)
-            if self.historyLines[-1] != curLine:
+            if self.history_append and self.historyLines[-1] != curLine:
                 self.historyLines.append(curLine)
         self.historyPosition = len(self.historyLines)
         recvline.RecvLine.handle_RETURN(self)
@@ -310,13 +323,14 @@ class ConsoleManhole(manhole.Manhole):
 
     def connectionMade(self):
         manhole.ColoredManhole.connectionMade(self)
-        self.keyHandlers[CTRL_R] = self.handle_CTRLR
-        self.keyHandlers[ESC] = self.handle_ESC
         self.interpreter = PreparseredInterpreter(self, self.namespace)
 
         self.keyHandlers.update({
             CTRL_A: self.handle_HOME,
             CTRL_E: self.handle_END,
+            CTRL_R: self.handle_CTRLR,
+            CTRL_Q: self.handle_CTRLQ,
+            ESC: self.handle_ESC,
             })
 
         # read in history from history file on disk, set internal history/position
