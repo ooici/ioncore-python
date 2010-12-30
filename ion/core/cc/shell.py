@@ -30,6 +30,9 @@ CTRL_R = "\x12"
 CTRL_Q = "\x11"
 ESC = "\x1b"
 
+PROMPT_HISTORY = { True  : ("><> ", "... "),
+                   False : ("--> ", "... ") }
+
 def get_virtualenv():
     if 'VIRTUAL_ENV' in os.environ:
         virtual_env = os.path.join(os.environ.get('VIRTUAL_ENV'),
@@ -54,7 +57,7 @@ class PreparseredInterpreter(manhole.ManholeInterpreter):
 
 #class ConsoleManhole(manhole.ColoredManhole):
 class ConsoleManhole(manhole.Manhole):
-    ps = ('><> ', '... ')
+    ps = PROMPT_HISTORY[True]
 
     def initializeScreen(self):
         """@todo This should show relevant and useful development info:
@@ -195,6 +198,7 @@ class ConsoleManhole(manhole.Manhole):
 
     def handle_CTRLQ(self):
         self.history_append = not self.history_append;
+        self.ps = PROMPT_HISTORY[self.history_append]
         self.printHistoryAppendStatus()
         self.drawInputLine()
 
