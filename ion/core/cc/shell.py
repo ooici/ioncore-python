@@ -46,13 +46,43 @@ class PreparseredInterpreter(manhole.ManholeInterpreter):
     """
     """
 
+    def __init__(self, handler, locals=None, filename="<console>", preprocess={}):
+        """
+        Initializes a PreparseredInterpreter.
+
+        @param preprocess   A dict mapping Regex expressions (which match lines) to
+                            callables. The callables should take a single parameter (a
+                            string with the line) and return either None or a string to
+                            send to the interpreter. If None is returned, the callable
+                            is assumed to have handled it and it is not sent to the
+                            interpreter.
+        """
+        self._preprocessHandlers = preprocess
+        manhole.ManholeInterpreter.__init__(self, handler, locals, filename)
+
+    def addPreprocessHandler(self, regex, handler):
+        self._preprocessHandlers[regex] = handler
+
+    def delPreprocessHandler(self, regex):
+        del(self._preprocessHandlers[regex])
+
     def push(self, line):
         """
         pre parse input lines
         """
-        if line and line[-1] == '?':
-            line = 'obj_info(%s)' % line[:-1]
-        return manhole.ManholeInterpreter.push(self, line)
+        newline = line
+        for regex, handler in self._preprocessHandlers.items():
+            mo = regex.match(line)
+            if mo != None:
+                retval = handler(line)
+                if retval == None:
+                    return False        # handled, all good
+                newline = retval
+                break
+
+        #if line and line[-1] == '?':
+        #    line = 'obj_info(%s)' % line[:-1]
+        return manhole.ManholeInterpreter.push(self, newline)
 
 
 class ConsoleManhole(manhole.ColoredManhole):
@@ -77,10 +107,10 @@ class ConsoleManhole(manhole.ColoredManhole):
         msg = """
     ____                ______                    ____        __  __
    /  _/____  ____     / ____/____  ________     / __ \__  __/ /_/ /_  ____  ____
-   / / / __ \/ __ \   / /    / __ \/ ___/ _ \   / /_/ / / / / __/ __ \/ __ \/ __ \ 
+   / / / __ \/ __ \   / /    / __ \/ ___/ _ \   / /_/ / / / / __/ __ \/ __ \/ __ \
  _/ / / /_/ / / / /  / /___ / /_/ / /  /  __/  / ____/ /_/ / /_/ / / / /_/ / / / /
 /___/ \____/_/ /_/   \____/ \____/_/   \___/  /_/    \__, /\__/_/ /_/\____/_/ /_/
-                                                    /____/                         
+                                                    /____/
 """
         # Make new banners using: http://patorjk.com/software/taag/
         self.terminal.write(msg)
@@ -326,7 +356,9 @@ class ConsoleManhole(manhole.ColoredManhole):
 
     def connectionMade(self):
         manhole.ColoredManhole.connectionMade(self)
-        self.interpreter = PreparseredInterpreter(self, self.namespace)
+
+        preprocess = { re.compile(r'^.*\?$') : self.obj_info }
+        self.interpreter = PreparseredInterpreter(self, self.namespace, preprocess=preprocess)
 
         self.keyHandlers.update({
             CTRL_A: self.handle_HOME,
@@ -489,10 +521,21 @@ def makeNamespace():
     from ion.core.cc.shell_api import *
     from ion.core.id import Id
 
-    def obj_info(item, format='print'):
+    def obj_info(self, item, format='print'):
         """Print useful information about item."""
+        # Item is a string with the ? trailing, chop it off.
+        item = item[:-1]
+
+        # now eval it
+        try:
+            item = eval(item, globals(), self.namespace)
+        except Exception, e:
+            self.terminal.write('\r\n')
+            self.terminal.write(str(e))
+            return None
+
         if item == '?':
-            print 'Type <object>? for info on that object.'
+            self.terminal.write('Type <object>? for info on that object.')
             return
         _name = 'N/A'
         _class = 'N/A'
@@ -515,12 +558,19 @@ def makeNamespace():
             _doc = _doc.strip()   # Remove leading/trailing whitespace.
         info = {'name':_name, 'class':_class, 'type':_type, 'repr':_repr, 'doc':_doc}
         if format is 'print':
+            self.terminal.write('\r\n')
             for k,v in info.iteritems():
-                print k.capitalize(),': ', v
-            print '\n\n'
-            return
+                self.terminal.write("%s: %s\r\n" % (str(k.capitalize()), str(v)))
+
+            self.terminal.write('\r\n\r\n')
+            return None
         elif format is 'dict':
+            raise ValueError("TODO: no work")
             return info
+
+def makeNamespace():
+    from ion.core.cc.shell_api import send, ps, ms, spawn, kill, info, rpc_send, svc, nodes, identify
+    from ion.core.id import Id
 
     namespace = locals()
     return namespace
