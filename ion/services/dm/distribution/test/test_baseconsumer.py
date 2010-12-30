@@ -21,10 +21,9 @@ from ion.test.iontest import IonTestCase
 import ion.util.procutils as pu
 
 from ion.data import dataobject
-from ion.resources.dm_resource_descriptions import DAPMessageObject, \
+from ion.resources.dm_resource_descriptions import \
     DataMessageObject, DictionaryMessageObject, StringMessageObject
 
-from ion.services.dm.util import dap_tools
 from ion.services.dm.distribution import base_consumer
 
 class BaseConsumerTest(IonTestCase):

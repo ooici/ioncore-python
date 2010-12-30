@@ -45,6 +45,26 @@
     <delete dir="_trial_temp"/>
   </target>
 
+  <target name="pipclean"
+        description="Uninstall dependencies using Pip">
+    <echo message="Uninstall dependencies using Pip"/>
+    <exec executable="pip">
+        <arg value="uninstall"/>
+        <arg value="-y"/>
+        <arg value="--requirement=requirements.txt"/>
+    </exec>
+  </target>
+  
+  <target name="pipinstall"
+        description="Install dependencies using Pip">
+    <echo message="Installing dependencies using Pip"/>
+    <exec executable="pip" failonerror="true">
+      <arg value="install"/>
+      <arg value="--find-links=http://ooici.net/packages"/>
+      <arg value="--requirement=requirements.txt"/>
+    </exec>
+  </target>
+
   <target name="install" depends="clean"
         description="Install dependencies" >
     <!-- Run new empty capability container without shell -->
@@ -89,7 +109,7 @@
     </exec>
   </target>
 
-  <target name="test" depends="clean"
+  <target name="test" depends="clean, pipinstall"
         description="exdecutes all trial unit test cases" >
     <exec executable="trial">
       <arg value="${src}"/>

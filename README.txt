@@ -21,16 +21,10 @@ is an early implementation of the OOI Python Capability Container.
 For more information, please see:
 http://www.oceanobservatories.org/spaces/display/syseng/CIAD+COI+SV+Python+Capability+Container
 
-Get LCAarch with
-::
-    git clone git@amoeba.ucsd.edu:lcaarch.git
-    cd lcaarch
-
-
 Dependencies
 ============
 
-LCAarch is compatible with Python 2.5 and higher, but not Python 3.x
+ioncore-python is compatible with Python 2.5 and higher, but not Python 3.x
 This project has several dependencies on libraries and packages. Most of these
 dependencies are resolved automatically using the provided setup script.
 
@@ -39,14 +33,13 @@ Step 1: Virtual env
     libraries and dependencies are installed separately from the Python
     system libraries
 ::
-    mkvirtualenv lcaarch
-    workon lcaarch
+    mkvirtualenv ioncore-python
+    workon ioncore-python
 
 Step 2: Core libraries (you can skip this step)
     Install some core libraries first. Sometimes the automatic installer
     produces errors, if these libraries are not present beforehand.
 ::
-    easy_install numpy
     easy_install -U twisted
 
 Step 3: Run the setup script
@@ -58,8 +51,7 @@ Check the trace output that there are no substantial errors. You are now ready
 to run.
 
 Current dependencies include:
-    twisted, carrot, numpy, txamqp, msgpack-python, httplib2, pycassa, simplejson,
-    pydap, pydap.handlers.netcdf, pydap.responses.netcdf, pydap.handlers.nca,
+    twisted, carrot, txamqp, msgpack-python, httplib2, pycassa, simplejson,
     gviz_api.py, nimboss, txrabbitmq, M2Crypto-patched
 
 NOTE: As the project evolves and new code is added, dependencies might change.
@@ -71,7 +63,7 @@ Run the setup script once in a while and when you get errors
 Usage
 =====
 
-(all subsequent steps assume you are in the lcaarch/ root dir)
+(all subsequent steps assume you are in the ioncore-python/ root dir)
 
 Start empty Python Capability Container shell with:
 ::

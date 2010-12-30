@@ -12,7 +12,7 @@
 
 setupdict = {
     'name' : 'ioncore',
-    'version' : '0.3.0', #VERSION,
+    'version' : '0.4.0', #VERSION,
     'description' : 'OOI ION Python Capability Container and Core Modules',
     'url': 'http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project',
     'download_url' : 'http://ooici.net/packages',
@@ -37,24 +37,17 @@ try:
     setupdict['dependency_links'] = ['http://ooici.net/packages']
     setupdict['packages'].extend(['twisted/plugins'])
     setupdict['test_suite'] = 'ion'
-    """
-    setupdict['install_requires'] = ['Twisted', 'carrot', 'txamqp', 'numpy',
-                                     'Paste', 'Pydap', 'simplejson', 'httplib2',
-                                     'pydap.handlers.netcdf','pydap.handlers.nca',
-                                     'pydap.responses.netcdf', 'msgpack-python',
-                                     'gviz_api.py','nimboss','txrabbitmq', 'Telephus', 
-                                     'pyrods-irods>=2.4.2', 'M2Crypto-patched', 'ionproto']
-    """
+
     setupdict['install_requires'] = ['Twisted', 'carrot', 'txamqp',
-                                     'Paste', 'simplejson', 'httplib2',
-                                     'msgpack-python',
+                                     'Paste','simplejson', 'httplib2','msgpack-python',
                                      'gviz_api.py','nimboss','txrabbitmq', 'Telephus', 
-                                     'ionproto']
+                                     'pyrods-irods>=2.4.2', 'M2Crypto', 'ionproto']
+
     
     setupdict['include_package_data'] = True
     setup(**setupdict)
 
 except ImportError:
     from distutils.core import setup
-    setupdict['packages'] = ['lcaarch']
+    setupdict['packages'] = ['ioncore']
     setup(**setupdict)

@@ -25,15 +25,7 @@ import ion.util.procutils as pu
 
 from ion.data import dataobject
 from ion.resources.dm_resource_descriptions import PubSubTopicResource, \
-    DAPMessageObject, DataMessageObject, StringMessageObject, DictionaryMessageObject
-
-from ion.services.dm.util import dap_tools
-
-from pydap.model import DatasetType
-
-#import numpy
-
-from ion.services.dm.util import dap_tools
+    DataMessageObject, StringMessageObject, DictionaryMessageObject
 
 
 class BaseConsumer(Process):
@@ -238,9 +230,7 @@ class BaseConsumer(Process):
 
         # Unpack the message and turn it into data
         datamessage = dataobject.DataObject.decode(content)
-        if isinstance(datamessage, DAPMessageObject):
-            data = dap_tools.dap_msg2ds(datamessage)
-        elif isinstance(datamessage, (StringMessageObject, DictionaryMessageObject)):
+        if isinstance(datamessage, (StringMessageObject, DictionaryMessageObject)):
             data = datamessage.data
         else:
             data = None
@@ -334,9 +324,7 @@ class BaseConsumer(Process):
 
     def queue_result(self,queue, data=None, notification=''):
 
-        if isinstance(data, DatasetType):
-            msg = dap_tools.ds2dap_msg(data)
-        elif isinstance(data, str):
+        if isinstance(data, str):
             msg = StringMessageObject()
             msg.data=data
         elif isinstance(data, dict):

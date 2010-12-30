@@ -14,7 +14,7 @@ from twisted.python import reflect
 
 from ion.data import dataobject
 from ion.data.datastore import registry
-from ion.services.dm.preservation import store
+from ion.data import store
 
 from ion.core import ioninit
 from ion.core.process.process import ProcessFactory, Process

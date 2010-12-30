@@ -25,7 +25,6 @@ from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.services.dm.distribution import base_consumer
 from ion.services.dm.distribution.consumers import forwarding_consumer
 from ion.services.dm.distribution.consumers import logging_consumer
-from ion.services.dm.distribution.consumers import example_consumer
 
 import ion.util.procutils as pu
 from ion.data import dataobject

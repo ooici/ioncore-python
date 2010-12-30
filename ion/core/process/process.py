@@ -22,7 +22,7 @@ from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
 from ion.core.messaging.ion_reply_codes import ResponseCodes
 from ion.core.process.cprocess import IContainerProcess, ContainerProcess
-from ion.services.dm.preservation.store import Store
+from ion.data.store import Store
 from ion.interact.conversation import Conversation
 from ion.interact.message import Message
 import ion.util.procutils as pu

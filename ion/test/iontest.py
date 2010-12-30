@@ -19,7 +19,7 @@ from ion.core.cc.container import Id, Container
 from ion.core.messaging.receiver import Receiver
 from ion.core.process import process
 from ion.core.process.process import IProcess, Process
-from ion.services.dm.preservation.store import Store
+from ion.data.store import Store
 import ion.util.procutils as pu
 
 from ion.resources import description_utility

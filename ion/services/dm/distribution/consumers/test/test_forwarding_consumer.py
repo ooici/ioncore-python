@@ -16,7 +16,6 @@ from ion.test.iontest import IonTestCase
 
 from ion.services.dm.distribution.consumers import forwarding_consumer
 
-from ion.services.dm.util import dap_tools
 from twisted.internet import defer
 
 
@@ -31,7 +30,6 @@ class TestForwardingConsumer(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
 
-        self.dapdata = dap_tools.demo_dataset()
 
         self.dictdata = {'data':3.14159,'name':'stuff'}
         self.strdata = 'Junk in a string'
@@ -62,10 +60,6 @@ class TestForwardingConsumer(IonTestCase):
 
         self.assertEqual(len(self.fc.msgs_to_send),2)
 
-
-    def test_dapdata(self):
-        self.fc.ondata(self.dapdata, self.notification, self.timestamp,queues=self.queues1)
-        self.assertEqual(len(self.fc.msgs_to_send),1)
 
     def test_strdata(self):
         self.fc.ondata(self.strdata, self.notification, self.timestamp,queues=self.queues1)

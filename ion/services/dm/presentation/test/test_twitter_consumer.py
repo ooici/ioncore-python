@@ -12,7 +12,6 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.test.iontest import IonTestCase
 
 from ion.services.dm.presentation import twitter_consumer
-from ion.services.dm.util import dap_tools
 from twisted.internet import defer
 
 from urllib2 import HTTPError

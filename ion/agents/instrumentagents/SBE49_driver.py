@@ -26,7 +26,7 @@ from collections import deque
 
 from ion.core.process.process import Process
 from ion.data.dataobject import ResourceReference
-from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource, DAPMessageObject
+from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource #, DAPMessageObject
 from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 
 from ion.agents.instrumentagents.instrument_agent import InstrumentDriver, InstrumentAgentClient

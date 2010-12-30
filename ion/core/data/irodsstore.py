@@ -17,7 +17,7 @@ logging = logging.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core import ioninit
-from ion.services.dm.preservation.store import IStore
+from ion.data.store import IStore
 
 from irods import *
 from irods_error import *
@@ -81,14 +81,14 @@ class IrodsStore(IStore):
         """
         self.conn, errMsg = rcConnect(self.hostname, int(self.port_num), self.user_name, self.zone)
         if not self.conn:
-            logging.info('rcConnect() error: ' + errMsg)
-            raise IrodsStoreError('rcConnect error: ' + errMsg)
+            logging.info('rcConnect() error: ' + str(errMsg))
+            raise IrodsStoreError('rcConnect error: ' + str(errMsg))
 
         status = clientLoginWithPassword(self.conn, self.user_passwd)
         if status < 0:
             self.conn = None
             errName, subErrName = rodsErrorName(status)
-            errMsg = str(status) + ':' + errName + ' ' + subErrName
+            errMsg = str(status) + ':' + str(errName) + ' ' + str(subErrName)
             logging.info('rcConnect() error: ' + errMsg)
             raise IrodsStoreError('clientLoginWithPassword() error:' + errMsg)
 
@@ -157,7 +157,7 @@ class IrodsStore(IStore):
 
         f = iRodsOpen(self.conn, self.fname, "r")
         if not f:
-            logging.info('Failed to open file for read: ' + self.fname)
+            logging.info('Failed to open file for read: ' + str(self.fname))
             #raise IrodsStoreError('Failed to open file for read: ' + self.fname)
             return defer.succeed(None)
         value = f.read()
@@ -186,14 +186,14 @@ class IrodsStore(IStore):
         status = rcCollCreate(self.conn, collinp)
         if status < 0:
             errMsg = self._get_errmsg_by_status(status)
-            logging.info('rcCollCreate() error: ' + errMsg)
-            raise IrodsStoreError('rcCollCreate() error: ' + errMsg)
+            logging.info('rcCollCreate() error: ' + str(errMsg))
+            raise IrodsStoreError('rcCollCreate() error: ' + str(errMsg))
 
         fname = self._get_irods_fname_by_key(key)
         f = iRodsOpen(self.conn, fname, 'w', self.default_resc)
         if not f:
-            logging.info('Failed to open file for write: ' + fname)
-            raise IrodsStoreError('Failed to open file for write: ' + fname)
+            logging.info('Failed to open file for write: ' + str(fname))
+            raise IrodsStoreError('Failed to open file for write: ' + str(fname))
 
         f.write(value)
         f.close()
@@ -202,7 +202,7 @@ class IrodsStore(IStore):
 
     def _get_errmsg_by_status(self, t):
         errName, subErrName = rodsErrorName(t)
-        errMsg = str(t) + ':' + errName + ' ' + subErrName
+        errMsg = str(t) + ':' + str(errName) + ' ' + str(subErrName)
         return errMsg
 
     
@@ -221,11 +221,11 @@ class IrodsStore(IStore):
         dataObjInp.setObjPath(self.fname)
 
         t = rcDataObjUnlink(self.conn, dataObjInp)
-
+    
         if t < 0:
             errMsg = self._get_errmsg_by_status(t)
-            logging.info('rcDataObjUnlink() error: ' + errMsg)
-            raise IrodsStoreError('rcDataObjUnlink() error: ' + errMsg)
+            logging.info('rcDataObjUnlink() error: ' + str(errMsg))
+            raise IrodsStoreError('rcDataObjUnlink() error: ' + str(errMsg))
 
         return defer.succeed(None)
 

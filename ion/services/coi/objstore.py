@@ -13,8 +13,8 @@ from twisted.internet import defer
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.exception import ReceivedError
-from ion.services.dm.preservation import store
-from ion.services.dm.preservation import cas
+from ion.data import store
+from ion.data import cas
 from ion.data.datastore import objstore
 
 class Serializer(object):

@@ -9,7 +9,6 @@
 import os
 import hashlib
 
-
 from twisted.trial import unittest
 from twisted.internet import defer
 
@@ -208,10 +207,9 @@ class ProcessTest(IonTestCase):
         sup = yield self._spawn_processes(processes, sup=p1)
 
         pid2 = p1.get_child_id('echo')
-
-        #byte_string = sha.sha('test').digest()
-        byte_string = hashlib.sha1('test').digest()
         
+        byte_string = hashlib.sha1('test').digest()
+
         yield p1.send(pid2, 'echo', byte_string)
         log.info('Sent byte-string')
 
