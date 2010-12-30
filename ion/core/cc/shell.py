@@ -55,8 +55,7 @@ class PreparseredInterpreter(manhole.ManholeInterpreter):
         return manhole.ManholeInterpreter.push(self, line)
 
 
-#class ConsoleManhole(manhole.ColoredManhole):
-class ConsoleManhole(manhole.Manhole):
+class ConsoleManhole(manhole.ColoredManhole):
     ps = PROMPT_HISTORY[True]
 
     def initializeScreen(self):
@@ -116,7 +115,7 @@ class ConsoleManhole(manhole.Manhole):
         search_term, attrQ = find_term(search_line)
 
         if not search_term:
-            return manhole.Manhole.handle_TAB(self)        
+            return manhole.ColoredManhole.handle_TAB(self)
 
         if attrQ:
             matches = completer.attr_matches(search_term)
