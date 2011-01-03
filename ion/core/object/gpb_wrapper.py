@@ -910,8 +910,7 @@ class ContainerWrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         wrapper_list=[]
-        stop = min(stop, len(self))
-        for index in range(start,stop):
+        for index in range(0, len(self))[start:stop]:
             wrapper_list.append(self.__getitem__(index))
         return wrapper_list
     

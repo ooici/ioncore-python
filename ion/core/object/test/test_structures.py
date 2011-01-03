@@ -214,7 +214,6 @@ class ContainerTest(unittest.TestCase):
         self.wb = workbench.WorkBench('No Process Test')
         
         self.repo, self.listobj = self.wb.init_repository(basic_pb2.ListObj)
-            
         
         
     def test_factory(self):
@@ -290,7 +289,7 @@ class ContainerTest(unittest.TestCase):
         # Test before commit to make sure the set/get works
         self.assertEqual(self.listobj.items[0].key, 'foo1')
         
-        self.repo.commit('test1')
+        self.repo.commit('test_setlink')
         
         listobj = self.repo.checkout('master')
         
@@ -298,29 +297,339 @@ class ContainerTest(unittest.TestCase):
         
     def test_getlink(self):
         """
-        Must test before and after committing
+        Test the container method GetLink() and check link consistency
+        Note: Test depends on test_setlink()
         """
+        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1.key = 'foo1'
+        kv1.value = 'bar1'
+        
+        items = self.listobj.items
+        
+        items.add()
+        items.SetLink(0, kv1)
+        
+        # Test before commit to make sure GetLink() works locally
+        link1 = items.GetLink(0)
+        realized_kv1 = items.Repository.get_linked_object(link1)
+        self.assertEqual(realized_kv1.key, 'foo1')
+        
+        # Test after commit
+        self.repo.commit('test_getlink')
+        listobj = self.repo.checkout('master')
+        items = listobj.items
+        
+        link2 = items.GetLink(0)
+        realized_kv2 = items.Repository.get_linked_object(link2)
+        self.assertEqual(realized_kv2.value, 'bar1')
+        
+        
     def test_getlinks(self):
         """
-        Must test before and after committing
+        Test the container method GetLinks() and check link consistency
+        Note: Test depends on test_setlink()
         """
+        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1.key = 'foo1'
+        kv1.value = 'bar1'
+        kv2 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv2.key = 'foo2'
+        kv2.value = 'bar2'
+        
+        items = self.listobj.items
+        
+        item1 = items.add()
+        item2 = items.add()
+        item1.SetLink(kv1)
+        item2.SetLink(kv2)
+        
+        # Test before commit to make sure GetLinks() works locally
+        links_list1 = items.GetLinks()
+        self.assertTrue(len(links_list1) == 2)
+        realized_kv1 = items.Repository.get_linked_object(links_list1[0])
+        realized_kv2 = items.Repository.get_linked_object(links_list1[1])
+        self.assertEqual(realized_kv1.key, 'foo1')
+        self.assertEqual(realized_kv2.key, 'foo2')
+        
+        # Test after commit
+        self.repo.commit('test_getlinks')
+        listobj = self.repo.checkout('master')
+        items = listobj.items
+        
+        links_list2 = items.GetLinks()
+        self.assertTrue(len(links_list2) == 2)
+        realized_kv3 = items.Repository.get_linked_object(links_list2[0])
+        realized_kv4 = items.Repository.get_linked_object(links_list2[1])
+        self.assertEqual(realized_kv3.value, 'bar1')
+        self.assertEqual(realized_kv4.value, 'bar2')
+        
+        
     def test_getitem(self):
         """
-        Must test before and after committing
+        Test the private container method __getitem_() by a given index
+        Note: Test depends on test_setlink()
         """
+        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1.key = 'foo1'
+        kv1.value = 'bar1'
+        
+        items = self.listobj.items
+        
+        items.add()
+        items.SetLink(0, kv1)
+        
+        # Test before commit to make sure __getitem__() works locally
+        item1 = items.__getitem__(0)
+        self.assertEqual(item1.key, 'foo1')
+        
+        # Test after commit
+        self.repo.commit('test_getitem')
+        listobj = self.repo.checkout('master')
+        items = listobj.items
+        
+        item2 = items.__getitem__(0)
+        self.assertEqual(item2.value, 'bar1')
+        
     def test_getslice(self):
         """
-        Must test before and after committing
+        Test the container method __getslice__() by start and stop indices
+        Note: Test depends on test_setlink()
         """
+        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1.key = 'foo1'
+        kv1.value = 'bar1'
+        kv2 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv2.key = 'foo2'
+        kv2.value = 'bar2'
+        kv3 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv3.key = 'foo3'
+        kv3.value = 'bar3'
+        
+        items = self.listobj.items
+        
+        item1 = items.add()
+        item2 = items.add()
+        item3 = items.add()
+        item1.SetLink(kv1)
+        item2.SetLink(kv2)
+        item3.SetLink(kv3)
+        
+        # Test before commit to make sure GetLinks() works locally
+        items_list = items.__getslice__(0, 2)
+        self.assertTrue(len(items_list) == 2)
+        self.assertEqual(items_list[0].key, 'foo1')
+        self.assertEqual(items_list[1].key, 'foo2')
+        
+        items_list = items.__getslice__(1, 2)
+        self.assertTrue(len(items_list) == 1)
+        self.assertEqual(items_list[0].key, 'foo2')
+        
+        items_list = items.__getslice__(1, 5)
+        self.assertTrue(len(items_list) == 2)
+        self.assertEqual(items_list[0].key, 'foo2')
+        self.assertEqual(items_list[1].key, 'foo3')
+        
+        items_list = items.__getslice__(-2, 3)
+        self.assertTrue(len(items_list) == 2)
+        self.assertEqual(items_list[0].key, 'foo2')
+        self.assertEqual(items_list[1].key, 'foo3')
+        
+        items_list = items.__getslice__(-5, 1)
+        self.assertTrue(len(items_list) == 1)
+        self.assertEqual(items_list[0].key, 'foo1')
+
+        items_list = items.__getslice__(-3, -1)
+        self.assertTrue(len(items_list) == 2)
+        self.assertEqual(items_list[0].key, 'foo1')
+        self.assertEqual(items_list[1].key, 'foo2')
+        
+        
+        # Test after commit
+        self.repo.commit('test_getslice')
+        listobj = self.repo.checkout('master')
+        items = listobj.items
+        
+        items_list = items.__getslice__(0, 2)
+        self.assertTrue(len(items_list) == 2)
+        self.assertEqual(items_list[0].value, 'bar1')
+        self.assertEqual(items_list[1].value, 'bar2')
+        
+        items_list = items.__getslice__(1, 2)
+        self.assertTrue(len(items_list) == 1)
+        self.assertEqual(items_list[0].value, 'bar2')
+        
+        items_list = items.__getslice__(1, 5)
+        self.assertTrue(len(items_list) == 2)
+        self.assertEqual(items_list[0].value, 'bar2')
+        self.assertEqual(items_list[1].value, 'bar3')
+        
+        items_list = items.__getslice__(-2, 3)
+        self.assertTrue(len(items_list) == 2)
+        self.assertEqual(items_list[0].value, 'bar2')
+        self.assertEqual(items_list[1].value, 'bar3')
+        
+        items_list = items.__getslice__(-5, 1)
+        self.assertTrue(len(items_list) == 1)
+        self.assertEqual(items_list[0].value, 'bar1')
+
+        items_list = items.__getslice__(-3, -1)
+        self.assertTrue(len(items_list) == 2)
+        self.assertEqual(items_list[0].value, 'bar1')
+        self.assertEqual(items_list[1].value, 'bar2')
+
+        
     def test_del(self):
         """
-        Must test before and after committing
+        Test the container method __delitem__() by index
+        Note: Test depends on test_setlink()
         """
+        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1.key = 'foo1'
+        kv1.value = 'bar1'
+        kv2 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv2.key = 'foo2'
+        kv2.value = 'bar2'
+        kv3 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv3.key = 'foo3'
+        kv3.value = 'bar3'
+        
+        items = self.listobj.items
+        
+        item1 = items.add()
+        item2 = items.add()
+        item3 = items.add()
+        item1.SetLink(kv1)
+        item2.SetLink(kv2)
+        item3.SetLink(kv3)
+        
+        # Test before commit to make sure __delitem__() works locally
+        links_list = items.GetLinks()
+        self.assertTrue(len(links_list) == 3)
+        items.__delitem__(0)
+        links_list = items.GetLinks()
+        self.assertTrue(len(links_list) == 2)
+        realized_kv1 = items.Repository.get_linked_object(links_list[0])
+        realized_kv2 = items.Repository.get_linked_object(links_list[1])
+        self.assertEqual(realized_kv1.key, 'foo2')
+        self.assertEqual(realized_kv2.key, 'foo3')
+        
+        # Test after commit
+        self.repo.commit('test_del')
+        listobj = self.repo.checkout('master')
+        items = listobj.items
+        
+        links_list = items.GetLinks()
+        self.assertTrue(len(links_list) == 2)
+        items.__delitem__(1)
+        links_list = items.GetLinks()
+        self.assertTrue(len(links_list) == 1)
+        realized_kv3 = items.Repository.get_linked_object(links_list[0])
+        self.assertEqual(realized_kv3.value, 'bar2')
+        
+        
     def test_delslice(self):
         """
-        Must test before and after committing
+        Test the container method __delslice__() by start and stop indices
+        Note: Test depends on test_setlink() and test_getslice()
         """
-       
+        items = self.listobj.items
+        
+        for idx in range(1, 21):
+            kv = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+            kv.key = 'foo' + str(idx)
+            kv.value = 'bar' + str(idx)
+            item = items.add()
+            item.SetLink(kv)
+            
+        # Test before commit to make sure __delslice__() works locally for various slices
+        items.__delslice__(0, 2)
+        items_list = items.__getslice__(0,20)
+        self.assertTrue(len(items_list) == 18)
+        self.assertEqual(items_list[0].key, 'foo3')
+        self.assertEqual(items_list[1].key, 'foo4')
+        self.assertEqual(items_list[2].key, 'foo5')
+        self.assertEqual(items_list[3].key, 'foo6')
+        self.assertEqual(items_list[4].key, 'foo7')
+        
+        items.__delslice__(1, 2)
+        items_list = items.__getslice__(0,20)
+        self.assertTrue(len(items_list) == 17)
+        self.assertEqual(items_list[0].key, 'foo3')
+        self.assertEqual(items_list[1].key, 'foo5')
+        self.assertEqual(items_list[2].key, 'foo6')
+        self.assertEqual(items_list[3].key, 'foo7')
+        self.assertEqual(items_list[4].key, 'foo8')
+        
+        items.__delslice__(15, 20)
+        items_list = items.__getslice__(0,20)
+        self.assertTrue(len(items_list) == 15)
+        self.assertEqual(items_list[10].key, 'foo14')
+        self.assertEqual(items_list[11].key, 'foo15')
+        self.assertEqual(items_list[12].key, 'foo16')
+        self.assertEqual(items_list[13].key, 'foo17')
+        self.assertEqual(items_list[14].key, 'foo18')
+        
+        items.__delslice__(-12, 5)
+        items_list = items.__getslice__(0,20)
+        self.assertTrue(len(items_list) == 13)
+        self.assertEqual(items_list[0].key, 'foo3')
+        self.assertEqual(items_list[1].key, 'foo5')
+        self.assertEqual(items_list[2].key, 'foo6')
+        self.assertEqual(items_list[3].key, 'foo9')
+        self.assertEqual(items_list[4].key, 'foo10')
+        
+        items.__delslice__(-20, 1)
+        items_list = items.__getslice__(0,20)
+        self.assertTrue(len(items_list) == 12)
+        self.assertEqual(items_list[0].key, 'foo5')
+        self.assertEqual(items_list[1].key, 'foo6')
+        self.assertEqual(items_list[2].key, 'foo9')
+        self.assertEqual(items_list[3].key, 'foo10')
+        self.assertEqual(items_list[4].key, 'foo11')
+
+        items.__delslice__(-9, -8)
+        items_list = items.__getslice__(0,20)
+        self.assertTrue(len(items_list) == 11)
+        self.assertEqual(items_list[0].key, 'foo5')
+        self.assertEqual(items_list[1].key, 'foo6')
+        self.assertEqual(items_list[2].key, 'foo9')
+        self.assertEqual(items_list[3].key, 'foo11')
+        self.assertEqual(items_list[4].key, 'foo12')
+        
+        # Test if deletes carry over during commit
+        self.repo.commit('test_getslice1')
+        listobj = self.repo.checkout('master')
+        items = listobj.items
+        
+        items_list = items.__getslice__(0, 20)
+        self.assertTrue(len(items_list) == 11)
+        self.assertEqual(items_list[0].key, 'foo5')
+        self.assertEqual(items_list[1].key, 'foo6')
+        self.assertEqual(items_list[2].key, 'foo9')
+        self.assertEqual(items_list[3].key, 'foo11')
+        self.assertEqual(items_list[4].key, 'foo12')
+        self.assertEqual(items_list[5].key, 'foo13')
+        self.assertEqual(items_list[6].key, 'foo14')
+        self.assertEqual(items_list[7].key, 'foo15')
+        self.assertEqual(items_list[8].key, 'foo16')
+        self.assertEqual(items_list[9].key, 'foo17')
+        self.assertEqual(items_list[10].key, 'foo18')
+        
+        # One more check by commit...
+        items.__delslice__(5, 9)
+        self.repo.commit('test_getslice2')
+        listobj = self.repo.checkout('master')
+        items = listobj.items
+        
+        items_list = items.__getslice__(0, 20)
+        self.assertTrue(len(items_list) == 7)
+        self.assertEqual(items_list[0].key, 'foo5')
+        self.assertEqual(items_list[1].key, 'foo6')
+        self.assertEqual(items_list[2].key, 'foo9')
+        self.assertEqual(items_list[3].key, 'foo11')
+        self.assertEqual(items_list[4].key, 'foo12')
+        self.assertEqual(items_list[5].key, 'foo17')
+        self.assertEqual(items_list[6].key, 'foo18')
         
         
     #def testsetcontainerlink(self):
