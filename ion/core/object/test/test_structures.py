@@ -245,8 +245,8 @@ class ContainerTest(unittest.TestCase):
         
         # Test some internals of the container/checkout functionality
         self.assertEqual(items.Invalid, True)
-        self.assertEqual(object.__getattribute__(self.listobj,'_invalid'), True)
-        self.assertEqual(object.__getattribute__(kv1,'_invalid'), True)
+        self.assertEqual(self.listobj.Invalid, True)
+        self.assertEqual(kv1.Invalid, True)
         
     def test_add(self):
         """

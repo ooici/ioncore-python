@@ -16,7 +16,7 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.services.dm.preservation import store
+from ion.data import store
 
 
 class DataStoreService(ServiceProcess):

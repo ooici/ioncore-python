@@ -517,7 +517,10 @@ class Wrapper(object):
 
     def __getattribute__(self, key):
         
-        if object.__getattribute__(self,'Invalid'):
+        invalid = object.__getattribute__(self,'Invalid')
+        if key == 'Invalid':
+            return invalid
+        elif invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         # Because we have over-riden the default getattribute we must be extremely
@@ -589,13 +592,15 @@ class Wrapper(object):
                     
                     value = obj
                     
-                #Examine the field we are trying to set 
-                field = getattr(gpb,key)
-                if not isinstance(field, message.Message):
-                    raise OOIObjectError('Only a composit field can be set using another message as a value')
+                self.SetLinkByName(key,value)
                     
-                wrapped_field = self._rewrap(field) # This will throw an exception if field is not a gpbMessage
-                self.Repository.set_linked_object(wrapped_field,value)
+                ##Examine the field we are trying to set 
+                #field = getattr(gpb,key)
+                #if not isinstance(field, message.Message):
+                #    raise OOIObjectError('Only a composit field can be set using another message as a value')
+                #    
+                #wrapped_field = self._rewrap(field) # This will throw an exception if field is not a gpbMessage
+                #self.Repository.set_linked_object(wrapped_field,value)
             
             else:
                 
@@ -721,7 +726,33 @@ class Wrapper(object):
     def ClearField(self, field_name):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self.GPBMessage.ClearField(field_name)
+        if self.GPBMessage.HasField(field_name):
+            
+            # If it is a Field defined by the gpb...
+            gpb = self.GPBMessage
+            
+            # This may be the result we were looking for, in the case of a simple
+            # scalar field
+            field = getattr(gpb,key)
+            
+            # Or it may be something more complex that we need to operate on...        
+            if isinstance(field, containers.RepeatedScalarFieldContainer):
+                result = ScalarContainerWrapper.factory(self, field)
+                
+            elif isinstance(field, containers.RepeatedCompositeFieldContainer):
+                result = ContainerWrapper.factory(self, field)
+                
+            elif isinstance(field, message.Message):
+                result = self._rewrap(field)
+                
+                if result.GPBType == self.LinkClassType:
+                    result = self.Repository.get_linked_object(result)
+            else:
+                # Probably bad that the common case comes last!
+                result = field
+        
+        
+        self.GPBMessage.ClearField(field_name)
         
     #def HasExtension(self, extension_handle):
     #    return self.GPBMessage.HasExtension(extension_handle)

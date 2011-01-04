@@ -49,24 +49,37 @@ class IStore(Interface):
         @retval Deferred, for success of this operation
         """
 
-class IStoreManager(Interface):
+class IDataManager(Interface):
     """
     @note Proposed class to fulfill preservation service management?
     @brief Administrative functionality for backend store configuration. 
     """
-
-    def makeNamespace(name):
+    def create_org(name):
+        """
+        @brief Create a seperate organizational instance in the backend
+        @param name is the name of the organization
+        @retval succeed or fail
+        """
+        
+    def remove_org(name):
+        """
+        @brief Remove an organizational instance in the backend
+        @param name is the name of the organization
+        @retval succeed or fail
+        """
+        
+    def create_namespace(name):
         """
         @brief 
         @param name
         @retval
         """
 
-    def removeNamespace(name):
+    def remove_namespace(name):
         """
         """
 
-    def listNamespaces():
+    def list_namespaces():
         """
         """
 

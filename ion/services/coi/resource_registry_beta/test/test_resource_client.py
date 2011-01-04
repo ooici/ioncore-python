@@ -39,7 +39,8 @@ class ResourceClientTest(IonTestCase):
         services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'datastore'}},
-            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService'}]
+            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
+             'spawnargs':{'datastore_service':'datastore'}}]
         sup = yield self._spawn_processes(services)
             
         self.rrc = ResourceRegistryClient(proc=sup)

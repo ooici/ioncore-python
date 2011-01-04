@@ -108,6 +108,8 @@ class CassandraStore(object):
 
 class CassandraManager(object):
 
+    implements(store.IDataManager)
+
     keyspace = None
 
     def __init__(self, client):
@@ -124,16 +126,21 @@ class CassandraManager(object):
                 cf_defs=[])
         return self.client.system_add_keyspace(ksdef)
 
-    def create(self, name):
+    def create_namespace(self, name):
         """
         """
         cfdef = CfDef(keyspace=self.keyspace, name=name)
         return self.client.system_add_column_family(cfdef)
 
-    def remove(self, name):
+    def remove_namespace(self, name):
         """
         """
         return self.system_drop_column_family(name)
+
+    def list_namespace(self):
+        """
+        """
+
 
 class CassandraFactory(object):
     """
