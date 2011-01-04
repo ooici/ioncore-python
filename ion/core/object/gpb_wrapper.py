@@ -722,9 +722,9 @@ class Wrapper(object):
             
         GPBMessage = self.GPBMessage
             
-        if not GPBMessage.HasField(field_name):
-            # Nothing to clear
-            return
+        #if not GPBMessage.HasField(field_name):
+        #    # Nothing to clear
+        #    return
             
         # Get the raw GPB field
         GPBField = getattr(GPBMessage, field_name)
@@ -735,32 +735,43 @@ class Wrapper(object):
             # Nothing to do - just clear the field. It can not contain a link            
 
         elif isinstance(GPBField, containers.RepeatedCompositeFieldContainer):
-            rcfc = ContainerWrapper.factory(self, GPBField)
-            for item in rcfc:
-                item.ClearField
+            for item in GPBField:
+                wrapped_field = self._rewrap(item)
+                wrapped_field._clear_derived_message()
+                
+                item_hash = item.__hash__()
+                del self.DerivedWrappers[item_hash]
+                
             objhash = GPBField.__hash__()
             del self.DerivedWrappers[objhash]            
 
         elif isinstance(GPBField, message.Message):
             wrapped_field = self._rewrap(GPBField)
-            
-            if wrapped_field.GPBType == self.LinkClassType:
-                child_obj = self.Repository.get_linked_object(wrapped_field)
-                # Remove this link from the list of parents
-                child_obj.ParentLinks.remove(wrapped_field)
-                    
-                # This is the only one, remove it as a child
-                self.ChildLinks.remove(wrapped_field)
-                
-            for wrapped_field_name in wrapped_field._GPBClass.DESCRIPTOR.fields_by_name.keys():
-                # Recursively remove all 
-                wrapped_field.ClearField(wrapped_field_name)
+            wrapped_field._clear_derived_message()
             
             objhash = GPBField.__hash__()
             del self.DerivedWrappers[objhash]
         
         #Now clear the field
         self.GPBMessage.ClearField(field_name)
+        # Set this object and it parents to be modified
+        self._set_parents_modified()
+            
+    def _clear_derived_message(self):
+        """
+        Helper method for ClearField
+        """
+        if self.GPBType == self.LinkClassType:
+            child_obj = self.Repository.get_linked_object(self)
+            # Remove this link from the list of parents
+            child_obj.ParentLinks.remove(self)
+                
+            # This is the only one, remove it as a child
+            self.ChildLinks.remove(self)
+            
+        for field_name in self._GPBClass.DESCRIPTOR.fields_by_name.keys():
+            # Recursively remove all 
+            self.ClearField(field_name)
         
     #def HasExtension(self, extension_handle):
     #    return self.GPBMessage.HasExtension(extension_handle)
@@ -951,6 +962,8 @@ class ContainerWrapper(object):
         wrapper_list=[]
         for index in range(0, len(self))[start:stop]:
             wrapper_list.append(self.__getitem__(index))
+            
+        # Does it make sense to return a list?
         return wrapper_list
     
     def __delitem__(self, key):
@@ -958,16 +971,21 @@ class ContainerWrapper(object):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         self._wrapper._set_parents_modified()
-
+            
+        item = self._gpbcontainer.__getitem__(key)
+        item = self._wrapper._rewrap(item)
+            
+        item._clear_derived_message()
+            
         self._gpbcontainer.__delitem__(key)
         
     def __delslice__(self, start, stop):
         """Deletes the subset of items from between the specified indices."""
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-            
-        self._wrapper._set_parents_modified()
-        self._gpbcontainer.__delslice__(start, stop)
+        i_range = range(0, len(self))[start:stop]
+        for index in reversed(i_range):
+            self.__delitem__(index)
     
     
     
@@ -1011,9 +1029,6 @@ class ScalarContainerWrapper(object):
         self._gpbcontainer = None
         self._wrapper = None
         self.Repository = None
-    
-    
-    
     
     def append(self, value):
         """Appends an item to the list. Similar to list.append()."""

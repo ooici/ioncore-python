@@ -120,30 +120,86 @@ class NodeLinkTest(unittest.TestCase):
             
             
         def test_clearfield(self):
+            """
+            Test clear field and the object accounting for parents and children
+            """
             self.ab.person.add()
             p = self.repo.create_wrapped_object(addressbook_pb2.Person)
             p.name = 'David'
             p.id = 5
             self.ab.person[0] = p
             self.ab.owner = p
-
+            
+            # Check to make sure all is set in the data structure
             self.assertEqual(self.ab.HasField('owner'),True)
-
+            
             # Assert that there is a child link
             self.assertIn(self.ab.GetLink('owner'),self.ab.ChildLinks)
             self.assertIn(self.ab.person.GetLink(0),self.ab.ChildLinks)
             self.assertEqual(len(self.ab.ChildLinks),2)
             
-            p.ParentLinks
+            # Assert that there is a parent link
+            self.assertIn(self.ab.GetLink('owner'),p.ParentLinks)
+            self.assertIn(self.ab.person.GetLink(0),p.ParentLinks)
+            self.assertEqual(len(p.ParentLinks),2)
             
-            #Clear the field
+            # Get the link object which will be cleared
+            owner_link = self.ab.GetLink('owner')
+            
+            owner_link_hash = owner_link.GPBMessage.__hash__()
+            owner_type_hash = owner_link.type.GPBMessage.__hash__()
+            
+            # Assert that the derived wrappers dictionary contains these objects
+            self.assertIn(owner_link_hash, self.ab.DerivedWrappers.keys())
+            self.assertIn(owner_type_hash, self.ab.DerivedWrappers.keys())
+            
+            # ***Clear the field***
             self.ab.ClearField('owner')
-            # Assert that there is a child link
-            self.assertIn(self.ab.person.GetLink(0),self.ab.ChildLinks)
-            self.assertEqual(len(self.ab.ChildLinks),1)
             
             # The field is clear
             self.assertEqual(self.ab.HasField('owner'),False)
+            
+            # Assert that there is only one child link
+            self.assertIn(self.ab.person.GetLink(0),self.ab.ChildLinks)
+            self.assertEqual(len(self.ab.ChildLinks),1)
+            
+            # Assert that there is only one parent link
+            self.assertIn(self.ab.person.GetLink(0),p.ParentLinks)
+            self.assertEqual(len(p.ParentLinks),1)
+                        
+            # Assert that the derived wrappers refs are gone!
+            self.assertNotIn(owner_link_hash, self.ab.DerivedWrappers.keys())
+            self.assertNotIn(owner_type_hash, self.ab.DerivedWrappers.keys())
+            
+            # Now try removing the person
+            
+            # Get the person link in the composite container
+            p0_link = self.ab.person.GetLink(0)
+            
+            p0_link_hash = p0_link.GPBMessage.__hash__()
+            p0_type_hash = p0_link.type.GPBMessage.__hash__()
+            
+            # Assert that the derived wrappers dictionary contains these objects
+            self.assertIn(p0_link_hash, self.ab.DerivedWrappers.keys())
+            self.assertIn(p0_type_hash, self.ab.DerivedWrappers.keys())
+            
+            # ***Clear the field***
+            self.ab.ClearField('person')
+            
+            # The field is clear
+            self.assertEqual(len(self.ab.person),0)
+                
+            # Assert that there are zero parent links
+            self.assertEqual(len(p.ParentLinks),0)
+            
+            # Assert that there are zero child links
+            self.assertEqual(len(self.ab.ChildLinks),0)
+            
+            # Assert that the derived wrappers dictionary is empty!
+            self.assertNotIn(p0_link_hash, self.ab.DerivedWrappers.keys())
+            self.assertNotIn(p0_type_hash, self.ab.DerivedWrappers.keys())
+            self.assertEqual(len(self.ab.DerivedWrappers.keys()),1)
+            
             
             
 class RecurseCommitTest(unittest.TestCase):

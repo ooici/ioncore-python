@@ -191,23 +191,6 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(object.__getattribute__(floats,'Invalid'), True)
         
 
-class StringDictObjectTest(unittest.TestCase):
-
-    def setUp(self):
-        self.wb = workbench.WorkBench('No Process Test')
-        
-        self.repo, self.sdobj = self.wb.init_repository(basic_pb2.StringDict)
-
-    
-    def test_add(self):
-        """
-        
-        """
-        self.sdobj.items.add()
-
-
-
-
 class ContainerTest(unittest.TestCase):
         
     def setUp(self):
@@ -379,7 +362,7 @@ class ContainerTest(unittest.TestCase):
         items.SetLink(0, kv1)
         
         # Test before commit to make sure __getitem__() works locally
-        item1 = items.__getitem__(0)
+        item1 = items[0]
         self.assertEqual(item1.key, 'foo1')
         
         # Test after commit
@@ -387,7 +370,7 @@ class ContainerTest(unittest.TestCase):
         listobj = self.repo.checkout('master')
         items = listobj.items
         
-        item2 = items.__getitem__(0)
+        item2 = items[0]
         self.assertEqual(item2.value, 'bar1')
         
     def test_getslice(self):
@@ -420,7 +403,7 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(items_list[0].key, 'foo1')
         self.assertEqual(items_list[1].key, 'foo2')
         
-        items_list = items.__getslice__(1, 2)
+        items_list = items[1, 2]
         self.assertTrue(len(items_list) == 1)
         self.assertEqual(items_list[0].key, 'foo2')
         
