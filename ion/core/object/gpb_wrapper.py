@@ -594,14 +594,6 @@ class Wrapper(object):
                     
                 self.SetLinkByName(key,value)
                     
-                ##Examine the field we are trying to set 
-                #field = getattr(gpb,key)
-                #if not isinstance(field, message.Message):
-                #    raise OOIObjectError('Only a composit field can be set using another message as a value')
-                #    
-                #wrapped_field = self._rewrap(field) # This will throw an exception if field is not a gpbMessage
-                #self.Repository.set_linked_object(wrapped_field,value)
-            
             else:
                 
                 setattr(gpb, key, value)
@@ -612,6 +604,7 @@ class Wrapper(object):
         else:
             v = object.__setattr__(self, key, value)
             
+        
     def _set_parents_modified(self):
         """
         This method recursively changes an objects parents to a modified state
@@ -726,32 +719,47 @@ class Wrapper(object):
     def ClearField(self, field_name):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        if self.GPBMessage.HasField(field_name):
             
-            # If it is a Field defined by the gpb...
-            gpb = self.GPBMessage
+        GPBMessage = self.GPBMessage
             
-            # This may be the result we were looking for, in the case of a simple
-            # scalar field
-            field = getattr(gpb,key)
+        if not GPBMessage.HasField(field_name):
+            # Nothing to clear
+            return
             
-            # Or it may be something more complex that we need to operate on...        
-            if isinstance(field, containers.RepeatedScalarFieldContainer):
-                result = ScalarContainerWrapper.factory(self, field)
-                
-            elif isinstance(field, containers.RepeatedCompositeFieldContainer):
-                result = ContainerWrapper.factory(self, field)
-                
-            elif isinstance(field, message.Message):
-                result = self._rewrap(field)
-                
-                if result.GPBType == self.LinkClassType:
-                    result = self.Repository.get_linked_object(result)
-            else:
-                # Probably bad that the common case comes last!
-                result = field
+        # Get the raw GPB field
+        GPBField = getattr(GPBMessage, field_name)
         
+        if isinstance(GPBField, containers.RepeatedScalarFieldContainer):
+            objhash = GPBField.__hash__()
+            del self.DerivedWrappers[objhash]
+            # Nothing to do - just clear the field. It can not contain a link            
+
+        elif isinstance(GPBField, containers.RepeatedCompositeFieldContainer):
+            rcfc = ContainerWrapper.factory(self, GPBField)
+            for item in rcfc:
+                item.ClearField
+            objhash = GPBField.__hash__()
+            del self.DerivedWrappers[objhash]            
+
+        elif isinstance(GPBField, message.Message):
+            wrapped_field = self._rewrap(GPBField)
+            
+            if wrapped_field.GPBType == self.LinkClassType:
+                child_obj = self.Repository.get_linked_object(wrapped_field)
+                # Remove this link from the list of parents
+                child_obj.ParentLinks.remove(wrapped_field)
+                    
+                # This is the only one, remove it as a child
+                self.ChildLinks.remove(wrapped_field)
+                
+            for wrapped_field_name in wrapped_field._GPBClass.DESCRIPTOR.fields_by_name.keys():
+                # Recursively remove all 
+                wrapped_field.ClearField(wrapped_field_name)
+            
+            objhash = GPBField.__hash__()
+            del self.DerivedWrappers[objhash]
         
+        #Now clear the field
         self.GPBMessage.ClearField(field_name)
         
     #def HasExtension(self, extension_handle):

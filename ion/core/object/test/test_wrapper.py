@@ -104,18 +104,46 @@ class NodeLinkTest(unittest.TestCase):
             self.assertEqual(self.ab.person[0].name ,'John')
             self.assertEqual(self.ab.owner.name ,'John')
                         
-        # How do I make this a fail unless?   
-        #def test_inparents(self):
-        #        
-        #    self.ab.person.add()
-        #        
-        #    ab2 = self.repo.create_wrapped_object(addressbook_pb2.AddressLink)
-        #        
-        #    self.ab.person[0] = ab2
-        #        
-        #    ab2.person.add()
-        #    
-        #    ab2.person[0] = self.ab
+        #How do I make this a fail unless?   
+        def test_inparents(self):
+                
+            self.ab.person.add()
+                
+            ab2 = self.repo.create_wrapped_object(addressbook_pb2.AddressLink)
+                
+            self.ab.person[0] = ab2
+                
+            ab2.person.add()
+            
+            # Should fail due to circular reference!
+            self.failUnlessRaises(repository.RepositoryError, ab2.person.SetLink, 0, self.ab)
+            
+            
+        def test_clearfield(self):
+            self.ab.person.add()
+            p = self.repo.create_wrapped_object(addressbook_pb2.Person)
+            p.name = 'David'
+            p.id = 5
+            self.ab.person[0] = p
+            self.ab.owner = p
+
+            self.assertEqual(self.ab.HasField('owner'),True)
+
+            # Assert that there is a child link
+            self.assertIn(self.ab.GetLink('owner'),self.ab.ChildLinks)
+            self.assertIn(self.ab.person.GetLink(0),self.ab.ChildLinks)
+            self.assertEqual(len(self.ab.ChildLinks),2)
+            
+            p.ParentLinks
+            
+            #Clear the field
+            self.ab.ClearField('owner')
+            # Assert that there is a child link
+            self.assertIn(self.ab.person.GetLink(0),self.ab.ChildLinks)
+            self.assertEqual(len(self.ab.ChildLinks),1)
+            
+            # The field is clear
+            self.assertEqual(self.ab.HasField('owner'),False)
             
             
 class RecurseCommitTest(unittest.TestCase):

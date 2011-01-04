@@ -369,9 +369,9 @@ class Repository(object):
             raise RepositoryError('This current branch is empty - there is nothing to reset too!')
         
         cref = self._current_branch.commitrefs[0]
-        
+
         # Do some clean up!
-        for item in self._workspace:
+        for item in self._workspace.itervalues():
             item.Invalidate()
         self._workspace = {}
         self._workspace_root = None
@@ -762,10 +762,23 @@ class Repository(object):
             if old_obj:
                 plinks = old_obj.ParentLinks
                 plinks.remove(link)
-                # If there are no parents left for the object delete it
-                if len(plinks)==0:
-                    del self._workspace[link.key]
                 
+                
+                # Don't do this - read below!
+                # If there are no parents left for the object delete it
+                #if len(plinks)==0:
+                    
+                    # This could lead to an invalid state
+                    #del self._workspace[link.key]
+                    
+                    # to do this correctly make a weak reference
+                    # Remove it from the work space
+                    # del the old_obj
+                    # if it is still there in the weak ref put it back
+                    # because something is still referenceing it
+                    
+                    # But really who cares - just leaving it hanging in the
+                    # workbench, it will be garbage collected later.
                 
         else:
             
