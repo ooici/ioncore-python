@@ -14,23 +14,16 @@ import ion.util.ionlog
 
 from twisted.internet import defer
 
-from ion.core import bootstrap
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.resources import dm_resource_descriptions
-
-from ion.data import dataobject
 from ion.services.dm.distribution import pubsub_registry
 
-import ion.util.procutils as pu
 from ion.core import ioninit
 
 # Global objects
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
-
-from ion.services.dm.distribution import base_consumer
 
 class PubSubService(ServiceProcess):
     """
@@ -45,7 +38,7 @@ class PubSubService(ServiceProcess):
     OOICI / DM / science data / test.pydap.org:coads.nc
     """
     declare = ServiceProcess.service_declare(name='pubsub',
-                                          version='0.1.0',
+                                          version='0.1.1',
                                           dependencies=[])
 
     @defer.inlineCallbacks
@@ -54,6 +47,18 @@ class PubSubService(ServiceProcess):
         self.reg = yield pubsub_registry.DataPubsubRegistryClient(proc=self)
 
     # Protocol entry points. Responsible for parsing and unpacking arguments
+    def op_declare_exchange_point(self, content, headers, msg):
+        try:
+            xp_name = content['exchange_point_name']
+        except KeyError:
+            estr = 'Missing information in message!'
+            log.exception(estr)
+            self.reply_ok(msg, {'value': estr})
+            return
+
+        rc = self.declare_exchange_point(xp_name)
+        self.reply_ok(msg, {'value': rc})
+        
     def op_declare_topic_tree(self, content, headers, msg):
         try:
             xs_name = content['exchange_space_name']
@@ -68,31 +73,104 @@ class PubSubService(ServiceProcess):
         self.reply_ok(msg, {'value': rc})
 
     def op_undeclare_topic_tree(self, content, headers, msg):
-        return self.undeclare_topic_tree(content['topic_tree_id'])
+        try:
+            tt_id = content['topic_tree_id']
+        except KeyError:
+            estr = 'Missing information in message!'
+            log.exception(estr)
+            self.reply_ok(msg, {'value': estr})
+            return
+
+        rc = self.undeclare_topic_tree(tt_id)
+        self.reply_ok(msg, {'value': rc})
 
     def op_query_topic_trees(self, content, headers, msg):
-        return self.query_topic_trees(content['topic_regex'])
+        try:
+            t_regex = content['topic_regex']
+        except KeyError:
+            estr = 'Missing information in message!'
+            log.exception(estr)
+            self.reply_ok(msg, {'value': estr})
+            return
+
+        rc = self.query_topic_trees(t_regex)
+        self.reply_ok(msg, {'value': rc})
 
     def op_query_topics(self, content, headers, msg):
-        return self.query_topics(content['exchange_point_name'], content['topic_regex'])
+        try:
+            xp_name = content['exchange_point_name']
+            t_regex = content['topic_regex']
+        except KeyError:
+            estr = 'Missing information in message!'
+            log.exception(estr)
+            self.reply_ok(msg, {'value': estr})
+            return
+
+        rc = self.query_topics(xp_name, t_regex)
+        self.reply_ok(msg, {'value': rc})
 
     def op_define_topic(self, content, headers, msg):
-        return self.define_topic(content['topic_tree_id'], content['topic_name'])
+        try:
+            tt_id = content['topic_tree_id']
+            t_name = content['topic_name']
+        except KeyError:
+            estr = 'Missing information in message!'
+            log.exception(estr)
+            self.reply_ok(msg, {'value': estr})
+            return
+
+        rc = self.define_topic(tt_id, t_name)
+        self.reply_ok(msg, {'value': rc})
 
     def op_define_publisher(self, content, headers, msg):
-        return self.define_publisher(content['topic_tree_id'], content['topic_id'],
-                                     content['publisher_name'], content['credentials'])
+        try:
+            tt_id = content['topic_tree_id']
+            topic_id = content['topic_id']
+            p_name = content['publisher_name']
+            cred = content['credentials']
+        except KeyError:
+            estr = 'Missing information in message!'
+            log.exception(estr)
+            self.reply_ok(msg, {'value': estr})
+            return
+
+        rc = self.define_publisher(tt_id, topic_id, p_name, cred)
+        self.reply_ok(msg, {'value': rc})
 
     def op_subscribe(self, content, headers, msg):
-        return self.subscribe(content['topic_regex'])
+        try:
+            t_regex = content['topic_regex']
+        except KeyError:
+            estr = 'Missing information in message!'
+            log.exception(estr)
+            self.reply_ok(msg, {'value': estr})
+            return
+
+        rc = self.subscribe(t_regex)
+        self.reply_ok(msg, {'value': rc})
 
     def op_unsubscribe(self, content, headers, msg):
-        return self.unsubscribe(content['subscription_id'])
+        try:
+            s_id = content['subscription_id']
+        except KeyError:
+            estr = 'Missing information in message!'
+            log.exception(estr)
+            self.reply_ok(msg, {'value': estr})
+            return
 
-
-
-
-    #    API-style entry points
+        rc = self.unsubscribe(s_id)
+        self.reply_ok(msg, {'value': rc})
+        
+    # API-style entry points. Akin to the twisted protocol/factory
+    def declare_exchange_point(self, xp_name):
+        """
+        @brief Create an exchange point, e.g. 'science data'
+        @param xp_name Exchange point name (string)
+        @retval ??
+        @note Idempotent - can call more than once on the same XP, no-op if already called
+        """
+        log.error('DEP not implemented')
+        
     def declare_topic_tree(self, exchange_space_name, topic_tree_name):
         """
         @brief Create a topic tree
@@ -108,7 +186,7 @@ class PubSubService(ServiceProcess):
         @param topic_tree_id ID, as returned from declare_topic_tree
         @retval None
         """
-        log.error('Not implemented')
+        log.error('UDTT not implemented')
 
     def query_topic_trees(self, topic_regex):
         """
@@ -116,7 +194,7 @@ class PubSubService(ServiceProcess):
         @param topic_regex Regular expression to match against
         @retval List, possibly empty, of topic tree names
         """
-        log.error('Not implemented')
+        log.error('QTT not implemented')
 
     def query_topics(self, exchange_point_name, topic_regex):
         """
@@ -125,7 +203,7 @@ class PubSubService(ServiceProcess):
         @param topic_regex Regex to match
         @retval List, possibly empty, of topic names
         """
-        log.error('Not implemented')
+        log.error('QT not implemented')
 
     def define_topic(self, topic_tree_id, topic_name):
         """
@@ -134,7 +212,7 @@ class PubSubService(ServiceProcess):
         @param topic_name Name to declare
         @retval Topic ID, or None if error
         """
-        log.error('Not implemented')
+        log.error('DT not implemented')
 
     def define_publisher(self, topic_tree_id, topic_id, publisher_name, credentials=None):
         """
@@ -144,7 +222,7 @@ class PubSubService(ServiceProcess):
         @param credentials Unused hook for auth*
         @retval Transciever instance with send() method hooked up to correct topic
         """
-        log.error('Not implemented')
+        log.error('DP not implemented')
 
     def subscribe(self, topic_regex):
         """
@@ -154,7 +232,7 @@ class PubSubService(ServiceProcess):
         @note creates the queue via EMS
         @retval Address of queue for ondata() callback and resource id
         """
-        log.error('Not implemented')
+        log.error('Sub not implemented')
 
     def unsubscribe(self, subscription_id):
         """
@@ -162,7 +240,8 @@ class PubSubService(ServiceProcess):
         @param subscription_id ID from subscribe calS
         @retval OK if no problems, error otherwise
         """
-        log.error('Not implemented')
+        log.error('Unsub not implemented')
+
 
 class PubSubClient(ServiceClient):
     """
@@ -175,47 +254,82 @@ class PubSubClient(ServiceClient):
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
+    def declare_exchange_point(self, xp_name):
+        yield self._check_init()
+        payload = {'exchange_point_name' : xp_name}
+        (content, headers, msg) = yield self.rpc_send('declare_exchange_point', payload)
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
+
+    @defer.inlineCallbacks
     def declare_topic_tree(self, exchange_space_name, topic_tree_name):
         yield self._check_init()
         payload = {'exchange_space_name' : exchange_space_name,
         'topic_tree_name': topic_tree_name}
         (content, headers, msg) = yield self.rpc_send('declare_topic_tree', payload)
         log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
     def undeclare_topic_tree(self, topic_tree_id):
         yield self._check_init()
-        log.error('Not implemented')
+        payload = {'topic_tree_id' : topic_tree_id}
+        (content, headers, payload) = yield self.rpc_send('undeclare_topic_tree', payload)
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
     def query_topic_trees(self, topic_regex):
         yield self._check_init()
-        log.error('Not implemented')
+        payload = {'topic_regex' : topic_regex}
+        (content, headers, payload) = yield self.rpc_send('query_topic_trees', payload)
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
     def query_topics(self, exchange_point_name, topic_regex):
         yield self._check_init()
-        log.error('Not implemented')
+        payload = {'topic_regex' : topic_regex,
+                'exchange_point_name' : exchange_point_name}
+        (content, headers, payload) = yield self.rpc_send('query_topics', payload)
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
     def define_topic(self, topic_tree_id, topic_name):
         yield self._check_init()
-        log.error('Not implemented')
+        payload = {'topic_tree_id' : topic_tree_id,
+                'topic_name' : topic_name}
+        (content, headers, payload) = yield self.rpc_send('define_topic', payload)
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
     def define_publisher(self, topic_tree_id, topic_id, publisher_name, credentials=None):
         yield self._check_init()
-        log.error('Not implemented')
+        payload = {'topic_tree_id' : topic_tree_id,
+                'topic_id': topic_id,
+                'publisher_name' : publisher_name,
+                'credentials': credentials}
+        (content, headers, payload) = yield self.rpc_send('define_publisher', payload)
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
     def subscribe(self, topic_regex):
         yield self._check_init()
-        log.error('Not implemented')
+        payload = {'topic_regex' : topic_regex}
+        (content, headers, payload) = yield self.rpc_send('subscribe', payload)
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
     def unsubscribe(self, subscription_id):
         yield self._check_init()
-        log.error('Not implemented')
+        payload = {'subscription_id':subscription_id}
+        (content, headers, payload) = yield self.rpc_send('unsubscribe', payload)
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
 
 
 # Spawn off the process using the module name
