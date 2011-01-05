@@ -595,27 +595,20 @@ class AppInterceptor(Interceptor):
 
 # ============================================================================
 
-class ProcessClient(object):
+class ProcessClientBase(object):
     """
     This is the base class for a process client. A process client is code that
     executes in the process space of a calling process. If no calling process
-    is given, a local one is created on the fly. This client adds some
-    glue to interact with a specific targer process
+    is given, a local one is created on the fly. 
     """
-    def __init__(self, proc=None, target=None, targetname=None, **kwargs):
+    def __init__(self, proc=None, **kwargs):
         """
-        Initializes a process client
+        Initializes a process client base
         @param proc a IProcess instance as originator of messages
-        @param target  global scoped (process id or name) to send to
-        @param targetname  system scoped exchange name to send messages to
         """
         if not proc:
             proc = Process()
         self.proc = proc
-        assert target or targetname, "Need either target or targetname"
-        self.target = target
-        if not self.target:
-            self.target = self.proc.get_scoped_name('system', targetname)
 
     @defer.inlineCallbacks
     def _check_init(self):
@@ -629,6 +622,22 @@ class ProcessClient(object):
     @defer.inlineCallbacks
     def attach(self):
         yield self._check_init()
+
+class ProcessClient(ProcessClientBase):
+    """
+    This specific derivation adds some glue to interact with a specific targer process.
+    """
+    def __init__(self, proc=None, target=None, targetname=None, **kwargs):
+        """
+        Initializes a process client
+        @param proc a IProcess instance as originator of messages
+        @param target  global scoped (process id or name) to send to
+        @param targetname  system scoped exchange name to send messages to
+        """
+        ProcessClientBase.__init__(self, proc=proc, **kwargs)
+        self.target = target
+        if not self.target:
+            self.target = self.proc.get_scoped_name('system', targetname)
 
     def rpc_send(self, *args):
         """
