@@ -92,6 +92,8 @@ class IonTestCase(unittest.TestCase):
         reinitialization.
         """
         log.info("Closing ION container")
+        yield self.twisted_container_service.stopService()
+
         self.test_sup = None
         # Cancel any delayed calls, such as timeouts, looping calls etc.
         dcs = reactor.getDelayedCalls()
@@ -116,7 +118,6 @@ class IonTestCase(unittest.TestCase):
             yield pu.asleep(0.2)
             num_wait += 1
 
-        yield self.twisted_container_service.stopService()
         #if self.container:
         #    yield self.container.terminate()
         #elif ioninit.container_instance:
