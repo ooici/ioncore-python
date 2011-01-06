@@ -91,7 +91,7 @@ class ExchangeManager(BasicLifecycleObject):
             if scope == 'local':
                 msgName = self.container.id + "." + msgName
             elif scope == 'system':
-                # @todo: in the root bootstrap this is ok, but HACK
+                # @todo in the root bootstrap this is ok, but HACK
                 msgName = self.container.id + "." + msgName
 
             # declare queues, bindings as needed

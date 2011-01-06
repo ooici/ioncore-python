@@ -205,7 +205,7 @@ class Receiver(BasicLifecycleObject):
         Constructs a standard message with standard headers and sends on given
         receiver.
         @param sender sender name of the message
-        @param recipient recipient name of the message
+        @param recipient recipient name of the message NOTE: this gets translated to "receiver" in the message in IONMessageInterceptor
         @param operation the operation (performative) of the message
         @param content the black-box content of the message
         @param headers dict with headers that may override standard headers
@@ -291,3 +291,66 @@ class NameReceiver(Receiver):
 
 class ServiceWorkerReceiver(WorkerReceiver):
     pass
+
+class PublisherReceiver(Receiver):
+    """
+    A "Receiver" used for publishing data to a topic.
+    """
+
+    @defer.inlineCallbacks
+    def on_initialize(self, *args, **kwargs):
+        """
+        @retval Deferred
+        """
+        assert self.xname, "Receiver must have a name"
+
+        name_config = messaging.worker(self.xname)
+        name_config.update({'name_type':'worker'})
+
+        yield self._init_receiver(name_config, store_config=True)
+
+    def send(self, exchange_point='', topic='', resource_id='', data='', **kwargs):
+        """
+        @return Deferred on send.
+        """
+        # TODO: exchange_point, resource_id
+        return Receiver.send(self, recipient=topic, content=data, headers={}, op='', **kwargs)
+
+    def on_activate(self, *args, **kwargs):
+        """
+        Overrides the base class on_activate, which would try to listen to a queue. We're not listening with a PublisherReceiver.
+        """
+        pass
+
+class SubscriberReceiver(Receiver):
+    """
+    A Receiver used by a process to subscribe to topic based routing.
+
+    Must activate this receiver to receive any messages.
+    """
+    def __init__(self, *args, **kwargs):
+        """
+        @param binding_key The binding key to use. By default, uses the computed xname, but can take a topic based string with wildcards.
+        """
+        binding_key = kwargs.pop("binding_key", None)
+        Receiver.__init__(self, *args, **kwargs)
+        if binding_key == None:
+            binding_key = self.xname
+
+        self.binding_key = binding_key
+
+    @defer.inlineCallbacks
+    def on_initialize(self, *args, **kwargs):
+        """
+        @retval Deferred
+        """
+        assert self.xname, "Receiver must have a name"
+
+        name_config = messaging.worker(self.xname)
+        #TODO: needs routing_key or it doesn't bind to the binding key - find where that occurs
+        #TODO: auto_delete gets clobbered in Consumer.name by exchange space dict config - rewrite - maybe not possible if exchange is set to auto_delete always
+        name_config.update({'name_type':'worker', 'binding_key':self.binding_key, 'routing_key':self.binding_key, 'auto_delete':False})
+
+        yield self._init_receiver(name_config, store_config=True)
+
+
