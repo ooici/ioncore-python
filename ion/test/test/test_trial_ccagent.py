@@ -22,5 +22,13 @@ class IonTestCaseCCAgentTest(iontest.IonTestCase):
         b = process.procRegistry.kvs.has_key('ccagent')
         self.failIf(b)
 
+    @defer.inlineCallbacks
+    def test_ccagent_starts_again(self):
+        yield self._start_container()
+        a = process.procRegistry.kvs.has_key('ccagent')
+        self.failUnless(a)
+        yield self._stop_container()
+        b = process.procRegistry.kvs.has_key('ccagent')
+        self.failIf(b)
 
 
