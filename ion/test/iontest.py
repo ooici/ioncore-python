@@ -14,6 +14,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import bootstrap, ioninit
 from ion.core import ioninit
+from ion.core.cc import service
 from ion.core.cc import container
 from ion.core.cc.container import Id, Container
 from ion.core.messaging.receiver import Receiver
@@ -48,22 +49,26 @@ class IonTestCase(unittest.TestCase):
         """
         Starting and initialzing the container with a connection to a broker.
         """
-        mopt = {}
+        #mopt = {}
+        mopt = service.Options()
         mopt['broker_host'] = CONF['broker_host']
         mopt['broker_port'] = CONF['broker_port']
         mopt['broker_vhost'] = CONF['broker_vhost']
         mopt['broker_heartbeat'] = CONF['broker_heartbeat']
-        mopt['boot_script'] = None
-        mopt['script'] = None
+        mopt['no_shell'] = True
+        mopt['script'] = CONF['start_app']
 
         # Little trick to have no consecutive failures if previous setUp() failed
         if Container._started:
             log.error("PROBLEM: Previous test did not stop container. Fixing...")
             yield self._stop_container()
 
-        self.container = container.create_new_container()
-        yield self.container.initialize(mopt)
-        yield self.container.activate()
+        #self.container = container.create_new_container()
+        #yield self.container.initialize(mopt)
+        #yield self.container.activate()
+        twisted_container_service = service.CapabilityContainer(mopt)
+        yield twisted_container_service.startService()
+        self.twisted_container_service = twisted_container_service
 
         # Manually perform some ioncore initializations
         yield bootstrap.init_ioncore()
@@ -111,10 +116,11 @@ class IonTestCase(unittest.TestCase):
             yield pu.asleep(0.2)
             num_wait += 1
 
-        if self.container:
-            yield self.container.terminate()
-        elif ioninit.container_instance:
-            yield ioninit.container_instance.terminate()
+        yield self.twisted_container_service.stopService()
+        #if self.container:
+        #    yield self.container.terminate()
+        #elif ioninit.container_instance:
+        #    yield ioninit.container_instance.terminate()
 
         # Reset static module values back to initial state for next test case
         bootstrap.reset_container()
