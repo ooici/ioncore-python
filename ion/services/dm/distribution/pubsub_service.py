@@ -241,6 +241,12 @@ class PubSubClient(ServiceClient):
 
     @defer.inlineCallbacks
     def declare_topic_tree(self, exchange_space_name, topic_tree_name):
+        """
+        @brief Create a topic tree
+        @param exchange_space_name Exchange space where the tree will live
+        @param topic_tree_name Name of the tree to create
+        @retval Topic tree ID on success, None if failure
+        """
         yield self._check_init()
         payload = {'exchange_space_name' : exchange_space_name,
         'topic_tree_name': topic_tree_name}
@@ -250,6 +256,11 @@ class PubSubClient(ServiceClient):
 
     @defer.inlineCallbacks
     def undeclare_topic_tree(self, topic_tree_id):
+        """
+        @brief Remove a topic tree
+        @param topic_tree_id ID, as returned from declare_topic_tree
+        @retval None
+        """
         yield self._check_init()
         payload = {'topic_tree_id' : topic_tree_id}
         (content, headers, payload) = yield self.rpc_send('undeclare_topic_tree', payload)
@@ -258,6 +269,11 @@ class PubSubClient(ServiceClient):
 
     @defer.inlineCallbacks
     def query_topic_trees(self, topic_regex):
+        """
+        @brief Registry query, return all trees that match the regex
+        @param topic_regex Regular expression to match against
+        @retval List, possibly empty, of topic tree names
+        """
         yield self._check_init()
         payload = {'topic_regex' : topic_regex}
         (content, headers, payload) = yield self.rpc_send('query_topic_trees', payload)
@@ -266,6 +282,12 @@ class PubSubClient(ServiceClient):
 
     @defer.inlineCallbacks
     def define_topic(self, topic_tree_id, topic_name):
+        """
+        @brief Within a topic tree, define a topic. Usually a dataset name by convention.
+        @param topic_tree_id ID, as returned from op_declare_topic_tree
+        @param topic_name Name to declare
+        @retval Topic ID, or None if error
+        """
         yield self._check_init()
         payload = {'topic_tree_id' : topic_tree_id,
                 'topic_name' : topic_name}
@@ -275,6 +297,12 @@ class PubSubClient(ServiceClient):
 
     @defer.inlineCallbacks
     def query_topics(self, exchange_point_name, topic_regex):
+        """
+        @brief Query topics within an exchange point
+        @param exchange_point_name Exchange point to inspect (scope)
+        @param topic_regex Regex to match
+        @retval List, possibly empty, of topic names
+        """
         yield self._check_init()
         payload = {'topic_regex' : topic_regex,
                 'exchange_point_name' : exchange_point_name}
@@ -284,6 +312,13 @@ class PubSubClient(ServiceClient):
 
     @defer.inlineCallbacks
     def define_publisher(self, topic_tree_id, topic_id, publisher_name, credentials=None):
+        """
+        @brief Called by the publisher, this drops through to the resource registry
+        @param topic_tree_id Tree where we'll publish
+        @param publisher_name Human-readable publisher ID string, e.g. "Doc X's buoy data for NYC harbor"
+        @param credentials Unused hook for auth*
+        @retval Transciever instance with send() method hooked up to correct topic
+        """
         yield self._check_init()
         payload = {'topic_tree_id' : topic_tree_id,
                 'topic_id': topic_id,
@@ -295,6 +330,15 @@ class PubSubClient(ServiceClient):
 
     @defer.inlineCallbacks
     def subscribe(self, topic_regex):
+        """
+        @brief Called by subscribers, this calls the EMS to setup the data flow
+        @param xs_name Exchange space name
+        @param tt_name Topic tree name
+        @param topic_regex Topic of interest. If no publishers, then no data, but no error
+        @note Order of calls on publish/subscribe does not matter
+        @note creates the queue via EMS
+        @retval Address of queue for ondata() callback and resource id
+        """
         yield self._check_init()
         payload = {'topic_regex' : topic_regex}
         (content, headers, payload) = yield self.rpc_send('subscribe', payload)
@@ -303,6 +347,11 @@ class PubSubClient(ServiceClient):
 
     @defer.inlineCallbacks
     def unsubscribe(self, subscription_id):
+        """
+        @brief Remove subscription
+        @param subscription_id ID from subscribe calS
+        @retval OK if no problems, error otherwise
+        """
         yield self._check_init()
         payload = {'subscription_id':subscription_id}
         (content, headers, payload) = yield self.rpc_send('unsubscribe', payload)

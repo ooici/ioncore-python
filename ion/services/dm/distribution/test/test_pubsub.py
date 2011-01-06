@@ -83,7 +83,6 @@ class PST(IonTestCase):
         self.failIf(pid is None)
 
     def test_subscribe(self):
-        # @todo Hmm, should subscribe() have more args or does it span all the namespaces?
         pass
 
     
