@@ -43,6 +43,7 @@ class IonTestCase(unittest.TestCase):
     timeout = 20
     procRegistry = process.procRegistry
     container = None
+    twisted_container_service = None #hack
 
     @defer.inlineCallbacks
     def _start_container(self):
@@ -92,7 +93,8 @@ class IonTestCase(unittest.TestCase):
         reinitialization.
         """
         log.info("Closing ION container")
-        yield self.twisted_container_service.stopService()
+        if self.twisted_container_service: #hack
+            yield self.twisted_container_service.stopService()
 
         self.test_sup = None
         # Cancel any delayed calls, such as timeouts, looping calls etc.
