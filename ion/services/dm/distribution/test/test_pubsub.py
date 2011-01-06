@@ -31,8 +31,7 @@ class PST(IonTestCase):
         self.psc = PubSubClient(self.sup)
 
         self.xs_name = 'ooici'
-        self.xp_name = 'science_data'
-        self.tt_name = 'pfh-tree-of-dm'
+        self.tt_name = 'science_data'
         self.topic_name = 'coads.nc'
 
     def tearDown(self):
@@ -42,20 +41,14 @@ class PST(IonTestCase):
         pass
 
     @defer.inlineCallbacks
-    def test_xp(self):
-        # Creation of an exchange point
-        rc = yield self.psc.declare_exchange_point(self.xp_name)
-        self.failIf(rc == None)
-
-    @defer.inlineCallbacks
     def test_topic_tree_creation(self):
         self.tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
-        self.failUnless(self.tt_id != None)
+        self.failIf(self.tt_id is None)
 
     @defer.inlineCallbacks
     def test_bad_topic_tree(self):
         rc = yield self.psc.declare_topic_tree(None, None)
-        self.failUnless(rc == None)
+        self.failIf(rc is not None)
 
     @defer.inlineCallbacks
     def test_tt_create_and_query(self):
@@ -67,20 +60,19 @@ class PST(IonTestCase):
     @defer.inlineCallbacks
     def test_tt_crud(self):
         # Test create/query/rm/query on topic trees
-        yield self.test_tt_create_query()
+        yield self.test_tt_create_and_query()
         rc = yield self.psc.undeclare_topic_tree(self.tt_id)
-        self.failIf(rc == None)
+        self.failIf(rc is None)
         rc = yield self.psc.query_topic_trees('.+')
         self.failIf(len(rc) > 0)
 
     @defer.inlineCallbacks
     def test_topics(self):
-        yield self.test_xp()
         tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
         topic_id = yield self.psc.define_topic(tt_id, self.topic_name)
         # Verify that it was created
-        self.failIf(topic_id == None)
-        rc = yield self.psc.query_topics(self.xp_name, '.+')
+        self.failIf(topic_id is None)
+        rc = yield self.psc.query_topics(self.tt_name, '.+')
         self.failIf(len(rc) < 1)
 
     @defer.inlineCallbacks
@@ -88,7 +80,7 @@ class PST(IonTestCase):
         tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
         topic_id = yield self.psc.define_topic(tt_id, self.topic_name)
         pid = yield self.psc.define_publisher(tt_id, topic_id, 'phubbard')
-        self.failUnless(pid != None)
+        self.failIf(pid is None)
 
     def test_subscribe(self):
         # @todo Hmm, should subscribe() have more args or does it span all the namespaces?
