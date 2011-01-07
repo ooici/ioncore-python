@@ -57,6 +57,57 @@ class Publisher(ProcessClientBase):
         """
         return self._publish_receiver.send(exchange_point=self._exchange_point, topic=topic, resource_id=self._resource_id, data=data)
 
+# =================================================================================
+
+class PublisherFactory(object):
+    """
+    A factory class for building Publisher objects.
+    """
+
+    def __init__(self, proc=None, xp_name=None, publisher_name=None, credentials=None):
+        """
+        Initializer. Sets default properties for calling the build method.
+
+        These default are overridden by specifying the same named keyword arguments to the 
+        build method.
+
+        @param  proc        The process the publisher should attach to. May be None to create an
+                            anonymous process contained in the Publisher instance itself.
+        @param  xp_name     Name of exchange point to use
+        @param  publisher_name Name of new publisher process, free-form string
+        @param  credentials Placeholder for auth* tokens
+        """
+        self._proc              = proc
+        self._xp_name           = xp_name
+        self._publisher_name    = publisher_name
+        self._credentials       = credentials
+
+    def build(self, proc=None, xp_name=None, publisher_name=None, credentials=None):
+        """
+        Creates a publisher and calls register on it.
+
+        The parameters passed to this method take defaults that were set up when this SubscriberFactory
+        was initialized. If None is specified for any of the parameters, or they are not filled out as
+        keyword arguments, the defaults take precedence.
+
+        @param  proc        The process the publisher should attach to. May be None to create an
+                            anonymous process contained in the Publisher instance itself.
+        @param  xp_name     Name of exchange point to use
+        @param  publisher_name Name of new publisher process, free-form string
+        @param  credentials Placeholder for auth* tokens
+        """
+        proc            = proc or self._proc
+        xp_name         = xp_name or self._xp_name
+        publisher_name  = publisher_name or self._publisher_name
+        credentials     = credentials or self._credentials
+
+        pub = Publisher(proc)
+        pub.register(xp_name, publisher_name, credentials)
+
+        return pub
+
+# =================================================================================
+
 class Subscriber(ProcessClientBase):
     """
     @brief This represents subscribers, both user-driven and internal (e.g. dataset persister)
@@ -110,3 +161,65 @@ class Subscriber(ProcessClientBase):
         """
         raise NotImplemented('Must be implmented by subclass')
 
+
+# =================================================================================
+
+class SubscriberFactory(object):
+    """
+    Factory to create Subscribers.
+    """
+
+    def __init__(self, proc=None, xp_name=None, topic_regex=None, subscriber_type=None):
+        """
+        Initializer. Sets default properties for calling the build method.
+
+        These default are overridden by specifying the same named keyword arguments to the 
+        build method.
+
+        @param  proc        The process the subscriber should attach to. May be None to create an
+                            anonymous process contained in the Subscriber instance itself.
+        @param  xp_name     Name of exchange point to use
+        @param  topic_regex Dataset of topic of interest, using amqp regex
+        @param  subscriber_type Specific derived Subscriber type to use. You can define a custom
+                            Subscriber derived class if you want to share the implementation
+                            across multiple Subscribers. If left None, the standard Subscriber
+                            class is used.
+        """
+
+        self._proc              = proc
+        self._xp_name           = xp_name
+        self._topic_regex       = topic_regex
+        self._subscriber_type   = subscriber_type
+
+    def build(self, proc=None, xp_name=None, topic_regex=None, subscriber_type=None, handler=None):
+        """
+        Creates a subscriber.
+
+        The parameters passed to this method take defaults that were set up when this SubscriberFactory
+        was initialized. If None is specified for any of the parameters, or they are not filled out as
+        keyword arguments, the defaults take precedence.
+
+        @param  proc        The process the subscriber should attach to. May be None to create an
+                            anonymous process contained in the Subscriber instance itself.
+        @param  xp_name     Name of exchange point to use
+        @param  topic_regex Dataset of topic of interest, using amqp regex
+        @param  subscriber_type Specific derived Subscriber type to use. You can define a custom
+                            Subscriber derived class if you want to share the implementation
+                            across multiple Subscribers. If left None, the standard Subscriber
+                            class is used.
+        @param  handler     A handler method to replace the Subscriber's ondata method. This is typically
+                            a bound method of the process owning this Subscriber, but may be any
+                            callable taking a data param. If this is left None, the subscriber_type
+                            must be set to a derived Subscriber that overrides the ondata method.
+        """
+        proc            = proc or self._proc
+        xp_name         = xp_name or self._xp_name
+        topic_regex     = topic_regex or self._topic_regex
+        subscriber_type = subscriber_type or self._subscriber_type or Subscriber
+
+        sub = subscriber_type(proc=proc)
+        sub.subscribe(xp_name, topic_regex)
+        if handler != None:
+            sub.ondata = handler
+
+        return sub
