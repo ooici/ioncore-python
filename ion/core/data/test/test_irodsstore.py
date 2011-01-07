@@ -21,7 +21,7 @@ class TestIrodsDataStoreInterface(unittest.TestCase):
         # self.ds = IrodsStore.create_store()
 
         # here we use config through args
-        irods_config = {'irodsHost': 'ec2-204-236-137-245.us-west-1.compute.amazonaws.com', \
+        irods_config = {'irodsHost': 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com', \
                     'irodsPort':'1247', \
                     'irodsDefResource':'ooi-test-resc1', \
                     'irodsOoiCollection':'/ooi-test-cluster1/home/testuser/OOI', \
