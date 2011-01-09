@@ -26,7 +26,7 @@ from ion.data.store import Store
 from ion.interact.conversation import Conversation
 from ion.interact.message import Message
 import ion.util.procutils as pu
-from ion.util.state_object import BasicLifecycleObject
+from ion.util.state_object import BasicLifecycleObject, BasicStates
 
 from ion.core.object import workbench
 
@@ -44,6 +44,11 @@ procRegistry = Store()
 class IProcess(Interface):
     """
     Interface for all capability container application processes
+    """
+
+class ProcessError(Exception):
+    """
+    An exception class for errors that occur in Process
     """
 
 class Process(BasicLifecycleObject,ResponseCodes):
@@ -132,6 +137,9 @@ class Process(BasicLifecycleObject,ResponseCodes):
         #The Workbench for all object repositories used by this process
         self.workbench = workbench.WorkBench(self)
         
+        # A list of other kinds of life cycle objects which are tied to the process 
+        self._registered_life_cycle_objects=[]
+        
         # TCP Connectors and Listening Ports
         self.connectors = []
         self.listeners = []
@@ -185,6 +193,10 @@ class Process(BasicLifecycleObject,ResponseCodes):
         # Create queue and consumer for backend receiver
         yield self.backend_receiver.initialize()
         yield self.backend_receiver.activate()
+        
+        # Move registerd life cycle objects through there life cycle
+        for lco in self._registered_life_cycle_objects:
+            yield defer.maybeDeferred(lco.initialize)
 
         # Callback to subclasses
         try:
@@ -223,6 +235,10 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
         # Create consumer for process receiver
         yield self.receiver.activate()
+        
+        # Move registerd life cycle objects through there life cycle
+        for lco in self._registered_life_cycle_objects:
+            yield defer.maybeDeferred(lco.activate)
 
         # Callback to subclasses
         try:
@@ -263,6 +279,10 @@ class Process(BasicLifecycleObject,ResponseCodes):
             connector.disconnect()
         for port in self.listeners:
             yield port.stopListening()
+            
+        # Move registerd life cycle objects through there life cycle
+        for lco in self._registered_life_cycle_objects:
+            yield defer.maybeDeferred(lco.terminate)
 
         if len(self.child_procs) > 0:
             log.info("Shutting down child processes")
@@ -300,6 +320,46 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
     def add_receiver(self, receiver):
         self.receivers[receiver.name] = receiver
+
+    def add_life_cycle_object(self, lco):
+        """
+        Add a life cycle object to the process during init.
+        This method should only be used during init to add lco's which are also
+        in the init state.
+        """
+        assert isinstance(lco, BasicLifecycleObject), \
+        'Can not add an instance that does not inherit from BasicLifecycleObject'
+        
+        if self._get_state() != BasicStates.S_INIT:
+            raise ProcessError, 'Can not use add_life_cycle_objects when the process is past the INIT state.'
+            
+        self._registered_life_cycle_objects.append(lco)
+            
+    
+    @defer.inlineCallbacks
+    def register_life_cycle_object(self, lco):
+        """
+        Register a life cycle object with the process and automatically advance
+        its state to the current state of the process.
+        """
+        assert isinstance(lco, BasicLifecycleObject), \
+        'Can not register an instance that does not inherit from BasicLifecycleObject'
+        
+        if self._get_state() == BasicStates.S_INIT:
+            pass
+        elif self._get_state() == BasicStates.S_READY:
+            yield defer.maybeDeferred(lco.initialize)
+            
+        elif self._get_state() == BasicStates.S_ACTIVE:
+            yield defer.maybeDeferred(lco.initialize)
+            yield defer.maybeDeferred(lco.activate)
+            
+        elif self._get_state() == BasicStates.S_TERMINATED:
+            raise ProcessError, '''Can not register life cycle object in invalid state "TERMINATED"'''
+        elif self._get_state() == BasicStates.S_ERROR:
+            raise ProcessError, '''Can not register life cycle object in invalid state "ERROR"'''
+        
+        self._registered_life_cycle_objects.append(lco)
 
     def is_spawned(self):
         return self.receiver.consumer != None

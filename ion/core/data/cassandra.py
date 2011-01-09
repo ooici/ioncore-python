@@ -29,6 +29,8 @@ from telephus.cassandra.ttypes import CfDef
 from ion.core import ioninit
 from ion.core.data import store 
 
+from ion.util.state_object import BasicLifecycleObject
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -43,7 +45,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 
 
-class CassandraStore(object):
+class CassandraStore(BasicLifecycleObject):
     """
     An Adapter class that implements the IStore interface by way of a
     cassandra client connection. As an adapter, this assumes an active
@@ -58,13 +60,12 @@ class CassandraStore(object):
 
     implements(store.IStore)
 
-    namespace = 'default' # implemented as cassandra column family
-                          # (Telephus columnPath)
-
-    def __init__(self, client):
+    def __init__(self, client, namespace=None):
         """functional wrapper around active client instance
         """
         self.client = client
+        
+        self.namespace = namespace # Cassandra Column Family!
 
     @defer.inlineCallbacks
     def get(self, key):
@@ -106,43 +107,100 @@ class CassandraStore(object):
         """
         yield self.client.remove(key, self.namespace, column='value')
 
-class CassandraManager(object):
+    def on_initialize(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
 
-    implements(store.IDataManager)
+    def on_activate(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
 
-    keyspace = None
+    def on_deactivate(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
+
+    def on_terminate(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
+
+    def on_error(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
+
+class CassandraManager(BasicLifecycleObject):
+
+    #implements(store.IDataManager)
 
     def __init__(self, client):
         self.client = client
+        self.storage_resource
 
-    def _set_keyspace(self, keyspace):
+    def create_persistent_archive(self, pa):
         """
-        This is for convenience and testing.
-        When the cassandra cluster is deployed, the deploy-er should
-        establish the existence of the keyspace.
+        @brief Create a Cassandra Key Space
+        @param pa is a persistent archive object which defines the properties of a Key Space
+        @retval ?
         """
-        ksdef = KsDef(name=keyspace, replication_factor=1,
-                strategy_class='org.apache.cassandra.locator.SimpleStrategy',
-                cf_defs=[])
-        return self.client.system_add_keyspace(ksdef)
+        #ksdef = KsDef(name=keyspace, replication_factor=1,
+        #        strategy_class='org.apache.cassandra.locator.SimpleStrategy',
+        #        cf_defs=[])
+        #return self.client.system_add_keyspace(ksdef)
 
-    def create_namespace(self, name):
+    def update_persistent_archive(self, pa):
         """
+        @brief Update a Cassandra Key Space
+        This method should update the Key Space properties - not change the column families!
+        @param pa is a persistent archive object which defines the properties of a Key Space
+        @retval ?
         """
-        cfdef = CfDef(keyspace=self.keyspace, name=name)
-        return self.client.system_add_column_family(cfdef)
+        
+    
+    def remove_persistent_archive(self, pa):
+        """
+        @brief Remove a Cassandra Key Space
+        @param pa is a persistent archive object which defines the properties of a Key Space
+        @retval ?
+        """
+        
 
-    def remove_namespace(self, name):
+    def create_cache(self, pa, cache):
         """
+        @brief Create a Cassandra column family
+        @param pa is a persistent archive object which defines the properties of an existing Key Space
+        @param cache is a cache object which defines the properties of column family
+        @retval ?
         """
-        return self.system_drop_column_family(name)
+        #cfdef = CfDef(keyspace=self.keyspace, name=name)
+        #return self.client.system_add_column_family(cfdef)
 
-    def list_namespace(self):
+    def remove_cache(self, pa, cache):
         """
+        @brief Remove a Cassandra column family
+        @param pa is a persistent archive object which defines the properties of an existing Key Space
+        @param cache is a cache object which defines the properties of column family
+        @retval ?
+        """
+        #return self.system_drop_column_family(name)
+
+    def update_cache(self, pa, cache):
+        """
+        @brief Update a Cassandra column family
+        @param pa is a persistent archive object which defines the properties of an existing Key Space
+        @param cache is a cache object which defines the properties of column family
+        @retval ?
         """
 
+    def on_initialize(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
 
-class CassandraFactory(object):
+    def on_activate(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
+
+    def on_deactivate(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
+
+    def on_terminate(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
+
+    def on_error(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented")
+
+class CassandraFactory(process.ProcessClientBase):
     """
     The store class attribute is the IStore adapter class that will be used
     to Adapt the cassandra client instance.
@@ -153,14 +211,10 @@ class CassandraFactory(object):
     client, and then adapt that client to conform to the IStore interface.
     """
     
-    # This is the Adapter class. The default, CassandraStore, implements
-    # the IStore interface. You can assign other Adapters here, if you want
-    # something besides IStore.
-    store = CassandraStore
+    # This is the Adapter class. It generates client connections for any
+    # cassandra class which is instantiated by init(client, kwargs)
 
-    cassandraKeyspace = "Keyspace1"
-
-    def __init__(self, host='localhost', port=9160, process=None):
+    def __init__(self, proc=None, storage_deployment=None):
         """
         @param host defaults to localhost
         @param port 9160 is the cassandra default
@@ -174,23 +228,33 @@ class CassandraFactory(object):
         implementation choice to fulfill a [not fully articulated]
         architectural need.
         """
-        self.host = host
-        self.port = port
-        if process is None:
-            process = reactor
-        self.process = process
+        ProcessClientBase.__init__(self, proc=process, **kwargs)
+        
+        self.storage_deployment = storage_deployment
+        #if process is None:
+        #    process = reactor
+        #self.process = process
 
-    def buildStore(self, namespace):
+    def buildStore(self, credential, clazz, **kwargs):
         """
         @param namespace Maps to Cassandra specific columnFamily option
         @note For cassandra, there needs to be a conventionaly used
         Keyspace option.
         """
-        # @note The cassandra KeySpace is used to implement the IStore namespace
-        # concept.
-        f = ManagedCassandraClientFactory(keyspace=self.cassandraKeyspace)
-        client = CassandraClient(f)
-        self.process.connectTCP(self.host, self.port, f)
+        
+        # Get the keyspace if any
+        keyspace = kwargs.get('keyspace',None)
+        
+        # Get the 
+        host = self.storage_deployment.hosts[0].host
+        port = self.storage_deployment.hosts[0].port
+        
+        #@TODO pass the credentials
+        manager = ManagedCassandraClientFactory(**kwargs)
+
+        client = CassandraClient(manager)        
+        self.proc.connectTCP(self.host, self.port, manager)
+        
         # What we have with this
         # CassandraFactory class is a mixture of a Factory pattern and an
         # Adapter pattern. s is our IStore providing instance the user of
@@ -199,9 +263,16 @@ class CassandraFactory(object):
         # be to build/carryout the mechanics of a TCP client connection AND
         # then Adapting it and returning the result as an IStore providing
         # instance.
-        s = self.store(client)
-        #s.namespace = namespace
-        return s
+        
+        
+        
+        
+        instance = clazz(client, **kwargs)
+        
+        self.proc.registerd_life_cycle_objects.append(instance)
+        
+        
+        return instance
 
 
 class CassandraMangerFactory(CassandraFactory):

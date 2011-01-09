@@ -17,13 +17,16 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.messaging import ion_reply_codes
-from ion.core.process.process import Process, ProcessDesc, ProcessFactory
+from ion.core.process.process import Process, ProcessDesc, ProcessFactory, ProcessError
 from ion.core.cc.container import Container
 from ion.core.exception import ReceivedError
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.id import Id
 from ion.test.iontest import IonTestCase, ReceiverProcess
 import ion.util.procutils as pu
+
+from ion.core.process.test import life_cycle_process
+from ion.util import state_object
 
 class ProcessTest(IonTestCase):
     """
@@ -240,15 +243,64 @@ class ProcessTest(IonTestCase):
         except defer.TimeoutError, te:
             log.info('Timeout received')
 
-
-class EchoProcess(Process):
-
     @defer.inlineCallbacks
-    def plc_noinit(self):
-        log.info("In init: "+self.proc_state)
-        yield pu.asleep(1)
-        log.info("Leaving init: "+self.proc_state)
+    def test_register_lco(self):
+        """
+        Test the registration of life cycle objects owned by a process
+        Do not spawn the process - want to manually move it through the FSM!
+        """
+        # Create a process which has an lco object in its init
+        lco1 = life_cycle_process.LifeCycleObject()
+        lcop = life_cycle_process.LCOProcess(lco1, spawnargs={'proc-name':'p1'})        
+        self.assertEquals(lcop._get_state(), state_object.BasicStates.S_INIT)
+        self.assertEquals(lco1._get_state(), state_object.BasicStates.S_INIT)
+        
+        lco2 = life_cycle_process.LifeCycleObject()
+        yield lcop.register_life_cycle_object(lco2)
+        self.assertEquals(lco2._get_state(), state_object.BasicStates.S_INIT)
+        
+        # Initialize the process and its objects
+        yield lcop.initialize()
+        self.assertEquals(lcop._get_state(), state_object.BasicStates.S_READY)
+        self.assertEquals(lco1._get_state(), state_object.BasicStates.S_READY)
+        self.assertEquals(lco2._get_state(), state_object.BasicStates.S_READY)
+        
+        lco3 = life_cycle_process.LifeCycleObject()
+        yield lcop.register_life_cycle_object(lco3)
+        self.assertEquals(lco3._get_state(), state_object.BasicStates.S_READY)
+        
+        # Check that using add after init causes an error
+        lcoa = life_cycle_process.LifeCycleObject()
+        self.assertRaises(ProcessError,lcop.add_life_cycle_object,lcoa)
+        
+        # Activate the process and its objects
+        yield lcop.activate()
+        
+        self.assertEquals(lcop._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.assertEquals(lco1._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.assertEquals(lco2._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.assertEquals(lco3._get_state(), state_object.BasicStates.S_ACTIVE)
 
+        
+        lco4 = life_cycle_process.LifeCycleObject()
+        yield lcop.register_life_cycle_object(lco4)
+        self.assertEquals(lco4._get_state(), state_object.BasicStates.S_ACTIVE)
+        
+        # Terminate the process and its objects
+        yield lcop.terminate()
+        self.assertEquals(lcop._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.assertEquals(lco1._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.assertEquals(lco2._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.assertEquals(lco3._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.assertEquals(lco4._get_state(), state_object.BasicStates.S_TERMINATED)
+        
+        # Can't seem to assert raises - not sure why not?
+        #lco5 = life_cycle_process.LifeCycleObject()
+        #self.assertRaises(ProcessError,lcop.register_life_cycle_object,lco5)
+        #yield lcop.register_life_cycle_object(lco5)
+        
+class EchoProcess(Process):
+        
     @defer.inlineCallbacks
     def op_echo(self, content, headers, msg):
         log.info("Message received: "+str(content))
