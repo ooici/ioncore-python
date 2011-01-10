@@ -9,6 +9,8 @@
 
 from ion.core.process.process import ProcessClientBase
 from ion.core.messaging.receiver import PublisherReceiver, SubscriberReceiver
+from ion.services.dm.distribution.pubsub_service import PubSubClient
+from twisted.internet import defer
 
 class Publisher(ProcessClientBase):
     """
@@ -25,20 +27,24 @@ class Publisher(ProcessClientBase):
         self._resource_id = ''
         self._exchange_point = ''
 
+        self._pubsub_client = PubSubClient(proc=proc)
         self._publish_receiver = PublisherReceiver(self.proc.id.full) # TODO: does it matter?
 
         # do NOT attach the receiver - don't even init it. We aren't creating queues with it.
 
-    def register(self, xp_name, publisher_name, credentials):
+    @defer.inlineCallbacks
+    def register(self, xp_name, topic_id, publisher_name, credentials):
         """
         @brief Register a new publisher, also does the access control step.
         @param xp_name Name of exchange point to use
+        @param topic_id Topic to publish to
         @param publisher_name Name of new publisher process, free-form string
         @param credentials Placeholder for auth* tokens
         @retval OK or error
         @note saves resource id to self._resource_id
         """
-        pass
+        ret = yield self._pubsub_client.define_publisher(xp_name, topic_id, publisher_name, credentials)
+        defer.returnValue(ret)
 
     def unregister(self):
         """
@@ -64,7 +70,7 @@ class PublisherFactory(object):
     A factory class for building Publisher objects.
     """
 
-    def __init__(self, proc=None, xp_name=None, publisher_name=None, credentials=None):
+    def __init__(self, proc=None, xp_name=None, topic_id=None, publisher_name=None, credentials=None):
         """
         Initializer. Sets default properties for calling the build method.
 
@@ -74,15 +80,18 @@ class PublisherFactory(object):
         @param  proc        The process the publisher should attach to. May be None to create an
                             anonymous process contained in the Publisher instance itself.
         @param  xp_name     Name of exchange point to use
+        @param  topic_id    Topic to publish to
         @param  publisher_name Name of new publisher process, free-form string
         @param  credentials Placeholder for auth* tokens
         """
         self._proc              = proc
         self._xp_name           = xp_name
+        self._topic_id          = topic_id
         self._publisher_name    = publisher_name
         self._credentials       = credentials
 
-    def build(self, proc=None, xp_name=None, publisher_name=None, credentials=None):
+    @defer.inlineCallbacks
+    def build(self, proc=None, xp_name=None, topic_id=None, publisher_name=None, credentials=None):
         """
         Creates a publisher and calls register on it.
 
@@ -93,18 +102,20 @@ class PublisherFactory(object):
         @param  proc        The process the publisher should attach to. May be None to create an
                             anonymous process contained in the Publisher instance itself.
         @param  xp_name     Name of exchange point to use
+        @param  topic_id    Topic to publish to
         @param  publisher_name Name of new publisher process, free-form string
         @param  credentials Placeholder for auth* tokens
         """
         proc            = proc or self._proc
         xp_name         = xp_name or self._xp_name
+        topic_id        = topic_id or self._topic_id
         publisher_name  = publisher_name or self._publisher_name
         credentials     = credentials or self._credentials
 
         pub = Publisher(proc)
-        pub.register(xp_name, publisher_name, credentials)
+        yield pub.register(xp_name, topic_id, publisher_name, credentials)
 
-        return pub
+        defer.returnValue(pub)
 
 # =================================================================================
 
@@ -122,8 +133,10 @@ class Subscriber(ProcessClientBase):
         self._resource_id = ''
         self._exchange_point = ''
 
+        self._pubsub_client = PubSubClient(proc=proc)
         self._subscribe_receiver = SubscriberReceiver(self.proc.id.full, handler=self._receive_handler) # TODO: use what for name here?
 
+    @defer.inlineCallbacks
     def subscribe(self, xp_name, topic_regex):
         """
         @brief Register a topic to subscribe to. Results will be sent to our private queue.
@@ -133,14 +146,18 @@ class Subscriber(ProcessClientBase):
         @param topic_regex Dataset topic of interest, using amqp regex
         @retval Return code only, with new queue automagically hooked up to ondata()?
         """
-        pass
+        # TODO: xp_name not taken by PSC?
+        self._resource_id = yield self._pubsub_client.subscribe(topic_regex)
+        self._subscriber_receiver.name = self._resource_id      # ugh this can't be good
+        self._subscriber_receiver.attach()          # "declares" queue in initialize, listens to queue in activate
+        defer.returnValue(True)
 
     def unsubscribe(self):
         """
         @brief Remove a subscription
         @retval Return code only
         """
-        pass
+        self._pubsub_client.unsubscribe(self._resource_id)
 
     def _receive_handler(self, data, msg):
         """
