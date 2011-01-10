@@ -7,8 +7,8 @@
 @brief Publisher/Subscriber classes for attaching to processes
 """
 
-from ion.core.process.process import ProcessClientBase
-from ion.core.messaging.receiver import Receiver, PublisherReceiver, SubscriberReceiver
+from ion.core.messaging import messaging
+from ion.core.messaging.receiver import Receiver
 from ion.services.dm.distribution.pubsub_service import PubSubClient
 from twisted.internet import defer
 
@@ -132,22 +132,45 @@ class PublisherFactory(object):
 
 # =================================================================================
 
-class Subscriber(ProcessClientBase):
+class Subscriber(Receiver):
     """
     @brief This represents subscribers, both user-driven and internal (e.g. dataset persister)
     @note All returns are HTTP return codes, 2xx for success, etc, unless otherwise noted.
     @todo Need a subscriber receiver that can hook into the topic xchg mechanism
     """
-    def __init__(self, proc=None):
+    def __init__(self, *args, **kwargs):
         """
         Save class variables for later
         """
-        ProcessClientBase.__init__(self, proc)
         self._resource_id = ''
         self._exchange_point = ''
 
-        self._pubsub_client = PubSubClient(proc=proc)
-        self._subscribe_receiver = SubscriberReceiver(self.proc.id.full, handler=self._receive_handler) # TODO: use what for name here?
+        self._pubsub_client = PubSubClient()
+
+        kwargs = kwargs.copy()
+        kwargs['handler'] = self._receive_handler
+
+        binding_key = kwargs.pop("binding_key", None)
+        Receiver.__init__(self, *args, **kwargs)
+
+        if binding_key == None:
+            binding_key = self.xname
+
+        self.binding_key = binding_key
+
+    @defer.inlineCallbacks
+    def on_initialize(self, *args, **kwargs):
+        """
+        @retval Deferred
+        """
+        assert self.xname, "Receiver must have a name"
+
+        name_config = messaging.worker(self.xname)
+        #TODO: needs routing_key or it doesn't bind to the binding key - find where that occurs
+        #TODO: auto_delete gets clobbered in Consumer.name by exchange space dict config - rewrite - maybe not possible if exchange is set to auto_delete always
+        name_config.update({'name_type':'worker', 'binding_key':self.binding_key, 'routing_key':self.binding_key, 'auto_delete':False})
+
+        yield self._init_receiver(name_config, store_config=True)
 
     @defer.inlineCallbacks
     def subscribe(self, xp_name, topic_regex):
@@ -161,8 +184,8 @@ class Subscriber(ProcessClientBase):
         """
         # TODO: xp_name not taken by PSC?
         self._resource_id = yield self._pubsub_client.subscribe(topic_regex)
-        self._subscriber_receiver.name = self._resource_id      # ugh this can't be good
-        self._subscriber_receiver.attach()          # "declares" queue in initialize, listens to queue in activate
+        self.xname = self._resource_id      # ugh this can't be good
+        self.attach()          # "declares" queue in initialize, listens to queue in activate
         defer.returnValue(True)
 
     def unsubscribe(self):
@@ -199,15 +222,13 @@ class SubscriberFactory(object):
     Factory to create Subscribers.
     """
 
-    def __init__(self, proc=None, xp_name=None, topic_regex=None, subscriber_type=None):
+    def __init__(self, xp_name=None, topic_regex=None, subscriber_type=None):
         """
         Initializer. Sets default properties for calling the build method.
 
         These default are overridden by specifying the same named keyword arguments to the 
         build method.
 
-        @param  proc        The process the subscriber should attach to. May be None to create an
-                            anonymous process contained in the Subscriber instance itself.
         @param  xp_name     Name of exchange point to use
         @param  topic_regex Dataset of topic of interest, using amqp regex
         @param  subscriber_type Specific derived Subscriber type to use. You can define a custom
@@ -216,12 +237,11 @@ class SubscriberFactory(object):
                             class is used.
         """
 
-        self._proc              = proc
         self._xp_name           = xp_name
         self._topic_regex       = topic_regex
         self._subscriber_type   = subscriber_type
 
-    def build(self, proc=None, xp_name=None, topic_regex=None, subscriber_type=None, handler=None):
+    def build(self, xp_name=None, topic_regex=None, subscriber_type=None, handler=None):
         """
         Creates a subscriber.
 
@@ -242,14 +262,14 @@ class SubscriberFactory(object):
                             callable taking a data param. If this is left None, the subscriber_type
                             must be set to a derived Subscriber that overrides the ondata method.
         """
-        proc            = proc or self._proc
         xp_name         = xp_name or self._xp_name
         topic_regex     = topic_regex or self._topic_regex
         subscriber_type = subscriber_type or self._subscriber_type or Subscriber
 
-        sub = subscriber_type(proc=proc)
+        sub = subscriber_type(xp_name) # TODO: name here, gets reset later? so doesn't matter?
         sub.subscribe(xp_name, topic_regex)
         if handler != None:
             sub.ondata = handler
 
         return sub
+
