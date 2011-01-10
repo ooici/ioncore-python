@@ -284,36 +284,6 @@ class NameReceiver(Receiver):
 class ServiceWorkerReceiver(WorkerReceiver):
     pass
 
-class PublisherReceiver(Receiver):
-    """
-    A "Receiver" used for publishing data to a topic.
-    """
-
-    @defer.inlineCallbacks
-    def on_initialize(self, *args, **kwargs):
-        """
-        @retval Deferred
-        """
-        assert self.xname, "Receiver must have a name"
-
-        name_config = messaging.worker(self.xname)
-        name_config.update({'name_type':'worker'})
-
-        yield self._init_receiver(name_config, store_config=True)
-
-    def send(self, exchange_point='', topic='', resource_id='', data='', **kwargs):
-        """
-        @return Deferred on send.
-        """
-        # TODO: exchange_point, resource_id
-        return Receiver.send(self, recipient=topic, content=data, headers={}, op='', **kwargs)
-
-    def on_activate(self, *args, **kwargs):
-        """
-        Overrides the base class on_activate, which would try to listen to a queue. We're not listening with a PublisherReceiver.
-        """
-        pass
-
 class SubscriberReceiver(Receiver):
     """
     A Receiver used by a process to subscribe to topic based routing.

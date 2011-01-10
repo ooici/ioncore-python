@@ -8,29 +8,34 @@
 """
 
 from ion.core.process.process import ProcessClientBase
-from ion.core.messaging.receiver import PublisherReceiver, SubscriberReceiver
+from ion.core.messaging.receiver import Receiver, PublisherReceiver, SubscriberReceiver
 from ion.services.dm.distribution.pubsub_service import PubSubClient
 from twisted.internet import defer
 
-class Publisher(ProcessClientBase):
+class Publisher(Receiver):
     """
     @brief This represents publishers of (mostly) science data. Intended use is
     to be instantiated within another class/process/codebase, as an object for sending data to OOI.
     @note All returns are HTTP return codes, 2xx for success, etc, unless otherwise noted.
     """
 
-    def __init__(self, proc=None):
+    #@defer.inlineCallbacks
+    def on_initialize(self, *args, **kwargs):
         """
-        Save class variables for later
+        @retval 
         """
-        ProcessClientBase.__init__(self, proc)
+        #assert self.xname, "Receiver must have a name"
+
+        #name_config = messaging.worker(self.xname)
+        #name_config.update({'name_type':'worker'})
+
         self._resource_id = ''
         self._exchange_point = ''
 
-        self._pubsub_client = PubSubClient(proc=proc)
-        self._publish_receiver = PublisherReceiver(self.proc.id.full) # TODO: does it matter?
+        self._pubsub_client = PubSubClient()
 
-        # do NOT attach the receiver - don't even init it. We aren't creating queues with it.
+        # don't do this, we don't want to declare a queue
+        #yield self._init_receiver(name_config, store_config=True)
 
     @defer.inlineCallbacks
     def register(self, xp_name, topic_id, publisher_name, credentials):
@@ -61,7 +66,20 @@ class Publisher(ProcessClientBase):
         @param data Data, OOI-format, protocol-buffer encoded
         @retval Deferred on send, not RPC
         """
-        return self._publish_receiver.send(exchange_point=self._exchange_point, topic=topic, resource_id=self._resource_id, data=data)
+        return self.send(exchange_point=self._exchange_point, topic=topic, resource_id=self._resource_id, data=data)
+
+    def send(self, exchange_point='', topic='', resource_id='', data='', **kwargs):
+        """
+        @return Deferred on send.
+        """
+        # TODO: exchange_point, resource_id
+        return Receiver.send(self, recipient=topic, content=data, headers={}, op='', **kwargs)
+
+    def on_activate(self, *args, **kwargs):
+        """
+        Overrides the base class on_activate, which would try to listen to a queue. We're not listening with a PublisherReceiver.
+        """
+        pass
 
 # =================================================================================
 
@@ -70,28 +88,25 @@ class PublisherFactory(object):
     A factory class for building Publisher objects.
     """
 
-    def __init__(self, proc=None, xp_name=None, topic_id=None, publisher_name=None, credentials=None):
+    def __init__(self, xp_name=None, topic_id=None, publisher_name=None, credentials=None):
         """
         Initializer. Sets default properties for calling the build method.
 
         These default are overridden by specifying the same named keyword arguments to the 
         build method.
 
-        @param  proc        The process the publisher should attach to. May be None to create an
-                            anonymous process contained in the Publisher instance itself.
         @param  xp_name     Name of exchange point to use
         @param  topic_id    Topic to publish to
         @param  publisher_name Name of new publisher process, free-form string
         @param  credentials Placeholder for auth* tokens
         """
-        self._proc              = proc
         self._xp_name           = xp_name
         self._topic_id          = topic_id
         self._publisher_name    = publisher_name
         self._credentials       = credentials
 
     @defer.inlineCallbacks
-    def build(self, proc=None, xp_name=None, topic_id=None, publisher_name=None, credentials=None):
+    def build(self, xp_name=None, topic_id=None, publisher_name=None, credentials=None):
         """
         Creates a publisher and calls register on it.
 
@@ -99,20 +114,18 @@ class PublisherFactory(object):
         was initialized. If None is specified for any of the parameters, or they are not filled out as
         keyword arguments, the defaults take precedence.
 
-        @param  proc        The process the publisher should attach to. May be None to create an
-                            anonymous process contained in the Publisher instance itself.
         @param  xp_name     Name of exchange point to use
         @param  topic_id    Topic to publish to
         @param  publisher_name Name of new publisher process, free-form string
         @param  credentials Placeholder for auth* tokens
         """
-        proc            = proc or self._proc
         xp_name         = xp_name or self._xp_name
         topic_id        = topic_id or self._topic_id
         publisher_name  = publisher_name or self._publisher_name
         credentials     = credentials or self._credentials
 
-        pub = Publisher(proc)
+        pub = Publisher(publisher_name)  # TODO: what goes for its name?
+        pub.attach()
         yield pub.register(xp_name, topic_id, publisher_name, credentials)
 
         defer.returnValue(pub)
