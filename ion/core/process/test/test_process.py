@@ -285,7 +285,9 @@ class ProcessTest(IonTestCase):
         lco4 = life_cycle_process.LifeCycleObject()
         yield lcop.register_life_cycle_object(lco4)
         self.assertEquals(lco4._get_state(), state_object.BasicStates.S_ACTIVE)
-        
+
+        # Process does not currently implement for deactivate!
+                
         # Terminate the process and its objects
         yield lcop.terminate()
         self.assertEquals(lcop._get_state(), state_object.BasicStates.S_TERMINATED)

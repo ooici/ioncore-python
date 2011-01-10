@@ -116,7 +116,7 @@ class Store(object):
     """
     implements(IStore)
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         self.kvs = {}
 
     def get(self, key):

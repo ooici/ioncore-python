@@ -23,6 +23,10 @@ from ion.core.data import irodsstore
 
 from ion.test.iontest import IonTestCase
 
+# Import the workbench and the Persistent Archive Resource Objects!
+from ion.core.object import workbench
+from net.ooici.storage import persistent_archive_pb2
+
 
 class IStoreTest(unittest.TestCase):
 
@@ -52,6 +56,7 @@ class IStoreTest(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_delete(self):
+        print 'EHEHEHEHEHEH'
         yield self.ds.put(self.key, self.value)
         yield self.ds.remove(self.key)
         rc = yield self.ds.get(self.key)
@@ -69,28 +74,53 @@ class IStoreTest(unittest.TestCase):
 class CassandraStoreTest(IStoreTest):
 
     def _setup_backend(self):
-        #host = 'amoeba.ucsd.edu'
-        host = 'localhost'
-        #host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
-        port = 9160
-        namespace = 'iontest'
-        builder = cassandra.CassandraFactory(host, port, reactor)
-        store = builder.buildStore(namespace)
-        store.namespace = namespace
         
-        manager_builder = cassandra.CassandraManagerFactory(host, port, reactor)
-        cas_man = manager_builder
-        #cas_man.create(namespace)
+        ### This is a short cut to use resource objects without a process 
+        wb = workbench.WorkBench('No Process: Testing only')
+        
+        ### Create a persistence_technology resource - for cassandra a CassandraCluster object
+        persistence_technology_repository, cassandra_cluster  = wb.init_repository(persistent_archive_pb2.CassandraCluster)
+        
+        # Set only one host and port in the host list for now
+        cas_host = cassandra_cluster.hosts.add()
+        #cas_host.host = 'amoeba.ucsd.edu'
+        cas_host.host = 'localhost'
+        #cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
+        #cas_host.host = '10.162.55.85'
+        cas_host.port = 9160
+        
+        ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
+        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(persistent_archive_pb2.CassandraKeySpace)
+        # only the name of the keyspace is required
+        #cassandra_keyspace.name = 'TestKeyspace'
+        cassandra_keyspace.name = 'Keyspace1'
+        
+        ### Create a Credentials resource - for cassandra a SimplePassword object
+        cache_repository, simple_password  = wb.init_repository(persistent_archive_pb2.SimplePassword)
+        # only the name of the column family is required
+        simple_password.username = 'ooiuser'
+        simple_password.password = 'illnevertell'
+        
+        ### Create a Cache resource - for cassandra a ColumnFamily object
+        cache_repository, column_family  = wb.init_repository(persistent_archive_pb2.ColumnFamily)
+        # only the name of the column family is required
+        column_family.name = 'TestCF'
+        
+        
+        store = cassandra.CassandraStore(cassandra_cluster, \
+                                         cassandra_keyspace, \
+                                         simple_password, \
+                                         column_family)
+        
+        store.initialize()
+        store.activate()
         
         
         return defer.succeed(store)
 
     def tearDown(self):
-        #cas_man = cassandra.CassandraManager(self.ds.client)
-        #cas_man.remove(self.ds.namespace)
         
-        
-        self.ds.client.manager.shutdown()
+        self.ds.terminate()
 
 class IRODSStoreTest(IStoreTest):
     

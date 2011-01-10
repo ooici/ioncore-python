@@ -254,7 +254,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
     def shutdown(self):
         return self.terminate()
-
+        
     @defer.inlineCallbacks
     def op_terminate(self, content, headers, msg):
         """

@@ -27,9 +27,11 @@ from telephus.cassandra.ttypes import KsDef
 from telephus.cassandra.ttypes import CfDef
 
 from ion.core import ioninit
-from ion.core.data import store 
+from ion.core.data import store
+from ion.core.process import process
 
-from ion.util.state_object import BasicLifecycleObject
+from ion.core.managedconnections import tcp
+
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -43,9 +45,12 @@ log = ion.util.ionlog.getLogger(__name__)
 #CF_default_namespace = CONF['default_namespace']
 #CF_default_key = CONF['default_key']
 
+class CassandraError(Exception):
+    """
+    An exception class for ION Cassandra Client errors
+    """
 
-
-class CassandraStore(BasicLifecycleObject):
+class CassandraStore(tcp.TCPConnection):
     """
     An Adapter class that implements the IStore interface by way of a
     cassandra client connection. As an adapter, this assumes an active
@@ -60,12 +65,39 @@ class CassandraStore(BasicLifecycleObject):
 
     implements(store.IStore)
 
-    def __init__(self, client, namespace=None):
+    def __init__(self, persistence_technology, persistent_archive, credentials, cache):
         """functional wrapper around active client instance
         """
-        self.client = client
         
-        self.namespace = namespace # Cassandra Column Family!
+        
+        ### Get the host and port from the Persistent Technology resource
+        host = persistence_technology.hosts[0].host
+        port = persistence_technology.hosts[0].port
+        
+        ### Get the Key Space for the connection
+        self._keyspace = persistent_archive.name
+        # More robust but obfuscates errors in calling arguments
+        #self._keyspace = getattr(persistent_archive, 'name', None)
+        
+        #Get the credentials for the cassandra connection
+        uname = credentials.username
+        pword = credentials.password
+        authorization_dictionary = {'username': uname, 'password': pword}
+        
+        ### Create the twisted factory for the TCP connection  
+        #self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
+        self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=None)
+        
+        # Call the initialization of the Managed TCP connection base class
+        tcp.TCPConnection.__init__(self,host,port,self._manager)
+        self.client = CassandraClient(self._manager)    
+        
+        
+        ### Get the column family name from the Cache resource
+        #if hasattr(cache, 'name'):
+        #    raise CassandraError, 'Cassandra Store must be initalized with a ION Cache Resource using the cfCache keyword argument'
+        self._cfCache = cache.name # Cassandra Column Family maps to an ION Cache resource
+        
 
     @defer.inlineCallbacks
     def get(self, key):
@@ -77,7 +109,7 @@ class CassandraStore(BasicLifecycleObject):
         
         log.debug("CassandraStore: Calling get on col %s " % key)
         try:
-            result = yield self.client.get(key, self.namespace, column='value')
+            result = yield self.client.get(key, self._cfCache, column='value')
             value = result.column.value
         except NotFoundException:
             log.debug("Didn't find the key: %s. Returning None" % key)     
@@ -95,7 +127,7 @@ class CassandraStore(BasicLifecycleObject):
         """
         log.debug("CassandraStore: Calling put on key: %s  value: %s " % (key, value))
         # @todo what exceptions need to be handled for an insert?
-        yield self.client.insert(key, self.namespace, value, column='value')
+        yield self.client.insert(key, self._cfCache, value, column='value')
 
     @defer.inlineCallbacks
     def remove(self, key):
@@ -105,24 +137,17 @@ class CassandraStore(BasicLifecycleObject):
         @retval Deferred, for success of operation
         @note Deletes are lazy, so key may still be visible for some time.
         """
-        yield self.client.remove(key, self.namespace, column='value')
-
-    def on_initialize(self, *args, **kwargs):
-        raise NotImplementedError("Not implemented")
-
-    def on_activate(self, *args, **kwargs):
-        raise NotImplementedError("Not implemented")
-
+        yield self.client.remove(key, self._cfCache, column='value')
+    
     def on_deactivate(self, *args, **kwargs):
-        raise NotImplementedError("Not implemented")
+        self._manager.shutdown()
+        log.info('on_deactivate: Loose Connection TCP')
 
     def on_terminate(self, *args, **kwargs):
-        raise NotImplementedError("Not implemented")
+        self._manager.shutdown()
+        log.info('on_terminate: Loose Connection TCP')
 
-    def on_error(self, *args, **kwargs):
-        raise NotImplementedError("Not implemented")
-
-class CassandraManager(BasicLifecycleObject):
+class CassandraManager(tcp.TCPConnection):
 
     #implements(store.IDataManager)
 
@@ -185,20 +210,15 @@ class CassandraManager(BasicLifecycleObject):
         @retval ?
         """
 
-    def on_initialize(self, *args, **kwargs):
-        raise NotImplementedError("Not implemented")
-
-    def on_activate(self, *args, **kwargs):
-        raise NotImplementedError("Not implemented")
-
+    
     def on_deactivate(self, *args, **kwargs):
-        raise NotImplementedError("Not implemented")
+        self._manager.shutdown()
+        log.info('on_deactivate: Loose Connection TCP')
 
     def on_terminate(self, *args, **kwargs):
-        raise NotImplementedError("Not implemented")
+        self._manager.shutdown()
+        log.info('on_terminate: Loose Connection TCP')
 
-    def on_error(self, *args, **kwargs):
-        raise NotImplementedError("Not implemented")
 
 class CassandraFactory(process.ProcessClientBase):
     """
@@ -214,7 +234,7 @@ class CassandraFactory(process.ProcessClientBase):
     # This is the Adapter class. It generates client connections for any
     # cassandra class which is instantiated by init(client, kwargs)
 
-    def __init__(self, proc=None, storage_deployment=None):
+    def __init__(self, proc=None, presistence_technology=None):
         """
         @param host defaults to localhost
         @param port 9160 is the cassandra default
@@ -230,30 +250,16 @@ class CassandraFactory(process.ProcessClientBase):
         """
         ProcessClientBase.__init__(self, proc=process, **kwargs)
         
-        self.storage_deployment = storage_deployment
-        #if process is None:
-        #    process = reactor
-        #self.process = process
+        self.presistence_technology = presistence_technology
+        
 
-    def buildStore(self, credential, clazz, **kwargs):
+    @defer.inlineCallbacks
+    def buildStore(self, IonCassandraClient, **kwargs):
         """
         @param namespace Maps to Cassandra specific columnFamily option
         @note For cassandra, there needs to be a conventionaly used
         Keyspace option.
         """
-        
-        # Get the keyspace if any
-        keyspace = kwargs.get('keyspace',None)
-        
-        # Get the 
-        host = self.storage_deployment.hosts[0].host
-        port = self.storage_deployment.hosts[0].port
-        
-        #@TODO pass the credentials
-        manager = ManagedCassandraClientFactory(**kwargs)
-
-        client = CassandraClient(manager)        
-        self.proc.connectTCP(self.host, self.port, manager)
         
         # What we have with this
         # CassandraFactory class is a mixture of a Factory pattern and an
@@ -264,17 +270,10 @@ class CassandraFactory(process.ProcessClientBase):
         # then Adapting it and returning the result as an IStore providing
         # instance.
         
+        # Create and instance of the ION Client class
+        instance = IonCassandraClient(self.presistence_technology, **kwargs)
         
+        yield defer.maybeDeferred(self.proc.register_life_cycle_objects.append, instance)
         
-        
-        instance = clazz(client, **kwargs)
-        
-        self.proc.registerd_life_cycle_objects.append(instance)
-        
-        
-        return instance
+        defer.returnValue(instance)
 
-
-class CassandraMangerFactory(CassandraFactory):
-    
-    store = CassandraManager
