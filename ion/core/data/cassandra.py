@@ -85,8 +85,8 @@ class CassandraStore(tcp.TCPConnection):
         authorization_dictionary = {'username': uname, 'password': pword}
         
         ### Create the twisted factory for the TCP connection  
-        #self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
-        self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=None)
+        self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
+        #self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=None)
         
         # Call the initialization of the Managed TCP connection base class
         tcp.TCPConnection.__init__(self,host,port,self._manager)
