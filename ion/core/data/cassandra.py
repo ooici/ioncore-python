@@ -30,7 +30,7 @@ from ion.core import ioninit
 from ion.core.data import store
 from ion.core.process import process
 
-from ion.core.managedconnections import tcp
+from ion.util.tcp_connections import TCPConnection
 
 
 import ion.util.ionlog
@@ -50,7 +50,7 @@ class CassandraError(Exception):
     An exception class for ION Cassandra Client errors
     """
 
-class CassandraStore(tcp.TCPConnection):
+class CassandraStore(TCPConnection):
     """
     An Adapter class that implements the IStore interface by way of a
     cassandra client connection. As an adapter, this assumes an active
@@ -89,7 +89,7 @@ class CassandraStore(tcp.TCPConnection):
         #self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=None)
         
         # Call the initialization of the Managed TCP connection base class
-        tcp.TCPConnection.__init__(self,host,port,self._manager)
+        TCPConnection.__init__(self,host,port,self._manager)
         self.client = CassandraClient(self._manager)    
         
         
@@ -147,7 +147,7 @@ class CassandraStore(tcp.TCPConnection):
         self._manager.shutdown()
         log.info('on_terminate: Loose Connection TCP')
 
-class CassandraManager(tcp.TCPConnection):
+class CassandraManager(TCPConnection):
 
     #implements(store.IDataManager)
 
