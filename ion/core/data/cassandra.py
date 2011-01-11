@@ -30,7 +30,7 @@ from ion.core import ioninit
 from ion.core.data import store
 from ion.core.process import process
 
-from ion.core.managedconnections import tcp
+from ion.util.tcp_connections import TCPConnection
 
 
 import ion.util.ionlog
@@ -50,7 +50,7 @@ class CassandraError(Exception):
     An exception class for ION Cassandra Client errors
     """
 
-class CassandraStore(tcp.TCPConnection):
+class CassandraStore(TCPConnection):
     """
     An Adapter class that implements the IStore interface by way of a
     cassandra client connection. As an adapter, this assumes an active
@@ -94,7 +94,7 @@ class CassandraStore(tcp.TCPConnection):
         #self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=None)
         
         # Call the initialization of the Managed TCP connection base class
-        tcp.TCPConnection.__init__(self,host,port,self._manager)
+        TCPConnection.__init__(self,host,port,self._manager)
         self.client = CassandraClient(self._manager)    
         
         
@@ -152,6 +152,7 @@ class CassandraStore(tcp.TCPConnection):
         self._manager.shutdown()
         log.info('on_terminate: Lose Connection TCP')
 
+
 class CassandraStorageResource:
     """
     This class holds the connection information in the
@@ -176,7 +177,8 @@ class CassandraStorageResource:
         authorization_dictionary = {'username': uname, 'password': pword}
         return authorization_dictionary
     
-class CassandraDataManager(tcp.TCPConnection):
+
+class CassandraDataManager(TCPConnection):
 
     #implements(store.IDataManager)
 
@@ -190,7 +192,7 @@ class CassandraDataManager(tcp.TCPConnection):
         
         self._manager = ManagedCassandraClientFactory(credentials=authorization_dictionary)
         
-        tcp.TCPConnection.__init__(self,host,port,self._manager)
+        TCPConnection.__init__(self,host,port,self._manager)
         self.client = CassandraClient(self._manager)    
         
         
@@ -255,11 +257,11 @@ class CassandraDataManager(tcp.TCPConnection):
     
     def on_deactivate(self, *args, **kwargs):
         self._manager.shutdown()
-        log.info('on_deactivate: Loose Connection TCP')
+        log.info('on_deactivate: Lose Connection TCP')
 
     def on_terminate(self, *args, **kwargs):
         self._manager.shutdown()
-        log.info('on_terminate: Loose Connection TCP')
+        log.info('on_terminate: Lose Connection TCP')
 
 
 ### Currently not used...

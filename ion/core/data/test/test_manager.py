@@ -62,5 +62,5 @@ class CassandraDataManagerTest(IDataManagerTest):
         manager.activate()
         return defer.succeed(manager)
     
-    #def tearDown(self):
-        
+    def tearDown(self):
+        self.manager.terminate()
