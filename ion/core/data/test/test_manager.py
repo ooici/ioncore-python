@@ -119,3 +119,23 @@ class CassandraDataManagerTest(IDataManagerTest):
         desc = yield self.manager.client.describe_keyspace(self.keyspace.name)
         log.info("Description of keyspace %s" % (desc,))
         log.info("Replication factor %s" % (desc.replication_factor,))    
+        self.failUnlessEqual(desc.replication_factor, 2)
+        
+    @defer.inlineCallbacks
+    def test_update_cache(self):
+        self.cache.column_type= 'Standard'
+        self.cache.comparator_type='org.apache.cassandra.db.marshal.BytesType'
+        
+        column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
+        column.column_name = "state"
+        column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
+        #Sleazy hack to coerce index_type to be IndexType.KEYS
+        column.index_type = '0'
+        column.index_name = 'stateIndex'
+        self.cache.column_metadata.add()
+        self.cache.column_metadata[0] = column
+        
+        yield self.manager.create_persistent_archive(self.keyspace)    
+        yield self.manager.create_cache(self.keyspace, self.cache)
+        yield self.manager.update_cache(self.keyspace, self.cache)
+        

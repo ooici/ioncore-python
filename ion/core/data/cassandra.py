@@ -17,9 +17,8 @@ from zope.interface import implements
 
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
-from telephus.cassandra.ttypes import NotFoundException
-from telephus.cassandra.ttypes import KsDef
-from telephus.cassandra.ttypes import CfDef
+from telephus.cassandra.ttypes import NotFoundException, KsDef, CfDef
+from telephus.cassandra.ttypes import IndexType, ColumnDef
 
 from ion.core.data import store
 
@@ -221,7 +220,6 @@ class CassandraDataManager(TCPConnection):
         """
         @brief Remove a Cassandra Key Space
         @param persistent_archive is a persistent archive object which defines the properties of a Key Space
-        @retval ?
         """
         keyspace = persistent_archive.name
         log.info("Removing keyspace with name %s" % (keyspace,))
@@ -233,7 +231,6 @@ class CassandraDataManager(TCPConnection):
         @brief Create a Cassandra column family
         @param persistent_archive is a persistent archive object which defines the properties of an existing Key Space
         @param cache is a cache object which defines the properties of column family
-        @retval ?
         """
         yield self.client.set_keyspace(persistent_archive.name)
         cfdef = CfDef(keyspace=persistent_archive.name, name=cache.name)
@@ -243,22 +240,51 @@ class CassandraDataManager(TCPConnection):
     def remove_cache(self, persistent_archive, cache):
         """
         @brief Remove a Cassandra column family
-        @param pa is a persistent archive object which defines the properties of an existing Key Space
+        @param persistent_archive is a persistent archive object which defines the properties of an existing Key Space
         @param cache is a cache object which defines the properties of column family
-        @retval ?
         """
         yield self.client.set_keyspace(persistent_archive.name)
         yield self.client.system_drop_column_family(cache.name)
 
     @defer.inlineCallbacks
-    def update_cache(self, pa, cache):
+    def update_cache(self, persistent_archive, cache):
         """
         @brief Update a Cassandra column family
-        @param pa is a persistent archive object which defines the properties of an existing Key Space
+        @param persistent_archive is a persistent archive object which defines the properties of an existing Key Space
         @param cache is a cache object which defines the properties of column family
-        @retval ?
+        
+        @note there is a problem using the GPB message from the column_metadata. I can't seem to access all of the fields.
+        As a temporary fix I have those values hard coded.
         """
-
+        yield self.client.set_keyspace(persistent_archive.name)
+        desc = yield self.client.describe_keyspace(persistent_archive.name)
+        log.info("Describe keyspace return %s" % (desc,))
+        #Retrieve the correct column family by filtering by name
+        select_cf = lambda cf_name: cf_name.name == cache.name
+        cf_defs = filter(select_cf, desc.cf_defs)
+        #Raise an exception if it doesn't find the column family
+        assert len(cf_defs) == 1
+        cf_id = cf_defs[0].id
+        log.info("Update column family with %s,%s,%s,%s%s" % (persistent_archive.name, cache.name, cf_id, cache.column_type, cache.comparator_type))
+        
+        column = cache.column_metadata[0]
+        log.info("column attrs %s " % (column.__dict__))
+        cf_def = CfDef(keyspace = persistent_archive.name,
+                       name = cache.name,
+                       id=cf_id,
+                       column_type=cache.column_type,
+                       comparator_type=cache.comparator_type,
+                       column_metadata=[ ColumnDef(
+                                       name=column.name,
+                                       #validation_class = column.validation_class,
+                                       validation_class = 'org.apache.cassandra.db.marshal.UTF8Type',
+                                       index_type=IndexType.KEYS,
+                                       #index_name=cache.column_metadata[0].index_name
+                                       index_name='StateIndex'
+                                        )
+                                       ])                
+        yield self.client.system_update_column_family(cf_def) 
+        
     
     def on_deactivate(self, *args, **kwargs):
         self._manager.shutdown()
