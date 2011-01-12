@@ -664,7 +664,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
         reshdrs = dict()
         # The status is still OK - this is for handled exceptions!
         reshdrs[self.MSG_STATUS] = str(self.ION_ERROR)
-        reshdrs[self.MSG_APP_ERROR] = str(response_code)
+        #reshdrs[self.MSG_APP_ERROR] = str(response_code)
         reshdrs[self.MSG_EXCEPTION] = str(exception)
         
         if headers != None:
