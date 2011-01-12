@@ -1,7 +1,7 @@
 Genshi==0.6
 M2Crypto==0.20.2
 Thrift==0.2.0
-Twisted>=10.1.0
+Twisted==10.2.0
 amqplib==0.6.1
 anyjson==0.2.5
 apache-libcloud==0.3.1
@@ -10,7 +10,7 @@ gviz-api.py==1.7.0
 httplib2==0.6.0
 msgpack-python==015final
 nimboss
-pyrods-irods
+pyrods-irods==2.4.3
 simplejson==2.1.2
 telephus==0.7-beta3.3
 twotp==0.7
