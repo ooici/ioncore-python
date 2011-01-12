@@ -190,7 +190,7 @@ class CassandraDataManager(TCPConnection):
         port = storage_resource.get_port()
         authorization_dictionary = storage_resource.get_credentials()
         
-        self._manager = ManagedCassandraClientFactory(credentials=authorization_dictionary)
+        self._manager = ManagedCassandraClientFactory( credentials=authorization_dictionary)
         
         TCPConnection.__init__(self,host,port,self._manager)
         self.client = CassandraClient(self._manager)    
@@ -204,12 +204,14 @@ class CassandraDataManager(TCPConnection):
         @retval ?
         """
         keyspace = persistent_archive.name
+        log.info("Creating keyspace with name %s" % (keyspace,))
         #Check to see if replication_factor and strategy_class is defined in the persistent_archive
         ksdef = KsDef(name=keyspace, replication_factor=1,
                 strategy_class='org.apache.cassandra.locator.SimpleStrategy',
                 cf_defs=[])
         yield self.client.system_add_keyspace(ksdef)
 
+    @defer.inlineCallbacks
     def update_persistent_archive(self, pa):
         """
         @brief Update a Cassandra Keyspace
@@ -218,15 +220,18 @@ class CassandraDataManager(TCPConnection):
         @retval ?
         """
         
-    
-    def remove_persistent_archive(self, pa):
+    @defer.inlineCallbacks
+    def remove_persistent_archive(self, persistent_archive):
         """
         @brief Remove a Cassandra Key Space
         @param pa is a persistent archive object which defines the properties of a Key Space
         @retval ?
         """
+        keyspace = persistent_archive.name
+        log.info("Removing keyspace with name %s" % (keyspace,))
+        yield self.client.system_drop_keyspace(keyspace)
         
-
+    @defer.inlineCallbacks
     def create_cache(self, pa, cache):
         """
         @brief Create a Cassandra column family
@@ -236,7 +241,8 @@ class CassandraDataManager(TCPConnection):
         """
         #cfdef = CfDef(keyspace=self.keyspace, name=name)
         #return self.client.system_add_column_family(cfdef)
-
+    
+    @defer.inlineCallbacks
     def remove_cache(self, pa, cache):
         """
         @brief Remove a Cassandra column family
@@ -246,6 +252,7 @@ class CassandraDataManager(TCPConnection):
         """
         #return self.system_drop_column_family(name)
 
+    @defer.inlineCallbacks
     def update_cache(self, pa, cache):
         """
         @brief Update a Cassandra column family
