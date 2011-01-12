@@ -11,6 +11,9 @@ from ion.core.data.cassandra import CassandraDataManager, CassandraStorageResour
 from ion.core.object import workbench
 from net.ooici.storage import persistent_archive_pb2
 
+from ion.core.data import store
+
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -22,6 +25,13 @@ class IDataManagerTest(unittest.TestCase):
         self.manager = yield self._setUpConnection()
         self._setUpArchiveAndCache()
         
+    def _setUpConnection(self):
+        return defer.maybeDeferred(store.DataManager)
+    
+    def _setUpArchiveAndCache(self):
+        self.keyspace = None
+        self.cache = None
+        
     @defer.inlineCallbacks    
     def test_instantiate(self):
         yield 1
@@ -29,7 +39,7 @@ class IDataManagerTest(unittest.TestCase):
     @defer.inlineCallbacks
     def test_create_persistent_archive(self):
         yield self.manager.create_persistent_archive(self.keyspace)
-        #yield self.manager.remove_persistent_archive(self.keyspace)
+        
     
     @defer.inlineCallbacks
     def test_remove_persistent_archive(self):
@@ -96,3 +106,16 @@ class CassandraDataManagerTest(IDataManagerTest):
         except Exception, ex:
             log.info("Exception raised %s " % (ex,))
         self.manager.terminate()
+        
+    
+    @defer.inlineCallbacks
+    def test_update_persistent_archive(self):
+        yield self.manager.create_persistent_archive(self.keyspace)
+        self.keyspace.replication_factor='2'
+        self.keyspace.strategy_class='org.apache.cassandra.locator.SimpleStrategy'
+        yield self.manager.update_persistent_archive(self.keyspace)
+        
+        #Disrespecting the manager abstraction, in order to test that it works
+        desc = yield self.manager.client.describe_keyspace(self.keyspace.name)
+        log.info("Description of keyspace %s" % (desc,))
+        log.info("Replication factor %s" % (desc.replication_factor,))    

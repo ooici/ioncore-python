@@ -205,13 +205,16 @@ class CassandraDataManager(TCPConnection):
         log.info("Added and set keyspace")
 
     @defer.inlineCallbacks
-    def update_persistent_archive(self, pa):
+    def update_persistent_archive(self, persistent_archive):
         """
         @brief Update a Cassandra Keyspace
         This method should update the Key Space properties - not change the column families!
-        @param pa is a persistent archive object which defines the properties of a Key Space
-        @retval ?
+        @param persistent_archiveis a persistent archive object which defines the properties of a Key Space
         """
+        pa = persistent_archive
+        ksdef = KsDef(name=pa.name,replication_factor=int(pa.replication_factor),
+                      strategy_class=pa.strategy_class, cf_defs=[])
+        yield self.client.system_update_keyspace(ksdef)
         
     @defer.inlineCallbacks
     def remove_persistent_archive(self, persistent_archive):
