@@ -11,6 +11,9 @@ from ion.core.data.cassandra import CassandraDataManager, CassandraStorageResour
 from ion.core.object import workbench
 from net.ooici.storage import persistent_archive_pb2
 
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 class IDataManagerTest(unittest.TestCase):
     
     @defer.inlineCallbacks
@@ -19,14 +22,20 @@ class IDataManagerTest(unittest.TestCase):
         self.manager = yield self._setUpConnection()
         self._setUpArchiveAndCache()
         
+    @defer.inlineCallbacks    
     def test_instantiate(self):
-        pass
+        yield 1
     
+    @defer.inlineCallbacks
     def test_create_persistent_archive(self):
-        
-        self.manager.create_persistent_archive(self.keyspace)
+        yield self.manager.create_persistent_archive(self.keyspace)
+        #yield self.manager.remove_persistent_archive(self.keyspace)
     
-    
+    @defer.inlineCallbacks
+    def test_remove_persistent_archive(self):
+        yield self.manager.create_persistent_archive(self.keyspace)
+        yield self.manager.remove_persistent_archive(self.keyspace)
+
 class CassandraDataManagerTest(IDataManagerTest):
     
     
@@ -35,7 +44,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
         persistent_archive_repository, cassandra_keyspace  = self.wb.init_repository(persistent_archive_pb2.CassandraKeySpace)
         # only the name of the keyspace is required
-        cassandra_keyspace.name = 'ManagerTestKeyspace'
+        cassandra_keyspace.name = 'ManagerTestKeyspace2'
         #cassandra_keyspace.name = 'Keyspace1'
         self.keyspace = cassandra_keyspace
         
@@ -62,5 +71,11 @@ class CassandraDataManagerTest(IDataManagerTest):
         manager.activate()
         return defer.succeed(manager)
     
+    @defer.inlineCallbacks
     def tearDown(self):
+        log.info("In tearDown")
+        try:
+            yield self.manager.remove_persistent_archive(self.keyspace)
+        except Exception, ex:
+            log.info("Exception raised %s " % (ex,))
         self.manager.terminate()
