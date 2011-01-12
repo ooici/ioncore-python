@@ -125,6 +125,10 @@ class Process(BasicLifecycleObject,ResponseCodes):
         self.add_receiver(self.receiver)
         self.add_receiver(self.backend_receiver)
 
+        # Dict of publishers and subscribers
+        self.publishers = {}
+        self.subscribers = {}
+
         # Dict of converations by conv-id
         self.conversations = {}
 
@@ -316,7 +320,23 @@ class Process(BasicLifecycleObject,ResponseCodes):
         """
         pass
 
-    # --- Internal helper methods
+    # -- publishers/subscribers
+
+    def add_publisher(self, publisher):
+        """
+        Adds a publisher to this process.
+
+        @param  publisher   A Publisher instance, preferably tied to this process.
+        """
+        self.publishers[publisher.name] = publisher
+
+    def add_subscriber(self, subscriber):
+        """
+        Adds a subscriber to this process, preferably tied to this process.
+        """
+        self.subscribers[subscriber.name] = subscriber
+
+     # --- Internal helper methods
 
     def add_receiver(self, receiver):
         self.receivers[receiver.name] = receiver
