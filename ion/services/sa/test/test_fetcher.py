@@ -73,8 +73,8 @@ class FetcherTest(IonTestCase):
     def _get_page(self, src_url):
         log.debug('sending GET request for "%s"...' % src_url)
         res = yield self.fc.get_url(src_url)
-        if res['status'] == 'ERROR':
-            raise ValueError('Error on fetch')
+        #if res['status'] == 'ERROR':
+        #    raise ValueError('Error on fetch')
         msg = base64.b64decode(res['value'])
         defer.returnValue(msg)
 
@@ -82,8 +82,8 @@ class FetcherTest(IonTestCase):
     def _get_phead(self, src_url):
         log.debug('sending HEAD request for "%s"...' % src_url)
         res = yield self.fc.get_head(src_url)
-        if res['status'] == 'ERROR':
-            raise ValueError('Error on fetch')
+        #if res['status'] == 'ERROR':
+        #    raise ValueError('Error on fetch')
         msg = base64.b64decode(res['value'])
         defer.returnValue(msg)
 
