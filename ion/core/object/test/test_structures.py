@@ -403,7 +403,7 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(items_list[0].key, 'foo1')
         self.assertEqual(items_list[1].key, 'foo2')
         
-        items_list = items[1, 2]
+        items_list = items[1:2]
         self.assertTrue(len(items_list) == 1)
         self.assertEqual(items_list[0].key, 'foo2')
         
