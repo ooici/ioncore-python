@@ -87,7 +87,7 @@ class SchedulerTest(IonTestCase):
         reply = yield sc.add_task('scheduled_task', 1.0, 'pingtest')
         task_id = reply['value']
         rl = yield sc.query_tasks('.+')
-        self.failUnless(len(rl) == 2)
+        self.failUnless(len(rl['value']) == 2)
         self.failUnlessSubstring(str(task_id), str(rl['value']))
 
     @defer.inlineCallbacks

@@ -107,7 +107,7 @@ class SchedulerService(ServiceProcess):
 
         log.debug(tlist)
 
-        self.reply_ok(msg, tlist)
+        self.reply_ok(msg,  {'value': tlist})
 
     ##################################################
     # Internal methods
