@@ -11,12 +11,7 @@
 @note Test cases for the cassandra backend are now in ion.data.test.test_store
 """
 
-import re
-import uuid
-
 from twisted.internet import defer
-from twisted.internet import reactor
-from twisted.python import components
 
 from zope.interface import implements
 
@@ -26,12 +21,9 @@ from telephus.cassandra.ttypes import NotFoundException
 from telephus.cassandra.ttypes import KsDef
 from telephus.cassandra.ttypes import CfDef
 
-from ion.core import ioninit
 from ion.core.data import store
-from ion.core.process import process
 
 from ion.util.tcp_connections import TCPConnection
-
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -201,7 +193,6 @@ class CassandraDataManager(TCPConnection):
         """
         @brief Create a Cassandra Keyspace
         @param persistent_archive is an ion resource which defines the properties of a Key Space
-        @retval ?
         """
         keyspace = persistent_archive.name
         log.info("Creating keyspace with name %s" % (keyspace,))
@@ -210,6 +201,8 @@ class CassandraDataManager(TCPConnection):
                 strategy_class='org.apache.cassandra.locator.SimpleStrategy',
                 cf_defs=[])
         yield self.client.system_add_keyspace(ksdef)
+        
+        log.info("Added and set keyspace")
 
     @defer.inlineCallbacks
     def update_persistent_archive(self, pa):
@@ -224,7 +217,7 @@ class CassandraDataManager(TCPConnection):
     def remove_persistent_archive(self, persistent_archive):
         """
         @brief Remove a Cassandra Key Space
-        @param pa is a persistent archive object which defines the properties of a Key Space
+        @param persistent_archive is a persistent archive object which defines the properties of a Key Space
         @retval ?
         """
         keyspace = persistent_archive.name
@@ -232,25 +225,27 @@ class CassandraDataManager(TCPConnection):
         yield self.client.system_drop_keyspace(keyspace)
         
     @defer.inlineCallbacks
-    def create_cache(self, pa, cache):
+    def create_cache(self, persistent_archive, cache):
         """
         @brief Create a Cassandra column family
-        @param pa is a persistent archive object which defines the properties of an existing Key Space
+        @param persistent_archive is a persistent archive object which defines the properties of an existing Key Space
         @param cache is a cache object which defines the properties of column family
         @retval ?
         """
-        #cfdef = CfDef(keyspace=self.keyspace, name=name)
-        #return self.client.system_add_column_family(cfdef)
+        yield self.client.set_keyspace(persistent_archive.name)
+        cfdef = CfDef(keyspace=persistent_archive.name, name=cache.name)
+        yield self.client.system_add_column_family(cfdef)
     
     @defer.inlineCallbacks
-    def remove_cache(self, pa, cache):
+    def remove_cache(self, persistent_archive, cache):
         """
         @brief Remove a Cassandra column family
         @param pa is a persistent archive object which defines the properties of an existing Key Space
         @param cache is a cache object which defines the properties of column family
         @retval ?
         """
-        #return self.system_drop_column_family(name)
+        yield self.client.set_keyspace(persistent_archive.name)
+        yield self.client.system_drop_column_family(cache.name)
 
     @defer.inlineCallbacks
     def update_cache(self, pa, cache):

@@ -36,6 +36,18 @@ class IDataManagerTest(unittest.TestCase):
         yield self.manager.create_persistent_archive(self.keyspace)
         yield self.manager.remove_persistent_archive(self.keyspace)
 
+    @defer.inlineCallbacks
+    def test_create_cache(self):
+        yield self.manager.create_persistent_archive(self.keyspace)
+        yield self.manager.create_cache(self.keyspace, self.cache)
+        
+    
+    @defer.inlineCallbacks
+    def test_remove_cache(self):
+        yield self.manager.create_persistent_archive(self.keyspace)
+        yield self.manager.create_cache(self.keyspace, self.cache)
+        yield self.manager.remove_cache(self.keyspace, self.cache)
+    
 class CassandraDataManagerTest(IDataManagerTest):
     
     
@@ -44,9 +56,14 @@ class CassandraDataManagerTest(IDataManagerTest):
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
         persistent_archive_repository, cassandra_keyspace  = self.wb.init_repository(persistent_archive_pb2.CassandraKeySpace)
         # only the name of the keyspace is required
-        cassandra_keyspace.name = 'ManagerTestKeyspace2'
+        cassandra_keyspace.name = 'ManagerTestKeyspace'
         #cassandra_keyspace.name = 'Keyspace1'
         self.keyspace = cassandra_keyspace
+        ### Create a Cache resource - for cassandra a ColumnFamily object
+        cache_repository, column_family  = self.wb.init_repository(persistent_archive_pb2.ColumnFamily)
+        # only the name of the column family is required
+        column_family.name = 'TestCF'
+        self.cache = column_family
         
     
     def _setUpConnection(self):
