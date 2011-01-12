@@ -608,7 +608,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
         
         # This is basically a pass through for the reply method interface - only
         # used for backward compatibility!
-        log.info('''REPLY_OK is depricated - please use "reply"''')
+        #log.info('''REPLY_OK is depricated - please use "reply"''')
         
         return self.reply(msg, operation=self.MSG_RESULT, content=content, headers=headers)
 
@@ -631,26 +631,26 @@ class Process(BasicLifecycleObject,ResponseCodes):
         return self.reply(msg, content=content, headers=reshdrs)
         
         
-    #def reply_err(self, msg, content=None, headers=None, exception='', response_code=''):
-    #    """
-    #    Boilerplate method for reply to a message which lead to an application
-    #    level error. The result can include content, a caught exception and an
-    #    application level error_code as an indication of the error.
-    #    @content any sendable type to be converted to dict, or dict (untouched)
-    #    @exception an instance of Exception
-    #    @response_code an ION application level defined error code for a handled exception
-    #    @retval Deferred for send of reply
-    #    """
-    #    reshdrs = dict()
-    #    # The status is still OK - this is for handled exceptions!
-    #    reshdrs[self.MSG_STATUS] = str(self.ION_OK)
-    #    reshdrs[self.MSG_APP_ERROR] = str(response_code)
-    #    reshdrs[self.MSG_EXCEPTION] = str(exception)
-    #    
-    #    if headers != None:
-    #        reshdrs.update(headers)
-    #        
-    #    return self.reply(msg, self.MSG_RESULT, content, reshdrs)
+    def reply_err(self, msg, content=None, headers=None, exception=None, response_code=''):
+        """
+        Boilerplate method for reply to a message which lead to an application
+        level error. The result can include content, a caught exception and an
+        application level error_code as an indication of the error.
+        @content any sendable type to be converted to dict, or dict (untouched)
+        @exception an instance of Exception
+        @response_code an ION application level defined error code for a handled exception
+        @retval Deferred for send of reply
+        """
+        reshdrs = dict()
+        # The status is still OK - this is for handled exceptions!
+        reshdrs[self.MSG_STATUS] = str(self.ION_ERROR)
+        reshdrs[self.MSG_APP_ERROR] = str(response_code)
+        reshdrs[self.MSG_EXCEPTION] = str(exception)
+        
+        if headers != None:
+            reshdrs.update(headers)
+            
+        return self.reply(msg, operation=self.MSG_RESULT, content=content, headers=reshdrs)
 
     def get_conversation(self, headers):
         convid = headers.get('conv-id', None)
