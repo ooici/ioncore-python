@@ -276,8 +276,8 @@ class CassandraDataManager(TCPConnection):
                        comparator_type=cache.comparator_type,
                        column_metadata=[ ColumnDef(
                                        name=column.name,
-                                       #validation_class = column.validation_class,
-                                       validation_class = 'org.apache.cassandra.db.marshal.UTF8Type',
+                                       validation_class = column.validation_class,
+                                       #validation_class = 'org.apache.cassandra.db.marshal.UTF8Type',
                                        index_type=IndexType.KEYS,
                                        #index_name=cache.column_metadata[0].index_name
                                        index_name='StateIndex'
