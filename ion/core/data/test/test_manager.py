@@ -74,12 +74,12 @@ class CassandraDataManagerTest(IDataManagerTest):
         # only the name of the column family is required
         column_family.name = 'TestCF'
         self.cache = column_family
-        
-        column = cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
+        self.cache_repository = cache_repository
+        column = self.cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
         #column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
         column.column_name = "state"
         column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
-        #Sleazy hack to coerce index_type to be IndexType.KEYS
+        #IndexType.KEYS is 0, and IndexType is an enum
         column.index_type = 0
         column.index_name = 'stateIndex'
         self.cache.column_metadata.add()
@@ -140,18 +140,29 @@ class CassandraDataManagerTest(IDataManagerTest):
     def test_update_cache(self):
         self.cache.column_type= 'Standard'
         self.cache.comparator_type='org.apache.cassandra.db.marshal.BytesType'
+        yield self.manager.create_persistent_archive(self.keyspace)    
+        yield self.manager.create_cache(self.keyspace, self.cache)
+        yield self.manager.update_cache(self.keyspace, self.cache)
         
+    @defer.inlineCallbacks
+    def test_update_cache_2indexes(self):
         """
-        column_repository, column = cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
+        The first index is defined in the _setUpArchiveAndCache method
+        """
+        self.cache.column_type= 'Standard'
+        self.cache.comparator_type='org.apache.cassandra.db.marshal.BytesType'
+        
+
+        column = self.cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
         #column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
-        column.column_name = "state"
+        column.column_name = "state2"
         column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
-        #Sleazy hack to coerce index_type to be IndexType.KEYS
-        column.index_type = '0'
-        column.index_name = 'stateIndex'
+        #IndexType.KEYS is 0, and IndexType is an enum
+        column.index_type = 0
+        column.index_name = 'stateIndex2'
         self.cache.column_metadata.add()
-        self.cache.column_metadata[0] = column
-        """
+        self.cache.column_metadata[1] = column
+        
         yield self.manager.create_persistent_archive(self.keyspace)    
         yield self.manager.create_cache(self.keyspace, self.cache)
         yield self.manager.update_cache(self.keyspace, self.cache)
