@@ -11,12 +11,7 @@
 @note Test cases for the cassandra backend are now in ion.data.test.test_store
 """
 
-import re
-import uuid
-
 from twisted.internet import defer
-from twisted.internet import reactor
-from twisted.python import components
 
 from zope.interface import implements
 
@@ -26,12 +21,9 @@ from telephus.cassandra.ttypes import NotFoundException
 from telephus.cassandra.ttypes import KsDef
 from telephus.cassandra.ttypes import CfDef
 
-from ion.core import ioninit
 from ion.core.data import store
-from ion.core.process import process
 
-from ion.core.managedconnections import tcp
-
+from ion.util.tcp_connections import TCPConnection
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -50,13 +42,18 @@ class CassandraError(Exception):
     An exception class for ION Cassandra Client errors
     """
 
-class CassandraStore(tcp.TCPConnection):
+class CassandraStore(TCPConnection):
     """
     An Adapter class that implements the IStore interface by way of a
     cassandra client connection. As an adapter, this assumes an active
     client (it implements/provides no means of connection management).
     The same client instance could be used by another adapter class that
     implements another interface.
+    
+    @note: This is how we map the OOI architecture terms to Cassandra.  
+    persistent_technology --> hostname, port
+    persistent_archive --> keyspace
+    cache --> columnfamily
 
     @todo Provide explanation of the cassandra options 
      - keyspace: Outermost context within a Cassandra server (like vhost).
@@ -65,14 +62,14 @@ class CassandraStore(tcp.TCPConnection):
 
     implements(store.IStore)
 
-    def __init__(self, persistence_technology, persistent_archive, credentials, cache):
-        """functional wrapper around active client instance
+    def __init__(self, persistent_technology, persistent_archive, credentials, cache):
+        """
+        functional wrapper around active client instance
         """
         
-        
         ### Get the host and port from the Persistent Technology resource
-        host = persistence_technology.hosts[0].host
-        port = persistence_technology.hosts[0].port
+        host = persistent_technology.hosts[0].host
+        port = persistent_technology.hosts[0].port
         
         ### Get the Key Space for the connection
         self._keyspace = persistent_archive.name
@@ -89,7 +86,7 @@ class CassandraStore(tcp.TCPConnection):
         #self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=None)
         
         # Call the initialization of the Managed TCP connection base class
-        tcp.TCPConnection.__init__(self,host,port,self._manager)
+        TCPConnection.__init__(self,host,port,self._manager)
         self.client = CassandraClient(self._manager)    
         
         
@@ -141,67 +138,119 @@ class CassandraStore(tcp.TCPConnection):
     
     def on_deactivate(self, *args, **kwargs):
         self._manager.shutdown()
-        log.info('on_deactivate: Loose Connection TCP')
+        log.info('on_deactivate: Lose Connection TCP')
 
     def on_terminate(self, *args, **kwargs):
         self._manager.shutdown()
-        log.info('on_terminate: Loose Connection TCP')
+        log.info('on_terminate: Lose Connection TCP')
 
-class CassandraManager(tcp.TCPConnection):
+
+class CassandraStorageResource:
+    """
+    This class holds the connection information in the
+    persistent_technology, persistent_archive, cache, and 
+    credentials
+    """
+    def __init__(self, persistent_technology, persistent_archive=None, cache=None, credentials=None):
+        self.persistent_technology = persistent_technology
+        self.persistent_archive = persistent_archive
+        self.cache = cache
+        self.credentials = credentials
+        
+    def get_host(self):
+        return self.persistent_technology.hosts[0].host
+    
+    def get_port(self):
+        return self.persistent_technology.hosts[0].port
+    
+    def get_credentials(self):    
+        uname = self.credentials.username
+        pword = self.credentials.password
+        authorization_dictionary = {'username': uname, 'password': pword}
+        return authorization_dictionary
+    
+
+class CassandraDataManager(TCPConnection):
 
     #implements(store.IDataManager)
 
-    def __init__(self, client):
-        self.client = client
-        self.storage_resource
-
-    def create_persistent_archive(self, pa):
+    def __init__(self, storage_resource):
         """
-        @brief Create a Cassandra Key Space
-        @param pa is a persistent archive object which defines the properties of a Key Space
-        @retval ?
+        @param storage_resource provides the connection information to connect to the Cassandra cluster.
         """
-        #ksdef = KsDef(name=keyspace, replication_factor=1,
-        #        strategy_class='org.apache.cassandra.locator.SimpleStrategy',
-        #        cf_defs=[])
-        #return self.client.system_add_keyspace(ksdef)
-
-    def update_persistent_archive(self, pa):
-        """
-        @brief Update a Cassandra Key Space
-        This method should update the Key Space properties - not change the column families!
-        @param pa is a persistent archive object which defines the properties of a Key Space
-        @retval ?
-        """
+        host = storage_resource.get_host()
+        port = storage_resource.get_port()
+        authorization_dictionary = storage_resource.get_credentials()
         
-    
-    def remove_persistent_archive(self, pa):
+        self._manager = ManagedCassandraClientFactory( credentials=authorization_dictionary)
+        
+        TCPConnection.__init__(self,host,port,self._manager)
+        self.client = CassandraClient(self._manager)    
+        
+        
+    @defer.inlineCallbacks
+    def create_persistent_archive(self, persistent_archive):
+        """
+        @brief Create a Cassandra Keyspace
+        @param persistent_archive is an ion resource which defines the properties of a Key Space
+        """
+        keyspace = persistent_archive.name
+        log.info("Creating keyspace with name %s" % (keyspace,))
+        #Check to see if replication_factor and strategy_class is defined in the persistent_archive
+        ksdef = KsDef(name=keyspace, replication_factor=1,
+                strategy_class='org.apache.cassandra.locator.SimpleStrategy',
+                cf_defs=[])
+        yield self.client.system_add_keyspace(ksdef)
+        
+        log.info("Added and set keyspace")
+
+    @defer.inlineCallbacks
+    def update_persistent_archive(self, persistent_archive):
+        """
+        @brief Update a Cassandra Keyspace
+        This method should update the Key Space properties - not change the column families!
+        @param persistent_archiveis a persistent archive object which defines the properties of a Key Space
+        """
+        pa = persistent_archive
+        ksdef = KsDef(name=pa.name,replication_factor=int(pa.replication_factor),
+                      strategy_class=pa.strategy_class, cf_defs=[])
+        yield self.client.system_update_keyspace(ksdef)
+        
+    @defer.inlineCallbacks
+    def remove_persistent_archive(self, persistent_archive):
         """
         @brief Remove a Cassandra Key Space
-        @param pa is a persistent archive object which defines the properties of a Key Space
+        @param persistent_archive is a persistent archive object which defines the properties of a Key Space
         @retval ?
         """
+        keyspace = persistent_archive.name
+        log.info("Removing keyspace with name %s" % (keyspace,))
+        yield self.client.system_drop_keyspace(keyspace)
         
-
-    def create_cache(self, pa, cache):
+    @defer.inlineCallbacks
+    def create_cache(self, persistent_archive, cache):
         """
         @brief Create a Cassandra column family
-        @param pa is a persistent archive object which defines the properties of an existing Key Space
+        @param persistent_archive is a persistent archive object which defines the properties of an existing Key Space
         @param cache is a cache object which defines the properties of column family
         @retval ?
         """
-        #cfdef = CfDef(keyspace=self.keyspace, name=name)
-        #return self.client.system_add_column_family(cfdef)
-
-    def remove_cache(self, pa, cache):
+        yield self.client.set_keyspace(persistent_archive.name)
+        cfdef = CfDef(keyspace=persistent_archive.name, name=cache.name)
+        yield self.client.system_add_column_family(cfdef)
+    
+    @defer.inlineCallbacks
+    def remove_cache(self, persistent_archive, cache):
         """
         @brief Remove a Cassandra column family
         @param pa is a persistent archive object which defines the properties of an existing Key Space
         @param cache is a cache object which defines the properties of column family
         @retval ?
         """
-        #return self.system_drop_column_family(name)
+        yield self.client.set_keyspace(persistent_archive.name)
+        yield self.client.system_drop_column_family(cache.name)
 
+    @defer.inlineCallbacks
     def update_cache(self, pa, cache):
         """
         @brief Update a Cassandra column family
@@ -213,11 +262,11 @@ class CassandraManager(tcp.TCPConnection):
     
     def on_deactivate(self, *args, **kwargs):
         self._manager.shutdown()
-        log.info('on_deactivate: Loose Connection TCP')
+        log.info('on_deactivate: Lose Connection TCP')
 
     def on_terminate(self, *args, **kwargs):
         self._manager.shutdown()
-        log.info('on_terminate: Loose Connection TCP')
+        log.info('on_terminate: Lose Connection TCP')
 
 
 ### Currently not used...

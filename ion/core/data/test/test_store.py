@@ -90,7 +90,7 @@ class CassandraStoreTest(IStoreTest):
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
         persistent_archive_repository, cassandra_keyspace  = wb.init_repository(persistent_archive_pb2.CassandraKeySpace)
         # only the name of the keyspace is required
-        cassandra_keyspace.name = 'TestKeyspace'
+        cassandra_keyspace.name = 'StoreTestKeyspace'
         #cassandra_keyspace.name = 'Keyspace1'
         
         ### Create a Credentials resource - for cassandra a SimplePassword object

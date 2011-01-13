@@ -228,7 +228,6 @@ class PubSubService(ServiceProcess):
         """
         log.error('Unsub not implemented')
 
-
 class PubSubClient(ServiceClient):
     """
     @brief Refactor of client for new interfaces

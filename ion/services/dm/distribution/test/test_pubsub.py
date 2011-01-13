@@ -10,6 +10,7 @@ import ion.util.ionlog
 from twisted.internet import defer
 
 from ion.services.dm.distribution.pubsub_service import PubSubClient
+from ion.services.dm.distribution.publisher_subscriber import Publisher, Subscriber
 from ion.test.iontest import IonTestCase
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -53,17 +54,20 @@ class PST(IonTestCase):
     @defer.inlineCallbacks
     def test_tt_create_and_query(self):
         # create a topic tree, query to look for it
-        yield self.test_topic_tree_creation()
+        tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
         rc = yield self.psc.query_topic_trees(self.tt_name)
-        self.failUnless(len(rc) > 0)
+        self.failIf(rc is None)
+        #self.failUnless(len(rc) > 0)
 
     @defer.inlineCallbacks
     def test_tt_crud(self):
         # Test create/query/rm/query on topic trees
-        yield self.test_tt_create_and_query()
-        rc = yield self.psc.undeclare_topic_tree(self.tt_id)
+        tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
+        tt_list = yield self.psc.query_topic_trees(self.tt_name)
+        rc = yield self.psc.undeclare_topic_tree(tt_id)
         self.failIf(rc is None)
         rc = yield self.psc.query_topic_trees('.+')
+        self.failIf(rc is None)
         self.failIf(len(rc) > 0)
 
     @defer.inlineCallbacks
@@ -73,6 +77,7 @@ class PST(IonTestCase):
         # Verify that it was created
         self.failIf(topic_id is None)
         rc = yield self.psc.query_topics(self.tt_name, '.+')
+        self.failIf(rc is None)
         self.failIf(len(rc) < 1)
 
     @defer.inlineCallbacks
@@ -83,6 +88,7 @@ class PST(IonTestCase):
         self.failIf(pid is None)
 
     def test_subscribe(self):
+        sub = Subscriber(proc=self.sup)
         pass
 
     
