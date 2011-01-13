@@ -15,5 +15,5 @@ simplejson==2.1.2
 telephus==0.7-beta3.3
 twotp==0.7
 txAMQP==0.3
-txrabbitmq==0.3
+txrabbitmq==0.4
 zope.interface==3.6.1
