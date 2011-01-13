@@ -74,6 +74,7 @@ def create_type_identifier(package='', protofile='', cls=''):
 def build_gpb_lookup(rootpath):
     """
     To be called once on package initialization.
+    The given package must include a list named "protos" specifying which protocol buffer files to import.
     @param rootpath The full path of the package to import the Protocol Buffers classes from.
     """
 
@@ -84,6 +85,10 @@ def build_gpb_lookup(rootpath):
     gpb_id_to_class = {}
 
     root = __import__(rootpath)
+    protos = root.protos
+    for proto in protos:
+        protopath = '%s.%s' % (rootpath, proto)
+        m = __import__(protopath)
 
     msg_classes = message.Message.__subclasses__()
     for msg_class in msg_classes:
