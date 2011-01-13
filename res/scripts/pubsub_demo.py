@@ -21,8 +21,6 @@ from ion.services.dm.distribution import pubsub_service
 
 from ion.resources.dm_resource_descriptions import PubSubTopicResource, SubscriptionResource
 
-from ion.services.dm.distribution.consumers import example_consumer, forwarding_consumer, latest_consumer, logging_consumer
-
 CONF = ioninit.config('startup.pubsub')
 
 # Static definition of message queues
