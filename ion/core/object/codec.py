@@ -39,7 +39,7 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         print 'note', invocation.note
         print 'workbench', invocation.workbench
         """
-        if ION_R1_GPB == invocation.content['encoding']:
+        if isinstance(invocation.content, dict) and ION_R1_GPB == invocation.content['encoding']:
             content = invocation.content['content']
             invocation.content['content'] = invocation.workbench.unpack_structure(content)        
         
