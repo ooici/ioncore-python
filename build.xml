@@ -60,8 +60,6 @@
     <echo message="Installing dependencies using Pip"/>
     <exec executable="pip" failonerror="true">
       <arg value="install"/>
-      <!--force download of all packages-->
-      <arg value="-U"/>
       <arg value="--find-links=http://ooici.net/packages"/>
       <arg value="--requirement=requirements.txt"/>
     </exec>
