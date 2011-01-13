@@ -80,7 +80,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         column.column_name = "state"
         column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
         #Sleazy hack to coerce index_type to be IndexType.KEYS
-        column.index_type = '0'
+        column.index_type = 0
         column.index_name = 'stateIndex'
         self.cache.column_metadata.add()
         self.cache.column_metadata[0] = column
@@ -126,7 +126,7 @@ class CassandraDataManagerTest(IDataManagerTest):
     @defer.inlineCallbacks
     def test_update_persistent_archive(self):
         yield self.manager.create_persistent_archive(self.keyspace)
-        self.keyspace.replication_factor='2'
+        self.keyspace.replication_factor=2
         self.keyspace.strategy_class='org.apache.cassandra.locator.SimpleStrategy'
         yield self.manager.update_persistent_archive(self.keyspace)
         

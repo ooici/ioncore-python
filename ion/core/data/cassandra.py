@@ -211,7 +211,7 @@ class CassandraDataManager(TCPConnection):
         @param persistent_archiveis a persistent archive object which defines the properties of a Key Space
         """
         pa = persistent_archive
-        ksdef = KsDef(name=pa.name,replication_factor=int(pa.replication_factor),
+        ksdef = KsDef(name=pa.name,replication_factor=pa.replication_factor,
                       strategy_class=pa.strategy_class, cf_defs=[])
         yield self.client.system_update_keyspace(ksdef)
         
@@ -270,21 +270,33 @@ class CassandraDataManager(TCPConnection):
         column = cache.column_metadata[0]
         log.info("column attrs %s " % (column.__dict__))
         log.info("Column message fields: %s,%s,%s" % (column.column_name,column.validation_class, column.index_name))
+
+        cf_column_metadata = self.__generate_column_metadata(cache)
         cf_def = CfDef(keyspace = persistent_archive.name,
                        name = cache.name,
                        id=cf_id,
                        column_type=cache.column_type,
                        comparator_type=cache.comparator_type,
-                       column_metadata=[ ColumnDef(
-                                       name=column.column_name,
-                                       validation_class = column.validation_class,
-                                       index_type=int(column.index_type),
-                                       index_name=column.index_name
-                                        )
-                                       ])                
+                       column_metadata= cf_column_metadata)         
         yield self.client.system_update_column_family(cf_def) 
         
-    
+    def __generate_column_metadata(self, column_family):
+        """
+        Convenience method that generates a list of ColumnDefs from the column_metadata fields
+        """
+        args_name = ["name","validation_class", "index_type", "index_name"]
+        #Generate a list of args foreach column definition
+        args_func = lambda x: [x.column_name,x.validation_class, x.index_type , x.index_name ]
+        cdefs_args = map(args_func, column_family.column_metadata)
+        #Generate a dictionary of args for each column definition
+        make_args_dict = lambda x: dict(zip(args_name, x))
+        cdefs_dicts = map(make_args_dict, cdefs_args)
+        #Create the ColumnDef for each kwarg dictionary
+        make_cdefs = lambda d: ColumnDef(**d)
+        cdefs = map(make_cdefs, cdefs_dicts)
+        return cdefs
+        
+        
     def on_deactivate(self, *args, **kwargs):
         self._manager.shutdown()
         log.info('on_deactivate: Lose Connection TCP')
