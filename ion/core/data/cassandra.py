@@ -18,7 +18,7 @@ from zope.interface import implements
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
 from telephus.cassandra.ttypes import NotFoundException, KsDef, CfDef
-from telephus.cassandra.ttypes import IndexType, ColumnDef
+from telephus.cassandra.ttypes import ColumnDef
 
 from ion.core.data import store
 
@@ -253,8 +253,8 @@ class CassandraDataManager(TCPConnection):
         @param persistent_archive is a persistent archive object which defines the properties of an existing Key Space
         @param cache is a cache object which defines the properties of column family
         
-        @note there is a problem using the GPB message from the column_metadata. I can't seem to access all of the fields.
-        As a temporary fix I have those values hard coded.
+        @note This update operation handles only one column_metadata gpb object. It needs to be generalized to work
+        with more than one. 
         """
         yield self.client.set_keyspace(persistent_archive.name)
         desc = yield self.client.describe_keyspace(persistent_archive.name)
@@ -269,18 +269,17 @@ class CassandraDataManager(TCPConnection):
         
         column = cache.column_metadata[0]
         log.info("column attrs %s " % (column.__dict__))
+        log.info("Column message fields: %s,%s,%s" % (column.column_name,column.validation_class, column.index_name))
         cf_def = CfDef(keyspace = persistent_archive.name,
                        name = cache.name,
                        id=cf_id,
                        column_type=cache.column_type,
                        comparator_type=cache.comparator_type,
                        column_metadata=[ ColumnDef(
-                                       name=column.name,
-                                       #validation_class = column.validation_class,
-                                       validation_class = 'org.apache.cassandra.db.marshal.UTF8Type',
-                                       index_type=IndexType.KEYS,
-                                       #index_name=cache.column_metadata[0].index_name
-                                       index_name='StateIndex'
+                                       name=column.column_name,
+                                       validation_class = column.validation_class,
+                                       index_type=int(column.index_type),
+                                       index_name=column.index_name
                                         )
                                        ])                
         yield self.client.system_update_column_family(cf_def) 

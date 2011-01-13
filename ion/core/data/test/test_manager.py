@@ -75,9 +75,22 @@ class CassandraDataManagerTest(IDataManagerTest):
         column_family.name = 'TestCF'
         self.cache = column_family
         
+        column = cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
+        #column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
+        column.column_name = "state"
+        column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
+        #Sleazy hack to coerce index_type to be IndexType.KEYS
+        column.index_type = '0'
+        column.index_name = 'stateIndex'
+        self.cache.column_metadata.add()
+        self.cache.column_metadata[0] = column
+        
     
     def _setUpConnection(self):
-        
+        """
+        This creates the ion resource objects necessary that hold the information needed to connect
+        to the Cassandra cluster.
+        """
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
         persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(persistent_archive_pb2.CassandraCluster)
         
@@ -90,6 +103,8 @@ class CassandraDataManagerTest(IDataManagerTest):
         cache_repository, simple_password  = self.wb.init_repository(persistent_archive_pb2.SimplePassword)
         simple_password.username = 'ooiuser'
         simple_password.password = 'oceans11'
+        
+        
         
         storage_resource = CassandraStorageResource(cassandra_cluster, credentials=simple_password)
         manager = CassandraDataManager(storage_resource)  
@@ -126,7 +141,9 @@ class CassandraDataManagerTest(IDataManagerTest):
         self.cache.column_type= 'Standard'
         self.cache.comparator_type='org.apache.cassandra.db.marshal.BytesType'
         
-        column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
+        """
+        column_repository, column = cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
+        #column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
         column.column_name = "state"
         column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
         #Sleazy hack to coerce index_type to be IndexType.KEYS
@@ -134,7 +151,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         column.index_name = 'stateIndex'
         self.cache.column_metadata.add()
         self.cache.column_metadata[0] = column
-        
+        """
         yield self.manager.create_persistent_archive(self.keyspace)    
         yield self.manager.create_cache(self.keyspace, self.cache)
         yield self.manager.update_cache(self.keyspace, self.cache)
