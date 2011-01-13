@@ -1,0 +1,117 @@
+//Google protocol buffer implementation of OOI primitive types and
+//structures.
+// 
+//The set of types and this mapping to proto buffer types is exploratory,
+//and more about proving the mechanism than providing a final design.
+
+//One message definition per ooi datatype might appear excessive and raise
+//concerns of bloated encodings, but since protobuffers is not self
+//describing and since the names aren't included in the encoding, the final
+//result is small encodings. Anything that wants to encode/decode an ooi
+//type or Data Object needs the google protobuffers library and this proto
+//file, and that is it. 
+//Other derived types/structures can be managed separately.
+
+package ion;
+option java_package = "ion.data";
+option java_outer_classname = "OOITypes";
+
+message Short {
+    required sint32 value = 1;
+}
+
+message Int {
+    required int32 value = 1;
+}
+
+message Long {
+    required sint64 value = 1;
+}
+
+message Float {
+    required float value = 1;
+}
+
+message Double {
+    required double value = 1;
+}
+
+message String {
+    required string value = 1;
+}
+
+message Boolean {
+    required bool value = 1;
+}
+
+message Bytes {
+    required bytes value = 1;
+}
+
+message Structure {
+    message StructureElement {
+        required string key = 1;
+        required string type = 2;
+        required bytes value = 3;
+    }
+    repeated StructureElement items = 1;
+}
+    
+//Description container
+//This is used to add a self-describing quality atop the proto-buffer
+//framework. 
+message TypedValue {
+    // type is one of the OOI Data Store datatypes; is is represented as a
+    // string because it is currently a human readable string; it could
+    // also be of type bytes or int if a mapping from ooi type name to
+    // number is established.
+    required string type = 1;
+    // value is the encoded data type
+    required bytes value = 2;
+}
+
+// Here is one example realization of DataObject
+// When decoded, this is a map containing typed attributes -- the simplest
+// essence of Data Object.
+// When encoded, this is a self contained byte blob suitable for messaging
+// and storing.
+message DataObject {
+    message Attribute {
+        required string key = 1;
+        required bytes value = 2;
+    }
+    repeated Attribute atts = 1;
+}
+
+//Describes structure of a dataobject
+message DataObjectDescription {
+    message Attribute {
+        required string key = 1;
+        required bytes value = 2;
+    }
+    required string name = 1;
+    repeated Attribute atts = 2;
+}
+
+// Full protobuffers version of DataObjectNode
+// ** Tentative ** //
+message DataObjectNode {
+    required string id = 1; // identity (from external key space)
+    required bytes content = 2; // id of root content node
+    required bytes type = 3; // ObjectNode type
+    required bytes flag = 4; // Write behavior
+}
+
+message Container {
+    repeated bytes items = 1;
+}
+
+message CAStore {
+    message Node {
+        required bytes key = 1;
+        required bytes value = 2;
+    }
+    repeated Node nodes = 1;
+}
+
+

@@ -1,0 +1,77 @@
+//Google protocol buffer implementation of OOI primitive types and
+//structures.
+// 
+//The set of types and this mapping to proto buffer types is exploratory,
+//and more about proving the mechanism than providing a final design.
+
+package ion;
+option java_package = "ion.data";
+option java_outer_classname = "IONTypes";
+
+message Float32 {
+    required float value = 1;
+}
+
+message Float64 {
+    required double value = 1;
+}
+
+message Int32 {
+    required int32 value = 1;
+}
+
+message Int64 {
+    required int64 value = 1;
+}
+
+message UInt32 {
+    required uint32 value = 1;
+}
+
+message UInt64 {
+    required uint64 value = 1;
+}
+
+message String {
+    required string value = 1;
+}
+
+message Boolean {
+    required bool value = 1;
+}
+
+message Byte {
+    required bytes value = 1;
+}
+
+message Bytes {
+    required bytes value = 1;
+}
+
+// ** Basic composites ** //
+// Contain pre-encoded values
+// Themselves, encoded into leafs
+message Map {
+    message Item {
+        required string key = 1; // or use bytes?
+        required bytes value = 2;
+    }
+    repeated Item items = 1;
+}
+
+message List {
+    repeated bytes elements = 1;
+}
+
+// ** non-basic, general composite container ** //
+message Composite {
+    message CompositeElement {
+        required string key = 1;
+        required string type = 2;
+        required bytes value = 3;
+    }
+    repeated CompositeElement items = 1;
+}
+
+    
+

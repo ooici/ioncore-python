@@ -37,10 +37,12 @@ try:
     setupdict['dependency_links'] = ['http://ooici.net/packages']
     setupdict['packages'].extend(['twisted/plugins'])
     setupdict['test_suite'] = 'ion'
+
     setupdict['install_requires'] = ['Twisted', 'carrot', 'txamqp',
                                      'simplejson', 'httplib2','msgpack-python',
                                      'gviz_api.py','nimboss','txrabbitmq', 'Telephus', 
-                                     'pyrods-irods>=2.4.2', 'M2Crypto']
+                                     'pyrods-irods>=2.4.2', 'M2Crypto', 'ionproto']
+
     
     setupdict['include_package_data'] = True
     setup(**setupdict)

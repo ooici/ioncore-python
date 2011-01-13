@@ -476,7 +476,8 @@ class BaseRegistryClient(ServiceClient):
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
         #resource = dataobject.Resource.decode(content['value'])
-        resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        #resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        resource = dataobject.serializer.decode(content, headers['encoding'])
         log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
         defer.returnValue(resource)
 
@@ -501,7 +502,8 @@ class BaseRegistryClient(ServiceClient):
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
         #resource = dataobject.Resource.decode(content['value'])
-        resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        #resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        resource = dataobject.serializer.decode(content, headers['encoding'])
         log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
         defer.returnValue(resource)
 
@@ -515,7 +517,8 @@ class BaseRegistryClient(ServiceClient):
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
         #resource = dataobject.Resource.decode(content['value'])
-        resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        #resource = dataobject.serializer.decode(content['value'], headers['encoding'])
+        resource = dataobject.serializer.decode(content, headers['encoding'])
         log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
         defer.returnValue(resource)
 
@@ -549,7 +552,8 @@ class BaseRegistryClient(ServiceClient):
         log.debug(self.__class__.__name__ + ': '+ op_name + '; Result:' + str(headers))
 
         #resource_reference = dataobject.ResourceReference.decode(content['value'])
-        resource_reference = dataobject.serializer.decode(content['value'], headers['encoding'])
+        #resource_reference = dataobject.serializer.decode(content['value'], headers['encoding'])
+        resource_reference = dataobject.serializer.decode(content, headers['encoding'])
         log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
         defer.returnValue(resource_reference)
 
@@ -591,7 +595,8 @@ class BaseRegistryClient(ServiceClient):
 
         # Return a list of resources
         #results = dataobject.DataObject.decode(content['value'])
-        results = dataobject.serializer.decode(content['value'], headers['encoding'])
+        #results = dataobject.serializer.decode(content['value'], headers['encoding'])
+        results = dataobject.serializer.decode(content, headers['encoding'])
         log.info(self.__class__.__name__ + ': '+ op_name + ' Success!')
         defer.returnValue(results.resources)
 

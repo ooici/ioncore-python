@@ -4,13 +4,11 @@
 @author Bing Zhu
 @brief Implementation of ion.data.store.IStore using PyIrods to interface a
        iRODS backend storage servers.
-@Note Test cases for the iRODS backend are in ion.data.backends.test.test_irodsstore 
-@Note The Python iRODS library package can be installed with: easy_install --find-links http://ooici.net/packages pyrods-irods
 
-@TODO - all IStore interface methods must returned deferreds! See the IStore.py and the
-python in memory dictionary implementation.
-@TODO - do not generically catch excpetions.
-@TODO - make sure this implementation of the IStore can run the IStore test cases
+@note Test cases for the iRODS backend are in ion.data.backends.test.test_irodsstore 
+@note The Python iRODS library package can be installed with: easy_install --find-links http://ooici.net/packages pyrods-irods
+@
+
 """
 
 import logging
@@ -36,8 +34,8 @@ class IrodsStoreError(Exception):
 class IrodsStore(IStore):
     """
     @brief Store interface for interacting with the iRODS distributed storage system
-    @Note see http://www.irods.org 
-    @Note The login info is stored in the ion config file.
+    @note see http://www.irods.org 
+    @note The login info is stored in the ion config file.
     """
     def __init__(self, **kwargs):
         """

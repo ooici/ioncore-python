@@ -130,8 +130,9 @@ class CapabilityContainer(service.Service):
         given the path to a file, open that file and exec the code.
         Assume the file contains Python source code.
         """
-        # script relative to ion
-        script = os.path.join(os.path.dirname(ion.__file__), self.config['script'])
+        # @todo: make this a more universal location such that the script works with a variety of wd
+        # script = os.path.join(os.path.dirname(ion.__file__), self.config['script'])
+        script = os.path.abspath(self.config['script'])
         if os.path.isfile(script):
             if script.endswith('.app'):
                 yield self.container.start_app(script)

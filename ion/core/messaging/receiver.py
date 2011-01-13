@@ -179,9 +179,13 @@ class Receiver(BasicLifecycleObject):
 
         data = msg.payload
         if not self.raw:
+            wb = None
+            if hasattr(self.process, 'workbench'):
+                wb = self.process.workbench
             inv = Invocation(path=Invocation.PATH_IN,
                              message=msg,
-                             content=data)
+                             content=data,
+                             workbench=wb)
             inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
             msg = inv1.message
             data = inv1.content
@@ -201,7 +205,7 @@ class Receiver(BasicLifecycleObject):
         Constructs a standard message with standard headers and sends on given
         receiver.
         @param sender sender name of the message
-        @param recipient recipient name of the message
+        @param recipient recipient name of the message NOTE: this gets translated to "receiver" in the message in IONMessageInterceptor
         @param operation the operation (performative) of the message
         @param content the black-box content of the message
         @param headers dict with headers that may override standard headers
@@ -211,9 +215,13 @@ class Receiver(BasicLifecycleObject):
         #log.debug("Send message op="+operation+" to="+str(recv))
         try:
             if not self.raw:
+                wb = None
+                if hasattr(self.process, 'workbench'):
+                    wb = self.process.workbench
                 inv = Invocation(path=Invocation.PATH_OUT,
                                  message=msg,
-                                 content=msg['content'])
+                                 content=msg['content'],
+                                 workbench=wb)
                 inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
                 msg = inv1.message
             yield ioninit.container_instance.send(msg.get('receiver'), msg)
@@ -283,3 +291,4 @@ class NameReceiver(Receiver):
 
 class ServiceWorkerReceiver(WorkerReceiver):
     pass
+

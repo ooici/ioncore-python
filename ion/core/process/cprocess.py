@@ -65,6 +65,7 @@ class Invocation(object):
         self.content = kwargs.get('content', None)
         self.status = kwargs.get('status', Invocation.STATUS_PROCESS)
         self.route = str(kwargs.get('route', ""))
+        self.workbench = kwargs.get('workbench',None)
         self.note = None
 
     def drop(self, note=None):

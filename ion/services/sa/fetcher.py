@@ -91,7 +91,7 @@ class FetcherService(ServiceProcess):
             # Uncomment this to see the completed result
             # log.debug(hstr)
             # @note base64-encoded page returned!
-            yield self.reply_ok(msg, content=base64.b64encode(hstr))
+            yield self.reply_ok(msg, {'value':base64.b64encode(hstr)})
         else:
             log.info('fetch error %s %s %s %s' %
                          (operation, src_url, res.status, res.reason))
@@ -202,7 +202,7 @@ class FetcherService(ServiceProcess):
             defer.returnValue(None)
 
         log.info('Returning dataset via reply_ok...')
-        yield self.reply_ok(msg, dmesg)
+        yield self.reply_ok(msg, {'value':dmesg})
         log.debug('Send complete')
 
 class FetcherClient(ServiceClient):
@@ -226,7 +226,7 @@ class FetcherClient(ServiceClient):
         try:
             (content, headers, msg) = yield self.rpc_send('get_head', requested_url)
         except ReceivedError, re:
-            raise ValueError('Error on URL: ' + re.msg_content['value'])
+            raise ValueError('Error on URL: ' + re[0]['exception'])
         defer.returnValue(content)
 
 
@@ -243,7 +243,7 @@ class FetcherClient(ServiceClient):
         try:
             (content, headers, msg) = yield self.rpc_send('get_url', requested_url)
         except ReceivedError, re:
-            raise ValueError('Error on URL: ' + re.msg_content['value'])
+            raise ValueError('Error on URL: ' + re[0]['exception'])
         defer.returnValue(content)
 
     @defer.inlineCallbacks
@@ -255,7 +255,7 @@ class FetcherClient(ServiceClient):
         try:
             (content, headers, msg) = yield self.rpc_send('get_dap_dataset', requested_url)
         except ReceivedError, re:
-            raise ValueError('Error on URL: ' + re.msg_content['value'])
+            raise ValueError('Error on URL: ' + re[0]['exception'])
         defer.returnValue(content)
 
     def _rewrite_headers(self, old_headers):

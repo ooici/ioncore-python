@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/hello_service.py
-@author Michael Meisinger
-@brief An example service definition that can be used as template.
+@file ion/play/hello_process.py
+@author David Stuebe
+@brief An example process definition that can be used as template.
 """
 
 import ion.util.ionlog
