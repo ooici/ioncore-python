@@ -18,5 +18,5 @@ txAMQP==0.3
 txrabbitmq==0.4
 zope.interface==3.6.1
 ionproto==0.2.1
-protobuf==2.3.0
+protobuf==2.3.0-p1
 .
