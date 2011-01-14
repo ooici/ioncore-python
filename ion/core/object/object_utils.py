@@ -10,7 +10,14 @@ from ion.util import procutils as pu
 from net.ooici.core.type import type_pb2
 
 import hashlib
+from google.protobuf import message
 
+# Globals
+gpb_id_to_class = {}
+
+class ObjectUtilException(Exception):
+    """ Exceptions specific to Object Utilities. """
+    pass
 
 def sha1hex(val):
     return hashlib.sha1(val).hexdigest().upper()
@@ -63,3 +70,52 @@ def create_type_identifier(package='', protofile='', cls=''):
     gpbtype.cls = cls
         
     return gpbtype
+
+def build_gpb_lookup(rootpath):
+    """
+    To be called once on package initialization.
+    The given package must include a list named "protos" specifying which protocol buffer files to import.
+    @param rootpath The full path of the package to import the Protocol Buffers classes from.
+    """
+
+    ENUM_NAME = '_MessageTypeIdentifier'
+    ENUM_ID_NAME = '_ID'
+
+    global gpb_id_to_class
+    gpb_id_to_class = {}
+
+    root = __import__(rootpath)
+    protos = root.protos
+    for proto in protos:
+        protopath = '%s.%s' % (rootpath, proto)
+        m = __import__(protopath)
+
+    msg_classes = message.Message.__subclasses__()
+    for msg_class in msg_classes:
+        if msg_class.__module__.startswith(rootpath):
+            if hasattr(msg_class, 'DESCRIPTOR'):
+                descriptor = msg_class.DESCRIPTOR
+                if hasattr(descriptor, 'enum_types'):
+                    for enum_type in descriptor.enum_types:
+                        if enum_type.name == ENUM_NAME:
+                            for val in enum_type.values:
+                                if val.name == ENUM_ID_NAME:
+                                    gpb_id_to_class[val.number] = msg_class
+
+def get_gpb_class_from_id(id):
+    """
+    Get a callable google.protobuf.message.Message subclass with the given MessageTypeIdentifier enum id.
+    @param id The integer id.
+    @retval msg_class The class for the given id.
+    @throws ObjectUtilException
+    """
+    try:
+        id = int(id)
+        return gpb_id_to_class[id]
+    except ValueError, ex:
+        raise ObjectUtilException('Protocol Buffer Message ids must be integers: "%s"' % (str(id)))
+    except KeyError, ex:
+        raise ObjectUtilException('No Protocol Buffer Message class found for id "%d"' % (id))
+
+# Build the lookup table on first import
+build_gpb_lookup('net')
