@@ -343,13 +343,12 @@ class ResourceInstance(object):
         """
         @brief Return the resource identity as a string
         """
-        return self._resource.identity
+        return str(self._resource.identity)
     
     @property
     def ResourceType(self):
         """
-        @brief Returns the resource type, at present this is an object, but will
-        be changed to a resource identifier in the near future.
+        @brief Returns the resource type - A type identifier object.
         """
         return self._resource.type
     
@@ -421,7 +420,7 @@ class ResourceInstance(object):
     def _get_resource_name(self):
         """
         """
-        return self._resource.name
+        return str(self._resource.name)
     
     ResourceName = property(_get_resource_name, _set_resource_name)
     """
@@ -436,7 +435,7 @@ class ResourceInstance(object):
     def _get_resource_description(self):
         """
         """
-        return self._resource.description 
+        return str(self._resource.description)
         
     
     ResourceDescription = property(_get_resource_description, _set_resource_description)
