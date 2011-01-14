@@ -94,7 +94,8 @@ class CassandraStore(TCPConnection):
         ### Get the column family name from the Cache resource
         #if hasattr(cache, 'name'):
         #    raise CassandraError, 'Cassandra Store must be initalized with a ION Cache Resource using the cfCache keyword argument'
-        self._cfCache = cache.name # Cassandra Column Family maps to an ION Cache resource
+        self._cache = cache # Cassandra Column Family maps to an ION Cache resource
+        self._cache_name = cache.name
         
 
     @defer.inlineCallbacks
@@ -107,7 +108,7 @@ class CassandraStore(TCPConnection):
         
         log.debug("CassandraStore: Calling get on col %s " % key)
         try:
-            result = yield self.client.get(key, self._cfCache, column='value')
+            result = yield self.client.get(key, self._cache_name, column='value')
             value = result.column.value
         except NotFoundException:
             log.debug("Didn't find the key: %s. Returning None" % key)     
@@ -125,7 +126,7 @@ class CassandraStore(TCPConnection):
         """
         log.debug("CassandraStore: Calling put on key: %s  value: %s " % (key, value))
         # @todo what exceptions need to be handled for an insert?
-        yield self.client.insert(key, self._cfCache, value, column='value')
+        yield self.client.insert(key, self._cache_name, value, column='value')
 
     @defer.inlineCallbacks
     def remove(self, key):
@@ -135,7 +136,7 @@ class CassandraStore(TCPConnection):
         @retval Deferred, for success of operation
         @note Deletes are lazy, so key may still be visible for some time.
         """
-        yield self.client.remove(key, self._cfCache, column='value')
+        yield self.client.remove(key, self._cache_name, column='value')
     
     def on_deactivate(self, *args, **kwargs):
         self._manager.shutdown()
@@ -144,7 +145,46 @@ class CassandraStore(TCPConnection):
     def on_terminate(self, *args, **kwargs):
         self._manager.shutdown()
         log.info('on_terminate: Lose Connection TCP')
+        
 
+class CassandraIndexedStore(CassandraStore):
+    """
+    
+    """
+    def __init__(self, persistent_technology, persistent_archive, credentials, cache):
+        """
+        functional wrapper around active client instance
+        """       
+        CassandraStore.__init__(self, persistent_technology, persistent_archive, credentials, cache)
+        self._cache = cache
+        
+    @defer.inlineCallbacks
+    def put(self, key, value, index_attributes={}):
+        """
+        Istore put, plus a dictionary of indexed stuff
+        The dictionary contains keys for the column name and the index value
+        """
+        index_attributes['value'] = value
+        yield self.client.batch_insert(key, self._cache_name, index_attributes)
+        
+    @defer.inlineCallbacks    
+    def query( self, indexed_attribute_dictionary):
+        """
+        Search for rows in the Cassandra instance.
+    
+        @param indexed_attribute_dictionary a dictionary with column:value mappings.
+        Rows are returned that have columns set to the value specified in 
+        the dictionary
+        """
+        
+    
+    def get_query_attributes(self):
+        """
+        Return the column names that are indexed.
+        """
+        get_names = lambda cdef: cdef.column_name
+        indexes = map(get_names, self._cache.column_metadata)
+        return indexes
 
 class CassandraStorageResource:
     """
