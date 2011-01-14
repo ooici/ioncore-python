@@ -646,8 +646,8 @@ class WorkBench(object):
             element = repo._hashed_elements.get(link.key)
             
             
-            if not link.type.package == element.type.package and \
-                    link.type.cls == element.type.cls:
+            if not link.type.object_id == element.type.object_id and \
+                    link.type.version == element.type.version:
                 raise WorkBenchError('The link type does not match the element type!')
             
             cref = repo._load_element(element)

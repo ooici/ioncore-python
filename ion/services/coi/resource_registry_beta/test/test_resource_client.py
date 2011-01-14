@@ -23,8 +23,8 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 from ion.test.iontest import IonTestCase
 
 
-addresslink_type = object_utils.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='AddressLink')
-person_type = object_utils.create_type_identifier(package='net.ooici.play', protofile='addressbook', cls='Person')
+addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
+person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 
 class ResourceClientTest(IonTestCase):
     """

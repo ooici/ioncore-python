@@ -40,34 +40,49 @@ def sha1_to_hex(bytes):
     return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
 
 def set_type_from_obj(obj):
-    """
-    Move to object utilities module
-    
+    """    
     Operates on instances and classes of gpb messages!
+    @TODO Needs cleaning up - should be more robust + get the version 
     """
+    ENUM_NAME = '_MessageTypeIdentifier'
+    ENUM_ID_NAME = '_ID'
+    
     gpbtype = type_pb2.GPBType()
     
-    # Take just the file name
-    gpbtype.protofile = obj.DESCRIPTOR.file.name.split('/')[-1]
-    # Get rid of the .proto
-    gpbtype.protofile = gpbtype.protofile.split('.')[0]
-
-    gpbtype.package = obj.DESCRIPTOR.file.package
-    gpbtype.cls = obj.DESCRIPTOR.name
+    descriptor = obj.DESCRIPTOR
+    if hasattr(descriptor, 'enum_types'):
+        for enum_type in descriptor.enum_types:
+            if enum_type.name == ENUM_NAME:
+                for val in enum_type.values:
+                    if val.name == ENUM_ID_NAME:
+                        gpbtype.object_id=val.number
+                        gpbtype.version = 1
+                        
+                        return gpbtype
+                        
     
-    return gpbtype
+    raise ObjectUtilException(\
+        '''This object has no Message Type Identifier enum: %s'''\
+        % (str(descriptor.name)))
+                    
+    
+    
 
 
 
-def create_type_identifier(package='', protofile='', cls=''):
+def create_type_identifier(object_id='', version=''):
     """
     This returns an unwrapped GPB object to the application level
     """        
     gpbtype = type_pb2.GPBType()
-        
-    gpbtype.protofile = protofile
-    gpbtype.package = package
-    gpbtype.cls = cls
+    
+    try:
+        gpbtype.object_id = int(object_id)
+        gpbtype.version = int(version)
+    except ValueError, ex:
+        raise ObjectUtilException(\
+            '''Protocol Buffer Object IDs must be integers:object_id - "%s", version "%s"'''\
+            % (str(object_id), str(version)))
         
     return gpbtype
 

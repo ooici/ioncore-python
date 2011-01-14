@@ -28,6 +28,7 @@ from net.ooici.core.type import type_pb2
 from net.ooici.core.link import link_pb2
 from net.ooici.core.mutable import mutable_pb2
 
+from ion.core.object import object_utils
 
 class RepositoryError(Exception):
     """
@@ -629,8 +630,8 @@ class Repository(object):
             element = self._hashed_elements.get(link.key)
             
             
-            if not link.type.package == element.type.package and \
-                    link.type.cls == element.type.cls:
+            if not link.type.object_id == element.type.object_id and \
+                    link.type.version == element.type.version:
                 raise RepositoryError('The link type does not match the element type found!')
             
             obj = self._load_element(element)
@@ -695,21 +696,7 @@ class Repository(object):
         
     def _load_class_from_type(self,ltype):
     
-        module = str(ltype.protofile) + '_pb2'
-                
-        cls_name = str(ltype.cls)
-        
-        package = str(ltype.package)
-        
-        log.debug('Loading Class from Type: Package - %s, Module - %s, Class - %s'\
-            % (package, module, cls_name))
-        
-        path = package + '.' + module
-        __import__(path)
-        
-        mod = sys.modules[package+'.'+module]
-        
-        cls = getattr(mod, cls_name)
+        cls = object_utils.get_gpb_class_from_id(ltype.object_id)
                 
         return cls
         

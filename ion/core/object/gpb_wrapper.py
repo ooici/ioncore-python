@@ -10,7 +10,7 @@ Finish test of new Invalid methods using weakrefs - make sure it is deleted!
 
 from ion.util import procutils as pu
 
-from ion.core.object.object_utils import set_type_from_obj, sha1bin, sha1hex
+from ion.core.object.object_utils import set_type_from_obj, sha1bin, sha1hex, ObjectUtilException
 
 from google.protobuf import message
 from google.protobuf.internal import containers
@@ -93,8 +93,12 @@ class Wrapper(object):
             for enum_value in enum_type.values:
                 field_names.append(enum_value.name)
         
-        self._gpb_type = set_type_from_obj(gpbMessage)
-        
+        try:
+            self._gpb_type = set_type_from_obj(gpbMessage)
+        except ObjectUtilException, re:
+            self._gpb_type = None
+            
+            
         self._root=None
         """
         A reference to the root object wrapper for this protobuffer
@@ -1174,9 +1178,8 @@ class StructureElement(object):
         
     #@type.setter
     def _set_type(self,value):
-        self._element.type.protofile = value.GPBType.protofile
-        self._element.type.package = value.GPBType.package
-        self._element.type.cls = value.GPBType.cls        
+        self._element.type.object_id = value.GPBType.object_id
+        self._element.type.version = value.GPBType.version
      
     type = property(_get_type, _set_type)
      
