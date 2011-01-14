@@ -18,7 +18,7 @@ from zope.interface import implements
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
 from telephus.cassandra.ttypes import NotFoundException, KsDef, CfDef
-from telephus.cassandra.ttypes import IndexType, ColumnDef
+from telephus.cassandra.ttypes import ColumnDef
 
 from ion.core.data import store
 
@@ -36,10 +36,12 @@ log = ion.util.ionlog.getLogger(__name__)
 #CF_default_namespace = CONF['default_namespace']
 #CF_default_key = CONF['default_key']
 
+
 class CassandraError(Exception):
     """
     An exception class for ION Cassandra Client errors
     """
+
 
 class CassandraStore(TCPConnection):
     """
@@ -211,7 +213,7 @@ class CassandraDataManager(TCPConnection):
         @param persistent_archiveis a persistent archive object which defines the properties of a Key Space
         """
         pa = persistent_archive
-        ksdef = KsDef(name=pa.name,replication_factor=int(pa.replication_factor),
+        ksdef = KsDef(name=pa.name,replication_factor=pa.replication_factor,
                       strategy_class=pa.strategy_class, cf_defs=[])
         yield self.client.system_update_keyspace(ksdef)
         
@@ -253,8 +255,8 @@ class CassandraDataManager(TCPConnection):
         @param persistent_archive is a persistent archive object which defines the properties of an existing Key Space
         @param cache is a cache object which defines the properties of column family
         
-        @note there is a problem using the GPB message from the column_metadata. I can't seem to access all of the fields.
-        As a temporary fix I have those values hard coded.
+        @note This update operation handles only one column_metadata gpb object. It needs to be generalized to work
+        with more than one. 
         """
         yield self.client.set_keyspace(persistent_archive.name)
         desc = yield self.client.describe_keyspace(persistent_archive.name)
@@ -269,23 +271,44 @@ class CassandraDataManager(TCPConnection):
         
         column = cache.column_metadata[0]
         log.info("column attrs %s " % (column.__dict__))
+        log.info("Column message fields: %s,%s,%s" % (column.column_name,column.validation_class, column.index_name))
+
+        cf_column_metadata = self.__generate_column_metadata(cache)
         cf_def = CfDef(keyspace = persistent_archive.name,
                        name = cache.name,
                        id=cf_id,
                        column_type=cache.column_type,
                        comparator_type=cache.comparator_type,
-                       column_metadata=[ ColumnDef(
-                                       name=column.name,
-                                       #validation_class = column.validation_class,
-                                       validation_class = 'org.apache.cassandra.db.marshal.UTF8Type',
-                                       index_type=IndexType.KEYS,
-                                       #index_name=cache.column_metadata[0].index_name
-                                       index_name='StateIndex'
-                                        )
-                                       ])                
+                       column_metadata= cf_column_metadata)         
         yield self.client.system_update_column_family(cf_def) 
-        
     
+    @defer.inlineCallbacks    
+    def _describe_keyspace(self, keyspace):
+        """    
+        @brief internal method used to get a description of the keyspace
+        @param keyspace is a string of the keyspace name
+        @retval returns a thrift KsDef 
+        """
+        desc = yield self.client.describe_keyspace(keyspace)
+        defer.returnValue(desc)
+    
+    def __generate_column_metadata(self, column_family):
+        """
+        Convenience method that generates a list of ColumnDefs from the column_metadata fields
+        """
+        args_name = ["name","validation_class", "index_type", "index_name"]
+        #Generate a list of args foreach column definition
+        args_func = lambda x: [x.column_name,x.validation_class, x.index_type , x.index_name ]
+        cdefs_args = map(args_func, column_family.column_metadata)
+        #Generate a dictionary of args for each column definition
+        make_args_dict = lambda x: dict(zip(args_name, x))
+        cdefs_dicts = map(make_args_dict, cdefs_args)
+        #Create the ColumnDef for each kwarg dictionary
+        make_cdefs = lambda d: ColumnDef(**d)
+        cdefs = map(make_cdefs, cdefs_dicts)
+        return cdefs
+        
+        
     def on_deactivate(self, *args, **kwargs):
         self._manager.shutdown()
         log.info('on_deactivate: Lose Connection TCP')

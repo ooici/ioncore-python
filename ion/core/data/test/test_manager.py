@@ -74,10 +74,23 @@ class CassandraDataManagerTest(IDataManagerTest):
         # only the name of the column family is required
         column_family.name = 'TestCF'
         self.cache = column_family
+        self.cache_repository = cache_repository
+        column = self.cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
+        #column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
+        column.column_name = "state"
+        column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
+        #IndexType.KEYS is 0, and IndexType is an enum
+        column.index_type = 0
+        column.index_name = 'stateIndex'
+        self.cache.column_metadata.add()
+        self.cache.column_metadata[0] = column
         
     
     def _setUpConnection(self):
-        
+        """
+        This creates the ion resource objects necessary that hold the information needed to connect
+        to the Cassandra cluster.
+        """
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
         persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(persistent_archive_pb2.CassandraCluster)
         
@@ -90,6 +103,8 @@ class CassandraDataManagerTest(IDataManagerTest):
         cache_repository, simple_password  = self.wb.init_repository(persistent_archive_pb2.SimplePassword)
         simple_password.username = 'ooiuser'
         simple_password.password = 'oceans11'
+        
+        
         
         storage_resource = CassandraStorageResource(cassandra_cluster, credentials=simple_password)
         manager = CassandraDataManager(storage_resource)  
@@ -111,12 +126,11 @@ class CassandraDataManagerTest(IDataManagerTest):
     @defer.inlineCallbacks
     def test_update_persistent_archive(self):
         yield self.manager.create_persistent_archive(self.keyspace)
-        self.keyspace.replication_factor='2'
+        self.keyspace.replication_factor=2
         self.keyspace.strategy_class='org.apache.cassandra.locator.SimpleStrategy'
         yield self.manager.update_persistent_archive(self.keyspace)
         
-        #Disrespecting the manager abstraction, in order to test that it works
-        desc = yield self.manager.client.describe_keyspace(self.keyspace.name)
+        desc = yield self.manager._describe_keyspace(self.keyspace.name)
         log.info("Description of keyspace %s" % (desc,))
         log.info("Replication factor %s" % (desc.replication_factor,))    
         self.failUnlessEqual(desc.replication_factor, 2)
@@ -125,17 +139,45 @@ class CassandraDataManagerTest(IDataManagerTest):
     def test_update_cache(self):
         self.cache.column_type= 'Standard'
         self.cache.comparator_type='org.apache.cassandra.db.marshal.BytesType'
+        yield self.manager.create_persistent_archive(self.keyspace)    
+        yield self.manager.create_cache(self.keyspace, self.cache)
+        yield self.manager.update_cache(self.keyspace, self.cache)
+        desc = yield self.manager._describe_keyspace(self.keyspace.name)
+        log.info("Description of keyspace %s" % (desc,))
+        log.info("column_metadata index_name %s " % (desc.cf_defs[0].column_metadata[0].index_name,))
+        self.failUnlessEqual(desc.cf_defs[0].column_metadata[0].index_name, "stateIndex")
         
-        column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
-        column.column_name = "state"
+    @defer.inlineCallbacks
+    def test_update_cache_two_indexes(self):
+        """
+        The first index is defined in the _setUpArchiveAndCache method
+        
+        This test creates two indexes and tests to see if the two index_names
+        it gets back from a describe_keyspace call are the same as the two 
+        index_names that were created. 
+        """
+        self.cache.column_type= 'Standard'
+        self.cache.comparator_type='org.apache.cassandra.db.marshal.BytesType'
+        
+
+        column = self.cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
+        #column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
+        column.column_name = "state2"
         column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
-        #Sleazy hack to coerce index_type to be IndexType.KEYS
-        column.index_type = '0'
-        column.index_name = 'stateIndex'
+        #IndexType.KEYS is 0, and IndexType is an enum
+        column.index_type = 0
+        column.index_name = 'stateIndex2'
         self.cache.column_metadata.add()
-        self.cache.column_metadata[0] = column
+        self.cache.column_metadata[1] = column
         
         yield self.manager.create_persistent_archive(self.keyspace)    
         yield self.manager.create_cache(self.keyspace, self.cache)
         yield self.manager.update_cache(self.keyspace, self.cache)
+        desc = yield self.manager._describe_keyspace(self.keyspace.name)
+        index_name1 = desc.cf_defs[0].column_metadata[0].index_name
+        index_name2 = desc.cf_defs[0].column_metadata[1].index_name
+        log.info("index_names %s,%s" % (index_name1, index_name2))
+        index_name_set = set((index_name1, index_name2))
+        correct_index_name_set = set(("stateIndex", "stateIndex2"))
+        self.failUnlessEqual(correct_index_name_set, index_name_set)
         
