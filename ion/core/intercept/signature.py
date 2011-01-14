@@ -80,8 +80,8 @@ class SystemSecurityPlugin(interceptor.EnvelopeInterceptor):
     included in the message headers.
     """
 
-    def __init__(self, system_priv_key_path=None, allowed_certs={}):
-        interceptor.EnvelopeInterceptor.__init__(self)
+    def __init__(self, name, system_priv_key_path=None, allowed_certs={}):
+        interceptor.EnvelopeInterceptor.__init__(self, name)
         #XXX @todo need to be able to properly configure this interceptor
         #during container startup
 
@@ -100,7 +100,6 @@ class SystemSecurityPlugin(interceptor.EnvelopeInterceptor):
         f.close()
         return key
 
-    @property
     def certs(self, id):
         """
         Get cert path by given id.
@@ -122,23 +121,44 @@ class SystemSecurityPlugin(interceptor.EnvelopeInterceptor):
         Decorate an outgoing message with a digital signature of the
         encoded content. Add signature to the message headers.
         """
-        content = invocation.message['content']
-        priv_key = self.priv_key()
-        signature = self.auth.sign_message(content, priv_key)
+        content = invocation.message['content'] #Hope this is a string!
+        try:
+            hash = hashlib.sha1(content).hexdigest()
+        except TypeError:
+            # Not sure what to do, being hashable is not really a policy,
+            # so dropping might not be appropriate. Need to raise some kind
+            # of error.
+            invocation.error(note='Error taking hash of content!')
+            return invocation
+        priv_key = self.priv_key
+        signature = self.auth.sign_message(hash, priv_key)
         invocation.message['signer'] = 'ooi-ion' #XXX What should this header be?
         invocation.message['signature'] = signature
+        # Do we call invocation.proceed ???
         return invocation
 
     def before(self, invocation):
-        content = invocation.message['content']
-        signature = invocation.message['signature']
-        signer = invocation.message['signer']
-        cert = self.certs(signer)
-        verifiedQ = self.auth.verify_message(content, cert, signature)
-        if verifiedQ:
-            return invocation
+        """
+        If the signature and signer headers are missing, then drop the
+        message. Otherwise, verify the message.
+        """
+        message = invocation.message
+        #hack check of message spec!
+        if message.has_key('signature') and message.has_key('signer'):
+            content = invocation.message['content'] #this better be there
+            hash = hashlib.sha1(content).hexdigest()
+            signature = invocation.message['signature']
+            signer = invocation.message['signer']
+            cert = self.certs(signer)
+            verifiedQ = self.auth.verify_message(hash, cert, signature)
+            if verifiedQ:
+                # Do we call invocation.proceed ???
+                return invocation
+            else:
+                invocation.drop('Unverified Signature')
+                return invocation
         else:
-            invocation.drop('Unverified Signature')
+            invocation.drop('Invalid Message Format')
             return invocation
 
 

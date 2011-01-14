@@ -13,7 +13,9 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 from ion.core.cc.container import Container
 from ion.core.exception import ConfigurationError
-from ion.core.intercept.interceptor import Interceptor, EnvelopeInterceptor, PassThroughInterceptor, DropInterceptor, Invocation
+from ion.core.intercept.interceptor import Interceptor, EnvelopeInterceptor
+from ion.core.intercept.interceptor import PassThroughInterceptor, DropInterceptor
+from ion.core.intercept.interceptor import Invocation
 from ion.core.intercept.interceptor_system import InterceptorSystem
 from ion.test.iontest import IonTestCase
 from ion.util.config import Config
@@ -236,3 +238,90 @@ class TestInterceptor(EnvelopeInterceptor):
         self.numafter += 1
         invocation.proceed()
         return invocation
+
+
+class TestSignature(IonTestCase):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        is_config_sig = {
+            'interceptors':{
+                'signature':{
+                    'classname':'ion.core.intercept.signature.SystemSecurityPlugin'
+                    },
+                },
+            'stack':[
+                {'name':'signature', 'interceptor':'signature'},
+                ]
+            }
+
+        intercept_sys = InterceptorSystem()
+        yield intercept_sys.initialize(is_config_sig)
+        yield intercept_sys.activate()
+        self.intercept_sys = intercept_sys
+
+
+    @defer.inlineCallbacks
+    def test_signature_headers(self):
+        """
+        Test that signature headers are set when message passes through
+        outgoing interceptor stack with signature interceptor
+
+        """
+        msg = {'content':'foo'}
+        inv_pre = Invocation(path=Invocation.PATH_OUT, message=msg)
+        inv_post = yield self.intercept_sys.process(inv_pre)
+        message = inv_post.message
+
+        self.failUnless(message.has_key('signature'))
+        self.failUnlessEqual(message['signer'], 'ooi-ion') #XXX Hard-coded assumption! 
+
+
+    @defer.inlineCallbacks
+    def test_allow(self):
+        """
+        Test case where a message is allowed in and out of the signature
+        interceptor
+        """
+        msg = {'content':'foo'}
+        inv_outgoing_a = Invocation(path=Invocation.PATH_OUT, message=msg)
+        inv_outgoing_b = yield self.intercept_sys.process(inv_outgoing_a)
+
+        self.failUnlessEqual(inv_outgoing_b.status,
+                Invocation.STATUS_PROCESS)
+
+        inv_incoming_a = inv_outgoing_b #use the last outgoing as the
+                                        #incoming so the headers are already set
+        inv_incoming_a.path = Invocation.PATH_IN #set to incoming
+
+        inv_incoming_b = yield self.intercept_sys.process(inv_incoming_a)
+
+        self.failUnlessEqual(inv_incoming_b.status, 
+                Invocation.STATUS_PROCESS)
+
+
+    @defer.inlineCallbacks
+    def test_drop(self):
+        msg = {'content':'foo'}
+        inv_outgoing_a = Invocation(path=Invocation.PATH_OUT, message=msg)
+        inv_outgoing_b = yield self.intercept_sys.process(inv_outgoing_a)
+
+        self.failUnlessEqual(inv_outgoing_b.status,
+                Invocation.STATUS_PROCESS)
+
+        inv_incoming_a = inv_outgoing_b #use the last outgoing as the
+                                        #incoming so the headers are already set
+        inv_incoming_a.path = Invocation.PATH_IN #set to incoming
+        inv_incoming_a.message['content'] = 'bar' #invalidate message
+
+        inv_incoming_b = yield self.intercept_sys.process(inv_incoming_a)
+
+        self.failUnlessEqual(inv_incoming_b.status, 
+                Invocation.STATUS_DROP)
+
+
+
+
+
+
+
