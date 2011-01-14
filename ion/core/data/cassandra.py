@@ -36,10 +36,12 @@ log = ion.util.ionlog.getLogger(__name__)
 #CF_default_namespace = CONF['default_namespace']
 #CF_default_key = CONF['default_key']
 
+
 class CassandraError(Exception):
     """
     An exception class for ION Cassandra Client errors
     """
+
 
 class CassandraStore(TCPConnection):
     """
@@ -279,7 +281,17 @@ class CassandraDataManager(TCPConnection):
                        comparator_type=cache.comparator_type,
                        column_metadata= cf_column_metadata)         
         yield self.client.system_update_column_family(cf_def) 
-        
+    
+    @defer.inlineCallbacks    
+    def _describe_keyspace(self, keyspace):
+        """    
+        @brief internal method used to get a description of the keyspace
+        @param keyspace is a string of the keyspace name
+        @retval returns a thrift KsDef 
+        """
+        desc = yield self.client.describe_keyspace(keyspace)
+        defer.returnValue(desc)
+    
     def __generate_column_metadata(self, column_family):
         """
         Convenience method that generates a list of ColumnDefs from the column_metadata fields
