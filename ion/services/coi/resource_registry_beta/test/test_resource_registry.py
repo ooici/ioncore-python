@@ -14,7 +14,7 @@ from twisted.trial import unittest
 
 from net.ooici.core.type import type_pb2
 from net.ooici.play import addressbook_pb2
-from net.ooici.resource import resource_pb2
+from net.ooici.services.coi import resource_framework_pb2
 
 from ion.core.object import gpb_wrapper
 
@@ -61,7 +61,7 @@ class ResourceRegistryTest(IonTestCase):
         wb = proc_rr2.workbench
         
         # Create a sendable resource object
-        description_repository, resource_description = wb.init_repository(rootclass=resource_pb2.ResourceDescription)
+        description_repository, resource_description = wb.init_repository(rootclass=resource_framework_pb2.ResourceDescription)
         
         # Set the description
         resource_description.name = 'Johns resource'

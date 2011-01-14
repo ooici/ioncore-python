@@ -29,7 +29,7 @@ from ion.core.object.repository import RepositoryError
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
 
 from net.ooici.core.type import type_pb2
-from net.ooici.resource import resource_pb2
+from net.ooici.services.coi import resource_framework_pb2
 from net.ooici.core.link import link_pb2
 
 
@@ -106,7 +106,7 @@ class ResourceClient(object):
         yield self._check_init()
         
         # Create a sendable resource object
-        description_repository, resource_description = self.workbench.init_repository(rootclass=resource_pb2.ResourceDescription)
+        description_repository, resource_description = self.workbench.init_repository(rootclass=resource_framework_pb2.ResourceDescription)
         
         # Set the description
         resource_description.name = name
@@ -362,19 +362,19 @@ class ResourceInstance(object):
         # Using IS for comparison - I think this is better than the usual ==
         # Want to force the use of the self.XXXX as the argument!
         if state == self.NEW:        
-            self._resource.lcs = resource_pb2.New
+            self._resource.lcs = resource_framework_pb2.New
         elif state == self.ACTIVE:
-            self._resource.lcs = resource_pb2.Active
+            self._resource.lcs = resource_framework_pb2.Active
         elif state == self.INACTIVE:
-            self._resource.lcs = resource_pb2.Inactive
+            self._resource.lcs = resource_framework_pb2.Inactive
         elif state == self.COMMISSIONED:
-            self._resource.lcs = resource_pb2.Commissioned
+            self._resource.lcs = resource_framework_pb2.Commissioned
         elif state == self.DECOMMISSIONED:
-            self.resource.lcs = resource_pb2.Decommissioned
+            self.resource.lcs = resource_framework_pb2.Decommissioned
         elif state == self.RETIRED:
-            self.resource.lcs = resource_pb2.Retired
+            self.resource.lcs = resource_framework_pb2.Retired
         elif state == self.DEVELOPED:
-            self.resource.lcs = resource_pb2.Developed
+            self.resource.lcs = resource_framework_pb2.Developed
         else:
             raise Exception('''Invalid argument value state: %s. State must be 
                 one of the class variables defined in Resource Instance''' % str(state))
@@ -384,25 +384,25 @@ class ResourceInstance(object):
         @brief Get the life cycle state of the resource
         """
         state = None
-        if self._resource.lcs == resource_pb2.New:
+        if self._resource.lcs == resource_framework_pb2.New:
             state = self.NEW    
         
-        elif self._resource.lcs == resource_pb2.Active:
+        elif self._resource.lcs == resource_framework_pb2.Active:
             state = self.ACTIVE
             
-        elif self._resource.lcs == resource_pb2.Inactive:
+        elif self._resource.lcs == resource_framework_pb2.Inactive:
             state = self.INACTIVE
             
-        elif self._resource.lcs == resource_pb2.Commissioned:
+        elif self._resource.lcs == resource_framework_pb2.Commissioned:
             state = self.COMMISSIONED
             
-        elif self._resource.lcs == resource_pb2.Decommissioned:
+        elif self._resource.lcs == resource_framework_pb2.Decommissioned:
             state = self.DECOMMISSIONED
             
-        elif self._resource.lcs == resource_pb2.Retired:
+        elif self._resource.lcs == resource_framework_pb2.Retired:
             state = self.RETIRED
             
-        elif self._resource.lcs == resource_pb2.Developed:
+        elif self._resource.lcs == resource_framework_pb2.Developed:
             state = self.DEVELOPED
         
         return state

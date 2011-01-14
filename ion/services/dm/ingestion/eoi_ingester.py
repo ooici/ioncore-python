@@ -19,7 +19,7 @@ from ion.services.coi import datastore
 
 from ion.core.object import gpb_wrapper
 
-from net.ooici.resource import resource_pb2
+from net.ooici.services.coi import resource_framework_pb2
 from net.ooici.core.type import type_pb2
 
 from ion.core.process.process import ProcessFactory, Process

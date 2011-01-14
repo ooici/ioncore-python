@@ -9,7 +9,7 @@ from twisted.internet import defer
 from ion.core.data.cassandra import CassandraDataManager, CassandraStorageResource
 
 from ion.core.object import workbench
-from net.ooici.storage import persistent_archive_pb2
+from net.ooici.services.dm import persistent_archive_pb2
 
 from ion.core.data import store
 

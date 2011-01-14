@@ -15,7 +15,7 @@ from twisted.trial import unittest
 
 from ion.test.iontest import IonTestCase
 
-from net.ooici.basic import basic_pb2
+from net.ooici.play import basic_pb2
 from ion.core.object import workbench
 
 

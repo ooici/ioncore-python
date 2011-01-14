@@ -25,7 +25,7 @@ from ion.test.iontest import IonTestCase
 
 # Import the workbench and the Persistent Archive Resource Objects!
 from ion.core.object import workbench
-from net.ooici.storage import persistent_archive_pb2
+from net.ooici.services.dm import persistent_archive_pb2
 
 
 class IStoreTest(unittest.TestCase):

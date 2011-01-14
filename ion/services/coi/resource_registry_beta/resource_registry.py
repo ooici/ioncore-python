@@ -16,7 +16,7 @@ from ion.services.coi import datastore
 
 from ion.core.object import gpb_wrapper
 
-from net.ooici.resource import resource_pb2
+from net.ooici.services.coi import resource_framework_pb2
 from net.ooici.core.type import type_pb2
 
 from ion.core.process.process import ProcessFactory, Process
@@ -38,7 +38,7 @@ class ResourceRegistryService(ServiceProcess):
     declare = ServiceProcess.service_declare(name='resource_registry_2', version='0.1.0', dependencies=[])
 
     TypeClassType = gpb_wrapper.set_type_from_obj(type_pb2.GPBType())
-    ResourceDescriptionClassType = gpb_wrapper.set_type_from_obj(resource_pb2.ResourceDescription())
+    ResourceDescriptionClassType = gpb_wrapper.set_type_from_obj(resource_framework_pb2.ResourceDescription())
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -83,7 +83,7 @@ class ResourceRegistryService(ServiceProcess):
         cls = msg_repo._load_class_from_type(resource_description.type)
         
         # Create a new repository to hold this resource
-        resource_repository, resource = self.workbench.init_repository(rootclass=resource_pb2.OOIResource)
+        resource_repository, resource = self.workbench.init_repository(rootclass=resource_framework_pb2.OOIResource)
         
         # Set the identity of the resource
         resource.identity = resource_repository.repository_key
@@ -100,7 +100,7 @@ class ResourceRegistryService(ServiceProcess):
         resource_repository._set_type_from_obj(resource.type, res_obj)
         
         # State is set to new by default
-        resource.lcs = resource_pb2.New
+        resource.lcs = resource_framework_pb2.New
         
         resource_repository.commit('Created a new resource!')
 

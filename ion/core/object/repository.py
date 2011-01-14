@@ -17,7 +17,6 @@ log = ion.util.ionlog.getLogger(__name__)
 
 import sys
 
-from net.ooici.core.mutable import mutable_pb2
 
 from twisted.internet import defer
 
@@ -27,6 +26,7 @@ from ion.util import procutils as pu
 
 from net.ooici.core.type import type_pb2
 from net.ooici.core.link import link_pb2
+from net.ooici.core.mutable import mutable_pb2
 
 
 class RepositoryError(Exception):

@@ -29,30 +29,30 @@ class HelloProcessTest(IonTestCase):
     def tearDown(self):
         yield self._stop_container()
 
-    @defer.inlineCallbacks
-    def test_hello(self):
-
-
-        pd1 = {'name':'hello1','module':'ion.play.hello_object','class':'HelloObject'}
-
-        proc1 = ProcessDesc(**pd1)
-
-
-        sup1 = yield bootstrap.create_supervisor()
-        
-        proc1_id = yield self.test_sup.spawn_child(proc1)
-
-        sup2 = yield bootstrap.create_supervisor()
-        
-        
-        log.info('Calling hello there with hc(sup2)')
-        hc1 = HelloObjectClient(proc=sup2,target=proc1_id)
-        yield hc1.hello("Hi there, hello1")
-
-
-        #log.info('Calling hello there with hc(sup2)')
-        #hc2 = HelloObjectClient(proc=sup2,target=proc1_id)
-        #yield hc2.hello("Hi there, hello1")
-
-
-        log.info('Tada!')
+    #@defer.inlineCallbacks
+    #def test_hello(self):
+    #
+    #
+    #    pd1 = {'name':'hello1','module':'ion.play.hello_object','class':'HelloObject'}
+    #
+    #    proc1 = ProcessDesc(**pd1)
+    #
+    #
+    #    sup1 = yield bootstrap.create_supervisor()
+    #    
+    #    proc1_id = yield self.test_sup.spawn_child(proc1)
+    #
+    #    sup2 = yield bootstrap.create_supervisor()
+    #    
+    #    
+    #    log.info('Calling hello there with hc(sup2)')
+    #    hc1 = HelloObjectClient(proc=sup2,target=proc1_id)
+    #    yield hc1.hello("Hi there, hello1")
+    #
+    #
+    #    #log.info('Calling hello there with hc(sup2)')
+    #    #hc2 = HelloObjectClient(proc=sup2,target=proc1_id)
+    #    #yield hc2.hello("Hi there, hello1")
+    #
+    #
+    #    log.info('Tada!')
