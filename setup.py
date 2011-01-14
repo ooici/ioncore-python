@@ -41,7 +41,7 @@ try:
     setupdict['install_requires'] = ['Twisted==10.2.0', 'carrot==0.10.11-txamqp', 'txamqp==0.3',
                                      'simplejson==2.1.2', 'httplib2==0.6.0','msgpack-python==015final',
                                      'gviz_api.py==1.7.0','nimboss','txrabbitmq==0.4', 'Telephus==0.7-beta3.3', 
-                                     'pyrods-irods==2.4.3', 'M2Crypto==0.20.2', 'ionproto']
+                                     'pyrods-irods==2.4.3', 'M2Crypto==0.20.2', 'ionproto==1.1.2']
 
     
     setupdict['include_package_data'] = True
