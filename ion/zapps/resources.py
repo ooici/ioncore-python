@@ -29,6 +29,11 @@ def start(container, starttype, app_definition, *args, **kwargs):
          'spawnargs':{'datastore_service':'datastore'}}
         ]
     
+    print '/////////////////////////////////////'
+    print args
+    print kwargs
+    print '/////////////////////////////////////'
+
 
     appsup_desc = ProcessDesc(name='app-supervisor-'+app_definition.name,
                               module=app_supervisor.__name__,
