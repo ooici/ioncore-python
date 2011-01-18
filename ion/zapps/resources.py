@@ -11,6 +11,7 @@ from ion.core.pack import app_supervisor
 
 #from ion.core.ioninit import ion_config
 from ion.core import ioninit
+from ion.core.cc.shell import control
 
 from ion.core.object import object_utils
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
@@ -49,10 +50,13 @@ def start(container, starttype, app_definition, *args, **kwargs):
         
         ### Rather than print the data_resources object - how do we add it to locals?
         ### I can't find the control object for the shell from here?
+        print '================================================================='
         print 'Added Data Resources:'
         print data_resources
-        #for k,v in data_resources.items():
-        #    control.add_term_name(k,v)
+        print 'The dataset IDs will be available in your localsOkay after the shell starts!'
+        print '================================================================='
+        for k,v in data_resources.items():
+            control.add_term_name(k,v)
     
     defer.returnValue(res)
 
@@ -73,6 +77,7 @@ def _bootstrap_objects(supid):
     
     print 'Sup:',supid
     
+    # This is only for bootstrap - do no do this in operational code!
     sup = ioninit.container_instance.proc_manager.process_registry.kvs.get(supid, None)
     
     rc = ResourceClient(proc=sup)
