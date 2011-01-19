@@ -313,7 +313,7 @@ class DataStoreTest(IonTestCase):
         
         try:
             f = open(self.FileLocation, "rb")
-        except IOError as ex:
+        except IOError, ex:
             log.info('Test data file not found: %s'\
                 % self.FileLocation)
             return
