@@ -18,7 +18,7 @@ from zope.interface import implements
 from telephus.client import CassandraClient
 from telephus.protocol import ManagedCassandraClientFactory
 from telephus.cassandra.ttypes import NotFoundException, KsDef, CfDef
-from telephus.cassandra.ttypes import ColumnDef
+from telephus.cassandra.ttypes import ColumnDef, IndexExpression, IndexOperator
 
 from ion.core.data import store
 
@@ -67,7 +67,8 @@ class CassandraStore(TCPConnection):
         """
         functional wrapper around active client instance
         """
-        
+        import twisted.internet.base
+        twisted.internet.base.DelayedCall.debug = True
         ### Get the host and port from the Persistent Technology resource
         host = persistent_technology.hosts[0].host
         port = persistent_technology.hosts[0].port
@@ -84,10 +85,10 @@ class CassandraStore(TCPConnection):
         
         ### Create the twisted factory for the TCP connection  
         self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
-        #self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=None)
+        #self._manager = ManagedCassandraClientFactory(credentials=authorization_dictionary)
         
         # Call the initialization of the Managed TCP connection base class
-        TCPConnection.__init__(self,host,port,self._manager)
+        TCPConnection.__init__(self,host, port, self._manager)
         self.client = CassandraClient(self._manager)    
         
         
@@ -136,16 +137,18 @@ class CassandraStore(TCPConnection):
         @retval Deferred, for success of operation
         @note Deletes are lazy, so key may still be visible for some time.
         """
-        yield self.client.remove(key, self._cache_name, column='value')
+        yield self.client.remove(key, self._cache_name)
     
     def on_deactivate(self, *args, **kwargs):
         self._manager.shutdown()
-        log.info('on_deactivate: Lose Connection TCP')
+        log.info('on_deactivate: Lose TCP Connection')
 
     def on_terminate(self, *args, **kwargs):
-        self._manager.shutdown()
-        log.info('on_terminate: Lose Connection TCP')
+        log.info("Called CassandraStore.on_terminate")
         
+        self._manager.shutdown()
+        log.info('on_terminate: Lose TCP Connection')
+     
 
 class CassandraIndexedStore(CassandraStore):
     """
@@ -168,23 +171,42 @@ class CassandraIndexedStore(CassandraStore):
         yield self.client.batch_insert(key, self._cache_name, index_attributes)
         
     @defer.inlineCallbacks    
-    def query( self, indexed_attribute_dictionary):
+    def query(self, indexed_attributes):
         """
         Search for rows in the Cassandra instance.
     
-        @param indexed_attribute_dictionary a dictionary with column:value mappings.
+        @param indexed_attributes is a dictionary with column:value mappings.
         Rows are returned that have columns set to the value specified in 
         the dictionary
-        """
         
-    
+        @retVal a thrift representation of the rows returned by the query.
+        """
+        make_predicate = lambda attr: {'column_name':attr[0],'op':IndexOperator.EQ,'value':attr[1]}
+        predicate_args = map(make_predicate, indexed_attributes.items())
+        log.info("predicate_args: %s" %(predicate_args,))
+        make_expressions = lambda args: IndexExpression(**args)
+        selection_predicate =  map(make_expressions, predicate_args)
+        log.info("selection_predicate %s " % (selection_predicate,))
+        rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicate)
+        #rows = yield self.client.get_indexed_slices(self._cache_name, [IndexExpression(op=IndexOperator.EQ, value='UT', column_name='state')])
+        defer.returnValue(rows)
+        
+    @defer.inlineCallbacks
     def get_query_attributes(self):
         """
         Return the column names that are indexed.
         """
-        get_names = lambda cdef: cdef.column_name
-        indexes = map(get_names, self._cache.column_metadata)
-        return indexes
+        keyspace_description = yield self.client.describe_keyspace(self._keyspace)
+        log.info("keyspace desc %s" % (keyspace_description,))
+        get_cfdef = lambda cfdef: cfdef.name == self._cache.name
+        cfdef = filter(get_cfdef, keyspace_description.cf_defs)
+        get_names = lambda cdef: cdef.name
+        indexes = map(get_names, cfdef[0].column_metadata)
+        
+        
+        defer.returnValue(indexes)
+    
+    
 
 class CassandraStorageResource:
     """
@@ -223,7 +245,7 @@ class CassandraDataManager(TCPConnection):
         port = storage_resource.get_port()
         authorization_dictionary = storage_resource.get_credentials()
         
-        self._manager = ManagedCassandraClientFactory( credentials=authorization_dictionary)
+        self._manager = ManagedCassandraClientFactory(credentials=authorization_dictionary)
         
         TCPConnection.__init__(self,host,port,self._manager)
         self.client = CassandraClient(self._manager)    
