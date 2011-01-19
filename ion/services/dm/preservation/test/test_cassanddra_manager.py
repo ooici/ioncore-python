@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/preservation/test/test_preservation_service.py
+@file ion/services/dm/preservation/test/test_cassandra_manager_service.py
 @author David Stuebe
 """
 
