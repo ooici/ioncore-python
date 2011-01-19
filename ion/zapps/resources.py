@@ -83,11 +83,12 @@ int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1
 
 @defer.inlineCallbacks
 def _bootstrap_objects(supid):
-    
-    print 'Sup:',supid
-    
-    # This is only for bootstrap - do no do this in operational code!
+        
+    # We need to cheat - get the supervisor process from the container
+    # This is only for bootstrap in a demo application - do no do this in operational code!
     sup = ioninit.container_instance.proc_manager.process_registry.kvs.get(supid, None)    
+    
+    # Instantiate the Resource Client using the supervisor
     rc = ResourceClient(proc=sup)
     
     # Create the dataset resource
@@ -107,6 +108,8 @@ def _bootstrap_objects(supid):
     #       as a repeated field so that it can support multi-dimensional variables.  The 'content'
     #       field can be filled with a Bounded Array, a Structure or a Sequence with the same rank
     #       and length as the dimension objects stored in the variables shape field.
+    #
+    #       See: http://oceanobservatories.org/spaces/display/CIDev/DM+CDM
     #       
     #       Scalars:
     #       Scalar variables such as 'station ID' in the example below, are not associated with a
