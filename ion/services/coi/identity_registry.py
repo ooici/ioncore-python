@@ -22,7 +22,7 @@ from ion.core import ioninit
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.resources import coi_resource_descriptions 
-from ion.services.coi.authentication import Authentication
+from ion.core.security.authentication import Authentication
 
 CONF = ioninit.config(__name__)
 

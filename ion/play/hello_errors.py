@@ -68,7 +68,7 @@ class HelloErrors(ServiceProcess):
                 raise RuntimeError("I'm supposed to fail")
                 result = 'Succeeded'
 
-            except RuntimeError as re:
+            except RuntimeError, re:
             
                 result = 'Caught'
                 response = self.APP_FAILED
