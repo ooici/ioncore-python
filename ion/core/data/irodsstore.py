@@ -2,6 +2,7 @@
 """
 @file ion/data/backends/irodsstore.py
 @author Bing Zhu
+@author Matt Rodriguez
 @brief Implementation of ion.data.store.IStore using PyIrods to interface a
        iRODS backend storage servers.
 
@@ -120,7 +121,7 @@ class IrodsStore(IStore):
      
     def clear_store(self):
         """
-        @brief Clean the iRODS collection and disonnect from iRODS
+        @brief Clean the iRODS collection and disconnect from iRODS
         """
         if not self.conn:
             return defer.succeed(None)

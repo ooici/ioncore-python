@@ -107,19 +107,29 @@ class CassandraStoreTest(IStoreTest):
                                          simple_password, \
                                          column_family)
         
+        
         store.initialize()
         store.activate()
         
         
         return defer.succeed(store)
 
-    def tearDown(self):
-        
-        self.ds.terminate()
 
+    
+     
+    def tearDown(self):
+        try:       
+            self.ds.terminate()
+        except Exception, ex:
+            log.info("Exception raised in tearDown %s" % (ex,))
+            
 class CassandraIndexedStoreTest(IStoreTest):
 
     def _setup_backend(self):
+        """
+        @note The column_metadata in the cache is not correct. The column family on the 
+        server has a few more indexes.  
+        """
         
         ### This is a short cut to use resource objects without a process 
         wb = workbench.WorkBench('No Process: Testing only')
@@ -147,9 +157,22 @@ class CassandraIndexedStoreTest(IStoreTest):
         simple_password.password = 'oceans11'
         
         ### Create a Cache resource - for cassandra a ColumnFamily object
+        
         cache_repository, column_family  = wb.init_repository(persistent_archive_pb2.ColumnFamily)
         # only the name of the column family is required
         column_family.name = 'TestCF'
+        
+        self.cache = column_family
+        self.cache_repository = cache_repository
+        column = self.cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
+        #column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
+        column.column_name = "state"
+        column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
+        #IndexType.KEYS is 0, and IndexType is an enum
+        column.index_type = 0
+        column.index_name = 'stateIndex'
+        self.cache.column_metadata.add()
+        self.cache.column_metadata[0] = column
         
         
         store = cassandra.CassandraIndexedStore(cassandra_cluster, \
@@ -162,11 +185,53 @@ class CassandraIndexedStoreTest(IStoreTest):
         
         
         return defer.succeed(store)
-
-    def tearDown(self):
+    
+    @defer.inlineCallbacks
+    def test_get_query_attributes(self):
+        attrs = yield self.ds.get_query_attributes()
+        log.info("attrs %s" % (attrs,))
+        attrs_set = set(attrs)
+        correct_set = set(['full_name', 'state', 'birth_date'])
+        self.failUnlessEqual(attrs_set, correct_set)
+    
+    @defer.inlineCallbacks
+    def test_query(self):
+        d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
+        d2 = {'full_name':'Patrick Rothfuss', 'birth_date': '1973', 'state':'WI'}     
+        d3 = {'full_name':'Howard Tayler', 'birth_date': '1968', 'state':'UT'}
+        binary_value1 = 'BinaryValue for Brandon Sanderson'
+        binary_value2 = 'BinaryValue for Patrick Rothfuss'
+        binary_value3 = 'BinaryValue for Howard Tayler'
+        yield self.ds.put('bsanderson',binary_value1, d1)   
+        yield self.ds.put('prothfuss',binary_value2, d2)   
+        yield self.ds.put('htayler',binary_value3, d3) 
+        query_attributes = {'birth_date':'1973'}
+        rows = yield self.ds.query(query_attributes)
+        log.info("Rows returned %s " % (rows,))
+        self.failUnlessEqual(rows[0].key, 'prothfuss')
+         
+    @defer.inlineCallbacks
+    def test_put(self):
+        d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
+        d2 = {'full_name':'Patrick Rothfuss', 'birth_date': '1973', 'state':'WI'}     
+        d3 = {'full_name':'Howard Tayler', 'birth_date': '1968', 'state':'UT'}
+        binary_value1 = 'BinaryValue for Brandon Sanderson'
+        binary_value2 = 'BinaryValue for Patrick Rothfuss'
+        binary_value3 = 'BinaryValue for Howard Tayler'
+        yield self.ds.put('bsanderson',binary_value1, d1)   
+        yield self.ds.put('prothfuss',binary_value2, d2)   
+        yield self.ds.put('htayler',binary_value3, d3)   
+        val1 = yield self.ds.get('bsanderson')
+        val2 = yield self.ds.get('prothfuss')
+        val3 = yield self.ds.get('htayler')
+        self.failUnlessEqual(val1, binary_value1)
+        self.failUnlessEqual(val2, binary_value2)
+        self.failUnlessEqual(val3, binary_value3)
         
-        self.ds.terminate()            
-
+    def tearDown(self):
+        self.ds.terminate()
+             
+        
 class IRODSStoreTest(IStoreTest):
     
     def _setup_backend(self):
