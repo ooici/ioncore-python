@@ -10,56 +10,55 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from ion.data.datastore import registry
-
+from ion.core import ioninit
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from twisted.internet import defer
 
-class ExchangeRegistryService(registry.BaseRegistryService):
+
+CONF = ioninit.config(__name__)
+
+class ExchangeRegistryService(ServiceProcess):
     """
     @brief Skeleton exchange registry
     @todo flesh out
     """
-
-    # A bunch of crud like interfaces for ...   
+    def __init__(self, *args, **kwargs):
+        ServiceProcess.__init__(self, *args, **kwargs)
+        self.spawn_args['bootstrap_args'] = self.spawn_args.get('bootstrap_args', CONF.getValue('bootstrap_args', default=None))
+        self.rc = ResourceClient(proc=self)
     
-    # AMQP exchanges
-    op_register_exchangename = registry.BaseRegistryService.base_register_resource
-    op_get_exchangename_by_id = registry.BaseRegistryService.base_get_resource_by_id
-    op_find_exchangename = registry.BaseRegistryService.base_find_resource
+    log.info('ExchangeRegistryService.__init__()')
+        
     
-    # name spaces
-    op_register_exchangenamespace = registry.BaseRegistryService.base_register_resource
-    op_get_exchangenamespace_by_id = registry.BaseRegistryService.base_get_resource_by_id
-    op_find_exchangenamespace = registry.BaseRegistryService.base_find_resource
+    @defer.inlineCallbacks
+    def op_get_exchangeobject(self, content, headers, msg):
+        """
+        Remove a task from the list/store. Will be dropped from the reactor
+        when the timer fires and _send_and_reschedule checks the registry.
+        """
+        task_id = content
 
-    # amqp mapping
-    op_register_amqpmapping = registry.BaseRegistryService.base_register_resource
-    op_get_exchangename_by_id = registry.BaseRegistryService.base_get_resource_by_id
-    op_find_amqpmapping = registry.BaseRegistryService.base_find_resource
+        if not task_id:
+            err = 'required argument task_id not found in message'
+            log.error(err)
+            self.reply_err(msg, {'value': err})
+            return
 
-    # hardware mapping
-    op_register_hardwaremapping = registry.BaseRegistryService.base_register_resource
-    op_get_hardwaremapping_by_id = registry.BaseRegistryService.base_get_resource_by_id
-    op_find_hardwaremapping = registry.BaseRegistryService.base_find_resource
+        log.debug('Removing task_id %s from store...' % task_id)
+        yield self.store.remove(task_id)
+        log.debug('Removal completed')
+        yield self.reply_ok(msg, {'value': 'OK'})
 
-    # broker federations
-    op_register_brokerfederation = registry.BaseRegistryService.base_register_resource
-    op_get_brokerfederation_by_id = registry.BaseRegistryService.base_get_resource_by_id
-    op_find_brokerfederation = registry.BaseRegistryService.base_find_resource
-
-    # broker credentials 
-    op_register_brokercredentials = registry.BaseRegistryService.base_register_resource
-    op_get_brokercredentials_by_id = registry.BaseRegistryService.base_get_resource_by_id
-    op_find_brokercredentials = registry.BaseRegistryService.base_find_resource
 
     declare = ServiceProcess.service_declare(name='exchange_registry', version='0.1.0', dependencies=[])
 
 
 
 
-class ExchangeRegistryClient(registry.BaseRegistryClient):
+class ExchangeRegistryClient(ServiceClient):
     """
     @brief Client class for accessing the ExchangeRegistry.
     @todo Stubbed only.  Needs much more work.
@@ -71,59 +70,17 @@ class ExchangeRegistryClient(registry.BaseRegistryClient):
         ServiceClient.__init__(self, proc, **kwargs)
 
 
-    # EXCHANGE NAME
-    def register_exchangename(self, exchangename):
-        return self.base_register_resource('register_exchangename', exchangename)
-
-    def get_exchangename_by_id(self, id):
-        return self.base_get_resource_by_id('get_exchangename_by_id', id)
-
-    def find_exchangename(self, description, regex=True,ignore_defaults=True,attnames=[]):
-        return self.base_find_resource('find_exchangename', description, regex, ignore_defaults)
-
-
-    # AMQP MAPPING
-    def register_amqpmapping(self, amqpmapping):
-        return self.base_register_resource('register_amqpmapping', amqpmapping)
-
-    def get_ampqmapping_by_id(self, id):
-        return self.base_get_resource_by_id('get_amqpmapping_by_id', id)
-
-    def find_amqpmapping(self, description, regex=True,ignore_defaults=True,attnames=[]):
-        return self.base_find_resource('find_amqpmapping', description, regex, ignore_defaults)
-
-
-    # HARDWARE MAPPING
-    def register_hardwaremapping(self, hardwaremapping):
-        return self.base_register_resource('register_hardwaremapping', hardwaremapping)
-
-    def get_hardwaremapping_by_id(self, id):
-        return self.base_get_resource_by_id('get_hardwaremapping_by_id', id)
-
-    def find_hardwaremapping(self, description, regex=True,ignore_defaults=True,attnames=[]):
-        return self.base_find_resource('find_hardwaremapping', description, regex, ignore_defaults)
-
-
-    # BROKER FEDERATION
-    def register_brokerfederation(self, brokerfederation):
-        return self.base_register_resource('register_brokerfederation', brokerfederation)
-
-    def get_brokerfederation_by_id(self, id):
-        return self.base_get_resource_by_id('get_brokerfederation_by_id', id)
-
-    def find_brokerfederation(self, description, regex=True,ignore_defaults=True,attnames=[]):
-        return self.base_find_resource('find_brokerfederation', description, regex, ignore_defaults)
-
-
-    #BROKERCREDENTIALS
-    def register_brokercredentials(self, brokercredentials):
-        return self.base_register_resource('register_brokerfederation', brokercredentials)
-
-    def get_brokercredentials_by_id(self, id):
-        return self.base_get_resource_by_id('get_brokercredentials_by_id', id)
-
-    def find_brokercredentials(self, description, regex=True,ignore_defaults=True,attnames=[]):
-        return self.base_find_resource('find_brokercredentials', description, regex, ignore_defaults)
-
+    @defer.inlineCallbacks
+    def get_exchange_object(self, name):
+        """
+        @brief Remove a task from the scheduler
+        @note If using cassandra, writes are delayed
+        @param taskid Task ID, as returned from add_task
+        @retval OK or error
+        """
+        #log.info("In SchedulerServiceClient: rm_task")
+        # yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send('get_exchangeobject', name)
+        defer.returnValue(content)
 
 factory = ProcessFactory(ExchangeRegistryService)
