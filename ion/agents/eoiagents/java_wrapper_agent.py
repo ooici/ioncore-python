@@ -458,8 +458,13 @@ factory = ProcessFactory(JavaWrapperAgent)
 # Copy/paste startup:
 #---------------------#
 #  :spawn an agent
-from ion.agents.eoiagents.java_wrapper_agent import JavaWrapperAgent as jwa, JavaWrapperAgentClient as jwac; agent = jwa(); agent.spawn(); aclient = jwac();
+from ion.agents.eoiagents.java_wrapper_agent import JavaWrapperAgent as jwa
+agent = jwa()
+agent.spawn()
 
+#  :Setup the client - placeholder for generating update requests
+from ion.agents.eoiagents.java_wrapper_agent import JavaWrapperAgentClient as jwac
+aclient = jwac()
 #  :Send update request for the dataset 'sos_station_st'
 aclient.rpc_request_update('sos_station_st')
 
