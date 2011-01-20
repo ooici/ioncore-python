@@ -112,6 +112,7 @@ class ResourceClient(object):
         resource_description.name = name
         resource_description.description = description
             
+        # This is breaking some abstractions - using the GPB directly...
         resource_description.type.GPBMessage.CopyFrom(type_id)
             
         # Use the registry client to make a new resource        

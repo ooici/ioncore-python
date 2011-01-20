@@ -23,9 +23,16 @@ from ion.core.process.process import ProcessFactory, Process
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
+from ion.core.object import object_utils
+
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
+
+class ResourceRegistryError(Exception):
+    """
+    An exception class for errors in the resource registry
+    """
 
 class ResourceRegistryService(ServiceProcess):
     """
@@ -69,7 +76,11 @@ class ResourceRegistryService(ServiceProcess):
         assert isinstance(content, gpb_wrapper.Wrapper)
         assert content.GPBType == self.ResourceDescriptionClassType
         
-        id = yield self._register_resource_instance(content)
+        try:
+            id = yield self._register_resource_instance(content)
+        except object_utils.ObjectUtilException, ex:
+            yield self.reply(msg, response_code=self.APP_FAILED, exception=ex)
+            return
         
         yield self.reply(msg, content=id)
         
@@ -164,10 +175,16 @@ class ResourceRegistryClient(ServiceClient):
         """
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('register_resource_instance', resource_type)
-        log.info('Resource Registry Service reply with new resource ID: '+str(content))
-        # Return value should be a resource identity
-        defer.returnValue(str(content))
         
+        log.info('Resource Registry Service reply with new resource ID: '+str(content))
+        response = headers.get(self.MSG_RESPONSE)
+        exception = headers.get(self.MSG_EXCEPTION)
+        
+        if response == self.ION_SUCCESS:
+            defer.returnValue(str(content))
+        else:
+            log.debug('Exception in Resource Registry: %s' % exception)
+            raise ResourceRegistryError('Error during Resource Registry service call: register_resource_instance')
         
 
     #@defer.inlineCallbacks

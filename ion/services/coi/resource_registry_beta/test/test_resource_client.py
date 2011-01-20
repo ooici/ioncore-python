@@ -17,7 +17,7 @@ from ion.core.object import gpb_wrapper
 from ion.core.object import workbench
 from ion.core.object import object_utils
 
-from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
+from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient, ResourceRegistryError
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 from ion.test.iontest import IonTestCase
@@ -25,6 +25,7 @@ from ion.test.iontest import IonTestCase
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
 
 class ResourceClientTest(IonTestCase):
     """
@@ -46,7 +47,7 @@ class ResourceClientTest(IonTestCase):
         self.rrc = ResourceRegistryClient(proc=sup)
         self.rc = ResourceClient(proc=sup)
         self.sup = sup
-
+        
     @defer.inlineCallbacks
     def tearDown(self):
         # You must explicitly clear the registry in case cassandra is used as a back end!
@@ -85,7 +86,7 @@ class ResourceClientTest(IonTestCase):
             
         self.assertEqual(my_resource.ResourceName, 'Test AddressLink Resource')
         
-    
+        
     @defer.inlineCallbacks
     def test_read_your_writes(self):
             
@@ -93,7 +94,7 @@ class ResourceClientTest(IonTestCase):
             
         self.assertEqual(resource.ResourceType.GPBMessage, addresslink_type)
             
-        
+            
         person = resource.CreateObject(person_type)
         resource.person.add()
         resource.person[0] = person
@@ -187,3 +188,19 @@ class ResourceClientTest(IonTestCase):
         self.assertRaises(gpb_wrapper.OOIObjectError, getattr, my_resource_1, 'person') 
         
         
+    @defer.inlineCallbacks
+    def test_invalid_type(self):
+        
+        # Create the resource object
+        #self.assertRaises(ResourceRegistryError, self.rc.create_instance, invalid_type, name='Test AddressLink Resource', description='A test resource')
+        
+        try:
+            resource = yield self.rc.create_instance(invalid_type, name='Test AddressLink Resource', description='A test resource')
+        except ResourceRegistryError, ex:
+            return
+        
+        self.fail('This test should raise an exception and return in the except!')
+        
+        
+        
+    
