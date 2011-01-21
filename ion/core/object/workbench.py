@@ -10,6 +10,9 @@ Add persistent store to the work bench. Use it fetch linked objects
 
 from twisted.internet import defer
 
+from google.protobuf import message
+
+from ion.core.object import object_utils
 from ion.core.object import repository
 from ion.core.object import gpb_wrapper
 
@@ -53,6 +56,7 @@ class WorkBench(object):
         Initialize a new repository
         Factory method for creating a repository - this is the responsibility
         of the workbench.
+        @param rootclass is the object class or type identifier for the object
         """
         
         repo = repository.Repository()
@@ -63,13 +67,36 @@ class WorkBench(object):
         # Set the default branch
         repo.branch(nickname='master')
            
-        if rootclass:
-            rootobj = repo.create_wrapped_object(rootclass)
+        # Handle options in the root class argument
+        if isinstance(rootclass, type_pb2.GPBType):
+            
+            try:
+                objclass = object_utils.get_gpb_class_from_type_id(rootclass)
+            except object_utils.ObjectUtilException, ex:
+                raise WorkBenchError('Invalid rootclass argument passed to init_repository')
+                 
+        elif rootclass in  message.Message.__subclasses__():
+            # if it is a type of GPB Message..
+            # This method of creating repositories is depricated!
+            objclass = rootclass
+            
+        elif rootclass == None:
+            objclass = None
+        else:
+            raise WorkBenchError('Invalid rootclass argument passed to init_repository')
+            
+        
+        if objclass:
+            try:
+                rootobj = repo.create_wrapped_object(objclass)
+            except gpb_wrapper.OOIObjectError, ex:
+                raise WorkBenchError('Invalid message object class passed in init_repository')
         
             repo._workspace_root = rootobj
         
         else:
             rootobj = None
+        
         
         self.put_repository(repo)
         

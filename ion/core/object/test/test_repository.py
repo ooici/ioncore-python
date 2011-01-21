@@ -17,7 +17,8 @@ from ion.test.iontest import IonTestCase
 
 from net.ooici.play import addressbook_pb2
 from ion.core.object import workbench
-
+from ion.core.object import gpb_wrapper
+from ion.core.object import object_utils
 from ion.core.object import repository
 
 class RepositoryTest(unittest.TestCase):
@@ -25,6 +26,34 @@ class RepositoryTest(unittest.TestCase):
     def setUp(self):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb
+        
+        
+    def test_init_repo(self):
+        
+        invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
+        person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+        
+        # Pass in a GPB message object class (the old way!)
+        repo, simple = self.wb.init_repository(addressbook_pb2.AddressBook)
+        self.assertIsInstance(repo, repository.Repository)
+        self.assertIsInstance(simple, gpb_wrapper.Wrapper)
+        
+        # Pass in a type id object (the new way!)
+        repo2, person = self.wb.init_repository(person_type)
+        self.assertIsInstance(repo2, repository.Repository)
+        self.assertIsInstance(person, gpb_wrapper.Wrapper)
+        
+        # Pass in an invalid type id object (the new way!)
+        self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, invalid_type)
+        
+        # Pass in None - get a repo with no root object yet...
+        repo3, nothing = self.wb.init_repository()
+        self.assertIsInstance(repo3, repository.Repository)
+        self.assertEqual(nothing, None)
+        
+        # Pass in an invalid argument
+        self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, 52)
+        
         
     def test_wrapper_properties(self):
         """
