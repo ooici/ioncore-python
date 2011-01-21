@@ -16,6 +16,8 @@ from ion.test.iontest import IonTestCase
 from ion.core.process.process import Process, ProcessClient, ProcessDesc
 from ion.core import bootstrap
 
+from ion.core.object import object_utils
+
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 
@@ -48,7 +50,7 @@ class HelloProcessTest(IonTestCase):
         
         ab.person.add()
     
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name = 'david'
         p.id = 59
         p.email = 'stringgggg'

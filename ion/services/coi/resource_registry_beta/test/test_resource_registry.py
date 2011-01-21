@@ -22,6 +22,9 @@ from ion.core.object import gpb_wrapper
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
 from ion.test.iontest import IonTestCase
 
+from ion.core.object import object_utils
+resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
+
 
 class ResourceRegistryTest(IonTestCase):
     """
@@ -62,7 +65,7 @@ class ResourceRegistryTest(IonTestCase):
         wb = proc_rr2.workbench
         
         # Create a sendable resource object
-        description_repository, resource_description = wb.init_repository(rootclass=resource_framework_pb2.ResourceDescription)
+        description_repository, resource_description = wb.init_repository(root_type=resource_description_type)
         
         # Set the description
         resource_description.name = 'Johns resource'

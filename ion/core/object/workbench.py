@@ -26,6 +26,8 @@ from net.ooici.core.mutable import mutable_pb2
 from net.ooici.core.type import type_pb2
 from net.ooici.core.link import link_pb2
 
+idref_type = object_utils.create_type_identifier(object_id=4, version=1)
+
 class WorkBenchError(Exception):
     """
     An exception class for errors that occur in the Object WorkBench class
@@ -36,7 +38,8 @@ class WorkBench(object):
     MutableClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.MutableNode())
     LinkClassType = gpb_wrapper.set_type_from_obj(link_pb2.CASRef())
     CommitClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.CommitRef())
- 
+    
+    
     def __init__(self, myprocess):   
     
         self._process = myprocess
@@ -56,7 +59,7 @@ class WorkBench(object):
         Initialize a new repository
         Factory method for creating a repository - this is the responsibility
         of the workbench.
-        @param rootclass is the object class or type identifier for the object
+        @param root_type is the object type identifier for the object
         """
         
         repo = repository.Repository()
@@ -124,7 +127,7 @@ class WorkBench(object):
                 raise WorkBenchError('Can not reference the current state of a repository which has been modified but not committed')
 
         # Create a new repository to hold this data object
-        repository, id_ref = self.init_repository(rootclass=link_pb2.IDRef)
+        repository, id_ref = self.init_repository(idref_type)
         
         id_ref.key = repo.repository_key
         id_ref.branch = repo._current_branch.branchkey

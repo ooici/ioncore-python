@@ -50,14 +50,14 @@ class EOIIngestionTest(IonTestCase):
         proc_ds1 = self._get_procinstance(child_ds1)
         
         
-        print 'Running Ingest:'
+        #print 'Running Ingest:'
         
         response, dataset_id = yield self.eoi_ic.ingest()
         
         dataset = yield self.eoi_ic.retrieve(dataset_id)
         
-        print 'Got dataset'
-        print dataset
+        #print 'Got dataset'
+        #print dataset
         
         
         
