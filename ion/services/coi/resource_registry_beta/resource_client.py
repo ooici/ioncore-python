@@ -287,7 +287,7 @@ class ResourceInstance(object):
         @retval the new object which can now be attached to the resource
         """
         
-        cls = self._repository._load_class_from_type(type_id)
+        cls = object_utils.get_gpb_class_from_type_id(type_id)
         obj = self._repository.create_wrapped_object(cls)
         return obj
         

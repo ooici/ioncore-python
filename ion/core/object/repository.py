@@ -670,7 +670,7 @@ class Repository(object):
             raise RepositoryError('The sha1 key does not match the value. The data is corrupted! \n' +\
             'Element key %s, Calculated key %s' % (element.key, element.sha1))
         
-        cls = self._load_class_from_type(element.type)
+        cls = object_utils.get_gpb_class_from_type_id(element.type)
                                 
         # Do not automatically load it into a particular space...
         obj = self.create_wrapped_object(cls, obj_id=element.key, addtoworkspace=False)
@@ -693,14 +693,6 @@ class Repository(object):
             element.ChildLinks.add(child.key)
         
         return obj
-        
-    def _load_class_from_type(self,typeid):
-        """
-        @TODO - get rid of this method. It is subsummed by object_utils!
-        """    
-        cls = object_utils.get_gpb_class_from_type_id(typeid)
-                
-        return cls
         
         
     def _set_type_from_obj(self, ltype, wrapped_obj):

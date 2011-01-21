@@ -91,7 +91,7 @@ class ResourceRegistryService(ServiceProcess):
         msg_repo = resource_description.Repository
             
         # Get the class for this type of resource
-        cls = msg_repo._load_class_from_type(resource_description.type)
+        cls = object_utils.get_gpb_class_from_type_id(resource_description.type)
         
         # Create a new repository to hold this resource
         resource_repository, resource = self.workbench.init_repository(rootclass=resource_framework_pb2.OOIResource)
