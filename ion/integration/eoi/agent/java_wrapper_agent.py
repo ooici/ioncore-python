@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file:   ion/agents/eoiagents/java_wrapper_agent.py
+@file:   ion/integration/eoi/agent/java_wrapper_agent.py
 @author: Chris Mueller
 @author: Tim LaRocque
 @brief:  EOI JavaWrapperAgent and JavaWrapperAgentClient class definitions
