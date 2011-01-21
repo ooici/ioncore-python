@@ -694,9 +694,11 @@ class Repository(object):
         
         return obj
         
-    def _load_class_from_type(self,ltype):
-    
-        cls = object_utils.get_gpb_class_from_id(ltype.object_id)
+    def _load_class_from_type(self,typeid):
+        """
+        @TODO - get rid of this method. It is subsummed by object_utils!
+        """    
+        cls = object_utils.get_gpb_class_from_type_id(typeid)
                 
         return cls
         

@@ -117,20 +117,19 @@ def build_gpb_lookup(rootpath):
                                 if val.name == ENUM_ID_NAME:
                                     gpb_id_to_class[val.number] = msg_class
 
-def get_gpb_class_from_id(id):
+def get_gpb_class_from_type_id(typeid):
     """
     Get a callable google.protobuf.message.Message subclass with the given MessageTypeIdentifier enum id.
-    @param id The integer id.
+    @param id The type id object
     @retval msg_class The class for the given id.
     @throws ObjectUtilException
     """
     try:
-        id = int(id)
-        return gpb_id_to_class[id]
-    except ValueError, ex:
-        raise ObjectUtilException('Protocol Buffer Message ids must be integers: "%s"' % (str(id)))
+        return gpb_id_to_class[typeid.object_id]
+    except AttributeError, ex:
+        raise ObjectUtilException('The type argument is not a valid type identifier objet: "%s, type: %s "' % (str(typeid), type(typeid)))
     except KeyError, ex:
-        raise ObjectUtilException('No Protocol Buffer Message class found for id "%d"' % (id))
+        raise ObjectUtilException('No Protocol Buffer Message class found for id "%s"' % (str(typeid)))
 
 # Build the lookup table on first import
 build_gpb_lookup('net')
