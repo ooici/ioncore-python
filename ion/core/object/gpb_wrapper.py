@@ -1170,7 +1170,13 @@ class StructureElement(object):
         
     @property
     def sha1(self):
-        return sha1hex(self.value + self.type.SerializeToString())
+        """
+        Make the sha1 safe for empty contents but also type safe.
+        Take use the sha twice so that we don't need to concatinate long strings!
+        """
+        content_sha = sha1hex(self.value)
+        
+        return sha1hex(content_sha + self.type.SerializeToString())
         
     #@property
     def _get_type(self):
