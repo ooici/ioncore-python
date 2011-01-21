@@ -39,7 +39,7 @@ def sha1_to_hex(bytes):
     almosthex = map(hex, hex_bytes)
     return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
 
-def set_type_from_obj(obj):
+def set_type_from_obj(obj, type=None):
     """    
     Operates on instances and classes of gpb messages!
     @TODO Needs cleaning up - should be more robust + get the version 
@@ -47,7 +47,10 @@ def set_type_from_obj(obj):
     ENUM_NAME = '_MessageTypeIdentifier'
     ENUM_ID_NAME = '_ID'
     
-    gpbtype = type_pb2.GPBType()
+    if type==None:    
+        gpbtype = type_pb2.GPBType()
+    else:
+        gpbtype = type.GPBMessage
     
     descriptor = obj.DESCRIPTOR
     if hasattr(descriptor, 'enum_types'):
@@ -58,6 +61,7 @@ def set_type_from_obj(obj):
                         gpbtype.object_id=val.number
                         gpbtype.version = 1
                         
+                        # Is it bad to return it if it was passed as an arg?
                         return gpbtype
                         
     

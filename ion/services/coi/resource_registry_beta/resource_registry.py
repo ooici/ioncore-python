@@ -108,7 +108,7 @@ class ResourceRegistryService(ServiceProcess):
         resource.name = resource_description.name
         resource.description = resource_description.description
         
-        resource_repository._set_type_from_obj(resource.type, res_obj)
+        object_utils.set_type_from_obj(res_obj, resource.type)
         
         # State is set to new by default
         resource.lcs = resource_framework_pb2.New

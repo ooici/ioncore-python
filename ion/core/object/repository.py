@@ -695,26 +695,6 @@ class Repository(object):
         return obj
         
         
-    def _set_type_from_obj(self, ltype, wrapped_obj):
-        """
-        This method is a bit of a mess - do we really need it?
-        
-        It opperates directly on unwrapped GPB objects
-        """
-            
-        obj = wrapped_obj
-        if isinstance(obj, gpb_wrapper.Wrapper):
-            obj = obj.GPBMessage
-            
-        gpbtype = gpb_wrapper.set_type_from_obj(obj)
-        
-        thetype = ltype
-        if isinstance(thetype, gpb_wrapper.Wrapper):
-            thetype=ltype.GPBMessage
-            
-        thetype.CopyFrom(gpbtype)
-        
-        
         
     def set_linked_object(self,link, value):        
         # If it is a link - set a link to the value in the wrapper
@@ -773,6 +753,6 @@ class Repository(object):
         
         # Set the type
         tp = link.type
-        self._set_type_from_obj(tp, value)
+        object_utils.set_type_from_obj(value, tp)
             
     

@@ -16,6 +16,7 @@ from net.ooici.core.type import type_pb2
 from net.ooici.play import addressbook_pb2
 from net.ooici.services.coi import resource_framework_pb2
 
+from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
@@ -66,7 +67,7 @@ class ResourceRegistryTest(IonTestCase):
         # Set the description
         resource_description.name = 'Johns resource'
         resource_description.description = 'Lots of metadata'
-        description_repository._set_type_from_obj(resource_description.type, addressbook_pb2.AddressLink)
+        object_utils.set_type_from_obj(addressbook_pb2.AddressLink, resource_description.type)
         
         # Test the business logic of the register resource instance operation
         res_id = yield proc_rr2._register_resource_instance(resource_description)
