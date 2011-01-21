@@ -54,9 +54,19 @@
         <arg value="--requirement=requirements.txt"/>
     </exec>
   </target>
-  
+
+  <property environment="env"/> 
+  <target name="cleanpipbuild"
+        description="rm virtual env build dir left over by pip" if="env.VIRTUAL_ENV" >
+    <echo message="rm virtual env build dir left over by pip"/>
+    <exec executable="rm">
+        <arg value="-rf"/>
+        <arg value="${env.VIRTUAL_ENV}/build"/>
+    </exec>
+  </target>
+
   <target name="pipinstall"
-        description="Install dependencies using Pip">
+        description="Install dependencies using Pip" depends="cleanpipbuild">
     <echo message="Installing dependencies using Pip"/>
     <exec executable="pip" failonerror="true">
       <arg value="install"/>
