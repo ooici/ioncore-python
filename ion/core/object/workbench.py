@@ -51,7 +51,7 @@ class WorkBench(object):
         self._hashed_elements={}
       
         
-    def init_repository(self, rootclass=None, nickname=None):
+    def init_repository(self, root_type=None, nickname=None):
         """
         Initialize a new repository
         Factory method for creating a repository - this is the responsibility
@@ -68,34 +68,19 @@ class WorkBench(object):
         repo.branch(nickname='master')
            
         # Handle options in the root class argument
-        if isinstance(rootclass, type_pb2.GPBType):
+        if isinstance(root_type, type_pb2.GPBType):
             
             try:
-                objclass = object_utils.get_gpb_class_from_type_id(rootclass)
+                rootobj = repo.create_object(root_type)
             except object_utils.ObjectUtilException, ex:
-                raise WorkBenchError('Invalid rootclass argument passed to init_repository')
-                 
-        elif rootclass in  message.Message.__subclasses__():
-            # if it is a type of GPB Message..
-            # This method of creating repositories is depricated!
-            objclass = rootclass
-            
-        elif rootclass == None:
-            objclass = None
-        else:
-            raise WorkBenchError('Invalid rootclass argument passed to init_repository')
-            
-        
-        if objclass:
-            try:
-                rootobj = repo.create_wrapped_object(objclass)
-            except gpb_wrapper.OOIObjectError, ex:
-                raise WorkBenchError('Invalid message object class passed in init_repository')
+                raise WorkBenchError('Invalid root object type identifier passed in init_repository')
         
             repo._workspace_root = rootobj
         
-        else:
+        elif root_type ==None:
             rootobj = None
+        else:
+            raise WorkBenchError('Invalid root type argument passed in init_repository')
         
         
         self.put_repository(repo)

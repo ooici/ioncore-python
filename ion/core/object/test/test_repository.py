@@ -21,6 +21,12 @@ from ion.core.object import gpb_wrapper
 from ion.core.object import object_utils
 from ion.core.object import repository
 
+invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
+person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
+addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
+
+
 class RepositoryTest(unittest.TestCase):
         
     def setUp(self):
@@ -30,13 +36,6 @@ class RepositoryTest(unittest.TestCase):
         
     def test_init_repo(self):
         
-        invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
-        person_type = object_utils.create_type_identifier(object_id=20001, version=1)
-        
-        # Pass in a GPB message object class (the old way!)
-        repo, simple = self.wb.init_repository(addressbook_pb2.AddressBook)
-        self.assertIsInstance(repo, repository.Repository)
-        self.assertIsInstance(simple, gpb_wrapper.Wrapper)
         
         # Pass in a type id object (the new way!)
         repo2, person = self.wb.init_repository(person_type)
@@ -59,14 +58,14 @@ class RepositoryTest(unittest.TestCase):
         """
         Test the basic state of a new wrapper object when it is created
         """
-        repo, simple = self.wb.init_repository(addressbook_pb2.AddressBook)   
+        repo, simple = self.wb.init_repository(addressbook_type)   
         
         self.assertEqual(len(simple.ParentLinks),0)
         self.assertEqual(len(simple.ChildLinks),0)
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
         
-        simple2= repo.create_wrapped_object(addressbook_pb2.AddressLink)
+        simple2= repo.create_object(addresslink_type)
         
         self.assertEqual(len(simple2.ParentLinks),0)
         self.assertEqual(len(simple2.ChildLinks),0)
@@ -75,7 +74,7 @@ class RepositoryTest(unittest.TestCase):
         
         
     def test_branch_checkout(self):
-        repo, ab = self.wb.init_repository(addressbook_pb2.AddressBook)   
+        repo, ab = self.wb.init_repository(addressbook_type)   
         p = ab.person.add()
         p.name = 'David'
         p.id = 1
@@ -98,13 +97,13 @@ class RepositoryTest(unittest.TestCase):
         
         
     def test_branch_no_commit(self):
-        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
+        repo, ab = self.wb.init_repository(addresslink_type)
         self.assertEqual(len(repo.branches),1)
             
         self.assertRaises(repository.RepositoryError, repo.branch, 'Arthur')
         
     def test_branch(self):
-        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
+        repo, ab = self.wb.init_repository(addresslink_type)
         repo.commit()
         self.assertEqual(len(repo.branches),1)
 
@@ -112,12 +111,12 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(len(repo.branches),2)
         
     def test_create_commit_ref(self):
-        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
+        repo, ab = self.wb.init_repository(addresslink_type)
         cref = repo._create_commit_ref(comment="Cogent Comment")
         assert(cref.comment == "Cogent Comment")
             
     def test_checkout_commit_id(self):
-        repo, ab = self.wb.init_repository(addressbook_pb2.AddressBook)
+        repo, ab = self.wb.init_repository(addressbook_type)
         
         commit_ref1 = repo.commit()
 
@@ -145,7 +144,7 @@ class RepositoryTest(unittest.TestCase):
     def test_log(self):
         wb1 = workbench.WorkBench('No Process Test')
         
-        repo1, ab = self.wb.init_repository(addressbook_pb2.AddressBook)
+        repo1, ab = self.wb.init_repository(addressbook_type)
         
         commit_ref1 = repo1.commit(comment='a')
         commit_ref2 = repo1.commit(comment='b')
@@ -156,9 +155,9 @@ class RepositoryTest(unittest.TestCase):
         
             
     def test_dag_structure(self):
-        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
+        repo, ab = self.wb.init_repository(addresslink_type)
                         
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
@@ -172,7 +171,7 @@ class RepositoryTest(unittest.TestCase):
         ab.person[0] = p
         
         ab.person.add()
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name='John'
         p.id = 78
         p.email = 'J@s.com'
@@ -206,10 +205,10 @@ class RepositoryTest(unittest.TestCase):
  
  
     def test_lost_objects(self):
-        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
+        repo, ab = self.wb.init_repository(addresslink_type)
             
         # Create a resource object    
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
@@ -231,10 +230,10 @@ class RepositoryTest(unittest.TestCase):
 
     def test_transfer_repository_objects(self):
         
-        repo1, ab1 = self.wb.init_repository(addressbook_pb2.AddressLink)
+        repo1, ab1 = self.wb.init_repository(addresslink_type)
             
         # Create a resource object    
-        p1 = repo1.create_wrapped_object(addressbook_pb2.Person)
+        p1 = repo1.create_object(person_type)
         p1.name='David'
         p1.id = 5
         p1.email = 'd@s.com'
@@ -247,7 +246,7 @@ class RepositoryTest(unittest.TestCase):
         cref = repo1.commit(comment='testing commit')
  
         # Create a second repository and copy from 1 to 2
-        repo2, ab2 = self.wb.init_repository(addressbook_pb2.AddressLink)
+        repo2, ab2 = self.wb.init_repository(addresslink_type)
             
         ab2.person.add()
         ab2.person[0] = p1

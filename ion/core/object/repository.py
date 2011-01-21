@@ -117,7 +117,7 @@ class Repository(object):
             self._dotgit.MyId = self.new_id()
         else:
            
-            self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
+            self._dotgit = self._create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
             self._dotgit.repositorykey = pu.create_guid()
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
@@ -300,7 +300,7 @@ class Repository(object):
         self._detached_head = detached
         
         if detached:
-            self._current_branch = self.create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
+            self._current_branch = self._create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
             bref = self._current_branch.commitrefs.add()
             bref.SetLink(cref)
             self._current_branch.branchkey = 'detached head'
@@ -324,7 +324,7 @@ class Repository(object):
         # Deal with the newest ref seperately
         crefs.remove(head_cref)
             
-        cref = self.create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
+        cref = self._create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
                     
         cref.date = pu.currenttime()
 
@@ -429,7 +429,7 @@ class Repository(object):
         @retval a string which is the commit reference
         """
         # Now add a Commit Ref     
-        cref = self.create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
+        cref = self._create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
         
         if not date:
             date = pu.currenttime()
@@ -561,8 +561,22 @@ class Repository(object):
         """
         Stash the current workspace for later reference
         """
+        raise Exception('Not implemented yet')
         
-    def create_wrapped_object(self, rootclass, obj_id=None, addtoworkspace=True):        
+    def create_object(self, type_id):
+        """
+        @brief CreateObject is used to make new locally create objects which can
+        be added to the resource's data structure.
+        @param type_id is the type_id of the object to be created
+        @retval the new object which can now be attached to the resource
+        """
+        
+        cls = object_utils.get_gpb_class_from_type_id(type_id)
+        obj = self._wrap_message_object(cls())
+        return obj
+        
+        
+    def _create_wrapped_object(self, rootclass, obj_id=None, addtoworkspace=True):        
         """
         Factory method for making wrapped GPB objects from the repository
         """
@@ -673,7 +687,7 @@ class Repository(object):
         cls = object_utils.get_gpb_class_from_type_id(element.type)
                                 
         # Do not automatically load it into a particular space...
-        obj = self.create_wrapped_object(cls, obj_id=element.key, addtoworkspace=False)
+        obj = self._create_wrapped_object(cls, obj_id=element.key, addtoworkspace=False)
             
         # If it is a leaf element set the bytes for the object, do not load it
         # If it is not a leaf element load it and find its child links
