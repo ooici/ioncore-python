@@ -41,7 +41,7 @@ class ExchangeManagementTest(IonTestCase):
 
 
     # @defer.inlineCallbacks
-    def test_none(self):
+    def xtest_none(self):
         """
         """
 

@@ -40,7 +40,7 @@ class ExchangeRegistryTest(IonTestCase):
 
 
     # @defer.inlineCallbacks
-    def test_none(self):
+    def xtest_none(self):
         """
         """
 
