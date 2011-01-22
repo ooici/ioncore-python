@@ -24,6 +24,7 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
 from ion.core.object import object_utils
+resource_type = object_utils.create_type_identifier(object_id=1102, version=1)
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -90,17 +91,15 @@ class ResourceRegistryService(ServiceProcess):
         # Get the repository that the object is in
         msg_repo = resource_description.Repository
             
-        # Get the class for this type of resource
-        cls = object_utils.get_gpb_class_from_type_id(resource_description.type)
         
         # Create a new repository to hold this resource
-        resource_repository, resource = self.workbench.init_repository(rootclass=resource_framework_pb2.OOIResource)
+        resource_repository, resource = self.workbench.init_repository(resource_type)
         
         # Set the identity of the resource
         resource.identity = resource_repository.repository_key
             
         # Create the new resource object
-        res_obj = resource_repository.create_wrapped_object(cls)
+        res_obj = resource_repository.create_object(resource_description.type)
         # Set the object as the child of the resource
         resource.SetLinkByName('resource_object', res_obj)
             

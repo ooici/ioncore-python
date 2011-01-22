@@ -13,6 +13,12 @@ from ion.test.iontest import IonTestCase
 
 from net.ooici.play import addressbook_pb2
 from ion.util import procutils as pu
+from ion.core.object import object_utils
+
+person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
+addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
+
 
 class DataStoreTest(IonTestCase):
     """
@@ -56,10 +62,10 @@ class DataStoreTest(IonTestCase):
         log.debug('Process ID:' + str(child_ds2))
         proc_ds2 = self._get_procinstance(child_ds2)
 
-        repo, ab = proc_ds1.workbench.init_repository(addressbook_pb2.AddressLink,'addressbook')
+        repo, ab = proc_ds1.workbench.init_repository(addresslink_type,'addressbook')
 
                         
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
@@ -72,7 +78,7 @@ class DataStoreTest(IonTestCase):
         ab.person.add()
         ab.person[0] = p
         
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name='John'
         p.id = 222
         p.email = 'd222@s.com'
@@ -123,10 +129,10 @@ class DataStoreTest(IonTestCase):
         log.debug('Process ID:' + str(child_ds2))
         proc_ds2 = self._get_procinstance(child_ds2)
             
-        repo1, ab1 = proc_ds1.workbench.init_repository(addressbook_pb2.AddressLink,'addressbook')
+        repo1, ab1 = proc_ds1.workbench.init_repository(addresslink_type,'addressbook')
             
            
-        pa1 = repo1.create_wrapped_object(addressbook_pb2.Person)
+        pa1 = repo1.create_object(person_type)
         pa1.name='David'
         pa1.id = 5
         pa1.email = 'd@s.com'
@@ -139,7 +145,7 @@ class DataStoreTest(IonTestCase):
         ab1.person.add()
         ab1.person[0] = pa1
             
-        pb1 = repo1.create_wrapped_object(addressbook_pb2.Person)
+        pb1 = repo1.create_object(person_type)
         pb1.name='John'
         pb1.id = 222
         pb1.email = 'd222@s.com'
@@ -234,10 +240,10 @@ class DataStoreTest(IonTestCase):
         log.debug('Process ID:' + str(child_ds2))
         proc_ds2 = self._get_procinstance(child_ds2)
 
-        repo, ab = proc_ds1.workbench.init_repository(addressbook_pb2.AddressLink,'addressbook')
+        repo, ab = proc_ds1.workbench.init_repository(addresslink_type,'addressbook')
 
                         
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
@@ -250,7 +256,7 @@ class DataStoreTest(IonTestCase):
         ab.person.add()
         ab.person[0] = p
         
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name='John'
         p.id = 222
         p.email = 'd222@s.com'

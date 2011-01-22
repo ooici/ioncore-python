@@ -26,6 +26,8 @@ from net.ooici.core.mutable import mutable_pb2
 from net.ooici.core.type import type_pb2
 from net.ooici.core.link import link_pb2
 
+idref_type = object_utils.create_type_identifier(object_id=4, version=1)
+
 class WorkBenchError(Exception):
     """
     An exception class for errors that occur in the Object WorkBench class
@@ -36,7 +38,8 @@ class WorkBench(object):
     MutableClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.MutableNode())
     LinkClassType = gpb_wrapper.set_type_from_obj(link_pb2.CASRef())
     CommitClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.CommitRef())
- 
+    
+    
     def __init__(self, myprocess):   
     
         self._process = myprocess
@@ -51,12 +54,12 @@ class WorkBench(object):
         self._hashed_elements={}
       
         
-    def init_repository(self, rootclass=None, nickname=None):
+    def init_repository(self, root_type=None, nickname=None):
         """
         Initialize a new repository
         Factory method for creating a repository - this is the responsibility
         of the workbench.
-        @param rootclass is the object class or type identifier for the object
+        @param root_type is the object type identifier for the object
         """
         
         repo = repository.Repository()
@@ -68,34 +71,19 @@ class WorkBench(object):
         repo.branch(nickname='master')
            
         # Handle options in the root class argument
-        if isinstance(rootclass, type_pb2.GPBType):
+        if isinstance(root_type, type_pb2.GPBType):
             
             try:
-                objclass = object_utils.get_gpb_class_from_type_id(rootclass)
+                rootobj = repo.create_object(root_type)
             except object_utils.ObjectUtilException, ex:
-                raise WorkBenchError('Invalid rootclass argument passed to init_repository')
-                 
-        elif rootclass in  message.Message.__subclasses__():
-            # if it is a type of GPB Message..
-            # This method of creating repositories is depricated!
-            objclass = rootclass
-            
-        elif rootclass == None:
-            objclass = None
-        else:
-            raise WorkBenchError('Invalid rootclass argument passed to init_repository')
-            
-        
-        if objclass:
-            try:
-                rootobj = repo.create_wrapped_object(objclass)
-            except gpb_wrapper.OOIObjectError, ex:
-                raise WorkBenchError('Invalid message object class passed in init_repository')
+                raise WorkBenchError('Invalid root object type identifier passed in init_repository')
         
             repo._workspace_root = rootobj
         
-        else:
+        elif root_type ==None:
             rootobj = None
+        else:
+            raise WorkBenchError('Invalid root type argument passed in init_repository')
         
         
         self.put_repository(repo)
@@ -139,7 +127,7 @@ class WorkBench(object):
                 raise WorkBenchError('Can not reference the current state of a repository which has been modified but not committed')
 
         # Create a new repository to hold this data object
-        repository, id_ref = self.init_repository(rootclass=link_pb2.IDRef)
+        repository, id_ref = self.init_repository(idref_type)
         
         id_ref.key = repo.repository_key
         id_ref.branch = repo._current_branch.branchkey
