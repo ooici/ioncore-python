@@ -10,6 +10,9 @@ Add persistent store to the work bench. Use it fetch linked objects
 
 from twisted.internet import defer
 
+from google.protobuf import message
+
+from ion.core.object import object_utils
 from ion.core.object import repository
 from ion.core.object import gpb_wrapper
 
@@ -23,6 +26,8 @@ from net.ooici.core.mutable import mutable_pb2
 from net.ooici.core.type import type_pb2
 from net.ooici.core.link import link_pb2
 
+idref_type = object_utils.create_type_identifier(object_id=4, version=1)
+
 class WorkBenchError(Exception):
     """
     An exception class for errors that occur in the Object WorkBench class
@@ -33,7 +38,8 @@ class WorkBench(object):
     MutableClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.MutableNode())
     LinkClassType = gpb_wrapper.set_type_from_obj(link_pb2.CASRef())
     CommitClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.CommitRef())
- 
+    
+    
     def __init__(self, myprocess):   
     
         self._process = myprocess
@@ -48,11 +54,12 @@ class WorkBench(object):
         self._hashed_elements={}
       
         
-    def init_repository(self, rootclass=None, nickname=None):
+    def init_repository(self, root_type=None, nickname=None):
         """
         Initialize a new repository
         Factory method for creating a repository - this is the responsibility
         of the workbench.
+        @param root_type is the object type identifier for the object
         """
         
         repo = repository.Repository()
@@ -63,13 +70,21 @@ class WorkBench(object):
         # Set the default branch
         repo.branch(nickname='master')
            
-        if rootclass:
-            rootobj = repo.create_wrapped_object(rootclass)
+        # Handle options in the root class argument
+        if isinstance(root_type, type_pb2.GPBType):
+            
+            try:
+                rootobj = repo.create_object(root_type)
+            except object_utils.ObjectUtilException, ex:
+                raise WorkBenchError('Invalid root object type identifier passed in init_repository')
         
             repo._workspace_root = rootobj
         
-        else:
+        elif root_type ==None:
             rootobj = None
+        else:
+            raise WorkBenchError('Invalid root type argument passed in init_repository')
+        
         
         self.put_repository(repo)
         
@@ -112,7 +127,7 @@ class WorkBench(object):
                 raise WorkBenchError('Can not reference the current state of a repository which has been modified but not committed')
 
         # Create a new repository to hold this data object
-        repository, id_ref = self.init_repository(rootclass=link_pb2.IDRef)
+        repository, id_ref = self.init_repository(idref_type)
         
         id_ref.key = repo.repository_key
         id_ref.branch = repo._current_branch.branchkey

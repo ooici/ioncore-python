@@ -12,11 +12,11 @@ from twisted.internet import defer
 from twisted.trial import unittest
 
 from ion.test.iontest import IonTestCase
-from ion.services.coi.exchange.exchange_registry import ExchangeRegistryClient
+from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
 
 from ion.resources import coi_resource_descriptions
 
-class ExchangeClientTest(IonTestCase):
+class ExchangeManagementTest(IonTestCase):
     """
     Testing client classes of User Registration
     """
@@ -28,9 +28,10 @@ class ExchangeClientTest(IonTestCase):
         yield self._start_container()
 
         services = [{'name':'exchange_registry','module':'ion.services.coi.exchange.exchange_registry','class':'ExchangeRegistryService'}]
+        services = [{'name':'exchange_management','module':'ion.services.coi.exchange.exchange_management','class':'ExchangeManagementService'}]
         supervisor = yield self._spawn_processes(services)
 
-        self.exchange_registry_client = ExchangeRegistryClient(proc=supervisor)
+        self.exchange_management_client = ExchangeManagementClient(proc=supervisor)
 
 
     @defer.inlineCallbacks
@@ -39,8 +40,8 @@ class ExchangeClientTest(IonTestCase):
         yield self._stop_container()
 
 
-    @defer.inlineCallbacks
-    def x_test_none(self):
+    # @defer.inlineCallbacks
+    def xtest_none(self):
         """
         """
 

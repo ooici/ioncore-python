@@ -21,6 +21,7 @@ from ion.core.messaging.receiver import Receiver, FanoutReceiver
 from ion.core.pack import app_supervisor
 from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 import ion.util.procutils as pu
+from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
 
 CONF = ioninit.config(__name__)
 CF_announce = CONF.getValue('announce', False)
@@ -40,6 +41,7 @@ class CCAgent(ResourceAgent):
         self.containers = {}
         self.contalive = {}
         self.last_identify = 0
+        self.exchange_management_client = None
 
     @defer.inlineCallbacks
     def plc_activate(self):
@@ -61,6 +63,9 @@ class CCAgent(ResourceAgent):
             #@todo - Can not send a message to a base process which is not initialized!
 
             yield self._send_announcement('initialize')
+        
+        # self.exchange_management_client = ExchangeManagementClient(ioninit.container_instance)
+
 
     @defer.inlineCallbacks
     def plc_terminate(self):
