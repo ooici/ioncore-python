@@ -33,6 +33,12 @@ from net.ooici.play import addressbook_pb2
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
+from ion.core.object import object_utils
+
+person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
+addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
+
 
 class EOIIngestionService(ServiceProcess):
     """
@@ -112,17 +118,17 @@ class EOIIngestionClient(ServiceClient):
         """
         yield self._check_init()
         
-        repo, ab = self.proc.workbench.init_repository(addressbook_pb2.AddressLink)
+        repo, ab = self.proc.workbench.init_repository(addresslink_type)
         
         ab.person.add()
 
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name = 'david'
         p.id = 59
         p.email = 'stringgggg'
         ab.person[0] = p
         
-        print 'AdressBook!',ab
+        #print 'AdressBook!',ab
         
         (content, headers, msg) = yield self.rpc_send('ingest', ab)
         

@@ -159,7 +159,7 @@ def _bootstrap_objects(supid):
     variable_salinity.data_type = DataType.FLOAT
     
     
-    # Construct the Coordinate Variables for time and depth
+    # Construct the Coordinate Variables: time and depth
     #------------------------------------------------------
     # Add dimensionality (shape)
     variable_t.shape.add()
@@ -194,8 +194,8 @@ def _bootstrap_objects(supid):
     variable_z.content[0].ndarray.value.extend([0.0, 0.1, 0.2])
     
     
-    # Construct the Scalar Variables for lat, lon and station id
-    #-----------------------------------------------------------
+    # Construct the Scalar Variables: lat, lon and station id
+    #------------------------------------------------------------
     # Add dimensionality (shape)
     # !! scalars DO NOT specify dimensions !!
     # Add attributes (CDM conventions require certain attributes!)
@@ -277,6 +277,39 @@ def _bootstrap_objects(supid):
     group.variables[5] = variable_z
     
     
+    # Create and Attach global attributes to the root group
+    #--------------------------------------------------------
+    attrib_feature_type =   _create_string_attribute(dataset, 'CF:featureType', ['stationProfile'])
+    attrib_conventions =    _create_string_attribute(dataset, 'Conventions',    ['CF-1.5'])
+    attrib_history =        _create_string_attribute(dataset, 'history',        ['Converted from CSV to OOI CDM compliant NC by net.ooici.agent.abstraction.impl.SosAgent', 'Reconstructed manually as a GPB composite for the resource registry tutorial'])
+    attrib_references =     _create_string_attribute(dataset, 'references',     ['http://sdf.ndbc.noaa.gov/sos/', 'http://www.ndbc.noaa.gov/', 'http://www.noaa.gov/'])
+    attrib_title =          _create_string_attribute(dataset, 'title',          ['NDBC Sensor Observation Service data from "http://sdf.ndbc.noaa.gov/sos/"'])
+    attrib_utc_begin_time = _create_string_attribute(dataset, 'utc_begin_time', ['2008-08-01T00:50:00Z'])
+    attrib_source =         _create_string_attribute(dataset, 'source',         ['NDBC SOS'])
+    attrib_utc_end_time =   _create_string_attribute(dataset, 'utc_end_time',   ['2008-08-01T23:50:00Z'])
+    attrib_institution =    _create_string_attribute(dataset, 'institution',    ["NOAA's National Data Buoy Center (http://www.ndbc.noaa.gov/)"])
+    
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
+    
+    group.attributes[0] = attrib_feature_type
+    group.attributes[1] = attrib_conventions
+    group.attributes[2] = attrib_history
+    group.attributes[3] = attrib_references
+    group.attributes[4] = attrib_title
+    group.attributes[5] = attrib_utc_begin_time
+    group.attributes[6] = attrib_source
+    group.attributes[7] = attrib_utc_end_time
+    group.attributes[8] = attrib_institution
+    
+    
     # 'put' the resource into the Resource Registry
     rc.put_instance(dataset, 'Testing put...')
     
@@ -284,16 +317,22 @@ def _bootstrap_objects(supid):
     data_resources ={'dataset1':dataset.ResourceIdentity}
     defer.returnValue(data_resources)
     
-    
-def _add_string_attribute(dataset, variable, name, values):
+def _create_string_attribute(dataset, name, values):
     '''
-    Helper method to add string attributes to variable instances
+    Helper method to create string attributes for variables and dataset groups
     '''
     atrib = dataset.CreateObject(attribute_type)
     atrib.name = name
     atrib.data_type= DataType.STRING
     atrib.array = dataset.CreateObject(stringArray_type)
     atrib.array.value.extend(values)
+    return atrib
+
+def _add_string_attribute(dataset, variable, name, values):
+    '''
+    Helper method to add string attributes to variable instances
+    '''
+    atrib = _create_string_attribute(dataset, name, values)
     
     atrib_ref = variable.attributes.add()
     atrib_ref.SetLink(atrib)

@@ -39,6 +39,9 @@ from ion.core.object import gpb_wrapper
 from ion.core.object import object_utils
 
 
+resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
+
+
 CONF = ioninit.config(__name__)
 
 
@@ -106,7 +109,7 @@ class ResourceClient(object):
         yield self._check_init()
         
         # Create a sendable resource object
-        description_repository, resource_description = self.workbench.init_repository(rootclass=resource_framework_pb2.ResourceDescription)
+        description_repository, resource_description = self.workbench.init_repository(resource_description_type)
         
         # Set the description
         resource_description.name = name
@@ -286,10 +289,7 @@ class ResourceInstance(object):
         @param type_id is the type_id of the object to be created
         @retval the new object which can now be attached to the resource
         """
-        
-        cls = self._repository._load_class_from_type(type_id)
-        obj = self._repository.create_wrapped_object(cls)
-        return obj
+        return self._repository.create_object(type_id)
         
         
     def __getattribute__(self, key):

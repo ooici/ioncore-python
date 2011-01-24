@@ -9,13 +9,28 @@ from twisted.internet import defer
 from ion.core.data.cassandra import CassandraDataManager, CassandraStorageResource
 
 from ion.core.object import workbench
-from net.ooici.services.dm import persistent_archive_pb2
 
 from ion.core.data import store
 
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+
+from ion.core.object import object_utils
+
+
+simple_password_type = object_utils.create_type_identifier(object_id=2502, version=1)
+
+columndef_type = object_utils.create_type_identifier(object_id=2503, version=1)
+
+column_family_type = object_utils.create_type_identifier(object_id=2507, version=1)
+
+cassandra_cluster_type = object_utils.create_type_identifier(object_id=2504, version=1)
+
+cassandra_keypsace_type = object_utils.create_type_identifier(object_id=2506, version=1)
+
+
+
 
 class IDataManagerTest(unittest.TestCase):
     
@@ -64,19 +79,18 @@ class CassandraDataManagerTest(IDataManagerTest):
     def _setUpArchiveAndCache(self):
         
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
-        persistent_archive_repository, cassandra_keyspace  = self.wb.init_repository(persistent_archive_pb2.CassandraKeySpace)
+        persistent_archive_repository, cassandra_keyspace  = self.wb.init_repository(cassandra_keypsace_type)
         # only the name of the keyspace is required
         cassandra_keyspace.name = 'ManagerTestKeyspace'
         #cassandra_keyspace.name = 'Keyspace1'
         self.keyspace = cassandra_keyspace
         ### Create a Cache resource - for cassandra a ColumnFamily object
-        cache_repository, column_family  = self.wb.init_repository(persistent_archive_pb2.ColumnFamily)
+        cache_repository, column_family  = self.wb.init_repository(column_family_type)
         # only the name of the column family is required
         column_family.name = 'TestCF'
         self.cache = column_family
         self.cache_repository = cache_repository
-        column = self.cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
-        #column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
+        column = self.cache_repository.create_object(columndef_type)
         column.column_name = "state"
         column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
         #IndexType.KEYS is 0, and IndexType is an enum
@@ -92,7 +106,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         to the Cassandra cluster.
         """
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
-        persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(persistent_archive_pb2.CassandraCluster)
+        persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(cassandra_cluster_type)
         
         # Set only one host and port in the host list for now
         cas_host = cassandra_cluster.hosts.add()
@@ -100,7 +114,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         cas_host.port = 9160
         
         ### Create a Credentials resource - for cassandra a SimplePassword object
-        cache_repository, simple_password  = self.wb.init_repository(persistent_archive_pb2.SimplePassword)
+        cache_repository, simple_password  = self.wb.init_repository(simple_password_type)
         simple_password.username = 'ooiuser'
         simple_password.password = 'oceans11'
         
@@ -160,7 +174,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         self.cache.comparator_type='org.apache.cassandra.db.marshal.BytesType'
         
 
-        column = self.cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
+        column = self.cache_repository.create_object(columndef_type)
         #column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
         column.column_name = "state2"
         column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'

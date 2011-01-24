@@ -14,8 +14,7 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory, Process, ProcessClient
 #from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from net.ooici.play import addressbook_pb2
-
+from ion.core.object import object_utils
 
 class HelloObject(Process):
     """
@@ -72,22 +71,10 @@ class HelloObjectClient(ProcessClient):
     """
 
     @defer.inlineCallbacks
-    def hello(self, text='Hi there'):
+    def hello(self, msg):
         yield self._check_init()
         
-        repo, ab = self.proc.workbench.init_repository(addressbook_pb2.AddressLink)
         
-        ab.person.add()
-
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
-        p.name = 'david'
-        p.id = 59
-        p.email = 'stringgggg'
-        ab.person[0] = p
-        
-        print 'AdressBook!',ab
-        repo.commit('My addresbook test')
-
         
         (content, headers, msg) = yield self.rpc_send('hello', ab)
         log.info('Process replied: ')
