@@ -131,6 +131,10 @@ To compile all code to see if there are Python compile errors anywhere:
 ---------------------------------------------------------------------------
 Change log:
 ===========
+
+2011-1-24:
+- Removed IRODS as backend storage configureation option
+
 2011-1-21:
 - ION is now using google protocol buffer objects in the resource object model
 - Bumped version number to 0.4.0 consistent with the setup.py file. 
