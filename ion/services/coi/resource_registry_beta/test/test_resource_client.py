@@ -26,6 +26,7 @@ from ion.test.iontest import IonTestCase
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
+Update_Type = object_utils.create_type_identifier(object_id=10, version=1)
 
 class ResourceClientTest(IonTestCase):
     """

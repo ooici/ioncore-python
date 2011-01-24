@@ -8,6 +8,7 @@ resource objects in services and processes. They provide a simple interface to
 create, get, put and update resources.
 
 @ TODO
+Add methods to access the state of updates which are merging...
 """
 
 from twisted.internet import defer, reactor
@@ -40,7 +41,7 @@ from ion.core.object import object_utils
 
 
 resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
-
+resource_type = object_utils.create_type_identifier(object_id=1102, version=1)
 
 CONF = ioninit.config(__name__)
 
@@ -57,7 +58,8 @@ class ResourceClient(object):
     The client helps create and manage resource instances.
     """
     
-    IDRefType = object_utils.set_type_from_obj(link_pb2.IDRef)
+    IDRef_Type = object_utils.create_type_identifier(object_id=4, version=1)
+    
     
     def __init__(self, proc=None, datastore_service='datastore'):
         """
@@ -192,6 +194,10 @@ class ResourceClient(object):
         @param instance is a ResourceInstance object to be written
         @param comment is a comment to add about the current state of the resource
         """
+        
+        if instance._update_ref != None:
+            raise raise ResourceClientError('Can not put and instance with an unresolved update!')
+        
         if not comment:
             comment = 'Resource client default commit message'
             
@@ -203,7 +209,7 @@ class ResourceClient(object):
         response, exception = yield self.workbench.push(self.datastore_service, repository.repository_key)
         
         if not response == self.proc.ION_SUCCESS:
-            raise ResourceInstanceError('Push to datastore failed during put_instance')
+            raise ResourceClientError('Push to datastore failed during put_instance')
         
 
 
@@ -228,9 +234,8 @@ class ResourceClient(object):
         """
         
         return self.workbench.reference_repository(instance.ResourceIdentity, current_state)
+        
 
-    
-    
     
 class ResourceInstanceError(Exception):
     """
@@ -244,6 +249,7 @@ class ResourceInstance(object):
     store and deals with resource specific properties.
     """
     
+    # Life Cycle States
     NEW='New'
     ACTIVE='Active'
     INACTIVE='Inactive'
@@ -251,6 +257,17 @@ class ResourceInstance(object):
     DECOMMISSIONED='Decommissioned'
     RETIRED='Retired'
     DEVELOPED='Developed'
+    UPDATE = 'Update'
+    
+    # Resource update mode
+    APPEND = 'Appending new update'
+    SET = 'Setting state equal to this update'
+    MODIFY = 'Merge modifications in this update'
+    
+    # Resource update Resolutions
+    RESOLVED = 'Update resolved' # When a merger occurs with the previous state
+    REJECTED = 'Update rejected' # When an update is rejected
+    ACCEPTED = 'Update accepted' # For updates which are accepted as the new state
     
     def __init__(self, resource):
         """
@@ -263,6 +280,8 @@ class ResourceInstance(object):
         self._resource = resource
         
         self._object = self._resource.resource_object
+        
+        self._update_ref = None
         
     def __str__(self):
         output  = '============== Resource ==============\n'
@@ -281,6 +300,57 @@ class ResourceInstance(object):
         
         branch_key = self._repository.branch()            
         return branch_key
+        
+    def CommitResourceUpdate(self, update, update_mode):
+        """
+        Use this method when updating an existing resource.
+        This is the recommended pattern for updating a resource. The Resource history will include a special
+        Branch pattern showing the previous state, the update and the updated state...
+        Once an update is commited, the update must be resolved before the instance
+        can be put (pushed) to the public datastore.
+        
+        <Updated State>  
+              |        \
+              |         <Update>
+              |        /
+        <Previous State>
+        
+        """
+
+        if update.GPBType != self._resource.type:
+            log.debug ('Resource Type does not match update Type')
+            raise ResourceClientError('update_instance argument "update" must be of the same type as the resource')
+        
+       current_branchname = self._current_branch.branchkey
+        
+        self._repository.branch('update')
+        
+        # Set the LCS in the resource branch to UPDATE and the object to the update
+        self.ResourceLifeCycleState = self.UPDATE
+        
+        # Copy the update object into resource as the current state object.
+        self._resource.resource_object = update
+        
+        self._repository.commit(comment=str(update_mode))
+        
+        self._repository.checkout(branchname=current_branchname)
+        
+        self._repository.merge(branchname='update')
+        
+        
+    def ResolveResourceUpdate(self, resolution):
+        """
+        Once the state is resolved after an update the resolution is recorded in a
+        new commit - the updated state. This method is called once the resource instance
+        is in that resolved state. The type of resolution is the only argument.
+        
+        After resolving the state, put_instance must be called to make the update
+        public.
+        """
+        
+        # Make a commit merging the parent and the merge ref.
+    
+    
     
     def CreateObject(self, type_id):
         """
@@ -362,19 +432,21 @@ class ResourceInstance(object):
         # Using IS for comparison - I think this is better than the usual ==
         # Want to force the use of the self.XXXX as the argument!
         if state == self.NEW:        
-            self._resource.lcs = resource_framework_pb2.New
+            self._resource.lcs = resource_type.New
         elif state == self.ACTIVE:
-            self._resource.lcs = resource_framework_pb2.Active
+            self._resource.lcs = resource_type.Active
         elif state == self.INACTIVE:
-            self._resource.lcs = resource_framework_pb2.Inactive
+            self._resource.lcs = resource_type.Inactive
         elif state == self.COMMISSIONED:
-            self._resource.lcs = resource_framework_pb2.Commissioned
+            self._resource.lcs = resource_type.Commissioned
         elif state == self.DECOMMISSIONED:
-            self.resource.lcs = resource_framework_pb2.Decommissioned
+            self.resource.lcs = resource_type.Decommissioned
         elif state == self.RETIRED:
-            self.resource.lcs = resource_framework_pb2.Retired
+            self.resource.lcs = resource_type.Retired
         elif state == self.DEVELOPED:
-            self.resource.lcs = resource_framework_pb2.Developed
+            self.resource.lcs = resource_type.Developed
+        elif state == self.UPDATE:
+            self.resource.lcs = resource_type.Update
         else:
             raise Exception('''Invalid argument value state: %s. State must be 
                 one of the class variables defined in Resource Instance''' % str(state))
@@ -384,26 +456,29 @@ class ResourceInstance(object):
         @brief Get the life cycle state of the resource
         """
         state = None
-        if self._resource.lcs == resource_framework_pb2.New:
+        if self._resource.lcs == resource_type.New:
             state = self.NEW    
         
-        elif self._resource.lcs == resource_framework_pb2.Active:
+        elif self._resource.lcs == resource_type.Active:
             state = self.ACTIVE
             
-        elif self._resource.lcs == resource_framework_pb2.Inactive:
+        elif self._resource.lcs == resource_type.Inactive:
             state = self.INACTIVE
             
-        elif self._resource.lcs == resource_framework_pb2.Commissioned:
+        elif self._resource.lcs == resource_type.Commissioned:
             state = self.COMMISSIONED
             
-        elif self._resource.lcs == resource_framework_pb2.Decommissioned:
+        elif self._resource.lcs == resource_type.Decommissioned:
             state = self.DECOMMISSIONED
             
-        elif self._resource.lcs == resource_framework_pb2.Retired:
+        elif self._resource.lcs == resource_type.Retired:
             state = self.RETIRED
             
-        elif self._resource.lcs == resource_framework_pb2.Developed:
+        elif self._resource.lcs == resource_type.Developed:
             state = self.DEVELOPED
+        
+        elif self._resource.lcs == resource_type.Update:
+            state = self.UPDATE
         
         return state
         

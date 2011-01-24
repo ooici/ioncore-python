@@ -8,8 +8,11 @@
 @author Matt Rodriguez
 
 TODO
-Make sure delete works for these objects the way we expect!
+Add and test remove branch method
+Test merge method.
+Test merging access to merging objects (ReadOnly)
 
+Make sure delete works for these objects the way we expect!
 """
 
 import ion.util.ionlog
@@ -66,6 +69,7 @@ class Repository(object):
         Pointer to the current root object in the workspace
         """
         
+        
         self._commit_index = {}
         """
         A dictionary containing the commit objects - all immutable content hashed
@@ -98,6 +102,12 @@ class Repository(object):
         Keep track of branches which were merged into this one!
         Like _current_brach, _merged_from is a list of links - not the actual
         commit refs
+        """
+        
+        self._merging_root=[]
+        """
+        When merging a repository state there are multiple root object in a
+        read only state from which you can draw values using repo.Merging[ind].[field]
         """
         
         self._stash = {}
@@ -179,12 +189,12 @@ class Repository(object):
             
         branch = self.get_branch(branchname)
         if not branch:
-            raise RepositoryError('Branch Key: "%s" does not exist!' % branchkey)
+            raise RepositoryError('Branch Key: "%s" does not exist!' % branchname)
             
         if len(branch.commitrefs)==0:
             raise RepositoryError('This branch is empty - there is nothing to checkout!')
             
-        
+            
         # Set the current branch now!
         self._current_branch = branch
         
@@ -470,12 +480,53 @@ class Repository(object):
         return cref
             
         
-    def merge(self, branch=None, commit_id = None, older_than=None):
+    def merge(self, branchname=None, commit_id = None):
         """
         merge the named branch in to the current branch
+        
+        This method does not 'do' the merger of state.
+        It simply adds the parent ref to the repositories merged from list!
+        
         """
         
-
+        crefs=[]
+        
+        if commit_id:
+            try:
+                crefs.append(self._commit_index[commit_id])
+            except KeyError, ex:
+                raise RepositoryError('Can not merge from unknown commit_id %s' % commit_id)
+        
+        elif branchname:
+            
+            branch = self.get_branch(branchname)
+            if not branch:
+                raise RepositoryError('Branch Key: "%s" does not exist!' % branchname)
+            
+            if branch.branchkey == self._current_branch.branchkey:
+                if len(branch.commitrefs)<2:
+                    raise RepositoryError('Can not merge with current branch head (self into self)')
+                
+                # Merge the divergent states of this branch!
+                crefs = branch.commitrefs[1:]
+                
+            else:
+                # Assume we merge any and all states of this branch?
+                crefs = branch.commitrefs
+        
+        else:
+            log.debug('''Arguments to Repository.merge - branchname: %s; commit_id: %s''' \
+                      % (branchname, commit_id))
+            raise RepositoryError('merge takes either a branchname argument or a commit_id argument!')
+        
+        assert len(crefs) > 0, 'Illegal state reached in Repository Merge function!'
+        
+        for cref in crefs:
+            self._merged_from.append(cref.MyId)
+            merge_root = cref.objectroot
+            merge_root.ReadOnly = True
+            self._merged_root.append(merge_root)
+        
         
         
     @property
@@ -657,9 +708,18 @@ class Repository(object):
             if obj.GPBType == self.CommitClassType:
                 self._commit_index[obj.MyId]=obj
                 obj.ReadOnly = True
-            else:
+                
+            elif link.Root.GPBType == self.CommitClassType:
+                # if the link is a commit but the linked object is not then it is a root object
+                # The default for a root object should be ReadOnly = False
                 self._workspace[obj.MyId]=obj
-                obj.ReadOnly = self._detached_head
+                obj.ReadOnly = False
+                
+            else:
+                # When getting an object from it's parent, use the parents readonly setting
+                self._workspace[obj.MyId]=obj
+                obj.ReadOnly = link.ReadOnly
+                
             return obj
             
         else:
