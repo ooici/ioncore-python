@@ -51,7 +51,7 @@ class CassandraManagerAgent(ServiceProcess):
     # Declaration of service
     declare = ServiceProcess.service_declare(name='cassandra_manager_agent', version='0.1.0', dependencies=[])
 
-     def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
         ServiceProcess.__init__(self, *args, **kwargs)
         
@@ -59,15 +59,10 @@ class CassandraManagerAgent(ServiceProcess):
         self.spawn_args['bootstrap_args'] = self.spawn_args.get('bootstrap_args', CONF.getValue('bootstrap_args', default=None))
         
         # Create a Resource Client 
-        self.rc = ResourceClient(proc=self)
-        
+        self.rc = ResourceClient(proc=self)        
         log.info('PreservationService.__init__()')
 
 
-    #@defer.inlineCallbacks
-    #def slc_init(self):
-        
-        
         
         
     @defer.inlineCallbacks
@@ -105,7 +100,7 @@ class CassandraManagerAgent(ServiceProcess):
         # The cassandra client manager
         manager = CassandraDataManager(storage_resource)
         
-        #@TODO Need update teh register method using Dave F's new code!
+        #@TODO Need update the register method using Dave F's new code!
         yield self.register_life_cycle_object(manager)
         
         self.manager = manager
@@ -132,7 +127,7 @@ class CassandraManagerAgent(ServiceProcess):
             
         
     @defer.inlineCallbacks
-    def op_create_persistent_archive(self, ???, headers, msg):
+    def op_create_persistent_archive(self, persistent_archive, headers, msg):
         """Service operation: define a new archive object
         
         What should the args be?
@@ -144,7 +139,7 @@ class CassandraManagerAgent(ServiceProcess):
         yield self.rc.put_instance(cassandra_keyspace)
 
     @defer.inlineCallbacks
-    def op_update_persistent_archive(self, ???, headers, msg):
+    def op_update_persistent_archive(self, persistent_archive, headers, msg):
         """Service operation: define a new archive object
         
         What should the args be?
@@ -166,7 +161,7 @@ class CassandraManagerAgent(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def op_delete_persistent_archive(self, ???, headers, msg):
+    def op_delete_persistent_archive(self, persistent_archive, headers, msg):
         """Service operation: define a new archive object
         
         What should the args be?
@@ -190,41 +185,15 @@ class PreservationClient(ServiceClient):
             kwargs['targetname'] = 'preservation_service'
         ServiceClient.__init__(self, proc, **kwargs)
 
-    def create_archive(self, data_reg_resource):
-        '''
+    def create_persistent_archive(self, persistent_archive):
+        """
         @brief create a new archive
         @param dataresource is a DM Data Resource which is registered
         @return IngestionDataStreamResource object
-        '''
-
-    def activate_archive_persister(self,archive):
-        '''
-        @brief start the persister
-        @param archive is a dm archive resource - the topic field must be valid
-        '''
-
-    def deactivate_archive_persister(self,archive):
-        '''
-        @brief stop the persister
-        '''
-
-    def archive_data(self, archive, data):
-        '''
-        @brief RPC interface to store a single block of data in an archive
-
-        '''
-
-    def set_archive_cache_policy(self,archive):
-        '''
-        @brief set the caching policy for an archive
-        '''
-
-    def set_archive_backup_policy(self,archive):
-        '''
-        @brief set the backup policy for an archive
-        '''
-
-    def set_archive_long_term_policy(self,archive):
-        '''
-        @brief set the long term storage policy for an archive
-        '''
+        """
+        
+    def update_persistent_archive(self, persistent_archive):
+        pass
+    
+    def delete_presistent_archive(self, persistent_archive):
+        pass
