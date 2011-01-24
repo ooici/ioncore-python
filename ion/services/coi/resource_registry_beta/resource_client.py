@@ -42,6 +42,7 @@ from ion.core.object import object_utils
 
 resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
 resource_type = object_utils.create_type_identifier(object_id=1102, version=1)
+idref_Type = object_utils.create_type_identifier(object_id=4, version=1)
 
 CONF = ioninit.config(__name__)
 
@@ -57,9 +58,6 @@ class ResourceClient(object):
     instances. The resource instance provides the interface for working with resources.
     The client helps create and manage resource instances.
     """
-    
-    IDRef_Type = object_utils.create_type_identifier(object_id=4, version=1)
-    
     
     def __init__(self, proc=None, datastore_service='datastore'):
         """
@@ -153,7 +151,7 @@ class ResourceClient(object):
         commit = None
         
         # Get the type of the argument and act accordingly
-        if hasattr(resource_id, 'GPBType') and resource_id.GPBType == self.IDRefType:
+        if hasattr(resource_id, 'GPBType') and resource_id.GPBType == idref_Type:
             # If it is a resource reference, unpack it.
             if resource_id.branch:
                 branch = resource_id.branch
@@ -196,7 +194,7 @@ class ResourceClient(object):
         """
         
         if instance._update_ref != None:
-            raise raise ResourceClientError('Can not put and instance with an unresolved update!')
+            raise ResourceClientError('Can not put and instance with an unresolved update!')
         
         if not comment:
             comment = 'Resource client default commit message'
@@ -249,6 +247,7 @@ class ResourceInstance(object):
     store and deals with resource specific properties.
     """
     
+    RESOURCE_CLASS = object_utils.get_gpb_class_from_type_id(resource_type)
     # Life Cycle States
     NEW='New'
     ACTIVE='Active'
@@ -321,7 +320,7 @@ class ResourceInstance(object):
             log.debug ('Resource Type does not match update Type')
             raise ResourceClientError('update_instance argument "update" must be of the same type as the resource')
         
-       current_branchname = self._current_branch.branchkey
+        current_branchname = self._current_branch.branchkey
         
         self._repository.branch('update')
         
@@ -432,21 +431,21 @@ class ResourceInstance(object):
         # Using IS for comparison - I think this is better than the usual ==
         # Want to force the use of the self.XXXX as the argument!
         if state == self.NEW:        
-            self._resource.lcs = resource_type.New
+            self._resource.lcs = self.RESOURCE_CLASS.New
         elif state == self.ACTIVE:
-            self._resource.lcs = resource_type.Active
+            self._resource.lcs = self.RESOURCE_CLASS.Active
         elif state == self.INACTIVE:
-            self._resource.lcs = resource_type.Inactive
+            self._resource.lcs = self.RESOURCE_CLASS.Inactive
         elif state == self.COMMISSIONED:
-            self._resource.lcs = resource_type.Commissioned
+            self._resource.lcs = self.RESOURCE_CLASS.Commissioned
         elif state == self.DECOMMISSIONED:
-            self.resource.lcs = resource_type.Decommissioned
+            self.resource.lcs = self.RESOURCE_CLASS.Decommissioned
         elif state == self.RETIRED:
-            self.resource.lcs = resource_type.Retired
+            self.resource.lcs = self.RESOURCE_CLASS.Retired
         elif state == self.DEVELOPED:
-            self.resource.lcs = resource_type.Developed
+            self.resource.lcs = self.RESOURCE_CLASS.Developed
         elif state == self.UPDATE:
-            self.resource.lcs = resource_type.Update
+            self.resource.lcs = self.RESOURCE_CLASS.Update
         else:
             raise Exception('''Invalid argument value state: %s. State must be 
                 one of the class variables defined in Resource Instance''' % str(state))
@@ -456,28 +455,28 @@ class ResourceInstance(object):
         @brief Get the life cycle state of the resource
         """
         state = None
-        if self._resource.lcs == resource_type.New:
+        if self._resource.lcs == self.RESOURCE_CLASS.New:
             state = self.NEW    
         
-        elif self._resource.lcs == resource_type.Active:
+        elif self._resource.lcs == self.RESOURCE_CLASS.Active:
             state = self.ACTIVE
             
-        elif self._resource.lcs == resource_type.Inactive:
+        elif self._resource.lcs == self.RESOURCE_CLASS.Inactive:
             state = self.INACTIVE
             
-        elif self._resource.lcs == resource_type.Commissioned:
+        elif self._resource.lcs == self.RESOURCE_CLASS.Commissioned:
             state = self.COMMISSIONED
             
-        elif self._resource.lcs == resource_type.Decommissioned:
+        elif self._resource.lcs == self.RESOURCE_CLASS.Decommissioned:
             state = self.DECOMMISSIONED
             
-        elif self._resource.lcs == resource_type.Retired:
+        elif self._resource.lcs == self.RESOURCE_CLASS.Retired:
             state = self.RETIRED
             
-        elif self._resource.lcs == resource_type.Developed:
+        elif self._resource.lcs == self.RESOURCE_CLASS.Developed:
             state = self.DEVELOPED
         
-        elif self._resource.lcs == resource_type.Update:
+        elif self._resource.lcs == self.RESOURCE_CLASS.Update:
             state = self.UPDATE
         
         return state

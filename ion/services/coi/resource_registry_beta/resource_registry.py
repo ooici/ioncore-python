@@ -16,15 +16,13 @@ from ion.services.coi import datastore
 
 from ion.core.object import gpb_wrapper
 
-from net.ooici.services.coi import resource_framework_pb2
-from net.ooici.core.type import type_pb2
-
 from ion.core.process.process import ProcessFactory, Process
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
 from ion.core.object import object_utils
 resource_type = object_utils.create_type_identifier(object_id=1102, version=1)
+resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -45,8 +43,12 @@ class ResourceRegistryService(ServiceProcess):
     # Declaration of service
     declare = ServiceProcess.service_declare(name='resource_registry_2', version='0.1.0', dependencies=[])
 
-    TypeClassType = gpb_wrapper.set_type_from_obj(type_pb2.GPBType())
-    ResourceDescriptionClassType = gpb_wrapper.set_type_from_obj(resource_framework_pb2.ResourceDescription())
+    typeobject_type = object_utils.create_type_identifier(object_id=9, version=1)
+    resource_type = object_utils.create_type_identifier(object_id=1102, version=1)
+    resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
+
+    RESOURCE_CLASS = object_utils.get_gpb_class_from_type_id(resource_type)
+
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -75,7 +77,7 @@ class ResourceRegistryService(ServiceProcess):
         
         # Check that we got the correct kind of content!
         assert isinstance(content, gpb_wrapper.Wrapper)
-        assert content.GPBType == self.ResourceDescriptionClassType
+        assert content.GPBType == self.resource_description_type
         
         try:
             id = yield self._register_resource_instance(content)
@@ -110,7 +112,7 @@ class ResourceRegistryService(ServiceProcess):
         object_utils.set_type_from_obj(res_obj, resource.type)
         
         # State is set to new by default
-        resource.lcs = resource_framework_pb2.New
+        resource.lcs = self.RESOURCE_CLASS.New
         
         resource_repository.commit('Created a new resource!')
 
