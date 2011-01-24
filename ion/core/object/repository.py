@@ -175,6 +175,8 @@ class Repository(object):
         brnch.branchkey = pu.create_guid()
         
         if nickname:
+            if nickname in self.branchnicknames.keys():
+                raise RepositoryError('That branch nickname is already in use.')
             self.branchnicknames[nickname]=brnch.branchkey
 
         if self._current_branch:
