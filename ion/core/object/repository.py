@@ -8,7 +8,6 @@
 @author Matt Rodriguez
 
 TODO
-Add and test remove branch method
 Test merge method.
 Test merging access to merging objects (ReadOnly)
 
@@ -97,14 +96,14 @@ class Repository(object):
         self._detached_head = False
         
         
-        self._merged_from = []
+        self._merge_from = []
         """
         Keep track of branches which were merged into this one!
-        Like _current_brach, _merged_from is a list of links - not the actual
+        Like _current_brach, _merge_from is a list of links - not the actual
         commit refs
         """
         
-        self._merging_root=[]
+        self._merge_root=[]
         """
         When merging a repository state there are multiple root object in a
         read only state from which you can draw values using repo.Merging[ind].[field]
@@ -147,10 +146,73 @@ class Repository(object):
         return self._dotgit.repositorykey
     
     @property
+    def merge_objects(self):
+        return self._merge_root
+    
+    
+    @property
     def branches(self):
+        """
+        Convience method to access the branches from the mutable head (dotgit object)
+        """
         return self._dotgit.branches
+    
+    def branch(self, nickname=None):
+        """
+        @brief Create a new branch from the current commit and switch the workspace to the new branch.
+        """
+        ## Need to check and then clear the workspace???
+        #if not self.status == self.UPTODATE:
+        #    raise Exception, 'Can not create new branch while the workspace is dirty'
         
-    def get_branch(self,name):
+        if self._current_branch != None and len(self._current_branch.commitrefs)==0:
+            # Unless this is an uninitialized repository it is an error to create
+            # a new branch from one which has no commits yet...
+            raise RepositoryError('The current branch is empty - a new one can not be created untill there is a commit!')
+        
+        
+        brnch = self.branches.add()    
+        brnch.branchkey = pu.create_guid()
+        
+        if nickname:
+            self.branchnicknames[nickname]=brnch.branchkey
+
+        if self._current_branch:
+            # Get the linked commit
+            
+            if len(brnch.commitrefs)>1:
+                raise RepositoryError('Branch should merge on read. Invalid state!')
+            elif len(brnch.commitrefs)==1:                
+                cref = self._current_branch.commitrefs[0]
+            
+                bref = brnch.commitrefs.add()
+            
+                # Set the new branch to point at the commit
+                bref.SetLink(cref)
+            
+            
+            # Making a new branch re-attaches to a head!
+            if self._detached_head:
+                self._workspace_root.SetStructureReadWrite()
+                self._detached_head = False
+                
+        self._current_branch = brnch
+        return brnch.branchkey
+    
+    def remove_branch(self,name):
+        branchkey = self.branchnicknames.get(name,None)
+        if not branchkey:
+            branchkey = name
+        
+        for idx, item in zip(range(len(self.branches)), self.branches):
+            if item.branchkey == branchkey:
+                del self.branches[idx]
+                break
+        else:
+            log.info('Branch %s not found!' % name)
+        
+    def get_branch(self, name):
+        
         branchkey = self.branchnicknames.get(name,None)
         if not branchkey:
             branchkey = name
@@ -164,7 +226,7 @@ class Repository(object):
             log.info('Branch %s not found!' % name)
             
         return branch
-            
+    
         
     def checkout(self, branchname=None, commit_id=None, older_than=None):
         """
@@ -465,10 +527,9 @@ class Repository(object):
         
         
         # For each branch that we merged from - add a  reference
-        for mrgd in self._merged_from:
+        for mrgd in self._merge_from:
             pref = cref.parentrefs.add()
-            merged_commit = mrgd.commitref # Get the commit ref of the merged item
-            pref.SetLinkByName('commitref',merged_commit)
+            pref.SetLinkByName('commitref',mrgd)
             pref.relationship = pref.MergedFrom
             
         cref.comment = comment
@@ -488,6 +549,10 @@ class Repository(object):
         It simply adds the parent ref to the repositories merged from list!
         
         """
+        
+        if self.status == self.MODIFIED:
+            log.warn('Merging while the workspace is dirty better to make a new commit first!')
+            #What to do for uninitialized? 
         
         crefs=[]
         
@@ -522,10 +587,10 @@ class Repository(object):
         assert len(crefs) > 0, 'Illegal state reached in Repository Merge function!'
         
         for cref in crefs:
-            self._merged_from.append(cref.MyId)
+            self._merge_from.append(cref)
             merge_root = cref.objectroot
             merge_root.ReadOnly = True
-            self._merged_root.append(merge_root)
+            self._merge_root.append(merge_root)
         
         
         
@@ -544,49 +609,6 @@ class Repository(object):
                 return self.UPTODATE
         else:
             return self.NOTINITIALIZED
-        
-        
-    def branch(self, nickname=None):
-        """
-        @brief Create a new branch from the current commit and switch the workspace to the new branch.
-        """
-        ## Need to check and then clear the workspace???
-        #if not self.status == self.UPTODATE:
-        #    raise Exception, 'Can not create new branch while the workspace is dirty'
-        
-        if self._current_branch != None and len(self._current_branch.commitrefs)==0:
-            # Unless this is an uninitialized repository it is an error to create
-            # a new branch from one which has no commits yet...
-            raise RepositoryError('The current branch is empty - a new one can not be created untill there is a commit!')
-        
-        
-        brnch = self.branches.add()    
-        brnch.branchkey = pu.create_guid()
-        
-        if nickname:
-            self.branchnicknames[nickname]=brnch.branchkey
-
-        if self._current_branch:
-            # Get the linked commit
-            
-            if len(brnch.commitrefs)>1:
-                raise RepositoryError('Branch should merge on read. Invalid state!')
-            elif len(brnch.commitrefs)==1:                
-                cref = self._current_branch.commitrefs[0]
-            
-                bref = brnch.commitrefs.add()
-            
-                # Set the new branch to point at the commit
-                bref.SetLink(cref)
-            
-            
-            # Making a new branch re-attaches to a head!
-            if self._detached_head:
-                self._workspace_root.SetStructureReadWrite()
-                self._detached_head = False
-                
-        self._current_branch = brnch
-        return brnch.branchkey
         
         
     def log_commits(self,branchname):

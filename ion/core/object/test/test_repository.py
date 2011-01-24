@@ -106,9 +106,25 @@ class RepositoryTest(unittest.TestCase):
         repo, ab = self.wb.init_repository(addresslink_type)
         repo.commit()
         self.assertEqual(len(repo.branches),1)
-
-        repo.branch("Arthur")   
+        
+        # Create a branch
+        branch_key = repo.branch("Arthur")   
         self.assertEqual(len(repo.branches),2)
+        
+        # Get by name
+        branch = repo.get_branch('Arthur')
+        self.assertEqual(branch.branchkey, branch_key)
+        
+        # Get by key
+        branch = repo.get_branch(branch_key)
+        self.assertEqual(branch.branchkey, branch_key)
+        
+        # delete
+        repo.remove_branch('Arthur')
+        self.assertEqual(len(repo.branches),1)
+
+        
+        
         
     def test_create_commit_ref(self):
         repo, ab = self.wb.init_repository(addresslink_type)
@@ -261,7 +277,78 @@ class RepositoryTest(unittest.TestCase):
         self.assertIdentical(ab2.person[0].Repository, ab2.Repository)
         
         
- 
+    def test_merge(self):
+        
+        repo, ab = self.wb.init_repository(addresslink_type)
+            
+        # Create a resource object    
+        p1 = repo.create_object(person_type)
+        p1.name='David'
+        p1.id = 5
+        p1.email = 'd@s.com'
+        ph1 = p1.phone.add()
+        ph1.type = p1.WORK
+        ph1.number = '123 456 7890'
+        ab.owner = p1
+        ab.person.add()
+        ab.person[0] = p1
+        
+        ab.title = 'Junk'
+        
+        cref1 = repo.commit(comment='testing commit')
+        
+        repo.branch('Merge')
+        
+        # Create a resource object    
+        p2 = repo.create_object(person_type)
+        p2.name='John'
+        p2.id = 3
+        p2.email = 'J@G.com'
+        ph2 = p1.phone.add()
+        ph2.type = p1.WORK
+        ph2.number = '098 765 4321'
+        ab.person.add()
+        ab.person[1] = p2
+        
+        cref2 = repo.commit('Appending a person')
+        
+        del ab, p1, p2, ph2, ph1
+        
+        ab = repo.checkout(branchname='master')
+        
+        repo.merge(branchname='Merge')
+        
+        self.assertEqual(ab.title, repo.merge_objects[0].title)
+        self.assertEqual(ab.person[0].name, repo.merge_objects[0].person[0].name)
+        
+        self.assertNotIdentical(ab.person[0], repo.merge_objects[0].person[0])
+        
+        # Can not modify merger objects   
+        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, repo.merge_objects[0], 'title', 'David')
+        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, repo.merge_objects[0].person[0], 'name', 'Matthew')
+        
+        # Can modify workspace objects
+        ab.person[0].name = 'Matthew'
+        ab.title = 'Not Junk!'
+        
+        # Can move object from merge to workspace
+        ab.person.add()
+        ab.person[1] = repo.merge_objects[0].person[1]
+        
+        self.assertEqual(ab.person[1].name, 'John')
+        
+        # Commit and check history...
+        cref3 = repo.commit('merge resolved')
+        
+        # Check commits...
+        branch = repo._current_branch
+        self.assertEqual(branch.commitrefs[0].MyId, cref3)
+        self.assertEqual(branch.commitrefs[0].parentrefs[0].commitref.MyId, cref1)
+        self.assertEqual(branch.commitrefs[0].parentrefs[1].commitref.MyId, cref2)
+        
+        
+        
+        
  
  
  
