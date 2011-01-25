@@ -212,15 +212,8 @@ class Consumer(messaging.Consumer):
         @param config is a dict of amqp options that __init__ extracts.
         """
         connection = ex_space.connection # broker connection
-        # @TODO: Exchange config dict should not clobber the passed in config dict -
-        #        it means that I cannot create a queue with auto_delete=False if the
-        #        exchange config says that the exchange is auto_delete=True.
-        #
-        #        I think this should be reversed - create a copy of the exchange's config,
-        #        then update that with the passed in config to this method.
-        #        -- dfoster 11 Nov 2010
-        full_config = config.copy()
-        full_config.update(ex_space.exchange.config_dict)
+        full_config = ex_space.exchange.config_dict.copy()
+        full_config.update(config)
         inst = cls(connection, **full_config)
         return inst.declare()
 
@@ -247,8 +240,8 @@ class Publisher(messaging.Publisher):
         if not config:
             raise RuntimeError("Publisher.name(): No config given")
 
-        full_config = config.copy()
-        full_config.update(ex_space.exchange.config_dict)
+        full_config = ex_space.exchange.config_dict.copy()
+        full_config.update(config)
         inst = cls(connection, **full_config)
 
         # Are we doing an exchange declare on every send???

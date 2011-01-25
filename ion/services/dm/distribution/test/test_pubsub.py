@@ -116,7 +116,6 @@ class PST(IonTestCase):
     def test_subscribe(self):
         raise unittest.SkipTest('Waiting for code')
         # @todo Create publisher, send data, verify receipt a la scheduler test code
-        #sub = Subscriber(proc=self.sup)
+        #sub = Subscriber('fake', process=self.sup)
         pass
 
-    
