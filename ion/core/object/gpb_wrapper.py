@@ -175,6 +175,13 @@ class Wrapper(object):
         self._invalid = True
         
     @property
+    def DESCRIPTOR(self):
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+        
+        return self._gpbMessage.DESCRIPTOR
+        
+    @property
     def Root(self):
         """
         Access to the root object of the nested GPB object structure
@@ -1170,7 +1177,13 @@ class StructureElement(object):
         
     @property
     def sha1(self):
-        return sha1hex(self.value + self.type.SerializeToString())
+        """
+        Make the sha1 safe for empty contents but also type safe.
+        Take use the sha twice so that we don't need to concatinate long strings!
+        """
+        content_sha = sha1hex(self.value)
+        
+        return sha1hex(content_sha + self.type.SerializeToString())
         
     #@property
     def _get_type(self):

@@ -130,10 +130,14 @@ class CapabilityContainer(service.Service):
         given the path to a file, open that file and exec the code.
         Assume the file contains Python source code.
         """
-        # @todo: make this a more universal location such that the script works with a variety of wd
-        # script = os.path.join(os.path.dirname(ion.__file__), self.config['script'])
+        
+        # Try two script locations, one for IDEs and another for shell. 
         script = os.path.abspath(self.config['script'])
-        if os.path.isfile(script):
+        if not os.path.isfile(script):
+            script = os.path.join(os.path.dirname(ion.__file__), self.config['script'])
+        if not os.path.isfile(script):
+            log.error('Bad startup script path: %s' % self.config['script'])
+        else:
             if script.endswith('.app'):
                 yield self.container.start_app(script)
             elif script.endswith('.rel'):
@@ -141,8 +145,6 @@ class CapabilityContainer(service.Service):
             else:
                 log.info("Executing script %s ..." % self.config['script'])
                 execfile(script, {})
-        else:
-            log.error('Bad startup script path: %s' % self.config['script'])
 
     def run_boot_script(self):
         """

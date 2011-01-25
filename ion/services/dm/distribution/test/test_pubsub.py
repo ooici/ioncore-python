@@ -10,8 +10,9 @@ import ion.util.ionlog
 from twisted.internet import defer
 
 from ion.services.dm.distribution.pubsub_service import PubSubClient
-from ion.services.dm.distribution.publisher_subscriber import Publisher, Subscriber
+#from ion.services.dm.distribution.publisher_subscriber import Subscriber
 from ion.test.iontest import IonTestCase
+from twisted.trial import unittest
 
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -33,37 +34,44 @@ class PST(IonTestCase):
 
         self.xs_name = 'ooici'
         self.tt_name = 'science_data'
-        self.topic_name = 'coads.nc'
+        self.topic_name = 'http://ooici.net:8001/coads.nc'
 
+    @defer.inlineCallbacks
     def tearDown(self):
-        self._stop_container()
+        yield self._stop_container()
 
     def test_start_stop(self):
         pass
 
     @defer.inlineCallbacks
     def test_topic_tree_creation(self):
+        raise unittest.SkipTest('Waiting for code')
+
         self.tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
         self.failIf(self.tt_id is None)
 
     @defer.inlineCallbacks
     def test_bad_topic_tree(self):
+        raise unittest.SkipTest('Waiting for code')
         rc = yield self.psc.declare_topic_tree(None, None)
         self.failIf(rc is not None)
 
     @defer.inlineCallbacks
     def test_tt_create_and_query(self):
+        raise unittest.SkipTest('Waiting for code')
         # create a topic tree, query to look for it
         tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
+        self.failIf(tt_id is None)
         rc = yield self.psc.query_topic_trees(self.tt_name)
         self.failIf(rc is None)
-        #self.failUnless(len(rc) > 0)
 
     @defer.inlineCallbacks
     def test_tt_crud(self):
+        raise unittest.SkipTest('Waiting for code')
         # Test create/query/rm/query on topic trees
         tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
         tt_list = yield self.psc.query_topic_trees(self.tt_name)
+        self.failIf(tt_list is None)
         rc = yield self.psc.undeclare_topic_tree(tt_id)
         self.failIf(rc is None)
         rc = yield self.psc.query_topic_trees('.+')
@@ -71,7 +79,15 @@ class PST(IonTestCase):
         self.failIf(len(rc) > 0)
 
     @defer.inlineCallbacks
+    def test_define_topic(self):
+        tt_id = 'fake_topic_id'
+        topic_id = yield self.psc.define_topic(tt_id, self.topic_name)
+        # Verify that it was created
+        self.failIf(topic_id is None)
+
+    @defer.inlineCallbacks
     def test_topics(self):
+        raise unittest.SkipTest('Waiting for code')
         tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
         topic_id = yield self.psc.define_topic(tt_id, self.topic_name)
         # Verify that it was created
@@ -82,12 +98,15 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_define_publisher(self):
+        raise unittest.SkipTest('Waiting for code')
         tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
         topic_id = yield self.psc.define_topic(tt_id, self.topic_name)
         pid = yield self.psc.define_publisher(tt_id, topic_id, 'phubbard')
         self.failIf(pid is None)
 
     def test_subscribe(self):
-        sub = Subscriber('fake', process=self.sup)
+        raise unittest.SkipTest('Waiting for code')
+        # @todo Create publisher, send data, verify receipt a la scheduler test code
+        #sub = Subscriber('fake', process=self.sup)
         pass
 
