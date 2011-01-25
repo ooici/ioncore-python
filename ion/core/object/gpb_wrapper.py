@@ -175,6 +175,13 @@ class Wrapper(object):
         self._invalid = True
         
     @property
+    def ObjectClass(self):
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+        
+        return self._GPBClass
+    
+    @property
     def DESCRIPTOR(self):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')

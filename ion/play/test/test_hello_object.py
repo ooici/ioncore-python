@@ -22,7 +22,7 @@ addresslink_type = object_utils.create_type_identifier(object_id=20003, version=
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 
 
-class HelloProcessTest(IonTestCase):
+class HelloObjectTest(IonTestCase):
     """
     Testing example hello object service.
     This example shows how it is possible to create and send strongly typed objects

@@ -809,7 +809,7 @@ class Repository(object):
         if not value.Repository.repository_key == self.repository_key:
             
             if value.Modified:
-                raise OOIObjectError('Can not move objects from a foreign repository which are in a modified state')
+                raise RepositoryError('Can not move objects from a foreign repository which are in a modified state. Commit before moving the object.')
             
             # Get the element from the hashed elements list
             element = self._hashed_elements.get(value.MyId)
