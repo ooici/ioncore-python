@@ -88,7 +88,6 @@ class PST(IonTestCase):
         self.failIf(pid is None)
 
     def test_subscribe(self):
-        sub = Subscriber(proc=self.sup)
+        sub = Subscriber('fake', process=self.sup)
         pass
 
-    
