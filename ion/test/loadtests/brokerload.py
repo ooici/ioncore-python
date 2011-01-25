@@ -9,7 +9,7 @@
 
 import uuid
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from carrot import connection, messaging
 
@@ -23,14 +23,14 @@ import sys
 
 class BrokerTestOptions(LoadTestOptions):
     optParameters = [
-                ["scenario", "s", "connect", "Load test scenario"],
-                ["host", "h", "localhost", "Broker host name"],
-                ["port", "p", 5672, "Broker port"],
-                ["vhost", "v", "/", "Broker vhost"],
-                ["heartbeat", None, 0, "Heartbeat rate [seconds]"],
-                    ]
-    optFlags = [
-                ]
+                ['scenario', 's', 'connect', 'Load test scenario'],
+                ['host', 'h', 'localhost', 'Broker host name'],
+                ['port', 'p', 5672, 'Broker port'],
+                ['vhost', 'v', '/', 'Broker vhost'],
+                ['heartbeat', None, 0, 'Heartbeat rate [seconds]'],
+                ['monitor', 'm', 3, 'Monitor poll rate [seconds]']
+    ]
+    optFlags = []
 
 
 class BrokerTest(LoadTest):
@@ -46,6 +46,7 @@ class BrokerTest(LoadTest):
         self.broker_host = opts['host']
         self.broker_port = opts['port']
         self.broker_vhost = opts['vhost']
+        self.monitor_rate = opts['monitor']
 
         print 'Running the "%s" scenario on "%s:%d" at "%s".' % (self.scenario, self.broker_host,
                                                                  self.broker_port, self.broker_vhost)
@@ -55,7 +56,7 @@ class BrokerTest(LoadTest):
         self.cur_state['msgrecv'] = 0
         self.cur_state['errors'] = 0
 
-        self._enable_monitor(3)
+        self._enable_monitor(self.monitor_rate)
 
     @defer.inlineCallbacks
     def generate_load(self):
@@ -203,6 +204,7 @@ class BrokerTest(LoadTest):
         self.cur_state['msgrecv'] += 1
 
     def tearDown(self):
+        self._disable_monitor()
         self.monitor()
 
     def monitor(self):
