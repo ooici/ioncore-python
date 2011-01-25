@@ -613,7 +613,10 @@ class Repository(object):
             return self.NOTINITIALIZED
         
         
-    def log_commits(self,branchname):
+    def log_commits(self,branchname=None):
+        
+        if branchname == None:
+            branchname = self._current_branch.branchkey
         
         branch = self.get_branch(branchname)
         log.info('$$ Logging commits on Branch %s $$' % branchname)

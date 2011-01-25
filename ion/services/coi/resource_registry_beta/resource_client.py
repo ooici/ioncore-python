@@ -260,13 +260,12 @@ class ResourceInstance(object):
     
     # Resource update mode
     APPEND = 'Appending new update'
-    Clobber = 'Clobber current state with this update'
+    CLOBBER = 'Clobber current state with this update'
     MERGE = 'Merge modifications in this update'
     
     # Resource update Resolutions
     RESOLVED = 'Update resolved' # When a merger occurs with the previous state
     REJECTED = 'Update rejected' # When an update is rejected
-    ACCEPTED = 'Update accepted' # For updates which are accepted as the new state
     
     def __init__(self, resource):
         """
@@ -287,29 +286,39 @@ class ResourceInstance(object):
         repo = object.__getattribute__(self, '_repository')
         return repo._workspace_root
         
-    @property
-    def ResourceObject(self):
+    
+    def _get_resource_object(self):
         repo = object.__getattribute__(self, '_repository')
         return repo._workspace_root.resource_object
         
+    def _set_resource_object(self, value):
+        repo = object.__getattribute__(self, '_repository')
+        if value.GPBType != self.ResourceType:
+            raise ResourceInstanceError('Can not change the type of a resource object!')
+        repo._workspace_root.resource_object = value
+        
+    ResourceObject = property(_get_resource_object, _set_resource_object)
+        
+        
     @property
-    def MergingResource(self):
+    def CompareToUpdates(self):
         """
-        This property accesses the committed resource states that are bing merged
-        into the current version of the Resource.
-        The result is the update object which is in a read only state.
+        @ Brief This methods provides access to the committed resource states that
+        are bing merged into the current version of the Resource.
+        @param ind is the index into list of merged states.
+        @result The result is a list of update objects which are in a read only state.
         """
-        if len(self.Repository.merge_objects)==0:
-            log.warn('MergingResource is available after calling MergeResourceUpdate. No merged state is present in this Resource Instance!')
-            return None
-        elif len(self.Repository.merge_objects)>=1:
-            log.debug('MergingResource is a convience method to access the state being merged.')
-            log.debug('If more than one resource state is being merged at one time you are on your own')
-            raise ResourceClientError('MergeResource is a convience property for accessing the state of the update. It can not be used with a multiple merger.')
         
-        res_update = self.Repository.merge_objects[0]
+        updates = self.Repository.merge_objects
+        if len(updates)==0:
+            log.warn('Invalid index into MergingResource. Current number of merged states is: %d' % (len(self.Repository.merge_objects)))
+            raise ResourceInstanceError('Invalid index access to Merging Resources. Either there is no merge or you picked an invalid index.')
         
-        return res_update.resource_object     
+        objects=[]
+        for resource in updates:
+            objects.append(resource.resource_object)
+        
+        return objects
         
     def __str__(self):
         output  = '============== Resource ==============\n'
@@ -329,7 +338,7 @@ class ResourceInstance(object):
         branch_key = self.Repository.branch()            
         return branch_key
         
-    def MergeResourceUpdate(self, update, update_mode):
+    def MergeResourceUpdate(self, mode, *args):
         """
         Use this method when updating an existing resource.
         This is the recommended pattern for updating a resource. The Resource history will include a special
@@ -338,40 +347,45 @@ class ResourceInstance(object):
         can be put (pushed) to the public datastore.
         
         <Updated State>  
-              |        \
-              |         <Update>
-              |        /
+        |    \          \
+        |    <Update1>  <Update2> ...
+        |    /          /
         <Previous State>
         
         """
-
-        if update.GPBType != self.ResourceType:
-            print type(update.GPBType), type(self.ResourceType)
-            log.debug ('Resource Type does not match update Type')
-            log.debug ('Update type %s; Resource type %s' % (str(update.GPBType), str(self.ResourceType)))
-            raise ResourceClientError('update_instance argument "update" must be of the same type as the resource')
+        if not self.Repository.status == self.Repository.UPTODATE:
+            raise ResourceInstanceError('Can not merge while the resource is in a modified state')
         
-        current_branchname = self.Repository._current_branch.branchkey
+        merge_branches = []
+        for update in args:
         
-        # Create and switch to a new branch
-        merge_branchname = self.Repository.branch()
+            if update.GPBType != self.ResourceType:
+                log.debug ('Resource Type does not match update Type')
+                log.debug ('Update type %s; Resource type %s' % (str(update.GPBType), str(self.ResourceType)))
+                raise ResourceInstanceError('update_instance argument "update" must be of the same type as the resource')
+            
+            current_branchname = self.Repository._current_branch.branchkey
+            
+            # Create and switch to a new branch
+            merge_branches.append(self.Repository.branch())
         
-        # Set the LCS in the resource branch to UPDATE and the object to the update
-        self.ResourceLifeCycleState = self.UPDATE
+            # Set the LCS in the resource branch to UPDATE and the object to the update
+            self.ResourceLifeCycleState = self.UPDATE
         
-        # Copy the update object into resource as the current state object.
-        self.Resource.resource_object = update
+            # Copy the update object into resource as the current state object.
+            self.Resource.resource_object = update
         
-        self.Repository.commit(comment=str(update_mode))
-        
-        self.Repository.checkout(branchname=current_branchname)
+            self.Repository.commit(comment=str(mode))
+            
+            self.Repository.checkout(branchname=current_branchname)
         
         # Set up the merge in the repository
-        self.Repository.merge(branchname=merge_branchname)
-        # on the next commit - when put_instance is called - the merge will be complete!
+        for b_name in merge_branches:
+            self.Repository.merge(branchname=b_name)
         
-        # Remove the merge branch - it is only a local concern
-        self.Repository.remove_branch(merge_branchname)
+            # Remove the merge branch - it is only a local concern
+            self.Repository.remove_branch(b_name)
+        # on the next commit - when put_instance is called - the merge will be complete!
         
         
         

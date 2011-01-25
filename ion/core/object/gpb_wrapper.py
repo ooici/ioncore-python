@@ -564,7 +564,13 @@ class Wrapper(object):
                 
         else:
             # If it is a attribute of this class, use the base class's getattr
-            result = object.__getattribute__(self, key)
+            try:
+                result = object.__getattribute__(self, key)
+            except AttributeError, ex:                
+                raise OOIObjectError(
+                '''"Wrapper" object for GPB class "%s"; has no attribute "%s"''' 
+                % (self._GPBClass, key))
+        
         return result
 
     def __setattr__(self,key,value):
@@ -597,8 +603,13 @@ class Wrapper(object):
             self._set_parents_modified()
                 
         else:
-            v = object.__setattr__(self, key, value)
-            
+            try:
+                v = object.__setattr__(self, key, value)
+            except AttributeError, ex:
+                
+                raise OOIObjectError(
+                '''"Wrapper" object for GPB class "%s"; has no attribute "%s"''' 
+                % (self._GPBClass, key))
         
     def _set_parents_modified(self):
         """
