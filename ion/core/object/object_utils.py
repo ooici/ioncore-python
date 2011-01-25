@@ -39,7 +39,7 @@ def sha1_to_hex(bytes):
     almosthex = map(hex, hex_bytes)
     return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
 
-def set_type_from_obj(obj):
+def set_type_from_obj(obj, type=None):
     """    
     Operates on instances and classes of gpb messages!
     @TODO Needs cleaning up - should be more robust + get the version 
@@ -47,7 +47,10 @@ def set_type_from_obj(obj):
     ENUM_NAME = '_MessageTypeIdentifier'
     ENUM_ID_NAME = '_ID'
     
-    gpbtype = type_pb2.GPBType()
+    if type==None:    
+        gpbtype = type_pb2.GPBType()
+    else:
+        gpbtype = type.GPBMessage
     
     descriptor = obj.DESCRIPTOR
     if hasattr(descriptor, 'enum_types'):
@@ -58,6 +61,7 @@ def set_type_from_obj(obj):
                         gpbtype.object_id=val.number
                         gpbtype.version = 1
                         
+                        # Is it bad to return it if it was passed as an arg?
                         return gpbtype
                         
     
@@ -117,20 +121,19 @@ def build_gpb_lookup(rootpath):
                                 if val.name == ENUM_ID_NAME:
                                     gpb_id_to_class[val.number] = msg_class
 
-def get_gpb_class_from_id(id):
+def get_gpb_class_from_type_id(typeid):
     """
     Get a callable google.protobuf.message.Message subclass with the given MessageTypeIdentifier enum id.
-    @param id The integer id.
+    @param id The type id object
     @retval msg_class The class for the given id.
     @throws ObjectUtilException
     """
     try:
-        id = int(id)
-        return gpb_id_to_class[id]
-    except ValueError, ex:
-        raise ObjectUtilException('Protocol Buffer Message ids must be integers: "%s"' % (str(id)))
+        return gpb_id_to_class[typeid.object_id]
+    except AttributeError, ex:
+        raise ObjectUtilException('The type argument is not a valid type identifier objet: "%s, type: %s "' % (str(typeid), type(typeid)))
     except KeyError, ex:
-        raise ObjectUtilException('No Protocol Buffer Message class found for id "%d"' % (id))
+        raise ObjectUtilException('No Protocol Buffer Message class found for id "%s"' % (str(typeid)))
 
 # Build the lookup table on first import
 build_gpb_lookup('net')

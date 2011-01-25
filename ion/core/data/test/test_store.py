@@ -18,12 +18,18 @@ from twisted.internet import defer
 
 from ion.core.data import store
 from ion.core.data import cassandra
-from ion.core.data import irodsstore
 
 # Import the workbench and the Persistent Archive Resource Objects!
 from ion.core.object import workbench
-from net.ooici.services.dm import persistent_archive_pb2
 
+from ion.core.object import object_utils
+
+
+simple_password_type = object_utils.create_type_identifier(object_id=2502, version=1)
+columndef_type = object_utils.create_type_identifier(object_id=2503, version=1)
+column_family_type = object_utils.create_type_identifier(object_id=2507, version=1)
+cassandra_cluster_type = object_utils.create_type_identifier(object_id=2504, version=1)
+cassandra_keypsace_type = object_utils.create_type_identifier(object_id=2506, version=1)
 
 class IStoreTest(unittest.TestCase):
 
@@ -75,7 +81,7 @@ class CassandraStoreTest(IStoreTest):
         wb = workbench.WorkBench('No Process: Testing only')
         
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
-        persistence_technology_repository, cassandra_cluster  = wb.init_repository(persistent_archive_pb2.CassandraCluster)
+        persistence_technology_repository, cassandra_cluster  = wb.init_repository(cassandra_cluster_type)
         
         # Set only one host and port in the host list for now
         cas_host = cassandra_cluster.hosts.add()
@@ -85,19 +91,19 @@ class CassandraStoreTest(IStoreTest):
         cas_host.port = 9160
         
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
-        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(persistent_archive_pb2.CassandraKeySpace)
+        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keypsace_type)
         # only the name of the keyspace is required
         cassandra_keyspace.name = 'StoreTestKeyspace'
         #cassandra_keyspace.name = 'Keyspace1'
         
         ### Create a Credentials resource - for cassandra a SimplePassword object
-        cache_repository, simple_password  = wb.init_repository(persistent_archive_pb2.SimplePassword)
+        cache_repository, simple_password  = wb.init_repository(simple_password_type)
         # only the name of the column family is required
         simple_password.username = 'ooiuser'
         simple_password.password = 'oceans11'
         
         ### Create a Cache resource - for cassandra a ColumnFamily object
-        cache_repository, column_family  = wb.init_repository(persistent_archive_pb2.ColumnFamily)
+        cache_repository, column_family  = wb.init_repository(column_family_type)
         # only the name of the column family is required
         column_family.name = 'TestCF'
         
@@ -135,7 +141,7 @@ class CassandraIndexedStoreTest(IStoreTest):
         wb = workbench.WorkBench('No Process: Testing only')
         
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
-        persistence_technology_repository, cassandra_cluster  = wb.init_repository(persistent_archive_pb2.CassandraCluster)
+        persistence_technology_repository, cassandra_cluster  = wb.init_repository(cassandra_cluster_type)
         
         # Set only one host and port in the host list for now
         cas_host = cassandra_cluster.hosts.add()
@@ -145,27 +151,27 @@ class CassandraIndexedStoreTest(IStoreTest):
         cas_host.port = 9160
         
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
-        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(persistent_archive_pb2.CassandraKeySpace)
+        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keypsace_type)
         # only the name of the keyspace is required
         cassandra_keyspace.name = 'StoreTestKeyspace'
         #cassandra_keyspace.name = 'Keyspace1'
         
         ### Create a Credentials resource - for cassandra a SimplePassword object
-        cache_repository, simple_password  = wb.init_repository(persistent_archive_pb2.SimplePassword)
+        cache_repository, simple_password  = wb.init_repository(simple_password_type)
         # only the name of the column family is required
         simple_password.username = 'ooiuser'
         simple_password.password = 'oceans11'
         
-        ### Create a Cache resource - for cassandra a ColumnFamily object
-        
-        cache_repository, column_family  = wb.init_repository(persistent_archive_pb2.ColumnFamily)
+        ### Create a Cache resource - for Cassandra a ColumnFamily object
+
+        cache_repository, column_family  = wb.init_repository(column_family_type)
         # only the name of the column family is required
         column_family.name = 'TestCF'
         
         self.cache = column_family
         self.cache_repository = cache_repository
-        column = self.cache_repository.create_wrapped_object(persistent_archive_pb2.ColumnDef)
-        #column_repository, column  = self.wb.init_repository(persistent_archive_pb2.ColumnDef)
+        #column = self.cache_repository.create_wrapped_object(ColumnDef)
+        column_repository, column  = wb.init_repository(columndef_type)
         column.column_name = "state"
         column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
         #IndexType.KEYS is 0, and IndexType is an enum
@@ -231,20 +237,3 @@ class CassandraIndexedStoreTest(IStoreTest):
     def tearDown(self):
         self.ds.terminate()
              
-        
-class IRODSStoreTest(IStoreTest):
-    
-    def _setup_backend(self):
-        irods_config = {'irodsHost': 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com', \
-                    'irodsPort':'1247', \
-                    'irodsDefResource':'ooi-test-resc1', \
-                    'irodsOoiCollection':'/ooi-test-cluster1/home/testuser/OOI', \
-                    'irodsUserName':'testuser', \
-                    'irodsUserPasswd':'test', \
-                    'irodsZone':'ooi-test-cluster1'}
-        ds = irodsstore.IrodsStore.create_store(**irods_config)
-        return ds
-     
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self.ds.clear_store()

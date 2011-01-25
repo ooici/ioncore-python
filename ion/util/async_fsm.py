@@ -69,7 +69,7 @@ class AsyncFSM(FSM):
             self.current_state = self.next_state
             self.next_state = None
             def_action = defer.Deferred()
-            def_action.callback()
+            def_action.callback(None)
 
         return def_action
 
