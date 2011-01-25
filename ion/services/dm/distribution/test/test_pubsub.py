@@ -34,7 +34,7 @@ class PST(IonTestCase):
 
         self.xs_name = 'ooici'
         self.tt_name = 'science_data'
-        self.topic_name = 'coads.nc'
+        self.topic_name = 'http://ooici.net:8001/coads.nc'
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -77,6 +77,13 @@ class PST(IonTestCase):
         rc = yield self.psc.query_topic_trees('.+')
         self.failIf(rc is None)
         self.failIf(len(rc) > 0)
+
+    @defer.inlineCallbacks
+    def test_define_topic(self):
+        tt_id = 'fake_topic_id'
+        topic_id = yield self.psc.define_topic(tt_id, self.topic_name)
+        # Verify that it was created
+        self.failIf(topic_id is None)
 
     @defer.inlineCallbacks
     def test_topics(self):

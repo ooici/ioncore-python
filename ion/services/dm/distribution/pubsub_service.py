@@ -13,18 +13,23 @@ and defining subscriptions.
 
 import ion.util.ionlog
 
+import time
+
 from twisted.internet import defer
 
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-
 from ion.services.dm.distribution import pubsub_registry
-
 from ion.core import ioninit
+from ion.core.object import object_utils
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 
 # Global objects
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
+
+# References to protobuf message/object definitions
+DSET_TYPE = object_utils.create_type_identifier(object_id=2301, version=1)
 
 class PubSubService(ServiceProcess):
     """
@@ -48,6 +53,8 @@ class PubSubService(ServiceProcess):
     def slc_init(self):
         # Link to registry
         self.reg = yield pubsub_registry.DataPubsubRegistryClient(proc=self)
+        self.dset_repo, self.db = self.workbench.init_repository(DSET_TYPE)
+        self.db.title = 'Dataset book'
 
     # Protocol entry points. Responsible for parsing and unpacking arguments
     def op_declare_topic_tree(self, content, headers, msg):
@@ -188,8 +195,25 @@ class PubSubService(ServiceProcess):
         @param topic_name Name to declare
         @retval Topic ID, or None if error
         """
-        
-        log.error('DT not implemented')
+        log.debug('Creating and populating dataset message/object')
+
+        dset = self.dset_repo.create_object(DSET_TYPE)
+
+        dset.open_dap = topic_name
+        now = time.time()
+        dset.last_updated = now
+        dset.date_created = now
+        dset.creator.name = 'Otto Niemand'
+
+        cstr = "%s/%s" % (topic_tree_id, topic_name)
+        log.debug('Dataset object created, pushing/committing "%s"' % cstr)
+        log.debug(dset)
+
+        id = self.dset_repo.commit(comment='Adding dataset %s' % cstr)
+
+        log.debug('Commit completed, %s' % id)
+        return id
+
 
     def query_topics(self, exchange_point_name, topic_regex):
         """
