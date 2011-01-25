@@ -338,7 +338,7 @@ class PubSubClient(ServiceClient):
         @param topic_regex Topic of interest. If no publishers, then no data, but no error
         @note Order of calls on publish/subscribe does not matter
         @note creates the queue via EMS
-        @retval Address of queue for ondata() callback and resource id
+        @retval Address of queue for ondata() callback and subscription id
         """
         yield self._check_init()
         payload = {'topic_regex' : topic_regex}
@@ -350,7 +350,7 @@ class PubSubClient(ServiceClient):
     def unsubscribe(self, subscription_id):
         """
         @brief Remove subscription
-        @param subscription_id ID from subscribe calS
+        @param subscription_id ID from subscribe call
         @retval OK if no problems, error otherwise
         """
         yield self._check_init()
