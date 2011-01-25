@@ -9,8 +9,6 @@
         in memory implementation
 """
 
-import re
-
 from zope.interface import Interface
 from zope.interface import implements
 
