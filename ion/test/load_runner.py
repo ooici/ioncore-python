@@ -151,7 +151,7 @@ class LoadTestRunner(object):
         yield defer.maybeDeferred(load_proc.setUp)
         yield defer.maybeDeferred(load_proc.generate_load)
 
-        #d3 = defer.maybeDeferred(load_proc.tearDown)
+        yield defer.maybeDeferred(load_proc.tearDown)
 
     def timeout(self):
         #print "TIMEOUT"

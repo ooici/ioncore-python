@@ -125,7 +125,7 @@ class AddUser(resource.Resource):
             new_user = coi_resource_descriptions.IdentityResource.create_new_resource()
             for field_name in new_user.attributes:
                 if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle")):
-                    if (len(request.args[field_name]) > 0):
+                    if (field_name in request.args and len(request.args[field_name]) > 0):
                         setattr(new_user, field_name, request.args[field_name][0])
 
             d = self.client.register_user(new_user)
@@ -210,7 +210,7 @@ class FindUser(resource.Resource):
                 updated_user = coi_resource_descriptions.IdentityResource()
                 for field_name in updated_user.attributes:
                     if (field_name not in ("lifecycle", "name", "RegistryCommit")):
-                        if (len(request.args[field_name]) > 0):
+                        if (field_name in request.args and len(request.args[field_name]) > 0):
                             setattr(updated_user, field_name, request.args[field_name][0])
 
                 foo = dataobject.LCState(state=request.args["lifecycle"][0].lower())
@@ -231,7 +231,7 @@ class FindUser(resource.Resource):
                     for field_name in user_description.attributes:
                         # (Future Roger, here is a message from past Roger) You have aged horribly, and note when funky unexplained shit shows up, add it in the line below to safely ignore it 
                         if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle", "name")):
-                            if (len(request.args[field_name]) > 0) and (len(request.args[field_name][0]) > 0) :
+                            if (field_name in request.args) and (len(request.args[field_name]) > 0) and (len(request.args[field_name][0]) > 0) :
                                 setattr(user_description, field_name, request.args[field_name][0])
                                 attnames.append(field_name)
                                 #print "************************* " + field_name + " = '" + request.args[field_name][0] + "'"
