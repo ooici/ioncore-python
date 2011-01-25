@@ -53,8 +53,6 @@ class PubSubService(ServiceProcess):
     def slc_init(self):
         # Link to registry
         self.reg = yield pubsub_registry.DataPubsubRegistryClient(proc=self)
-        self.dset_repo, self.db = self.workbench.init_repository(DSET_TYPE)
-        self.db.title = 'Dataset book'
 
     # Protocol entry points. Responsible for parsing and unpacking arguments
     def op_declare_topic_tree(self, content, headers, msg):
@@ -188,6 +186,7 @@ class PubSubService(ServiceProcess):
         """
         log.error('QTT not implemented')
 
+    @defer.inlineCallbacks
     def define_topic(self, topic_tree_id, topic_name):
         """
         @brief Within a topic tree, define a topic. Usually a dataset name by convention.
@@ -197,22 +196,22 @@ class PubSubService(ServiceProcess):
         """
         log.debug('Creating and populating dataset message/object')
 
-        dset = self.dset_repo.create_object(DSET_TYPE)
 
+        cstr = "%s/%s" % (topic_tree_id, topic_name)
+        rc = ResourceClient()
+        dset = yield rc.create_instance(DSET_TYPE, name=topic_name,
+                                  description=cstr)
         dset.open_dap = topic_name
         now = time.time()
         dset.last_updated = now
         dset.date_created = now
         dset.creator.name = 'Otto Niemand'
-
-        cstr = "%s/%s" % (topic_tree_id, topic_name)
         log.debug('Dataset object created, pushing/committing "%s"' % cstr)
-        log.debug(dset)
+        #log.debug(dset)
 
-        id = self.dset_repo.commit(comment='Adding dataset %s' % cstr)
-
-        log.debug('Commit completed, %s' % id)
-        return id
+        rc.put_instance(dset, 'Adding dataset/topic %s' % cstr)
+        log.debug('Commit completed, %s' % dset.ResourceIdentity)
+        defer.returnValue(dset.ResourceIdentity)
 
 
     def query_topics(self, exchange_point_name, topic_regex):
