@@ -506,7 +506,6 @@ class Wrapper(object):
         else:
             self.ParentLinks.add(link)
         
-        
     def _rewrap(self, gpbMessage):
         '''
         Factory method to return a new instance of wrapper for a gpbMessage
@@ -587,21 +586,6 @@ class Wrapper(object):
                     
                 if value.Invalid:
                     raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-                    
-                if not value.Repository is self.Repository:
-                    if value.Repository.status != self.Repository.UPTODATE:
-                        raise OOIObjectError('Can not move objects from a foreign repository which is in a modified state')
-                    
-                    if len(value.ParentLinks) < 1:
-                        raise OOIObjectError('''Can not move an object from a foreign repository which has no parent links.
-                                             It must have been set as part of the data structure first.''')
-                    
-                    # Get the object from it serialized version in the hash.
-                    obj = self.Repository.get_linked_object(value.ParentLinks[0])
-                    # load all its linked children
-                    self.Repository._load_links(obj)
-                    
-                    value = obj
                     
                 self.SetLinkByName(key,value)
                     

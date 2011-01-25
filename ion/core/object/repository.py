@@ -802,6 +802,22 @@ class Repository(object):
         if not value.IsRoot == True:
             raise RepositoryError('You can not set a link equal to part of a gpb composite!')
         
+        # if this value is from another repository... you need to load it from the hashed objects into this repository
+        if not value.Repository.repository_key == self.repository_key:
+            
+            if value.Modified:
+                raise OOIObjectError('Can not move objects from a foreign repository which are in a modified state')
+            
+            # Get the element from the hashed elements list
+            element = self._hashed_elements.get(value.MyId)
+            
+            obj = self._load_element(element)
+            
+            self._load_links(obj)
+            
+            value = obj
+        
+        
         if link.key == value.MyId:
                 # Add the new link to the list of parents for the object
                 value.AddParentLink(link) 
