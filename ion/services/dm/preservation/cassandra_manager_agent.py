@@ -36,7 +36,7 @@ column_family_type =  object_utils.create_type_identifier(object_id=2507, versio
 
 class CassandraManagerAgent(ServiceProcess):
     """
-    @Brief Cassandra Manager Agent interface
+    @brief Cassandra Manager Agent interface
     @TODO change to inherit from agent process
     The agent uses a single manager client connection to cassandra to configure
     cassandra persistent archive and cache resources. 
@@ -74,13 +74,13 @@ class CassandraManagerAgent(ServiceProcess):
         First, default to bootstrapping from the spawn args. Create all resources
         by describing the cluster!
         
-        Second, add hooks to over ride the spawn args and take the storage resource
+        Second, add hooks to override the spawn args and take the storage resource
         reference from a message in op_activate - connecting to an already active
         system!
         
         """
         
-        
+        """
         if self.spawn_args.get('bootstrap_args', None):
             
             # Build a storage resource from the spawn_args dictionary 
@@ -95,13 +95,28 @@ class CassandraManagerAgent(ServiceProcess):
             # Lets put it in the spawn args for now...
             #self.spawn_args.get(...)
             storage_resource = yield self.rc.get_instance(storage_resource_ref)
-        
-        
+        """
+        #Hard code the storage resource for now. Eventually pass all this into spawn_args
         # The cassandra client manager
+        self.wb = workbench.Workbench("I need this make ION resources")
+                ### Create a persistence_technology resource - for cassandra a CassandraCluster object
+        persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(cassandra_cluster_type)
+        
+        # Set only one host and port in the host list for now
+        cas_host = cassandra_cluster.hosts.add()
+        cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
+        cas_host.port = 9160
+        
+        ### Create a Credentials resource - for cassandra a SimplePassword object
+        cache_repository, simple_password  = self.wb.init_repository(simple_password_type)
+        simple_password.username = 'ooiuser'
+        simple_password.password = 'oceans11'
+        
+        storage_resource = CassandraStorageResource(cassandra_cluster, credentials=simple_password)
         manager = CassandraDataManager(storage_resource)
         
         #@TODO Need update the register method using Dave F's new code!
-        yield self.register_life_cycle_object(manager)
+        #yield self.register_life_cycle_object(manager)
         
         self.manager = manager
         
@@ -114,7 +129,9 @@ class CassandraManagerAgent(ServiceProcess):
         
     @defer.inlineCallbacks
     def _bootstrap(self):
-        
+        yield 1
+        #Implement this later
+        """
         for keyspace in cassandracluster:
             cassandra_keyspace = yield self.rc.create_instance(...)
             yield self.manager.describe_keyspace(cassandra_keyspace)            
@@ -125,52 +142,40 @@ class CassandraManagerAgent(ServiceProcess):
             # ...
             # ...
             
-        
+        """
     @defer.inlineCallbacks
     def op_create_persistent_archive(self, persistent_archive, headers, msg):
-        """Service operation: define a new archive object
-        
-        What should the args be?
-        What happens with credentials for a new keyspace?
-        
         """
-        cassandra_keyspace = yield self.rc.create_instance(...)
-        yield self.manager.create_persistent_archive
-        yield self.rc.put_instance(cassandra_keyspace)
+        Service operation: define a new archive object
+        """
+        #cassandra_keyspace = yield self.rc.create_instance(...)
+        yield self.manager.create_persistent_archive(persistent_archive)
+        #yield self.rc.put_instance(cassandra_keyspace)
 
     @defer.inlineCallbacks
     def op_update_persistent_archive(self, persistent_archive, headers, msg):
-        """Service operation: define a new archive object
-        
-        What should the args be?
-        * PA_REF
-        * Updated values?
-        What happens with credentials for a new keyspace?
+        """
+        Service operation: update the persistent_archive
         
         """
-        cassandra_keyspace = yield self.rc.get_instance(pa_ref)
-        
-        #make the changes in the resource
-        #...
-        
+        #cassandra_keyspace = yield self.rc.get_instance(pa_ref
         # update cassandra
-        yield self.manager.update_persistent_archive
-        
+        yield self.manager.update_persistent_archive(persistent_archive)
         # update the resource
-        yield self.rc.put_instance(cassandra_keyspace)
+        #yield self.rc.put_instance(cassandra_keyspace)
 
 
     @defer.inlineCallbacks
     def op_delete_persistent_archive(self, persistent_archive, headers, msg):
-        """Service operation: define a new archive object
+        """
+        Service operation: define a new archive object
         
         What should the args be?
         What happens with credentials for a new keyspace?
-        
         """
-        cassandra_keyspace = yield self.rc.create_instance(...)
-        yield self.manager.create_persistent_archive
-        yield self.rc.put_instance(cassandra_keyspace)
+       # cassandra_keyspace = yield self.rc.create_instance(...)
+        yield self.manager.delete_persistent_archive(persistent_archive)
+        #yield self.rc.put_instance(cassandra_keyspace)
    
    # more of the same for the cache?
    
