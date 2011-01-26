@@ -8,14 +8,16 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-from twisted.trial import unittest
-
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
-from ion.services.dm.preservation.preservation_service import PreservationClient, PreservationService
+from ion.core.object import workbench
 
-class PreservationTester(IonTestCase):
+from ion.services.dm.preservation.cassandra_manager_agent import CassandraManagerClient
+from ion.core.object import object_utils
+cassandra_keyspace_type = object_utils.create_type_identifier(object_id=2506, version=1)
+
+class CassandraManagerTester(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -24,13 +26,15 @@ class PreservationTester(IonTestCase):
             {'name': 'preservation_registry',
              'module': 'ion.services.dm.preservation.preservation_registry',
              'class':'PreservationRegistryService'},
-            {'name': 'preservation_service',
-             'module': 'ion.services.dm.preservation.preservation_service',
-             'class':'PreservationService'},           
+            {'name': 'cassandra_manager_agent',
+             'module': 'ion.services.dm.preservation.cassandra_manager_agent',
+             'class':'CassandraManagerAgent'},           
         ]
         sup = yield self._spawn_processes(services)
-        self.pc = PreservationClient(proc=sup)
-
+        self.client = CassandraManagerClient(proc=sup)
+        self.wb = workbench.WorkBench('No Process: Testing only')
+        
+        
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -39,11 +43,13 @@ class PreservationTester(IonTestCase):
     def test_instantiation_only(self):
         pass
 
+    @defer.inlineCallbacks
     def test_create_archive(self):
-        """
-        Use fetcher service to create dataset so we can test without
-        actual messaging.
-        """
-        raise unittest.SkipTest('Not implemented')
+
+        persistent_archive_repository, cassandra_keyspace  = self.wb.init_repository(cassandra_keyspace_type)
+        cassandra_keyspace.name = 'ManagerServiceKeyspace'
+        self.keyspace = cassandra_keyspace
+        yield self.client.create_persistent_archive(self.keyspace)
+        
 
         
