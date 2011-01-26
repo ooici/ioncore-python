@@ -92,7 +92,8 @@ def _bootstrap_objects(supid):
     rc = ResourceClient(proc=sup)
     
     # Create the dataset resource
-    dataset = yield rc.create_instance(dataset_type, name='Test CDM Resource dataset', description='A test resource')
+    dataset = yield rc.create_instance(dataset_type, name='Test CDM Resource dataset',
+                                       description='A test resource')
     
     # Attach the root group
     group = dataset.CreateObject(group_type)

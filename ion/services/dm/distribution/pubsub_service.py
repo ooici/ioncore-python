@@ -13,18 +13,23 @@ and defining subscriptions.
 
 import ion.util.ionlog
 
+import time
+
 from twisted.internet import defer
 
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-
-from ion.services.dm.distribution import pubsub_registry
-
+#from ion.services.dm.distribution import pubsub_registry
 from ion.core import ioninit
+from ion.core.object import object_utils
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 
 # Global objects
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
+
+# References to protobuf message/object definitions
+DSET_TYPE = object_utils.create_type_identifier(object_id=2301, version=1)
 
 class PubSubService(ServiceProcess):
     """
@@ -44,10 +49,10 @@ class PubSubService(ServiceProcess):
                                           version='0.1.1',
                                           dependencies=[])
 
-    @defer.inlineCallbacks
-    def slc_init(self):
+    #@defer.inlineCallbacks
+    #def slc_init(self):
         # Link to registry
-        self.reg = yield pubsub_registry.DataPubsubRegistryClient(proc=self)
+        #self.reg = yield pubsub_registry.DataPubsubRegistryClient(proc=self)
 
     # Protocol entry points. Responsible for parsing and unpacking arguments
     def op_declare_topic_tree(self, content, headers, msg):
@@ -87,6 +92,7 @@ class PubSubService(ServiceProcess):
         rc = self.query_topic_trees(t_regex)
         self.reply_ok(msg, {'value': rc})
 
+    @defer.inlineCallbacks
     def op_define_topic(self, content, headers, msg):
         try:
             tt_id = content['topic_tree_id']
@@ -94,11 +100,11 @@ class PubSubService(ServiceProcess):
         except KeyError:
             estr = 'Missing information in message!'
             log.exception(estr)
-            self.reply_err(msg, {'value': estr})
+            yield self.reply_err(msg, {'value': estr})
             return
 
-        rc = self.define_topic(tt_id, t_name)
-        self.reply_ok(msg, {'value': rc})
+        rc = yield self.define_topic(tt_id, t_name)
+        yield self.reply_ok(msg, {'value': rc})
 
     def op_query_topics(self, content, headers, msg):
         try:
@@ -181,6 +187,7 @@ class PubSubService(ServiceProcess):
         """
         log.error('QTT not implemented')
 
+    @defer.inlineCallbacks
     def define_topic(self, topic_tree_id, topic_name):
         """
         @brief Within a topic tree, define a topic. Usually a dataset name by convention.
@@ -188,8 +195,25 @@ class PubSubService(ServiceProcess):
         @param topic_name Name to declare
         @retval Topic ID, or None if error
         """
-        
-        log.error('DT not implemented')
+        log.debug('Creating and populating dataset message/object')
+
+
+        cstr = "%s/%s" % (topic_tree_id, topic_name)
+        rc = ResourceClient(proc=self)
+        dset = yield rc.create_instance(DSET_TYPE, name=topic_name,
+                                  description=cstr)
+        dset.open_dap = topic_name
+        now = time.time()
+        dset.last_updated = now
+        dset.date_created = now
+        dset.creator.name = 'Otto Niemand'
+        log.debug('Dataset object created, pushing/committing "%s"' % cstr)
+        #log.debug(dset)
+
+        yield rc.put_instance(dset, 'Adding dataset/topic %s' % cstr)
+        log.debug('Commit completed, %s' % dset.ResourceIdentity)
+        defer.returnValue(dset.ResourceIdentity)
+
 
     def query_topics(self, exchange_point_name, topic_regex):
         """
@@ -338,7 +362,7 @@ class PubSubClient(ServiceClient):
         @param topic_regex Topic of interest. If no publishers, then no data, but no error
         @note Order of calls on publish/subscribe does not matter
         @note creates the queue via EMS
-        @retval Address of queue for ondata() callback and resource id
+        @retval Address of queue for ondata() callback and subscription id
         """
         yield self._check_init()
         payload = {'topic_regex' : topic_regex}
@@ -350,7 +374,7 @@ class PubSubClient(ServiceClient):
     def unsubscribe(self, subscription_id):
         """
         @brief Remove subscription
-        @param subscription_id ID from subscribe calS
+        @param subscription_id ID from subscribe call
         @retval OK if no problems, error otherwise
         """
         yield self._check_init()
