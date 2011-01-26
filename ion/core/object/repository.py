@@ -699,7 +699,7 @@ class Repository(object):
      
     def get_linked_object(self, link):
                 
-        if link.GPBType != self.LinkClassType:
+        if link.ObjectType != self.LinkClassType:
             raise RepositoryError('Illegal argument type in get_linked_object.')
                 
                 
@@ -736,11 +736,11 @@ class Repository(object):
             #self.set_linked_object(link, obj)
             obj.AddParentLink(link)
             
-            if obj.GPBType == self.CommitClassType:
+            if obj.ObjectType == self.CommitClassType:
                 self._commit_index[obj.MyId]=obj
                 obj.ReadOnly = True
                 
-            elif link.Root.GPBType == self.CommitClassType:
+            elif link.Root.ObjectType == self.CommitClassType:
                 # if the link is a commit but the linked object is not then it is a root object
                 # The default for a root object should be ReadOnly = False
                 self._workspace[obj.MyId]=obj
@@ -803,7 +803,7 @@ class Repository(object):
         
     def set_linked_object(self,link, value):        
         # If it is a link - set a link to the value in the wrapper
-        if link.GPBType != link.LinkClassType:
+        if link.ObjectType != link.LinkClassType:
             raise RepositoryError('Can not set a composite field unless it is of type Link')
                     
         if not value.IsRoot == True:

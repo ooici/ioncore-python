@@ -45,9 +45,9 @@ class HelloObject(ServiceProcess):
 
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if person.GPBType != person_type:
+        if person.ObjectType != person_type:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloError('Unexpected type received %s; type: %s' % (str(person), str(person.GPBType)))
+            raise HelloError('Unexpected type received %s; type: %s' % (str(person), str(person.ObjectType)))
             
                 
         # Creepy hello person object log statements...
@@ -68,9 +68,9 @@ class HelloObject(ServiceProcess):
     def op_hello_everyone(self, addressbook, headers, msg):
         log.info('op_hello_everyone: ')
 
-        if addressbook.GPBType != addresslink_type:
+        if addressbook.ObjectType != addresslink_type:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloError('Unexpected type received %s; type: %s' % (str(addressbook), str(addressbook.GPBType)))
+            raise HelloError('Unexpected type received %s; type: %s' % (str(addressbook), str(addressbook.ObjectType)))
             
         log.info('Received addresbook; Title: ' + addressbook.title)
         for person in addressbook.person:

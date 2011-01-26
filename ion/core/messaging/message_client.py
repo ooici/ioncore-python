@@ -157,7 +157,7 @@ class MessageInstance(object):
         
     def _set_message_object(self, value):
         repo = object.__getattribute__(self, '_repository')
-        if value.GPBType != self.MessageType:
+        if value.ObjectType != self.MessageType:
             raise MessageInstanceError('Can not change the type of a message object!')
         repo._workspace_root.message_object = value
         
@@ -231,6 +231,9 @@ class MessageInstance(object):
                 
         else:
             v = object.__setattr__(self, key, value)
+        
+    def HasField(self, field):
+        return self.Message.HasField(field)
         
         
     @property

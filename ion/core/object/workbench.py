@@ -303,7 +303,7 @@ class WorkBench(object):
         
             # Can not set the pointer directly... must set the components
             se.value = link.SerializeToString()
-            se.type.CopyFrom(link.GPBType) # Copy is okay - this is small
+            se.type.CopyFrom(link.ObjectType) # Copy is okay - this is small
             #se.key = gpb_wrapper.sha1hex(se.value)
 
             # Calculate the sha1 from the serialized value and type!
@@ -669,7 +669,7 @@ class WorkBench(object):
             
             cref = repo._load_element(element)
             
-            if cref.GPBType == self.CommitClassType:
+            if cref.ObjectType == self.CommitClassType:
                 repo._commit_index[cref.MyId]=cref
                 cref.ReadOnly = True
             else:

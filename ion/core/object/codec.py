@@ -48,8 +48,8 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
             raw_content = invocation.content['content']
             unpacked_content = invocation.workbench.unpack_structure(raw_content)
                 
-            if hasattr(unpacked_content, 'GPBType') and \
-                unpacked_content.GPBType == ion_message_type:
+            if hasattr(unpacked_content, 'ObjectType') and \
+                unpacked_content.ObjectType == ion_message_type:
                 # If this content should be returned in a Message Instance
                 content = message_client.MessageInstance(unpacked_content.Repository)
             

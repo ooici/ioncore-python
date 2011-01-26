@@ -148,7 +148,7 @@ class ResourceClient(object):
         commit = None
         
         # Get the type of the argument and act accordingly
-        if hasattr(resource_id, 'GPBType') and resource_id.GPBType == idref_Type:
+        if hasattr(resource_id, 'ObjectType') and resource_id.ObjectType == idref_Type:
             # If it is a resource reference, unpack it.
             if resource_id.branch:
                 branch = resource_id.branch
@@ -287,7 +287,7 @@ class ResourceInstance(object):
         
     def _set_resource_object(self, value):
         repo = object.__getattribute__(self, '_repository')
-        if value.GPBType != self.ResourceType:
+        if value.ObjectType != self.ResourceType:
             raise ResourceInstanceError('Can not change the type of a resource object!')
         repo._workspace_root.resource_object = value
         
@@ -353,9 +353,9 @@ class ResourceInstance(object):
         merge_branches = []
         for update in args:
         
-            if update.GPBType != self.ResourceType:
+            if update.ObjectType != self.ResourceType:
                 log.debug ('Resource Type does not match update Type')
-                log.debug ('Update type %s; Resource type %s' % (str(update.GPBType), str(self.ResourceType)))
+                log.debug ('Update type %s; Resource type %s' % (str(update.ObjectType), str(self.ResourceType)))
                 raise ResourceInstanceError('update_instance argument "update" must be of the same type as the resource')
             
             current_branchname = self.Repository._current_branch.branchkey
@@ -444,6 +444,8 @@ class ResourceInstance(object):
         else:
             v = object.__setattr__(self, key, value)
         
+    def HasField(self, field):
+        return self.Message.HasField(field)
         
     @property
     def ResourceIdentity(self):
