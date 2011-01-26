@@ -134,7 +134,9 @@ class WorkBench(object):
         
         if current_state:
             id_ref.commit = repo._current_branch.commitrefs[0].MyId
-
+            
+        repository.commit('Created repository reference')
+        
         return id_ref
         
     def fork(self, structure, name):

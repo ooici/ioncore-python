@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/hello_resource.py
+@file ion/play/hello_data_update.py
 @author David Stuebe
-@brief An example service definition that can be used as template for resource management.
+@brief An example service definition that can be used as template for data
+resource management. This is a more complex example of resource management
+specific to datasets...
 """
 
 import ion.util.ionlog
@@ -14,6 +16,8 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory, Process, ProcessClient
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
+from ion.core.messaging.message_client import MessageClient
+
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 
@@ -21,15 +25,16 @@ from ion.core.object import object_utils
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
-update_resource_type = object_utils.create_type_identifier(object_id=10, version=1)
+resource_request_type = object_utils.create_type_identifier(object_id=10, version=1)
+resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
 
-class HelloResourceError(Exception):
+class HelloDataUpdateError(Exception):
     """
     An exception class for the Hello Object example
     """
 
 
-class HelloResource(ServiceProcess):
+class HelloDataUpdate(ServiceProcess):
     """
     Example service which manages a set of resources.
     
@@ -49,7 +54,7 @@ class HelloResource(ServiceProcess):
     """
 
     # Declaration of service
-    declare = ServiceProcess.service_declare(name='hello_resource',
+    declare = ServiceProcess.service_declare(name='hello_data_update',
                                              version='0.1.0',
                                              dependencies=[])
 
@@ -58,27 +63,27 @@ class HelloResource(ServiceProcess):
         
         # Can be called in __init__ or in slc_init... no yield required
         self.rc = ResourceClient(proc=self)
+        self.mc = MessageClient(proc=self)
         
         self.instance_counter = 1
         
         log.info('SLC_INIT HelloResource')
 
     @defer.inlineCallbacks
-    def op_create_addressbook_resource(self, addresslink, headers, msg):
+    def op_create_addressbook_resource(self, request, headers, msg):
         """
         This method assumes that the caller provides an addresslink object which
-        should be made into a resource. A higher level service might provide
-        a more abstract interface rather than actually sending the object which
-        will become the resource...
+        should be made into a resource This is not the standard pattern for
+        resource and is likely only to be used for data resources. 
         """
         log.info('op_create_addressbook_resource: ')
 
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if addresslink.GPBType != addresslink_type:
+        if request.MessageType != resource_request_type:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloResourceError('Expected object class AddressLink, received %s; object class: %s'
-                                     % (str(addressbook), str(addressbook.ObjectClass)))
+            raise HelloDataUpdateError('Expected message type ResourceConfigurationRequest, received %s'
+                                     % str(request))
             
         # Attributes of a resource like name and description should be controlled
         # by the service that manages them
@@ -90,21 +95,27 @@ class HelloResource(ServiceProcess):
         # the ResourceObject property of the ResourceInstance provides a setter
         # for the value of the entire resource object - it is usefull for creation
         # and clobber updates...
-        resource.ResourceObject = addresslink
+        resource.ResourceObject = request.configuration
         
         yield self.rc.put_instance(resource)
         
         log.info(str(resource))
         
+        
+        response = yield self.mc.create_instance(resource_response_type, name='create_addressbook_resource response')
+        
         # Create a reference to return to the caller
-        # This is one pattern - it exposes the resource to the caller
-        ref = self.rc.reference_instance(resource)
+        # This is one pattern - it exposes the resource to the caller        
+        response.resource_reference = self.rc.reference_instance(resource)
+        response.configuration = resource.ResourceObject
+        response.result = 'Created'
+        
         
         # The following line shows how to reply to a message
-        yield self.reply_ok(msg, ref)
+        yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
-    def op_clobber_addressbook_resource(self, update_request, headers, msg):
+    def op_clobber_addressbook_resource(self, request, headers, msg):
         """
         This method is an example using a standard resource update request.
         It contains two parts, the reference to the resource to update and the
@@ -113,16 +124,18 @@ class HelloResource(ServiceProcess):
         
         log.info('op_clobber_addressbook_resource: ')
             
-        if update_request.GPBType != update_resource_type:
+        # Check only the type recieved and linked object types. All fields are
+        #strongly typed in google protocol buffers!
+        if request.MessageType != resource_request_type:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloResourceError('Expected object class UpdateResource, received %s; object class: %s'
-                                     % (str(update_request), str(update_request.ObjectClass)))
+            raise HelloDataUpdateError('Expected message type ResourceConfigurationRequest, received %s'
+                                     % str(request))
             
         # Get the current state of the resource
-        resource = yield self.rc.get_instance(update_request.resource_reference)
+        resource = yield self.rc.get_instance(request.resource_reference)
         
         # Merge the requested state into the resource history
-        resource.MergeResourceUpdate(resource.CLOBBER, update_request.configuration)
+        resource.MergeResourceUpdate(resource.CLOBBER, request.configuration)
             
         # Clobber the current state with the update
         resource.ResourceObject = resource.CompareToUpdates[0]
@@ -131,10 +144,18 @@ class HelloResource(ServiceProcess):
             
         yield self.rc.put_instance(resource)
             
+        response = yield self.mc.create_instance(resource_response_type, name='clobber_addressbook_resource response')
+        
+        # Create a reference to return to the caller
+        # This is one pattern - it exposes the resource to the caller        
+        response.resource_reference = self.rc.reference_instance(resource)
+        response.configuration = resource.ResourceObject
+        response.result = 'Clobbered'
+         
         yield self.reply_ok(msg)
 
     @defer.inlineCallbacks
-    def op_merge_addressbook_resource(self, update_request, headers, msg):
+    def op_merge_addressbook_resource(self, request, headers, msg):
         """
         This method is an example using a standard resource update request.
         It contains two parts, the reference to the resource to update and the
@@ -143,16 +164,18 @@ class HelloResource(ServiceProcess):
         
         log.info('op_clobber_addressbook_resource: ')
             
-        if update_request.GPBType != update_resource_type:
+        # Check only the type recieved and linked object types. All fields are
+        #strongly typed in google protocol buffers!
+        if request.MessageType != resource_request_type:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloResourceError('Expected object class UpdateResource, received %s; object class: %s'
-                                     % (str(update_request), str(update_request.ObjectClass)))
+            raise HelloResourceError('Expected message class ResourceConfigurationRequest, received %s'
+                                     % str(request))
             
         # Get the current state of the resource
-        resource = yield self.rc.get_instance(update_request.resource_reference)
+        resource = yield self.rc.get_instance(request.resource_reference)
         
         # Merge the requested state into the resource history
-        resource.MergeResourceUpdate(resource.MERGE, update_request.configuration)
+        resource.MergeResourceUpdate(resource.MERGE, request.configuration)
             
         # Merge the current state with the update
         
@@ -182,20 +205,28 @@ class HelloResource(ServiceProcess):
             
         yield self.rc.put_instance(resource)
             
+        response = yield self.mc.create_instance(resource_response_type, name='clobber_addressbook_resource response')
+        
+        # Create a reference to return to the caller
+        # This is one pattern - it exposes the resource to the caller        
+        response.resource_reference = self.rc.reference_instance(resource)
+        response.configuration = resource.ResourceObject
+        response.result = 'Merged'
+            
         yield self.reply_ok(msg)
 
 
-class HelloResourceClient(ServiceClient):
+class HelloDataUpdateClient(ServiceClient):
     """
-    This is an exemplar service client that calls the hello object service. It
-    makes service calls RPC style using GPB object. There is no special handling
+    This is an exemplar service client that calls the hello update data service.
+    It makes service calls RPC style using GPB objects. There is no special handling
     here, just call send. The clients should become exteremly thin wrappers with
     no business logic.
     """
 
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "hello_resource"
+            kwargs['targetname'] = "hello_data_update"
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
@@ -223,16 +254,6 @@ class HelloResourceClient(ServiceClient):
         defer.returnValue(content)
 
 # Spawn of the process using the module name
-factory = ProcessFactory(HelloResource)
+factory = ProcessFactory(HelloDataUpdate)
 
 
-
-"""
-from ion.play import hello_service as h
-spawn(h)
-send(1, {'op':'hello','content':'Hello you there!'})
-
-from ion.play.hello_service import HelloServiceClient
-hc = HelloServiceClient(1)
-hc.hello()
-"""

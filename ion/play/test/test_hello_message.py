@@ -12,7 +12,7 @@ from twisted.internet import defer
 
 from ion.play.hello_message import HelloMessageClient
 from ion.test.iontest import IonTestCase
-from ion.core.messaging import message_client
+from ion.core.messaging.message_client import MessageClient
 from ion.core.process.process import Process, ProcessClient, ProcessDesc
 from ion.core import bootstrap
 
@@ -52,7 +52,7 @@ class HelloMessageTest(IonTestCase):
         hc1 = HelloMessageClient(proc=self.test_sup)
             
         # Create a mesasge client
-        mc = message_client.MessageClient(proc=self.test_sup)
+        mc = MessageClient(proc=self.test_sup)
         
         # Use the message client to create a message object
         ab_msg = yield mc.create_instance(addresslink_type, name='addressbook message')

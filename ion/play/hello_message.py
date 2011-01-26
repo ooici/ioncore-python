@@ -14,7 +14,7 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory, Process, ProcessClient
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.core.messaging import message_client
+from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -38,7 +38,7 @@ class HelloMessage(ServiceProcess):
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
-        self.mc = message_client.MessageClient(proc=self)
+        self.mc = MessageClient(proc=self)
         
         log.info('SLC_INIT HelloProcess')
 
@@ -117,13 +117,3 @@ class HelloMessageClient(ServiceClient):
 factory = ProcessFactory(HelloMessage)
 
 
-
-"""
-from ion.play import hello_service as h
-spawn(h)
-send(1, {'op':'hello','content':'Hello you there!'})
-
-from ion.play.hello_service import HelloServiceClient
-hc = HelloServiceClient(1)
-hc.hello()
-"""
