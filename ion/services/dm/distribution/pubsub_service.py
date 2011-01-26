@@ -92,6 +92,7 @@ class PubSubService(ServiceProcess):
         rc = self.query_topic_trees(t_regex)
         self.reply_ok(msg, {'value': rc})
 
+    @defer.inlineCallbacks
     def op_define_topic(self, content, headers, msg):
         try:
             tt_id = content['topic_tree_id']
@@ -102,7 +103,7 @@ class PubSubService(ServiceProcess):
             self.reply_err(msg, {'value': estr})
             return
 
-        rc = self.define_topic(tt_id, t_name)
+        rc = yield self.define_topic(tt_id, t_name)
         self.reply_ok(msg, {'value': rc})
 
     def op_query_topics(self, content, headers, msg):
@@ -198,7 +199,7 @@ class PubSubService(ServiceProcess):
 
 
         cstr = "%s/%s" % (topic_tree_id, topic_name)
-        rc = ResourceClient()
+        rc = ResourceClient(proc=self)
         dset = yield rc.create_instance(DSET_TYPE, name=topic_name,
                                   description=cstr)
         dset.open_dap = topic_name
