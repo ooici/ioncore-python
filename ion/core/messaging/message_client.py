@@ -233,8 +233,10 @@ class MessageInstance(object):
             v = object.__setattr__(self, key, value)
         
     def HasField(self, field):
-        return self.Message.HasField(field)
+        return self.MessageObject.HasField(field)
         
+    def ClearField(self, field):
+        return self.MessageObject.ClearField(field)
         
     @property
     def MessageIdentity(self):

@@ -445,7 +445,10 @@ class ResourceInstance(object):
             v = object.__setattr__(self, key, value)
         
     def HasField(self, field):
-        return self.Message.HasField(field)
+        return self.ResourceObject.HasField(field)
+        
+    def ClearField(self, field):
+        return self.ResourceObject.ClearField(field)
         
     @property
     def ResourceIdentity(self):

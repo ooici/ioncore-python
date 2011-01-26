@@ -77,7 +77,7 @@ class HelloDataUpdateTest(IonTestCase):
         create_request_msg.configuration.person[0].phone.add()
         create_request_msg.configuration.person[0].phone.number = '401 789 6224'
         
-        log.info('AdressBook!' + str(create_request_msg))
+        log.info('AdressBook! \n' + str(create_request_msg))
         
         
         log.info('Calling create addressbook resource ')
