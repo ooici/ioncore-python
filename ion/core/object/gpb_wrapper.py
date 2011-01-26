@@ -727,7 +727,14 @@ class Wrapper(object):
     def HasField(self, field_name):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self.GPBMessage.HasField(field_name)
+            
+        try:
+            result = self.GPBMessage.HasField(field_name)
+        except ValueError, ex:
+            raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
+                    (str(self.ObjectClass), field_name))
+            
+        return result
     
     def ClearField(self, field_name):
         if self.Invalid:
@@ -740,8 +747,12 @@ class Wrapper(object):
         #    return
             
         # Get the raw GPB field
-        GPBField = getattr(GPBMessage, field_name)
-        
+        try: 
+            GPBField = getattr(GPBMessage, field_name)
+        except AttributeError, ex:
+            raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
+                    (str(self.ObjectClass), field_name))
+            
         if isinstance(GPBField, containers.RepeatedScalarFieldContainer):
             objhash = GPBField.__hash__()
             del self.DerivedWrappers[objhash]
