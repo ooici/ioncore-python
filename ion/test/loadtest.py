@@ -77,7 +77,9 @@ class LoadTest(object):
         cur_value = self.cur_state[key]
         base_value = self.base_state[key]
         interval = interval or self._get_interval()
-        rate = (cur_value - base_value) / interval
+        rate = 0
+        if interval != 0:
+            rate = (cur_value - base_value) / interval
         return rate
 
     def _get_state_rate(self):

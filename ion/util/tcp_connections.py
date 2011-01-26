@@ -41,6 +41,7 @@ class TCPConnection(BasicLifecycleObject):
         log.info('on_deactivate: disconnected TCP')
 
     def on_terminate(self, *args, **kwargs):
+        log.info('on_terminate: disconnected TCP')
         self._connector.disconnect()
         log.info('on_terminate: disconnected TCP')
 
@@ -67,11 +68,11 @@ class TCPListen(BasicLifecycleObject):
 
     def on_deactivate(self, *args, **kwargs):
         self._listener.stopListening()
-        log.info('on_deactivate: diconnected TCP')
+        log.info('on_deactivate: disconnected TCP')
         
     def on_terminate(self, *args, **kwargs):
         self._listener.stopListening()
-        log.info('on_terminate: diconnected TCP')
+        log.info('on_terminate: disconnected TCP')
 
     def on_error(self, *args, **kwargs):
         log.info('on_error')

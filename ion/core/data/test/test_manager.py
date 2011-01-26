@@ -118,8 +118,6 @@ class CassandraDataManagerTest(IDataManagerTest):
         simple_password.username = 'ooiuser'
         simple_password.password = 'oceans11'
         
-        
-        
         storage_resource = CassandraStorageResource(cassandra_cluster, credentials=simple_password)
         manager = CassandraDataManager(storage_resource)  
         
@@ -135,7 +133,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         except Exception, ex:
             log.info("Exception raised %s " % (ex,))
         self.manager.terminate()
-        
+         
     
     @defer.inlineCallbacks
     def test_update_persistent_archive(self):
