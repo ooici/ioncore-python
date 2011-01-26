@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.services.dm.distribution import pubsub_registry
+#from ion.services.dm.distribution import pubsub_registry
 from ion.core import ioninit
 from ion.core.object import object_utils
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
@@ -49,10 +49,10 @@ class PubSubService(ServiceProcess):
                                           version='0.1.1',
                                           dependencies=[])
 
-    @defer.inlineCallbacks
-    def slc_init(self):
+    #@defer.inlineCallbacks
+    #def slc_init(self):
         # Link to registry
-        self.reg = yield pubsub_registry.DataPubsubRegistryClient(proc=self)
+        #self.reg = yield pubsub_registry.DataPubsubRegistryClient(proc=self)
 
     # Protocol entry points. Responsible for parsing and unpacking arguments
     def op_declare_topic_tree(self, content, headers, msg):
@@ -100,11 +100,11 @@ class PubSubService(ServiceProcess):
         except KeyError:
             estr = 'Missing information in message!'
             log.exception(estr)
-            self.reply_err(msg, {'value': estr})
+            yield self.reply_err(msg, {'value': estr})
             return
 
         rc = yield self.define_topic(tt_id, t_name)
-        self.reply_ok(msg, {'value': rc})
+        yield self.reply_ok(msg, {'value': rc})
 
     def op_query_topics(self, content, headers, msg):
         try:
@@ -210,7 +210,7 @@ class PubSubService(ServiceProcess):
         log.debug('Dataset object created, pushing/committing "%s"' % cstr)
         #log.debug(dset)
 
-        rc.put_instance(dset, 'Adding dataset/topic %s' % cstr)
+        yield rc.put_instance(dset, 'Adding dataset/topic %s' % cstr)
         log.debug('Commit completed, %s' % dset.ResourceIdentity)
         defer.returnValue(dset.ResourceIdentity)
 
