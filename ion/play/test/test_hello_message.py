@@ -64,48 +64,41 @@ class HelloMessageTest(IonTestCase):
         ab_msg.person.add()
     
         # Make a new person object to go in the list
-        person = ab_msg.CreateObject(person_type)
-        person.name = 'david'
-        person.id = 59
-        person.email = 'stringgggg'
-        ph = person.phone.add()
-        ph.number = '401 789 6224'
+        ab_msg.person[0] = ab_msg.CreateObject(person_type)
+        ab_msg.person[0].name = 'david'
+        ab_msg.person[0].id = 59
+        ab_msg.person[0].email = 'stringgggg'
+        ab_msg.person[0].phone.add()
+        ab_msg.person[0].phone[0].number = '401 789 6224'
         
-        # Since ab.person is of type 'link' we need to set the link equal to the
-        # person object
-        ab_msg.person[0] = person
-        
-        log.info('AdressBook!' + str(ab_msg))        
+        log.info('AdressBook! \n' + str(ab_msg))        
         
         # Lets try sending the addressbook now...
         log.info('Calling hello everyone...')
         yield hc1.hello_everyone(ab_msg)
         # The response is just a ack
         
-        # Now try making a person object and using the person from the ab message
+        ### Now try making a person object and using the person from the ab message
         # You can move objects from one place to another...
-        
         person_msg = yield mc.create_instance(person_type, name='my message')
         
+        # Use the person we made from the first message
         person_msg.MessageObject = ab_msg.person[0]
         
         log.info('Calling hello person...')
         # You can send the root of the object or any linked composite part of it.
         result_person_msg = yield hc1.hello_person(person_msg)
         
-        # This is a different repository from the one we started with!
-        log.info('Nome of the command object:' + person_msg.Repository.repository_key)
-        log.info('Nome of the response object:' + result_person_msg.Repository.repository_key)
-        
         
         # Now lets add the new_person from the reply to the addressbook        
-        p2 = ab_msg.person.add()
+        ab_msg.person.add()
         
         # You can move a linked object from one repository to another when it
         # has been commited. An exception will be raised if you try and move
         # a modified object. Only a linked composite can be moved
-        #p2.SetLink(new_person)
+        
         # you can use an assignment operator or the set link command...
+        # ab_msg.person.SetLink(1,result_person_msg.MessageObject)
         ab_msg.person[1] = result_person_msg.MessageObject
         
         # The address book now has two perosn object, but you only see the links in the log

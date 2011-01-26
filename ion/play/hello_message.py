@@ -43,41 +43,43 @@ class HelloMessage(ServiceProcess):
         log.info('SLC_INIT HelloProcess')
 
     @defer.inlineCallbacks
-    def op_hello_person(self, person, headers, msg):
+    def op_hello_person(self, person_msg, headers, msg):
         log.info('op_hello_person: ')
 
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if person.MessageType != person_type:
+        if person_msg.MessageType != person_type:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloMessageError('Unexpected type received \n %s' % str(person))
+            raise HelloMessageError('Unexpected type received \n %s' % str(person_msg))
             
                 
         # Creepy hello person object log statements...
-        log.info( 'Hello ' + person.name +'...')
-        log.info('I know your phone number ' + person.name + '... it is: '+ person.phone[0].number)
+        log.info( 'Hello ' + person_msg.name +'...')
+        log.info('I know your phone number ' + person_msg.name + '... it is: '+ person_msg.phone[0].number)
+        
+        person_reply = yield self.mc.create_instance(person_type, name='reply message')
+        
+        # If you want to move the whole object, you can do that using the getter/setter
+        person_reply.MessageObject = person_msg.MessageObject
         
         # Change something...
         
-        person.name = person.name + ' stuebe'
-        
-        # Print the name of the repository which holds this object
-        log.info('The name of the person object in the service: ' +person.Repository.repository_key)
+        person_reply.name = person_reply.name + ' stuebe'
         
         # The following line shows how to reply to a message
         # The api for reply may be refactored later on so that there is just the one argument...
-        yield self.reply_ok(msg, person)
+        yield self.reply_ok(msg, person_reply)
 
     @defer.inlineCallbacks
-    def op_hello_everyone(self, addressbook, headers, msg):
+    def op_hello_everyone(self, addressbook_msg, headers, msg):
         log.info('op_hello_everyone: ')
 
-        if addressbook.MessageType  != addresslink_type:
+        if addressbook_msg.MessageType  != addresslink_type:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloError('Unexpected type received \n %s' % str(addressbook))
+            raise HelloError('Unexpected type received \n %s' % str(addressbook_msg))
             
-        log.info('Received addresbook; Title: ' + addressbook.title)
-        for person in addressbook.person:
+        log.info('Received addresbook; Title: ' + addressbook_msg.title)
+        for person in addressbook_msg.person:
             log.info('Logging Person: \n' +str(person))
             
         yield self.reply_ok(msg)
