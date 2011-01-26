@@ -10,9 +10,10 @@ from twisted.internet import defer
 from ion.core import ioninit
 from ion.core import bootstrap
 from ion.core.cc.shell import control
-from ion.util import ionlog
+#from ion.util import ionlog
 
-from ion.services.dm.distribution.notification import LoggingReceiver, LoggingHandler
+#from ion.services.dm.distribution.notification import LoggingHandler
+from ion.services.dm.distribution.logging_rec import LoggingReceiver
 
 CONF = ioninit.config('startup.pubsub')
 
@@ -31,7 +32,7 @@ def start():
     startsvcs.extend(notify_services)
     sup = yield bootstrap.bootstrap(ion_messaging, startsvcs)
 
-    ionlog.log_factory.add_handler(LoggingHandler(ioninit.container_instance.exchange_manager.exchange_space, {}))
+    #ionlog.log_factory.add_handler(LoggingHandler(ioninit.container_instance.exchange_manager.exchange_space, {}))
 
     lr = LoggingReceiver("nobody", loglevel="DEBUG")
     lr.attach()
