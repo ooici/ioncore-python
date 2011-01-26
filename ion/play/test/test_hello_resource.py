@@ -134,6 +134,23 @@ class HelloResourceTest(IonTestCase):
         
         self.ab.person[0].name = 'Catch me if you can...'
         
+        self.repo.commit('Commit the object before moving to another repo...')
+        
+        # Create an update request object to send to the service
+        update_repo, update = self.test_sup.workbench.init_repository(update_resource_type)
+
+        # Set the reference to update
+        update.resource_reference = res_ref
+        
+        # Set the value to give
+        update.configuration = self.ab
+        result = yield hc1.merge_addressbook_resource(update)
+        
+        # Get the updated state...
+        resource = yield self.rc.get_instance(res_ref)
+        self.assertEqual(resource.title, 'Bad addresses')
+        
+        
         log.info('Tada!')
         
         

@@ -128,8 +128,6 @@ class HelloResource(ServiceProcess):
         resource.ResourceObject = resource.CompareToUpdates[0]
         # resource.ResourceObject is a property setter/getter for the resource object
         # resource.CompareToUpdates is a getter for the list of updated states that are being merged
-           
-        if resource.title == resource.CompareToUpdates[0].title:
             
         yield self.rc.put_instance(resource)
             

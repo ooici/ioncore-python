@@ -537,6 +537,10 @@ class Repository(object):
         cref.comment = comment
         cref.SetLinkByName('objectroot', self._workspace_root)            
         
+        # Clear the merge root and merged from
+        self._merge_from = []
+        self._merge_root = []
+        
         # Update the cref in the branch
         branch.commitrefs.SetLink(0,cref)
         
