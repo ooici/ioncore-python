@@ -149,6 +149,7 @@ class CassandraManagerService(ServiceProcess):
         """
         Service operation: define a new archive object
         """
+        log.info("Called CassandraManagerService.op_create_persistent_archive")
         #cassandra_keyspace = yield self.rc.create_instance(...)
         yield self.manager.create_persistent_archive(persistent_archive)
         #yield self.rc.put_instance(cassandra_keyspace)
@@ -198,9 +199,11 @@ class CassandraManagerClient(ServiceClient):
         @brief create a new archive
         @param persistent_archive is an ion resource which defines the properties of a Keyspace
         """
+        log.info("Called CassandraManagerClient.create_persistent_archive")
         (content, headers, msg) = yield self.rpc_send('create_persistent_archive', persistent_archive)
         defer.returnValue(msg)
-        
+      
+    @defer.inlineCallbacks    
     def update_persistent_archive(self, persistent_archive):
         """
         @brief update an archive
@@ -209,6 +212,7 @@ class CassandraManagerClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('update_persistent_archive', persistent_archive)
         defer.returnValue(msg)
     
+    @defer.inlineCallbacks
     def delete_presistent_archive(self, persistent_archive):
         """
         @brief remove an archive
