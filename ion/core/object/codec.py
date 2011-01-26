@@ -47,10 +47,9 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         if isinstance(invocation.content, dict) and ION_R1_GPB == invocation.content['encoding']:
             raw_content = invocation.content['content']
             unpacked_content = invocation.workbench.unpack_structure(raw_content)
-            
+                
             if hasattr(unpacked_content, 'GPBType') and \
                 unpacked_content.GPBType == ion_message_type:
-                
                 # If this content should be returned in a Message Instance
                 content = message_client.MessageInstance(unpacked_content.Repository)
             
@@ -81,7 +80,7 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         content = invocation.message['content']
           
         if isinstance(content, message_client.MessageInstance):
-            invocation.message['content'] = invocation.workbench.pack_structure(content.MessageObject)
+            invocation.message['content'] = invocation.workbench.pack_structure(content.Message)
             invocation.message['encoding'] = ION_R1_GPB
             
         elif isinstance(content, gpb_wrapper.Wrapper):

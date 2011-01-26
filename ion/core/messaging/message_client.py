@@ -24,6 +24,8 @@ import ion.util.procutils as pu
 from ion.core.process import process
 from ion.core.object.repository import RepositoryError
 
+from ion.core.object import workbench
+
 from ion.core.object import object_utils
 
 ion_message_type = object_utils.create_type_identifier(object_id=11, version=1)
@@ -37,11 +39,11 @@ class MessageClientError(Exception):
     A class for message client exceptions
     """
 
-class ResourceClient(object):
+class MessageClient(object):
     """
-    @brief This is the base class for a resource client. It is a factory for resource
-    instances. The resource instance provides the interface for working with resources.
-    The client helps create and manage resource instances.
+    @brief This is the base class for a message client. It is a factory for message
+    instances. The message instance provides the interface for working with messages.
+    The client helps create and manage message instances.
     """
     
     def __init__(self, proc=None):
@@ -56,7 +58,7 @@ class ResourceClient(object):
         
         self.proc = proc
         
-        # The resource client is backed by a process workbench.
+        # The message client is backed by a process workbench.
         self.workbench = self.proc.workbench
         
 
@@ -82,7 +84,7 @@ class ResourceClient(object):
         """
         yield self._check_init()
         
-        # Create a sendable resource object
+        # Create a sendable message object
         msg_repo, msg_object = self.workbench.init_repository(ion_message_type)
         
         # Set the type and name
@@ -107,15 +109,15 @@ class ResourceClient(object):
         
     def reference_instance(self, instance, current_state=False):
         """
-        @brief Reference Resource creates a data object which can be used as a
-        message or part of a message or added to another data object or resource.
-        @param instance is a ResourceInstance object
+        @brief Reference message creates a data object which can be used as a
+        message or part of a message or added to another data object or message.
+        @param instance is a messageInstance object
         @param current_state is a boolen argument which determines whether you
-        intend to reference exactly the current state of the resource.
-        @retval an Identity Reference object to the resource
+        intend to reference exactly the current state of the message.
+        @retval an Identity Reference object to the message
         """
         
-        return self.workbench.reference_repository(instance.ResourceIdentity, current_state)
+        return self.workbench.reference_repository(instance.MessageIdentity, current_state)
         
 
     
@@ -127,13 +129,13 @@ class MessageInstanceError(Exception):
 class MessageInstance(object):
     """
     @brief The resoure instance is the vehicle through which a process
-    interacts with a resource instance. It hides the git semantics of the data
-    store and deals with resource specific properties.
+    interacts with a message instance. It hides the git semantics of the data
+    store and deals with message specific properties.
     """
         
     def __init__(self, message_repository):
         """
-        Resource Instance objects are created by the resource client
+        message Instance objects are created by the message client
         """
         object.__setattr__(self,'_repository',None)
         
@@ -151,13 +153,13 @@ class MessageInstance(object):
     
     def _get_message_object(self):
         repo = object.__getattribute__(self, '_repository')
-        return repo._workspace_root.resource_object
+        return repo._workspace_root.message_object
         
     def _set_message_object(self, value):
         repo = object.__getattribute__(self, '_repository')
         if value.GPBType != self.MessageType:
             raise MessageInstanceError('Can not change the type of a message object!')
-        repo._workspace_root.resource_object = value
+        repo._workspace_root.message_object = value
         
     MessageObject = property(_get_message_object, _set_message_object)
         
@@ -176,16 +178,16 @@ class MessageInstance(object):
         @brief CreateObject is used to make new locally created objects which can
         be added to the message's data structure.
         @param type_id is the type_id of the object to be created
-        @retval the new object which can now be attached to the resource
+        @retval the new object which can now be attached to the message
         """
         return self.Repository.create_object(type_id)
         
         
     def __getattribute__(self, key):
         """
-        @brief We want to expose the resource and its object through a uniform
+        @brief We want to expose the message and its object through a uniform
         interface. To do so we override getattr to expose the data fields of the
-        resource object
+        message object
         """
         # Because we have over-riden the default getattribute we must be extremely
         # careful about how we use it!
@@ -210,9 +212,9 @@ class MessageInstance(object):
         
     def __setattr__(self,key,value):
         """
-        @brief We want to expose the resource and its object through a uniform
+        @brief We want to expose the message and its object through a uniform
         interface. To do so we override getattr to expose the data fields of the
-        resource object
+        message object
         """
         repo = object.__getattribute__(self, '_repository')
         
@@ -234,14 +236,31 @@ class MessageInstance(object):
     @property
     def MessageIdentity(self):
         """
-        @brief Return the resource identity as a string
+        @brief Return the message identity as a string
         """
         return str(self.Message.identity)
     
     @property
     def MessageType(self):
         """
-        @brief Returns the resource type - A type identifier object - not the wrapped object.
+        @brief Returns the message type - A type identifier object - not the wrapped object.
         """
         return self.Message.type.GPBMessage
+    
+    def _set_message_name(self, name):
+        """
+        Set the name of the message object
+        """
+        self.Message.name = name
+        
+    def _get_message_name(self):
+        """
+        """
+        return str(self.Message.name)
+    
+    MessageName = property(_get_message_name, _set_message_name)
+    """
+    @var MessageName is a getter setter property for the name of the message
+    """
+    
     
