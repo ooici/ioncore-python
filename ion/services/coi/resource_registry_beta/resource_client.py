@@ -29,10 +29,6 @@ from ion.core.object.repository import RepositoryError
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
 
-from net.ooici.core.type import type_pb2
-from net.ooici.services.coi import resource_framework_pb2
-from net.ooici.core.link import link_pb2
-
 
 from google.protobuf import message
 from google.protobuf.internal import containers
@@ -130,7 +126,8 @@ class ResourceClient(object):
         
         self.workbench.set_repository_nickname(res_id, name)
             
-        resource = ResourceInstance(repo.checkout('master'))
+        repo.checkout('master')
+        resource = ResourceInstance(repo)
         
         defer.returnValue(resource)
         
@@ -176,9 +173,10 @@ class ResourceClient(object):
             
         # Get the repository
         repo = self.workbench.get_repository(reference)
+        repo.checkout(branch)
         
         # Create a resource instance to return
-        resource = ResourceInstance(repo.checkout(branch))
+        resource = ResourceInstance(repo)
             
         self.workbench.set_repository_nickname(reference, resource.ResourceName)
         # Is this a good use of the resource name? Is it safe?
@@ -193,14 +191,11 @@ class ResourceClient(object):
         @param comment is a comment to add about the current state of the resource
         """
         
-        if instance._update_ref != None:
-            raise ResourceClientError('Can not put and instance with an unresolved update!')
-        
         if not comment:
             comment = 'Resource client default commit message'
             
         # Get the repository
-        repository = instance._repository
+        repository = instance.Repository
             
         repository.commit(comment=comment)            
             
@@ -267,15 +262,14 @@ class ResourceInstance(object):
     RESOLVED = 'Update resolved' # When a merger occurs with the previous state
     REJECTED = 'Update rejected' # When an update is rejected
     
-    def __init__(self, resource):
+    def __init__(self, resource_repository):
         """
         Resource Instance objects are created by the resource client
         """
         object.__setattr__(self,'_repository',None)
         
-        self._repository = resource.Repository
+        self._repository = resource_repository
         
-        self._update_ref = None
         
     @property
     def Repository(self):
