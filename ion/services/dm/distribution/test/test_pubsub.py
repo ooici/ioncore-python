@@ -13,6 +13,7 @@ from ion.services.dm.distribution.pubsub_service import PubSubClient
 #from ion.services.dm.distribution.publisher_subscriber import Subscriber
 from ion.test.iontest import IonTestCase
 from twisted.trial import unittest
+from ion.util.procutils import asleep
 
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -88,6 +89,7 @@ class PST(IonTestCase):
         topic_id = yield self.psc.define_topic(tt_id, self.topic_name)
         # Verify that it was created
         self.failIf(topic_id is None)
+        yield asleep(2.0)
 
     @defer.inlineCallbacks
     def test_topics(self):
