@@ -78,12 +78,8 @@ class BrokerTest(LoadTest):
 
             # Start the publisher deferred before waiting/yielding with the consumer
             self._run_publisher()
+            #self._run_consumer()
             yield self._run_consumer()
-
-            yield self.publisher.close()
-            yield self.consumer.close()
-            yield self._disconnect_broker()
-            #print "disconnected"
 
         elif self.scenario == "wait":
             while True:
@@ -138,6 +134,7 @@ class BrokerTest(LoadTest):
                     durable=False,
                     auto_delete=True,
                     exclusive=False,
+                    no_ack=True,
                     routing_key=routingkey)
 
         self.consumer.register_callback(self._recv_callback)
@@ -155,14 +152,16 @@ class BrokerTest(LoadTest):
                     routing_key=routingkey,
                     arguments={})
 
-        yield self.consumer.qos(prefetch_count=1)
+        #yield self.consumer.qos()
 
     @defer.inlineCallbacks
     def _run_consumer(self):
+        yield self.consumer.iterconsume()
+
         while True:
             if self.is_shutdown():
                 break
-            yield self._recv_messages()
+
             # Run the consumer less frequently, batch fetching up to 50times/sec
             yield pu.asleep(0.02)
 
@@ -202,8 +201,14 @@ class BrokerTest(LoadTest):
 
     def _recv_callback(self, message):
         self.cur_state['msgrecv'] += 1
+        message.ack()
 
+    @defer.inlineCallbacks
     def tearDown(self):
+        yield self.publisher.close()
+        yield self.consumer.close()
+        yield self._disconnect_broker()
+        
         self._disable_monitor()
         self._call_monitor()
 
