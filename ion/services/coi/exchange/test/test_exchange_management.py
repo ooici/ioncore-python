@@ -26,13 +26,30 @@ class ExchangeManagementTest(IonTestCase):
         """
         """
         yield self._start_container()
-
-        services = [{'name':'exchange_registry','module':'ion.services.coi.exchange.exchange_registry','class':'ExchangeRegistryService'}]
-        services = [{'name':'exchange_management','module':'ion.services.coi.exchange.exchange_management','class':'ExchangeManagementService'}]
-        supervisor = yield self._spawn_processes(services)
-
-        self.exchange_management_client = ExchangeManagementClient(proc=supervisor)
-
+        services = [
+            {
+                'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                'spawnargs':{'servicename':'datastore'}
+            },
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'class':'ResourceRegistryService',
+                'spawnargs':{'datastore_service':'datastore'}
+            },
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+                'spawnargs':{'datastore_sevice':'datastore'}
+            }
+        ]
+        sup = yield self._spawn_processes(services)
+        self.emc = ExchangeManagementClient(proc=self.test_sup)
+        self.sup = sup
+        
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -40,9 +57,11 @@ class ExchangeManagementTest(IonTestCase):
         yield self._stop_container()
 
 
-    # @defer.inlineCallbacks
-    def xtest_none(self):
+    @defer.inlineCallbacks
+    def test_create_methods(self):
         """
         """
+        yield self.emc.create_exchangespace("name","description")
+        yield self.emc.create_exchangename("name")
 
-        pass
+        
