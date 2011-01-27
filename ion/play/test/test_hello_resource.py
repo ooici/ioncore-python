@@ -93,7 +93,7 @@ class HelloResourceTest(IonTestCase):
         
         self.assertEqual(create_response_msg.configuration.name, 'A CTD')
         
-        ### request to clobber the state of the resource
+        ### request to update the state of the resource
         update_request_msg = yield self.mc.create_instance(resource_request_type, name='Update it!')
         
         # Copy from the create request and make some changes...
@@ -108,6 +108,14 @@ class HelloResourceTest(IonTestCase):
         update_result_msg = yield hc1.update_instrument_resource(update_request_msg)
         
         
+        ### request to update the state of the resource
+        lcs_request_msg = yield self.mc.create_instance(resource_request_type, name='Update it!')
+
+        lcs_request_msg.resource_reference = create_response_msg.resource_reference
+        lcs_request_msg.life_cycle_operation = lcs_request_msg.MessageObject.Activate
+        
+        # Call the life cycle operation method method 
+        update_result_msg = yield hc1.set_instrument_resource_life_cycle(lcs_request_msg)
         
         log.info('Tada!')
         

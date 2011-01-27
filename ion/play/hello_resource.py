@@ -40,19 +40,6 @@ class HelloResource(ServiceProcess):
     """
     Example service which manages a set of resources.
     
-    It is possible to make fewer "op_'s" and send more complex arguments.
-    Here I have choosen to break out the various operations to demonstrate each
-    function more clearly. It is up to the developer and the architecture team
-    whether there one 'update' operation and the mode (clobber, merge, append) is
-    sent as part of the message object, or like in this example, there are
-    multiple operations one for each mode.
-    
-    Similarly this example shows an service which 'loosly' controls its resources.
-    The caller is has access to the resources by reference. With a resource client
-    the caller could just as easily make changes directly.
-    
-    The developer may wish to abstract the calls to the service and never expose
-    the actual resource references to the caller.
     """
 
     # Declaration of service
@@ -80,7 +67,6 @@ class HelloResource(ServiceProcess):
         resource.
         
         This is the standard pattern for working with a resource.
-        
         
         """
         log.info('op_create_instrument_resource: ')
@@ -263,7 +249,7 @@ class HelloResource(ServiceProcess):
         state of the resource which should be set.
         """
         
-        log.info('op_update_instrument_resource: ')
+        log.info('op_set_instrument_resource_life_cycle: ')
             
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
@@ -273,15 +259,10 @@ class HelloResource(ServiceProcess):
                                      % str(request))
         
         ### Check the type of the configuration request
-        if not request.HasField('configuration'):
+        if request.HasField('configuration'):
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloResourceError('Expected message with configuration field of type InstrumentInfoRequest, received empty configuration!')
-
-        if request.configuration.ObjectType != instrument_info_type:
-            # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloResourceError('Expected message with configuration field of type InstrumentInfoRequest, received %s; type %s'
-                    % (str(request.configuration), str(request.configuration.ObjectClass)))
-
+            raise HelloResourceError('Expected message with NO configuration field, received an illegal message!')
+        
         ### Check the type of the configuration request
         if not request.HasField('resource_reference'):
             # This will terminate the hello service. As an alternative reply okay with an error message
@@ -293,15 +274,39 @@ class HelloResource(ServiceProcess):
             raise HelloResourceError('Expected message with resource_reference field of type IDRef, received %s; type %s'
                     % (str(request.resource_reference), str(request.resource_reference.ObjectClass)))
 
-
+        if not request.HasField('life_cycle_operation'):
+            # This will terminate the hello service. As an alternative reply okay with an error message
+            raise HelloResourceError('Expected message with a life_cycle_operation field, received an illegal message!')
+            ### Don't need to check the type of the lco field... it is gpb defined
             
         # Get the current state of the resource
         resource = yield self.rc.get_instance(request.resource_reference)
         
+        
+        # Business logic to modify physical resources goes inside these if statements!
+        if request.life_cycle_operation == request.MessageObject.Activate:
+           resource.ResourceLifeCycleState = resource.ACTIVE
 
+        elif request.life_cycle_operation == request.MessageObject.Deactivate:
+           resource.ResourceLifeCycleState = resource.INACTIVE
+           
+        elif request.life_cycle_operation == request.MessageObject.Commission:
+           resource.ResourceLifeCycleState = resource.COMMISSIONED
+           
+        elif request.life_cycle_operation == request.MessageObject.Decommission:
+           resource.ResourceLifeCycleState = resource.DECOMMISSIONED
+           
+        elif request.life_cycle_operation == request.MessageObject.Retire:
+           resource.ResourceLifeCycleState = resource.RETIRED
+           
+        elif request.life_cycle_operation == request.MessageObject.Develop:
+           resource.ResourceLifeCycleState = resource.DEVELOPED
 
-    
-
+        yield self.rc.put_instance(resource)
+        
+        # Just reply ok...
+        yield self.reply_ok(msg)
+        
 
 class HelloResourceClient(ServiceClient):
     """
@@ -332,6 +337,13 @@ class HelloResourceClient(ServiceClient):
         
         defer.returnValue(content)
 
+    @defer.inlineCallbacks
+    def set_instrument_resource_life_cycle(self, msg):
+        yield self._check_init()
+        
+        (content, headers, msg) = yield self.rpc_send('set_instrument_resource_life_cycle', msg)
+        
+        defer.returnValue(content)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(HelloResource)
