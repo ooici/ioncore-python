@@ -175,6 +175,13 @@ class Wrapper(object):
         self._invalid = True
         
     @property
+    def ObjectClass(self):
+        if self.Invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+        
+        return self._GPBClass
+    
+    @property
     def DESCRIPTOR(self):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
@@ -201,7 +208,7 @@ class Wrapper(object):
         return self is self._root
     
     @property
-    def GPBType(self):
+    def ObjectType(self):
         """
         Could just replace the attribute with the capital name?
         """
@@ -318,7 +325,7 @@ class Wrapper(object):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
-        if not self.GPBType == self.LinkClassType:
+        if not self.ObjectType == self.LinkClassType:
             raise OOIObjectError('Can not set link for non link type!')
         self.Repository.set_linked_object(self,value)
         if not self.Modified:
@@ -338,7 +345,7 @@ class Wrapper(object):
         gpb = self.GPBMessage
         link = getattr(gpb,linkname)
         link = self._rewrap(link)
-        if not link.GPBType == self.LinkClassType:
+        if not link.ObjectType == self.LinkClassType:
             raise OOIObjectError('The field "%s" is not a link!' % linkname)
         return link
          
@@ -477,7 +484,7 @@ class Wrapper(object):
                     for item in gpb_field:
                         
                         wrapped_item = self._rewrap(item)
-                        if wrapped_item.GPBType == wrapped_item.LinkClassType:
+                        if wrapped_item.ObjectType == wrapped_item.LinkClassType:
                             self.ChildLinks.add(wrapped_item)
                         else:
                             wrapped_item.FindChildLinks()
@@ -490,7 +497,7 @@ class Wrapper(object):
                         continue
                     
                     item = self._rewrap(gpb_field)
-                    if item.GPBType == item.LinkClassType:
+                    if item.ObjectType == item.LinkClassType:
                         self.ChildLinks.add(item)
                     else:
                         item.FindChildLinks()
@@ -505,7 +512,6 @@ class Wrapper(object):
                 break
         else:
             self.ParentLinks.add(link)
-        
         
     def _rewrap(self, gpbMessage):
         '''
@@ -557,7 +563,7 @@ class Wrapper(object):
             elif isinstance(field, message.Message):
                 result = self._rewrap(field)
                 
-                if result.GPBType == self.LinkClassType:
+                if result.ObjectType == self.LinkClassType:
                     result = self.Repository.get_linked_object(result)
             else:
                 # Probably bad that the common case comes last!
@@ -565,7 +571,13 @@ class Wrapper(object):
                 
         else:
             # If it is a attribute of this class, use the base class's getattr
-            result = object.__getattribute__(self, key)
+            try:
+                result = object.__getattribute__(self, key)
+            except AttributeError, ex:                
+                raise OOIObjectError(
+                '''"Wrapper" object for GPB class "%s"; has no attribute "%s"''' 
+                % (self._GPBClass, key))
+        
         return result
 
     def __setattr__(self,key,value):
@@ -588,21 +600,6 @@ class Wrapper(object):
                 if value.Invalid:
                     raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
                     
-                if not value.Repository is self.Repository:
-                    if value.Repository.status != self.Repository.UPTODATE:
-                        raise OOIObjectError('Can not move objects from a foreign repository which is in a modified state')
-                    
-                    if len(value.ParentLinks) < 1:
-                        raise OOIObjectError('''Can not move an object from a foreign repository which has no parent links.
-                                             It must have been set as part of the data structure first.''')
-                    
-                    # Get the object from it serialized version in the hash.
-                    obj = self.Repository.get_linked_object(value.ParentLinks[0])
-                    # load all its linked children
-                    self.Repository._load_links(obj)
-                    
-                    value = obj
-                    
                 self.SetLinkByName(key,value)
                     
             else:
@@ -613,8 +610,13 @@ class Wrapper(object):
             self._set_parents_modified()
                 
         else:
-            v = object.__setattr__(self, key, value)
-            
+            try:
+                v = object.__setattr__(self, key, value)
+            except AttributeError, ex:
+                
+                raise OOIObjectError(
+                '''"Wrapper" object for GPB class "%s"; has no attribute "%s"''' 
+                % (self._GPBClass, key))
         
     def _set_parents_modified(self):
         """
@@ -725,7 +727,14 @@ class Wrapper(object):
     def HasField(self, field_name):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self.GPBMessage.HasField(field_name)
+            
+        try:
+            result = self.GPBMessage.HasField(field_name)
+        except ValueError, ex:
+            raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
+                    (str(self.ObjectClass), field_name))
+            
+        return result
     
     def ClearField(self, field_name):
         if self.Invalid:
@@ -738,8 +747,12 @@ class Wrapper(object):
         #    return
             
         # Get the raw GPB field
-        GPBField = getattr(GPBMessage, field_name)
-        
+        try: 
+            GPBField = getattr(GPBMessage, field_name)
+        except AttributeError, ex:
+            raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
+                    (str(self.ObjectClass), field_name))
+            
         if isinstance(GPBField, containers.RepeatedScalarFieldContainer):
             objhash = GPBField.__hash__()
             del self.DerivedWrappers[objhash]
@@ -772,7 +785,7 @@ class Wrapper(object):
         """
         Helper method for ClearField
         """
-        if self.GPBType == self.LinkClassType:
+        if self.ObjectType == self.LinkClassType:
             child_obj = self.Repository.get_linked_object(self)
             # Remove this link from the list of parents
             child_obj.ParentLinks.remove(self)
@@ -860,7 +873,7 @@ class ContainerWrapper(object):
         
         item = self._gpbcontainer.__getitem__(key)
         item = self._wrapper._rewrap(item)
-        if item.GPBType == self.LinkClassType:
+        if item.ObjectType == self.LinkClassType:
             self.Repository.set_linked_object(item, value)
         else:
             raise OOIObjectError('It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
@@ -881,7 +894,7 @@ class ContainerWrapper(object):
         
         item = self._gpbcontainer.__getitem__(key)
         item = self._wrapper._rewrap(item)
-        if item.GPBType == self.LinkClassType:
+        if item.ObjectType == self.LinkClassType:
             self.Repository.set_linked_object(item, value)
         else:
             raise OOIObjectError('It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
@@ -896,7 +909,7 @@ class ContainerWrapper(object):
             
         value = self._gpbcontainer.__getitem__(key)
         value = self._wrapper._rewrap(value)
-        if value.GPBType == self.LinkClassType:
+        if value.ObjectType == self.LinkClassType:
             value = self.Repository.get_linked_object(value)
         return value
     
@@ -907,7 +920,7 @@ class ContainerWrapper(object):
             
         link = self._gpbcontainer.__getitem__(key)
         link = self._wrapper._rewrap(link)
-        assert link.GPBType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
+        assert link.ObjectType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
         return link
         
     def GetLinks(self):
@@ -917,7 +930,7 @@ class ContainerWrapper(object):
         links = self._gpbcontainer[:] # Get all the links!
         for link in links:
             link = self._wrapper._rewrap(link)
-            assert link.GPBType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
+            assert link.ObjectType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
             wrapper_list.append(link)
         return wrapper_list
     
@@ -1191,8 +1204,8 @@ class StructureElement(object):
         
     #@type.setter
     def _set_type(self,value):
-        self._element.type.object_id = value.GPBType.object_id
-        self._element.type.version = value.GPBType.version
+        self._element.type.object_id = value.ObjectType.object_id
+        self._element.type.version = value.ObjectType.version
      
     type = property(_get_type, _set_type)
      

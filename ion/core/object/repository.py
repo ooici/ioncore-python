@@ -175,6 +175,8 @@ class Repository(object):
         brnch.branchkey = pu.create_guid()
         
         if nickname:
+            if nickname in self.branchnicknames.keys():
+                raise RepositoryError('That branch nickname is already in use.')
             self.branchnicknames[nickname]=brnch.branchkey
 
         if self._current_branch:
@@ -535,6 +537,10 @@ class Repository(object):
         cref.comment = comment
         cref.SetLinkByName('objectroot', self._workspace_root)            
         
+        # Clear the merge root and merged from
+        self._merge_from = []
+        self._merge_root = []
+        
         # Update the cref in the branch
         branch.commitrefs.SetLink(0,cref)
         
@@ -611,7 +617,10 @@ class Repository(object):
             return self.NOTINITIALIZED
         
         
-    def log_commits(self,branchname):
+    def log_commits(self,branchname=None):
+        
+        if branchname == None:
+            branchname = self._current_branch.branchkey
         
         branch = self.get_branch(branchname)
         log.info('$$ Logging commits on Branch %s $$' % branchname)
@@ -690,7 +699,7 @@ class Repository(object):
      
     def get_linked_object(self, link):
                 
-        if link.GPBType != self.LinkClassType:
+        if link.ObjectType != self.LinkClassType:
             raise RepositoryError('Illegal argument type in get_linked_object.')
                 
                 
@@ -727,11 +736,11 @@ class Repository(object):
             #self.set_linked_object(link, obj)
             obj.AddParentLink(link)
             
-            if obj.GPBType == self.CommitClassType:
+            if obj.ObjectType == self.CommitClassType:
                 self._commit_index[obj.MyId]=obj
                 obj.ReadOnly = True
                 
-            elif link.Root.GPBType == self.CommitClassType:
+            elif link.Root.ObjectType == self.CommitClassType:
                 # if the link is a commit but the linked object is not then it is a root object
                 # The default for a root object should be ReadOnly = False
                 self._workspace[obj.MyId]=obj
@@ -794,11 +803,27 @@ class Repository(object):
         
     def set_linked_object(self,link, value):        
         # If it is a link - set a link to the value in the wrapper
-        if link.GPBType != link.LinkClassType:
+        if link.ObjectType != link.LinkClassType:
             raise RepositoryError('Can not set a composite field unless it is of type Link')
                     
         if not value.IsRoot == True:
             raise RepositoryError('You can not set a link equal to part of a gpb composite!')
+        
+        # if this value is from another repository... you need to load it from the hashed objects into this repository
+        if not value.Repository.repository_key == self.repository_key:
+            
+            if value.Modified:
+                raise RepositoryError('Can not move objects from a foreign repository which are in a modified state. Commit before moving the object.')
+            
+            # Get the element from the hashed elements list
+            element = self._hashed_elements.get(value.MyId)
+            
+            obj = self._load_element(element)
+            
+            self._load_links(obj)
+            
+            value = obj
+        
         
         if link.key == value.MyId:
                 # Add the new link to the list of parents for the object

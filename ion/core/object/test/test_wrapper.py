@@ -81,7 +81,7 @@ class NodeLinkTest(unittest.TestCase):
             
             wL = self.ab.person.add()
             
-            self.assertEqual(wL.GPBType, wL.LinkClassType)
+            self.assertEqual(wL.ObjectType, wL.LinkClassType)
             
             p = self.repo.create_object(person_type)
             

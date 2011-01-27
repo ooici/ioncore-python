@@ -22,7 +22,7 @@ addresslink_type = object_utils.create_type_identifier(object_id=20003, version=
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 
 
-class HelloProcessTest(IonTestCase):
+class HelloObjectTest(IonTestCase):
     """
     Testing example hello object service.
     This example shows how it is possible to create and send strongly typed objects
@@ -41,13 +41,11 @@ class HelloProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_hello(self):
-            
-        pd1 = {'name':'hello1','module':'ion.play.hello_object','class':'HelloObject'}
-            
-        proc1 = ProcessDesc(**pd1)
-            
-        # Spawn our test process
-        proc1_id = yield self.test_sup.spawn_child(proc1)
+        services = [
+            {'name':'hello1','module':'ion.play.hello_object','class':'HelloObject'},
+        ]
+
+        sup = yield self._spawn_processes(services)  
             
         # Each process has a object work bench. In the test we can get a work bench
         # from the test supervisor process.

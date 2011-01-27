@@ -154,4 +154,4 @@ class Version(object):
         return ' (Git:%s)' % commit
 
 # VERSION !!! This is the main version !!!
-version = Version('ion', 0, 4, 1)
+version = Version('ion', 0, 4, 2)
