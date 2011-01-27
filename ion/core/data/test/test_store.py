@@ -214,7 +214,8 @@ class CassandraIndexedStoreTest(IStoreTest):
         attrs_set = set(attrs)
         correct_set = set(['full_name', 'state', 'birth_date'])
         self.failUnlessEqual(attrs_set, correct_set)
-    
+
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_query(self):
         d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
@@ -231,6 +232,7 @@ class CassandraIndexedStoreTest(IStoreTest):
         log.info("Rows returned %s " % (rows,))
         self.failUnlessEqual(rows[0].key, 'prothfuss')
          
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_put(self):
         d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
@@ -248,7 +250,7 @@ class CassandraIndexedStoreTest(IStoreTest):
         self.failUnlessEqual(val1, binary_value1)
         self.failUnlessEqual(val2, binary_value2)
         self.failUnlessEqual(val3, binary_value3)
-
+    
     @defer.inlineCallbacks  
     def tearDown(self):
         yield self.ds.terminate()
