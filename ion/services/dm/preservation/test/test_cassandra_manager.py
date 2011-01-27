@@ -28,6 +28,8 @@ class CassandraManagerTester(IonTestCase):
         services = [
            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'datastore'}},
+           {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
+             'spawnargs':{'datastore_service':'datastore'}},
             {'name': 'cassandra_manager_agent',
              'module': 'ion.services.dm.preservation.cassandra_manager_agent',
              'class':'CassandraManagerAgent'},         
