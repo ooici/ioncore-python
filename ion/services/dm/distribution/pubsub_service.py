@@ -3,6 +3,7 @@
 """
 @file ion/services/dm/distribution/pubsub_service.py
 @package ion.services.dm.distribution.pubsub
+@author Paul Hubbard
 @author Michael Meisinger
 @author David Stuebe
 @brief service for publishing on data streams, and for subscribing to streams.
@@ -187,6 +188,7 @@ class PubSubService(ServiceProcess):
         @param topic_name Name to declare
         @retval Topic ID, or None if error
         """
+        
         log.error('DT not implemented')
 
     def query_topics(self, exchange_point_name, topic_regex):

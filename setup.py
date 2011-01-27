@@ -36,6 +36,7 @@ try:
 
     setupdict['dependency_links'] = ['http://ooici.net/packages']
     setupdict['packages'].extend(['twisted/plugins'])
+    setupdict['package_data'] = {'twisted.plugins': ['twisted/plugins/cc.py']}
     setupdict['test_suite'] = 'ion'
 
     setupdict['install_requires'] = ['Twisted==10.2.0', 'carrot==0.10.11-txamqp', 'txamqp==0.3',
@@ -49,5 +50,5 @@ try:
 
 except ImportError:
     from distutils.core import setup
-    setupdict['packages'] = ['ioncore']
+    setupdict['packages'] = ['ion']
     setup(**setupdict)

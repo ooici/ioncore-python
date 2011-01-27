@@ -18,6 +18,11 @@ dist
 /.settings
 /.metadata
 dropin.cache
+eggs/
+parts/
+develop-eggs/
+downloads/
+bin/
 
 /net
 ion/agents/instrumentagents copy/NportSendBreak.py
