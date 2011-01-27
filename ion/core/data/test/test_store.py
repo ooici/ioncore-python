@@ -24,6 +24,10 @@ from ion.core.object import workbench
 
 from ion.core.object import object_utils
 
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
+from ion.util.test_decorator import itv
+
 
 simple_password_type = object_utils.create_type_identifier(object_id=2502, version=1)
 columndef_type = object_utils.create_type_identifier(object_id=2503, version=1)
@@ -75,6 +79,7 @@ class IStoreTest(unittest.TestCase):
 
 class CassandraStoreTest(IStoreTest):
 
+    @itv(CONF)
     def _setup_backend(self):
         
         ### This is a short cut to use resource objects without a process 
@@ -129,8 +134,11 @@ class CassandraStoreTest(IStoreTest):
         except Exception, ex:
             log.info("Exception raised in tearDown %s" % (ex,))
             
+            
+            
 class CassandraIndexedStoreTest(IStoreTest):
 
+    @itv(CONF)
     def _setup_backend(self):
         """
         @note The column_metadata in the cache is not correct. The column family on the 
@@ -191,7 +199,8 @@ class CassandraIndexedStoreTest(IStoreTest):
         
         
         return defer.succeed(store)
-    
+        
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_get_query_attributes(self):
         attrs = yield self.ds.get_query_attributes()
@@ -233,7 +242,8 @@ class CassandraIndexedStoreTest(IStoreTest):
         self.failUnlessEqual(val1, binary_value1)
         self.failUnlessEqual(val2, binary_value2)
         self.failUnlessEqual(val3, binary_value3)
-        
+
+    @defer.inlineCallbacks  
     def tearDown(self):
-        self.ds.terminate()
+        yield self.ds.terminate()
              
