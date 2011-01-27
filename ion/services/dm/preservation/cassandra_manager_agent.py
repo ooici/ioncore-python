@@ -17,6 +17,9 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.object import object_utils
 from ion.core.data.cassandra import CassandraDataManager, CassandraStorageResource
 
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+
+from ion.core.messaging.message_client import MessageClient
 from ion.core.object import workbench
 
 
@@ -29,11 +32,12 @@ column_def_type =  object_utils.create_type_identifier(object_id=2508, version=1
 cassandra_cluster_type =  object_utils.create_type_identifier(object_id=2504, version=1)
 
 # Persistent Archive Resource:
-cassandra_keySpace_type =  object_utils.create_type_identifier(object_id=2506, version=1)
+cassandra_keyspace_type =  object_utils.create_type_identifier(object_id=2506, version=1)
 
 # Cache Resource:
 column_family_type =  object_utils.create_type_identifier(object_id=2507, version=1)
 
+resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
 
 class CassandraManagerService(ServiceProcess):
     """
@@ -60,7 +64,8 @@ class CassandraManagerService(ServiceProcess):
         #self.spawn_args['bootstrap_args'] = self.spawn_args.get('bootstrap_args', CONF.getValue('bootstrap_args', default=None))
         
         # Create a Resource Client 
-        #self.rc = ResourceClient(proc=self)        
+        self.rc = ResourceClient(proc=self)    
+        self.mc = MessageClient(proc=self)    
         log.info('CassandraManagerAgent.__init__()')
 
 
@@ -145,15 +150,34 @@ class CassandraManagerService(ServiceProcess):
             
         """
     @defer.inlineCallbacks
-    def op_create_persistent_archive(self, persistent_archive, headers, msg):
+    def op_create_persistent_archive(self, request, headers, msg):
         """
         Service operation: define a new archive object
         """
         log.info("Called CassandraManagerService.op_create_persistent_archive")
+        persistent_archive = request.configuration
+        log.info("request.configuration %s" % (request.configuration,))
+        persistent_archive_resource = yield self.rc.create_instance(cassandra_keyspace_type, name=persistent_archive.name,
+                                  description="A description")
+        
         #cassandra_keyspace = yield self.rc.create_instance(...)
-        yield self.manager.create_persistent_archive(persistent_archive)
+        log.info("Created resource")
+        yield self.rc.put_instance(persistent_archive_resource, "A commit message")
+        log.info("Put resource into datastore")
+        #yield self.manager.create_persistent_archive(pa)
         #yield self.rc.put_instance(cassandra_keyspace)
-        yield self.reply_ok(msg)
+        response = yield self.mc.create_instance(resource_response_type, name="create_persistent_archive_response")
+        response.resource_reference = self.rc.reference_instance(persistent_archive_resource)
+        
+        # pass the current configuration
+        response.configuration = persistent_archive_resource.ResourceObject
+        
+        # pass the result of the create operation...
+        response.result = 'Created'
+                
+        # The following line shows how to reply to a message
+        yield self.reply_ok(msg, response)
+        
 
     @defer.inlineCallbacks
     def op_update_persistent_archive(self, persistent_archive, headers, msg):
