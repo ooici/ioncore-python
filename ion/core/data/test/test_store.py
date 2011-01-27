@@ -170,8 +170,8 @@ class CassandraIndexedStoreTest(IStoreTest):
         
         self.cache = column_family
         self.cache_repository = cache_repository
-        #column = self.cache_repository.create_wrapped_object(ColumnDef)
-        column_repository, column  = wb.init_repository(columndef_type)
+        column = cache_repository.create_object(columndef_type)
+        #column_repository, column  = wb.init_repository(columndef_type) # This is wrong...
         column.column_name = "state"
         column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
         #IndexType.KEYS is 0, and IndexType is an enum
