@@ -27,7 +27,7 @@ class BrokerTestOptions(LoadTestOptions):
                 ['host', 'h', 'localhost', 'Broker host name'],
                 ['port', 'p', 5672, 'Broker port'],
                 ['vhost', 'v', '/', 'Broker vhost'],
-                ['heartbeat', None, 0, 'Heartbeat rate [seconds]'],
+                ['heartbeat', 'hb', 0, 'Heartbeat rate [seconds]'],
                 ['monitor', 'm', 3, 'Monitor poll rate [seconds]']
     ]
     optFlags = []
@@ -205,7 +205,7 @@ class BrokerTest(LoadTest):
 
     def tearDown(self):
         self._disable_monitor()
-        self.monitor()
+        self._call_monitor()
 
     def monitor(self):
         interval = self._get_interval()
