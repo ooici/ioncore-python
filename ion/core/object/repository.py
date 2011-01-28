@@ -703,7 +703,7 @@ class Repository(object):
             raise RepositoryError('Illegal argument type in get_linked_object.')
                 
                 
-        if not link.HasField('key'):
+        if not link.IsFieldSet('key'):
             return None
                 
         if self._workspace.has_key(link.key):

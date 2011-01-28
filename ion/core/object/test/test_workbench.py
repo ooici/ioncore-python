@@ -26,6 +26,7 @@ from ion.core.object import object_utils
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
+invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
 
 
 class WorkBenchTest(unittest.TestCase):
@@ -64,7 +65,9 @@ class WorkBenchTest(unittest.TestCase):
         self.ab = ab
         self.repo = repo
         
+    def test_invalid_type(self):
         
+        self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, invalid_type )
             
     def test_simple_commit(self):
         
@@ -152,6 +155,7 @@ class WorkBenchTest(unittest.TestCase):
         
         
 class WorkBenchMergeTest(unittest.TestCase):
+        
         
     def test_fastforward_merge(self):
         wb1 = workbench.WorkBench('No Process Test')
