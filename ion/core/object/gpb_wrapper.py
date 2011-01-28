@@ -15,6 +15,8 @@ from ion.core.object.object_utils import set_type_from_obj, sha1bin, sha1hex, sh
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+import struct
+
 from google.protobuf import message
 from google.protobuf.internal import containers
     
@@ -1202,8 +1204,36 @@ class StructureElement(object):
         Make the sha1 safe for empty contents but also type safe.
         Take use the sha twice so that we don't need to concatinate long strings!
         """
-        content_sha = sha1bin(self.value)
-        return sha1bin(content_sha + self.type.SerializeToString())
+        #################
+        ## This is the method that you can compare in Java
+        #################
+        ## Get the length of the binary arrays
+        #sha_len = 20
+        #type_len = self.type.ByteSize()
+        #
+        ## Convert to signed integer bytes
+        #fmt = '!%db' % type_len
+        #type_bytes = struct.unpack('!%db' % type_len , self.type.SerializeToString())
+        #
+        ## Convert the sha1 of the content to signed integer bytes
+        #c_sha_bytes = struct.unpack('!20b', sha1bin(self.value))
+        #
+        ## Concatinate the the byte arrays as integers
+        #cat_bytes = list(c_sha_bytes) + list(type_bytes)
+        #
+        ## Get the length of the concatination and convert to byte array
+        #fmt = '!%db' % (type_len+sha_len)
+        #sha_cat = struct.pack(fmt, *cat_bytes)
+        #
+        ##print 'sha1hex(sha_cat):',sha1hex(sha_cat)
+        ##print 'sha1hex(sha1bin(self.value) + self.type.SerializeToString()):',sha1hex(sha1bin(self.value) + self.type.SerializeToString())
+        #
+        ## Return the sha1 of the byte array
+        #return sha1bin(sha_cat)
+        #################
+        # This does the same thing much faster and shorter!
+        #################
+        return sha1bin(sha1bin(self.value) + self.type.SerializeToString())
         
     #@property
     def _get_type(self):
