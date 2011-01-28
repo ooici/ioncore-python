@@ -76,7 +76,7 @@ class WorkBench(object):
             try:
                 rootobj = repo.create_object(root_type)
             except object_utils.ObjectUtilException, ex:
-                raise WorkBenchError('Invalid root object type identifier passed in init_repository')
+                raise WorkBenchError('Invalid root object type identifier passed in init_repository. Unrecognized type: "%s"' % str(root_type))
         
             repo._workspace_root = rootobj
         
