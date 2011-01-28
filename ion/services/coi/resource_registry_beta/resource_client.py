@@ -443,9 +443,16 @@ class ResourceInstance(object):
                 
         else:
             v = object.__setattr__(self, key, value)
-        
+
+    def ListSetFields(self):
+        return self.ResourceObject.ListSetFields()
+
     def HasField(self, field):
-        return self.ResourceObject.HasField(field)
+        log.warn('HasField is depricated because the name is confusing. Use IsFieldSet')
+        return self.IsFieldSet(field)
+        
+    def IsFieldSet(self, field):
+        return self.ResourceObject.IsFieldSet(field)
         
     def ClearField(self, field):
         return self.ResourceObject.ClearField(field)

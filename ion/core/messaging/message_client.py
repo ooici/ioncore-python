@@ -232,8 +232,15 @@ class MessageInstance(object):
         else:
             v = object.__setattr__(self, key, value)
         
+    def ListSetFields(self):
+        return self.ResourceObject.ListSetFields()
+        
+    def IsFieldSet(self, field):
+        return self.MessageObject.IsFieldSet(field)
+        
     def HasField(self, field):
-        return self.MessageObject.HasField(field)
+        log.warn('HasField is depricated because the name is confusing. Use IsFieldSet')
+        return self.IsFieldSet(field)
         
     def ClearField(self, field):
         return self.MessageObject.ClearField(field)

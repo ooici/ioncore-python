@@ -79,7 +79,7 @@ class HelloResource(ServiceProcess):
                                      % str(request))
             
         ### Check the type of the configuration request
-        if request.HasField('resource_reference'):
+        if request.IsFieldSet('resource_reference'):
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message with NO resource_reference field, received an illegal message!')
             
@@ -92,7 +92,7 @@ class HelloResource(ServiceProcess):
         resource = yield self.rc.create_instance(instrument_resource_type, name=name, description='Preposterous instrument resource!')
         
         ### Set any fields provided by the configuration request
-        if request.HasField('configuration'):
+        if request.IsFieldSet('configuration'):
             
             ### Check the type of the configuration request
             if request.configuration.ObjectType != instrument_info_type:
@@ -100,16 +100,16 @@ class HelloResource(ServiceProcess):
                 raise HelloResourceError('Expected message type InstrumentInfoRequest, received %s; type %s'
                                          % (str(request.configuration), str(request.configuration.ObjectClass)))
                 
-            if request.configuration.HasField('name'):
+            if request.configuration.IsFieldSet('name'):
                 resource.name = request.configuration.name
                 
-            if request.configuration.HasField('make'):
+            if request.configuration.IsFieldSet('make'):
                 resource.make = request.configuration.make
                 
-            if request.configuration.HasField('model'):
+            if request.configuration.IsFieldSet('model'):
                 resource.model = request.configuration.model
                 
-            if request.configuration.HasField('serial_number'):
+            if request.configuration.IsFieldSet('serial_number'):
                 resource.serial_number = request.configuration.serial_number
         
         
@@ -154,7 +154,7 @@ class HelloResource(ServiceProcess):
                                      % str(request))
         
         ### Check the type of the configuration request
-        if not request.HasField('configuration'):
+        if not request.IsFieldSet('configuration'):
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message with configuration field of type InstrumentInfoRequest, received empty configuration!')
 
@@ -164,7 +164,7 @@ class HelloResource(ServiceProcess):
                     % (str(request.configuration), str(request.configuration.ObjectClass)))
 
         ### Check the type of the configuration request
-        if not request.HasField('resource_reference'):
+        if not request.IsFieldSet('resource_reference'):
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message with resource_reference field of type IDRef, received empty resource_reference!')
             
@@ -180,40 +180,40 @@ class HelloResource(ServiceProcess):
         resource = yield self.rc.get_instance(request.resource_reference)
         
         ### Set any fields provided by the configuration request
-        if request.HasField('configuration'):
+        if request.IsFieldSet('configuration'):
 
             ### Check the type of the configuration request
             
             # This method will set the field in the resource if it is set in the message.
-            #if request.configuration.HasField('name'):
+            #if request.configuration.IsFieldSet('name'):
             #    resource.name = request.configuration.name
             #    
-            #if request.configuration.HasField('make'):
+            #if request.configuration.IsFieldSet('make'):
             #    resource.make = request.configuration.make
             #    
-            #if request.configuration.HasField('model'):
+            #if request.configuration.IsFieldSet('model'):
             #    resource.model = request.configuration.model
             #    
-            #if request.configuration.HasField('serial_number'):
+            #if request.configuration.IsFieldSet('serial_number'):
             #    resource.serial_number = request.configuration.serial_number
         
             ### This method will clear the field in the resource if it is not set in the message.
-            if request.configuration.HasField('name'):
+            if request.configuration.IsFieldSet('name'):
                 resource.name = request.configuration.name
             else:
                 resource.ClearField('name')
                 
-            if request.configuration.HasField('make'):
+            if request.configuration.IsFieldSet('make'):
                 resource.make = request.configuration.make
             else:
                 resource.ClearField('make')
                 
-            if request.configuration.HasField('model'):
+            if request.configuration.IsFieldSet('model'):
                 resource.model = request.configuration.model
             else:
                 resource.ClearField('model')
                 
-            if request.configuration.HasField('serial_number'):
+            if request.configuration.IsFieldSet('serial_number'):
                 resource.serial_number = request.configuration.serial_number
             else:
                 resource.ClearField('serial_number')
@@ -259,12 +259,12 @@ class HelloResource(ServiceProcess):
                                      % str(request))
         
         ### Check the type of the configuration request
-        if request.HasField('configuration'):
+        if request.IsFieldSet('configuration'):
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message with NO configuration field, received an illegal message!')
         
         ### Check the type of the configuration request
-        if not request.HasField('resource_reference'):
+        if not request.IsFieldSet('resource_reference'):
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message with resource_reference field of type IDRef, received empty configuration!')
             
@@ -274,7 +274,7 @@ class HelloResource(ServiceProcess):
             raise HelloResourceError('Expected message with resource_reference field of type IDRef, received %s; type %s'
                     % (str(request.resource_reference), str(request.resource_reference.ObjectClass)))
 
-        if not request.HasField('life_cycle_operation'):
+        if not request.IsFieldSet('life_cycle_operation'):
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message with a life_cycle_operation field, received an illegal message!')
             ### Don't need to check the type of the lco field... it is gpb defined

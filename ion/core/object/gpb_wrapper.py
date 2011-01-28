@@ -12,6 +12,9 @@ from ion.util import procutils as pu
 
 from ion.core.object.object_utils import set_type_from_obj, sha1bin, sha1hex, ObjectUtilException
 
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 from google.protobuf import message
 from google.protobuf.internal import containers
     
@@ -434,6 +437,7 @@ class Wrapper(object):
         se.type = self
         
         # Calculate the sha1 from the serialized value and type!
+        # Sha1 is a property - not a method...
         se.key = se.sha1
         
         # Determine whether I am a leaf
@@ -714,17 +718,17 @@ class Wrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         self._gpbMessage.ParseFromString(serialized)
         
-    def ListInitializedFields(self):
+    def ListSetFields(self):
         """Returns a list of (FieldDescriptor, value) tuples for all
         fields in the message which are not empty.  A singular field is non-empty
-        if HasField() would return true, and a repeated field is non-empty if
+        if IsFieldSet() would return true, and a repeated field is non-empty if
         it contains at least one element.  The fields are ordered by field
         number"""
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         return self.GPBMessage.ListFields()
 
-    def HasField(self, field_name):
+    def IsFieldSet(self, field_name):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
@@ -735,6 +739,10 @@ class Wrapper(object):
                     (str(self.ObjectClass), field_name))
             
         return result
+
+    def HasField(self, field_name):
+        log.warn('HasField is depricated because the name is confusing. Use IsFieldSet')
+        return self.IsFieldSet(field_name)
     
     def ClearField(self, field_name):
         if self.Invalid:
@@ -742,7 +750,7 @@ class Wrapper(object):
             
         GPBMessage = self.GPBMessage
             
-        #if not GPBMessage.HasField(field_name):
+        #if not GPBMessage.IsFieldSet(field_name):
         #    # Nothing to clear
         #    return
             
