@@ -17,52 +17,28 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 from twisted.internet import defer
 
+from ion.services.coi.exchange.exchange_boilerplate import ServiceHelper
 
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
 
 
-class ExchangeManagementError(Exception):
-    """
-    An exception class for the Exhcnage Management system.
-    """
-
-
 class ExchangeManagementService(ServiceProcess):
 
+    # Declaration of service
     declare = ServiceProcess.service_declare(name='exchange_management',
-                                          version='0.1.0',
-                                          dependencies=[])
+                                             version='0.1.0',
+                                             dependencies=[])
 
-    def __init__(self, *args, **kwargs):
-        # Service class initializer. Basic config, but no yields allowed.
-        
-        ServiceProcess.__init__(self, *args, **kwargs)
-        
-        self.push = self.workbench.push
-        self.pull = self.workbench.pull
-        self.fetch_linked_objects = self.workbench.fetch_linked_objects
-        self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
-        
-        self.datastore_service = self.spawn_args.get(
-                'datastore_service', 
-                CONF.getValue('datastore_service', default='No Data Store service name provided!')
-        )
-        
-        log.info('ExchangeManagementService.__init__()')
-        
-        
     def slc_init(self):
-        self.rc = ResourceClient(proc=self)
-        self.mc = MessageClient(proc=self)
-        self.instance_counter = 1
-        log.info("ExchangeManagementService slc init.")
+        self.helper = ServiceHelper(self)
+        log.debug("ExchangeManagementService.slc_init(self)")
       
 
     # EXCHANGESPACE CRUD
 
     @defer.inlineCallbacks
-    def op_create_exchangespace(self, request, headers, msg):
+    def op_create_exchangespace(self, exchangespace, headers, msg):
         """
         Creates an ExchangeSpace distributed resource from the parameter 
         request.  The following restrictions are enforced:  request.name 
@@ -71,8 +47,17 @@ class ExchangeManagementService(ServiceProcess):
         a trivial string and should provide a useful description of the
         ExchangeSpace.        
         """
-        log.info('op_create_exchangespace: ')
-        yield self.reply_ok(msg, "Reply")
+        log.debug('op_create_exchangespace()')
+        object = yield self.helper.create_object(exchangespace, "Name", "Description")
+        
+        # Object validation and assignment goes here
+        object.name = exchangespace.configuration.name
+        object.description = exchangespace.configuration.description
+        
+        
+        response = yield self.helper.push_object(object)
+        log.debug('Created exchangespace.  id: %s', response.configuration.MyId)
+        yield self.reply_ok(msg, response.configuration.MyId)
 
 
     @defer.inlineCallbacks
@@ -137,9 +122,9 @@ class ExchangeManagementService(ServiceProcess):
 class ExchangeManagementClient(ServiceClient):
     
     def __init__(self, proc=None, **kwargs):
-        log.info("ExchangeManagementClient init.")
+        log.debug("ExchangeManagementClient.__init__(self, proc, args)")
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "exchange_registry"
+            kwargs['targetname'] = "exchange_management"
         ServiceClient.__init__(self, proc, **kwargs)
 
 
@@ -147,19 +132,20 @@ class ExchangeManagementClient(ServiceClient):
     # EXCHANGE SPACE CLIENT METHODS
 
     @defer.inlineCallbacks
-    def create_exchangespace(self, name, description):
+    def create_exchangespace(self, msg):
         """
         """
         yield self._check_init()
-        yield self.send('create_exchangespace', None)
+        (content, headers, msg) = yield self.rpc_send('create_exchangespace', msg)
+        defer.returnValue(content)
 
         
     @defer.inlineCallbacks
-    def update_exchangespace(self, name, description):
+    def update_exchangespace(self, msg):
         """
         """
         yield self._check_init()
-        yield self.send('update_exchangespace', None)
+        (content, headers, msg) = yield self.rpc_send('update_exchangespace', msg)
 
 
     @defer.inlineCallbacks
@@ -167,7 +153,7 @@ class ExchangeManagementClient(ServiceClient):
         """
         """
         yield self._check_init()
-        yield self.send('set_exchangespace_life_cycle', None)
+        yield self.send('set_exchangespace_life_cycle', msg)
 
 
 
@@ -178,7 +164,7 @@ class ExchangeManagementClient(ServiceClient):
         """
         """
         yield self._check_init()
-        yield self.send('create_exchangename', None)
+        (content, headers, msg) = yield self.rpc_send('create_exchangename', msg)
 
         
     @defer.inlineCallbacks
@@ -186,7 +172,7 @@ class ExchangeManagementClient(ServiceClient):
         """
         """
         yield self._check_init()
-        yield self.send('update_exchangename', None)
+        (content, headers, msg) = yield self.rpc_send('update_exchangename', msg)
 
 
     @defer.inlineCallbacks
@@ -194,7 +180,7 @@ class ExchangeManagementClient(ServiceClient):
         """
         """
         yield self._check_init()
-        yield self.send('set_exchangename_life_cycle', None)
+        (content, headers, msg) = yield self.rpc_send('set_exchangename_life_cycle', None)
 
 
 factory = ProcessFactory(ExchangeManagementService)
