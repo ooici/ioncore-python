@@ -10,7 +10,7 @@ Finish test of new Invalid methods using weakrefs - make sure it is deleted!
 
 from ion.util import procutils as pu
 
-from ion.core.object.object_utils import set_type_from_obj, sha1bin, sha1hex, ObjectUtilException
+from ion.core.object.object_utils import set_type_from_obj, sha1bin, sha1hex, sha1_to_hex, ObjectUtilException
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -1202,9 +1202,8 @@ class StructureElement(object):
         Make the sha1 safe for empty contents but also type safe.
         Take use the sha twice so that we don't need to concatinate long strings!
         """
-        content_sha = sha1hex(self.value)
-        
-        return sha1hex(content_sha + self.type.SerializeToString())
+        content_sha = sha1bin(self.value)
+        return sha1bin(content_sha + self.type.SerializeToString())
         
     #@property
     def _get_type(self):
@@ -1229,6 +1228,7 @@ class StructureElement(object):
         
     #@property
     def _get_key(self):
+        #return sha1_to_hex(self._element.key)
         return self._element.key
         
     #@key.setter
@@ -1246,5 +1246,8 @@ class StructureElement(object):
     isleaf = property(_get_isleaf, _set_isleaf)
     
     def __str__(self):
-        return self._element.__str__()
+        msg = ''
+        if len(self._element.key)==20:
+            msg  = 'Hexkey: "'+sha1_to_hex(self._element.key) +'"\n'
+        return msg + self._element.__str__()
         

@@ -10,6 +10,7 @@ from ion.util import procutils as pu
 from net.ooici.core.type import type_pb2
 
 import hashlib
+import struct
 from google.protobuf import message
 
 # Globals
