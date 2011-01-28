@@ -1,4 +1,12 @@
+#!/usr/bin/env python
 
+"""
+@file ion/util/itv_decorator.py
+@author David Stuebe
+@brief A decorator class to skip unit tests not called out in your local config
+
+@TODO Make the skip specific to a class within a test module?
+"""
 
 from twisted.trial import unittest
 
