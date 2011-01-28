@@ -136,6 +136,11 @@ To compile all code to see if there are Python compile errors anywhere:
 ---------------------------------------------------------------------------
 Change log:
 ===========
+
+2011-1-28:
+- Switched to binary sha1 keys in all objects.
+- Added @ITV decorator to skip itv tests when running 'trial ion'
+
 2011-1-26:
 - Moved scripts in bin/ dir to scripts/ dir.
 
