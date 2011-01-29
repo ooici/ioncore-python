@@ -51,6 +51,9 @@ class CassandraManagerService(ServiceProcess):
     Resources can be deleted by the agent
     
     The agent is also used during a boot strap procedure...
+    
+    @TODO This class just does the messaging, it does not actually do the business logic. I want
+    to make sure the messaging works using the new resource/messaging framework.
     """
 
     # Declaration of service
@@ -180,30 +183,48 @@ class CassandraManagerService(ServiceProcess):
         
 
     @defer.inlineCallbacks
-    def op_update_persistent_archive(self, persistent_archive, headers, msg):
+    def op_update_persistent_archive(self, request, headers, msg):
         """
         Service operation: update the persistent_archive
         
         """
-        #cassandra_keyspace = yield self.rc.get_instance(pa_ref
-        # update cassandra
-        yield self.manager.update_persistent_archive(persistent_archive)
-        # update the resource
-        #yield self.rc.put_instance(cassandra_keyspace)
-        yield self.reply_ok(msg)
+        log.info("In op_update_persistent_archive")
+        
+        persistent_archive_resource = yield self.rc.get_instance(request.resource_reference)
+        #Check to see if the resource has changed
+        log.info("put instance")
+        yield self.rc.put_instance(persistent_archive_resource)
+        #Do the business logic
+        #yield self.manager.update_persistent_archive(persistent_archive)
+        
+        log.info("created response")
+        response = yield self.mc.create_instance(resource_response_type, name="update_persistent_archive_response")
+        response.resource_reference = self.rc.reference_instance(persistent_archive_resource)
+        
+        response.configuration = persistent_archive_resource.ResourceObject
+        response.result = 'Updated'
+        yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
-    def op_delete_persistent_archive(self, persistent_archive, headers, msg):
+    def op_delete_persistent_archive(self, request, headers, msg):
         """
-        Service operation: define a new archive object
+        Service operation: delete the archive
+        """
         
-        What should the args be?
-        What happens with credentials for a new keyspace?
-        """
-       # cassandra_keyspace = yield self.rc.create_instance(...)
-        yield self.manager.delete_persistent_archive(persistent_archive)
+        
+        persistent_archive_resource = yield self.rc.get_instance(request.resource_reference)
+        #We want to delete this resource from the registry here
+        
+        #yield self.manager.delete_persistent_archive(persistent_archive)
+        response = yield self.mc.create_instance(resource_response_type, name="update_persistent_archive_response")
+        response.resource_reference = self.rc.reference_instance(persistent_archive_resource)
+        
+        response.configuration = persistent_archive_resource.ResourceObject
+        response.result = 'Deleted'
+        yield self.reply_ok(msg, response)
+        # cassandra_keyspace = yield self.rc.create_instance(...)
+        
         #yield self.rc.put_instance(cassandra_keyspace)
-        yield self.reply_ok(msg)
    
    
 
@@ -225,7 +246,7 @@ class CassandraManagerClient(ServiceClient):
         """
         log.info("Called CassandraManagerClient.create_persistent_archive")
         (content, headers, msg) = yield self.rpc_send('create_persistent_archive', persistent_archive)
-        defer.returnValue(msg)
+        defer.returnValue(content)
       
     @defer.inlineCallbacks    
     def update_persistent_archive(self, persistent_archive):
@@ -234,13 +255,13 @@ class CassandraManagerClient(ServiceClient):
         @param persistent_archive is an ion resource which defines the properties of a Keyspace
         """
         (content, headers, msg) = yield self.rpc_send('update_persistent_archive', persistent_archive)
-        defer.returnValue(msg)
+        defer.returnValue(content)
     
     @defer.inlineCallbacks
-    def delete_presistent_archive(self, persistent_archive):
+    def delete_persistent_archive(self, persistent_archive):
         """
         @brief remove an archive
         @param persistent_archive is an ion resource which defines the properties of a Keyspace
         """
         (content, headers, msg) = yield self.rpc_send('delete_persistent_archive', persistent_archive)
-        defer.returnValue(msg)
+        defer.returnValue(content)

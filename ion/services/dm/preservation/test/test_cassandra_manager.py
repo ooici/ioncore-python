@@ -11,7 +11,6 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
-from ion.core.object import workbench
 from ion.core.messaging.message_client import MessageClient
 from ion.services.dm.preservation.cassandra_manager_agent import CassandraManagerClient
 from ion.core.object import object_utils
@@ -49,14 +48,55 @@ class CassandraManagerTester(IonTestCase):
 
     @defer.inlineCallbacks
     def test_create_archive(self):
-        create_request_msg = yield self.mc.create_instance(resource_request_type, name='Creating a request')
-        create_request_msg.configuration =  create_request_msg.CreateObject(cassandra_keyspace_type)
+        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        create_request.configuration =  create_request.CreateObject(cassandra_keyspace_type)
 
         #persistent_archive_repository, cassandra_keyspace  = self.wb.init_repository(cassandra_keyspace_type)
-        create_request_msg.configuration.name = 'ManagerServiceKeyspace'
-        log.info("request.configuration " + str(create_request_msg))
+        create_request.configuration.name = 'ManagerServiceKeyspace'
+        log.info("create_request.configuration " + str(create_request))
     
-        create_response_msg = yield self.client.create_persistent_archive(create_request_msg)
+        create_response = yield self.client.create_persistent_archive(create_request)
+        log.info("create_response.result " + str(create_response.result))
         
+        
+    @defer.inlineCallbacks
+    def test_update_archive(self):
+        
+        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        create_request.configuration =  create_request.CreateObject(cassandra_keyspace_type)
 
+        create_request.configuration.name = 'ManagerServiceKeyspace'
+        log.info("create_request.configuration " + str(create_request))
+    
+        create_response = yield self.client.create_persistent_archive(create_request)
+        log.info("create_response " + str(create_response))
+        update_request = yield self.mc.create_instance(resource_request_type, name='Creating a delete_request')
+        update_request.configuration =  create_request.configuration
+        update_request.configuration.name = 'ManagerServiceKeyspace'
+        update_request.configuration.replication_factor = 2
         
+        update_request.resource_reference = create_response.resource_reference
+        log.info("Sending delete_request")
+        
+        update_response = yield self.client.update_persistent_archive(update_request)
+        log.info("update_response.result " + str(update_response.result))
+        
+    @defer.inlineCallbacks
+    def test_delete_archive(self):
+                
+        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        create_request.configuration =  create_request.CreateObject(cassandra_keyspace_type)
+
+        create_request.configuration.name = 'ManagerServiceKeyspace'
+        log.info("create_request.configuration " + str(create_request))
+    
+        create_response = yield self.client.create_persistent_archive(create_request)
+        log.info("create_response " + str(create_response))
+        delete_request = yield self.mc.create_instance(resource_request_type, name='Creating a delete_request')
+        delete_request.configuration =  create_request.configuration
+        
+        delete_request.resource_reference = create_response.resource_reference
+        log.info("Sending delete_request")
+        
+        delete_response = yield self.client.delete_persistent_archive(delete_request)
+        log.info("delete_response.result " + str(delete_response.result))
