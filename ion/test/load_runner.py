@@ -131,15 +131,18 @@ class LoadTestRunner(object):
         else:
             # Start all in same Twisted reactor
             self.mode = "suite-internal"
-            deflist = []
-            for i in range(numprocs):
-                d = self.start_load_proc(suitecls, str(i), options, argv)
-                deflist.append(d)
 
             try:
+                deflist = []
+                for i in range(numprocs):
+                    d = self.start_load_proc(suitecls, str(i), options, argv)
+                    deflist.append(d)
+
                 dl = defer.DeferredList(deflist)
                 yield dl
             except SystemExit, ex:
+                pass
+            except txamqp.client.Closed, ex:
                 pass
 
     @defer.inlineCallbacks

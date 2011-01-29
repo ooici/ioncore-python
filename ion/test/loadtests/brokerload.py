@@ -45,6 +45,9 @@ class BrokerTestOptions(LoadTestOptions):
     optFlags = [
           ['no-consume', None, 'Disable message consumers to try and make the broker explode.']
         , ['no-ack', None, 'Disable message acks to try and make the broker explode.']
+        , ['no-autodelete', None, 'Disable auto-deletion of exchanges and queues to try and make the broker explode.']
+        , ['durable', None, 'Set durable to true in all relevant AMQP options.']
+        , ['exclusive', None, 'Set queues and consumers to exclusive.']
     ]
 
 
@@ -108,9 +111,12 @@ class BrokerTest(LoadTest):
             )
             print '-'*80
 
-            
-            if self.publish_msgs: yield self._declare_publishers(exchanges, routes, pubcount)
-            if self.consume_msgs: yield self._declare_consumers(exchanges, routes, queues, concount)
+            durable, exclusive, auto_delete = opts['durable'], opts['exclusive'], not opts['no-autodelete']
+            if self.publish_msgs:
+                yield self._declare_publishers(exchanges, routes, pubcount, durable=durable, auto_delete=auto_delete)
+            if self.consume_msgs:
+                yield self._declare_consumers(exchanges, routes, queues, concount, durable=durable,
+                                              auto_delete=auto_delete, exclusive=exclusive)
 
             # Start the publisher deferred before waiting/yielding with the consumer
             self._run_publishers()
@@ -149,26 +155,27 @@ class BrokerTest(LoadTest):
 
     @defer.inlineCallbacks
     def _declare_consumers(self, exchanges, routes, queues, count, exchange_type='topic', durable=False,
-                           auto_delete=True, exclusive=False, no_ack=True):
+                           auto_delete=True, exclusive=False, no_ack=True, warn_if_exists=False):
         self.consumers = []
         qdecs, qbinds = [], []
+        backend = self.connection.create_backend()
+
         for exchange in exchanges:
             for route in routes:
                 for queue in queues:
+                    qdecs.append(backend.queue_declare(queue=queue, durable=durable, exclusive=exclusive,
+                            auto_delete=auto_delete, warn_if_exists=warn_if_exists))
+                    qbinds.append(backend.queue_bind(queue=queue, exchange=exchange, routing_key=route, arguments={}))
+
                     for i in range(count):
-                        con = messaging.Consumer(connection=self.connection, exchange=exchange,
+                        con = messaging.Consumer(connection=self.connection, queue=queue, exchange=exchange,
                              exchange_type=exchange_type, durable=durable, auto_delete=auto_delete, exclusive=exclusive,
                              no_ack=no_ack, routing_key=route)
 
                         self.consumers.append(con)
                         con.register_callback(self._recv_callback)
 
-                        qdecs.append(con.backend.queue_declare(queue=queue, durable=durable, exclusive=exclusive,
-                            auto_delete=auto_delete, warn_if_exists=con.warn_if_exists))
-                        qbinds.append(con.backend.queue_bind(queue=queue, exchange=exchange,
-                            routing_key=route, arguments={}))
-
-                    #yield self.consumer.qos()
+                        #yield self.consumer.qos()
 
         yield defer.DeferredList(qdecs)
         yield defer.DeferredList(qbinds)
@@ -244,7 +251,7 @@ class BrokerTest(LoadTest):
         print '\n'.join([
               '-'*80
             , '#%s Summary' % (self.load_id)
-            , 'Test ran for %.2f seconds, sending a total of %d messages and receiving a total of %d messages.' % (
+            , 'Test ran for %.2f seconds, with a total of %d sent messages and %d received messages.' % (
                   secsElapsed, state['msgsend'], state['msgrecv'])
             , 'The average messages/second was %.2f sent and %.2f received.' % (
                 state['msgsend']/secsElapsed, state['msgrecv']/secsElapsed)
