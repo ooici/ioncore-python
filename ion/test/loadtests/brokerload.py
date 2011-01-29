@@ -20,6 +20,7 @@ from ion.test.loadtest import LoadTest, LoadTestOptions
 import ion.util.procutils as pu
 
 import sys
+import time
 
 class BrokerTestOptions(LoadTestOptions):
     optParameters = [
@@ -27,22 +28,24 @@ class BrokerTestOptions(LoadTestOptions):
         , ['host', 'h', 'localhost', 'Broker host name.']
         , ['port', 'p', 5672, 'Broker port.']
         , ['vhost', 'v', '/', 'Broker vhost.']
-        , ['heartbeat', 'hb', 0, 'Heartbeat rate [seconds].']
         , ['monitor', 'm', 3, 'Monitor poll rate [seconds].']
+        , ['heartbeat', None, 0, 'Heartbeat rate [seconds].']
 
         # Tuning parameters for custom test
         , ['exchange', None, None, 'Name of exchange for distributed tests.']
         , ['queue', None, None, 'Name of queue for distributed tests. Supplying a name sets the "exclusive" queue parameter to false.']
         , ['route', None, None, 'Name of routing key for distributed tests.']
-        , ['consume', None, True, 'Whether to run a consumer. Set to false to try and make the broker explode.']
-        , ['ack', None, True, 'Whether the consumer should "ack" messages. Set to false to try and make the broker explode.']
+
         , ['exchanges', None, 1, 'Number of concurrent exchanges per connection. Note that setting the "exchange" name overrides this.']
         , ['routes', None, 1, 'Number of concurrent routes per exchange. Note that setting the "route" name overrides this.']
         , ['queues', None, 1, 'Number of concurrent queues per route. Note that setting the "queue" name overrides this.']
         , ['publishers', None, 1, 'Number of concurrent publishers per route.']
         , ['consumers', None, 1, 'Number of concurrent consumers per queue.']
     ]
-    optFlags = []
+    optFlags = [
+          ['no-consume', None, 'Disable message consumers to try and make the broker explode.']
+        , ['no-ack', None, 'Disable message acks to try and make the broker explode.']
+    ]
 
 
 class BrokerTest(LoadTest):
@@ -59,9 +62,9 @@ class BrokerTest(LoadTest):
         self.broker_port = opts['port']
         self.broker_vhost = opts['vhost']
         self.monitor_rate = opts['monitor']
-
-        print 'Running the "%s" scenario on "%s:%d" at "%s".' % (self.scenario, self.broker_host,
-                                                                 self.broker_port, self.broker_vhost)
+        self.ack_msgs = not opts['no-ack']
+        self.consume_msgs = not opts['no-consume']
+        self.publish_msgs = True
 
         self.cur_state['connects'] = 0
         self.cur_state['msgsend'] = 0
@@ -80,6 +83,8 @@ class BrokerTest(LoadTest):
         opts = self.opts
         
         if self.scenario == "connect":
+            print '#%s] <%s> on %s:%d at %s.' % (self.load_id, self.scenario, self.broker_host,
+                                                                 self.broker_port, self.broker_vhost)
             while True:
                 if self.is_shutdown():
                     break
@@ -91,14 +96,21 @@ class BrokerTest(LoadTest):
 
             # Generate a bunch of unique ids for each parameter if an explicit name was not supplied
             exchange, queue, route = opts['exchange'], opts['queue'], opts['route']
-            exchanges = [exchange] if exchange else [self.guid() for i in range(opts['exchanges'])]
-            routes = [route] if route else [self.guid() for i in range(opts['routes'])]
-            queues = [queue] if queue else [self.guid() for i in range(opts['queues'])]
+            exchangecount, queuecount, routecount = int(opts['exchanges']), int(opts['queues']), int(opts['routes'])
+            exchanges = [exchange] if exchange else [self.guid() for i in range(exchangecount)]
+            routes = [route] if route else [self.guid() for i in range(routecount)]
+            queues = [queue] if queue else [self.guid() for i in range(queuecount)]
 
-            print 'Exchanges: %s, queues: %s, routes: %s' % (exchanges, queues, routes)
+            pubcount, concount = int(opts['publishers']), int(opts['consumers'])
+            print '#%s] Spawning %d exchanges, %d routes, %d queues, %d total publishers, and %d total consumers.' % (
+                self.load_id, len(exchanges), len(routes), len(queues), len(exchanges)*len(routes)*pubcount,
+                len(exchanges)*len(routes)*len(queues)*concount
+            )
+            print '-'*80
+
             
-            yield self._declare_publishers(exchanges, routes)
-            yield self._declare_consumers(exchanges, routes, queues)
+            if self.publish_msgs: yield self._declare_publishers(exchanges, routes, pubcount)
+            if self.consume_msgs: yield self._declare_consumers(exchanges, routes, queues, concount)
 
             # Start the publisher deferred before waiting/yielding with the consumer
             self._run_publishers()
@@ -118,7 +130,7 @@ class BrokerTest(LoadTest):
         yield self.connection._connection.transport.loseConnection()
 
     @defer.inlineCallbacks
-    def _declare_publishers(self, exchanges, routes, exchange_type='topic', durable=False, auto_delete=True):
+    def _declare_publishers(self, exchanges, routes, count, exchange_type='topic', durable=False, auto_delete=True):
         self.publishers = []
         defers = []
         backend = self.connection.create_backend()
@@ -128,30 +140,33 @@ class BrokerTest(LoadTest):
                                                        durable=durable, auto_delete=auto_delete))
 
             for route in routes:
-                pub = messaging.Publisher(connection=self.connection, exchange_type=exchange_type, durable=durable,
-                    auto_delete=auto_delete, exchange=exchange, routing_key=route)
-                self.publishers.append(pub)
+                for i in range(count):
+                    pub = messaging.Publisher(connection=self.connection, exchange_type=exchange_type, durable=durable,
+                        auto_delete=auto_delete, exchange=exchange, routing_key=route)
+                    self.publishers.append(pub)
 
         yield defer.DeferredList(defers)
 
     @defer.inlineCallbacks
-    def _declare_consumers(self, exchanges, routes, queues, exchange_type='topic', durable=False, auto_delete=True,
-                           exclusive=False, no_ack=True):
+    def _declare_consumers(self, exchanges, routes, queues, count, exchange_type='topic', durable=False,
+                           auto_delete=True, exclusive=False, no_ack=True):
         self.consumers = []
         qdecs, qbinds = [], []
         for exchange in exchanges:
             for route in routes:
                 for queue in queues:
-                    con = messaging.Consumer(connection=self.connection, exchange=exchange, exchange_type=exchange_type,
-                        durable=durable, auto_delete=auto_delete, exclusive=exclusive, no_ack=no_ack, routing_key=route)
+                    for i in range(count):
+                        con = messaging.Consumer(connection=self.connection, exchange=exchange,
+                             exchange_type=exchange_type, durable=durable, auto_delete=auto_delete, exclusive=exclusive,
+                             no_ack=no_ack, routing_key=route)
 
-                    self.consumers.append(con)
-                    con.register_callback(self._recv_callback)
+                        self.consumers.append(con)
+                        con.register_callback(self._recv_callback)
 
-                    qdecs.append(con.backend.queue_declare(queue=queue, durable=durable, exclusive=exclusive,
-                                                           auto_delete=auto_delete, warn_if_exists=con.warn_if_exists))
-                    qbinds.append(con.backend.queue_bind(queue=queue, exchange=exchange,
-                                                         routing_key=route, arguments={}))
+                        qdecs.append(con.backend.queue_declare(queue=queue, durable=durable, exclusive=exclusive,
+                            auto_delete=auto_delete, warn_if_exists=con.warn_if_exists))
+                        qbinds.append(con.backend.queue_bind(queue=queue, exchange=exchange,
+                            routing_key=route, arguments={}))
 
                     #yield self.consumer.qos()
 
@@ -197,7 +212,7 @@ class BrokerTest(LoadTest):
 
     def _recv_callback(self, message):
         self.cur_state['msgrecv'] += 1
-        message.ack()
+        if self.ack_msgs: message.ack()
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -206,19 +221,37 @@ class BrokerTest(LoadTest):
         yield self._disconnect_broker()
 
         self._disable_monitor()
-        self._call_monitor()
+        self._call_monitor(False)
+        self.summary()
 
-    def monitor(self):
+
+    def monitor(self, output=True):
         interval = self._get_interval()
-
         rates = self._get_state_rate()
-        print "%s: new state  %s" % (self.load_id, self.cur_state)
-        print "%s: rate state %s" % (self.load_id, rates)
 
-        #print "%s: performed %s connect (rate %s), %s send, %s receive, %s error" % (
-        #    self.load_id, self.connects, connect_rate, self.msgsend, self.msgrecv, self.errors)
+        if output:
+            pieces = []
+            if rates['errors']: pieces.append('had %.2f errors/sec' % rates['errors'])
+            if rates['connects']: pieces.append('made %.2f connects/sec' % rates['connects'])
+            if rates['msgsend']: pieces.append('sent %.2f msgs/sec' % rates['msgsend'])
+            if rates['msgrecv']: pieces.append('received %.2f msgs/sec' % rates['msgrecv'])
+            print '#%s] (%s) %s' % (self.load_id, time.strftime('%H:%M:%S'), ', '.join(pieces))
+
+    def summary(self):
+        state = self.cur_state
+        secsElapsed = (state['_time'] - self.start_state['_time']) or 0.0001
+
+        print '\n'.join([
+              '-'*80
+            , '#%s Summary' % (self.load_id)
+            , 'Test ran for %.2f seconds, sending a total of %d messages and receiving a total of %d messages.' % (
+                  secsElapsed, state['msgsend'], state['msgrecv'])
+            , 'The average messages/second was %.2f sent and %.2f received.' % (
+                state['msgsend']/secsElapsed, state['msgrecv']/secsElapsed)
+            , '-'*80
+        ])
 
 
 """
-python -m ion.test.load_runner -s -c ion.test.loadtests.brokerload.BrokerTest -s connect
+python -m ion.test.load_runner -s -c ion.test.loadtests.brokerload.BrokerTest - -s connect
 """

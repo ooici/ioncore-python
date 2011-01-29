@@ -3,6 +3,7 @@
 """
 @file ion/test/load_runner.py
 @author Michael Meisinger
+@author Adam R. Smith
 @brief Spawns a number of Unix processes to create some load
 """
 
@@ -85,7 +86,7 @@ class LoadTestRunner(object):
 
     @defer.inlineCallbacks
     def start_load_suite(self, suitecls, spawn_procs, options, argv):
-        print "Start load suite %s" % (suitecls)
+        print 'Starting load suite "%s.%s"...' % (suitecls.__module__, suitecls.__name__)
         numprocs = int(options['count'])
 
         if spawn_procs:
@@ -135,8 +136,11 @@ class LoadTestRunner(object):
                 d = self.start_load_proc(suitecls, str(i), options, argv)
                 deflist.append(d)
 
-            dl = defer.DeferredList(deflist)
-            yield dl
+            try:
+                dl = defer.DeferredList(deflist)
+                yield dl
+            except SystemExit, ex:
+                pass
 
     @defer.inlineCallbacks
     def start_load_proc(self, suitecls, loadid, options, argv):
@@ -150,7 +154,11 @@ class LoadTestRunner(object):
 
         self.load_procs[load_proc.load_id] = load_proc
 
-        yield defer.maybeDeferred(load_proc.setUp, argv)
+        try:
+            yield defer.maybeDeferred(load_proc.setUp, argv)
+        except SystemExit, ex:
+            return
+
         yield defer.maybeDeferred(load_proc.generate_load)
 
         yield defer.maybeDeferred(load_proc.tearDown)
@@ -168,7 +176,7 @@ class LoadTestRunner(object):
         if self._is_shutdown:
             return
         self._shutdown_deferred = defer.Deferred()
-        self._shutdown_to = reactor.callLater(2, self.shutdown_timeout)
+        self._shutdown_to = reactor.callLater(5, self.shutdown_timeout)
 
         prockeys = sorted(self.load_procs.keys())
         for key in prockeys:
@@ -195,7 +203,6 @@ class LoadTestRunner(object):
                 # Use a separator to distinguish options reserved for derived classes
                 sep = '-'
                 opts, extraOpts = sys.argv[1:], []
-                print opts
                 try:
                     sepIndex = opts.index(sep)
                     extraOpts = opts[sepIndex + 1:]
