@@ -3,7 +3,7 @@ Ocean Observatories Initiative Cyberinfrastructure
 Integrated Observatory Network (ION)
 ioncore-python - Capability Container and Core Modules
 ==================================================
-
+ 
 April 2010 - September 2010 (C) UCSD Regents
 
 This project provides a service framework with auxilliary functions for running
@@ -33,8 +33,13 @@ Step 1: Virtual env
     libraries and dependencies are installed separately from the Python
     system libraries
 ::
-    mkvirtualenv ioncore-python
+    mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 --distribute ioncore-python
     workon ioncore-python
+
+    Note: When troubleshooting issues (since easy_install is easy but has its own problems)
+    , start all over again with a new virtualenv, such as:
+    mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 --distribute ioncore-python2
+    You can remove old virtualenvs using `rmvirtualenv <env_name>`.
 
 Step 2: Core libraries (you can skip this step)
     Install some core libraries first. Sometimes the automatic installer
@@ -51,8 +56,8 @@ Check the trace output that there are no substantial errors. You are now ready
 to run.
 
 Current dependencies include:
-    twisted, carrot, txamqp, msgpack-python, httplib2, pycassa, simplejson,
-    gviz_api.py, nimboss, txrabbitmq, M2Crypto-patched
+    twisted, carrot, txamqp, msgpack-python, httplib2, simplejson, Telephus
+    gviz_api.py, nimboss, txrabbitmq, M2Crypto-patched, ionproto and protobuf
 
 NOTE: As the project evolves and new code is added, dependencies might change.
 Run the setup script once in a while and when you get errors
@@ -67,8 +72,8 @@ Usage
 
 Start empty Python Capability Container shell with:
 ::
-    bin/start-cc -h amoeba.ucsd.edu
-    bin/start-cc   # to run with localhost
+    scripts/start-cc -h amoeba.ucsd.edu
+    scripts/start-cc   # to run with localhost
     # Alternatively the direct call to twistd developer
     twistd -n cc -h amoeba.ucsd.edu
     # To set a sysname, i.e. a "cluster name" for all containers in a cluster
@@ -83,9 +88,8 @@ Start system by executing within the CC shell:
 
 Alternatively (better) from UNIX shell executing a script:
 ::
-    bin/start-cc -h amoeba.ucsd.edu res/scripts/bootstrap.py
-    bin/start-cc -h amoeba.ucsd.edu res/scripts/newcc.py
-    bin/start-cc -h amoeba.ucsd.edu -a nproducers=25 res/scripts/pubsub.py
+    scripts/start-cc -h amoeba.ucsd.edu res/scripts/bootstrap.py
+    scripts/start-cc -h amoeba.ucsd.edu res/scripts/newcc.py
 
 
 Testing
@@ -132,6 +136,21 @@ To compile all code to see if there are Python compile errors anywhere:
 ---------------------------------------------------------------------------
 Change log:
 ===========
+
+2011-1-28:
+- Switched to binary sha1 keys in all objects.
+- Added @ITV decorator to skip itv tests when running 'trial ion'
+
+2011-1-26:
+- Moved scripts in bin/ dir to scripts/ dir.
+
+2011-1-24:
+- Removed IRODS as backend storage configureation option
+
+2011-1-21:
+- ION is now using google protocol buffer objects in the resource object model
+- Bumped version number to 0.4.0 consistent with the setup.py file. 
+
 
 2010-10-28:
 - Set RPC default timeout to 15 secs (see ion.config).
@@ -291,3 +310,5 @@ Change log:
 - Provided an easier to use BaseServiceClient, which uses a default service
   name lookup. Accepts BaseProcess instance as argument to use for sending/
   receiving service calls.
+
+.

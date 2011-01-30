@@ -17,6 +17,16 @@ from ion.test.iontest import IonTestCase
 
 from net.ooici.play import basic_pb2
 from ion.core.object import workbench
+from ion.core.object import object_utils
+
+#basic_pb2.KeyValue
+keyvalue_type = object_utils.create_type_identifier(object_id=20005, version=1)
+
+#basic_pb2.TestObj
+testobj_type = object_utils.create_type_identifier(object_id=20010, version=1)
+
+#basic_pb2.ListObj
+listobj_type = object_utils.create_type_identifier(object_id=20004, version=1)
 
 
 class SimpleObjectTest(unittest.TestCase):
@@ -24,7 +34,7 @@ class SimpleObjectTest(unittest.TestCase):
     def setUp(self):
         wb = workbench.WorkBench('No Process Test')
         
-        repo, simple = wb.init_repository(basic_pb2.TestObj)
+        repo, simple = wb.init_repository(testobj_type)
 
         simple.string = 'abc'
         simple.integer = 5
@@ -196,7 +206,7 @@ class ContainerTest(unittest.TestCase):
     def setUp(self):
         self.wb = workbench.WorkBench('No Process Test')
         
-        self.repo, self.listobj = self.wb.init_repository(basic_pb2.ListObj)
+        self.repo, self.listobj = self.wb.init_repository(listobj_type)
         
         
     def test_factory(self):
@@ -213,7 +223,7 @@ class ContainerTest(unittest.TestCase):
         """
         Test the container method to set link by index
         """
-        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1 = self.repo.create_object(keyvalue_type)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
         
@@ -235,7 +245,7 @@ class ContainerTest(unittest.TestCase):
         """
         Test the container and set the link using the object wrapper
         """
-        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1 = self.repo.create_object(keyvalue_type)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
         
@@ -260,7 +270,7 @@ class ContainerTest(unittest.TestCase):
         """
         Test the container method to set link by index
         """
-        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1 = self.repo.create_object(keyvalue_type)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
         
@@ -283,7 +293,7 @@ class ContainerTest(unittest.TestCase):
         Test the container method GetLink() and check link consistency
         Note: Test depends on test_setlink()
         """
-        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1 = self.repo.create_object(keyvalue_type)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
         
@@ -312,10 +322,10 @@ class ContainerTest(unittest.TestCase):
         Test the container method GetLinks() and check link consistency
         Note: Test depends on test_setlink()
         """
-        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1 = self.repo.create_object(keyvalue_type)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
-        kv2 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv2 = self.repo.create_object(keyvalue_type)
         kv2.key = 'foo2'
         kv2.value = 'bar2'
         
@@ -352,7 +362,7 @@ class ContainerTest(unittest.TestCase):
         Test the private container method __getitem_() by a given index
         Note: Test depends on test_setlink()
         """
-        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1 = self.repo.create_object(keyvalue_type)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
         
@@ -378,13 +388,13 @@ class ContainerTest(unittest.TestCase):
         Test the container method __getslice__() by start and stop indices
         Note: Test depends on test_setlink()
         """
-        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1 = self.repo.create_object(keyvalue_type)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
-        kv2 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv2 = self.repo.create_object(keyvalue_type)
         kv2.key = 'foo2'
         kv2.value = 'bar2'
-        kv3 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv3 = self.repo.create_object(keyvalue_type)
         kv3.key = 'foo3'
         kv3.value = 'bar3'
         
@@ -466,13 +476,13 @@ class ContainerTest(unittest.TestCase):
         Test the container method __delitem__() by index
         Note: Test depends on test_setlink()
         """
-        kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv1 = self.repo.create_object(keyvalue_type)
         kv1.key = 'foo1'
         kv1.value = 'bar1'
-        kv2 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv2 = self.repo.create_object(keyvalue_type)
         kv2.key = 'foo2'
         kv2.value = 'bar2'
-        kv3 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+        kv3 = self.repo.create_object(keyvalue_type)
         kv3.key = 'foo3'
         kv3.value = 'bar3'
         
@@ -518,7 +528,7 @@ class ContainerTest(unittest.TestCase):
         items = self.listobj.items
         
         for idx in range(1, 21):
-            kv = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+            kv = self.repo.create_object(keyvalue_type)
             kv.key = 'foo' + str(idx)
             kv.value = 'bar' + str(idx)
             item = items.add()
@@ -616,7 +626,7 @@ class ContainerTest(unittest.TestCase):
         
         
     #def testsetcontainerlink(self):
-    #    kv1 = self.repo.create_wrapped_object(basic_pb2.KeyValue)
+    #    kv1 = self.repo.create_object(keyvalue_type)
     #    kv1.key = 'foo1'
     #    kv1.value = 'bar1'
     #    
@@ -635,11 +645,11 @@ class ContainerTest(unittest.TestCase):
         #
         #
         #
-        #kv2 = repo.create_wrapped_object(basic_pb2.KeyValue)
+        #kv2 = repo.create_object(keyvalue_type)
         #kv2.key = 'foo2'
         #kv2.value = 'bar2'
         #
-        #kv3 = repo.create_wrapped_object(basic_pb2.KeyValue)
+        #kv3 = repo.create_object(keyvalue_type)
         #kv3.key = 'foo3'
         #kv3.value = 'bar3'
         #

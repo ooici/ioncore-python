@@ -20,6 +20,11 @@ from net.ooici.play import addressbook_pb2
 from ion.core.object import gpb_wrapper
 from ion.core.object import repository
 from ion.core.object import workbench
+from ion.core.object import object_utils
+
+person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
+addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
 
 
 class WrapperMethodsTest(unittest.TestCase):
@@ -29,7 +34,7 @@ class WrapperMethodsTest(unittest.TestCase):
         
         wb = workbench.WorkBench('No Process Test')
         
-        repo, ab = wb.init_repository(addressbook_pb2.AddressBook)
+        repo, ab = wb.init_repository(addressbook_type)
             
         ab.person.add()
         ab.person.add()
@@ -58,7 +63,7 @@ class NodeLinkTest(unittest.TestCase):
         def setUp(self):
             wb = workbench.WorkBench('No Process Test')
             
-            repo, ab = wb.init_repository(addressbook_pb2.AddressLink)
+            repo, ab = wb.init_repository(addresslink_type)
             
             self.repo = repo
             self.ab = ab
@@ -66,7 +71,7 @@ class NodeLinkTest(unittest.TestCase):
             
         def test_link(self):
             
-            p = self.repo.create_wrapped_object(addressbook_pb2.Person)
+            p = self.repo.create_object(person_type)
                         
             p.name = 'David'
             self.ab.owner = p
@@ -76,9 +81,9 @@ class NodeLinkTest(unittest.TestCase):
             
             wL = self.ab.person.add()
             
-            self.assertEqual(wL.GPBType, wL.LinkClassType)
+            self.assertEqual(wL.ObjectType, wL.LinkClassType)
             
-            p = self.repo.create_wrapped_object(addressbook_pb2.Person)
+            p = self.repo.create_object(person_type)
             
             p.name = 'David'
             
@@ -90,7 +95,7 @@ class NodeLinkTest(unittest.TestCase):
             
             self.ab.person.add()
             
-            p = self.repo.create_wrapped_object(addressbook_pb2.Person)
+            p = self.repo.create_object(person_type)
             
             p.name = 'David'
             p.id = 5
@@ -109,7 +114,7 @@ class NodeLinkTest(unittest.TestCase):
                 
             self.ab.person.add()
                 
-            ab2 = self.repo.create_wrapped_object(addressbook_pb2.AddressLink)
+            ab2 = self.repo.create_object(addresslink_type)
                 
             self.ab.person[0] = ab2
                 
@@ -124,14 +129,14 @@ class NodeLinkTest(unittest.TestCase):
             Test clear field and the object accounting for parents and children
             """
             self.ab.person.add()
-            p = self.repo.create_wrapped_object(addressbook_pb2.Person)
+            p = self.repo.create_object(person_type)
             p.name = 'David'
             p.id = 5
             self.ab.person[0] = p
             self.ab.owner = p
             
             # Check to make sure all is set in the data structure
-            self.assertEqual(self.ab.HasField('owner'),True)
+            self.assertEqual(self.ab.IsFieldSet('owner'),True)
             
             # Assert that there is a child link
             self.assertIn(self.ab.GetLink('owner'),self.ab.ChildLinks)
@@ -157,7 +162,7 @@ class NodeLinkTest(unittest.TestCase):
             self.ab.ClearField('owner')
             
             # The field is clear
-            self.assertEqual(self.ab.HasField('owner'),False)
+            self.assertEqual(self.ab.IsFieldSet('owner'),False)
             
             # Assert that there is only one child link
             self.assertIn(self.ab.person.GetLink(0),self.ab.ChildLinks)
@@ -208,11 +213,11 @@ class RecurseCommitTest(unittest.TestCase):
     def test_simple_commit(self):
         wb = workbench.WorkBench('No Process Test')
             
-        repo, ab = wb.init_repository(addressbook_pb2.AddressLink)
+        repo, ab = wb.init_repository(addresslink_type)
         
         ab.person.add()
         
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'

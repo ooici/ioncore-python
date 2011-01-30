@@ -8,8 +8,10 @@
 @author Matt Rodriguez
 
 TODO
-Make sure delete works for these objects the way we expect!
+Test merge method.
+Test merging access to merging objects (ReadOnly)
 
+Make sure delete works for these objects the way we expect!
 """
 
 import ion.util.ionlog
@@ -66,6 +68,7 @@ class Repository(object):
         Pointer to the current root object in the workspace
         """
         
+        
         self._commit_index = {}
         """
         A dictionary containing the commit objects - all immutable content hashed
@@ -93,11 +96,17 @@ class Repository(object):
         self._detached_head = False
         
         
-        self._merged_from = []
+        self._merge_from = []
         """
         Keep track of branches which were merged into this one!
-        Like _current_brach, _merged_from is a list of links - not the actual
+        Like _current_brach, _merge_from is a list of links - not the actual
         commit refs
+        """
+        
+        self._merge_root=[]
+        """
+        When merging a repository state there are multiple root object in a
+        read only state from which you can draw values using repo.Merging[ind].[field]
         """
         
         self._stash = {}
@@ -117,7 +126,7 @@ class Repository(object):
             self._dotgit.MyId = self.new_id()
         else:
            
-            self._dotgit = self.create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
+            self._dotgit = self._create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
             self._dotgit.repositorykey = pu.create_guid()
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
@@ -137,10 +146,75 @@ class Repository(object):
         return self._dotgit.repositorykey
     
     @property
+    def merge_objects(self):
+        return self._merge_root
+    
+    
+    @property
     def branches(self):
+        """
+        Convience method to access the branches from the mutable head (dotgit object)
+        """
         return self._dotgit.branches
+    
+    def branch(self, nickname=None):
+        """
+        @brief Create a new branch from the current commit and switch the workspace to the new branch.
+        """
+        ## Need to check and then clear the workspace???
+        #if not self.status == self.UPTODATE:
+        #    raise Exception, 'Can not create new branch while the workspace is dirty'
         
-    def get_branch(self,name):
+        if self._current_branch != None and len(self._current_branch.commitrefs)==0:
+            # Unless this is an uninitialized repository it is an error to create
+            # a new branch from one which has no commits yet...
+            raise RepositoryError('The current branch is empty - a new one can not be created untill there is a commit!')
+        
+        
+        brnch = self.branches.add()    
+        brnch.branchkey = pu.create_guid()
+        
+        if nickname:
+            if nickname in self.branchnicknames.keys():
+                raise RepositoryError('That branch nickname is already in use.')
+            self.branchnicknames[nickname]=brnch.branchkey
+
+        if self._current_branch:
+            # Get the linked commit
+            
+            if len(brnch.commitrefs)>1:
+                raise RepositoryError('Branch should merge on read. Invalid state!')
+            elif len(brnch.commitrefs)==1:                
+                cref = self._current_branch.commitrefs[0]
+            
+                bref = brnch.commitrefs.add()
+            
+                # Set the new branch to point at the commit
+                bref.SetLink(cref)
+            
+            
+            # Making a new branch re-attaches to a head!
+            if self._detached_head:
+                self._workspace_root.SetStructureReadWrite()
+                self._detached_head = False
+                
+        self._current_branch = brnch
+        return brnch.branchkey
+    
+    def remove_branch(self,name):
+        branchkey = self.branchnicknames.get(name,None)
+        if not branchkey:
+            branchkey = name
+        
+        for idx, item in zip(range(len(self.branches)), self.branches):
+            if item.branchkey == branchkey:
+                del self.branches[idx]
+                break
+        else:
+            log.info('Branch %s not found!' % name)
+        
+    def get_branch(self, name):
+        
         branchkey = self.branchnicknames.get(name,None)
         if not branchkey:
             branchkey = name
@@ -154,7 +228,7 @@ class Repository(object):
             log.info('Branch %s not found!' % name)
             
         return branch
-            
+    
         
     def checkout(self, branchname=None, commit_id=None, older_than=None):
         """
@@ -179,12 +253,12 @@ class Repository(object):
             
         branch = self.get_branch(branchname)
         if not branch:
-            raise RepositoryError('Branch Key: "%s" does not exist!' % branchkey)
+            raise RepositoryError('Branch Key: "%s" does not exist!' % branchname)
             
         if len(branch.commitrefs)==0:
             raise RepositoryError('This branch is empty - there is nothing to checkout!')
             
-        
+            
         # Set the current branch now!
         self._current_branch = branch
         
@@ -300,7 +374,7 @@ class Repository(object):
         self._detached_head = detached
         
         if detached:
-            self._current_branch = self.create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
+            self._current_branch = self._create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
             bref = self._current_branch.commitrefs.add()
             bref.SetLink(cref)
             self._current_branch.branchkey = 'detached head'
@@ -324,7 +398,7 @@ class Repository(object):
         # Deal with the newest ref seperately
         crefs.remove(head_cref)
             
-        cref = self.create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
+        cref = self._create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
                     
         cref.date = pu.currenttime()
 
@@ -429,7 +503,7 @@ class Repository(object):
         @retval a string which is the commit reference
         """
         # Now add a Commit Ref     
-        cref = self.create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
+        cref = self._create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
         
         if not date:
             date = pu.currenttime()
@@ -455,14 +529,17 @@ class Repository(object):
         
         
         # For each branch that we merged from - add a  reference
-        for mrgd in self._merged_from:
+        for mrgd in self._merge_from:
             pref = cref.parentrefs.add()
-            merged_commit = mrgd.commitref # Get the commit ref of the merged item
-            pref.SetLinkByName('commitref',merged_commit)
+            pref.SetLinkByName('commitref',mrgd)
             pref.relationship = pref.MergedFrom
             
         cref.comment = comment
         cref.SetLinkByName('objectroot', self._workspace_root)            
+        
+        # Clear the merge root and merged from
+        self._merge_from = []
+        self._merge_root = []
         
         # Update the cref in the branch
         branch.commitrefs.SetLink(0,cref)
@@ -470,12 +547,57 @@ class Repository(object):
         return cref
             
         
-    def merge(self, branch=None, commit_id = None, older_than=None):
+    def merge(self, branchname=None, commit_id = None):
         """
         merge the named branch in to the current branch
+        
+        This method does not 'do' the merger of state.
+        It simply adds the parent ref to the repositories merged from list!
+        
         """
         
-
+        if self.status == self.MODIFIED:
+            log.warn('Merging while the workspace is dirty better to make a new commit first!')
+            #What to do for uninitialized? 
+        
+        crefs=[]
+        
+        if commit_id:
+            try:
+                crefs.append(self._commit_index[commit_id])
+            except KeyError, ex:
+                raise RepositoryError('Can not merge from unknown commit_id %s' % commit_id)
+        
+        elif branchname:
+            
+            branch = self.get_branch(branchname)
+            if not branch:
+                raise RepositoryError('Branch Key: "%s" does not exist!' % branchname)
+            
+            if branch.branchkey == self._current_branch.branchkey:
+                if len(branch.commitrefs)<2:
+                    raise RepositoryError('Can not merge with current branch head (self into self)')
+                
+                # Merge the divergent states of this branch!
+                crefs = branch.commitrefs[1:]
+                
+            else:
+                # Assume we merge any and all states of this branch?
+                crefs = branch.commitrefs
+        
+        else:
+            log.debug('''Arguments to Repository.merge - branchname: %s; commit_id: %s''' \
+                      % (branchname, commit_id))
+            raise RepositoryError('merge takes either a branchname argument or a commit_id argument!')
+        
+        assert len(crefs) > 0, 'Illegal state reached in Repository Merge function!'
+        
+        for cref in crefs:
+            self._merge_from.append(cref)
+            merge_root = cref.objectroot
+            merge_root.ReadOnly = True
+            self._merge_root.append(merge_root)
+        
         
         
     @property
@@ -495,50 +617,10 @@ class Repository(object):
             return self.NOTINITIALIZED
         
         
-    def branch(self, nickname=None):
-        """
-        @brief Create a new branch from the current commit and switch the workspace to the new branch.
-        """
-        ## Need to check and then clear the workspace???
-        #if not self.status == self.UPTODATE:
-        #    raise Exception, 'Can not create new branch while the workspace is dirty'
+    def log_commits(self,branchname=None):
         
-        if self._current_branch != None and len(self._current_branch.commitrefs)==0:
-            # Unless this is an uninitialized repository it is an error to create
-            # a new branch from one which has no commits yet...
-            raise RepositoryError('The current branch is empty - a new one can not be created untill there is a commit!')
-        
-        
-        brnch = self.branches.add()    
-        brnch.branchkey = pu.create_guid()
-        
-        if nickname:
-            self.branchnicknames[nickname]=brnch.branchkey
-
-        if self._current_branch:
-            # Get the linked commit
-            
-            if len(brnch.commitrefs)>1:
-                raise RepositoryError('Branch should merge on read. Invalid state!')
-            elif len(brnch.commitrefs)==1:                
-                cref = self._current_branch.commitrefs[0]
-            
-                bref = brnch.commitrefs.add()
-            
-                # Set the new branch to point at the commit
-                bref.SetLink(cref)
-            
-            
-            # Making a new branch re-attaches to a head!
-            if self._detached_head:
-                self._workspace_root.SetStructureReadWrite()
-                self._detached_head = False
-                
-        self._current_branch = brnch
-        return brnch.branchkey
-        
-        
-    def log_commits(self,branchname):
+        if branchname == None:
+            branchname = self._current_branch.branchkey
         
         branch = self.get_branch(branchname)
         log.info('$$ Logging commits on Branch %s $$' % branchname)
@@ -561,8 +643,22 @@ class Repository(object):
         """
         Stash the current workspace for later reference
         """
+        raise Exception('Not implemented yet')
         
-    def create_wrapped_object(self, rootclass, obj_id=None, addtoworkspace=True):        
+    def create_object(self, type_id):
+        """
+        @brief CreateObject is used to make new locally create objects which can
+        be added to the resource's data structure.
+        @param type_id is the type_id of the object to be created
+        @retval the new object which can now be attached to the resource
+        """
+        
+        cls = object_utils.get_gpb_class_from_type_id(type_id)
+        obj = self._wrap_message_object(cls())
+        return obj
+        
+        
+    def _create_wrapped_object(self, rootclass, obj_id=None, addtoworkspace=True):        
         """
         Factory method for making wrapped GPB objects from the repository
         """
@@ -603,11 +699,11 @@ class Repository(object):
      
     def get_linked_object(self, link):
                 
-        if link.GPBType != self.LinkClassType:
+        if link.ObjectType != self.LinkClassType:
             raise RepositoryError('Illegal argument type in get_linked_object.')
                 
                 
-        if not link.HasField('key'):
+        if not link.IsFieldSet('key'):
             return None
                 
         if self._workspace.has_key(link.key):
@@ -640,12 +736,21 @@ class Repository(object):
             #self.set_linked_object(link, obj)
             obj.AddParentLink(link)
             
-            if obj.GPBType == self.CommitClassType:
+            if obj.ObjectType == self.CommitClassType:
                 self._commit_index[obj.MyId]=obj
                 obj.ReadOnly = True
-            else:
+                
+            elif link.Root.ObjectType == self.CommitClassType:
+                # if the link is a commit but the linked object is not then it is a root object
+                # The default for a root object should be ReadOnly = False
                 self._workspace[obj.MyId]=obj
-                obj.ReadOnly = self._detached_head
+                obj.ReadOnly = False
+                
+            else:
+                # When getting an object from it's parent, use the parents readonly setting
+                self._workspace[obj.MyId]=obj
+                obj.ReadOnly = link.ReadOnly
+                
             return obj
             
         else:
@@ -668,12 +773,12 @@ class Repository(object):
         # check that the caluclated value in element.sha1 matches the stored value
         if not element.key == element.sha1:
             raise RepositoryError('The sha1 key does not match the value. The data is corrupted! \n' +\
-            'Element key %s, Calculated key %s' % (element.key, element.sha1))
+            'Element key %s, Calculated key %s' % (object_utils.sha1_to_hex(element.key), object_utils.sha1_to_hex(element.sha1)))
         
-        cls = self._load_class_from_type(element.type)
+        cls = object_utils.get_gpb_class_from_type_id(element.type)
                                 
         # Do not automatically load it into a particular space...
-        obj = self.create_wrapped_object(cls, obj_id=element.key, addtoworkspace=False)
+        obj = self._create_wrapped_object(cls, obj_id=element.key, addtoworkspace=False)
             
         # If it is a leaf element set the bytes for the object, do not load it
         # If it is not a leaf element load it and find its child links
@@ -694,41 +799,31 @@ class Repository(object):
         
         return obj
         
-    def _load_class_from_type(self,ltype):
-    
-        cls = object_utils.get_gpb_class_from_id(ltype.object_id)
-                
-        return cls
-        
-        
-    def _set_type_from_obj(self, ltype, wrapped_obj):
-        """
-        This method is a bit of a mess - do we really need it?
-        
-        It opperates directly on unwrapped GPB objects
-        """
-            
-        obj = wrapped_obj
-        if isinstance(obj, gpb_wrapper.Wrapper):
-            obj = obj.GPBMessage
-            
-        gpbtype = gpb_wrapper.set_type_from_obj(obj)
-        
-        thetype = ltype
-        if isinstance(thetype, gpb_wrapper.Wrapper):
-            thetype=ltype.GPBMessage
-            
-        thetype.CopyFrom(gpbtype)
-        
         
         
     def set_linked_object(self,link, value):        
         # If it is a link - set a link to the value in the wrapper
-        if link.GPBType != link.LinkClassType:
+        if link.ObjectType != link.LinkClassType:
             raise RepositoryError('Can not set a composite field unless it is of type Link')
                     
         if not value.IsRoot == True:
             raise RepositoryError('You can not set a link equal to part of a gpb composite!')
+        
+        # if this value is from another repository... you need to load it from the hashed objects into this repository
+        if not value.Repository.repository_key == self.repository_key:
+            
+            if value.Modified:
+                raise RepositoryError('Can not move objects from a foreign repository which are in a modified state. Commit before moving the object.')
+            
+            # Get the element from the hashed elements list
+            element = self._hashed_elements.get(value.MyId)
+            
+            obj = self._load_element(element)
+            
+            self._load_links(obj)
+            
+            value = obj
+        
         
         if link.key == value.MyId:
                 # Add the new link to the list of parents for the object
@@ -779,6 +874,6 @@ class Repository(object):
         
         # Set the type
         tp = link.type
-        self._set_type_from_obj(tp, value)
+        object_utils.set_type_from_obj(value, tp)
             
     

@@ -21,6 +21,12 @@ from net.ooici.play import addressbook_pb2
 from ion.core.object import gpb_wrapper
 from ion.core.object import repository
 from ion.core.object import workbench
+from ion.core.object import object_utils
+
+person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
+addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
+invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
 
 
 class WorkBenchTest(unittest.TestCase):
@@ -29,10 +35,10 @@ class WorkBenchTest(unittest.TestCase):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb
         
-        repo, ab = self.wb.init_repository(addressbook_pb2.AddressLink)
+        repo, ab = self.wb.init_repository(addresslink_type)
 
                         
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
@@ -46,7 +52,7 @@ class WorkBenchTest(unittest.TestCase):
         ab.person[0] = p
         
         ab.person.add()
-        p = repo.create_wrapped_object(addressbook_pb2.Person)
+        p = repo.create_object(person_type)
         p.name='John'
         p.id = 78
         p.email = 'J@s.com'
@@ -59,7 +65,9 @@ class WorkBenchTest(unittest.TestCase):
         self.ab = ab
         self.repo = repo
         
+    def test_invalid_type(self):
         
+        self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, invalid_type )
             
     def test_simple_commit(self):
         
@@ -132,14 +140,14 @@ class WorkBenchTest(unittest.TestCase):
             
             
         # Try it with a root object this time
-        repo, rootobj = self.wb.init_repository(rootclass=addressbook_pb2.AddressBook)
+        repo, rootobj = self.wb.init_repository(addressbook_type)
             
         rkey = repo.repository_key
         self.assertEqual(repo, self.wb.get_repository(rkey))
         self.assertIsInstance(rootobj, gpb_wrapper.Wrapper)
             
         # Try it with a nickname for the repository
-        repo, rootobj = self.wb.init_repository(rootclass=addressbook_pb2.AddressBook, nickname='David')
+        repo, rootobj = self.wb.init_repository(root_type=addressbook_type, nickname='David')
             
         self.assertEqual(repo, self.wb.get_repository('David'))
         self.assertIsInstance(rootobj, gpb_wrapper.Wrapper)
@@ -148,10 +156,11 @@ class WorkBenchTest(unittest.TestCase):
         
 class WorkBenchMergeTest(unittest.TestCase):
         
+        
     def test_fastforward_merge(self):
         wb1 = workbench.WorkBench('No Process Test')
         
-        repo1, ab = wb1.init_repository(addressbook_pb2.AddressBook)
+        repo1, ab = wb1.init_repository(addressbook_type)
         
         commit_ref1 = repo1.commit(comment='a')
         commit_ref2 = repo1.commit(comment='b')
@@ -191,7 +200,7 @@ class WorkBenchMergeTest(unittest.TestCase):
     def test_divergent_merge(self):
         wb1 = workbench.WorkBench('No Process Test')
         
-        repo1, ab1 = wb1.init_repository(addressbook_pb2.AddressBook)
+        repo1, ab1 = wb1.init_repository(addressbook_type)
         
         commit_ref_a1 = repo1.commit(comment='a1')
         commit_ref_b1 = repo1.commit(comment='b1')

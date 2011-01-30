@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/core/process/test/test_baseprocess.py
+@file ion/core/process/test/test_process.py
 @author Michael Meisinger
 @brief test case for process base class
 """

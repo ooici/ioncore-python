@@ -16,8 +16,15 @@ dist
 .pydevproject
 .project
 /.settings
+/.metadata
 dropin.cache
+eggs/
+parts/
+develop-eggs/
+downloads/
+bin/
 
+/net
 ion/agents/instrumentagents copy/NportSendBreak.py
 ion/agents/instrumentagents copy/SBE49_IA.py
 ion/agents/instrumentagents copy/SBE49_constants.py

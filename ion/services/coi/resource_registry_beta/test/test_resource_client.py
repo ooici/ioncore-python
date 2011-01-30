@@ -17,7 +17,7 @@ from ion.core.object import gpb_wrapper
 from ion.core.object import workbench
 from ion.core.object import object_utils
 
-from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
+from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient, ResourceRegistryError
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 from ion.test.iontest import IonTestCase
@@ -25,6 +25,8 @@ from ion.test.iontest import IonTestCase
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
+Update_Type = object_utils.create_type_identifier(object_id=10, version=1)
 
 class ResourceClientTest(IonTestCase):
     """
@@ -46,7 +48,7 @@ class ResourceClientTest(IonTestCase):
         self.rrc = ResourceRegistryClient(proc=sup)
         self.rc = ResourceClient(proc=sup)
         self.sup = sup
-
+        
     @defer.inlineCallbacks
     def tearDown(self):
         # You must explicitly clear the registry in case cassandra is used as a back end!
@@ -85,15 +87,15 @@ class ResourceClientTest(IonTestCase):
             
         self.assertEqual(my_resource.ResourceName, 'Test AddressLink Resource')
         
-    
+        
     @defer.inlineCallbacks
     def test_read_your_writes(self):
             
         resource = yield self.rc.create_instance(addresslink_type, name='Test AddressLink Resource', description='A test resource')
             
-        self.assertEqual(resource.ResourceType.GPBMessage, addresslink_type)
+        self.assertEqual(resource.ResourceType, addresslink_type)
             
-        
+            
         person = resource.CreateObject(person_type)
         resource.person.add()
         resource.person[0] = person
@@ -184,6 +186,78 @@ class ResourceClientTest(IonTestCase):
         
         self.assertEqual(my_resource_2.person[0].name, 'Paul')
         
-        self.assertRaises(gpb_wrapper.OOIObjectError, getattr, my_resource_1, 'person') 
         
         
+    @defer.inlineCallbacks
+    def test_invalid_type(self):
+        
+        # Create the resource object
+        #self.assertRaises(ResourceRegistryError, self.rc.create_instance, invalid_type, name='Test AddressLink Resource', description='A test resource')
+        
+        try:
+            resource = yield self.rc.create_instance(invalid_type, name='Test AddressLink Resource', description='A test resource')
+        except ResourceRegistryError, ex:
+            return
+        
+        self.fail('This test should raise an exception and return in the except!')
+        
+        
+    @defer.inlineCallbacks
+    def test_merge_update(self):
+        
+        # Create the resource object    
+        resource = yield self.rc.create_instance(addresslink_type, name='Test AddressLink Resource', description='A test resource')
+                
+        person = resource.CreateObject(person_type)
+        
+        resource.person.add()
+        person.id=5
+        person.name='David'
+        
+        resource.person[0] = person
+        
+        yield self.rc.put_instance(resource, 'Testing write...')
+        # Get the branch key
+        branch_key = resource.Repository._current_branch.branchkey
+        cref = resource.Repository._current_branch.commitrefs[0]
+        
+        # Make sure that you the MergingResource method raises an errro
+        self.assertRaises(ResourceInstanceError, getattr, resource, 'CompareToUpdates')
+        
+        # Create an update to merge into it...
+        update_repo, ab = self.rc.workbench.init_repository(addresslink_type)
+        
+        p2 = update_repo.create_object(person_type)
+        p2.name = 'John'
+        p2.id = 5
+        
+        ab.person.add()
+        ab.person[0] = p2
+        ab.title = 'Revision'
+        update_repo.commit('an update object')
+                
+        # Merge the update!
+        resource.MergeResourceUpdate(resource.MERGE, ab)
+            
+            
+        # Make sure the correct commit is at the head.
+        self.assertEqual(branch_key, resource.Repository._current_branch.branchkey)
+        self.assertEqual(cref, resource.Repository._current_branch.commitrefs[0])
+        
+        self.assertEqual(resource.person[0].name, 'David')\
+        
+        # Try getting the merge objects resource...
+        self.assertEqual(resource.CompareToUpdates[0].person[0].name, 'John')
+        
+        self.assertRaises(gpb_wrapper.OOIObjectError,setattr, resource.CompareToUpdates[0], 'title', 'David')
+        
+        # Set the resource object equal to the updated addressbook
+        resource.ResourceObject = resource.CompareToUpdates[0]
+        
+        self.assertEqual(resource.person[0].name, 'John')
+        
+        
+        yield self.rc.put_instance(resource, resource.RESOLVED)
+        
+        resource.Repository.log_commits()
+    

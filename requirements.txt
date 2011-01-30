@@ -10,13 +10,12 @@ gviz-api.py==1.7.0
 httplib2==0.6.0
 msgpack-python==015final
 nimboss
-pyrods-irods==2.4.3
 simplejson==2.1.2
 telephus==0.7-beta3.3
 twotp==0.7
 txAMQP==0.3
 txrabbitmq==0.4
 zope.interface==3.6.1
-ionproto==0.2.1
+ionproto==0.3.0
 protobuf==2.3.0-p1
 .

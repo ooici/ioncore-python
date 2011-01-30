@@ -3,12 +3,13 @@
 """
 @file ion/test/loadtests/brokerload.py
 @author Michael Meisinger
+@author Adam R. Smith
 @brief Creates load on an AMQP broker
 """
 
 import uuid
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from carrot import connection, messaging
 
@@ -18,34 +19,44 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.test.loadtest import LoadTest, LoadTestOptions
 import ion.util.procutils as pu
 
+import sys
+
 class BrokerTestOptions(LoadTestOptions):
     optParameters = [
-                ["scenario", "s", "connect", "Load test scenario"],
-                ["host", "h", "localhost", "Broker host name"],
-                ["port", "p", 5672, "Broker port"],
-                ["vhost", "v", "/", "Broker vhost"],
-                ["heartbeat", None, 0, "Heartbeat rate [seconds]"],
-                    ]
-    optFlags = [
-                ]
+                ['scenario', 's', 'connect', 'Load test scenario'],
+                ['host', 'h', 'localhost', 'Broker host name'],
+                ['port', 'p', 5672, 'Broker port'],
+                ['vhost', 'v', '/', 'Broker vhost'],
+                ['heartbeat', 'hb', 0, 'Heartbeat rate [seconds]'],
+                ['monitor', 'm', 3, 'Monitor poll rate [seconds]']
+    ]
+    optFlags = []
 
 
 class BrokerTest(LoadTest):
 
-    def setUp(self):
-        numopt = len(self.options['test_args'])
-        assert numopt >= 2
-        self.scenario = self.options['test_args'][0]
-        self.broker_host = self.options['test_args'][1]
-        self.broker_port = numopt >= 3 and self.options['test_args'][2] or 5672
-        self.broker_vhost = numopt >= 4 and self.options['test_args'][3] or "/"
+    def setUp(self, argv=None):
+        fullPath = '%s.%s' % (self.__class__.__module__, self.__class__.__name__)
+        if argv is None and fullPath in sys.argv:
+            argv = sys.argv[sys.argv.index(fullPath) + 1:]
+        opts = BrokerTestOptions()
+        opts.parseOptions(argv)
+
+        self.scenario = opts['scenario']
+        self.broker_host = opts['host']
+        self.broker_port = opts['port']
+        self.broker_vhost = opts['vhost']
+        self.monitor_rate = opts['monitor']
+
+        print 'Running the "%s" scenario on "%s:%d" at "%s".' % (self.scenario, self.broker_host,
+                                                                 self.broker_port, self.broker_vhost)
 
         self.cur_state['connects'] = 0
         self.cur_state['msgsend'] = 0
         self.cur_state['msgrecv'] = 0
         self.cur_state['errors'] = 0
 
-        self._enable_monitor(5)
+        self._enable_monitor(self.monitor_rate)
 
     @defer.inlineCallbacks
     def generate_load(self):
@@ -61,13 +72,13 @@ class BrokerTest(LoadTest):
             exname = "%s:%s" % (self.load_id,pu.create_guid())
             queuename = "%s:%s" % (self.load_id,pu.create_guid())
             routingkey = "%s:%s" % (self.load_id,pu.create_guid())
-            yield self._declare_exchange(exname, routingkey)
+            print 'Exchange: %s, queue: %s, routekey: %s' % (exname, queuename, routingkey)
+            yield self._declare_publisher(exname, routingkey)
             yield self._declare_consumer(exname, routingkey, queuename)
-            while True:
-                if self.is_shutdown():
-                    break
-                yield self._send_message()
-                yield pu.asleep(0.02)
+
+            # Start the publisher deferred before waiting/yielding with the consumer
+            self._run_publisher()
+            yield self._run_consumer()
 
             yield self.publisher.close()
             yield self.consumer.close()
@@ -103,7 +114,7 @@ class BrokerTest(LoadTest):
         yield self.connection._connection.transport.loseConnection()
 
     @defer.inlineCallbacks
-    def _declare_exchange(self, exname, routingkey):
+    def _declare_publisher(self, exname, routingkey):
         self.publisher = messaging.Publisher(
                     connection=self.connection,
                     exchange=exname,
@@ -129,6 +140,8 @@ class BrokerTest(LoadTest):
                     exclusive=False,
                     routing_key=routingkey)
 
+        self.consumer.register_callback(self._recv_callback)
+
         yield self.consumer.backend.queue_declare(
                     queue=queuename,
                     durable=self.consumer.durable,
@@ -143,6 +156,25 @@ class BrokerTest(LoadTest):
                     arguments={})
 
         yield self.consumer.qos(prefetch_count=1)
+
+    @defer.inlineCallbacks
+    def _run_consumer(self):
+        while True:
+            if self.is_shutdown():
+                break
+            yield self._recv_messages()
+            # Run the consumer less frequently, batch fetching up to 50times/sec
+            yield pu.asleep(0.02)
+
+    @defer.inlineCallbacks
+    def _run_publisher(self):
+        while True:
+            if self.is_shutdown():
+                break
+            yield self._send_message()
+            # Generate as much load as this client can handle, up to 100000/sec
+            yield pu.asleep(0.00001)
+
 
     @defer.inlineCallbacks
     def _send_message(self):
@@ -160,8 +192,20 @@ class BrokerTest(LoadTest):
                     content_encoding='binary')
         self.cur_state['msgsend'] += 1
 
+    @defer.inlineCallbacks
+    def _recv_messages(self):
+        try:
+            while True:
+                yield self.consumer.fetch(enable_callbacks=True)
+        except:
+            pass # No More Messages
+
+    def _recv_callback(self, message):
+        self.cur_state['msgrecv'] += 1
+
     def tearDown(self):
-        self.monitor()
+        self._disable_monitor()
+        self._call_monitor()
 
     def monitor(self):
         interval = self._get_interval()
@@ -175,5 +219,5 @@ class BrokerTest(LoadTest):
 
 
 """
-python -m ion.test.load_runner -s -c ion.test.loadtests.brokerload.BrokerTest -p connect
+python -m ion.test.load_runner -c ion.test.loadtests.brokerload.BrokerTest -s connect
 """
