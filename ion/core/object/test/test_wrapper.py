@@ -81,7 +81,7 @@ class NodeLinkTest(unittest.TestCase):
             
             wL = self.ab.person.add()
             
-            self.assertEqual(wL.GPBType, wL.LinkClassType)
+            self.assertEqual(wL.ObjectType, wL.LinkClassType)
             
             p = self.repo.create_object(person_type)
             
@@ -136,7 +136,7 @@ class NodeLinkTest(unittest.TestCase):
             self.ab.owner = p
             
             # Check to make sure all is set in the data structure
-            self.assertEqual(self.ab.HasField('owner'),True)
+            self.assertEqual(self.ab.IsFieldSet('owner'),True)
             
             # Assert that there is a child link
             self.assertIn(self.ab.GetLink('owner'),self.ab.ChildLinks)
@@ -162,7 +162,7 @@ class NodeLinkTest(unittest.TestCase):
             self.ab.ClearField('owner')
             
             # The field is clear
-            self.assertEqual(self.ab.HasField('owner'),False)
+            self.assertEqual(self.ab.IsFieldSet('owner'),False)
             
             # Assert that there is only one child link
             self.assertIn(self.ab.person.GetLink(0),self.ab.ChildLinks)

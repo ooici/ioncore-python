@@ -2,6 +2,11 @@
 @file ion/core/data/test/test_manager.py
 @author Matt Rodriguez
 @test Test the IDataManager interface
+
+@TODO - Right now skiptest causes an error when used with a cassandra connection
+ Once this is fixed we can skip individual tests. For now we must skip all or none
+ by skipping the setUp or a method inside it!
+
 """
 from twisted.trial import unittest
 from twisted.internet import defer
@@ -12,6 +17,9 @@ from ion.core.object import workbench
 
 from ion.core.data import store
 
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
+from ion.util.itv_decorator import itv
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -100,6 +108,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         self.cache.column_metadata[0] = column
         
     
+    @itv(CONF)
     def _setUpConnection(self):
         """
         This creates the ion resource objects necessary that hold the information needed to connect
@@ -135,6 +144,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         self.manager.terminate()
          
     
+    #@itv(CONF)
     @defer.inlineCallbacks
     def test_update_persistent_archive(self):
         yield self.manager.create_persistent_archive(self.keyspace)
@@ -147,6 +157,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         log.info("Replication factor %s" % (desc.replication_factor,))    
         self.failUnlessEqual(desc.replication_factor, 2)
         
+    #@itv(CONF)
     @defer.inlineCallbacks
     def test_update_cache(self):
         self.cache.column_type= 'Standard'
@@ -159,6 +170,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         log.info("column_metadata index_name %s " % (desc.cf_defs[0].column_metadata[0].index_name,))
         self.failUnlessEqual(desc.cf_defs[0].column_metadata[0].index_name, "stateIndex")
         
+    #@itv(CONF)
     @defer.inlineCallbacks
     def test_update_cache_two_indexes(self):
         """

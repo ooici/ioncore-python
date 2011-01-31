@@ -19,6 +19,10 @@ import ion.test.iontest
 from ion.test.iontest import IonTestCase
 from ion.services.cei.queuestat import QueueStatClient
 
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
+from ion.util.itv_decorator import itv
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -58,6 +62,7 @@ class TestQueueStatService(IonTestCase):
         log.debug('Resetting broker_host')
         ion.test.iontest.CONF.obj['broker_host'] = self.other_broker_host
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_queue_stat(self):
         subscriber = TestSubscriber()
