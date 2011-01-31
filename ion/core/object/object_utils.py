@@ -10,6 +10,7 @@ from ion.util import procutils as pu
 from net.ooici.core.type import type_pb2
 
 import hashlib
+import struct
 from google.protobuf import message
 
 # Globals
@@ -37,7 +38,7 @@ def sha1_to_hex(bytes):
     """
     hex_bytes = struct.unpack('!20B', bytes)
     almosthex = map(hex, hex_bytes)
-    return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
+    return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]]).upper()
 
 def set_type_from_obj(obj, type=None):
     """    

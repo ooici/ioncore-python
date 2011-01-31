@@ -773,7 +773,7 @@ class Repository(object):
         # check that the caluclated value in element.sha1 matches the stored value
         if not element.key == element.sha1:
             raise RepositoryError('The sha1 key does not match the value. The data is corrupted! \n' +\
-            'Element key %s, Calculated key %s' % (element.key, element.sha1))
+            'Element key %s, Calculated key %s' % (object_utils.sha1_to_hex(element.key), object_utils.sha1_to_hex(element.sha1)))
         
         cls = object_utils.get_gpb_class_from_type_id(element.type)
                                 
