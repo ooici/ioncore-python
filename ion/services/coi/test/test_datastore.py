@@ -9,6 +9,10 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
+from ion.util.itv_decorator import itv
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
+
 from ion.test.iontest import IonTestCase
 
 from net.ooici.play import addressbook_pb2
@@ -28,6 +32,7 @@ class DataStoreTest(IonTestCase):
     # This is a temporary way to test communication between python and java using GPBs...
     #FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/01184000_0.protostruct'
     #FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/grid.protostruct'
+    #FileLocation = '/Users/dstuebe/Dropbox/EOI_Shared/transfer (deleted periodically)/station_profile.protostruct'
     FileLocation = ''
 
     @defer.inlineCallbacks
@@ -306,7 +311,7 @@ class DataStoreTest(IonTestCase):
         
         
 
-
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_load_data(self):
         """
@@ -330,7 +335,7 @@ class DataStoreTest(IonTestCase):
         
         log.info('dataset: \n' + str(dataset))
         
-        log.info('rootGroup: \n' +str(dataset.rootGroup))
+        log.info('rootGroup: \n' +str(dataset.root_group))
         
         def log_atts(atts, tab=''):
             
@@ -364,9 +369,9 @@ class DataStoreTest(IonTestCase):
                     ba_string += str(ba.ndarray.value[:25])+'\n'
             return ba_string
                 
-        log_dims(dataset.rootGroup.dimensions)
-        log_atts(dataset.rootGroup.attributes)
-        log_vars(dataset.rootGroup.variables)
+        log_dims(dataset.root_group.dimensions)
+        log_atts(dataset.root_group.attributes)
+        log_vars(dataset.root_group.variables)
         
         
         
