@@ -258,15 +258,19 @@ class RepositoryTest(unittest.TestCase):
         ph1.number = '123 456 7890'
  
         ab1.owner = p1
-        
         cref = repo1.commit(comment='testing commit')
  
-        # Create a second repository and copy from 1 to 2
+        # Create a second repository and copy p1 from repo1 to repo2
         repo2, ab2 = self.wb.init_repository(addresslink_type)
             
         ab2.person.add()
-        ab2.person[0] = p1
+        
+        # move to a repeated link
+        ab2.person[0] = ab1.owner
+        
+        
             
+        # Test the person
         self.assertEqual(ab2.person[0].name, 'David')
             
         self.assertEqual(ab2.person[0].MyId, ab1.owner.MyId)
@@ -275,6 +279,18 @@ class RepositoryTest(unittest.TestCase):
         self.assertNotIdentical(ab2.person[0].Repository, ab1.owner.Repository)
         
         self.assertIdentical(ab2.person[0].Repository, ab2.Repository)
+        
+        # move to a link
+        ab2.owner = ab1.owner
+        
+        # Test the owner
+        self.assertEqual(ab2.owner.name, 'David')
+        self.assertEqual(ab2.owner.MyId, ab1.owner.MyId)
+        self.assertEqual(ab2.owner, ab1.owner)
+        self.assertNotIdentical(ab2.owner, ab1.owner)
+        self.assertNotIdentical(ab2.owner.Repository, ab1.owner.Repository)
+        
+        
         
         
     def test_merge(self):

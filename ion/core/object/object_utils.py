@@ -10,6 +10,7 @@ from ion.util import procutils as pu
 from net.ooici.core.type import type_pb2
 
 import hashlib
+import struct
 from google.protobuf import message
 
 # Globals
@@ -37,7 +38,7 @@ def sha1_to_hex(bytes):
     """
     hex_bytes = struct.unpack('!20B', bytes)
     almosthex = map(hex, hex_bytes)
-    return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]])
+    return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]]).upper()
 
 def set_type_from_obj(obj, type=None):
     """    
@@ -48,9 +49,9 @@ def set_type_from_obj(obj, type=None):
     ENUM_ID_NAME = '_ID'
     
     if type==None:    
-        gpbtype = type_pb2.GPBType()
+        ObjectType = type_pb2.GPBType()
     else:
-        gpbtype = type.GPBMessage
+        ObjectType = type.GPBMessage
     
     descriptor = obj.DESCRIPTOR
     if hasattr(descriptor, 'enum_types'):
@@ -58,11 +59,11 @@ def set_type_from_obj(obj, type=None):
             if enum_type.name == ENUM_NAME:
                 for val in enum_type.values:
                     if val.name == ENUM_ID_NAME:
-                        gpbtype.object_id=val.number
-                        gpbtype.version = 1
+                        ObjectType.object_id=val.number
+                        ObjectType.version = 1
                         
                         # Is it bad to return it if it was passed as an arg?
-                        return gpbtype
+                        return ObjectType
                         
     
     raise ObjectUtilException(\
@@ -78,17 +79,17 @@ def create_type_identifier(object_id='', version=''):
     """
     This returns an unwrapped GPB object to the application level
     """        
-    gpbtype = type_pb2.GPBType()
+    ObjectType = type_pb2.GPBType()
     
     try:
-        gpbtype.object_id = int(object_id)
-        gpbtype.version = int(version)
+        ObjectType.object_id = int(object_id)
+        ObjectType.version = int(version)
     except ValueError, ex:
         raise ObjectUtilException(\
             '''Protocol Buffer Object IDs must be integers:object_id - "%s", version "%s"'''\
             % (str(object_id), str(version)))
         
-    return gpbtype
+    return ObjectType
 
 def build_gpb_lookup(rootpath):
     """

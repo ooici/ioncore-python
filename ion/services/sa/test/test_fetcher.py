@@ -15,11 +15,16 @@ from socket import gaierror
 from ion.services.sa.fetcher import FetcherClient, FetcherService
 from ion.test.iontest import IonTestCase
 
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
+from ion.util.itv_decorator import itv
+
 class FetcherServiceTester(IonTestCase):
     """
     Just instantiate the FetcherService class and exercise the inner get_page
     method.
     """
+    @itv(CONF)
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -57,6 +62,7 @@ class FetcherServiceTester(IonTestCase):
                               'http://amoeba.ucsd.edu/tmp/bad-filename')
 
 class FetcherTest(IonTestCase):
+    @itv(CONF)
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -125,23 +131,4 @@ class FetcherTest(IonTestCase):
         except ValueError:
             pass
 
-TEST_DSET = 'http://ooici.net:8001/coads.nc'
-TEST_ADSET1 = 'http://ooici.net:8001/grid_surf_el1.nc'
-TEST_ADSET2 = 'http://ooici.net:8001/grid_surf_el2.nc'
-TEST_APATTERN = "/tmp/grid_surf_el*.nc"
 
-class TransportTester(IonTestCase):
-    """
-    Verify that we can transport binary (XDR) data.
-    """
-    @defer.inlineCallbacks
-    def setUp(self):
-        yield self._start_container()
-        self.timeout = 120
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self._stop_container()
-
-    def test_updown(self):
-        pass

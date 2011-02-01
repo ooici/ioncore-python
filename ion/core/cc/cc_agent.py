@@ -196,7 +196,8 @@ def start(container, starttype, app_definition, *args, **kwargs):
 
 @defer.inlineCallbacks
 def stop(container, state):
-    log.debug("state: %s" % state)
+
+    #print "state", state
     supdesc = state[0]
     log.info("Terminating CC agent")
     yield supdesc.terminate()

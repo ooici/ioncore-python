@@ -7,7 +7,7 @@
 @brief service for registering resources
 
 To test this with the Java CC!
-> bin/start-cc -h amoeba.ucsd.edu -a sysname=eoitest res/scripts/eoi_demo.py
+> scripts/start-cc -h amoeba.ucsd.edu -a sysname=eoitest res/scripts/eoi_demo.py
 """
 
 import ion.util.ionlog
@@ -48,7 +48,7 @@ class EOIIngestionService(ServiceProcess):
     # Declaration of service
     declare = ServiceProcess.service_declare(name='eoi_ingest', version='0.1.0', dependencies=[])
 
-    #TypeClassType = gpb_wrapper.set_type_from_obj(type_pb2.GPBType())
+    #TypeClassType = gpb_wrapper.set_type_from_obj(type_pb2.ObjectType())
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
