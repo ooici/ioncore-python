@@ -41,6 +41,11 @@ column_family_type =  object_utils.create_type_identifier(object_id=2507, versio
 
 resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
 
+class CassandraManagerServiceException(Exception):
+    """
+    Exceptions that originate in the CassandraManagerService class
+    """
+
 class CassandraManagerService(ServiceProcess):
     """
     @brief Cassandra Manager Agent interface
@@ -66,8 +71,12 @@ class CassandraManagerService(ServiceProcess):
         ServiceProcess.__init__(self, *args, **kwargs)
         
         # Bootstrap args is a dictionary containing a host list and credentials
-        self.spawn_args['bootstrap_args'] = self.spawn_args.get('bootstrap_args', CONF.getValue('bootstrap_args', default=None))
+        #self.spawn_args['bootstrap_args'] = self.spawn_args.get('bootstrap_args', CONF.getValue('bootstrap_args', default=None))
         
+        self._host = CONF.getValue('host')
+        self._port = CONF.getValue('port')
+        self._username = CONF.getValue('username')
+        self._password = CONF.getValue('password')
         # Create a Resource Client 
         self.rc = ResourceClient(proc=self)    
         self.mc = MessageClient(proc=self)    
@@ -108,22 +117,31 @@ class CassandraManagerService(ServiceProcess):
             storage_resource = yield self.rc.get_instance(storage_resource_ref)
         """
         #Hard code the storage resource for now. Eventually pass all this into spawn_args
-        # The cassandra client manager
-        log.info(str(args))
-        log.info(str(args['host']))
+        if self._host is None:
+            raise CassandraManagerServiceException("The hostname for the Cassandra cluster is not set.")
+        
+        if self._port is None:
+            raise CassandraManagerServiceException("The port for the Cassandra cluster is not set.")
+        
+        if self._username is None:
+            raise CassandraManagerServiceException("The username for the credentials to authenticate to the Cassandra cluster is not set.")
+        
+        if self._password is None:
+            raise CassandraManagerServiceException("The password for the credentials to authenticate to the Cassandra cluster is not set.")
+        
         self.wb = workbench.WorkBench("I need this make ION resources")
-                ### Create a persistence_technology resource - for cassandra a CassandraCluster object
+        ### Create a persistence_technology resource - for cassandra a CassandraCluster object
         persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(cassandra_cluster_type)
         
         # Set only one host and port in the host list for now
         cas_host = cassandra_cluster.hosts.add()
-        cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
-        cas_host.port = 9160
+        cas_host.host = self._host
+        cas_host.port = self._port
         
         ### Create a Credentials resource - for cassandra a SimplePassword object
         cache_repository, simple_password  = self.wb.init_repository(simple_password_type)
-        simple_password.username = 'ooiuser'
-        simple_password.password = 'oceans11'
+        simple_password.username = self._username
+        simple_password.password = self._password
         
         storage_resource = CassandraStorageResource(cassandra_cluster, credentials=simple_password)
         manager = CassandraDataManager(storage_resource)
@@ -136,7 +154,7 @@ class CassandraManagerService(ServiceProcess):
         # Now query the cluster to create persistence resources 
         if self.spawn_args.get('bootstrap_args', None):
             yield self._bootstrap()
-            pass
+            
         
         
         
