@@ -89,7 +89,6 @@ class PST(IonTestCase):
         topic_id = yield self.psc.define_topic(tt_id, self.topic_name)
         # Verify that it was created
         self.failIf(topic_id is None)
-        yield asleep(2.0)
 
     @defer.inlineCallbacks
     def test_topics(self):

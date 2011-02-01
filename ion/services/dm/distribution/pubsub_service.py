@@ -200,15 +200,14 @@ class PubSubService(ServiceProcess):
 
         cstr = "%s/%s" % (topic_tree_id, topic_name)
         rc = ResourceClient(proc=self)
-        dset = yield rc.create_instance(DSET_TYPE, name=topic_name,
-                                  description=cstr)
+        dset = yield rc.create_instance(DSET_TYPE, name=topic_name, description=cstr)
+
         dset.open_dap = topic_name
         now = time.time()
         dset.last_updated = now
         dset.date_created = now
         dset.creator.name = 'Otto Niemand'
         log.debug('Dataset object created, pushing/committing "%s"' % cstr)
-        #log.debug(dset)
 
         yield rc.put_instance(dset, 'Adding dataset/topic %s' % cstr)
         log.debug('Commit completed, %s' % dset.ResourceIdentity)
