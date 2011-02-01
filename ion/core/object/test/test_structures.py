@@ -10,6 +10,7 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from twisted.internet import defer
 
 from twisted.trial import unittest
 
@@ -48,18 +49,19 @@ class SimpleObjectTest(unittest.TestCase):
         self.wb = wb
         self.repo = repo
         
+    @defer.inlineCallbacks
     def test_init(self):
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         
         self.assertEqual(len(simple.ParentLinks),1)
         self.assertEqual(len(simple.ChildLinks),0)
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, False)
         
-        
+    @defer.inlineCallbacks
     def test_modify_string(self):
         
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         self.assertEqual(simple.string, 'abc')
         simple.string = 'xyz'
         self.assertEqual(simple.string, 'xyz')
@@ -69,10 +71,10 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
         
-    
+    @defer.inlineCallbacks
     def test_modify_integer(self):
         
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         self.assertEqual(simple.integer, 5)
 
         simple.integer = 50
@@ -83,9 +85,10 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
         
+    @defer.inlineCallbacks
     def test_modify_float(self):
         
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         self.assertEqual(simple.float, 3.)
         
         simple.float = 50
@@ -96,9 +99,10 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
         
+    @defer.inlineCallbacks
     def test_modify_strings(self):
         
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         self.assertEqual(simple.strings, ['stuff','junk','more'])
         
         simple.strings.insert(2,'xyz')
@@ -109,10 +113,10 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
         
-    
+    @defer.inlineCallbacks
     def test_modify_integers(self):
         
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         self.assertEqual(simple.integers, [1,2,3,4])
         simple.integers.append( 50)
         self.assertEqual(simple.integers, [1,2,3,4,50])
@@ -122,9 +126,10 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
         
+    @defer.inlineCallbacks
     def test_modify_floats(self):
         
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         self.assertEqual(simple.floats, [3.,4.,5.,6.])
         
         simple.floats.remove( 4.0)
@@ -135,9 +140,10 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
         
+    @defer.inlineCallbacks
     def test_setitem(self):
         
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         self.assertEqual(simple.floats, [3.,4.,5.,6.])
         simple.floats[1]=( 44.0)
         self.assertEqual(simple.floats, [3.,44.,5.,6.])
@@ -147,9 +153,10 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
         
+    @defer.inlineCallbacks
     def test_getitem(self):
         
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         self.assertEqual(simple.floats, [3.,4.,5.,6.])
         self.assertEqual(simple.floats[1], 4.)
         
@@ -159,9 +166,10 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, False)
         
+    @defer.inlineCallbacks
     def test_delitem(self):
         
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         self.assertEqual(simple.floats, [3.,4.,5.,6.])
         del simple.floats[1]
         self.assertEqual(simple.floats, [3.,5.,6.])
@@ -172,10 +180,11 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(len(simple.ChildLinks),0)
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
-        
+    
+    @defer.inlineCallbacks
     def test_delslice(self):
         
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         self.assertEqual(simple.floats, [3.,4.,5.,6.])
         del simple.floats[1:3]
         self.assertEqual(simple.floats, [3.,6.])
@@ -187,15 +196,15 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(simple.IsRoot, True)
         self.assertEqual(simple.Modified, True)
         
-        
+    @defer.inlineCallbacks
     def test_invalidate(self):
         
-        simple = self.repo.checkout('master')
+        simple = yield self.repo.checkout('master')
         self.assertEqual(simple.floats, [3.,4.,5.,6.])
         floats = simple.floats
         
         # Checkout to invalidate it
-        simple_2 = self.repo.checkout('master')
+        simple_2 = yield self.repo.checkout('master')
         
         self.assertEqual(object.__getattribute__(simple,'Invalid'), True)
         self.assertEqual(object.__getattribute__(floats,'Invalid'), True)
@@ -219,6 +228,7 @@ class ContainerTest(unittest.TestCase):
         self.assertIdentical(items1._wrapper, self.listobj)
         self.assertIdentical(items1.Root, self.listobj.Root)
 
+    @defer.inlineCallbacks
     def test_invalidation(self):
         """
         Test the container method to set link by index
@@ -234,13 +244,14 @@ class ContainerTest(unittest.TestCase):
         
         self.repo.commit('test1')
         
-        listobj = self.repo.checkout('master')
+        listobj = yield self.repo.checkout('master')
         
         # Test some internals of the container/checkout functionality
         self.assertEqual(items.Invalid, True)
         self.assertEqual(self.listobj.Invalid, True)
         self.assertEqual(kv1.Invalid, True)
-        
+    
+    @defer.inlineCallbacks
     def test_add(self):
         """
         Test the container and set the link using the object wrapper
@@ -261,11 +272,11 @@ class ContainerTest(unittest.TestCase):
         
         self.repo.commit('test1')
         
-        listobj = self.repo.checkout('master')
+        listobj = yield self.repo.checkout('master')
         
         self.assertEqual(listobj.items[0].value, 'bar1')
         
-        
+    @defer.inlineCallbacks        
     def test_setlink(self):
         """
         Test the container method to set link by index
@@ -284,10 +295,11 @@ class ContainerTest(unittest.TestCase):
         
         self.repo.commit('test_setlink')
         
-        listobj = self.repo.checkout('master')
+        listobj = yield self.repo.checkout('master')
         
         self.assertEqual(listobj.items[0].value, 'bar1')
         
+    @defer.inlineCallbacks
     def test_getlink(self):
         """
         Test the container method GetLink() and check link consistency
@@ -309,14 +321,14 @@ class ContainerTest(unittest.TestCase):
         
         # Test after commit
         self.repo.commit('test_getlink')
-        listobj = self.repo.checkout('master')
+        listobj = yield self.repo.checkout('master')
         items = listobj.items
         
         link2 = items.GetLink(0)
         realized_kv2 = items.Repository.get_linked_object(link2)
         self.assertEqual(realized_kv2.value, 'bar1')
         
-        
+    @defer.inlineCallbacks
     def test_getlinks(self):
         """
         Test the container method GetLinks() and check link consistency
@@ -346,7 +358,7 @@ class ContainerTest(unittest.TestCase):
         
         # Test after commit
         self.repo.commit('test_getlinks')
-        listobj = self.repo.checkout('master')
+        listobj = yield self.repo.checkout('master')
         items = listobj.items
         
         links_list2 = items.GetLinks()
@@ -356,7 +368,7 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(realized_kv3.value, 'bar1')
         self.assertEqual(realized_kv4.value, 'bar2')
         
-        
+    @defer.inlineCallbacks
     def test_getitem(self):
         """
         Test the private container method __getitem_() by a given index
@@ -377,12 +389,13 @@ class ContainerTest(unittest.TestCase):
         
         # Test after commit
         self.repo.commit('test_getitem')
-        listobj = self.repo.checkout('master')
+        listobj = yield self.repo.checkout('master')
         items = listobj.items
         
         item2 = items[0]
         self.assertEqual(item2.value, 'bar1')
         
+    @defer.inlineCallbacks
     def test_getslice(self):
         """
         Test the container method __getslice__() by start and stop indices
@@ -439,7 +452,7 @@ class ContainerTest(unittest.TestCase):
         
         # Test after commit
         self.repo.commit('test_getslice')
-        listobj = self.repo.checkout('master')
+        listobj = yield self.repo.checkout('master')
         items = listobj.items
         
         items_list = items.__getslice__(0, 2)
@@ -470,7 +483,7 @@ class ContainerTest(unittest.TestCase):
         self.assertEqual(items_list[0].value, 'bar1')
         self.assertEqual(items_list[1].value, 'bar2')
 
-        
+    @defer.inlineCallbacks
     def test_del(self):
         """
         Test the container method __delitem__() by index
@@ -508,7 +521,7 @@ class ContainerTest(unittest.TestCase):
         
         # Test after commit
         self.repo.commit('test_del')
-        listobj = self.repo.checkout('master')
+        listobj = yield self.repo.checkout('master')
         items = listobj.items
         
         links_list = items.GetLinks()
@@ -519,7 +532,7 @@ class ContainerTest(unittest.TestCase):
         realized_kv3 = items.Repository.get_linked_object(links_list[0])
         self.assertEqual(realized_kv3.value, 'bar2')
         
-        
+    @defer.inlineCallbacks
     def test_delslice(self):
         """
         Test the container method __delslice__() by start and stop indices
@@ -591,7 +604,7 @@ class ContainerTest(unittest.TestCase):
         
         # Test if deletes carry over during commit
         self.repo.commit('test_getslice1')
-        listobj = self.repo.checkout('master')
+        listobj = yield self.repo.checkout('master')
         items = listobj.items
         
         items_list = items.__getslice__(0, 20)
@@ -611,7 +624,7 @@ class ContainerTest(unittest.TestCase):
         # One more check by commit...
         items.__delslice__(5, 9)
         self.repo.commit('test_getslice2')
-        listobj = self.repo.checkout('master')
+        listobj = yield self.repo.checkout('master')
         items = listobj.items
         
         items_list = items.__getslice__(0, 20)
@@ -639,7 +652,7 @@ class ContainerTest(unittest.TestCase):
     #    
     #    self.repo.commit('test1')
     #    
-    #    listobj = self.repo.checkout('master')
+    #    listobj = yield self.repo.checkout('master')
     #    
     #    
         #

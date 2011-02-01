@@ -169,7 +169,7 @@ class WorkBench(object):
         repo.upstream['process'] = headers.get('reply-to')
             
         # Get the objects in the repository - modify to get only head?
-        yield self._fetch_repo_objects(repo, headers.get('reply-to'))
+        #yield self._fetch_repo_objects(repo, headers.get('reply-to'))
         # should have a return value to make sure this worked... ?
         
         defer.returnValue((response, exception))
@@ -223,7 +223,7 @@ class WorkBench(object):
             defer.returnValue((response, exception))
 
         else:
-            raise Exception, 'Push returned an exception!' % exception
+            raise WorkBenchError('Push returned an exception!' % exception)
             
 
         
@@ -288,7 +288,10 @@ class WorkBench(object):
             
             # Get the objects we don't have
             ### Call the method defined by the process - not the workbench!
-            yield self._process.fetch_linked_objects(origin, objs_to_get)
+            result = yield self._process.fetch_linked_objects(origin, objs_to_get)
+            
+            if not result:
+                raise WorkBenchError('Fetch failed!')
             
             # Would like to have fetch use reply to - to keep the conversation context but does not work yet...
             #yield self.fetch_linked_objects(msg, objs_to_get)
@@ -307,6 +310,8 @@ class WorkBench(object):
         """
         Fetch the linked objects from the data store service
         """     
+            
+        #print 'FETCHING LINKED OBJECTS!!!!'
             
         cs = container_pb2.Structure()
             
@@ -333,6 +338,11 @@ class WorkBench(object):
         
         for obj in objs:
             self._hashed_elements[obj.key]=obj
+            
+        #print 'GOT HERE!!!!!'
+            
+        defer.returnValue(True)
+            
         return
         
             
@@ -341,7 +351,7 @@ class WorkBench(object):
         """
         Send a linked object back to a requestor if you have it!
         """
-        log.info('op_fetch_linked_objects: received content type, %s' % type(elements))
+        log.info('op_fetch_linked_objects: received content type, %s; \n Elements: %s' % (type(elements), str(elements)))
         cs = container_pb2.Structure()
                 
         for se in elements:

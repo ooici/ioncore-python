@@ -112,7 +112,7 @@ class DataStoreTest(IonTestCase):
         
         self.assertEqual(repo_ds2._dotgit, repo._dotgit)
         
-        ab_2 = repo_ds2.checkout('master')
+        ab_2 = yield repo_ds2.checkout('master')
         
         self.assertEqual(ab_2, ab)
         
@@ -175,7 +175,7 @@ class DataStoreTest(IonTestCase):
             
         self.assertEqual(repo2._dotgit, repo1._dotgit)
             
-        ab2 = repo2.checkout('master')
+        ab2 = yield repo2.checkout('master')
             
         self.assertEqual(ab2, ab1)
             
@@ -213,7 +213,7 @@ class DataStoreTest(IonTestCase):
         self.assertEqual(len(repo1.branches[0].commitrefs),2)
             
         # Merge on Read
-        ab1 = repo1.checkout('master')
+        ab1 = yield repo1.checkout('master')
             
         # Assert that the Divergence was repaired!
         self.assertEqual(len(repo1.branches[0].commitrefs),1)
@@ -226,7 +226,7 @@ class DataStoreTest(IonTestCase):
         # Assert that the Divergence was repaired!
         self.assertEqual(len(repo2.branches[0].commitrefs),1)
         # Checkout the current state
-        ab2 = repo2.checkout('master')
+        ab2 = yield repo2.checkout('master')
         
         # The state is repaired here too
         self.assertEqual(ab2.owner.email, 'process1@gmail.com')
@@ -289,7 +289,7 @@ class DataStoreTest(IonTestCase):
         
         self.assertEqual(repo_ds2._dotgit, repo._dotgit)
         
-        ab_2 = repo_ds2.checkout('master')
+        ab_2 = yield repo_ds2.checkout('master')
         
         self.assertEqual(ab_2, ab)
         
@@ -303,7 +303,7 @@ class DataStoreTest(IonTestCase):
         
         self.assertNotIn(repo._dotgit.MyId, repo._workspace)
         
-        ab = repo.checkout('master')
+        ab = yield repo.checkout('master')
         
         self.assertEqual(repo_ds2._dotgit, repo._dotgit)
         self.assertEqual(ab_2, ab)

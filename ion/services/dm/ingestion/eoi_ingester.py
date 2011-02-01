@@ -95,7 +95,7 @@ class EOIIngestionService(ServiceProcess):
         
         repo = self.workbench.get_repository(content)
         
-        head = repo.checkout('master')
+        head = yield repo.checkout('master')
         
         yield self.reply(msg, content=head)
         

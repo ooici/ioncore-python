@@ -19,8 +19,8 @@ log = ion.util.ionlog.getLogger(__name__)
 
 import sys
 
-
-from twisted.internet import defer
+import time
+from twisted.internet import threads, reactor, defer
 
 from ion.core.object import gpb_wrapper
 
@@ -243,7 +243,7 @@ class Repository(object):
             
         return branch
     
-        
+    @defer.inlineCallbacks
     def checkout(self, branchname=None, commit_id=None, older_than=None):
         """
         Check out a particular branch
@@ -379,10 +379,10 @@ class Repository(object):
         self._workspace_root = None
             
         # Automatically fetch the object from the hashed dictionary
-        rootobj = cref.objectroot
+        rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
         self._workspace_root = rootobj
         
-        self._load_links(rootobj)
+        yield self._load_remote_links(rootobj)
         
         
         self._detached_head = detached
@@ -395,8 +395,8 @@ class Repository(object):
             
             rootobj.SetStructureReadOnly()
             
-            
-        return rootobj
+        defer.returnValue(rootobj)
+        return
         
         
     def merge_by_date(self, branch):
@@ -560,7 +560,8 @@ class Repository(object):
         
         return cref
             
-        
+
+    @defer.inlineCallbacks
     def merge(self, branchname=None, commit_id = None):
         """
         merge the named branch in to the current branch
@@ -608,8 +609,13 @@ class Repository(object):
         
         for cref in crefs:
             self._merge_from.append(cref)
-            merge_root = cref.objectroot
+            
+            rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
+            merge_root = rootobj
             merge_root.ReadOnly = True
+            # The child objects inherit there ReadOnly setting from the root
+            yield self._load_remote_links(rootobj)
+            
             self._merge_root.append(merge_root)
         
         
@@ -740,29 +746,10 @@ class Repository(object):
             
         else:
             
-            log.debug('Linked object not found. Getting non local object: %s' % str(link))
+            log.debug('Linked object not found. Need non local object: %s' % str(link))
             
-            if not self._workbench:
-                raise RepositoryError('Object not found and not work bench is present!')
-                
-            proc = self._workbench._process
-            # Check for Iprocess once defined outside process module?
-            if not process:
-                raise RepositoryError('Linked Obect not found and work bench has no process to get it with!')
-                
-            links = [link,]
-                
-            if hasattr(process, 'fetch_linked_objects'):
-                # Get the method from the process if it overrides workbench
-                fetch_linked_objects = process.fetch_linked_objects
-            else:
-                fetch_linked_objects = self._workbench.fetch_linked_objects
-                
-                
-            # USE TWISTED THREAD !
-                
-                
-            element = self._hashed_elements.get(link.key)
+            raise KeyError('Object not found in the local work bench.')
+            
             
             
         if not link.type.object_id == element.type.object_id and \
@@ -792,6 +779,43 @@ class Repository(object):
             
         return obj
             
+    @defer.inlineCallbacks
+    def get_remote_linked_object(self, link):
+            
+        try:
+            obj = self.get_linked_object(link)
+        except KeyError, ex:
+            log.info('"get_remote_linked_object": Caught object not found:'+str(ex))
+            res = yield self._fetch_remote_objects([link,])
+            obj = self.get_linked_object(link)
+        
+        defer.returnValue(obj)
+        return 
+        
+         
+    @defer.inlineCallbacks
+    def _fetch_remote_objects(self, links):
+    
+        if not self._workbench:
+                raise RepositoryError('Object not found and not work bench is present!')
+                
+        proc = self._workbench._process
+        # Check for Iprocess once defined outside process module?
+        if not proc:
+            raise RepositoryError('Linked Obect not found and work bench has no process to get it with!')
+            
+        if hasattr(proc, 'fetch_linked_objects'):
+            # Get the method from the process if it overrides workbench
+            fetch_linked_objects = proc.fetch_linked_objects
+        else:
+            fetch_linked_objects = self._workbench.fetch_linked_objects
+            
+        #@TODO provide catch mechanism to use the service name instead of the
+        # process name if the process does not respond...
+        result = yield fetch_linked_objects(self.upstream['process'], links)
+        
+        defer.returnValue(result)
+            
             
     def _load_links(self, obj):
         """
@@ -800,6 +824,27 @@ class Repository(object):
         for link in obj.ChildLinks:
             child = self.get_linked_object(link)  
             self._load_links(child)
+            
+
+    @defer.inlineCallbacks
+    def _load_remote_links(self, obj):
+        """
+        Load links which may require remote (deferred) access
+        """
+        remote_objects = []
+        for link in obj.ChildLinks:
+            try:
+                child = self.get_linked_object(link)
+                yield self._load_remote_links(child)
+            except KeyError, ex:
+                log.info('"_load_remote_links": Caught object not found:'+str(ex))
+                remote_objects.append(link)
+            
+            
+        if remote_objects:
+            res = yield self._fetch_remote_objects(remote_objects)
+            res = yield self._load_remote_links(obj)
+        defer.returnValue(True)
             
     def _load_element(self, element):
         
