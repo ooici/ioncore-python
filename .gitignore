@@ -23,6 +23,7 @@ parts/
 develop-eggs/
 downloads/
 bin/
+.installed.cfg
 
 /net
 ion/agents/instrumentagents copy/NportSendBreak.py
