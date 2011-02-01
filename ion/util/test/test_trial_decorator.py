@@ -31,6 +31,8 @@ class DecoratorTest(unittest.TestCase):
     def test_skiptest(self):
         # Make sure we can still use skiptest
         raise unittest.SkipTest('Skipping this test')
+        # Should not reach this point
+        self.fail('SkipTest failed!')
 
     @itv(CONF)
     def test_that_skips(self):
