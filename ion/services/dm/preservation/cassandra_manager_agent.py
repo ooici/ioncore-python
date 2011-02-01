@@ -22,6 +22,8 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import workbench
 
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 host_list_type = object_utils.create_type_identifier(object_id=2501, version=1)
 simple_password_type = object_utils.create_type_identifier(object_id=2502, version=1)
@@ -64,7 +66,7 @@ class CassandraManagerService(ServiceProcess):
         ServiceProcess.__init__(self, *args, **kwargs)
         
         # Bootstrap args is a dictionary containing a host list and credentials
-        #self.spawn_args['bootstrap_args'] = self.spawn_args.get('bootstrap_args', CONF.getValue('bootstrap_args', default=None))
+        self.spawn_args['bootstrap_args'] = self.spawn_args.get('bootstrap_args', CONF.getValue('bootstrap_args', default=None))
         
         # Create a Resource Client 
         self.rc = ResourceClient(proc=self)    
@@ -107,6 +109,8 @@ class CassandraManagerService(ServiceProcess):
         """
         #Hard code the storage resource for now. Eventually pass all this into spawn_args
         # The cassandra client manager
+        log.info(str(args))
+        log.info(str(args['host']))
         self.wb = workbench.WorkBench("I need this make ION resources")
                 ### Create a persistence_technology resource - for cassandra a CassandraCluster object
         persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(cassandra_cluster_type)
@@ -163,12 +167,12 @@ class CassandraManagerService(ServiceProcess):
         persistent_archive_resource = yield self.rc.create_instance(cassandra_keyspace_type, name=persistent_archive.name,
                                   description="A description")
         
-        #cassandra_keyspace = yield self.rc.create_instance(...)
+        
         log.info("Created resource")
         yield self.rc.put_instance(persistent_archive_resource, "A commit message")
         log.info("Put resource into datastore")
         #yield self.manager.create_persistent_archive(pa)
-        #yield self.rc.put_instance(cassandra_keyspace)
+        
         response = yield self.mc.create_instance(resource_response_type, name="create_persistent_archive_response")
         response.resource_reference = self.rc.reference_instance(persistent_archive_resource)
         
@@ -222,9 +226,6 @@ class CassandraManagerService(ServiceProcess):
         response.configuration = persistent_archive_resource.ResourceObject
         response.result = 'Deleted'
         yield self.reply_ok(msg, response)
-        # cassandra_keyspace = yield self.rc.create_instance(...)
-        
-        #yield self.rc.put_instance(cassandra_keyspace)
    
    
 

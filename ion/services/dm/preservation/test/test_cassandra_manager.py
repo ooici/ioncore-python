@@ -46,6 +46,7 @@ class CassandraManagerTester(IonTestCase):
     def test_instantiation_only(self):
         pass
 
+
     @defer.inlineCallbacks
     def test_create_archive(self):
         create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
