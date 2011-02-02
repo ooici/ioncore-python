@@ -1,18 +1,15 @@
 """
-@file ion/util/test/test_trial_decorator.py
+@file ion/util/test/test_itv_decorator.py
 @author Paul Hubbard
-@author David Stuebe
 @date 2/1/11
 @brief Unit tests for decorator
 """
 
 from twisted.trial import unittest
-from twisted.internet import defer
 
 import ion.util.ionlog
-from ion.util.trial_decorator import itv
+from ion.util.itv_decorator import itv
 from ion.core import ioninit
-from ion.util.trial_decorator import itv
 
 
 log = ion.util.ionlog.getLogger(__name__)

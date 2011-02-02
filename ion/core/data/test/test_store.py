@@ -45,6 +45,7 @@ class IStoreTest(unittest.TestCase):
     #@itv(CONF)
     @defer.inlineCallbacks
     def setUp(self):
+        self.timeout = 10
         self.ds = yield self._setup_backend()
         self.key = str(uuid4())
         self.value = str(uuid4())
