@@ -13,6 +13,51 @@ from twisted.internet import defer
 
 from ion.services.dm.distribution.notification import NOTIFY_EXCHANGE_SPACE, NOTIFY_EXCHANGE_TYPE
 
+class LoggingPublisherReceiver(Receiver):
+
+    def __init__(self, name, **kwargs):
+        """
+        Constructor override.
+        Sets up publisher config for using our notification exchange, used by send.
+        """
+        kwargs = kwargs.copy()
+
+        # add our custom exchange stuff to be passed through to the ultimate result of send
+        kwargs['publisher_config'] = { 'exchange' : NOTIFY_EXCHANGE_SPACE,
+                                       'exchange_type' : NOTIFY_EXCHANGE_TYPE,
+                                       'durable': False,
+                                       'mandatory': True,
+                                       'immediate': False,
+                                       'warn_if_exists': False }
+
+        Receiver.__init__(self, name, **kwargs)
+
+    def debug(self, msg, *args, **kwargs):
+        name = kwargs.pop("name", "<unknown>")
+        self.send(headers={}, content=msg, recipient="_not.log.DEBUG.%s" % name)
+
+    def info(self, msg, *args, **kwargs):
+        name = kwargs.pop("name", "<unknown>")
+        self.send(headers={}, content=msg, recipient="_not.log.INFO.%s" % name)
+
+    def warn(self, msg, *args, **kwargs):
+        name = kwargs.pop("name", "<unknown>")
+        self.send(headers={}, content=msg, recipient="_not.log.WARN.%s" % name)
+
+    def error(self, msg, *args, **kwargs):
+        name = kwargs.pop("name", "<unknown>")
+        self.send(headers={}, content=msg, recipient="_not.log.ERROR.%s" % name)
+
+    def critical(self, msg, *args, **kwargs):
+        name = kwargs.pop("name", "<unknown>")
+        self.send(headers={}, content=msg, recipient="_not.log.CRITICAL.%s" % name)
+
+    def exception(self, msg, *args, **kwargs):
+        name = kwargs.pop("name", "<unknown>")
+        self.send(headers={}, content=msg, recipient="_not.log.EXCEPTION.%s" % name)
+
+    warning = warn
+
 class LoggingReceiver(Receiver):
 
     def __init__(self, *args, **kwargs):
