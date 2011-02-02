@@ -137,7 +137,6 @@ class IndexStore(object):
         self.kvs = {}
         self.indices = {}
         
-        print 'KWARGS', kwargs
         if kwargs.has_key('indices'):
             for name in kwargs.get('indices'):
                 self.indices[name]={}
