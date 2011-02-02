@@ -23,7 +23,7 @@ class PST(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
-        self.timeout = 5
+        #self.timeout = 5
         services = [
             {'name':'pubsub_service',
              'module':'ion.services.dm.distribution.pubsub_service',

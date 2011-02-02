@@ -41,6 +41,7 @@ class ExchangeProtoTest(IonTestCase):
         
     @defer.inlineCallbacks
     def setUp(self):
+        self.timeout = 40
         yield self._start_container()
         #self.sup = yield self._start_core_services()
         services = [
@@ -50,7 +51,7 @@ class ExchangeProtoTest(IonTestCase):
              'spawnargs':{'datastore_service':'datastore'}}]
         sup = yield self._spawn_processes(services)
             
-        self.rrc = ResourceRegistryClient(proc=sup)
+        self.rrc = ResourceRegistryClient(proc=self.test_sup)
         self.rc = ResourceClient(proc=sup)
         self.sup = sup
         
