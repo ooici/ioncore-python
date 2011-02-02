@@ -179,7 +179,8 @@ class CassandraIndexedStore(CassandraStore):
         Rows are returned that have columns set to the value specified in 
         the dictionary
         
-        @retVal a thrift representation of the rows returned by the query.
+        @retVal a list of dictionaries. Each dictionary contains the key and the columns
+        in the row. 
         """
         make_predicate = lambda attr: {'column_name':attr[0],'op':IndexOperator.EQ,'value':attr[1]}
         predicate_args = map(make_predicate, indexed_attributes.items())
