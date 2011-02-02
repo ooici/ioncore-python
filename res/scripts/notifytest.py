@@ -14,7 +14,7 @@ from ion.core.process.process import Process
 #from ion.util import ionlog
 
 #from ion.services.dm.distribution.notification import LoggingHandler
-from ion.services.dm.distribution.logging_rec import LoggingReceiver
+from ion.services.dm.distribution.notification import LoggingReceiver
 
 CONF = ioninit.config('startup.pubsub')
 

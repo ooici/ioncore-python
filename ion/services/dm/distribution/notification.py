@@ -6,79 +6,149 @@
 @brief Notification classes for doing notification (logging + otherwise)
 """
 
-import logging
-
 NOTIFY_EXCHANGE_SPACE = 'notify_exchange'
 NOTIFY_EXCHANGE_TYPE = 'topic'
 
-class LoggingHandler(logging.Handler):
+from ion.core.messaging.receiver import Receiver
+from twisted.internet import defer
+
+from ion.services.dm.distribution.notification import NOTIFY_EXCHANGE_SPACE, NOTIFY_EXCHANGE_TYPE
+
+from ion.core.object import object_utils
+from ion.core.messaging.message_client import MessageClient
+
+notification_type = object_utils.create_type_identifier(object_id=2304, version=1)
+log_notification_type = object_utils.create_type_identifier(object_id=2305, version=1)
+
+class LoggingPublisherReceiver(Receiver):
     """
-    A Python Logging Handler derived class for sending log messages to AMQP.
-    
-    This Handler is initialized very early in the system, with the logging config,
-    which presents a number of challenges.
-    - The LoggingPublisherReceiver must wait until the default container is initialized
-      in order to be imported or created.
-    - There is no good "post initialization" time to do this, so we wait until
-      the first emit call comes in from Python.
-    - Log messages emitted are queued until they are able to be sent via flush, which
-      is called when the LoggingPublisherReceiver/its attached anon process finishes
-      initialization.
+    Publisher for log messages.
+    The Python logging handler creates one of these at an appropriate time.
     """
+    def __init__(self, name, **kwargs):
+        """
+        Constructor override.
+        Sets up publisher config for using our notification exchange, used by send.
+        """
+        kwargs = kwargs.copy()
 
-    def __init__(self, level=logging.NOTSET):
-        logging.Handler.__init__(self, level)
-        self._log_pub = None
-        self._stored_logs = []
-        self._create_called = False
+        # add our custom exchange stuff to be passed through to the ultimate result of send
+        kwargs['publisher_config'] = { 'exchange' : NOTIFY_EXCHANGE_SPACE,
+                                       'exchange_type' : NOTIFY_EXCHANGE_TYPE,
+                                       'durable': False,
+                                       'mandatory': True,
+                                       'immediate': False,
+                                       'warn_if_exists': False }
 
-        self._all = []
+        Receiver.__init__(self, name, **kwargs)
 
-    def emit(self, record):
+        self._msgclient = MessageClient(proc=kwargs['process'])
 
-        print "handler", dir(self)
-        print "record", dir(record)
+    def log(self, record, **kwargs):
+        """
+        Sends a log message to an exchange.
+        """
+        def complete_send(result, record):
+            # result are a list of tuples of the form (success, result)
+            # the internal results are tuples of (msg_repo, msg_object)
 
+            # ensure success first
+            assert [x[0] for x in result] == [True, True]
 
-        # lazy initialize 
-        if not self._log_pub and not self._create_called:
-            self._create_publisher()
+            # get both message objects
+            not_msg, log_not_msg = [x[1] for x in result]
 
-        self._all.append(record)
+            log_not_msg = not_msg.CreateObject(log_notification_type)
 
-        if self._log_pub:
-            self._send_log_msg(record)
-        else:
-            self._stored_logs.append(record)
+            # fill them with record details
+            #not_msg.body = record.getMessage()
 
-    def flush(self):
+            log_not_msg.message = record.getMessage()
+            log_not_msg.levelname = record.levelname
+            log_not_msg.levelno = record.levelno
+            log_not_msg.asctime = record.asctime
+            log_not_msg.createdtime = str(record.created)
+            log_not_msg.filename = record.filename
+            log_not_msg.funcName = record.funcName
+            log_not_msg.lineno = record.lineno
+            log_not_msg.module = record.module
+            log_not_msg.pathname = record.pathname
+            not_msg.additional_data = log_not_msg        # link them
 
-        # can't do anything if we have no publisher yet
-        if not self._log_pub:
-            return
+            recipient = "_not.log.%s.%s" % (record.levelname, record.module)
 
-        for record in self._stored_logs:
-            self._send_log_msg(record)
+            #print "NOT REALLY SENDING YET", str(log_not_msg)
+            # perform send!
+            self.send(recipient=recipient,
+                      content=not_msg,
+                      headers={})
 
-        self._stored_logs = []
+        # first we need to create messages to populate
+        d1 = self._msgclient.create_instance(notification_type)
+        d2 = self._msgclient.create_instance(log_notification_type)
 
-    def _create_publisher(self):
-        assert self._log_pub == None
-        from ion.services.dm.distribution.logging_rec import LoggingPublisherReceiver
-        from ion.core.process.process import Process
+        # add callback on both so we can continue (can't yield here (maybe))
+        dl = defer.DeferredList([d1, d2])
+        dl.addCallback(complete_send, record=record)
 
-        def publisher_inited(result, pub=None):
-            self._log_pub = pub
-            self.flush()
+class LoggingReceiver(Receiver):
+    """
+    Example log notification receiver.
 
-        # begin deferred creation (of Process)
-        proc = Process()
-        log_pub = LoggingPublisherReceiver("loghandler", process=proc)
-        spawn_def = proc.spawn()
-        spawn_def.addCallback(publisher_inited, pub=log_pub)
+    Listens for log messages on the notification exchange and prints them.
+    Sample of how to look at messages on the notification exchange.
+    """
+    def __init__(self, *args, **kwargs):
+        kwargs = kwargs.copy()
+        kwargs['handler'] = self.printlog
+        self.loglevel = kwargs.pop('loglevel', 'WARN')
+        Receiver.__init__(self, *args, **kwargs)
 
-        self._create_called = True
+        self._msgs = []
 
-    def _send_log_msg(self, rec):
-        self._log_pub.log(rec)
+    @defer.inlineCallbacks
+    def on_initialize(self, *args, **kwargs):
+        """
+        @retval Deferred
+        """
+        assert self.xname, "Receiver must have a name"
+        yield self._init_receiver({}, store_config=True)
+
+    @defer.inlineCallbacks
+    def _init_receiver(self, receiver_config, store_config=False):
+        receiver_config = receiver_config.copy()
+        receiver_config.update( {'exchange': NOTIFY_EXCHANGE_SPACE,
+                                 'exchange_type':  NOTIFY_EXCHANGE_TYPE,
+                                 'durable': False,
+                                 'queue': None,     # make it up for us
+                                 'binding_key': "_not.log.idontexist.#",
+                                 'routing_key': "_not.log.idontexist.#",
+                                 'exclusive': False,
+                                 'mandatory': True,
+                                 'warn_if_exists' : False,
+                                 'no_ack': False,
+                                 'auto_delete' : True,
+                                 'immediate' : False })
+
+        yield Receiver._init_receiver(self, receiver_config, store_config)
+
+        # add logging bindings to self.consumer
+        levels = ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL', 'EXCEPTION']
+        try:
+            idx = levels.index(self.loglevel)
+        except ValueError:
+            idx = levels[2]
+
+        for level in levels[idx:]:
+            self.consumer.backend.queue_bind(queue=self.consumer.queue,
+                                             exchange=self.consumer.exchange,
+                                             routing_key="_not.log.%s.#" % level,
+                                             arguments={})
+
+    def printlog(self, payload, msg):
+        self._msgs.append(msg)
+        logmsg = payload['content'].additional_data
+        print logmsg.levelname, ": (", logmsg.module, "):",logmsg.message
+        msg.ack()
+
 
