@@ -7,16 +7,22 @@
 @brief:  EOI JavaWrapperAgent and JavaWrapperAgentClient class definitions
 """
 
+# Imports: Logging
 import ion.util.ionlog
-import ion.util.procutils as pu
+log = ion.util.ionlog.getLogger(__name__)
 
+# Imports: General
+import ion.util.procutils as pu
 from twisted.internet import defer, reactor
 from ion.core.process.process import Process, ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.util.state_object import BasicStates
 from ion.util.os_process import OSProcess
 
-log = ion.util.ionlog.getLogger(__name__)
+# Imports: Message object creation
+from ion.core.object import object_utils
+from ion.core.messaging.message_client import MessageClient
+context_message_type = object_utils.create_type_identifier(object_id=4501, version=1)
 
 
 class JavaWrapperAgent(ServiceProcess):
@@ -24,7 +30,7 @@ class JavaWrapperAgent(ServiceProcess):
     Class designed to facilitate (Java) Dataset Agent's tight interaction with ION in
     lieu of an incomplete Java CC.  Wrapping Java Agents in Python processes in this way
     provides the following functionality:
-    Agent registration, process lifecycle, and reactivity to other core ION services
+    Agent registration, process lifecycle (governance), and reactivity to other core ION services
     """
     
     
@@ -138,11 +144,14 @@ class JavaWrapperAgent(ServiceProcess):
         Initialization upon Service spawning.  This life-cycle process, in-turn, spawns the
         a Dataset Agent for which it is providing governance
         '''
-        log.debug(" -[]- Entered slc_init()")
+        log.debug(" -[]- Entered slc_init(); state=%s" % (str(self._get_state())))
         # Step 1: Delegate initialization to parent class
         yield defer.maybeDeferred(ServiceProcess.slc_init, self)
         
-        # Step 2: Spawn the associated dataset agent (if not already done)
+        # Step 2: Perform Initialization
+        self.mc = MessageClient(proc=self)
+        
+        # Step 2: Spawn the associated external child process (if not already done)
         res = yield defer.maybeDeferred(self._spawn_dataset_agent)
     
     @defer.inlineCallbacks
@@ -152,11 +161,11 @@ class JavaWrapperAgent(ServiceProcess):
         resolve until the external Dataset Agent remotely invokes op_binding_key_callback()
         @return: defer.Deferred()
         '''
-        log.debug(" -[]- Entered slc_activate()")
+        log.debug(" -[]- Entered slc_activate(); state=%s" % (str(self._get_state())))
         # Step 1: Delegate initialization to parent class
         yield defer.maybeDeferred(ServiceProcess.slc_activate, self)
         
-        # Step 2: Suspend execution until receipt of the Dataset Agent's binding key
+        # Step 2: Suspend execution until receipt of the external child process's binding key
         def _recieve_binding_key(self):
             d = self.__binding_key_deferred
             if d is None:
@@ -168,13 +177,45 @@ class JavaWrapperAgent(ServiceProcess):
         
         reactor.callLater(0, lambda: _recieve_binding_key(self))
 
-#        defer.returnValue(d)
     
+    @defer.inlineCallbacks
     def slc_deactivate(self):
         '''
         '''
-        log.debug(" -[]- Entered java_wrapper_agent.slc_deactivate()")
-        log.debug(" ********* Current state is %s" % self._get_state())
+        log.debug(" -[]- Entered java_wrapper_agent.slc_deactivate(); state=%s" % (str(self._get_state())))
+        
+        returncode= None
+        if self._get_state() == BasicStates.S_ACTIVE:
+            # Step 1: Cancel the termination callback of the underlying process
+            cb_list = self.__agent_phandle.deferred_exited.callbacks
+            cb_tuple = (
+                          (self._osp_terminate_callback, (), {}),
+                          (self._osp_terminate_callback, (), {})
+                       )
+            if cb_tuple in cb_list:
+                cb_list.remove(cb_tuple)
+            
+            # Step 2: Terminate the underlying dataset agent
+            result = yield self._terminate_dataset_agent()
+        
+            # Step 3: Log output from the underlying agent
+            returncode = result["exitcode"]
+#            outlines = result["outlines"]
+#            errlines = result["errlines"]
+            msg1 = "External child process terminated.  RETURN CODE == %s" % str(returncode)
+#            msg2 = "External child process terminated with the following log:\r"
+#            if outlines is not None:
+#                msg2 += '\r'.join(outlines) + '\r'
+#            if errlines is not None:
+#                msg2 += '\r'.join(errlines)
+            log.info(msg1)
+#            log.debug(msg2)
+        else:
+            log.warning('slc_deactivate():  This Service Process is expected to be in the "%s" state.  Deactivation may have occured prematurely.  state=%s' % (str(BasicStates.S_ACTIVE), str(self._get_state())))
+            
+
+        defer.returnValue(returncode)
+    
     
     @defer.inlineCallbacks
     def slc_terminate(self):
@@ -182,52 +223,45 @@ class JavaWrapperAgent(ServiceProcess):
         Termination life cycle process.  This affect also terminates the Java Dataset Agent which
         this class is intended to wrap.
         '''
-        log.debug(" -[]- Entered java_wrapper_agent.slc_terminate()")
-        log.debug(" ********* Current state is %s" % self._get_state())
-        # Step 1: Terminate the underlying dataset agent
-        returncode, outlines, errlines = yield self._terminate_dataset_agent()
-        msg1 = "Agent process terminated.  RETURN CODE == %s" % str(returncode)
-        msg2 = "Agent process terminated with the following log:\r"
-        if outlines is not None:
-            msg2 += '\r'.join(outlines) + '\r'
-        if errlines is not None:
-            msg2 += '\r'.join(errlines)
-        log.info(msg1)
-        log.debug(msg2)
+        log.debug(" -[]- Entered slc_terminate(); state=%s" % (str(self._get_state())))
+        # Step 1: Perform necessary cleanup
+        # ....
+        log.info('Cleaning up resources...')
+        
         
         # Step 2: Finish termination by delegating to parent
-        yield defer.maybeDeferred(ServiceProcess.slc_terminate, self)
-        defer.returnValue(returncode)
+        res = yield defer.maybeDeferred(ServiceProcess.slc_terminate, self)
+        log.info('Service Life Cycle termination complete.')
+        defer.returnValue(res)
 
 
     def on_deactivate(self, *args, **kwargs):
         """
+        No imlementation: State change ONLY!
+        @todo: change the BasicLifeCycleObject transition to state change only instead of implementing this method
         """
-        log.debug(" -[]- Entered java_wrapper_agent.on_deactivate()")
-        log.debug(" ********* Current state is %s" % self._get_state())
+        log.debug(" -[]- Entered on_deactivate(); state=%s" % (str(self._get_state())))
         
     def _spawn_dataset_agent(self):
         '''
         Instantiates the Java Dataset Agent providing appropriate binding information so the underlying agent can establish messaging channels
         '''
-        log.debug(" -[]- Entered _spawn_dataset_agent()")
+        log.debug(" -[]- Entered _spawn_dataset_agent(); state=%s" % (str(self._get_state())))
+        # @todo: rethink this check
         if self._get_state() is not BasicStates.S_READY:
-            err_msg = "External dataset agent cannot be spawned unless %s's service state is %s" % (__name__, str(BasicStates.S_READY))
+            err_msg = "External child process cannot be spawned unless %s's service state is %s" % (__name__, str(BasicStates.S_READY))
             log.warn(err_msg)
             raise RuntimeError(err_msg)
         
         # Step 1: Acquire the dataset spawn arguments
         (binary, args) = self.agent_spawn_args
-        log.info("Spawning delegate process with command: \n\n\t'%s %s'\n" % (binary, " ".join(args)))
+        log.info("Spawning external child process with command: \n\n\t'%s %s'\n" % (binary, " ".join(args)))
         
         # Step 2: Start the Dataset Agent (java) passing necessary spawn arguments
         try:
-            def _cb_deactivate_on_callback(result):
-                self.deactivate()
-                return result
             proc = OSProcess(binary, args)
             proc.spawn()
-            proc.deferred_exited.addBoth(_cb_deactivate_on_callback)
+            proc.deferred_exited.addBoth(self._osp_terminate_callback)
             # @todo Add a callback which forces this service to terminate if the underlying dataset agent exits (when the deferred returns)
         except ValueError, ex:
             raise RuntimeError("JavaWrapperAgent._spawn_agent(): Received invalid spawn arguments form JavaWrapperAgent.agent_spawn_args" + str(ex))
@@ -243,47 +277,42 @@ class JavaWrapperAgent(ServiceProcess):
         '''
         Terminates the underlying dataset by sending it a 'terminate' message and waiting for the OSProcess object's exit callback.  
         '''
-        log.debug("Entered _terminate_dataset_agent()")
-        returncode = -1
-        outlines = None
-        errlines = None
-        if self.is_agent_active():
+        log.debug(" -[]- Entered _terminate_dataset_agent(); state=%s" % (str(self._get_state())))
+        result = None
+        if self._get_state() is BasicStates.S_ACTIVE:
             # Step 1: Send a terminate message to the java dataset agent
-            log.info("@@@--->>> Sending termination request to underlying Dataset Agent")
-            yield self.send(self.agent_binding, self.agent_term_op, None)
+            log.info("@@@--->>> Sending termination request to external child process")
+            yield self.send(self.agent_binding, self.agent_term_op, {})
             
             # Step 2: Suspend execution until the agent process exits
             result = yield self.__agent_phandle.deferred_exited
-            
-            returncode = result["exitcode"]
-            outlines = result["outlines"]
-            errlines = result["errlines"]
             self.__agent_binding = None
             self.__agent_phandle = None
-        else:
-            errlines = "Dataset Agent has not been spawned, and therefore will not be terminated"
-            log.warning(errlines)
+        elif self._get_state() is BasicStates.S_READY:
+            errmsg = "External child process has not been spawned, and therefore can not be terminated"
+            log.warning(errmsg)
+
         
-        result = (returncode, outlines, errlines)
         defer.returnValue(result)
 
+    def _osp_terminate_callback(self, result):
+        log.info('External child process has terminated; Wrapper Service shutting down...')
+        self.deactivate()
+        self.terminate()
+        return result
 
     @defer.inlineCallbacks
     def op_pretty_print(self, content, headers, msg):
         pretty = "Java_Wrapper_Agent Status:" + \
                  "\n--------------------------" + \
-                 "\nService State:  " + str(self._get_state()) + \
-                 "\nIs Initialized:  " + str(self.is_agent_initialized()) + \
-                 "\nIs Activating:  " + str(self.is_agent_activating()) + \
-                 "\nIs Active:  " + str(self.is_agent_active()) +\
-                 "\nIs Terminated:  " + str(self.is_agent_terminated());
+                 "\nService State:  " + str(self._get_state())
         res = yield self.reply_ok(msg, {'value':pretty}, {})
         defer.returnValue(res)
         
         
     @defer.inlineCallbacks
     def op_do_shutdown(self, content, headers, msg):
-        res = yield defer.maybeDeferred(self.shutdown)
+        res = self.shutdown()
         res = yield self.reply_ok(msg, {'value':res}, {})
         defer.returnValue(res)
 
@@ -294,18 +323,7 @@ class JavaWrapperAgent(ServiceProcess):
         res = yield self.reply_ok(msg, {'value':res}, {})
         defer.returnValue(res)
     
-#    def dec_requires_active(self, func, *args, **kwargs):
-#        
-#        def _check_active(self, func, *args, **kwargs):
-#            status = self._get_state()
-#            if state is not BasicStates.S_READY:
-#                raise RuntimeError("")
-#            else:
-#                func(args, kwargs)
-#        
-#        return _check_active(func, args, kwargs)
-#    
-#    @dec_requires_active
+
     @defer.inlineCallbacks
     def op_update_request(self, content, headers, msg):
         '''
@@ -320,35 +338,9 @@ class JavaWrapperAgent(ServiceProcess):
         '''
         log.info("<<<---@@@ Recieved operation 'update_request'.  Delegating to underlying dataset agent...")
         
-        # @todo: this check should be pulled into a decorator so that all ops may process in the same manner.
-        # @todo: This method could pass itself as a callback to a deferred where the head in that deferred's
-        #        callback chain relies on the activation of the dataset agent
-#        status = self._get_state()
-#        
-#        if state is not BasicStates.S_READY:
-#            
-#            S_INIT = "INIT"
-#    S_READY = "READY"
-#    S_ACTIVE = "ACTIVE"
-#    S_TERMINATED = "TERMINATED"
-#    S_ERROR = "ERROR"
-#    
-#    
-#        if (self.is_agent_terminated()):
-#            errmsg = "Dataset agent has been terminated.  Requests cannot be made!"
-##            raise RuntimeError(errmsg)
-#            log.warning(errmsg)
-#            yield self.reply_uncaught_err(msg, errmsg)
-#            defer.returnValue(None)
-#        elif (self.is_agent_activating()):
-#            errmsg = "Dataset agent is not yet active.  Cannot fulfill update request for: " + str(content)
-#            log.warning(errmsg)
-#            yield self.reply_uncaught_err(msg, errmsg)
-#            defer.returnValue(None)
-        
         # Step 1: Grab the context for the given dataset ID
         try:
-            context = self._get_dataset_context(str(content))
+            context = yield self._get_dataset_context(str(content))
         except KeyError, ex:
             yield self.reply_err(msg, "Could not grab the current context for the dataset with id: " + str(content))
         
@@ -370,8 +362,6 @@ class JavaWrapperAgent(ServiceProcess):
         '''
         log.info("<<<---@@@ Incoming callback with binding key message")
         log.debug("...Content:\t" + str(content))
-#        log.debug("...Headers\t" + str(headers))
-#        log.debug("...Message\t" + str(msg))
         
         self.__agent_binding = str(content)
         if self.__binding_key_deferred is not None and 'result' not in dir(self.__binding_key_deferred):
@@ -384,19 +374,7 @@ class JavaWrapperAgent(ServiceProcess):
         log.info("Accepted Dataset Agent binding key: '%s'" % (self.__agent_binding))
         return True
     
-    def op_data_message_callback(self, content, headers, msg):
-        """
-        Currently UNUSED.  Intented purpose has expired.  This method may be removed in future release.
-        """
-        # @todo: pass this message up to the eoi ingest service
-        #log.info("<<<---@@@ Receiving incoming data stream...")
-        #log.info("...Headers\t" + str(headers))
-        #(content, headers, msg) = yield self.rpc_send('ingest', content)
-        #log.info("Returned OOI DatasetID: " + str(content))
-        
-        return True
-
-        
+    @defer.inlineCallbacks
     def _get_dataset_context(self, datasetID):
         '''
         Requests the current state of the given datasetID from the Resource Registry and returns that state as
@@ -405,36 +383,38 @@ class JavaWrapperAgent(ServiceProcess):
         (For the purposes of elaboration this method simply returns a cached context from a dictionary which has
         been keyed to the given datasetID; communication with the Resource Registry does NOT occur)
         '''
-        log.debug("Entered _get_dataset_context(datasetID=%s)" % (datasetID))
+        # @todo: this method will be reimplemented so that dataset contexts can be retrieved dynamically
+        log.debug(" -[]- Entered _get_dataset_context(datasetID=%s); state=%s" % (datasetID, str(self._get_state())))
         if (datasetID in self.__dataset_context_dict):
-            return self.__dataset_context_dict[datasetID]
+            context_args = self.__dataset_context_dict[datasetID]
+            # @todo HACK: this implementation will always return the same context (an SOS station request)
+            # @SEE ion.play.hello_message.py for create message object instances
+            # @SEE use msg_instance.MessageObject.SOS (example of accessing GPB enum fields)
+            
+            # Create an instance of the EoiDataContext message
+            msg = yield self.mc.create_instance(context_message_type, name="data_context")
+            
+            # Fill in values
+            msg.source_type    = msg.MessageObject.SOS
+            msg.start_time     = '2008-08-01T00:00:00Z'
+            msg.end_time       = '2008-08-02T00:00:00Z'
+
+            msg.property.append('sea_water_temperature')
+            msg.station_id.append('41012')
+
+#            msg.request_type (how can we grab this from a list)
+            msg.top            = 0.0
+            msg.bottom         = 0.0
+            msg.left           = 0.0
+            msg.right          = 0.0
+            msg.base_url       = "http://sdf.ndbc.noaa.gov/sos/server.php?"
+            msg.dataset_url    = ''
+            msg.ncml_mask      = ''
+            
+            
+            defer.returnValue(msg)
         else:
             raise KeyError("Invalid datasetID: %s" % (datasetID))
-
-    def is_agent_initialized(self):
-        '''
-        @return: True if this agent is initialized.  This agent is initialized when it has spawned its underlying
-        Dataset Agent via slc_init()
-        '''
-        return self.agent_phandle != None
-    
-    def is_agent_active(self):
-        '''
-        @return: True if this agent is active.  This agent is active when it has spawned its underlying
-        Dataset Agent via slc_init() and that agent has responded.  Essentially, a JavaWrapperAgent is active,
-        when communication channels between it and the agent it is wrapping, have been established.
-        '''
-        return self.is_agent_initialized() and self.agent_binding != None
-    
-    def is_agent_terminated(self):
-        return self.is_agent_initialized() and 'result' in dir(self.agent_phandle.deferred_exited)
-    
-    def is_agent_activating(self):
-        '''
-        Returns True if this agent is currently activating.  This agent is activating when it has been initialized
-        but the underlying dataset agent has not yet responded.
-        '''
-        return self.is_agent_initialized() and not self.is_agent_active()
 
     @property
     def agent_phandle(self):
@@ -502,7 +482,7 @@ class JavaWrapperAgent(ServiceProcess):
         # Do not return anything.  Store spawn arguments in __agent_spawn_args
         binary = "java"
         args = ["-jar", jar_pathname, hostname, exchange, wrapper, callback]
-        log.debug("Acquired dataset agent spawn arguments:  %s %s" % (binary, " ".join(args)))
+        log.debug("Acquired external process's spawn arguments:  %s %s" % (binary, " ".join(args)))
         self.__agent_spawn_args = (binary, args)
     
     def _init_agent_update_op(self):
@@ -520,7 +500,7 @@ class JavaWrapperAgent(ServiceProcess):
         '''
         # @todo: Acquiring the shutdown op may need to be dynamic in the future
         term_op= "op_shutdown"
-        log.debug("Acquired Dataset Agent terminate op: %s" % (term_op))
+        log.debug("Acquired external process's terminate op: %s" % (term_op))
         self.__agent_term_op = term_op
         
 
