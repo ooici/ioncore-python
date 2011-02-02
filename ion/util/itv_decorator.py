@@ -3,9 +3,23 @@
 """
 @file ion/util/itv_decorator.py
 @author David Stuebe
-@brief A decorator class to skip unit tests not called out in your local config
+@todo Make the skip specific to a class within a test module?
+@brief Unit test decorator that skips unit/integration tests based on the
+ion configuration file. This lets us separate integration tests for buildbot.
+@note Experimental code!
 
-@TODO Make the skip specific to a class within a test module?
+To use this, add an entry to res/config/ion.config, keyed to the name
+of your file. Here's the config for the unit tests:
+
+
+'ion.util.test._trial_decorator': {
+    'test_that_skips' : False,
+    'test_that_passes' : True,
+    'test_skiptest' : True,
+},
+
+In this case, test_that_skips is not run - anything marked False
+is skipped.
 """
 
 from twisted.trial import unittest
