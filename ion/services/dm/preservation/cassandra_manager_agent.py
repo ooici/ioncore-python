@@ -73,10 +73,10 @@ class CassandraManagerService(ServiceProcess):
         # Bootstrap args is a dictionary containing a host list and credentials
         #self.spawn_args['bootstrap_args'] = self.spawn_args.get('bootstrap_args', CONF.getValue('bootstrap_args', default=None))
         
-        self._host = CONF.getValue('host')
-        self._port = CONF.getValue('port')
-        self._username = CONF.getValue('username')
-        self._password = CONF.getValue('password')
+        self._host = self.spawn_args.get('bootstrap_args',  CONF.getValue('host'))
+        self._port = self.spawn_args.get('bootstrap_args', CONF.getValue('port'))
+        self._username = self.spawn_args.get('bootstrap_args', CONF.getValue('username'))
+        self._password = self.spawn_args.get('bootstrap_args',CONF.getValue('password'))
         # Create a Resource Client 
         self.rc = ResourceClient(proc=self)    
         self.mc = MessageClient(proc=self)    
@@ -131,7 +131,8 @@ class CassandraManagerService(ServiceProcess):
         
         self.wb = workbench.WorkBench("I need this make ION resources")
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
-        persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(cassandra_cluster_type)
+        cassandra_cluster = yield self.rc.create_instance(cassandra_cluster_type, name="Cassandra cluster", description="OOI Cassandra cluster")
+        #persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(cassandra_cluster_type)
         
         # Set only one host and port in the host list for now
         cas_host = cassandra_cluster.hosts.add()
