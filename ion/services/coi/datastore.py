@@ -78,13 +78,3 @@ class DataStoreService(ServiceProcess):
 factory = ProcessFactory(DataStoreService)
 
 
-
-"""
-from ion.play import hello_service as h
-spawn(h)
-send(1, {'op':'hello','content':'Hello you there!'})
-
-from ion.play.hello_service import HelloServiceClient
-hc = HelloServiceClient(1)
-hc.hello()
-"""

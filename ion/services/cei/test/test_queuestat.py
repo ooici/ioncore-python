@@ -28,14 +28,17 @@ log = ion.util.ionlog.getLogger(__name__)
 
 class TestQueueStatService(IonTestCase):
 
-    @defer.inlineCallbacks
     def setUp(self):
+        self.original_broker_host = None
 
-        if not os.path.exists(os.path.expanduser('~/.erlang.cookie')):
-            raise unittest.SkipTest('Needs a RabbitMQ server on localhost')
+    @defer.inlineCallbacks
+    def _broker_setup(self):
+
+        # this gets called manually within tests to ensure it is skipped
+        # based on itv decorator
 
         log.debug('Temporarily changing broker_host to 127.0.0.1')
-        self.other_broker_host = ion.test.iontest.CONF.obj['broker_host']
+        self.original_broker_host = ion.test.iontest.CONF.obj['broker_host']
         ion.test.iontest.CONF.obj['broker_host'] = '127.0.0.1'
 
         yield self._start_container()
@@ -56,15 +59,18 @@ class TestQueueStatService(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._shutdown_processes()
-        yield self._stop_container()
+        if self.original_broker_host:
+            log.debug('Resetting broker_host')
+            ion.test.iontest.CONF.obj['broker_host'] = self.original_broker_host
 
-        log.debug('Resetting broker_host')
-        ion.test.iontest.CONF.obj['broker_host'] = self.other_broker_host
+            yield self._shutdown_processes()
+            yield self._stop_container()
 
     @itv(CONF)
     @defer.inlineCallbacks
     def test_queue_stat(self):
+        yield self._broker_setup()
+
         subscriber = TestSubscriber()
         subId = yield self._spawn_process(subscriber)
         queuestat_client = QueueStatClient(subscriber)

@@ -9,6 +9,10 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
+from ion.util.itv_decorator import itv
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
+
 from ion.test.iontest import IonTestCase
 
 from net.ooici.play import addressbook_pb2
@@ -28,6 +32,7 @@ class DataStoreTest(IonTestCase):
     # This is a temporary way to test communication between python and java using GPBs...
     #FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/01184000_0.protostruct'
     #FileLocation = '/Users/dstuebe/Dropbox/OOICI/Proto2David/grid.protostruct'
+    #FileLocation = '/Users/dstuebe/Dropbox/EOI_Shared/transfer (deleted periodically)/station_profile.protostruct'
     FileLocation = ''
 
     @defer.inlineCallbacks
@@ -107,7 +112,7 @@ class DataStoreTest(IonTestCase):
         
         self.assertEqual(repo_ds2._dotgit, repo._dotgit)
         
-        ab_2 = repo_ds2.checkout('master')
+        ab_2 = yield repo_ds2.checkout('master')
         
         self.assertEqual(ab_2, ab)
         
@@ -170,7 +175,7 @@ class DataStoreTest(IonTestCase):
             
         self.assertEqual(repo2._dotgit, repo1._dotgit)
             
-        ab2 = repo2.checkout('master')
+        ab2 = yield repo2.checkout('master')
             
         self.assertEqual(ab2, ab1)
             
@@ -208,7 +213,7 @@ class DataStoreTest(IonTestCase):
         self.assertEqual(len(repo1.branches[0].commitrefs),2)
             
         # Merge on Read
-        ab1 = repo1.checkout('master')
+        ab1 = yield repo1.checkout('master')
             
         # Assert that the Divergence was repaired!
         self.assertEqual(len(repo1.branches[0].commitrefs),1)
@@ -221,7 +226,7 @@ class DataStoreTest(IonTestCase):
         # Assert that the Divergence was repaired!
         self.assertEqual(len(repo2.branches[0].commitrefs),1)
         # Checkout the current state
-        ab2 = repo2.checkout('master')
+        ab2 = yield repo2.checkout('master')
         
         # The state is repaired here too
         self.assertEqual(ab2.owner.email, 'process1@gmail.com')
@@ -284,7 +289,7 @@ class DataStoreTest(IonTestCase):
         
         self.assertEqual(repo_ds2._dotgit, repo._dotgit)
         
-        ab_2 = repo_ds2.checkout('master')
+        ab_2 = yield repo_ds2.checkout('master')
         
         self.assertEqual(ab_2, ab)
         
@@ -298,7 +303,7 @@ class DataStoreTest(IonTestCase):
         
         self.assertNotIn(repo._dotgit.MyId, repo._workspace)
         
-        ab = repo.checkout('master')
+        ab = yield repo.checkout('master')
         
         self.assertEqual(repo_ds2._dotgit, repo._dotgit)
         self.assertEqual(ab_2, ab)
@@ -306,7 +311,7 @@ class DataStoreTest(IonTestCase):
         
         
 
-
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_load_data(self):
         """
@@ -330,7 +335,7 @@ class DataStoreTest(IonTestCase):
         
         log.info('dataset: \n' + str(dataset))
         
-        log.info('rootGroup: \n' +str(dataset.rootGroup))
+        log.info('rootGroup: \n' +str(dataset.root_group))
         
         def log_atts(atts, tab=''):
             
@@ -364,9 +369,9 @@ class DataStoreTest(IonTestCase):
                     ba_string += str(ba.ndarray.value[:25])+'\n'
             return ba_string
                 
-        log_dims(dataset.rootGroup.dimensions)
-        log_atts(dataset.rootGroup.attributes)
-        log_vars(dataset.rootGroup.variables)
+        log_dims(dataset.root_group.dimensions)
+        log_atts(dataset.root_group.attributes)
+        log_vars(dataset.root_group.variables)
         
         
         

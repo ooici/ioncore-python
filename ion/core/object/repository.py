@@ -19,8 +19,8 @@ log = ion.util.ionlog.getLogger(__name__)
 
 import sys
 
-
-from twisted.internet import defer
+import time
+from twisted.internet import threads, reactor, defer
 
 from ion.core.object import gpb_wrapper
 
@@ -114,11 +114,16 @@ class Repository(object):
         A place to stash the work space under a saved name.
         """
         
-        #self._workbench=None
+        self._workbench=None
         """
         The work bench which this repository belongs to...
         """
-
+        
+        self._upstream={}
+        """
+        The upstream source of this repository. 
+        """
+        
         if head:
             self._dotgit = self._load_element(head)
             # Set it to modified and give it a new ID as soon as we get it!
@@ -148,6 +153,15 @@ class Repository(object):
     @property
     def merge_objects(self):
         return self._merge_root
+    
+    
+    def _set_upstream(self, source):
+        self._upstream = source
+        
+    def _get_upstream(self):
+        return self._upstream
+    
+    upstream = property(_get_upstream, _set_upstream)
     
     
     @property
@@ -229,7 +243,7 @@ class Repository(object):
             
         return branch
     
-        
+    @defer.inlineCallbacks
     def checkout(self, branchname=None, commit_id=None, older_than=None):
         """
         Check out a particular branch
@@ -365,10 +379,10 @@ class Repository(object):
         self._workspace_root = None
             
         # Automatically fetch the object from the hashed dictionary
-        rootobj = cref.objectroot
+        rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
         self._workspace_root = rootobj
         
-        self._load_links(rootobj)
+        yield self._load_remote_links(rootobj)
         
         
         self._detached_head = detached
@@ -381,8 +395,8 @@ class Repository(object):
             
             rootobj.SetStructureReadOnly()
             
-            
-        return rootobj
+        defer.returnValue(rootobj)
+        return
         
         
     def merge_by_date(self, branch):
@@ -546,7 +560,8 @@ class Repository(object):
         
         return cref
             
-        
+
+    @defer.inlineCallbacks
     def merge(self, branchname=None, commit_id = None):
         """
         merge the named branch in to the current branch
@@ -594,8 +609,13 @@ class Repository(object):
         
         for cref in crefs:
             self._merge_from.append(cref)
-            merge_root = cref.objectroot
+            
+            rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
+            merge_root = rootobj
             merge_root.ReadOnly = True
+            # The child objects inherit there ReadOnly setting from the root
+            yield self._load_remote_links(rootobj)
+            
             self._merge_root.append(merge_root)
         
         
@@ -709,14 +729,13 @@ class Repository(object):
         if self._workspace.has_key(link.key):
             
             obj = self._workspace.get(link.key)
-            # Make sure the 
+            # Make sure the parent is set...
             #self.set_linked_object(link, obj)
             obj.AddParentLink(link)
             return obj
 
         elif self._commit_index.has_key(link.key):
-            # The commit object will be missing its parent links.
-            # Is that a problem?
+            # make sure the parent is set...
             obj = self._commit_index.get(link.key)
             obj.AddParentLink(link)
             return obj
@@ -725,38 +744,78 @@ class Repository(object):
             
             element = self._hashed_elements.get(link.key)
             
+        else:
             
-            if not link.type.object_id == element.type.object_id and \
-                    link.type.version == element.type.version:
-                raise RepositoryError('The link type does not match the element type found!')
+            log.debug('Linked object not found. Need non local object: %s' % str(link))
             
-            obj = self._load_element(element)
+            raise KeyError('Object not found in the local work bench.')
             
-            # For objects loaded from the hash the parent child relationship must be set
-            #self.set_linked_object(link, obj)
-            obj.AddParentLink(link)
             
-            if obj.ObjectType == self.CommitClassType:
-                self._commit_index[obj.MyId]=obj
-                obj.ReadOnly = True
+            
+        if not link.type.object_id == element.type.object_id and \
+                link.type.version == element.type.version:
+            raise RepositoryError('The link type does not match the element type found!')
+            
+        obj = self._load_element(element)
+            
+        # For objects loaded from the hash the parent child relationship must be set
+        #self.set_linked_object(link, obj)
+        obj.AddParentLink(link)
+        
+        if obj.ObjectType == self.CommitClassType:
+            self._commit_index[obj.MyId]=obj
+            obj.ReadOnly = True
                 
-            elif link.Root.ObjectType == self.CommitClassType:
-                # if the link is a commit but the linked object is not then it is a root object
-                # The default for a root object should be ReadOnly = False
-                self._workspace[obj.MyId]=obj
-                obj.ReadOnly = False
-                
-            else:
-                # When getting an object from it's parent, use the parents readonly setting
-                self._workspace[obj.MyId]=obj
-                obj.ReadOnly = link.ReadOnly
-                
-            return obj
+        elif link.Root.ObjectType == self.CommitClassType:
+            # if the link is a commit but the linked object is not then it is a root object
+            # The default for a root object should be ReadOnly = False
+            self._workspace[obj.MyId]=obj
+            obj.ReadOnly = False
             
         else:
-            #print 'LINK Not Found: \n', link 
-            raise RepositoryError('Object not in workbench! You must pull the leaf elements!')
-            #return self._workbench.fetch_linked_objects(link)
+            # When getting an object from it's parent, use the parents readonly setting
+            self._workspace[obj.MyId]=obj
+            obj.ReadOnly = link.ReadOnly
+            
+        return obj
+            
+    @defer.inlineCallbacks
+    def get_remote_linked_object(self, link):
+            
+        try:
+            obj = self.get_linked_object(link)
+        except KeyError, ex:
+            log.info('"get_remote_linked_object": Caught object not found:'+str(ex))
+            res = yield self._fetch_remote_objects([link,])
+            obj = self.get_linked_object(link)
+        
+        defer.returnValue(obj)
+        return 
+        
+         
+    @defer.inlineCallbacks
+    def _fetch_remote_objects(self, links):
+    
+        if not self._workbench:
+                raise RepositoryError('Object not found and not work bench is present!')
+                
+        proc = self._workbench._process
+        # Check for Iprocess once defined outside process module?
+        if not proc:
+            raise RepositoryError('Linked Obect not found and work bench has no process to get it with!')
+            
+        if hasattr(proc, 'fetch_linked_objects'):
+            # Get the method from the process if it overrides workbench
+            fetch_linked_objects = proc.fetch_linked_objects
+        else:
+            fetch_linked_objects = self._workbench.fetch_linked_objects
+            
+        #@TODO provide catch mechanism to use the service name instead of the
+        # process name if the process does not respond...
+        result = yield fetch_linked_objects(self.upstream['process'], links)
+        
+        defer.returnValue(result)
+            
             
     def _load_links(self, obj):
         """
@@ -765,6 +824,27 @@ class Repository(object):
         for link in obj.ChildLinks:
             child = self.get_linked_object(link)  
             self._load_links(child)
+            
+
+    @defer.inlineCallbacks
+    def _load_remote_links(self, obj):
+        """
+        Load links which may require remote (deferred) access
+        """
+        remote_objects = []
+        for link in obj.ChildLinks:
+            try:
+                child = self.get_linked_object(link)
+                yield self._load_remote_links(child)
+            except KeyError, ex:
+                log.info('"_load_remote_links": Caught object not found:'+str(ex))
+                remote_objects.append(link)
+            
+            
+        if remote_objects:
+            res = yield self._fetch_remote_objects(remote_objects)
+            res = yield self._load_remote_links(obj)
+        defer.returnValue(True)
             
     def _load_element(self, element):
         

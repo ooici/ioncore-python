@@ -675,7 +675,12 @@ class Wrapper(object):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
-        return self.GPBMessage.__str__()
+        if self.ObjectType == self.LinkClassType:
+            msg = '\nkey: %s \ntype { %s }' % (sha1_to_hex(self.GPBMessage.key), self.GPBMessage.type)
+        else:
+            msg = '\n' +self.GPBMessage.__str__()
+            
+        return msg
         
     def debug(self):
         output  = '================== Wrapper (Modified = %s)====================\n' % self.Modified

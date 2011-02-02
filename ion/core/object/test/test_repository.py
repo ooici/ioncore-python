@@ -9,6 +9,7 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+from twisted.internet import defer
 
 
 from twisted.trial import unittest
@@ -72,7 +73,7 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(simple2.IsRoot, True)
         self.assertEqual(simple2.Modified, True)
         
-        
+    @defer.inlineCallbacks
     def test_branch_checkout(self):
         repo, ab = self.wb.init_repository(addressbook_type)   
         p = ab.person.add()
@@ -87,11 +88,11 @@ class RepositoryTest(unittest.TestCase):
         
         repo.commit()
 
-        ab2 = repo.checkout(branchname="master")
+        ab2 = yield repo.checkout(branchname="master")
         
         self.assertEqual(ab2.person[0].name, 'David')
         
-        ab3 = repo.checkout(branchname="Arthur")
+        ab3 = yield repo.checkout(branchname="Arthur")
         
         self.assertEqual(ab3.person[0].name, 'John')
         
@@ -131,6 +132,7 @@ class RepositoryTest(unittest.TestCase):
         cref = repo._create_commit_ref(comment="Cogent Comment")
         assert(cref.comment == "Cogent Comment")
             
+    @defer.inlineCallbacks
     def test_checkout_commit_id(self):
         repo, ab = self.wb.init_repository(addressbook_type)
         
@@ -145,14 +147,14 @@ class RepositoryTest(unittest.TestCase):
         p.name = 'alpha'
         commit_ref3 = repo.commit()
             
-        ab = repo.checkout(branchname='master', commit_id=commit_ref1)
+        ab = yield repo.checkout(branchname='master', commit_id=commit_ref1)
         self.assertEqual(len(ab.person),0)
             
-        ab = repo.checkout(branchname='master', commit_id=commit_ref2)
+        ab = yield repo.checkout(branchname='master', commit_id=commit_ref2)
         self.assertEqual(ab.person[0].id,1)
         self.assertEqual(ab.person[0].name,'Uma')
         
-        ab = repo.checkout(branchname='master', commit_id=commit_ref3)
+        ab = yield repo.checkout(branchname='master', commit_id=commit_ref3)
         self.assertEqual(ab.person[0].id,1)
         self.assertEqual(ab.person[0].name,'alpha')
         
@@ -169,7 +171,7 @@ class RepositoryTest(unittest.TestCase):
             
         repo1.log_commits('master')
         
-            
+    @defer.inlineCallbacks  
     def test_dag_structure(self):
         repo, ab = self.wb.init_repository(addresslink_type)
                         
@@ -204,7 +206,7 @@ class RepositoryTest(unittest.TestCase):
         p = None
         ab = None
         
-        ab = repo.checkout(branchname='master')
+        ab = yield repo.checkout(branchname='master')
 
         
         self.assertEqual(len(ab.ChildLinks),3)
@@ -219,7 +221,7 @@ class RepositoryTest(unittest.TestCase):
         
         self.assertEqual(ab.person[0].name, 'Michael')
  
- 
+    @defer.inlineCallbacks
     def test_lost_objects(self):
         repo, ab = self.wb.init_repository(addresslink_type)
             
@@ -236,7 +238,7 @@ class RepositoryTest(unittest.TestCase):
         
         cref = repo.commit(comment='testing commit')
  
-        ab2 = repo.checkout(branchname='master')
+        ab2 = yield repo.checkout(branchname='master')
         
         # This is only for testing - to make sure that the invalid method is
         # working properly!
@@ -292,7 +294,7 @@ class RepositoryTest(unittest.TestCase):
         
         
         
-        
+    @defer.inlineCallbacks 
     def test_merge(self):
         
         repo, ab = self.wb.init_repository(addresslink_type)
@@ -330,9 +332,9 @@ class RepositoryTest(unittest.TestCase):
         
         del ab, p1, p2, ph2, ph1
         
-        ab = repo.checkout(branchname='master')
+        ab = yield repo.checkout(branchname='master')
         
-        repo.merge(branchname='Merge')
+        yield repo.merge(branchname='Merge')
         
         self.assertEqual(ab.title, repo.merge_objects[0].title)
         self.assertEqual(ab.person[0].name, repo.merge_objects[0].person[0].name)
