@@ -197,7 +197,7 @@ class SimpleObjectTest(unittest.TestCase):
         self.assertEqual(simple.Modified, True)
         
     @defer.inlineCallbacks
-    def test_invalidate(self):
+    def test_invalidate_repateadscalar(self):
         
         simple = yield self.repo.checkout('master')
         self.assertEqual(simple.floats, [3.,4.,5.,6.])
