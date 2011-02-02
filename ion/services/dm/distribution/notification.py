@@ -17,12 +17,13 @@ class LoggingHandler(logging.Handler):
     
     This Handler is initialized very early in the system, with the logging config,
     which presents a number of challenges.
-    - The LoggingPublisher must wait until the default container is initialized
-      in order to be created, as it needs an ExchangeSpace to publish to.
+    - The LoggingPublisherReceiver must wait until the default container is initialized
+      in order to be imported or created.
     - There is no good "post initialization" time to do this, so we wait until
       the first emit call comes in from Python.
     - Log messages emitted are queued until they are able to be sent via flush, which
-      is called when the LoggingPublisher finished initialization.
+      is called when the LoggingPublisherReceiver/its attached anon process finishes
+      initialization.
     """
 
     def __init__(self, level=logging.NOTSET):
@@ -34,6 +35,10 @@ class LoggingHandler(logging.Handler):
         self._all = []
 
     def emit(self, record):
+
+        print "handler", dir(self)
+        print "record", dir(record)
+
 
         # lazy initialize 
         if not self._log_pub and not self._create_called:
@@ -75,5 +80,5 @@ class LoggingHandler(logging.Handler):
         self._create_called = True
 
     def _send_log_msg(self, rec):
-        getattr(self._log_pub, rec.levelname.lower())(rec.msg, name=rec.name, record=rec)
+        self._log_pub.log(rec)
 

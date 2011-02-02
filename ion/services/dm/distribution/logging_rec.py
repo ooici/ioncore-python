@@ -13,6 +13,12 @@ from twisted.internet import defer
 
 from ion.services.dm.distribution.notification import NOTIFY_EXCHANGE_SPACE, NOTIFY_EXCHANGE_TYPE
 
+from ion.core.object import object_utils
+from ion.core.messaging.message_client import MessageClient
+
+notification_type = object_utils.create_type_identifier(object_id=2304, version=1)
+log_notification_type = object_utils.create_type_identifier(object_id=2305, version=1)
+
 class LoggingPublisherReceiver(Receiver):
 
     def __init__(self, name, **kwargs):
@@ -32,31 +38,52 @@ class LoggingPublisherReceiver(Receiver):
 
         Receiver.__init__(self, name, **kwargs)
 
-    def debug(self, msg, *args, **kwargs):
-        name = kwargs.pop("name", "<unknown>")
-        self.send(headers={}, content=msg, recipient="_not.log.DEBUG.%s" % name)
+        self._msgclient = MessageClient(proc=kwargs['process'])
 
-    def info(self, msg, *args, **kwargs):
-        name = kwargs.pop("name", "<unknown>")
-        self.send(headers={}, content=msg, recipient="_not.log.INFO.%s" % name)
+    def log(self, record, **kwargs):
 
-    def warn(self, msg, *args, **kwargs):
-        name = kwargs.pop("name", "<unknown>")
-        self.send(headers={}, content=msg, recipient="_not.log.WARN.%s" % name)
+        def complete_send(result, record):
+            # result are a list of tuples of the form (success, result)
+            # the internal results are tuples of (msg_repo, msg_object)
 
-    def error(self, msg, *args, **kwargs):
-        name = kwargs.pop("name", "<unknown>")
-        self.send(headers={}, content=msg, recipient="_not.log.ERROR.%s" % name)
+            # ensure success first
+            assert [x[0] for x in result] == [True, True]
 
-    def critical(self, msg, *args, **kwargs):
-        name = kwargs.pop("name", "<unknown>")
-        self.send(headers={}, content=msg, recipient="_not.log.CRITICAL.%s" % name)
+            # get both message objects
+            not_msg, log_not_msg = [x[1] for x in result]
 
-    def exception(self, msg, *args, **kwargs):
-        name = kwargs.pop("name", "<unknown>")
-        self.send(headers={}, content=msg, recipient="_not.log.EXCEPTION.%s" % name)
+            log_not_msg = not_msg.CreateObject(log_notification_type)
 
-    warning = warn
+            # fill them with record details
+            #not_msg.body = record.getMessage()
+
+            log_not_msg.message = record.getMessage()
+            log_not_msg.levelname = record.levelname
+            log_not_msg.levelno = record.levelno
+            log_not_msg.asctime = record.asctime
+            log_not_msg.createdtime = str(record.created)
+            log_not_msg.filename = record.filename
+            log_not_msg.funcName = record.funcName
+            log_not_msg.lineno = record.lineno
+            log_not_msg.module = record.module
+            log_not_msg.pathname = record.pathname
+            not_msg.additional_data = log_not_msg        # link them
+
+            recipient = "_not.log.%s.%s" % (record.levelname, record.module)
+
+            #print "NOT REALLY SENDING YET", str(log_not_msg)
+            # perform send!
+            self.send(recipient=recipient,
+                      content=not_msg,
+                      headers={})
+
+        # first we need to create messages to populate
+        d1 = self._msgclient.create_instance(notification_type)
+        d2 = self._msgclient.create_instance(log_notification_type)
+
+        # add callback on both so we can continue (can't yield here (maybe))
+        dl = defer.DeferredList([d1, d2])
+        dl.addCallback(complete_send, record=record)
 
 class LoggingReceiver(Receiver):
 
@@ -109,7 +136,8 @@ class LoggingReceiver(Receiver):
 
     def printlog(self, payload, msg):
         self._msgs.append(msg)
-        print "LOG", payload
+        logmsg = payload['content'].additional_data
+        print logmsg.levelname, ": (", logmsg.module, "):",logmsg.message
         msg.ack()
 
 
