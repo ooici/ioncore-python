@@ -193,6 +193,8 @@ class Consumer(messaging.Consumer):
             # remember the queue name the broker made for us
             self.queue = reply.queue
 
+        print 'Queue Name: "%s"' % self.queue
+
         yield self.backend.queue_bind(queue=self.queue,
                                     exchange=self.exchange,
                                     routing_key=routing_key,
