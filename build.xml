@@ -43,6 +43,13 @@
     <delete dir="${dist}"/>
     <delete dir="ioncore.egg-info"/>
     <delete dir="_trial_temp"/>
+    <echo message="Clean up buildout directories.  Please run `python bootstrap.py` to start buildout."/>
+    <delete dir="parts"/>
+    <delete dir="develop-eggs"/>
+    <delete dir="bin"/>
+    <delete dir="downloads"/>
+    <delete dir="eggs"/>
+    <delete file=".installed.cfg"/>
   </target>
 
   <target name="pipclean"
