@@ -1,6 +1,10 @@
 import cProfile
 import pstats
 import sys
+
+#from twisted.internet import kqreactor
+#kqreactor.install()
+
 from twisted.internet import defer, protocol, reactor
 from ion.test.load_runner import LoadTestRunner
 
@@ -11,5 +15,5 @@ def run():
 
 cProfile.run('run()', 'brokerload')
 p = pstats.Stats('brokerload')
-p.sort_stats('cumulative').print_stats(30)
-p.sort_stats('time').print_stats(30)
+#p.sort_stats('cumulative').print_stats(60)
+p.sort_stats('time').print_stats(100)

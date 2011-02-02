@@ -28,8 +28,8 @@ class BrokerTestOptions(LoadTestOptions):
         , ['host', 'h', 'localhost', 'Broker host name.']
         , ['port', 'p', 5672, 'Broker port.']
         , ['vhost', 'v', '/', 'Broker vhost.']
-        , ['monitor', 'm', 3, 'Monitor poll rate [seconds].']
         , ['heartbeat', None, 0, 'Heartbeat rate [seconds].']
+        , ['monitor', 'm', 3, 'Monitor poll rate [seconds].']
 
         # Tuning parameters for custom test
         , ['exchange', None, None, 'Name of exchange for distributed tests.']
@@ -52,6 +52,10 @@ class BrokerTestOptions(LoadTestOptions):
 
 
 class BrokerTest(LoadTest):
+    """
+    Pure AMQP load test with a large number of configuration parameters. Run it like this to see the params:
+    python -m ion.test.load_runner -s -c ion.test.loadtests.brokerload.BrokerTest - --help
+    """
 
     def setUp(self, argv=None):
         fullPath = '%s.%s' % (self.__class__.__module__, self.__class__.__name__)
@@ -197,6 +201,7 @@ class BrokerTest(LoadTest):
         while True:
             if self.is_shutdown():
                 break
+                
             yield self._send_messages()
             # Generate as much load as this client can handle, up to 100000/sec
             yield pu.asleep(0.00001)
