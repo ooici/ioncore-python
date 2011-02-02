@@ -236,7 +236,7 @@ class CassandraIndexedStoreTest(IStoreTest):
         query_attributes = {'birth_date':'1973'}
         rows = yield self.ds.query(query_attributes)
         log.info("Rows returned %s " % (rows,))
-        self.failUnlessEqual(rows[0].key, 'prothfuss')
+        self.failUnlessEqual(rows[0]['key'], 'prothfuss')
          
     #@itv(CONF)
     @defer.inlineCallbacks

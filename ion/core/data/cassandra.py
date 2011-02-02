@@ -189,7 +189,22 @@ class CassandraIndexedStore(CassandraStore):
         log.info("selection_predicate %s " % (selection_predicate,))
         rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicate)
         #rows = yield self.client.get_indexed_slices(self._cache_name, [IndexExpression(op=IndexOperator.EQ, value='UT', column_name='state')])
-        defer.returnValue(rows)
+        
+        #print len(rows)
+        #print rows[0].columns[0].column.name, rows[0].columns[0].column.value
+        #print dir(rows)
+        #print dir(rows[0])
+        
+        # Create a list of dictionaries as a pythonic return value.
+        results=[]        
+        for row in rows:
+            result = {}
+            result['key'] = row.key
+            for column in row.columns:
+                result[column.column.name] = column.column.value
+            results.append(result)
+            
+        defer.returnValue(results)
         
     @defer.inlineCallbacks
     def get_query_attributes(self):
@@ -197,7 +212,7 @@ class CassandraIndexedStore(CassandraStore):
         Return the column names that are indexed.
         """
         keyspace_description = yield self.client.describe_keyspace(self._keyspace)
-        log.info("keyspace desc %s" % (keyspace_description,))
+        log.debug("keyspace desc %s" % (keyspace_description,))
         get_cfdef = lambda cfdef: cfdef.name == self._cache.name
         cfdef = filter(get_cfdef, keyspace_description.cf_defs)
         get_names = lambda cdef: cdef.name
