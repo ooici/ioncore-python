@@ -42,35 +42,35 @@ cassandra_keypsace_type = object_utils.create_type_identifier(object_id=2506, ve
 
 class IStoreTest(unittest.TestCase):
 
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def setUp(self):
         self.ds = yield self._setup_backend()
         self.key = str(uuid4())
         self.value = str(uuid4())
 
-    #@itv(CONF)
+    @itv(CONF)
     def _setup_backend(self):
         """return a deferred which returns a initiated instance of a
         backend
         """
         return defer.maybeDeferred(store.Store)
 
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_get_none(self):
         # Make sure we can't read the not-written
         rc = yield self.ds.get(self.key)
         self.failUnlessEqual(rc, None)
 
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_write_and_delete(self):
         # Hmm, simplest op, just looking for exceptions
         yield self.ds.put(self.key, self.value)
         yield self.ds.remove(self.key)
 
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_delete(self):
         yield self.ds.put(self.key, self.value)
@@ -78,7 +78,7 @@ class IStoreTest(unittest.TestCase):
         rc = yield self.ds.get(self.key)
         self.failUnlessEqual(rc, None)
 
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_put_get_delete(self):
         # Write, then read to verify same
@@ -211,7 +211,7 @@ class CassandraIndexedStoreTest(IStoreTest):
         
         return defer.succeed(store)
         
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_get_query_attributes(self):
         attrs = yield self.ds.get_query_attributes()
@@ -220,7 +220,7 @@ class CassandraIndexedStoreTest(IStoreTest):
         correct_set = set(['full_name', 'state', 'birth_date'])
         self.failUnlessEqual(attrs_set, correct_set)
 
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_query(self):
         d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
@@ -237,7 +237,7 @@ class CassandraIndexedStoreTest(IStoreTest):
         log.info("Rows returned %s " % (rows,))
         self.failUnlessEqual(rows[0].key, 'prothfuss')
          
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_put(self):
         d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
