@@ -126,7 +126,7 @@ class ResourceClient(object):
         
         self.workbench.set_repository_nickname(res_id, name)
             
-        repo.checkout('master')
+        yield repo.checkout('master')
         resource = ResourceInstance(repo)
         
         defer.returnValue(resource)
@@ -173,7 +173,7 @@ class ResourceClient(object):
             
         # Get the repository
         repo = self.workbench.get_repository(reference)
-        repo.checkout(branch)
+        yield repo.checkout(branch)
         
         # Create a resource instance to return
         resource = ResourceInstance(repo)
@@ -331,7 +331,8 @@ class ResourceInstance(object):
         
         branch_key = self.Repository.branch()            
         return branch_key
-        
+
+    @defer.inlineCallbacks
     def MergeResourceUpdate(self, mode, *args):
         """
         Use this method when updating an existing resource.
@@ -371,11 +372,11 @@ class ResourceInstance(object):
         
             self.Repository.commit(comment=str(mode))
             
-            self.Repository.checkout(branchname=current_branchname)
+            yield self.Repository.checkout(branchname=current_branchname)
         
         # Set up the merge in the repository
         for b_name in merge_branches:
-            self.Repository.merge(branchname=b_name)
+            yield self.Repository.merge(branchname=b_name)
         
             # Remove the merge branch - it is only a local concern
             self.Repository.remove_branch(b_name)

@@ -164,15 +164,24 @@ class WorkBench(object):
         if response != self._process.ION_SUCCESS:
             defer.returnValue((response, exception))
             
+        # Where to get objects not yet transfered.
+        repo.upstream['service'] = origin
+        repo.upstream['process'] = headers.get('reply-to')
+            
+        # Get the objects in the repository - modify to get only head?
+        #yield self._fetch_repo_objects(repo, headers.get('reply-to'))
         # should have a return value to make sure this worked... ?
-        yield self._fetch_repo_objects(repo, headers.get('reply-to'))
         
         defer.returnValue((response, exception))
         
     @defer.inlineCallbacks
     def op_pull(self,content, headers, msg):
         """
-        The operation which responds to a pull 
+        The operation which responds to a pull request
+        If a process exposes this operation it must provide persistent storage
+        for the objects it provides - the data store! When the op is complete
+        only the repository and its commits have been transfered. The content
+        will be lazy fetched as needed!
         """
         
         #print 'Received pull request, id:', content
@@ -188,7 +197,9 @@ class WorkBench(object):
     @defer.inlineCallbacks
     def push(self, origin, name):
         """
-        Push the current state of the repository
+        Push the current state of the repository.
+        When the operation is complete - the transfer of all objects in the
+        repository is complete.
         """
         targetname = self._process.get_scoped_name('system', origin)
         repo = self.get_repository(name)
@@ -212,14 +223,16 @@ class WorkBench(object):
             defer.returnValue((response, exception))
 
         else:
-            raise Exception, 'Push returned an exception!' % exception
+            raise WorkBenchError('Push returned an exception!' % exception)
             
 
         
     @defer.inlineCallbacks
     def op_push(self, repo, headers, msg):
         """
-        The Operation which responds to a push
+        The Operation which responds to a push.
+        
+        Operation does not complete until transfer is complete!
         """
         log.info('op_push: received content type, %s' % type(repo))
                 
@@ -274,7 +287,11 @@ class WorkBench(object):
             new_links = set()
             
             # Get the objects we don't have
-            yield self.fetch_linked_objects(origin, objs_to_get)
+            ### Call the method defined by the process - not the workbench!
+            result = yield self._process.fetch_linked_objects(origin, objs_to_get)
+            
+            if not result:
+                raise WorkBenchError('Fetch failed!')
             
             # Would like to have fetch use reply to - to keep the conversation context but does not work yet...
             #yield self.fetch_linked_objects(msg, objs_to_get)
@@ -293,6 +310,8 @@ class WorkBench(object):
         """
         Fetch the linked objects from the data store service
         """     
+            
+        #print 'FETCHING LINKED OBJECTS!!!!'
             
         cs = container_pb2.Structure()
             
@@ -319,6 +338,11 @@ class WorkBench(object):
         
         for obj in objs:
             self._hashed_elements[obj.key]=obj
+            
+        #print 'GOT HERE!!!!!'
+            
+        defer.returnValue(True)
+            
         return
         
             
@@ -327,7 +351,7 @@ class WorkBench(object):
         """
         Send a linked object back to a requestor if you have it!
         """
-        log.info('op_fetch_linked_objects: received content type, %s' % type(elements))
+        log.info('op_fetch_linked_objects: received content type, %s; \n Elements: %s' % (type(elements), str(elements)))
         cs = container_pb2.Structure()
                 
         for se in elements:
@@ -492,6 +516,8 @@ class WorkBench(object):
     def _pack_container(self, head, object_keys):
         """
         Helper for the sender to pack message content into a container in order
+        Awkward interface. Head is wrapper object, object_keys is a list of keys.
+        Should be all objects or all keys...
         """
         log.debug('_pack_container: Packing container head and object_keys!')
         # An unwrapped GPB Structure message to put stuff into!
@@ -551,6 +577,7 @@ class WorkBench(object):
             return repo
         
         else:
+            # This is what generally happens when a message is recieved!
                 
             for item in obj_list:
                 self._hashed_elements[item.key]=item
@@ -613,7 +640,7 @@ class WorkBench(object):
         
     def _load_repo_from_mutable(self,head):
         """
-        Load a repository from a mutable - helper for clone and other methods
+        Load a repository from a mutable - helper for push and pull - methods
         that send and receive an entire repo.
         head is a raw (unwrapped) gpb message
         """
@@ -655,33 +682,22 @@ class WorkBench(object):
     def _load_commits(self, repo, link):
                 
         log.debug('_load_commits: Loading all commits in the repository')
-        if repo._commit_index.has_key(link.key):
-            return repo._commit_index.get(link.key)
-
-        elif repo._hashed_elements.has_key(link.key):
-            
-            element = repo._hashed_elements.get(link.key)
-            
-            
-            if not link.type.object_id == element.type.object_id and \
-                    link.type.version == element.type.version:
-                raise WorkBenchError('The link type does not match the element type!')
-            
-            cref = repo._load_element(element)
-            
-            if cref.ObjectType == self.CommitClassType:
-                repo._commit_index[cref.MyId]=cref
-                cref.ReadOnly = True
-            else:
-                raise WorkBenchError('This method should only load commits!')
-            
-            for parent in cref.parentrefs:
-                link = parent.GetLink('commitref')
-                # Call this method recursively for each link
-                self._load_commits(repo, link)
-        else:
-            raise WorkBenchError('Commit id not found: %s' % link.key)
+        
+        try:
+            cref = repo.get_linked_object(link)
+        except repository.RepositoryError, ex:
+            log.debug(ex)
+            raise WorkBenchError('Commit id not found while loding commits: \n %s' % link.key)
             # This commit ref was not actually sent!
+            
+        if cref.ObjectType != self.CommitClassType:
+            raise WorkBenchError('This method should only load commits!')
+            
+        for parent in cref.parentrefs:
+            link = parent.GetLink('commitref')
+            # Call this method recursively for each link
+            self._load_commits(repo, link)
+        
         log.debug('_load_commits: Loaded all commits!')
     
     def _merge_repo_heads(self, existing_repo, new_repo):
@@ -752,6 +768,10 @@ class WorkBench(object):
                     found = True
                     existing_link.key = new_link.key # Cheat and just copy the key!
                     self._load_commits(existing_repo, new_link) # Load the new ancestors!
+                
+                # Anything state that is not caught by these three options is
+                # resolved in the else of the for loop by adding this divergent
+                # state to the existing (local) repositories branch
                 
             else:
                 

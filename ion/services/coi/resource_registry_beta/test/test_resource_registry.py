@@ -78,7 +78,7 @@ class ResourceRegistryTest(IonTestCase):
         # Check the result!
         new_repo = proc_ds1.workbench.get_repository(res_id)
             
-        resource = new_repo.checkout('master')
+        resource = yield new_repo.checkout('master')
             
         self.assertEqual(resource.identity, res_id)
         

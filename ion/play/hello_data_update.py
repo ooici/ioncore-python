@@ -135,7 +135,7 @@ class HelloDataUpdate(ServiceProcess):
         resource = yield self.rc.get_instance(request.resource_reference)
         
         # Merge the requested state into the resource history
-        resource.MergeResourceUpdate(resource.CLOBBER, request.configuration)
+        yield resource.MergeResourceUpdate(resource.CLOBBER, request.configuration)
             
         # Clobber the current state with the update
         resource.ResourceObject = resource.CompareToUpdates[0]
@@ -175,7 +175,7 @@ class HelloDataUpdate(ServiceProcess):
         resource = yield self.rc.get_instance(request.resource_reference)
         
         # Merge the requested state into the resource history
-        resource.MergeResourceUpdate(resource.MERGE, request.configuration)
+        yield resource.MergeResourceUpdate(resource.MERGE, request.configuration)
             
         # Merge the current state with the update
         

@@ -237,7 +237,7 @@ class ResourceClientTest(IonTestCase):
         update_repo.commit('an update object')
                 
         # Merge the update!
-        resource.MergeResourceUpdate(resource.MERGE, ab)
+        yield resource.MergeResourceUpdate(resource.MERGE, ab)
             
             
         # Make sure the correct commit is at the head.

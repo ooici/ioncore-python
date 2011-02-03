@@ -12,7 +12,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from uuid import uuid4
 
 from twisted.trial import unittest
-#from twisted.internet import defer
+from twisted.internet import defer
 
 from ion.test.iontest import IonTestCase
 
@@ -98,7 +98,7 @@ class WorkBenchTest(unittest.TestCase):
         
         self.assertEqual(res,self.ab)
         
-        
+    @defer.inlineCallbacks
     def test_pack_mutable_eq_unpack(self):
             
         serialized = self.wb.pack_structure(self.repo._dotgit)
@@ -107,7 +107,7 @@ class WorkBenchTest(unittest.TestCase):
         
         self.assertEqual(repo._dotgit, self.repo._dotgit)
         
-        ab=repo.checkout(branchname='master')
+        ab= yield repo.checkout(branchname='master')
         
         self.assertEqual(ab.person[0].name, 'David')
             
@@ -196,7 +196,7 @@ class WorkBenchMergeTest(unittest.TestCase):
         self.assertEqual(repo2._dotgit, repo1._dotgit)
         
         
-        
+    @defer.inlineCallbacks
     def test_divergent_merge(self):
         wb1 = workbench.WorkBench('No Process Test')
         
@@ -221,7 +221,7 @@ class WorkBenchMergeTest(unittest.TestCase):
         
         #repo2.log_commits('master')
         
-        ab2 = repo2.checkout('master')
+        ab2 = yield repo2.checkout('master')
         
         # Show that the state of the heads is the same
         self.assertEqual(repo2._dotgit, repo1._dotgit)
