@@ -211,7 +211,7 @@ class ExchangeManagementClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_exchangename_life_cycle', None)
 
 
-factory = ProcessFactory(ExchangeManagementService)
+# factory = ProcessFactory(ExchangeManagementService)
 
 
 
