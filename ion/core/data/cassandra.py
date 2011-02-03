@@ -154,6 +154,8 @@ class CassandraIndexedStore(CassandraStore):
     """
     
     """
+    implements(store.IIndexStore)
+    
     def __init__(self, persistent_technology, persistent_archive, credentials, cache):
         """
         functional wrapper around active client instance
@@ -171,7 +173,7 @@ class CassandraIndexedStore(CassandraStore):
         yield self.client.batch_insert(key, self._cache_name, index_attributes)
         
     @defer.inlineCallbacks    
-    def query(self, indexed_attributes):
+    def query(self, indexed_attributes={}):
         """
         Search for rows in the Cassandra instance.
     
@@ -179,7 +181,7 @@ class CassandraIndexedStore(CassandraStore):
         Rows are returned that have columns set to the value specified in 
         the dictionary
         
-        @retVal a thrift representation of the rows returned by the query.
+        @retVal a dictionary containing the keys and values which match the query.
         """
         make_predicate = lambda attr: {'column_name':attr[0],'op':IndexOperator.EQ,'value':attr[1]}
         predicate_args = map(make_predicate, indexed_attributes.items())
@@ -195,16 +197,18 @@ class CassandraIndexedStore(CassandraStore):
         #print dir(rows)
         #print dir(rows[0])
         
-        # Create a list of dictionaries as a pythonic return value.
-        results=[]        
+        # Create a list of dictionaries as a pythonic return value.   
+        result ={}
         for row in rows:
-            result = {}
-            result['key'] = row.key
-            for column in row.columns:
-                result[column.column.name] = column.column.value
-            results.append(result)
             
-        defer.returnValue(results)
+            for column in row.columns:
+                if column.column.name == 'value':
+                    result[row.key] = column.column.value
+                    break
+            else:
+                raise KeyError('Cassandra column "value" not found in row.')
+            
+        defer.returnValue(result)
         
     @defer.inlineCallbacks
     def get_query_attributes(self):

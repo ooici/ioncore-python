@@ -255,7 +255,7 @@ class LoadTestRunner(object):
 
         if self._shutdown_deferred:
             #print "cancel shotdown to"
-            self._shutdown_to.cancel()
+            if self._shutdown_to.active(): self._shutdown_to.cancel()
             self._shutdown_deferred.callback(None)
 
         # Need to check for kill condition. Somehow this interferes with the reactor

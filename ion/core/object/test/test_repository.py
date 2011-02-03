@@ -55,6 +55,18 @@ class RepositoryTest(unittest.TestCase):
         self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, 52)
         
         
+    @defer.inlineCallbacks
+    def test_invalidate(self):
+        
+        repo, person = self.wb.init_repository(person_type)
+        
+        repo.commit('junk commit')
+        
+        # Checkout to invalidate it
+        person_2 = yield repo.checkout('master')
+        
+        self.assertEqual(object.__getattribute__(person,'Invalid'), True)
+        
     def test_wrapper_properties(self):
         """
         Test the basic state of a new wrapper object when it is created

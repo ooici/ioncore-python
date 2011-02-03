@@ -1,8 +1,36 @@
 import cProfile
 import pstats
-import sys
+import re
+from cStringIO import StringIO
+
+#from twisted.internet import kqreactor
+#kqreactor.install()
+
 from twisted.internet import defer, protocol, reactor
 from ion.test.load_runner import LoadTestRunner
+
+totalTimeRe = re.compile('([0-9.]+) CPU seconds')
+
+def percentTime(name, pattern, printResult=False):
+    ''' Find total CPU usage for functions/files matching the given pattern. '''
+
+    stream = StringIO()
+    p = pstats.Stats(name, stream=stream)
+    p.sort_stats('time')
+    p.print_stats(pattern)
+    output = stream.getvalue()
+    
+    lines = [line for line in output.split('\n') if len(line)]
+    total = float(totalTimeRe.search(lines[1]).group(1))
+    lines = lines[5:] # Skip the headers
+    table = [line.split() for line in lines if len(line)]
+    spent = sum([float(row[1]) for row in table])
+    percent = spent/total*100
+
+    if printResult:
+        print '"%s" matches %.2f%% of the CPU time' % (pattern, percent)
+
+    return percent
 
 testrunner = LoadTestRunner()
 def run():
@@ -10,6 +38,11 @@ def run():
     reactor.run()
 
 cProfile.run('run()', 'brokerload')
-p = pstats.Stats('brokerload')
-p.sort_stats('cumulative').print_stats(30)
-p.sort_stats('time').print_stats(30)
+
+#pstats.Stats('brokerload').sort_stats('time').print_stats(100)
+
+percentTime('brokerload', 'gpb_wrapper', printResult=True)
+percentTime('brokerload', 'protobuf', printResult=True)
+percentTime('brokerload', 'twisted', printResult=True)
+percentTime('brokerload', '{isinstance}', printResult=True)
+percentTime('brokerload', '{select.select}', printResult=True)
