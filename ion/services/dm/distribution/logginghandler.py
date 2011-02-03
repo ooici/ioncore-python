@@ -33,10 +33,6 @@ class LoggingHandler(logging.Handler):
 
     def emit(self, record):
 
-        print "handler", dir(self)
-        print "record", dir(record)
-
-
         # lazy initialize 
         if not self._log_pub and not self._create_called:
             self._create_publisher()
