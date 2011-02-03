@@ -20,15 +20,12 @@ from ion.core.messaging.message_client import MessageClient
 notification_type = object_utils.create_type_identifier(object_id=2304, version=1)
 log_notification_type = object_utils.create_type_identifier(object_id=2305, version=1)
 
-class LoggingPublisherReceiver(Receiver):
-    """
-    Publisher for log messages.
-    The Python logging handler creates one of these at an appropriate time.
-    """
+class NotificationPublisherReceiver(Receiver):
     def __init__(self, name, **kwargs):
         """
         Constructor override.
         Sets up publisher config for using our notification exchange, used by send.
+        Also sets up a MessageClient instance.
         """
         kwargs = kwargs.copy()
 
@@ -43,6 +40,12 @@ class LoggingPublisherReceiver(Receiver):
         Receiver.__init__(self, name, **kwargs)
 
         self._msgclient = MessageClient(proc=kwargs['process'])
+
+class LoggingPublisherReceiver(NotificationPublisherReceiver):
+    """
+    Publisher for log messages.
+    The Python logging handler creates one of these at an appropriate time.
+    """
 
     def log(self, record, **kwargs):
         """
