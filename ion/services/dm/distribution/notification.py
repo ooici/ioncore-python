@@ -12,8 +12,6 @@ NOTIFY_EXCHANGE_TYPE = 'topic'
 from ion.core.messaging.receiver import Receiver
 from twisted.internet import defer
 
-from ion.services.dm.distribution.notification import NOTIFY_EXCHANGE_SPACE, NOTIFY_EXCHANGE_TYPE
-
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 
