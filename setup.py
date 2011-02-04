@@ -44,7 +44,7 @@ try:
                                      'gviz_api.py==1.7.0','nimboss','txrabbitmq==0.4', 'Telephus==0.7-beta3.3', 
                                      #thrift is a dependency of Telephus, which should be included there ideally 
                                      'thrift==0.2.0', 
-                                     'M2Crypto==0.20.2', 'ionproto==0.3.1']
+                                     'M2Crypto==0.20.2', 'ionproto==0.3.3']
 
     
     setupdict['include_package_data'] = True
