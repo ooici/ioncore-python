@@ -35,9 +35,9 @@ class WorkBenchError(Exception):
 
 class WorkBench(object):
  
-    MutableClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.MutableNode())
-    LinkClassType = gpb_wrapper.set_type_from_obj(link_pb2.CASRef())
-    CommitClassType = gpb_wrapper.set_type_from_obj(mutable_pb2.CommitRef())
+    MutableClassType = object_utils.create_type_identifier(object_id=6, version=1)
+    LinkClassType = object_utils.create_type_identifier(object_id=3, version=1)
+    CommitClassType = object_utils.create_type_identifier(object_id=8, version=1)
     
     
     def __init__(self, myprocess):   
