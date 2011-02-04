@@ -10,10 +10,17 @@ NOTIFY_EXCHANGE_SPACE = 'notify_exchange'
 NOTIFY_EXCHANGE_TYPE = 'topic'
 
 from ion.core.messaging.receiver import Receiver
-from twisted.internet import defer
+from twisted.internet import defer, reactor
+from twisted.web import server, resource
 
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
+
+import string
+try:
+    import json
+except:
+    import simplejson as json
 
 notification_type = object_utils.create_type_identifier(object_id=2304, version=1)
 log_notification_type = object_utils.create_type_identifier(object_id=2305, version=1)
@@ -92,6 +99,69 @@ class LoggingPublisherReceiver(NotificationPublisherReceiver):
         dl = defer.DeferredList([d1, d2])
         dl.addCallback(complete_send, record=record)
 
+class LoggingWebResource(resource.Resource):
+
+    class LoggingWebAjaxResource(resource.Resource):
+        isLeaf = True
+        def __init__(self, msgslice, lastindex):
+            resource.Resource.__init__(self)
+            self._msgslice = msgslice
+            self._lastindex = lastindex
+
+        def render_GET(self, request):
+            msgs = ""
+            for m in self._msgslice:
+                msgs += "<li>%s</li>" % str(m['content'].additional_data.message)
+
+            data = { 'html': msgs,
+                     'lastindex': self._lastindex }
+            return json.dumps(data);
+
+    page_template = """
+        <html>
+            <head>
+                <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script>
+            </head>
+            <body>
+                <input id="lastslice" type="hidden" value="0" />
+                <input type="button" id="stopupdates" value="Stop" />
+                <ul id="log"></ul>
+            </body>
+            <script type="text/javascript">
+                var intervalID;
+                $$(document).ready(function() { 
+                    intervalID = window.setInterval(function() {
+                        req = "/" + $$('input#lastslice').val();
+                        $$.getJSON(req, function(data) {
+                            $$('ul#log').append(data.html);
+                            $$('input#lastslice').val(data.lastindex);
+                        });
+                    }, 2000);
+
+                    $$('input#stopupdates').click(function() { 
+                        window.clearInterval(intervalID);
+                    });
+                });
+            </script>
+        </html>
+        """
+    def __init__(self):
+        self._msgs = []
+        resource.Resource.__init__(self)
+
+    def getChild(self, name, request):
+        try:
+            since = int(name)
+            return self.LoggingWebAjaxResource(self._msgs[since:], len(self._msgs))
+        except ValueError:
+            pass
+
+        return self
+
+    def render_GET(self, request):
+        template = string.Template(self.page_template)
+        return template.substitute()
+
 class LoggingReceiver(Receiver):
     """
     Example log notification receiver.
@@ -99,6 +169,7 @@ class LoggingReceiver(Receiver):
     Listens for log messages on the notification exchange and prints them.
     Sample of how to look at messages on the notification exchange.
     """
+
     def __init__(self, *args, **kwargs):
         kwargs = kwargs.copy()
         kwargs['handler'] = self.printlog
@@ -106,6 +177,11 @@ class LoggingReceiver(Receiver):
         Receiver.__init__(self, *args, **kwargs)
 
         self._msgs = []
+
+        self._web = LoggingWebResource()
+        self._site = server.Site(self._web)
+        reactor.listenTCP(9999, self._site)
+        print "Listening on http://localhost:9999"
 
     @defer.inlineCallbacks
     def on_initialize(self, *args, **kwargs):
@@ -147,9 +223,9 @@ class LoggingReceiver(Receiver):
                                              arguments={})
 
     def printlog(self, payload, msg):
-        self._msgs.append(msg)
+        self._msgs.append(payload)
+        self._web._msgs = self._msgs
         logmsg = payload['content'].additional_data
         print logmsg.levelname, ": (", logmsg.module, "):",logmsg.message
         msg.ack()
-
 
