@@ -129,7 +129,7 @@ class CassandraManagerService(ServiceProcess):
         if self._password is None:
             raise CassandraManagerServiceException("The password for the credentials to authenticate to the Cassandra cluster is not set.")
         
-        self.wb = workbench.WorkBench("I need this make ION resources")
+        
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
         cassandra_cluster = yield self.rc.create_instance(cassandra_cluster_type, name="Cassandra cluster", description="OOI Cassandra cluster")
         #persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(cassandra_cluster_type)
