@@ -112,6 +112,9 @@ class WorkBenchTest(unittest.TestCase):
         self.assertEqual(ab.person[0].name, 'David')
             
             
+    def test_unpack_error(self):
+        
+        self.assertRaises(workbench.WorkBenchError,self.wb.unpack_structure,'junk that is not a serialized container!')
         
     def test_pack_repository_commits(self):
         

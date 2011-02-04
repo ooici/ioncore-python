@@ -446,6 +446,9 @@ class ResourceInstance(object):
             v = object.__setattr__(self, key, value)
 
     def ListSetFields(self):
+        """
+        Return a list of the names of the fields which have been set.
+        """
         return self.ResourceObject.ListSetFields()
 
     def HasField(self, field):

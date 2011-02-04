@@ -826,7 +826,12 @@ class Wrapper(object):
         if object.__getattribute__(self,'_invalid'):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         #return self.GPBMessage.ListFields()
-        return object.__getattribute__(self,'GPBMessage').ListFields()
+        
+        field_list = object.__getattribute__(self,'GPBMessage').ListFields()
+        fnames=[]
+        for desc, val in field_list:
+            fnames.append(desc.name)
+        return fnames
 
     def IsFieldSet(self, field_name):
         #if self.Invalid:

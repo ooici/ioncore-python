@@ -18,6 +18,8 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.data import store
 
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 class DataStoreService(ServiceProcess):
     """
@@ -48,12 +50,54 @@ class DataStoreService(ServiceProcess):
         #self.clone = self.workbench.clone
         self.fetch_linked_objects = self.workbench.fetch_linked_objects
 
+        #self.spawn_args['_class'] = self.spawn_args.get('_class', CONF.getValue('_class', default='ion.data.store.Store'))
+        self.spawn_args['mutable_store_class'] = self.spawn_args.get('mutable_store_class', CONF.getValue('mutable_store_class', default='ion.core.data.store.Store'))
+        self.spawn_args['commit_store_class'] = self.spawn_args.get('commit_store_class', CONF.getValue('commit_store_class', default='ion.core.data.store.IndexStore'))
+        self.spawn_args['blob_store_class'] = self.spawn_args.get('blob_store_class', CONF.getValue('blob_store_class', default='ion.core.data.store.Store'))
+
+
+
+
         log.info('DataStoreService.__init__()')
         
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
+
+        #Set up the stores
+
+
+    def slc_activate(self):
+        pass
+        # need to get resources?
+        # activate the stores
+
+
+    #
+    #
+    #def op_push(self, *args):
+    #    self.workbench.op_push(*args)
+    #    
+    #    
+    #def op_pull(self, *args):
+    #    defer.returnValue(self.workbench.op_pull(*args))
+    #    
+    #    
+    #def op_fetch_linked_objects(self, *args):
+    #    self.workbench.op_fetch_linked_objects(*args)
+    #    
+    #def push(self, *args):
+    #    self.workbench.push(*args)
+    #    
+    #def pull(self, *args):
+    #    self.workbench.pull(*args)
+    #    
+    #def fetch_linked_objects(self, *args):
+    #    defer.returnValue(self.workbench.fetch_linked_objects(*args))
+    #    
+    #    
+    #    
 
 #
 #
