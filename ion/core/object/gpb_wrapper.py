@@ -10,7 +10,7 @@ Finish test of new Invalid methods using weakrefs - make sure it is deleted!
 
 from ion.util import procutils as pu
 
-from ion.core.object.object_utils import set_type_from_obj, sha1bin, sha1hex, sha1_to_hex, ObjectUtilException, create_type_identifier
+from ion.core.object.object_utils import get_type_from_obj, sha1bin, sha1hex, sha1_to_hex, ObjectUtilException, create_type_identifier
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -23,6 +23,7 @@ from google.protobuf.internal import containers
 from net.ooici.core.container import container_pb2
 from net.ooici.core.link import link_pb2
 from net.ooici.core.type import type_pb2
+from ion.util.cache import memoize
 
 import hashlib
 
@@ -99,7 +100,7 @@ class Wrapper(object):
                 field_names.append(enum_value.name)
         
         try:
-            self._gpb_type = set_type_from_obj(gpbMessage)
+            self._gpb_type = get_type_from_obj(gpbMessage)
         except ObjectUtilException, re:
             self._gpb_type = None
             
@@ -592,7 +593,7 @@ class Wrapper(object):
         # Check the root wrapper objects list of derived wrappers
         objhash = gpbMessage.__hash__()
         dw = object.__getattribute__(self,'DerivedWrappers')
-        if dw.has_key(objhash):
+        if objhash in dw:
             return dw[objhash]
         
         # Else make a new one...
