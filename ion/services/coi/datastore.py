@@ -75,24 +75,38 @@ class DataStoreService(ServiceProcess):
 
 
     
-    
+    @defer.inlineCallbacks
     def op_push(self, *args):
-        self.workbench.op_push(*args)
+        yield self.workbench.op_push(*args)
         
+    @defer.inlineCallbacks
     def op_pull(self, *args):
-        self.workbench.op_pull(*args)
+        yield self.workbench.op_pull(*args)
         
+    @defer.inlineCallbacks
     def op_fetch_linked_objects(self, *args):
-        self.workbench.op_fetch_linked_objects(*args)
+        yield self.workbench.op_fetch_linked_objects(*args)
         
+    @defer.inlineCallbacks
     def push(self, *args):
-        defer.returnValue(self.workbench.push(*args))
         
+        ret = yield self.workbench.push(*args)
+        
+        defer.returnValue(ret)
+        
+    @defer.inlineCallbacks
     def pull(self, *args):
-        defer.returnValue(self.workbench.pull(*args))
+
+        ret = yield self.workbench.pull(*args)
+
+        defer.returnValue(ret)
         
+    @defer.inlineCallbacks
     def fetch_linked_objects(self, *args):
-        defer.returnValue(self.workbench.fetch_linked_objects(*args))
+
+        ret = yield self.workbench.fetch_linked_objects(*args)
+
+        defer.returnValue(ret)
         
         
         
