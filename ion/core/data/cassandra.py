@@ -244,7 +244,7 @@ class CassandraDataManager(TCPConnection):
         host = storage_resource.get_host()
         port = storage_resource.get_port()
         authorization_dictionary = storage_resource.get_credentials()
-        
+        log.info("host: %s and port: %s" % (host,str(port)))
         self._manager = ManagedCassandraClientFactory(credentials=authorization_dictionary)
         
         TCPConnection.__init__(self,host,port,self._manager)
@@ -352,6 +352,17 @@ class CassandraDataManager(TCPConnection):
         @retval returns a thrift KsDef 
         """
         desc = yield self.client.describe_keyspace(keyspace)
+        defer.returnValue(desc)
+        
+    @defer.inlineCallbacks
+    def _describe_keyspaces(self):
+        """
+        @brief internal method used to get a description of all keyspaces 
+        in the cluster.
+        @retval returns a list of thrift KsDefs
+        """
+        log.info("In CassandraDataManager._describe_keyspaces")
+        desc = yield self.client.describe_keyspaces()
         defer.returnValue(desc)
     
     def __generate_column_metadata(self, column_family):
