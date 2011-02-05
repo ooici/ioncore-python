@@ -40,15 +40,15 @@ class DataStoreService(ServiceProcess):
         #self.backend = backend
         ServiceProcess.__init__(self, *args, **kwargs)
         
-        self.op_push = self.workbench.op_push
-        self.op_pull = self.workbench.op_pull
+        #self.op_push = self.workbench.op_push
+        #self.op_pull = self.workbench.op_pull
         #self.op_clone = self.workbench.op_clone
-        self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
+        #self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
 
-        self.push = self.workbench.push
-        self.pull = self.workbench.pull
+        #self.push = self.workbench.push
+        #self.pull = self.workbench.pull
         #self.clone = self.workbench.clone
-        self.fetch_linked_objects = self.workbench.fetch_linked_objects
+        #self.fetch_linked_objects = self.workbench.fetch_linked_objects
 
         #self.spawn_args['_class'] = self.spawn_args.get('_class', CONF.getValue('_class', default='ion.data.store.Store'))
         self.spawn_args['mutable_store_class'] = self.spawn_args.get('mutable_store_class', CONF.getValue('mutable_store_class', default='ion.core.data.store.Store'))
@@ -74,30 +74,28 @@ class DataStoreService(ServiceProcess):
         # activate the stores
 
 
-    #
-    #
-    #def op_push(self, *args):
-    #    self.workbench.op_push(*args)
-    #    
-    #    
-    #def op_pull(self, *args):
-    #    defer.returnValue(self.workbench.op_pull(*args))
-    #    
-    #    
-    #def op_fetch_linked_objects(self, *args):
-    #    self.workbench.op_fetch_linked_objects(*args)
-    #    
-    #def push(self, *args):
-    #    self.workbench.push(*args)
-    #    
-    #def pull(self, *args):
-    #    self.workbench.pull(*args)
-    #    
-    #def fetch_linked_objects(self, *args):
-    #    defer.returnValue(self.workbench.fetch_linked_objects(*args))
-    #    
-    #    
-    #    
+    
+    
+    def op_push(self, *args):
+        self.workbench.op_push(*args)
+        
+    def op_pull(self, *args):
+        self.workbench.op_pull(*args)
+        
+    def op_fetch_linked_objects(self, *args):
+        self.workbench.op_fetch_linked_objects(*args)
+        
+    def push(self, *args):
+        defer.returnValue(self.workbench.push(*args))
+        
+    def pull(self, *args):
+        defer.returnValue(self.workbench.pull(*args))
+        
+    def fetch_linked_objects(self, *args):
+        defer.returnValue(self.workbench.fetch_linked_objects(*args))
+        
+        
+        
 
 #
 #
