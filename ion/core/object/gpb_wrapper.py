@@ -30,9 +30,6 @@ class OOIObjectError(Exception):
     An exception class for errors that occur in the Object Wrapper class
     """
 
-class BaseWrapper(object):
-    """ Abstract base class for Wrapper and its metaclass-mutated variants. """
-
 class WrappedProperty(object):
     """ Data descriptor (like a property) for passing through GPB properties from the Wrapper. """
 
@@ -46,7 +43,7 @@ class WrappedProperty(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
 
         # This may be the result we were looking for, in the case of a simple scalar field
-        field = getattr(wrapper._gpbMessage, self.name)
+        field = getattr(wrapper.GPBMessage, self.name)
 
         # Or it may be something more complex that we need to operate on...
         if isinstance(field, containers.RepeatedScalarFieldContainer):
@@ -79,12 +76,25 @@ class WrappedProperty(object):
             # get the callable and call it!
             wrapper.SetLinkByName(self.name, value)
         else:
-            setattr(wrapper._gpbMessage, self.name, value)
+            setattr(wrapper.GPBMessage, self.name, value)
 
         # Set this object and it parents to be modified
         wrapper._set_parents_modified()
 
         return None
+
+class WrappedEnum(object):
+    """ Data descriptor (like a property) for passing through GPB enums from the Wrapper. """
+
+    def __init__(self, val, doc=None):
+        self.val = val
+        if doc: self.__doc__ = doc
+
+    def __get__(self, obj, objtype=None):
+        return self.val
+
+    def __set__(self, obj, value):
+        raise AttributeError('Enums are read-only.')
 
 class WrapperType(type):
     """
@@ -94,39 +104,36 @@ class WrapperType(type):
 
     _type_cache = {}
 
-    def __call__(self, gpbMessage, *args, **kwargs):
+    def __call__(cls, gpbMessage, *args, **kwargs):
         # Cache the custom-built classes
         msgType, clsType = type(gpbMessage), None
 
-        try:
-            if msgType in WrapperType._type_cache:
-                clsType = WrapperType._type_cache[msgType]
-            else:
-                clsName = '%s_%s' % (self.__name__, msgType.__name__)
-                clsDict = {}
+        if msgType in WrapperType._type_cache:
+            clsType = WrapperType._type_cache[msgType]
+        else:
+            clsName = '%s_%s' % (cls.__name__, msgType.__name__)
+            clsDict = {}
 
-                # Now setup the properties to map through to the GPB object
-                descriptor = msgType.DESCRIPTOR
-                fieldNames = descriptor.fields_by_name.keys()
+            # Now setup the properties to map through to the GPB object
+            descriptor = msgType.DESCRIPTOR
+            fieldNames = descriptor.fields_by_name.keys()
 
-                for fieldName in fieldNames:
-                    fieldType = getattr(msgType, fieldName)
-                    prop = WrappedProperty(self, fieldName, doc=fieldType.__doc__)
-                    clsDict[fieldName] = prop
+            for fieldName in fieldNames:
+                fieldType = getattr(msgType, fieldName)
+                prop = WrappedProperty(cls, fieldName, doc=fieldType.__doc__)
+                clsDict[fieldName] = prop
 
-                # Also grab the enums
-                if hasattr(descriptor, 'enum_values_by_name'):
-                    clsDict.update(dict((k,v.number) for k,v in descriptor.enum_values_by_name.iteritems()))
-                    
-                clsType = WrapperType.__new__(WrapperType, clsName, (self,), clsDict)
-                WrapperType._type_cache[msgType] = clsType
+            clsType = WrapperType.__new__(WrapperType, clsName, (cls,), clsDict)
 
-            # Finally allow the instantiation to occur, but slip in our new class type
-            obj = super(WrapperType, clsType).__call__(gpbMessage, *args, **kwargs)
-                
-        except Exception, ex:
-            x = 84
+            # Also set the enum descriptors _after_ building the class so the descriptor doesn't go away
+            if hasattr(descriptor, 'enum_values_by_name'):
+                for k,v in descriptor.enum_values_by_name.iteritems():
+                    setattr(clsType, k, WrappedEnum(v.number))
 
+            WrapperType._type_cache[msgType] = clsType
+
+        # Finally allow the instantiation to occur, but slip in our new class type
+        obj = super(WrapperType, clsType).__call__(gpbMessage, *args, **kwargs)
         return obj
 
 class Wrapper(object):
