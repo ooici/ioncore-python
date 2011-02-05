@@ -38,6 +38,27 @@ class WrapperMethodsTest(unittest.TestCase):
         self.ab = ab
         self.wb = wb
         
+    def test_set_get_del(self):
+        
+        # set a string field
+        self.ab.title = 'String'
+        
+        # Can not set a string field to an integer
+        self.assertRaises(TypeError, setattr, self.ab , 'title', 6)
+        
+        # Get a string field
+        self.assertEqual(self.ab.title, 'String')
+        
+        # Del ?
+        try:
+            del self.ab.title
+        except AttributeError, ae:
+            return
+        
+        self.fail('Attribute Error not raised by invalid delete request')
+            
+        
+        
     def test_set_composite(self):
         
         repo, ab = self.wb.init_repository(addressbook_type)

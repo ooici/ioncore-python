@@ -30,8 +30,65 @@ class OOIObjectError(Exception):
     An exception class for errors that occur in the Object Wrapper class
     """
 
-class WrappedProperty(object):
-    """ Data descriptor (like a property) for passing through GPB properties from the Wrapper. """
+
+class WrappedMessageProperty(object):
+    """ Data descriptor (like a property) for passing through GPB properties of Type Message from the Wrapper. """
+
+    def __init__(self, wrapper, name, doc=None):
+        self.wrapper = wrapper
+        self.name = name
+        if doc: self.__doc__ = doc
+        
+    def __get__(self, wrapper, objtype=None):
+        if wrapper._invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+        # This may be the result we were looking for, in the case of a simple scalar field
+        field = getattr(wrapper.GPBMessage, self.name)
+        result = wrapper._rewrap(field)
+
+        if result.ObjectType == wrapper.LinkClassType:
+            result = wrapper.Repository.get_linked_object(result)
+
+        return result
+
+    def __set__(self, wrapper, value):
+        if wrapper._invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+        if wrapper.ReadOnly:
+            raise OOIObjectError('This object wrapper is read only!')
+
+        # get the callable and call it!
+        wrapper.SetLinkByName(self.name, value)
+        wrapper._set_parents_modified()
+
+        return None
+
+class WrappedRepeatedScalarProperty(object):
+    """ Data descriptor (like a property) for passing through GPB properties of Type Repeated Scalar from the Wrapper. """
+
+    def __init__(self, wrapper, name, doc=None):
+        self.wrapper = wrapper
+        self.name = name
+        if doc: self.__doc__ = doc
+        
+    def __get__(self, wrapper, objtype=None):
+        if wrapper._invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+        # This may be the result we were looking for, in the case of a simple scalar field
+        field = getattr(wrapper.GPBMessage, self.name)
+        
+        return ScalarContainerWrapper.factory(wrapper, field)
+
+    def __set__(self, wrapper, value):
+        raise AttributeError('Assignement is not allowed for field name "%s" of type Repeated Scalar in ION Object')
+
+        return None
+
+class WrappedRepeatedCompositeProperty(object):
+    """ Data descriptor (like a property) for passing through GPB properties of Type Repeated Composite from the Wrapper. """
 
     def __init__(self, wrapper, name, doc=None):
         self.wrapper = wrapper
@@ -45,21 +102,27 @@ class WrappedProperty(object):
         # This may be the result we were looking for, in the case of a simple scalar field
         field = getattr(wrapper.GPBMessage, self.name)
 
-        # Or it may be something more complex that we need to operate on...
-        if isinstance(field, containers.RepeatedScalarFieldContainer):
-            result = ScalarContainerWrapper.factory(wrapper, field)
-        elif isinstance(field, containers.RepeatedCompositeFieldContainer):
-            result = ContainerWrapper.factory(wrapper, field)
-        elif isinstance(field, message.Message):
-            result = wrapper._rewrap(field)
+        return ContainerWrapper.factory(wrapper, field)
+        
+    def __set__(self, wrapper, value):
+        raise AttributeError('Assignement is not allowed for field name "%s" of type Repeated Composite in ION Object')
 
-            if result.ObjectType == wrapper.LinkClassType:
-                result = wrapper.Repository.get_linked_object(result)
-        else:
-            # Probably bad that the common case comes last!
-            result = field
+        return None
 
-        return result
+class WrappedScalarProperty(object):
+    """ Data descriptor (like a property) for passing through GPB properties of Type Scalar from the Wrapper. """
+
+    def __init__(self, wrapper, name, doc=None):
+        self.wrapper = wrapper
+        self.name = name
+        if doc: self.__doc__ = doc
+        
+    def __get__(self, wrapper, objtype=None):
+        if wrapper._invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+        # This may be the result we were looking for, in the case of a simple scalar field
+        return getattr(wrapper.GPBMessage, self.name)
 
     def __set__(self, wrapper, value):
         if wrapper._invalid:
@@ -68,20 +131,16 @@ class WrappedProperty(object):
         if wrapper.ReadOnly:
             raise OOIObjectError('This object wrapper is read only!')
 
-        # If the value we are setting is a Wrapper Object
-        if isinstance(value, Wrapper):
-            if value._invalid:
-                raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-
-            # get the callable and call it!
-            wrapper.SetLinkByName(self.name, value)
-        else:
-            setattr(wrapper.GPBMessage, self.name, value)
+        setattr(wrapper.GPBMessage, self.name, value)
 
         # Set this object and it parents to be modified
         wrapper._set_parents_modified()
 
         return None
+    
+    def __delete__(self, wrapper):
+        raise AttributeError('Can not delete a Wrapper property for an ION Object field')
+
 
 class WrappedEnum(object):
     """ Data descriptor (like a property) for passing through GPB enums from the Wrapper. """
@@ -95,6 +154,7 @@ class WrappedEnum(object):
 
     def __set__(self, obj, value):
         raise AttributeError('Enums are read-only.')
+
 
 class WrapperType(type):
     """
@@ -116,11 +176,23 @@ class WrapperType(type):
 
             # Now setup the properties to map through to the GPB object
             descriptor = msgType.DESCRIPTOR
-            fieldNames = descriptor.fields_by_name.keys()
+            #fieldNames = descriptor.fields_by_name.keys()
 
-            for fieldName in fieldNames:
+            for fieldName, field_desc in descriptor.fields_by_name.items():
                 fieldType = getattr(msgType, fieldName)
-                prop = WrappedProperty(cls, fieldName, doc=fieldType.__doc__)
+                
+                if field_desc.label == field_desc.LABEL_REPEATED:
+                    if field_desc.cpp_type == field_desc.CPPTYPE_MESSAGE:
+                        prop = WrappedRepeatedCompositeProperty(cls, fieldName, doc=fieldType.__doc__)
+                    else:
+                        prop = WrappedRepeatedScalarProperty(cls, fieldName, doc=fieldType.__doc__)
+                else:
+                    if field_desc.cpp_type == field_desc.CPPTYPE_MESSAGE:
+                        prop = WrappedMessageProperty(cls, fieldName, doc=fieldType.__doc__)
+                    else:
+                        prop = WrappedScalarProperty(cls, fieldName, doc=fieldType.__doc__)
+
+                #prop = WrappedProperty(cls, fieldName, doc=fieldType.__doc__)
                 clsDict[fieldName] = prop
 
             clsType = WrapperType.__new__(WrapperType, clsName, (cls,), clsDict)
