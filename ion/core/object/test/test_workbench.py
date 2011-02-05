@@ -43,7 +43,7 @@ class WorkBenchTest(unittest.TestCase):
         p.id = 5
         p.email = 'd@s.com'
         ph = p.phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '123 456 7890'
         
         ab.owner = p
@@ -57,7 +57,7 @@ class WorkBenchTest(unittest.TestCase):
         p.id = 78
         p.email = 'J@s.com'
         ph = p.phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '111 222 3333'
         
         ab.person[1] = p

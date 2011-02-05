@@ -26,32 +26,27 @@ person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
 
+attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
 
 class WrapperMethodsTest(unittest.TestCase):
         
-    def setUp(self):
-        wb = workbench.WorkBench('No Process Test')
-        
-        repo, ab = wb.init_repository(addresslink_type)
-        
-        self.repo = repo
-        self.ab = ab
-        self.wb = wb
         
     def test_set_get_del(self):
         
+        ab = gpb_wrapper.Wrapper._create_object(addressbook_type)
+        
         # set a string field
-        self.ab.title = 'String'
+        ab.title = 'String'
         
         # Can not set a string field to an integer
-        self.assertRaises(TypeError, setattr, self.ab , 'title', 6)
+        self.assertRaises(TypeError, setattr, ab , 'title', 6)
         
         # Get a string field
-        self.assertEqual(self.ab.title, 'String')
+        self.assertEqual(ab.title, 'String')
         
         # Del ?
         try:
-            del self.ab.title
+            del ab.title
         except AttributeError, ae:
             return
         
@@ -61,7 +56,7 @@ class WrapperMethodsTest(unittest.TestCase):
         
     def test_set_composite(self):
         
-        repo, ab = self.wb.init_repository(addressbook_type)
+        ab = gpb_wrapper.Wrapper._create_object(addressbook_type)
             
         ab.person.add()
         ab.person.add()
@@ -73,7 +68,7 @@ class WrapperMethodsTest(unittest.TestCase):
         p = ab.person[0]
         
         ph = ab.person[0].phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '123 456 7890'
             
         self.assertEqual(ab.person[1].name, 'David')
@@ -85,37 +80,33 @@ class WrapperMethodsTest(unittest.TestCase):
         
     def test_enum_access(self):
         
-        p = self.repo.create_object(person_type)
-    
+        p = gpb_wrapper.Wrapper._create_object(person_type)
+        
         # Get an enum
-        self.assertEqual(p.MOBILE,0)
-        self.assertEqual(p.HOME,1)
-        self.assertEqual(p.WORK,2)
+        self.assertEqual(p.PhoneType.MOBILE,0)
+        self.assertEqual(p.PhoneType.HOME,1)
+        self.assertEqual(p.PhoneType.WORK,2)
         
         # error to set an enum
-        self.assertRaises(AttributeError, setattr, p, 'MOBILE', 5)
+        self.assertRaises(AttributeError, setattr, p.PhoneType, 'MOBILE', 5)
         
-    
-    
-    #How do I make this a fail unless?   
-    def test_inparents(self):
-            
-        self.ab.person.add()
-            
-        ab2 = self.repo.create_object(addresslink_type)
-            
-        self.ab.person[0] = ab2
-            
-        ab2.person.add()
+    def test_imported_enum_access(self):
         
-        # Should fail due to circular reference!
-        self.failUnlessRaises(repository.RepositoryError, ab2.person.SetLink, 0, self.ab)
+        
+        att = gpb_wrapper.Wrapper._create_object(attribute_type)
+        
+        att.data_type = att.DataType.BOOLEAN
+        
+        self.assertEqual(att.data_type, att.DataType.BOOLEAN)
+        
+        self.assertRaises(AttributeError, setattr, att.DataType, 'BOOLEAN', 5)
+        
         
         
     def test_listsetfields(self):
         
-        self.ab.person.add()
-        p = self.repo.create_object(person_type)
+        p = gpb_wrapper.Wrapper._create_object(person_type)
+
         p.name = 'David'
         p.id = 5
         
@@ -125,6 +116,17 @@ class WrapperMethodsTest(unittest.TestCase):
         self.assertEqual(['name', 'id'], mylist)
         
         
+        
+class TestWrapperMethodsRequiringRepository(unittest.TestCase):
+    
+    def setUp(self):
+        wb = workbench.WorkBench('No Process Test')
+        
+        repo, ab = wb.init_repository(addresslink_type)
+        
+        self.repo = repo
+        self.ab = ab
+        self.wb = wb
         
     def test_clearfield(self):
         """
@@ -284,7 +286,7 @@ class RecurseCommitTest(unittest.TestCase):
         p.id = 5
         p.email = 'd@s.com'
         ph = p.phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '123 456 7890'
         
         ab.person[0] = p
