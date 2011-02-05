@@ -24,11 +24,13 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from net.ooici.core.container import container_pb2
-from net.ooici.core.mutable import mutable_pb2
-from net.ooici.core.type import type_pb2
-from net.ooici.core.link import link_pb2
+
+structure_element_type = object_utils.create_type_identifier(object_id=1, version=1)
+structure_type = object_utils.create_type_identifier(object_id=2, version=1)
 
 idref_type = object_utils.create_type_identifier(object_id=4, version=1)
+gpbtype_type = object_utils.create_type_identifier(object_id=9, version=1)
+
 
 class WorkBenchError(Exception):
     """
@@ -73,7 +75,7 @@ class WorkBench(object):
         repo.branch(nickname='master')
            
         # Handle options in the root class argument
-        if isinstance(root_type, type_pb2.GPBType):
+        if isinstance(root_type, object_utils.get_gpb_class_from_type_id(gpbtype_type)):
             
             try:
                 rootobj = repo.create_object(root_type)
@@ -315,7 +317,7 @@ class WorkBench(object):
             
         #print 'FETCHING LINKED OBJECTS!!!!'
             
-        cs = container_pb2.Structure()
+        cs = object_utils.get_gpb_class_from_type_id(structure_type)()
             
         for link in links:
             se_raw = cs.items.add()
@@ -354,13 +356,13 @@ class WorkBench(object):
         Send a linked object back to a requestor if you have it!
         """
         log.info('op_fetch_linked_objects: received content type, %s; \n Elements: %s' % (type(elements), str(elements)))
-        cs = container_pb2.Structure()
+        cs = object_utils.get_gpb_class_from_type_id(structure_type)()
                 
         for se in elements:
             
             assert se.type == self.LinkClassType, 'This is not a link element!'
     
-            link = link_pb2.CASRef()
+            link = object_utils.get_gpb_class_from_type_id(self.LinkClassType)
             link.ParseFromString(se.value)
 
             se = cs.items.add()
@@ -523,7 +525,7 @@ class WorkBench(object):
         """
         log.debug('_pack_container: Packing container head and object_keys!')
         # An unwrapped GPB Structure message to put stuff into!
-        cs = container_pb2.Structure()
+        cs = object_utils.get_gpb_class_from_type_id(structure_type)()
         
         cs.heads.add()
         cs.heads[0].key = head._element.key
@@ -641,7 +643,7 @@ class WorkBench(object):
             
         log.debug('_unpack_container: Unpacking Container')
         # An unwrapped GPB Structure message to put stuff into!
-        cs = container_pb2.Structure()
+        cs = object_utils.get_gpb_class_from_type_id(structure_type)()
             
         try:
             cs.ParseFromString(serialized_container)

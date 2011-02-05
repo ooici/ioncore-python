@@ -16,7 +16,8 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.data import store
+from ion.core.data import store
+from ion.core.data import cassandra
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -33,30 +34,43 @@ class DataStoreService(ServiceProcess):
                                              version='0.1.0',
                                              dependencies=[])
 
+    MUTABLE_STORE = 'mutable_store_class'
+    COMMIT_STORE = 'commit_store_class'
+    BLOB_STORE = 'blob_store_class'
+    
+    
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
         
         #assert isinstance(backend, store.IStore)
         #self.backend = backend
-        ServiceProcess.__init__(self, *args, **kwargs)
-        
-        #self.op_push = self.workbench.op_push
-        #self.op_pull = self.workbench.op_pull
-        #self.op_clone = self.workbench.op_clone
-        #self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
-
-        #self.push = self.workbench.push
-        #self.pull = self.workbench.pull
-        #self.clone = self.workbench.clone
-        #self.fetch_linked_objects = self.workbench.fetch_linked_objects
-
+        ServiceProcess.__init__(self, *args, **kwargs)        
+            
+        self._backend_cls_names = {}
         #self.spawn_args['_class'] = self.spawn_args.get('_class', CONF.getValue('_class', default='ion.data.store.Store'))
-        self.spawn_args['mutable_store_class'] = self.spawn_args.get('mutable_store_class', CONF.getValue('mutable_store_class', default='ion.core.data.store.Store'))
-        self.spawn_args['commit_store_class'] = self.spawn_args.get('commit_store_class', CONF.getValue('commit_store_class', default='ion.core.data.store.IndexStore'))
-        self.spawn_args['blob_store_class'] = self.spawn_args.get('blob_store_class', CONF.getValue('blob_store_class', default='ion.core.data.store.Store'))
-
-
-
+        self._backend_cls_names[self.MUTABLE_STORE] = self.spawn_args.get(self.MUTABLE_STORE, CONF.getValue(self.MUTABLE_STORE, default='ion.core.data.store.Store'))
+        self._backend_cls_names[self.COMMIT_STORE] = self.spawn_args.get(self.COMMIT_STORE, CONF.getValue(self.COMMIT_STORE, default='ion.core.data.store.IndexStore'))
+        self._backend_cls_names[self.BLOB_STORE] = self.spawn_args.get(self.BLOB_STORE, CONF.getValue(self.BLOB_STORE, default='ion.core.data.store.Store'))
+            
+        self._backend_classes={}
+            
+        self._backend_classes[self.MUTABLE_STORE] = pu.get_class(self._backend_cls_names[self.MUTABLE_STORE])
+        assert store.IStore.implementedBy(self._backend_classes[self.MUTABLE_STORE]), \
+            'The back end class to store mutable objects passed to the data store does not implement the required ISTORE interface.'
+            
+        self._backend_classes[self.COMMIT_STORE] = pu.get_class(self._backend_cls_names[self.COMMIT_STORE])
+        assert store.IIndexStore.implementedBy(self._backend_classes[self.COMMIT_STORE]), \
+            'The back end class to store commit objects passed to the data store does not implement the required IIndexSTORE interface.'
+            
+        self._backend_classes[self.BLOB_STORE] = pu.get_class(self._backend_cls_names[self.BLOB_STORE])
+        assert store.IStore.implementedBy(self._backend_classes[self.BLOB_STORE]), \
+            'The back end class to store blob objects passed to the data store does not implement the required ISTORE interface.'
+            
+        # Declare some variables to hold the store instances
+        self.m_store = None
+        self.c_store = None
+        self.b_store = None
+            
 
         log.info('DataStoreService.__init__()')
         
@@ -64,15 +78,26 @@ class DataStoreService(ServiceProcess):
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
+        
 
-        #Set up the stores
-
-
+    @defer.inlineCallbacks
     def slc_activate(self):
-        pass
-        # need to get resources?
-        # activate the stores
-
+        
+        if issubclass(self._backend_classes[self.MUTABLE_STORE], cassandra.CassandraStore):
+            raise NotImplementedError('Startup for cassandra store is not yet complete')
+        else:
+            self.m_store = yield defer.maybeDeferred(self._backend_classes[self.MUTABLE_STORE])
+        
+        if issubclass(self._backend_classes[self.COMMIT_STORE], cassandra.CassandraStore):
+            raise NotImplementedError('Startup for cassandra store is not yet complete')
+        else:
+            self.c_store = yield defer.maybeDeferred(self._backend_classes[self.COMMIT_STORE])
+        
+        if issubclass(self._backend_classes[self.BLOB_STORE], cassandra.CassandraStore):
+            raise NotImplementedError('Startup for cassandra store is not yet complete')
+        else:
+            self.b_store = yield defer.maybeDeferred(self._backend_classes[self.BLOB_STORE])
+        
 
     
     @defer.inlineCallbacks
@@ -111,24 +136,6 @@ class DataStoreService(ServiceProcess):
         
         
 
-#
-#
-#class DataStoreServiceClient(ServiceClient):
-#    """
-#    This is an exemplar service client that calls the hello service. It
-#    makes service calls RPC style.
-#    """
-#    def __init__(self, proc=None, **kwargs):
-#        if not 'targetname' in kwargs:
-#            kwargs['targetname'] = "datastore"
-#        ServiceClient.__init__(self, proc, **kwargs)
-#
-#    @defer.inlineCallbacks
-#    def hello(self, text='Hi there'):
-#        yield self._check_init()
-#        (content, headers, msg) = yield self.rpc_send('hello', text)
-#        log.info('Service reply: '+str(content))
-#        defer.returnValue(str(content))
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DataStoreService)

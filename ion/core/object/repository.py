@@ -23,12 +23,13 @@ import time
 from twisted.internet import threads, reactor, defer
 
 from ion.core.object import gpb_wrapper
+from ion.core.object import object_utils
 
 from ion.util import procutils as pu
 
-from net.ooici.core.type import type_pb2
-from net.ooici.core.link import link_pb2
-from net.ooici.core.mutable import mutable_pb2
+commit_type = object_utils.create_type_identifier(object_id=8, version=1)
+mutable_type = object_utils.create_type_identifier(object_id=6, version=1)
+branch_type = object_utils.create_type_identifier(object_id=5, version=1)
 
 from ion.core.object import object_utils
 
@@ -131,7 +132,8 @@ class Repository(object):
             self._dotgit.MyId = self.new_id()
         else:
            
-            self._dotgit = self._create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
+            mutable_cls = object_utils.get_gpb_class_from_type_id(mutable_type)
+            self._dotgit = self._create_wrapped_object(mutable_cls, addtoworkspace = False)
             self._dotgit.repositorykey = pu.create_guid()
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
@@ -388,7 +390,8 @@ class Repository(object):
         self._detached_head = detached
         
         if detached:
-            self._current_branch = self._create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
+            branch_cls = object_utils.get_gpb_class_from_type_id(branch_type)
+            self._current_branch = self._create_wrapped_object(branch_cls, addtoworkspace=False)
             bref = self._current_branch.commitrefs.add()
             bref.SetLink(cref)
             self._current_branch.branchkey = 'detached head'
@@ -412,7 +415,9 @@ class Repository(object):
         # Deal with the newest ref seperately
         crefs.remove(head_cref)
             
-        cref = self._create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
+        # make a new commit ref
+        commit_cls = object_utils.get_gpb_class_from_type_id(commit_type)
+        cref = self._create_wrapped_object(commit_cls, addtoworkspace=False)
                     
         cref.date = pu.currenttime()
 
@@ -516,8 +521,10 @@ class Repository(object):
         the current time is used.
         @retval a string which is the commit reference
         """
-        # Now add a Commit Ref     
-        cref = self._create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
+        # Now add a Commit Ref
+        # make a new commit ref
+        commit_cls = object_utils.get_gpb_class_from_type_id(commit_type)
+        cref = self._create_wrapped_object(commit_cls, addtoworkspace=False)
         
         if not date:
             date = pu.currenttime()
