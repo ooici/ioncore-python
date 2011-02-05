@@ -418,7 +418,7 @@ class Repository(object):
 
         pref = cref.parentrefs.add()
         pref.SetLinkByName('commitref',head_cref)
-        pref.relationship = pref.Parent
+        pref.relationship = pref.Relationship.PARENT
 
         cref.SetLinkByName('objectroot', head_cref.objectroot)
 
@@ -427,7 +427,7 @@ class Repository(object):
         for ref in crefs:
             pref = cref.parentrefs.add()
             pref.SetLinkByName('commitref',ref)
-            pref.relationship = pref.MergedFrom
+            pref.relationship = pref.Relationship.MERGEDFROM
         
         structure={}                            
         # Add the CRef to the hashed elements
@@ -534,7 +534,7 @@ class Repository(object):
             pref = cref.parentrefs.add()
             parent = branch.commitrefs[0] # get the parent commit ref
             pref.SetLinkByName('commitref',parent)
-            pref.relationship = pref.Parent
+            pref.relationship = pref.Relationship.PARENT
         elif len(branch.commitrefs)>1:
             raise RepositoryError('The Branch is in an invalid state and should have been merged on read!')
         else:
@@ -546,7 +546,7 @@ class Repository(object):
         for mrgd in self._merge_from:
             pref = cref.parentrefs.add()
             pref.SetLinkByName('commitref',mrgd)
-            pref.relationship = pref.MergedFrom
+            pref.relationship = pref.Relationship.MERGEDFROM
             
         cref.comment = comment
         cref.SetLinkByName('objectroot', self._workspace_root)            
@@ -659,7 +659,7 @@ class Repository(object):
         
             while len(cref.parentrefs) >0:
                 for pref in cref.parentrefs:
-                    if pref.relationship == pref.Parent:
+                    if pref.relationship == pref.Relationship.PARENT:
                             cref = pref.commitref
                             log.info('Commit: \n' + str(cref))
                             break # There should be only one parent ancestor from a branch
@@ -711,9 +711,7 @@ class Repository(object):
 
         if addtoworkspace:
             self._workspace[obj_id] = obj
-            
-        obj._activated=True
-            
+                        
         return obj
         
     def new_id(self):
