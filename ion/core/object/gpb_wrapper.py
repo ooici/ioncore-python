@@ -21,20 +21,11 @@ from google.protobuf import message
 from google.protobuf.internal import containers
 from google.protobuf import descriptor
     
-from net.ooici.core.link import link_pb2
-from net.ooici.core.type import type_pb2
 from ion.util.cache import memoize
 
 import hashlib
 
-structure_element_type = object_utils.create_type_identifier(object_id=1, version=1)
-structure_type = object_utils.create_type_identifier(object_id=2, version=1)
-
-idref_type = object_utils.create_type_identifier(object_id=4, version=1)
-gpbtype_type = object_utils.create_type_identifier(object_id=9, version=1)
-
-
-
+structure_element_type = create_type_identifier(object_id=1, version=1)
 
 class OOIObjectError(Exception):
     """
@@ -1430,7 +1421,7 @@ class StructureElement(object):
     """
     def __init__(self):
             
-        self._element = object_utils.get_gpb_class_from_type_id(structure_element_type)()
+        self._element = get_gpb_class_from_type_id(structure_element_type)()
         self.ChildLinks = set()
         
     @classmethod
