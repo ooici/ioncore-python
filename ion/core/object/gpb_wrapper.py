@@ -1505,3 +1505,6 @@ class StructureElement(object):
             msg  = 'Hexkey: "'+sha1_to_hex(self._element.key) +'"\n'
         return msg + self._element.__str__()
         
+    def serialize(self):
+        return self._element.SerializeToString()
+        

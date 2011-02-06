@@ -17,6 +17,7 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.core.object import object_utils
+from ion.core.object import gpb_wrapper
 from ion.core.data import store
 from ion.core.data import cassandra
 
@@ -136,13 +137,11 @@ class DataStoreService(ServiceProcess):
                     def_list.append(self.b_store.get(link.key))
             
         obj_list = yield defer.DeferredList(def_list)
-        print 'OBJECT LIST:', obj_list
+        #print 'OBJECT LIST:', obj_list
             
         # Load this list of objects from the store into memory for use in the datastores workbench
-        for blob in obj_list:
-            se = object_utils.get_gpb_class_from_type_id(structure_element_type)()
-            se.ParseFromString(blob)
-            wse = gpb_wrapper.StructureElement.wrap_structure_element(se)
+        for result, blob in obj_list:
+            wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
             self._hashed_elements[wse.key]=wse
             
         yield self.workbench.op_fetch_linked_objects(elements, headers, message)
@@ -169,29 +168,57 @@ class DataStoreService(ServiceProcess):
         
         #Check and make sure it is not in the datastore
         def_list = []
-        if not link.key in self.workbench._hashed_elements:            
-            if link.type == commit_type:
-                def_list.append(self.c_store.get(link.key))
-            else:
-                def_list.append(self.b_store.get(link.key))
+        for link in links:
+            if not link.key in self.workbench._hashed_elements:            
+                if link.type == commit_type:
+                    def_list.append(self.c_store.get(link.key))
+                else:
+                    def_list.append(self.b_store.get(link.key))
+        
+        #for defd in def_list:
+        #    print 'Defd type: %s; value: %s' % (type(defd), defd)
         
         # The list of requested objects that are in the store
-        store_list = yield defer.DeferredList(def_list)
+        obj_list = yield defer.DeferredList(def_list)
         
+        #for obj in obj_list:
+        #    print 'obj type: %s; value: %s' % (type(obj), obj)
+        
+        
+        # If we have the object, put it in the work space, if not request it.
         need_list = []
-        for link, blob in zip(links, store_list):
+        obj_dict = {}
+        
+        # For some reason the obj_list is a tuple not the value of the result
+        for link, (result, blob)  in zip(links, obj_list):
             if blob is None:
                 need_list.append(link)
+                obj_dict[link.key] = None
             else:
+                #print 'BLOB type: %s; value: %s' % (type(blob), blob)
                 wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
                 self._hashed_elements[wse.key]=wse
-        
+                obj_dict[link.key] = wse
 
-        obj_list = yield self.workbench.fetch_linked_objects(address, links)
-        
-        
 
-        defer.returnValue(obj_list)
+        # Get these from the other service
+        got_objs = yield self.workbench.fetch_linked_objects(address, need_list)
+        
+        def_list = []
+        for wse in got_objs:
+            if wse.type == commit_type:
+                def_list.append(self.c_store.put(wse.key, wse.serialize()))
+            else:
+                def_list.append(self.b_store.put(wse.key, wse.serialize()))
+            # Add it to the dictionary of objects 
+            obj_dict[wse.key] = wse
+        
+        yield defer.DeferredList(def_list)
+        
+        print 'JDJDJDJDJDJDJDJDJDJD', self.b_store.kvs.keys()
+
+
+        defer.returnValue(obj_dict.values())
         
         
         
