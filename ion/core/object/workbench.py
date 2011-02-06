@@ -322,7 +322,7 @@ class WorkBench(object):
         for link in links:
             se_raw = cs.items.add()
             
-            se = gpb_wrapper.StructureElement.wrap_structure_element(se_raw)
+            se = gpb_wrapper.StructureElement(se_raw)
         
             # Can not set the pointer directly... must set the components
             se.value = link.SerializeToString()
@@ -334,18 +334,15 @@ class WorkBench(object):
             se.isleaf = link.isleaf # What does this mean in this context?
             
             
-        if isinstance(address, str):
-            objs, headers, msg = yield self._process.rpc_send(address,'fetch_linked_objects', cs)
-        #elif hasattr(address, 'payload'):
-        #    # Would like to have fetch use reply to - to keep the conversation context but does not work yet...
-        #    objs, headers, reply_msg = yield self._process.reply(address, operation='fetch_linked_objects', content=cs)
+        objs, headers, msg = yield self._process.rpc_send(address,'fetch_linked_objects', cs)
+        
         
         for obj in objs:
             self._hashed_elements[obj.key]=obj
             
         #print 'GOT HERE!!!!!'
             
-        defer.returnValue(True)
+        defer.returnValue(objs)
             
         return
         
@@ -660,13 +657,13 @@ class WorkBench(object):
             
             for raw_head in cs.heads:
                 
-                wrapped_head = gpb_wrapper.StructureElement.wrap_structure_element(raw_head)
+                wrapped_head = gpb_wrapper.StructureElement(raw_head)
                 #self._hashed_elements[head.key]=head
                 obj_list.append(wrapped_head)
                 heads.append(wrapped_head)
             
         for se in cs.items:
-            wse = gpb_wrapper.StructureElement.wrap_structure_element(se)
+            wse = gpb_wrapper.StructureElement(se)
             
             #self._hashed_elements[wse.key]=wse
             #obj_list.append(wse.key)

@@ -1408,16 +1408,19 @@ class StructureElement(object):
     here. A set provides references to the child objects so that the content
     need not be decoded to find them.
     """
-    def __init__(self):
+    def __init__(self,se=None):
             
-        self._element = get_gpb_class_from_type_id(structure_element_type)()
+        if se:
+            self._element = se
+        else:
+            self._element = get_gpb_class_from_type_id(structure_element_type)()
         self.ChildLinks = set()
         
     @classmethod
-    def wrap_structure_element(cls,se):
-        inst = cls()
-        inst._element = se
-        return inst
+    def parse_structure_element(cls,blob):
+        se = get_gpb_class_from_type_id(structure_element_type)()
+        se.ParseFromString(blob)
+        return cls(se)
         
     @property
     def sha1(self):

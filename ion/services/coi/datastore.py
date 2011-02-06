@@ -26,6 +26,7 @@ CONF = ioninit.config(__name__)
 link_type = object_utils.create_type_identifier(object_id=3, version=1)
 commit_type = object_utils.create_type_identifier(object_id=8, version=1)
 mutable_type = object_utils.create_type_identifier(object_id=6, version=1)
+structure_element_type = object_utils.create_type_identifier(object_id=1, version=1)
 
 class DataStoreService(ServiceProcess):
     """
@@ -117,7 +118,9 @@ class DataStoreService(ServiceProcess):
         
     @defer.inlineCallbacks
     def op_fetch_linked_objects(self, elements, headers, message):
-        
+        """
+        The data store is getting objects for another process...
+        """
         def_list=[]
         for se in elements:
             
@@ -135,7 +138,13 @@ class DataStoreService(ServiceProcess):
         obj_list = yield defer.DeferredList(def_list)
         print 'OBJECT LIST:', obj_list
             
-        
+        # Load this list of objects from the store into memory for use in the datastores workbench
+        for blob in obj_list:
+            se = object_utils.get_gpb_class_from_type_id(structure_element_type)()
+            se.ParseFromString(blob)
+            wse = gpb_wrapper.StructureElement.wrap_structure_element(se)
+            self._hashed_elements[wse.key]=wse
+            
         yield self.workbench.op_fetch_linked_objects(elements, headers, message)
         
     @defer.inlineCallbacks
@@ -153,11 +162,36 @@ class DataStoreService(ServiceProcess):
         defer.returnValue(ret)
         
     @defer.inlineCallbacks
-    def fetch_linked_objects(self, *args):
+    def fetch_linked_objects(self, address, links):
+        """
+        The datastore is getting any objects it does not already have... 
+        """
+        
+        #Check and make sure it is not in the datastore
+        def_list = []
+        if not link.key in self.workbench._hashed_elements:            
+            if link.type == commit_type:
+                def_list.append(self.c_store.get(link.key))
+            else:
+                def_list.append(self.b_store.get(link.key))
+        
+        # The list of requested objects that are in the store
+        store_list = yield defer.DeferredList(def_list)
+        
+        need_list = []
+        for link, blob in zip(links, store_list):
+            if blob is None:
+                need_list.append(link)
+            else:
+                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                self._hashed_elements[wse.key]=wse
+        
 
-        ret = yield self.workbench.fetch_linked_objects(*args)
+        obj_list = yield self.workbench.fetch_linked_objects(address, links)
+        
+        
 
-        defer.returnValue(ret)
+        defer.returnValue(obj_list)
         
         
         

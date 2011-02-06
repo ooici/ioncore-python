@@ -165,6 +165,13 @@ class Repository(object):
     
     upstream = property(_get_upstream, _set_upstream)
     
+    def _get_root_object(self):
+        return self._workspace_root.resource_object
+        
+    def _set_root_object(self, value):
+        self._workspace_root.resource_object = value
+        
+    root_object = property(_get_root_object, _set_root_object)
     
     @property
     def branches(self):
