@@ -105,7 +105,7 @@ class WorkBench(object):
         @param root_type is the object type identifier for the object
         """
         
-        log.warn('The init_repository method is depricated in favor of create_repository')
+        log.info('The init_repository method is depricated in favor of create_repository')
         
         repo = self.create_repository(root_type, nickname)
         
@@ -613,8 +613,7 @@ class WorkBench(object):
                
                 # Load the object and set it as the workspace root
                 root_obj = repo._load_element(head)
-                repo._workspace_root = root_obj
-                repo._workspace[root_obj.MyId] = root_obj
+                repo.root_object = root_obj
     
                 # Create a commit to record the state when the message arrived
                 cref = repo.commit(comment='Message for you Sir!')

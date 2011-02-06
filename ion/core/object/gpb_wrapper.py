@@ -762,15 +762,15 @@ class Wrapper(object):
                         if link.key != se.key:
                             link.key = se.key
                     
-                    msg = ''.join(['============================================='])
-                    msg.join(['''DAG structure created by hash conflict - two wrappers of the same type with the same value in one data structure./n
-                                This is not an error, but the state of this composite is now shared.'''])
-                    msg.join(['Shared Object: %s' % str(self)])
-                    msg.join(['Shared Parents:']) 
-                    for parent in self.ParentLinks:
-                        msg = msg.join(['Parent: %s' % str(parent)])
-                    msg.join(['Old references to the object are now invalid!'])
-                    #log.warn(msg)
+                    msg = '=============================================\n'
+                    msg += '''DAG structure created by hash conflict - two wrappers of the same type with the same value in one data structure. This is not an error, but the state of this composite is now shared.\n'''
+                    msg +='Shared Object: %s' % self.Debug()
+                    msg += 'Shared Parents:\n'
+                    for link in self.ParentLinks:
+                        msg +='Parent: %s' % (link.Root.Debug())
+                    msg +='Old references to the object are now invalid!\n'
+                    msg += '============================================='
+                    log.warn(msg)
                     
                     # Force the object to be reloaded from the workbench!
                     del repo._workspace[se.key]
@@ -957,7 +957,7 @@ class Wrapper(object):
         output += 'Wrapper ChildLinks: %s \n' % str(self.ChildLinks)
         output += 'Wrapper current value:\n'
         output += str(self) + '\n'
-        output += '================== Wrapper Complete ========================='
+        output += '================== Wrapper Complete =========================\n'
         return output
 
     def IsInitialized(self):
