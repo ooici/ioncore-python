@@ -16,11 +16,16 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
+from ion.core.object import object_utils
 from ion.core.data import store
 from ion.core.data import cassandra
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
+
+link_type = object_utils.create_type_identifier(object_id=3, version=1)
+commit_type = object_utils.create_type_identifier(object_id=8, version=1)
+mutable_type = object_utils.create_type_identifier(object_id=6, version=1)
 
 class DataStoreService(ServiceProcess):
     """
@@ -33,6 +38,8 @@ class DataStoreService(ServiceProcess):
     declare = ServiceProcess.service_declare(name='datastore',
                                              version='0.1.0',
                                              dependencies=[])
+
+    LinkClassType = object_utils.create_type_identifier(object_id=3, version=1)
 
     MUTABLE_STORE = 'mutable_store_class'
     COMMIT_STORE = 'commit_store_class'
@@ -109,8 +116,27 @@ class DataStoreService(ServiceProcess):
         yield self.workbench.op_pull(*args)
         
     @defer.inlineCallbacks
-    def op_fetch_linked_objects(self, *args):
-        yield self.workbench.op_fetch_linked_objects(*args)
+    def op_fetch_linked_objects(self, elements, headers, message):
+        
+        def_list=[]
+        for se in elements:
+            
+            assert se.type == link_type, 'This is not a link element!'
+            link = object_utils.get_gpb_class_from_type_id(link_type)()
+            link.ParseFromString(se.value)
+                
+            # if it is already in memory, don't worry about it...
+            if not link.key in self.workbench._hashed_elements:            
+                if link.type == commit_type:
+                    def_list.append(self.c_store.get(link.key))
+                else:
+                    def_list.append(self.b_store.get(link.key))
+            
+        obj_list = yield defer.DeferredList(def_list)
+        print 'OBJECT LIST:', obj_list
+            
+        
+        yield self.workbench.op_fetch_linked_objects(elements, headers, message)
         
     @defer.inlineCallbacks
     def push(self, *args):

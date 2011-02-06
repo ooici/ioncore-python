@@ -362,7 +362,7 @@ class WorkBench(object):
             
             assert se.type == self.LinkClassType, 'This is not a link element!'
     
-            link = object_utils.get_gpb_class_from_type_id(self.LinkClassType)
+            link = object_utils.get_gpb_class_from_type_id(self.LinkClassType)()
             link.ParseFromString(se.value)
 
             se = cs.items.add()

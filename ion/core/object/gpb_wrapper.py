@@ -914,11 +914,9 @@ class Wrapper(object):
             The method returns True if the message is initialized (i.e. all of its
         required fields are set).
         """
-        #if self.Invalid:
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
-        #return self.GPBMessage.IsInitialized()
         return self.GPBMessage.IsInitialized()
         
     def SerializeToString(self):
@@ -931,20 +929,16 @@ class Wrapper(object):
         Raises:
           message.EncodeError if the message isn't initialized.
         """
-        #if self.Invalid:
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        #return self.GPBMessage.SerializeToString()
         return self.GPBMessage.SerializeToString()
     
     def ParseFromString(self, serialized):
         """Clear the message and read from serialized."""
-        #if self.Invalid:
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
 
         # Do not use the GPBMessage method - it will recurse!
-        #self._gpbMessage.ParseFromString(serialized)
         self._gpbMessage.ParseFromString(serialized)
         
     def ListSetFields(self):
@@ -953,10 +947,8 @@ class Wrapper(object):
         if IsFieldSet() would return true, and a repeated field is non-empty if
         it contains at least one element.  The fields are ordered by field
         number"""
-        #if self.Invalid:
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        #return self.GPBMessage.ListFields()
         
         field_list = self.GPBMessage.ListFields()
         fnames=[]
@@ -970,7 +962,6 @@ class Wrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         try:
-            #result = self.GPBMessage.HasField(field_name)
             result = self.GPBMessage.HasField(field_name)
         except ValueError, ex:
             raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
@@ -980,11 +971,9 @@ class Wrapper(object):
 
     def HasField(self, field_name):
         log.warn('HasField is depricated because the name is confusing. Use IsFieldSet')
-        #return self.IsFieldSet(field_name)
         return self.IsFieldSet(field_name)
     
     def ClearField(self, field_name):
-        #if self.Invalid:
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
