@@ -57,15 +57,14 @@ class WorkBench(object):
         """  
         self._hashed_elements={}
       
-        
-    def init_repository(self, root_type=None, nickname=None):
+      
+    def create_repository(self, root_type=None, nickname=None):
         """
-        Initialize a new repository
-        Factory method for creating a repository - this is the responsibility
-        of the workbench.
-        @param root_type is the object type identifier for the object
+        New better method to initialize a repository.
+        The init_repository method returns both the repo and the root object.
+        This is awkward. Now that the repository has a root_object property, it
+        is better to just return the repository.
         """
-        
         repo = repository.Repository()
         repo._workbench = self
             
@@ -80,14 +79,14 @@ class WorkBench(object):
             try:
                 rootobj = repo.create_object(root_type)
             except object_utils.ObjectUtilException, ex:
-                raise WorkBenchError('Invalid root object type identifier passed in init_repository. Unrecognized type: "%s"' % str(root_type))
+                raise WorkBenchError('Invalid root object type identifier passed in create_repository. Unrecognized type: "%s"' % str(root_type))
         
             repo._workspace_root = rootobj
         
         elif root_type ==None:
             rootobj = None
         else:
-            raise WorkBenchError('Invalid root type argument passed in init_repository')
+            raise WorkBenchError('Invalid root type argument passed in create_repository')
         
         
         self.put_repository(repo)
@@ -95,7 +94,22 @@ class WorkBench(object):
         if nickname:
             self.set_repository_nickname(repo.repository_key, nickname)
         
-        return repo, rootobj
+        return repo
+      
+        
+    def init_repository(self, root_type=None, nickname=None):
+        """
+        Initialize a new repository
+        Factory method for creating a repository - this is the responsibility
+        of the workbench.
+        @param root_type is the object type identifier for the object
+        """
+        
+        log.warn('The init_repository method is depricated in favor of create_repository')
+        
+        repo = self.create_repository(root_type, nickname)
+        
+        return repo, repo.root_object
         
     def set_repository_nickname(self,repositorykey, nickname):
         # Should this throw an error if that nickname already exists?
@@ -131,7 +145,9 @@ class WorkBench(object):
                 raise WorkBenchError('Can not reference the current state of a repository which has been modified but not committed')
 
         # Create a new repository to hold this data object
-        repository, id_ref = self.init_repository(idref_type)
+        repository = self.create_repository(idref_type)
+        
+        id_ref = repository.root_object
         
         id_ref.key = repo.repository_key
         id_ref.branch = repo._current_branch.branchkey
@@ -573,7 +589,7 @@ class WorkBench(object):
     
             if head.type == self.MutableClassType:
             
-                # This is a pull or clone and we don't know the context here.
+                # This is a pull or push and we don't know the context here.
                 # Return the mutable head as the content and let the process
                 # operation figure out what to do with it!
                             
@@ -592,7 +608,7 @@ class WorkBench(object):
                     self._hashed_elements[item.key]=item
                 
                 # Create a new repository for the structure in the container
-                repo, none = self.init_repository()
+                repo = self.create_repository()
                     
                
                 # Load the object and set it as the workspace root

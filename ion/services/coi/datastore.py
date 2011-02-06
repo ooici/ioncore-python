@@ -215,9 +215,6 @@ class DataStoreService(ServiceProcess):
         
         yield defer.DeferredList(def_list)
         
-        print 'JDJDJDJDJDJDJDJDJDJD', self.b_store.kvs.keys()
-
-
         defer.returnValue(obj_dict.values())
         
         

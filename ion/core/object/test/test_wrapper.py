@@ -306,4 +306,93 @@ class RecurseCommitTest(unittest.TestCase):
         self.assertEqual(len(ab_se.ChildLinks),1)
         self.assertIn(p.MyId, ab_se.ChildLinks)
         
+    def test_dag_conflict(self):
+        
+        wb = workbench.WorkBench('No Process Test')
+            
+        repo = wb.create_repository(addresslink_type)
+        
+        repo.root_object.person.add()
+        repo.root_object.person[0] = repo.create_object(person_type)
+        repo.root_object.person[0].name = 'David'
+        repo.root_object.person[0].id = 5
+        
+        repo.root_object.person.add()
+        repo.root_object.person[1] = repo.create_object(person_type)
+        repo.root_object.person[1].name = 'David'
+        repo.root_object.person[1].id = 5
+        
+        p0 = repo.root_object.person[0]
+        p1 = repo.root_object.person[1]
+        
+        strct={}
+        repo.root_object.RecurseCommit(strct)
+        
+        
+        # The address link should now be unmodified
+        self.assertEqual(repo.root_object.Modified, False)
+        
+        # there should be only two objects once hashed!
+        self.assertEqual(len(strct.keys()), 2)
+        
+        # Show that the old references are now invalid
+        self.assertEqual(p0.Invalid, True)
+        self.assertEqual(p1.Invalid, True)
+        
+        # manually update the hashed elements...
+        wb._hashed_elements.update(strct)
+        
+        self.assertIn(repo.root_object.MyId, strct)
+        self.assertIn(repo.root_object.person[0].MyId, strct)
+        self.assertIn(repo.root_object.person[1].MyId, strct)
+            
+        self.assertIdentical(repo.root_object.person[0], repo.root_object.person[1])
+            
+        # Get the committed structure element
+        ab_se = strct.get(repo.root_object.MyId)
+            
+        # Show that the the SE recongnized only 1 child object
+        self.assertEqual(len(ab_se.ChildLinks),1)
+            
+        # There should be two parent links
+        self.assertEqual(len(repo.root_object.person[0].ParentLinks), 2)
+        
+        par1 = repo.root_object.person[0].ParentLinks.pop()
+        par2 = repo.root_object.person[0].ParentLinks.pop()
+        
+        # They are not identical - they came from a set, but they should be equal!
+        self.assertEqual(par1, par2)
+        
+        # Their root should be identical, the addresslink!
+        self.assertIdentical(par1.Root, repo.root_object)
+        self.assertIdentical(par1.Root, par2.Root)
+        
+        
+    def test_reset_same_value(self):
+        
+        wb = workbench.WorkBench('No Process Test')
+            
+        repo = wb.create_repository(addresslink_type)
+        
+        repo.root_object.person.add()
+        repo.root_object.person[0] = repo.create_object(person_type)
+        repo.root_object.person[0].name = 'David'
+        repo.root_object.person[0].id = 5
+        
+        repo.commit('Jokes on me')
+        
+        repo.root_object.person[0].name = 'David'
+        
+        self.assertEqual(repo.root_object.Modified, True)
+        
+        p0 = repo.root_object.person[0]
+        
+        repo.commit('Jokes on you!')
+
+        self.assertEqual(repo.root_object.Modified, False)
+        self.assertEqual(p0.Invalid, False)
+        self.assertEqual(p0.Modified, False)
+        
+        
+        
             

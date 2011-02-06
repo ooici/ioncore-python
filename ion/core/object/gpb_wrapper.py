@@ -423,7 +423,7 @@ class Wrapper(object):
         obj._child_links = set()
         obj._derived_wrappers={}
         obj._read_only = False
-        obj._myid = -1
+        obj._myid = '-1'
         obj._modified = True
         obj._invalid = False
         
@@ -732,20 +732,72 @@ class Wrapper(object):
         else:
             se.isleaf = False
             
-        
-        if repo._workspace.has_key(self.MyId):
+        # Done setting up the Sturcture Element
+        structure[se.key] = se
             
+        # This will be true for any object which is not a core object such as a commit
+        # We don't want to worry about what is in the workspace - that is the repositories job.
+        # if I am currently in the work space the commited version of me should be too!
+        if repo._workspace.has_key(self.MyId):
+            # Remove my old name
             del repo._workspace[self.MyId]
-            repo._workspace[se.key] = self
-
+            
+            # Now deal with some nastyness
+            # Possible DAG structure created by hash conflict - two wrappers of the same type with the same value in one data structure 
+            if se.key in repo._workspace:
+                
+                # Get the other object with the same name...
+                other = repo._workspace[se.key]
+                
+                # if the value of a field has been set to the same value again,
+                # it will be re serialized and re hashed. This is not a conflict!
+                if not other is self:
+                
+                    self.ParentLinks = set.union(self.ParentLinks, other.ParentLinks)
+                    
+                    # Here, we don't want to modify a parent if it is already correct.
+                    # The hash conflict provides a back door by which a parent, which is
+                    # already benn correctly committed might be modified if we are not careful
+                    for link in self.ParentLinks:
+                        if link.key != se.key:
+                            link.key = se.key
+                    
+                    msg = ''.join(['============================================='])
+                    msg.join(['''DAG structure created by hash conflict - two wrappers of the same type with the same value in one data structure./n
+                                This is not an error, but the state of this composite is now shared.'''])
+                    msg.join(['Shared Object: %s' % str(self)])
+                    msg.join(['Shared Parents:']) 
+                    for parent in self.ParentLinks:
+                        msg = msg.join(['Parent: %s' % str(parent)])
+                    msg.join(['Old references to the object are now invalid!'])
+                    #log.warn(msg)
+                    
+                    # Force the object to be reloaded from the workbench!
+                    del repo._workspace[se.key]
+                    other.Invalidate()
+                    self.Invalidate()
+                    
+                    # We are done - get outta here!
+                    return
+                
+            else:
+                repo._workspace[se.key] = self
+            
+        
         self.MyId = se.key
         self.Modified = False
        
         # Set the key value for parent links!
+        # This will only be reached once for a given child object. Set all parents
+        # now and the child will return as unmodified when the other parents ask it
+        # to recurse commit.
         for link in self.ParentLinks:
             link.key = self.MyId
             
-        structure[se.key] = se
+        
+        
+        
+
         
         
 
@@ -838,6 +890,7 @@ class Wrapper(object):
             
         if self.Modified:
             # Be clear about what we are doing here!
+            # If it has already been modified we are done.
             return
         else:
             

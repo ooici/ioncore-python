@@ -166,10 +166,16 @@ class Repository(object):
     upstream = property(_get_upstream, _set_upstream)
     
     def _get_root_object(self):
-        return self._workspace_root.resource_object
+        return self._workspace_root
         
     def _set_root_object(self, value):
-        self._workspace_root.resource_object = value
+        if not isinstance(value, gpb_wrapper.Wrapper):
+            raise RepositoryError('Can not set the root object of the repository to a value which is not an instance of Wrapper')
+    
+        if not value.Repository is self:
+            value = self._copy_from_other(value)
+
+        self._workspace_root = value
         
     root_object = property(_get_root_object, _set_root_object)
     
@@ -898,6 +904,43 @@ class Repository(object):
         return obj
         
         
+    def _copy_from_other(self, value):
+        """
+        Copy an object from another repository. This method will serialize any
+        content which is not already in the hashed objects. Then read it back in
+        as new objects in this repository. The objects must not already exist in
+        the current repository or it will return an error
+        """
+        if not isinstance(value, gpb_wrapper.Wrapper):
+            raise RepositoryError('Can not copy an object which is not an instance of Wrapper')    
+        
+        if not value.IsRoot:
+            # @TODO provide for transfer by serialization and re instantiation
+            raise RepositoryError('You can not copy only part of a gpb composite, only the root!')
+        
+        if value.Repository is self:
+            raise RepositoryError('Can not copy an object from the same repository')
+            
+        if value.ObjectType.object_id <= 1000 and value.ObjectType.object_id != 4:
+            # This is a core object other than an IDRef to another repository.
+            # Generally this should not happen...
+            log.warn('Copying core objects is not an error but unexpected results may occur.')
+            
+        structure={}
+        value.RecurseCommit(structure)
+        self._hashed_elements.update(structure)
+        
+        # Get the element from the hashed elements list
+        element = self._hashed_elements.get(value.MyId)
+        
+        obj = self._load_element(element)
+        self._workspace[obj.MyId] = obj
+        
+        self._load_links(obj)
+        
+        return obj
+    
+    
         
     def set_linked_object(self,link, value):        
         # If it is a link - set a link to the value in the wrapper
@@ -905,22 +948,14 @@ class Repository(object):
             raise RepositoryError('Can not set a composite field unless it is of type Link')
                     
         if not value.IsRoot == True:
-            raise RepositoryError('You can not set a link equal to part of a gpb composite!')
+            # @TODO provide for transfer by serialization and re instantiation
+            raise RepositoryError('You can not set a link equal to part of a gpb composite, only the root!')
+            
         
         # if this value is from another repository... you need to load it from the hashed objects into this repository
-        if not value.Repository.repository_key == self.repository_key:
+        if not value.Repository is self:
             
-            if value.Modified:
-                raise RepositoryError('Can not move objects from a foreign repository which are in a modified state. Commit before moving the object.')
-            
-            # Get the element from the hashed elements list
-            element = self._hashed_elements.get(value.MyId)
-            
-            obj = self._load_element(element)
-            
-            self._load_links(obj)
-            
-            value = obj
+            value = self._copy_from_other(value)
         
         
         if link.key == value.MyId:
