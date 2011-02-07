@@ -11,12 +11,13 @@ from twisted.trial import unittest
 from twisted.internet.defer import inlineCallbacks, Deferred, returnValue, DeferredQueue, DeferredLock
 from twisted.python import failure
 from txamqp.queue import Empty
-  
-  
-RABBITMQ = "RABBITMQ"
-OPENAMQ = "OPENAMQ"
-QPID = "QPID"
-  
+
+import ion
+from ion import ioninit
+from ion.util import ionlog
+
+CONF = ioninit.config(__name__)
+log = ionlog.getLogger(__name__)  
   
 USERNAME='guest'
 PASSWORD='guest'
@@ -29,13 +30,14 @@ class BrokerController:
     heartbeat = HEARTBEAT
   
     def __init__(self, *args, **kwargs):
-        self.host = 'localhost'
-        self.port = 5672
-        self.broker = None
-        self.spec = '/Users/brianfox/workspaces/ooici/ioncore-python/ion/../res/amqp/specs/standard/amqp0-8.xml'
-        self.user = USERNAME
-        self.password = PASSWORD
-        self.vhost = VHOST
+        self._privileged_broker = CONF.getValue('privileged_broker_connection')
+        self._amqp_spec = txamqp.spec.load(
+            os.path.join(
+                os.path.dirname(ion.__file__), 
+                "..", 
+                CONF.getValue('amqp_spec')
+            )
+        )
         self.queues = []
         self.exchanges = []
         self.connectors = []
@@ -48,10 +50,14 @@ class BrokerController:
         try:
             self.client = yield self._connect()
         except txamqp.client.Closed, le:
-            le.args = tuple(("Unable to connect to AMQP broker in order to run tests (perhaps due to auth failure?). " \
-                "The tests assume that an instance of the %s AMQP broker is already set up and that this test script " \
-                "can connect to it and use it as user '%s', password '%s', vhost '%s'." % ('',
-                    USERNAME, PASSWORD, VHOST),) + le.args)
+            mys = "failed to connect to amqp broker:\n \tusername: %s\n \tpassword: %s\n \thost: %s\n \tport: %s\n \tvhost: %s" % (
+                   str(self._privileged_broker['username']),
+                   str(self._privileged_broker['password']),
+                   str(self._privileged_broker['host']),
+                   str(self._privileged_broker['port']),
+                   str(self._privileged_broker['vhost'])
+                )
+            print mys
             raise
   
         self.channel = yield self.client.channel(1)
@@ -72,42 +78,30 @@ class BrokerController:
 
   
     @inlineCallbacks
-    def _connect(
-            self, 
-            host=None, 
-            port=None, 
-            spec=None, 
-            user=None, 
-            password=None, 
-            vhost=None,
-            heartbeat=None, 
-            clientClass=None
-    ):
-        host = host or self.host
-        port = port or self.port
-        spec = spec or self.spec
-        user = user or self.user
-        password = password or self.password
-        vhost = vhost or self.vhost
-        heartbeat = heartbeat or self.heartbeat
-        clientClass = clientClass or self.clientClass
+    def _connect(self): 
+        host = self._privileged_broker['host']
+        port = self._privileged_broker['port']
+        username = self._privileged_broker['username']
+        password = self._privileged_broker['password']
+        vhost = self._privileged_broker['vhost']
+        heartbeat = self._privileged_broker['heartbeat']
+        clientClass = self.clientClass
   
         delegate = TwistedDelegate()
         onConn = Deferred()
-        p = clientClass(delegate, vhost, txamqp.spec.load(spec), heartbeat=heartbeat)
+        p = clientClass(delegate, vhost, self._amqp_spec, heartbeat=heartbeat)
         f = protocol._InstanceFactory(reactor, p, onConn)
         c = reactor.connectTCP(host, port, f)
         def errb(thefailure):
             thefailure.trap(error.ConnectionRefusedError)
-            print "failed to connect to host: %s, port: %s; These tests are designed to run against a running instance" \
-                  " of the %s AMQP broker on the given host and port.  failure: %r" % (host, port, self.broker, thefailure,)
+            log.critical( "failed to connect to amqp broker:\n\tusername: %s\n\tpassword: %s\n\thost: %s\n\tport: %s\n\tvhost: %s" % (username, password, host, port, self.broker, self.vhost))
             thefailure.raiseException()
         onConn.addErrback(errb)
   
         self.connectors.append(c)
         client = yield onConn
   
-        yield client.authenticate(user, password)
+        yield client.authenticate(username, password)
         returnValue(client)
   
     @inlineCallbacks
@@ -152,34 +146,3 @@ class BrokerController:
         reply = yield self.channel.basic_consume(queue=queueName, no_ack=True)
         returnValue((yield self.client.queue(reply.consumer_tag)))
   
-    @inlineCallbacks
-    def assertEmpty(self, queue):
-        """Assert that the queue is empty"""
-        try:
-            yield queue.get(timeout=1)
-            self.fail("Queue is not empty.")
-        except Empty: None              # Ignore
-  
-    @inlineCallbacks
-    def assertPublishGet(self, queue, exchange="", routing_key="", properties=None):
-        """
-        Publish to exchange and assert queue.get() returns the same message.
-        """
-        body = self.uniqueString()
-        self.channel.basic_publish(exchange=exchange,
-                                   content=Content(body, properties=properties),
-                                   routing_key=routing_key)
-        msg = yield queue.get(timeout=1)
-        self.assertEqual(body, msg.content.body)
-        if (properties): self.assertEqual(properties, msg.content.properties)
-  
-    def uniqueString(self):
-        """Generate a unique string, unique for this TestBase instance"""
-        if not "uniqueCounter" in dir(self): self.uniqueCounter = 1;
-        return "Test Message " + str(self.uniqueCounter)
-  
-    @inlineCallbacks
-    def consume(self, queueName):
-        """Consume from named queue returns the Queue object."""
-        reply = yield self.channel.basic_consume(queue=queueName, no_ack=True)
-        returnValue((yield self.client.queue(reply.consumer_tag)))
