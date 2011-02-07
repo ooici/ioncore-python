@@ -14,6 +14,10 @@ from zope.interface import implements
 
 from twisted.internet import defer
 
+# Useful for inspecting binary content
+import binascii
+# print binascii.b2a_hex(blob)
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -151,15 +155,8 @@ class IndexStore(object):
         """
         @see IStore.put
         """
-        
-        log.info( 'PUTTING KEY: type %s, value: %s' % (type(key), str(key)))
-        log.info('PUTTING VALUE: type %s, value: %s' % (type(value), str(value)))
-        
         for k,v in index_attributes.items():
-            print 'Index KEY: type %s, value: %s' % (type(k), k)
-            print 'Index Value: type %s, value: %s' % (type(v), v)
-
-
+            
             kindex = self.indices.get(k, None)
             if not kindex:
                 kindex = {}
@@ -204,9 +201,6 @@ class IndexStore(object):
             # This is stupid, but now remove effectively works - delete keys are no longer visible!
             if self.kvs.has_key(k):
                 result[k] = self.kvs.get(k)
-            print 'Getting KEY: type %s, value: %s' % (type(k), k)
-            print 'Getting VALUE: type %s, value: %s' % (type(result[k]), result[k])
-                
                 
         return result
         

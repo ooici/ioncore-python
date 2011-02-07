@@ -21,6 +21,8 @@ from ion.core.object import gpb_wrapper
 from ion.core.data import store
 from ion.core.data import cassandra
 
+import binascii
+
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
@@ -137,28 +139,18 @@ class DataStoreService(ServiceProcess):
             blob = yield self.m_store.get(repo_key)
             # if the store has a version of the repo - then load it
             if blob:
-                print 'DLDLDLDLDLDLDLDLDDLDL'
                 store_head = gpb_wrapper.StructureElement.parse_structure_element(blob)
                 self.workbench._hashed_elements[store_head.key]=store_head
                 
-                print 'OPOOPOPOPOOPOOPOPOPOPOPOPOP'
                 # Get the commits using the query interface
                 blobs = yield self.c_store.query({self.CommitIndexName:repo_key})
                     
-                print 'LEN KVS == ', len(self.c_store.kvs)
-
-                print 'KVS', self.c_store.kvs
-                    
-                print 'INDICES', self.c_store.indices
-                    
-                print 'ERERERERERERERERERERERER'
-                    
-                for blob in blobs:
-                    print 'BLOB: type %s; value: "%s"' % (type(blob), blob)
+                for key, blob in blobs.items():
+                    #print 'BLOB key: "%s"; value: "%s"' % (binascii.b2a_hex(key), binascii.b2a_hex(blob))
                     wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                    assert key == wse.key, 'Calculated key does not match the stored key!'
                     store_commits[wse.key] = wse
                     
-                print 'GIGIGIIGIGIGIGIGIGIGIGIGGIGI'
                     
                 # Load these commits into the workbench
                 self.workbench._hashed_elements.update(store_commits)
@@ -186,16 +178,15 @@ class DataStoreService(ServiceProcess):
             for key in repo._commit_index.keys():
                 if not key in store_commits:
                     wse = self.workbench._hashed_elements.get(key)
-                    print 'STORING Key: "%s"; BLOB: "%s"' % (key, wse.serialize())
+                    
+                    mystr = binascii.b2a_hex(wse.serialize())
                     defd = self.c_store.put(key = key,
                                            value = wse.serialize(),
                                            index_attributes = {self.CommitIndexName : str(repo_key)})
                     def_list.append(defd)
             
         yield defer.DeferredList(def_list)
-        
-        print 'LEN KVS == ', len(self.c_store.kvs)
-        
+            
         def_list = []
         # Now put the mutable heads
         for repo_key in pushed_repos.keys():
