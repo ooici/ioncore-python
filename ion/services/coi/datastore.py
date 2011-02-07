@@ -202,8 +202,41 @@ class DataStoreService(ServiceProcess):
                 
         
     @defer.inlineCallbacks
-    def op_pull(self, *args):
-        yield self.workbench.op_pull(*args)
+    def op_pull(self, content, headers, msg):
+        """
+        Content is a string - the name of a mutable head for a repository
+        """
+        repo_key = str(content)
+        
+        store_commits ={}
+        
+        blob = yield self.m_store.get(repo_key)
+        # if the store has a version of the repo - then load it
+        if blob:
+            store_head = gpb_wrapper.StructureElement.parse_structure_element(blob)
+            self.workbench._hashed_elements[store_head.key]=store_head
+                
+            # Get the commits using the query interface
+            blobs = yield self.c_store.query({self.CommitIndexName:repo_key})
+                
+            for key, blob in blobs.items():
+                #print 'BLOB key: "%s"; value: "%s"' % (binascii.b2a_hex(key), binascii.b2a_hex(blob))
+                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                assert key == wse.key, 'Calculated key does not match the stored key!'
+                store_commits[wse.key] = wse
+                    
+                    
+                # Load these commits into the workbench
+                self.workbench._hashed_elements.update(store_commits)
+                    
+                repo = self.workbench._load_repo_from_mutable(store_head)
+                    
+                # Check to make sure the mutable is upto date with the commits...
+                for commit_key in store_commits.keys():
+                    if not commit_key in repo._commit_index:
+                        raise DataStoreError('Can not handle divergence yet...')
+        
+        yield self.workbench.op_pull(content, headers, msg)
         
     @defer.inlineCallbacks
     def op_fetch_linked_objects(self, elements, headers, message):
