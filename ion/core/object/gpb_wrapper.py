@@ -9,13 +9,11 @@ Finish test of new Invalid methods using weakrefs - make sure it is deleted!
 """
 
 from ion.util import procutils as pu
-
+from ion.util.cache import memoize
 from ion.core.object.object_utils import get_type_from_obj, sha1bin, sha1hex, sha1_to_hex, ObjectUtilException, create_type_identifier
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-
-import struct
 
 from google.protobuf import message
 from google.protobuf.internal import containers
@@ -31,7 +29,113 @@ class OOIObjectError(Exception):
     """
     An exception class for errors that occur in the Object Wrapper class
     """
-    
+
+class WrappedProperty(object):
+    """ Data descriptor (like a property) for passing through GPB properties from the Wrapper. """
+
+    def __init__(self, wrapper, name, doc=None):
+        self.wrapper = wrapper
+        self.name = name
+        if doc: self.__doc__ = doc
+        
+    def __get__(self, wrapper, objtype=None):
+        if wrapper._invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+        # This may be the result we were looking for, in the case of a simple scalar field
+        field = getattr(wrapper.GPBMessage, self.name)
+
+        # Or it may be something more complex that we need to operate on...
+        if isinstance(field, containers.RepeatedScalarFieldContainer):
+            result = ScalarContainerWrapper.factory(wrapper, field)
+        elif isinstance(field, containers.RepeatedCompositeFieldContainer):
+            result = ContainerWrapper.factory(wrapper, field)
+        elif isinstance(field, message.Message):
+            result = wrapper._rewrap(field)
+
+            if result.ObjectType == wrapper.LinkClassType:
+                result = wrapper.Repository.get_linked_object(result)
+        else:
+            # Probably bad that the common case comes last!
+            result = field
+
+        return result
+
+    def __set__(self, wrapper, value):
+        if wrapper._invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+        if wrapper.ReadOnly:
+            raise OOIObjectError('This object wrapper is read only!')
+
+        # If the value we are setting is a Wrapper Object
+        if isinstance(value, Wrapper):
+            if value._invalid:
+                raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+            # get the callable and call it!
+            wrapper.SetLinkByName(self.name, value)
+        else:
+            setattr(wrapper.GPBMessage, self.name, value)
+
+        # Set this object and it parents to be modified
+        wrapper._set_parents_modified()
+
+        return None
+
+class WrappedEnum(object):
+    """ Data descriptor (like a property) for passing through GPB enums from the Wrapper. """
+
+    def __init__(self, val, doc=None):
+        self.val = val
+        if doc: self.__doc__ = doc
+
+    def __get__(self, obj, objtype=None):
+        return self.val
+
+    def __set__(self, obj, value):
+        raise AttributeError('Enums are read-only.')
+
+class WrapperType(type):
+    """
+    Metaclass that automatically generates subclasses of Wrapper with corresponding enums and
+    pass-through properties for each field in the protobuf descriptor.
+    """
+
+    _type_cache = {}
+
+    def __call__(cls, gpbMessage, *args, **kwargs):
+        # Cache the custom-built classes
+        msgType, clsType = type(gpbMessage), None
+
+        if msgType in WrapperType._type_cache:
+            clsType = WrapperType._type_cache[msgType]
+        else:
+            clsName = '%s_%s' % (cls.__name__, msgType.__name__)
+            clsDict = {}
+
+            # Now setup the properties to map through to the GPB object
+            descriptor = msgType.DESCRIPTOR
+            fieldNames = descriptor.fields_by_name.keys()
+
+            for fieldName in fieldNames:
+                fieldType = getattr(msgType, fieldName)
+                prop = WrappedProperty(cls, fieldName, doc=fieldType.__doc__)
+                clsDict[fieldName] = prop
+
+            clsType = WrapperType.__new__(WrapperType, clsName, (cls,), clsDict)
+
+            # Also set the enum descriptors _after_ building the class so the descriptor doesn't go away
+            if hasattr(descriptor, 'enum_values_by_name'):
+                for k,v in descriptor.enum_values_by_name.iteritems():
+                    setattr(clsType, k, WrappedEnum(v.number))
+
+            WrapperType._type_cache[msgType] = clsType
+
+        # Finally allow the instantiation to occur, but slip in our new class type
+        obj = super(WrapperType, clsType).__call__(gpbMessage, *args, **kwargs)
+        return obj
+
 class Wrapper(object):
     '''
     A Wrapper class for intercepting access to protocol buffers message fields.
@@ -64,6 +168,8 @@ class Wrapper(object):
     
     
     '''
+
+    __metaclass__ = WrapperType
         
     LinkClassType = create_type_identifier(object_id=3, version=1)
         
@@ -78,7 +184,7 @@ class Wrapper(object):
         A list of fields names empty for now... so that we can use getter/setters
         on the data elements of the wrapped proto buffer
         """
-        
+
         object.__setattr__(self,'_invalid',False)
         """
         Use this field to invalidate a message wrapper when it should be deleted.
@@ -98,7 +204,7 @@ class Wrapper(object):
         for enum_type in self._GPBClass.DESCRIPTOR.enum_types:
             for enum_value in enum_type.values:
                 field_names.append(enum_value.name)
-        
+
         try:
             self._gpb_type = get_type_from_obj(gpbMessage)
         except ObjectUtilException, re:
@@ -152,16 +258,16 @@ class Wrapper(object):
         
         self._repository = None # only exists in the root object
         """
-        Need to cary a reference to the repository I am in.
+        Need to carry a reference to the repository I am in.
         """
         
         # Now set the fields from that GPB to preempt getter/setter!
         self._gpbFields = field_names
-                
-        
+
+
     @property
     def Invalid(self):
-        return object.__getattribute__(self,'_invalid')
+        return self._invalid
     
     def Invalidate(self):
         if self.IsRoot:
@@ -183,20 +289,20 @@ class Wrapper(object):
     @property
     def ObjectClass(self):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         
         #return self._GPBClass
-        return object.__getattribute__(self,'_GPBClass')
+        return self._GPBClass
     
     @property
     def DESCRIPTOR(self):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         
         #return self._gpbMessage.DESCRIPTOR
-        return object.__getattribute__(self,'_gpbMessage').DESCRIPTOR
+        return self._gpbMessage.DESCRIPTOR
         
     @property
     def Root(self):
@@ -204,10 +310,10 @@ class Wrapper(object):
         Access to the root object of the nested GPB object structure
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         #return self._root
-        return object.__getattribute__(self,'_root')
+        return self._root
     
     @property
     def IsRoot(self):
@@ -216,9 +322,9 @@ class Wrapper(object):
         GPBs are also tree structures and each element must be wrapped
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self is object.__getattribute__(self,'_root')
+        return self is self._root
     
     @property
     def ObjectType(self):
@@ -226,10 +332,10 @@ class Wrapper(object):
         Could just replace the attribute with the capital name?
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         #return self._gpb_type
-        return object.__getattribute__(self,'_gpb_type')
+        return self._gpb_type
     
     @property
     def GPBMessage(self):
@@ -237,52 +343,52 @@ class Wrapper(object):
         Could just replace the attribute with the capital name?
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         # If this is a proxy object which references its serialized value load it!
         
         #bytes = self._bytes
-        bytes = object.__getattribute__(self,'_bytes')
+        bytes = self._bytes
         if  bytes != None:
             #self.ParseFromString(bytes)
-            pfs = object.__getattribute__(self,'ParseFromString')
+            pfs = self.ParseFromString
             pfs(bytes)
             #self._bytes = None
             object.__setattr__(self,'_bytes', None)
             
         #return self._gpbMessage
-        return object.__getattribute__(self,'_gpbMessage')
+        return self._gpbMessage
         
     @property
     def Repository(self):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        root = object.__getattribute__(self,'Root')
-        return object.__getattribute__(root,'_repository')
+        root = self.Root
+        return root._repository
     
     @property
     def DerivedWrappers(self):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        root = object.__getattribute__(self,'Root')
-        return object.__getattribute__(root,'_derived_wrappers')
+        root = self.Root
+        return root._derived_wrappers
     
     def _get_myid(self):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        root = object.__getattribute__(self,'Root')
-        return object.__getattribute__(root,'_myid')
+        root = self.Root
+        return root._myid
     
     def _set_myid(self,value):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         assert isinstance(value, str), 'myid is a string property'
-        root = object.__getattribute__(self,'Root')
+        root = self.Root
         object.__setattr__(root,'_myid', value)
 
     MyId = property(_get_myid, _set_myid)
@@ -293,19 +399,19 @@ class Wrapper(object):
         A list of all the wrappers which link to me
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        root = object.__getattribute__(self,'Root')
-        return object.__getattribute__(root,'_parent_links')
+        root = self.Root
+        return root._parent_links
         
     def _set_parent_links(self,value):
         """
         A list of all the wrappers which link to me
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        root = object.__getattribute__(self,'Root')
+        root = self.Root
         object.__setattr__(root,'_parent_links', value)
 
     ParentLinks = property(_get_parent_links, _set_parent_links)
@@ -315,53 +421,53 @@ class Wrapper(object):
         A list of all the wrappers which I link to
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        root = object.__getattribute__(self,'Root')
-        return object.__getattribute__(root,'_child_links')
+        root = self.Root
+        return root._child_links
         
     def _set_child_links(self, value):
         """
         A list of all the wrappers which I link to
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        root = object.__getattribute__(self,'Root')
+        root = self.Root
         object.__setattr__(root,'_child_links', value)
         
     ChildLinks = property(_get_child_links, _set_child_links)
         
     def _get_readonly(self):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        root = object.__getattribute__(self,'Root')
-        return object.__getattribute__(root,'_read_only')
+        root = self.Root
+        return root._read_only
         
     def _set_readonly(self,value):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         assert isinstance(value, bool), 'readonly is a boolen property'
-        root = object.__getattribute__(self,'Root')
+        root = self.Root
         object.__setattr__(root,'_read_only', value)
 
     ReadOnly = property(_get_readonly, _set_readonly)
     
     def _get_modified(self):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        root = object.__getattribute__(self,'Root')
-        return object.__getattribute__(root,'_modified')
+        root = self.Root
+        return root._modified
 
     def _set_modified(self,value):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         assert isinstance(value, bool), 'modified is a boolen property'
-        root = object.__getattribute__(self,'Root')
+        root = self.Root
         object.__setattr__(root,'_modified',value)
 
     Modified = property(_get_modified, _set_modified)
@@ -369,39 +475,39 @@ class Wrapper(object):
     
     def SetLink(self,value):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         if not self.ObjectType == self.LinkClassType:
             raise OOIObjectError('Can not set link for non link type!')
             
-        object.__getattribute__(self,'Repository').set_linked_object(self,value)
-        if not object.__getattribute__(self,'Modified'):
+        self.Repository.set_linked_object(self,value)
+        if not self.Modified:
             #self._set_parents_modified()
-            object.__getattribute__(self,'_set_parents_modified')()
+            self._set_parents_modified()
             
         
     def SetLinkByName(self,linkname,value):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         #link = self.GetLink(linkname)
-        link = object.__getattribute__(self,'GetLink')(linkname)
+        link = self.GetLink(linkname)
         #link.SetLink(value)
-        object.__getattribute__(link,'SetLink')(value)
+        link.SetLink(value)
         
     def GetLink(self,linkname):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         
-        gpb = object.__getattribute__(self,'GPBMessage')
+        gpb = self.GPBMessage
         link = getattr(gpb,linkname)
         #link = self._rewrap(link)
-        link = object.__getattribute__(self,'_rewrap')(link)
+        link = self._rewrap(link)
         
-        if not object.__getattribute__(link,'ObjectType') == object.__getattribute__(self,'LinkClassType'):
+        if not link.ObjectType == self.LinkClassType:
             raise OOIObjectError('The field "%s" is not a link!' % linkname)
         return link
          
@@ -410,14 +516,14 @@ class Wrapper(object):
         Check recursively to make sure the object is not already its own parent!
         '''
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
-        for item in object.__getattribute__(self,'ParentLinks'):
-            if object.__getattribute__(item,'Root') is value:
+        for item in self.ParentLinks:
+            if item.Root is value:
                 return True
             # if item.InParents(value):
-            if object.__getattribute__(item, 'InParents')(value):
+            if item.InParents(value):
                 return True
         return False
     
@@ -426,28 +532,28 @@ class Wrapper(object):
         Set these objects to be read only
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         object.__setattr__(self, 'read_only',True)
-        for link in object.__getattribute__(self, 'ChildLinks'):
-            child = object.__getattribute__(self,'Repository').get_linked_object(link)
+        for link in self.ChildLinks:
+            child = self.Repository.get_linked_object(link)
             child.SetStructureReadOnly()
-            object.__getattribute__(child,'SetStructureReadOnly')()
+            child.SetStructureReadOnly()
         
     def SetStructureReadWrite(self):
         """
         Set these object to be read write!
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         object.__setattr__(self, 'read_only',False)
-        for link in object.__getattribute__(self, 'ChildLinks'):
-            child = object.__getattribute__(self,'Repository').get_linked_object(link)
+        for link in self.ChildLinks:
+            child = self.Repository.get_linked_object(link)
             #child.SetStructureReadWrite()
-            object.__getattribute__(child,'SetStructureReadWrite')()
+            child.SetStructureReadWrite()
 
     def RecurseCommit(self,structure):
         """
@@ -455,17 +561,17 @@ class Wrapper(object):
         to commit this wrapper and reset all the links using its CAS name.
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
-        if not  object.__getattribute__(self,'Modified'):
+        if not  self.Modified:
             # This object is already committed!
             return
         
         # Create the Structure Element in which the binary blob will be stored
         se = StructureElement()        
-        repo = object.__getattribute__(self,'Repository')
-        for link in  object.__getattribute__(self,'ChildLinks'):
+        repo = self.Repository
+        for link in  self.ChildLinks:
                         
             # Test to see if it is already serialized!
             
@@ -479,7 +585,7 @@ class Wrapper(object):
                 child = repo.get_linked_object(link)
                 
                 # Determine whether this is a leaf node
-                if len(object.__getattribute__(child,'ChildLinks'))==0:
+                if len(child.ChildLinks)==0:
                     link.isleaf = True
                 else:
                     link.isleaf = False
@@ -493,14 +599,14 @@ class Wrapper(object):
         #se.key = sha1hex(se.value)
 
         # Structure element wrapper provides for setting type!
-        se.type = object.__getattribute__(self,'ObjectType')
+        se.type = self.ObjectType
         
         # Calculate the sha1 from the serialized value and type!
         # Sha1 is a property - not a method...
         se.key = se.sha1
         
         # Determine whether I am a leaf
-        if len(object.__getattribute__(self,'ChildLinks'))==0:
+        if len(self.ChildLinks)==0:
             se.isleaf=True
         else:
             se.isleaf = False
@@ -516,9 +622,9 @@ class Wrapper(object):
         object.__setattr__(self,'Modified',False)
        
         # Set the key value for parent links!
-        for link in object.__getattribute__(self,'ParentLinks'):
+        for link in self.ParentLinks:
             # Can not use object.__setattr__ on gpb fields!
-            link.key = object.__getattribute__(self,'MyId')
+            link.key = self.MyId
             
         structure[se.key] = se
         
@@ -530,10 +636,10 @@ class Wrapper(object):
         All of the objects worked on in this method are raw proto buffers messages!
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
-        gpb = object.__getattribute__(self,'GPBMessage')
+        gpb = self.GPBMessage
         # For each field in the protobuffer message
         for field in gpb.DESCRIPTOR.fields:
             # if the field is a composite - another message
@@ -550,7 +656,7 @@ class Wrapper(object):
                         
                         wrapped_item = self._rewrap(item)
                         if wrapped_item.ObjectType == wrapped_item.LinkClassType:
-                            object.__getattribute__(self,'ChildLinks').add(wrapped_item)
+                            self.ChildLinks.add(wrapped_item)
                         else:
                             wrapped_item.FindChildLinks()
                                 
@@ -561,20 +667,20 @@ class Wrapper(object):
                         # it can not hold any links!
                         continue
                     
-                    rr= object.__getattribute__(self,'_rewrap')
+                    rr= self._rewrap
                     item = rr(gpb_field)
-                    if object.__getattribute__(item,'ObjectType') == object.__getattribute__(item,'LinkClassType'):
-                        object.__getattribute__(self,'ChildLinks').add(item)
+                    if item.ObjectType == item.LinkClassType:
+                        self.ChildLinks.add(item)
                     else:
-                        fcl = object.__getattribute__(item,'FindChildLinks')
+                        fcl = item.FindChildLinks
                         fcl()
     
     def AddParentLink(self, link):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
-        for parent in object.__getattribute__(self,'ParentLinks'):
+        for parent in self.ParentLinks:
             
             if parent.GPBMessage is link.GPBMessage:
                 break
@@ -588,11 +694,11 @@ class Wrapper(object):
         shared variables as the parent wrapper
         '''
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         # Check the root wrapper objects list of derived wrappers
         objhash = gpbMessage.__hash__()
-        dw = object.__getattribute__(self,'DerivedWrappers')
+        dw = self.DerivedWrappers
         if objhash in dw:
             return dw[objhash]
         
@@ -604,97 +710,6 @@ class Wrapper(object):
         dw[objhash] = inst
         
         return inst
-
-    def __getattribute__(self, key):
-        
-        #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
-            if key == 'Invalid':
-                return True
-            else:
-                raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-                
-        # Because we have over-riden the default getattribute we must be extremely
-        # careful about how we use it!
-        gpbfields = object.__getattribute__(self,'_gpbFields')
-        
-        if key in gpbfields:
-            
-            # If it is a Field defined by the gpb...
-            gpb = object.__getattribute__(self,'GPBMessage')
-            
-            # This may be the result we were looking for, in the case of a simple
-            # scalar field
-            field = getattr(gpb,key)
-            
-            # Or it may be something more complex that we need to operate on...        
-            if isinstance(field, containers.RepeatedScalarFieldContainer):
-                result = ScalarContainerWrapper.factory(self, field)
-                
-            elif isinstance(field, containers.RepeatedCompositeFieldContainer):
-                result = ContainerWrapper.factory(self, field)
-                
-            elif isinstance(field, message.Message):
-                result = self._rewrap(field)
-                
-                if object.__getattribute__(result,'ObjectType') == object.__getattribute__(self,'LinkClassType'):
-                    result = object.__getattribute__(self,'Repository').get_linked_object(result)
-            else:
-                # Probably bad that the common case comes last!
-                result = field
-                
-        else:
-            # If it is a attribute of this class, use the base class's getattr
-            try:
-                result = object.__getattribute__(self, key)
-            except AttributeError, ex:                
-                raise OOIObjectError(
-                '''"Wrapper" object for GPB class "%s"; has no attribute "%s"''' 
-                % (self._GPBClass, key))
-        
-        return result
-
-    def __setattr__(self,key,value):
-
-        #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
-            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-            
-        gpbfields = object.__getattribute__(self,'_gpbFields')
-        
-        if key in gpbfields:
-            # If it is a Field defined by the gpb...
-            if object.__getattribute__(self,'ReadOnly'):
-                raise OOIObjectError('This object wrapper is read only!')
-                        
-            gpb = object.__getattribute__(self,'GPBMessage')
-
-            # If the value we are setting is a Wrapper Object
-            if isinstance(value, Wrapper):
-                    
-                if object.__getattribute__(value,'_invalid'):
-                    raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-                    
-                # get the callable and call it!
-                #self.SetLinkByName(key,value)
-                object.__getattribute__(self,'SetLinkByName')(key,value)
-                    
-            else:
-                
-                setattr(gpb, key, value)
-                
-            # Set this object and it parents to be modified
-            #self._set_parents_modified()
-            object.__getattribute__(self,'_set_parents_modified')()
-                
-        else:
-            try:
-                v = object.__setattr__(self, key, value)
-            except AttributeError, ex:
-                
-                raise OOIObjectError(
-                '''"Wrapper" object for GPB class "%s"; has no attribute "%s"''' 
-                % (self._GPBClass, key))
         
     def _set_parents_modified(self):
         """
@@ -702,10 +717,10 @@ class Wrapper(object):
         All links are reset as they are no longer hashed values
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
-        if object.__getattribute__(self,'Modified'):
+        if self.Modified:
             # Be clear about what we are doing here!
             return
         else:
@@ -713,7 +728,7 @@ class Wrapper(object):
             object.__setattr__(self,'Modified', True)
             
             # Get the repository            
-            repo = object.__getattribute__(self,'Repository')
+            repo = self.Repository
             
             new_id = repo.new_id()
             repo._workspace[new_id] = self.Root
@@ -723,22 +738,22 @@ class Wrapper(object):
             object.__setattr__(self,'MyId', new_id)
               
             # When you hit the commit ref - stop!                   
-            if object.__getattribute__(self,'Root') is repo._workspace_root:
+            if self.Root is repo._workspace_root:
                 # The commit is no longer really your parent!
                 object.__setattr__(self,'ParentLinks',set())
                 
             else:
                 
-                for link in object.__getattribute__(self,'ParentLinks'):
+                for link in self.ParentLinks:
                     # Tricky - set the message directly and call modified!
                     #link.GPBMessage.key = self.MyId
-                    object.__getattribute__(link,'GPBMessage').key = self.MyId
+                    link.GPBMessage.key = self.MyId
                     #link._set_parents_modified()
-                    object.__getattribute__(link,'_set_parents_modified')()
+                    link._set_parents_modified()
             
     def __eq__(self, other):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         if not isinstance(other, Wrapper):
@@ -747,7 +762,7 @@ class Wrapper(object):
         if self is other:
             return True
         
-        return object.__getattribute__(self,'GPBMessage') == object.__getattribute__(other,'GPBMessage')
+        return self.GPBMessage == other.GPBMessage
     
     def __ne__(self, other):
         # Can't just say self != other_msg, since that would infinitely recurse. :)
@@ -755,7 +770,7 @@ class Wrapper(object):
     
     def __str__(self):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         if self.ObjectType == self.LinkClassType:
@@ -784,11 +799,11 @@ class Wrapper(object):
         required fields are set).
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         #return self.GPBMessage.IsInitialized()
-        return object.__getattribute__(self,'GPBMessage').IsInitialized()
+        return self.GPBMessage.IsInitialized()
         
     def SerializeToString(self):
         """Serializes the protocol message to a binary string.
@@ -801,20 +816,20 @@ class Wrapper(object):
           message.EncodeError if the message isn't initialized.
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         #return self.GPBMessage.SerializeToString()
-        return object.__getattribute__(self,'GPBMessage').SerializeToString()
+        return self.GPBMessage.SerializeToString()
     
     def ParseFromString(self, serialized):
         """Clear the message and read from serialized."""
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
 
         # Do not use the GPBMessage method - it will recurse!
         #self._gpbMessage.ParseFromString(serialized)
-        object.__getattribute__(self,'_gpbMessage').ParseFromString(serialized)
+        self._gpbMessage.ParseFromString(serialized)
         
     def ListSetFields(self):
         """Returns a list of (FieldDescriptor, value) tuples for all
@@ -823,19 +838,24 @@ class Wrapper(object):
         it contains at least one element.  The fields are ordered by field
         number"""
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         #return self.GPBMessage.ListFields()
-        return object.__getattribute__(self,'GPBMessage').ListFields()
+        
+        field_list = self.GPBMessage.ListFields()
+        fnames=[]
+        for desc, val in field_list:
+            fnames.append(desc.name)
+        return fnames
 
     def IsFieldSet(self, field_name):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         try:
             #result = self.GPBMessage.HasField(field_name)
-            result = object.__getattribute__(self,'GPBMessage').HasField(field_name)
+            result = self.GPBMessage.HasField(field_name)
         except ValueError, ex:
             raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
                     (str(self.ObjectClass), field_name))
@@ -845,14 +865,14 @@ class Wrapper(object):
     def HasField(self, field_name):
         log.warn('HasField is depricated because the name is confusing. Use IsFieldSet')
         #return self.IsFieldSet(field_name)
-        return object.__getattribute__(self,'IsFieldSet')(field_name)
+        return self.IsFieldSet(field_name)
     
     def ClearField(self, field_name):
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
-        GPBMessage = object.__getattribute__(self,'GPBMessage')
+        GPBMessage = self.GPBMessage
             
         #if not GPBMessage.IsFieldSet(field_name):
         #    # Nothing to clear
@@ -897,17 +917,17 @@ class Wrapper(object):
         """
         Helper method for ClearField
         """
-        if object.__getattribute__(self,'ObjectType') == object.__getattribute__(self,'LinkClassType'):
-            child_obj = object.__getattribute__(self,'Repository').get_linked_object(self)
+        if self.ObjectType == self.LinkClassType:
+            child_obj = self.Repository.get_linked_object(self)
             # Remove this link from the list of parents
-            object.__getattribute__(child_obj,'ParentLinks').remove(self)
+            child_obj.ParentLinks.remove(self)
                 
             # This is the only one, remove it as a child
-            object.__getattribute__(self,'ChildLinks').remove(self)
+            self.ChildLinks.remove(self)
             
-        for field_name in object.__getattribute__(self,'DESCRIPTOR').fields_by_name.keys():
+        for field_name in self.DESCRIPTOR.fields_by_name.keys():
             # Recursively remove all 
-            object.__getattribute__(self,'ClearField')(field_name)
+            self.ClearField(field_name)
         
     #def HasExtension(self, extension_handle):
     #    return self.GPBMessage.HasExtension(extension_handle)
@@ -920,9 +940,9 @@ class Wrapper(object):
         Recursively calls ByteSize() on all contained messages.
         """
         #if self.Invalid:
-        if object.__getattribute__(self,'_invalid'):
+        if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return object.__getattribute__(self,'GPBMessage').ByteSize()
+        return self.GPBMessage.ByteSize()
     
     
     
@@ -940,17 +960,17 @@ class ContainerWrapper(object):
         if not isinstance(gpbcontainer, containers.RepeatedCompositeFieldContainer):
             raise OOIObjectError('The Container Wrapper is only for use with Repeated Composit Field Containers')
         self._gpbcontainer = gpbcontainer
-        self.Repository = object.__getattribute__(wrapper,'Repository')
+        self.Repository = wrapper.Repository
 
     @classmethod
     def factory(cls, wrapper, gpbcontainer):
         
         # Check the root wrapper objects list of derived wrappers before making a new one
-        if object.__getattribute__(wrapper,'_invalid'):
+        if wrapper._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         objhash = gpbcontainer.__hash__()
-        dw = object.__getattribute__(wrapper,'DerivedWrappers')
+        dw = wrapper.DerivedWrappers
         if dw.has_key(objhash):
             return dw[objhash]
         
@@ -966,13 +986,13 @@ class ContainerWrapper(object):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
 
-        return object.__getattribute__(self._wrapper,'Root')
+        return self._wrapper.Root
 
     @property
     def Invalid(self):
         if not self._wrapper:
             return True
-        return object.__getattribute__(self._wrapper,'_invalid')
+        return self._wrapper._invalid
     
     def Invalidate(self):
         self._gpbcontainer = None
@@ -989,13 +1009,13 @@ class ContainerWrapper(object):
             raise OOIObjectError('To set an item in a repeated field container, the value must be a Wrapper')
         
         item = self._gpbcontainer.__getitem__(key)
-        item = object.__getattribute__(self._wrapper,'_rewrap')(item)
-        if object.__getattribute__(item,'ObjectType') == self.LinkClassType:
+        item = self._wrapper._rewrap(item)
+        if item.ObjectType == self.LinkClassType:
             self.Repository.set_linked_object(item, value)
         else:
             raise OOIObjectError('It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
          
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
+        self._wrapper._set_parents_modified()
          
         
     def SetLink(self,key,value):
@@ -1007,13 +1027,13 @@ class ContainerWrapper(object):
             raise OOIObjectError('To set an item in a repeated field container, the value must be a Wrapper')
         
         item = self._gpbcontainer.__getitem__(key)
-        item = object.__getattribute__(self._wrapper,'_rewrap')(item)
-        if object.__getattribute__(item,'ObjectType') == self.LinkClassType:
+        item = self._wrapper._rewrap(item)
+        if item.ObjectType == self.LinkClassType:
             self.Repository.set_linked_object(item, value)
         else:
             raise OOIObjectError('It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
          
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
+        self._wrapper._set_parents_modified()
          
             
     def __getitem__(self, key):
@@ -1022,8 +1042,8 @@ class ContainerWrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         value = self._gpbcontainer.__getitem__(key)
-        value = object.__getattribute__(self._wrapper,'_rewrap')(value)
-        if object.__getattribute__(value,'ObjectType') == self.LinkClassType:
+        value = self._wrapper._rewrap(value)
+        if value.ObjectType == self.LinkClassType:
             value = self.Repository.get_linked_object(value)
         return value
     
@@ -1033,8 +1053,8 @@ class ContainerWrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         link = self._gpbcontainer.__getitem__(key)
-        link = object.__getattribute__(self._wrapper,'_rewrap')(link)
-        assert object.__getattribute__(link,'ObjectType') == self.LinkClassType, 'The field "%s" is not a link!' % linkname
+        link = self._wrapper._rewrap(link)
+        assert link.ObjectType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
         return link
         
     def GetLinks(self):
@@ -1043,8 +1063,8 @@ class ContainerWrapper(object):
         wrapper_list=[]            
         links = self._gpbcontainer[:] # Get all the links!
         for link in links:
-            link = object.__getattribute__(self._wrapper,'_rewrap')(link)
-            assert object.__getattribute__(link,'ObjectType') == self.LinkClassType, 'The field "%s" is not a link!' % linkname
+            link = self._wrapper._rewrap(link)
+            assert link.ObjectType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
             wrapper_list.append(link)
         return wrapper_list
     
@@ -1089,8 +1109,8 @@ class ContainerWrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         new_element = self._gpbcontainer.add()
         
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
-        return object.__getattribute__(self._wrapper,'_rewrap')(new_element)
+        self._wrapper._set_parents_modified()
+        return self._wrapper._rewrap(new_element)
         
     def __getslice__(self, start, stop):
         """Retrieves the subset of items from between the specified indices."""
@@ -1108,12 +1128,12 @@ class ContainerWrapper(object):
         """Deletes the item at the specified position."""
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
+        self._wrapper._set_parents_modified()
             
         item = self._gpbcontainer.__getitem__(key)
-        item = object.__getattribute__(self._wrapper,'_rewrap')(item)
+        item = self._wrapper._rewrap(item)
             
-        object.__getattribute__(item,'_clear_derived_message')()
+        item._clear_derived_message()
             
         self._gpbcontainer.__delitem__(key)
         
@@ -1146,7 +1166,7 @@ class ScalarContainerWrapper(object):
         
         # Check the root wrapper objects list of derived wrappers before making a new one
         objhash = gpbcontainer.__hash__()
-        dw = object.__getattribute__(wrapper,'DerivedWrappers')
+        dw = wrapper.DerivedWrappers
         if dw.has_key(objhash):
             return dw[objhash]
         
@@ -1160,7 +1180,7 @@ class ScalarContainerWrapper(object):
     def Invalid(self):
         if not self._wrapper:
             return True
-        return object.__getattribute__(self._wrapper,'_invalid')
+        return self._wrapper._invalid
     
     def Invalidate(self):
         self._gpbcontainer = None
@@ -1173,7 +1193,7 @@ class ScalarContainerWrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
            
         self._gpbcontainer.append(value)
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
+        self._wrapper._set_parents_modified()
 
     def insert(self, key, value):
         """Inserts the item at the specified position. Similar to list.insert()."""
@@ -1181,7 +1201,7 @@ class ScalarContainerWrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
            
         self._gpbcontainer.insert(key, value)
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
+        self._wrapper._set_parents_modified()
 
     def extend(self, elem_seq):
         """Extends by appending the given sequence. Similar to list.extend()."""
@@ -1189,7 +1209,7 @@ class ScalarContainerWrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
            
         self._gpbcontainer.extend(elem_seq)
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
+        self._wrapper._set_parents_modified()
 
     def remove(self, elem):
         """Removes an item from the list. Similar to list.remove()."""
@@ -1197,7 +1217,7 @@ class ScalarContainerWrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
            
         self._gpbcontainer.remove(elem)
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
+        self._wrapper._set_parents_modified()
 
     
     def __getslice__(self, start, stop):
@@ -1224,7 +1244,7 @@ class ScalarContainerWrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
            
         self._gpbcontainer.__setitem__(key, value)
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
+        self._wrapper._set_parents_modified()
 
     def __setslice__(self, start, stop, values):
         """Sets the subset of items from between the specified indices."""
@@ -1232,7 +1252,7 @@ class ScalarContainerWrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
            
         self._gpbcontainer.__setslice__(start, stop, values)
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
+        self._wrapper._set_parents_modified()
 
     def __delitem__(self, key):
         """Deletes the item at the specified position."""
@@ -1241,7 +1261,7 @@ class ScalarContainerWrapper(object):
            
         del self._gpbcontainer._values[key]
         self._gpbcontainer._message_listener.Modified()
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
+        self._wrapper._set_parents_modified()
 
     def __delslice__(self, start, stop):
         """Deletes the subset of items from between the specified indices."""
@@ -1250,7 +1270,7 @@ class ScalarContainerWrapper(object):
             
         self._gpbcontainer._values.__delslice__(start,stop)
         self._gpbcontainer._message_listener.Modified()
-        object.__getattribute__(self._wrapper,'_set_parents_modified')()
+        self._wrapper._set_parents_modified()
 
     def __eq__(self, other):
         """Compares the current instance with another one."""

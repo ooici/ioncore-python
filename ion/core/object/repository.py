@@ -41,7 +41,7 @@ class Repository(object):
     
     UPTODATE='up to date'
     MODIFIED='modified'
-    NOTINITIALIZED = 'This repository is not initialized yet'
+    NOTINITIALIZED = 'This repository is not initialized yet (No commit checked out)'
 
     CommitClassType = object_utils.create_type_identifier(object_id=8, version=1)
     LinkClassType = object_utils.create_type_identifier(object_id=3, version=1)
@@ -573,11 +573,16 @@ class Repository(object):
         
         if self.status == self.MODIFIED:
             log.warn('Merging while the workspace is dirty better to make a new commit first!')
-            #What to do for uninitialized? 
+            #What to do for uninitialized?
+            
+        if self.status == self.NOTINITIALIZED:
+            raise RepositoryError('Can not merge in a repository which is not initialized (Checkout something first!)')
         
         crefs=[]
-        
+                
         if commit_id:
+            if commit_id == self._current_branch.commitrefs[0].MyId:
+                raise RepositoryError('Can not merge into self!')
             try:
                 crefs.append(self._commit_index[commit_id])
             except KeyError, ex:
@@ -594,11 +599,12 @@ class Repository(object):
                     raise RepositoryError('Can not merge with current branch head (self into self)')
                 
                 # Merge the divergent states of this branch!
-                crefs = branch.commitrefs[1:]
+                crefs = branch.commitrefs
+                crefs.pop(self._current_branch.commitrefs[0])
                 
             else:
                 # Assume we merge any and all states of this branch?
-                crefs = branch.commitrefs
+                crefs.extend( branch.commitrefs)
         
         else:
             log.debug('''Arguments to Repository.merge - branchname: %s; commit_id: %s''' \
