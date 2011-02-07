@@ -615,6 +615,8 @@ class WorkBench(object):
                 root_obj = repo._load_element(head)
                 repo.root_object = root_obj
     
+                print repo
+                
                 # Create a commit to record the state when the message arrived
                 cref = repo.commit(comment='Message for you Sir!')
     

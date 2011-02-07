@@ -174,8 +174,12 @@ class Repository(object):
     
         if not value.Repository is self:
             value = self._copy_from_other(value)
-
+        
+        if not value.MyId in self._workspace:
+            self._workspace[value.MyId] = value
+            
         self._workspace_root = value
+        
         
     root_object = property(_get_root_object, _set_root_object)
     
@@ -930,13 +934,18 @@ class Repository(object):
         value.RecurseCommit(structure)
         self._hashed_elements.update(structure)
         
-        # Get the element from the hashed elements list
-        element = self._hashed_elements.get(value.MyId)
+        # Get the element by creating a temporary link and loading links...
+        link_cls = object_utils.get_gpb_class_from_type_id(self.LinkClassType)
+        link = self._create_wrapped_object(link_cls, addtoworkspace=False)
+        link.key = value.MyId
+        object_utils.set_type_from_obj(value, link.type)
         
-        obj = self._load_element(element)
-        self._workspace[obj.MyId] = obj
+        self._load_links(link)
         
-        self._load_links(obj)
+        obj = self.get_linked_object(link)
+        
+        # Get rid of the temporary link
+        obj.ParentLinks.discard(link)
         
         return obj
     
