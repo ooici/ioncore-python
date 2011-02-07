@@ -47,6 +47,7 @@ class CassandraManagerTester(IonTestCase):
     def tearDown(self):
         log.info("In tearDown")
         #This yield is needed to use the inlineCallback decorator
+        yield self._shutdown_processes()
         yield self._stop_container()
         #yield "nothing"
         """

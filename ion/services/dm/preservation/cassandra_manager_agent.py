@@ -157,11 +157,11 @@ class CassandraManagerService(ServiceProcess):
         #if self.spawn_args.get('bootstrap_args', None):
         #    yield self._bootstrap()
             
-        
+   
     @defer.inlineCallbacks
-    def slc_deactivate(self, *args):
-        log.info("In CassandraManagerService.slc_deactivate")
-        self.manager.deactivate()   
+    def slc_terminate(self, *args):
+        log.info("In CassandraManagerService.slc_terminate")
+        yield self.manager.deactivate()   
         
         
     @defer.inlineCallbacks
@@ -178,7 +178,6 @@ class CassandraManagerService(ServiceProcess):
         for ks in desc:
             persistent_archive = yield self.rc.create_instance(cassandra_keyspace_type, name=ks.name, description="description of " + ks.name)
             persistent_archive.name = ks.name
-            
             for cf in ks.cf_defs:
                 cache = yield self.rc.create_instance(column_family_type, name=cf.name, description="description of " + cf.name)
                 cache.name = cf.name
