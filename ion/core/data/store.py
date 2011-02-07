@@ -151,13 +151,22 @@ class IndexStore(object):
         """
         @see IStore.put
         """
+        
+        log.info( 'PUTTING KEY: type %s, value: %s' % (type(key), str(key)))
+        log.info('PUTTING VALUE: type %s, value: %s' % (type(value), str(value)))
+        
         for k,v in index_attributes.items():
+            print 'Index KEY: type %s, value: %s' % (type(k), k)
+            print 'Index Value: type %s, value: %s' % (type(v), v)
+
+
             kindex = self.indices.get(k, None)
             if not kindex:
                 kindex = {}
                 self.indices[k] = kindex
-            kindex[v]=key
-            
+            kindex[v]= kindex.get(v, set())
+            kindex[v].add(key)
+                        
         return defer.maybeDeferred(self.kvs.update, {key:value})
 
     def remove(self, key):
@@ -188,15 +197,16 @@ class IndexStore(object):
         for k,v in indexed_attributes.items():
             kindex = self.indices.get(k, None)
             if kindex:
-                keys.add(kindex.get(v,None))
-            
-        keys.discard(None)
+                keys.update(kindex.get(v,set()))
         
         result = {}
         for k in keys:
             # This is stupid, but now remove effectively works - delete keys are no longer visible!
             if self.kvs.has_key(k):
                 result[k] = self.kvs.get(k)
+            print 'Getting KEY: type %s, value: %s' % (type(k), k)
+            print 'Getting VALUE: type %s, value: %s' % (type(result[k]), result[k])
+                
                 
         return result
         

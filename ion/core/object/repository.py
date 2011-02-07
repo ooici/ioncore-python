@@ -815,6 +815,7 @@ class Repository(object):
         except KeyError, ex:
             log.info('"get_remote_linked_object": Caught object not found:'+str(ex))
             res = yield self._fetch_remote_objects([link,])
+            # Object is now in the hashed objects dictionary
             obj = self.get_linked_object(link)
         
         defer.returnValue(obj)

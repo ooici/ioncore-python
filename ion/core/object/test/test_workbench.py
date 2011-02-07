@@ -100,10 +100,17 @@ class WorkBenchTest(unittest.TestCase):
         
     @defer.inlineCallbacks
     def test_pack_mutable_eq_unpack(self):
+        """
+        This method packs everything in a repository!
+        """
             
         serialized = self.wb.pack_structure(self.repo._dotgit)
             
-        repo = self.wb.unpack_structure(serialized)
+        heads = self.wb.unpack_structure(serialized)
+    
+        self.assertEqual(len(heads), 1)
+        
+        repo = self.wb._load_repo_from_mutable(heads[0])
         
         self.assertEqual(repo._dotgit, self.repo._dotgit)
         
@@ -117,12 +124,18 @@ class WorkBenchTest(unittest.TestCase):
         self.assertRaises(workbench.WorkBenchError,self.wb.unpack_structure,'junk that is not a serialized container!')
         
     def test_pack_repository_commits(self):
-        
+        """
+        This method packs only the mutable and the commits
+        """
         self.repo.commit('testing repository packing')
         
         serialized = self.wb.pack_repository_commits(self.repo)
         
-        repo = self.wb.unpack_structure(serialized)
+        heads = self.wb.unpack_structure(serialized)
+    
+        self.assertEqual(len(heads), 1)
+        
+        repo = self.wb._load_repo_from_mutable(heads[0])
         
         self.assertEqual(repo._dotgit, self.repo._dotgit)
         
@@ -132,10 +145,11 @@ class WorkBenchTest(unittest.TestCase):
         self.assertEqual(commit, self.repo._current_branch.commitrefs[0])
         
         
-    def test_init_repo(self):
+    def test_create_repo(self):
             
         # Try it with no arguments
-        repo, rootobj = self.wb.init_repository()
+        repo = self.wb.create_repository()   
+        rootobj = repo.root_object
             
         rkey = repo.repository_key
         self.assertEqual(repo, self.wb.get_repository(rkey))
@@ -143,14 +157,16 @@ class WorkBenchTest(unittest.TestCase):
             
             
         # Try it with a root object this time
-        repo, rootobj = self.wb.init_repository(addressbook_type)
+        repo = self.wb.create_repository(addressbook_type)
+        rootobj = repo.root_object
             
         rkey = repo.repository_key
         self.assertEqual(repo, self.wb.get_repository(rkey))
         self.assertIsInstance(rootobj, gpb_wrapper.Wrapper)
             
         # Try it with a nickname for the repository
-        repo, rootobj = self.wb.init_repository(root_type=addressbook_type, nickname='David')
+        repo = self.wb.create_repository(root_type=addressbook_type, nickname='David')
+        rootobj = repo.root_object
             
         self.assertEqual(repo, self.wb.get_repository('David'))
         self.assertIsInstance(rootobj, gpb_wrapper.Wrapper)
@@ -176,7 +192,9 @@ class WorkBenchMergeTest(unittest.TestCase):
         
         # Create a new, separate work bench and read it!
         wb2 = workbench.WorkBench('No Process Test')
-        repo2 = wb2.unpack_structure(serialized)
+        heads = wb2.unpack_structure(serialized)
+        
+        repo2 = wb2._load_repo_from_mutable(heads[0])
         
         repo2.log_commits('master')
         
@@ -192,7 +210,9 @@ class WorkBenchMergeTest(unittest.TestCase):
         serialized = wb1.pack_repository_commits(repo1)
         
         # Create a new, separate work bench and read it!
-        repo2 = wb2.unpack_structure(serialized)
+        heads = wb2.unpack_structure(serialized)
+        
+        repo2 = wb2._load_repo_from_mutable(heads[0])
         
         repo2.log_commits('master')
         
@@ -218,7 +238,9 @@ class WorkBenchMergeTest(unittest.TestCase):
         
         # Create a new, separate work bench and read it!
         wb2 = workbench.WorkBench('No Process Test')
-        repo2 = wb2.unpack_structure(serialized)
+        heads = wb2.unpack_structure(serialized)
+        
+        repo2 = wb2._load_repo_from_mutable(heads[0])
         
         self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
         
@@ -247,7 +269,9 @@ class WorkBenchMergeTest(unittest.TestCase):
         self.assertNotIn(repo2._dotgit.MyId, repo2._workspace)
         
         # Read it in the other work bench!
-        repo2 = wb2.unpack_structure(serialized)
+        heads = wb2.unpack_structure(serialized)
+        
+        repo2 = wb2._load_repo_from_mutable(heads[0])
         
         repo2.log_commits('master')
         
@@ -268,7 +292,9 @@ class WorkBenchMergeTest(unittest.TestCase):
         serialized = wb2.pack_structure(repo2._dotgit)
         
         # Read it in the other work bench!
-        repo1 = wb1.unpack_structure(serialized)
+        heads = wb1.unpack_structure(serialized)        
+        repo1 = wb1._load_repo_from_mutable(heads[0])
+        
         
         log.info('Showing merged history!')
         repo1.log_commits('master')

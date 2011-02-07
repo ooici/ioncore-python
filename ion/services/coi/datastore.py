@@ -29,6 +29,12 @@ commit_type = object_utils.create_type_identifier(object_id=8, version=1)
 mutable_type = object_utils.create_type_identifier(object_id=6, version=1)
 structure_element_type = object_utils.create_type_identifier(object_id=1, version=1)
 
+class DataStoreError(Exception):
+    """
+    An exception class for the data store
+    """
+
+
 class DataStoreService(ServiceProcess):
     """
     The data store is not yet persistent. At the moment all its stored objects
@@ -47,6 +53,7 @@ class DataStoreService(ServiceProcess):
     COMMIT_STORE = 'commit_store_class'
     BLOB_STORE = 'blob_store_class'
     
+    CommitIndexName = 'repository'
     
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -110,8 +117,98 @@ class DataStoreService(ServiceProcess):
 
     
     @defer.inlineCallbacks
-    def op_push(self, *args):
-        yield self.workbench.op_push(*args)
+    def op_push(self, heads, headers, msg):
+        
+        pushed_repos = {}
+        
+        for head in heads:
+            
+            # Extract the repository key from the mutable
+            raw_mutable = object_utils.get_gpb_class_from_type_id(mutable_type)()
+            raw_mutable.ParseFromString(head.value)
+            repo_key = str(raw_mutable.repositorykey)
+            
+            # Get the mutable
+            store_head = None
+            store_commits = {}
+
+            pushed_repos[repo_key] = store_commits
+
+            blob = yield self.m_store.get(repo_key)
+            # if the store has a version of the repo - then load it
+            if blob:
+                print 'DLDLDLDLDLDLDLDLDDLDL'
+                store_head = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                self.workbench._hashed_elements[store_head.key]=store_head
+                
+                print 'OPOOPOPOPOOPOOPOPOPOPOPOPOP'
+                # Get the commits using the query interface
+                blobs = yield self.c_store.query({self.CommitIndexName:repo_key})
+                    
+                print 'LEN KVS == ', len(self.c_store.kvs)
+
+                print 'KVS', self.c_store.kvs
+                    
+                print 'INDICES', self.c_store.indices
+                    
+                print 'ERERERERERERERERERERERER'
+                    
+                for blob in blobs:
+                    print 'BLOB: type %s; value: "%s"' % (type(blob), blob)
+                    wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                    store_commits[wse.key] = wse
+                    
+                print 'GIGIGIIGIGIGIGIGIGIGIGIGGIGI'
+                    
+                # Load these commits into the workbench
+                self.workbench._hashed_elements.update(store_commits)
+                    
+                repo = self.workbench._load_repo_from_mutable(store_head)
+                    
+                # Check to make sure the mutable is upto date with the commits...
+                for commit_key in store_commits.keys():
+                    if not commit_key in repo._commit_index:
+                        raise DataStoreError('Can not handle divergence yet...')
+            
+            
+        yield self.workbench.op_push(heads, headers, msg)
+        
+        def_list = []
+        # First put the updated commits
+        for repo_key, store_commits in pushed_repos.items():
+            # Get the updated repository
+            repo = self.workbench.get_repository(repo_key)
+            
+            # any objects in the data structure that were transmitted have already
+            # been updated during fetch linked objects.
+            
+            
+            for key in repo._commit_index.keys():
+                if not key in store_commits:
+                    wse = self.workbench._hashed_elements.get(key)
+                    print 'STORING Key: "%s"; BLOB: "%s"' % (key, wse.serialize())
+                    defd = self.c_store.put(key = key,
+                                           value = wse.serialize(),
+                                           index_attributes = {self.CommitIndexName : str(repo_key)})
+                    def_list.append(defd)
+            
+        yield defer.DeferredList(def_list)
+        
+        print 'LEN KVS == ', len(self.c_store.kvs)
+        
+        def_list = []
+        # Now put the mutable heads
+        for repo_key in pushed_repos.keys():
+            repo = self.workbench.get_repository(repo_key)
+            wse = self.workbench.serialize_mutable(repo._dotgit)
+            defd = self.m_store.put(repo_key, wse.serialize())
+            
+            def_list.append(defd)
+            
+        yield defer.DeferredList(def_list)
+        
+            
+                
         
     @defer.inlineCallbacks
     def op_pull(self, *args):
@@ -123,7 +220,8 @@ class DataStoreService(ServiceProcess):
         The data store is getting objects for another process...
         """
         def_list=[]
-        for se in elements:
+        # Elements is a dictionary of wrapped structure elements
+        for se in elements.values():
             
             assert se.type == link_type, 'This is not a link element!'
             link = object_utils.get_gpb_class_from_type_id(link_type)()
@@ -132,6 +230,7 @@ class DataStoreService(ServiceProcess):
             # if it is already in memory, don't worry about it...
             if not link.key in self.workbench._hashed_elements:            
                 if link.type == commit_type:
+                    raise DataStoreError('Can not get commits in a fetch!')
                     def_list.append(self.c_store.get(link.key))
                 else:
                     def_list.append(self.b_store.get(link.key))
@@ -148,6 +247,10 @@ class DataStoreService(ServiceProcess):
         
     @defer.inlineCallbacks
     def push(self, *args):
+        """
+        This method is only for testing purposes. There is not need architecturally
+        for the data store to push to other services...
+        """
         
         ret = yield self.workbench.push(*args)
         
@@ -171,6 +274,7 @@ class DataStoreService(ServiceProcess):
         for link in links:
             if not link.key in self.workbench._hashed_elements:            
                 if link.type == commit_type:
+                    raise DataStoreError('Can not get commits in a fetch!')
                     def_list.append(self.c_store.get(link.key))
                 else:
                     def_list.append(self.b_store.get(link.key))
@@ -189,7 +293,7 @@ class DataStoreService(ServiceProcess):
         need_list = []
         obj_dict = {}
         
-        # For some reason the obj_list is a tuple not the value of the result
+        # For some reason the obj_list is a tuple not just the value of the result
         for link, (result, blob)  in zip(links, obj_list):
             if blob is None:
                 need_list.append(link)
@@ -202,16 +306,19 @@ class DataStoreService(ServiceProcess):
 
 
         # Get these from the other service
-        got_objs = yield self.workbench.fetch_linked_objects(address, need_list)
+        if need_list:
+            got_objs = yield self.workbench.fetch_linked_objects(address, need_list)
         
         def_list = []
-        for wse in got_objs:
+        for key, wse in got_objs.items():
             if wse.type == commit_type:
-                def_list.append(self.c_store.put(wse.key, wse.serialize()))
+                raise DataStoreError('Can not get commits in a fetch!')
+                def_list.append(self.c_store.put(key, wse.serialize()))
             else:
-                def_list.append(self.b_store.put(wse.key, wse.serialize()))
+                def_list.append(self.b_store.put(key, wse.serialize()))
             # Add it to the dictionary of objects 
-            obj_dict[wse.key] = wse
+        
+        obj_dict.update(got_objs)
         
         yield defer.DeferredList(def_list)
         
