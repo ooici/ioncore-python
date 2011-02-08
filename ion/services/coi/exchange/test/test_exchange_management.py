@@ -18,9 +18,9 @@ from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
-
-import ion.services.coi.exchange.exchange_boilerplate as bp
-from ion.services.coi.exchange.exchange_boilerplate import ClientHelper
+ 
+import ion.services.coi.exchange.exchange_resources as bp
+from ion.services.coi.exchange.exchange_resources import ClientHelper
 
 class ExchangeManagementTest(IonTestCase):
     """
@@ -45,11 +45,11 @@ class ExchangeManagementTest(IonTestCase):
                 'class':'ResourceRegistryService',
                 'spawnargs':{'datastore_service':'datastore'}
             },
-#            {
-#                'name':'exchange_management',
-#                'module':'ion.services.coi.exchange.exchange_management',
-#                'class':'ExchangeManagementService',
-#            },
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+            },
         ]
         yield self._spawn_processes(services)
         self.emc = ExchangeManagementClient(proc = self.test_sup)
