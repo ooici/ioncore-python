@@ -12,16 +12,10 @@ from zope.interface import implements, Interface
 
 import ion.util.ionlog
 from ion.core import ioninit
-
 from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
-
 from ion.core.process.process import ProcessDesc
-
 from ion.core.pack import app_supervisor
-
-import ion.services.coi.exchange.exchange_resources as bp
-from ion.services.coi.exchange.exchange_resources import ClientHelper
+from ion.services.dm.distribution.pubsub_service import PubSubClient
 
 # Global(s)
 log = ion.util.ionlog.getLogger(__name__)
@@ -49,6 +43,12 @@ def start(container, starttype, *args, **kwargs):
                     'module':'ion.services.coi.exchange.exchange_management',
                     'class':'ExchangeManagementService',
                 },
+                {
+                    'name':'pubsub',
+                    'module':'ion.services.dm.distribution.pubsub_service',
+                    'class' : 'PubSubService',
+
+                },
         ]
 
     log.debug('Starting application supervisor and required services...')
@@ -64,10 +64,25 @@ def start(container, starttype, *args, **kwargs):
 
     log.debug('Starting EMC...')
     emc = ExchangeManagementClient(proc=sup)
-    log.debug('Starting helper...')
-    emc_helper = ClientHelper(sup)
+    log.debug('Starting pubsub client')
+    psc = PubSubClient(proc=sup)
+    
     log.info('Started, time for init.')
 
+    # Create our exchange space
+    log.debug('Creating exchange space...')
+
+    # Humor - a swapmeet is a space to exchange things
+    xs_name = 'swapmeet'
+
+    # This call will return an error if space already exists - ignore
+    yield emc.create_exchangespace(xs_name, 'DM exchange space')
+
+    log.debug('Trying to invoke pubsub controller to create science data exchange point...')
+    yield psc.declare_topic_tree(xs_name, 'science_data')
+
+    log.debug('DM bootstrapping completed.')
+    
     res = (supv_id.full, [app_supv_desc])
     defer.returnValue(res)
 
