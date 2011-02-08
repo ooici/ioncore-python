@@ -127,8 +127,7 @@ class CassandraManagerService(ServiceProcess):
         
         if self._password is None:
             raise CassandraManagerServiceException("The password for the credentials to authenticate to the Cassandra cluster is not set.")
-        
-        #self.wb = workbench.WorkBench("I need this create resources")
+    
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
         cassandra_cluster = yield self.rc.create_instance(cassandra_cluster_type, name="Cassandra cluster", description="OOI Cassandra cluster")
         #persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(cassandra_cluster_type)
@@ -146,22 +145,14 @@ class CassandraManagerService(ServiceProcess):
         
         storage_resource = CassandraStorageResource(cassandra_cluster, credentials=simple_password)
         manager = CassandraDataManager(storage_resource)
-        manager.initialize() 
-        manager.activate()
-        #@TODO Need update the register method using Dave F's new code!
-        #yield self.register_life_cycle_object(manager)
+
+        yield self.register_life_cycle_object(manager)
         
         self.manager = manager
         yield self._bootstrap()
         # Now query the cluster to create persistence resources 
         #if self.spawn_args.get('bootstrap_args', None):
         #    yield self._bootstrap()
-            
-   
-    @defer.inlineCallbacks
-    def slc_terminate(self, *args):
-        log.info("In CassandraManagerService.slc_terminate")
-        yield self.manager.deactivate()   
         
         
     @defer.inlineCallbacks
@@ -207,6 +198,8 @@ class CassandraManagerService(ServiceProcess):
         
         
         log.info("Created resource")
+        #Set fields of the persistent_archive_resource from persistent_archive
+        
         yield self.rc.put_instance(persistent_archive_resource, "A commit message")
         log.info("Put resource into datastore")
         yield self.manager.create_persistent_archive(persistent_archive)
