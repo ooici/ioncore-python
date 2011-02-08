@@ -17,8 +17,9 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 from twisted.internet import defer
 
-import ion.services.coi.exchange.exchange_resources as bp
-from ion.services.coi.exchange.exchange_resources import ServiceHelper
+import ion.services.coi.exchange.resource_wrapper as res_wrapper
+from ion.services.coi.exchange.resource_wrapper import ServiceHelper
+from ion.services.coi.exchange.broker_controller import BrokerController
 
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
@@ -35,16 +36,24 @@ class ExchangeManagementService(ServiceProcess):
 
     def __init__(self, *args, **kwargs):
         ServiceProcess.__init__(self, *args, **kwargs)
-        self._privileged_broker = self.spawn_args.get('bootstrap_args',  CONF.getValue('privileged_broker_connection'))
 
+    @defer.inlineCallbacks
     def slc_init(self):
-        log.debug("ExchangeManagementService.slc_init(self)")
+        log.info("ExchangeManagementService.slc_init(self)")
         self.helper = ServiceHelper(self)
+        self.controller = BrokerController()
+        yield self.controller.start()
+        
         self.xs = {}
         self.xn = {}
         
-        log.debug("Establishing privileged connection")
-        self.connection = None
+
+
+    @defer.inlineCallbacks
+    def slc_deactivate(self):
+        log.info("ExchangeManagementService.slc_terminate(self)")
+        yield self.controller.stop()
+        
 
     @defer.inlineCallbacks
     def op_create_object(self, object, headers, msg):
@@ -93,11 +102,11 @@ class ExchangeManagementService(ServiceProcess):
             name = exchangespace.configuration.name.strip()
             description = exchangespace.configuration.description
             if len(name) == 0:
-                raise bp.ExchangeManagementError("exchangespace.name is invalid") 
+                raise res_wrapper.ExchangeManagementError("exchangespace.name is invalid") 
             if self.xs.has_key(name):
-                raise bp.ExchangeManagementError("exchangespace.name already exists") 
+                raise res_wrapper.ExchangeManagementError("exchangespace.name already exists") 
             
-        except bp.ExchangeManagementError, err:
+        except res_wrapper.ExchangeManagementError, err:
             yield self.reply_err(msg, str(err))
             return
         
@@ -135,15 +144,15 @@ class ExchangeManagementService(ServiceProcess):
             description = exchangename.configuration.description
             exchangespace = exchangename.configuration.exchangespace.strip()
             if len(name) == 0:
-                raise bp.ExchangeManagementError("exchangename.name is required") 
+                raise res_wrapper.ExchangeManagementError("exchangename.name is required") 
             if self.xn.has_key(name):
-                raise bp.ExchangeManagementError("exchangename.name already exists") 
+                raise res_wrapper.ExchangeManagementError("exchangename.name already exists") 
             if len(exchangespace) == 0:
-                raise bp.ExchangeManagementError("exchangename.exchangespace is required") 
+                raise res_wrapper.ExchangeManagementError("exchangename.exchangespace is required") 
             if not self.xs.has_key(exchangespace):
-                raise bp.ExchangeManagementError("exchangename.exchangespace doesn't exist") 
+                raise res_wrapper.ExchangeManagementError("exchangename.exchangespace doesn't exist") 
             
-        except bp.ExchangeManagementError, err:
+        except res_wrapper.ExchangeManagementError, err:
             yield self.reply_err(msg, str(err))
             return
         
