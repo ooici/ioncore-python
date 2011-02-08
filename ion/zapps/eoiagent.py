@@ -10,7 +10,7 @@ from ion.core.cc.shell import control
 from ion.core.object import object_utils
 from ion.core.pack import app_supervisor
 from ion.core.process.process import ProcessDesc
-from ion.integration.eoi.agent.java_wrapper_agent import JavaWrapperAgentClient
+from ion.integration.eoi.agent.java_agent_wrapper import JavaAgentWrapperClient
 
 # --- CC Application interface ---
 
@@ -67,17 +67,17 @@ def _bootstrap_procs(*args, **kw):
     supervisor.spawn_child()
     '''
     # Step 1: Define boostrap process descriptions and any additional arguments for supervisor.spawn_child()
-    java_agent_wrapper_args   = []
-    java_agent_wrapper_kwargs = {}
-#    java_agent_wrapper_kwargs = {'activate':False}
-    java_agent_wrapper_desc  = ProcessDesc(name      = 'JavaAgentWrapper',
-                                           module    = 'ion.integration.eoi.agent.java_wrapper_agent',
-                                           procclass = 'JavaWrapperAgent',
+    java_wrapper_agent_args   = []
+    java_wrapper_agent_kwargs = {}
+#    java_wrapper_agent_kwargs = {'activate':False}
+    java_wrapper_agent_desc  = ProcessDesc(name      = 'JavaWrapperAgent',
+                                           module    = 'ion.integration.eoi.agent.java_agent_wrapper',
+                                           procclass = 'JavaAgentWrapper',
                                            spawnargs = None)
 
     # Step 2: Return bootstrap procs as a tuple (process description then args)
     app_procs = [
-                  (java_agent_wrapper_desc, java_agent_wrapper_args, java_agent_wrapper_kwargs)
+                  (java_wrapper_agent_desc, java_wrapper_agent_args, java_wrapper_agent_kwargs)
                 ]
     return app_procs
 
@@ -91,7 +91,7 @@ def _bootstrap_objects(*args, **kw):
     '''
     # Step 1: Define bootstrap objects and ids
     client_id = 'eoiclient'
-    client_ob = yield JavaWrapperAgentClient()
+    client_ob = yield JavaAgentWrapperClient()
     
     # Step 2: Return bootstrap objects as a tuple (id then object)
     app_obs = [

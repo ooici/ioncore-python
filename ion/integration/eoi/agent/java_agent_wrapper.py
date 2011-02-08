@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 """
-@file:   ion/integration/eoi/agent/java_wrapper_agent.py
+@file:   ion/integration/eoi/agent/java_agent_wrapper.py
 @author: Chris Mueller
 @author: Tim LaRocque
-@brief:  EOI JavaWrapperAgent and JavaWrapperAgentClient class definitions
+@brief:  EOI JavaAgentAgent and JavaAgentWrapperClient class definitions
 """
 
 # Imports: Logging
@@ -25,7 +25,7 @@ from ion.core.messaging.message_client import MessageClient
 context_message_type = object_utils.create_type_identifier(object_id=4501, version=1)
 
 
-class JavaWrapperAgent(ServiceProcess):
+class JavaAgentWrapper(ServiceProcess):
     """
     Class designed to facilitate (Java) Dataset Agent's tight interaction with ION in
     lieu of an incomplete Java CC.  Wrapping Java Agents in Python processes in this way
@@ -34,14 +34,14 @@ class JavaWrapperAgent(ServiceProcess):
     """
     
     
-    declare = ServiceProcess.service_declare(name='java_wrapper_agent',
+    declare = ServiceProcess.service_declare(name='java_agent_wrapper',
                                              version='0.1.0',
                                              dependencies=[]) # no dependencies
 
         
     def __init__(self, *args, **kwargs):
         '''
-        Initialize the JavaWrapperAgent instance, init instance fields, etc.
+        Initialize the JavaAgentWrapper instance, init instance fields, etc.
         '''
         # Step 1: Delegate initialization to parent "ServiceProcess"
         log.info('')
@@ -182,7 +182,7 @@ class JavaWrapperAgent(ServiceProcess):
     def slc_deactivate(self):
         '''
         '''
-        log.debug(" -[]- Entered java_wrapper_agent.slc_deactivate(); state=%s" % (str(self._get_state())))
+        log.debug(" -[]- Entered JavaAgentWrapper.slc_deactivate(); state=%s" % (str(self._get_state())))
         
         returncode= None
         if self._get_state() == BasicStates.S_ACTIVE:
@@ -264,9 +264,9 @@ class JavaWrapperAgent(ServiceProcess):
             proc.deferred_exited.addBoth(self._osp_terminate_callback)
             # @todo Add a callback which forces this service to terminate if the underlying dataset agent exits (when the deferred returns)
         except ValueError, ex:
-            raise RuntimeError("JavaWrapperAgent._spawn_agent(): Received invalid spawn arguments form JavaWrapperAgent.agent_spawn_args" + str(ex))
+            raise RuntimeError("JavaAgentWrapper._spawn_agent(): Received invalid spawn arguments form JavaAgentWrapper.agent_spawn_args" + str(ex))
         except OSError, ex:
-            raise RuntimeError("JavaWrapperAgent._spawn_agent(): Failed to spawn the external Dataset Agent.  Error: %s" % (str(ex)))
+            raise RuntimeError("JavaAgentWrapper._spawn_agent(): Failed to spawn the external Dataset Agent.  Error: %s" % (str(ex)))
 
         # Step 3: Maintain a reference to the OSProcess object for later communication
         self.__agent_phandle = proc
@@ -275,7 +275,7 @@ class JavaWrapperAgent(ServiceProcess):
     @defer.inlineCallbacks
     def _terminate_dataset_agent(self):
         '''
-        Terminates the underlying dataset by sending it a 'terminate' message and waiting for the OSProcess object's exit callback.  
+        Terminates the underlying dataset agent by sending it a 'terminate' message and waiting for the OSProcess object's exit callback.  
         '''
         log.debug(" -[]- Entered _terminate_dataset_agent(); state=%s" % (str(self._get_state())))
         result = None
@@ -303,7 +303,7 @@ class JavaWrapperAgent(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_pretty_print(self, content, headers, msg):
-        pretty = "Java_Wrapper_Agent Status:" + \
+        pretty = "Java Agent Wrapper Status:" + \
                  "\n--------------------------" + \
                  "\nService State:  " + str(self._get_state())
         res = yield self.reply_ok(msg, {'value':pretty}, {})
@@ -357,7 +357,7 @@ class JavaWrapperAgent(ServiceProcess):
     
     def op_binding_key_callback(self, content, headers, msg):
         '''
-        Caches the given binding_key for future communication between the JavaWrapperAgent and its underlying
+        Caches the given binding_key for future communication between the JavaAgentWrapper and its underlying
         Java Dataset Agent.  This method is invoked remotely from the Dataset Agent during its initialization.
         '''
         log.info("<<<---@@@ Incoming callback with binding key message")
@@ -439,7 +439,7 @@ class JavaWrapperAgent(ServiceProcess):
     @property
     def agent_spawn_args(self):
         '''
-        @return: a list of arguments which can be passed to a spawning mechanism (such as OSProcess) to spawn this JavaWrapperAgent's
+        @return: a list of arguments which can be passed to a spawning mechanism (such as OSProcess) to spawn this JavaAgentWrapper's
         underlying Dataset Agent.
         '''
         # Lazy-initialize the spawn arguments
@@ -504,19 +504,19 @@ class JavaWrapperAgent(ServiceProcess):
         self.__agent_term_op = term_op
         
 
-class JavaWrapperAgentClient(ServiceClient):
+class JavaAgentWrapperClient(ServiceClient):
     """
-    Test client for direct (RPC) interaction with the JavaWrapperAgent ServiceProcess
+    Test client for direct (RPC) interaction with the JavaAgentWrapper ServiceProcess
     """
     
     def __init__(self, *args, **kwargs):
-        kwargs['targetname'] = 'java_wrapper_agent'
+        kwargs['targetname'] = 'java_agent_wrapper'
         ServiceClient.__init__(self, *args, **kwargs)
     
     @defer.inlineCallbacks
     def rpc_pretty_print(self):
         '''
-        Retrieve the state of the JavaWrapperAgent Service
+        Retrieve the state of the JavaAgentWrapper Service
         '''
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('pretty_print', None)
@@ -538,7 +538,7 @@ class JavaWrapperAgentClient(ServiceClient):
     @defer.inlineCallbacks
     def rpc_do_shutdown(self):
         '''
-        Retrieve the state of the JavaWrapperAgent Service
+        Retrieve the state of the JavaAgentWrapper Service
         '''
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('do_shutdown', None)
@@ -547,7 +547,7 @@ class JavaWrapperAgentClient(ServiceClient):
     @defer.inlineCallbacks
     def rpc_do_deactivate(self):
         '''
-        Retrieve the state of the JavaWrapperAgent Service
+        Retrieve the state of the JavaAgentWrapper Service
         '''
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('do_deactivate', None)
@@ -556,14 +556,14 @@ class JavaWrapperAgentClient(ServiceClient):
     @defer.inlineCallbacks
     def rpc_request_update(self, datasetId):
         '''
-        Simulates an update request to the JavaWrapperAgent as if from the Scheduler Service
+        Simulates an update request to the JavaAgentWrapper as if from the Scheduler Service
         '''
         # Ensure a Process instance exists to send messages FROM...
         #   ...if not, this will spawn a new default instance.
         yield self._check_init()
         
         # Invoke [op_]update_request() on the target service 'dispatcher_svc' via RPC
-        log.info("@@@--->>> Sending 'update_request' RPC message to java_wrapper_agent service")
+        log.info("@@@--->>> Sending 'update_request' RPC message to java_agent_wrapper service")
         (content, headers, msg) = yield self.rpc_send('update_request', datasetId)
         
         defer.returnValue(str(content))
@@ -571,28 +571,32 @@ class JavaWrapperAgentClient(ServiceClient):
         
     
 # Spawn of the process using the module name
-factory = ProcessFactory(JavaWrapperAgent)
+factory = ProcessFactory(JavaAgentWrapper)
 
 
 
 '''
 
+#----------------------------#
+# Application Startup
+#----------------------------#
+:: bash ::
+scripts/start-cc -h amoeba.ucsd.edu -a sysname=eoitest res/apps/eoiagent.app
 
-#---------------------#
-# Copy/paste startup:
-#---------------------#
-#  :spawn an agent
-from ion.agents.eoiagents.java_wrapper_agent import JavaWrapperAgent as jwa
-agent = jwa()
-agent.spawn()
 
-#  :Setup the client - placeholder for generating update requests
-from ion.agents.eoiagents.java_wrapper_agent import JavaWrapperAgentClient as jwac
-aclient = jwac()
-#  :Send update request for the dataset 'sos_station_st'
+#----------------------------#
+# Update Testing
+#----------------------------#
+:: py ::
+from ion.integration.eoi.agent.java_agent_wrapper import JavaAgentWrapperClient as jawc
+aclient = jawc()
 aclient.rpc_request_update('sos_station_st')
 
 
+#----------------------------#
+# Governance Testing
+#----------------------------#
+#      @todo:
 '''
 
 
