@@ -112,7 +112,7 @@ class HelloResourceTest(IonTestCase):
         lcs_request_msg = yield self.mc.create_instance(resource_request_type, name='Update it!')
 
         lcs_request_msg.resource_reference = create_response_msg.resource_reference
-        lcs_request_msg.life_cycle_operation = lcs_request_msg.MessageObject.Activate
+        lcs_request_msg.life_cycle_operation = lcs_request_msg.MessageObject.LifeCycleOperation.ACTIVATE
         
         # Call the life cycle operation method method 
         update_result_msg = yield hc1.set_instrument_resource_life_cycle(lcs_request_msg)

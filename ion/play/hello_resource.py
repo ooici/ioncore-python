@@ -380,7 +380,7 @@ class HelloResource(ServiceProcess):
         
         
         # Business logic to modify physical resources goes inside these if statements!
-        if request.life_cycle_operation == request.MessageObject.Activate:
+        if request.life_cycle_operation == request.MessageObject.LifeCycleOperation.ACTIVATE:
            resource.ResourceLifeCycleState = resource.ACTIVE
 
         elif request.life_cycle_operation == request.MessageObject.Deactivate:

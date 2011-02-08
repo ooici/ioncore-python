@@ -492,9 +492,13 @@ class Wrapper(object):
         if self._gpb_type:
             return self._gpb_type
         
-        self._gpb_type = create_type_identifier(object_id=self._MessageTypeIdentifier._ID,\
-                                                version=self._MessageTypeIdentifier._VERSION)
         
+        if hasattr(self,'_MessageTypeIdentifier'):
+            self._gpb_type = create_type_identifier(object_id=self._MessageTypeIdentifier._ID,\
+                                                version=self._MessageTypeIdentifier._VERSION)
+        else:
+            self._gpb_type = create_type_identifier(object_id=-99,\
+                                                version=-99)
         
         return self._gpb_type
     
