@@ -44,9 +44,13 @@ class Options(usage.Options):
                 ["no_history", "i", "Do not read/write history file"],
                     ]
 
+    def __init__(self):
+        usage.Options.__init__(self)
+        self['script'] = None
+
     def opt_version(self):
-        from ion.core.ionconst import VERSION
-        log.info("ION Capability Container version: "+ VERSION)
+        from ion import version
+        print "ION Capability Container version:", version.short()
         sys.exit(0)
 
     def parseArgs(self, script=None):

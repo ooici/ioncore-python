@@ -28,5 +28,5 @@ operational architecture prototype as required for LCA.
 #from ion.core import ioninit
 #from ion.core import ionconst
 
-
-#__version__ = ionconst.VERSION
+from ion.core._version import version
+__version__ = version.short()

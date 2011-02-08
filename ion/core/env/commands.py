@@ -23,6 +23,7 @@ def init_command(name=None, path='.'):
         raise args.ArgumentError("The path %s already exists." % (envroot,))
 
     os.mkdir(envroot)
+    os.mkdir(os.path.join(envroot, 'logs'))
     orig_tree = os.path.join(os.path.abspath(env.__path__[0]), 'res')
     dest_tree = os.path.join(envroot, 'res')
 
