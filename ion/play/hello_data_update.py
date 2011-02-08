@@ -254,7 +254,7 @@ class HelloDataUpdate(ServiceProcess):
         response.configuration = resource.ResourceObject
         response.result = 'Clobbered'
          
-        yield self.reply_ok(msg)
+        yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
     def op_merge_addressbook_resource(self, request, headers, msg):
@@ -315,7 +315,7 @@ class HelloDataUpdate(ServiceProcess):
         response.configuration = resource.ResourceObject
         response.result = 'Merged'
             
-        yield self.reply_ok(msg)
+        yield self.reply_ok(msg, response)
 
 
 class HelloDataUpdateClient(ServiceClient):
