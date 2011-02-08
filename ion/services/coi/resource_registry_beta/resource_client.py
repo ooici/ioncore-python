@@ -105,7 +105,9 @@ class ResourceClient(object):
         yield self._check_init()
         
         # Create a sendable resource object
-        description_repository, resource_description = self.workbench.init_repository(resource_description_type)
+        description_repository = self.workbench.create_repository(resource_description_type)
+        
+        resource_description = description_repository.root_object
         
         # Set the description
         resource_description.name = name
