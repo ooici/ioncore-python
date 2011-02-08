@@ -955,5 +955,6 @@ class Repository(object):
         # Set the type
         tp = link.type
         object_utils.set_type_from_obj(value, tp)
+        #link.type = object_utils.get_type_from_obj(value)
             
     
