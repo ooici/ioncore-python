@@ -25,8 +25,8 @@ operational architecture prototype as required for LCA.
 # Make sure the init code in ioninit (e.g. logging settings) executes before
 # anything else in the system
 
-from ion.core import ioninit
-from ion.core import ionconst
+#from ion.core import ioninit
+#from ion.core import ionconst
 
 
 #__version__ = ionconst.VERSION
