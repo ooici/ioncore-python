@@ -17,8 +17,8 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 from twisted.internet import defer
 
-import ion.services.coi.exchange.exchange_boilerplate as bp
-from ion.services.coi.exchange.exchange_boilerplate import ServiceHelper
+import ion.services.coi.exchange.exchange_resources as bp
+from ion.services.coi.exchange.exchange_resources import ServiceHelper
 
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
@@ -35,14 +35,16 @@ class ExchangeManagementService(ServiceProcess):
 
     def __init__(self, *args, **kwargs):
         ServiceProcess.__init__(self, *args, **kwargs)
-        
+        self._privileged_broker = self.spawn_args.get('bootstrap_args',  CONF.getValue('privileged_broker_connection'))
+
     def slc_init(self):
+        log.debug("ExchangeManagementService.slc_init(self)")
         self.helper = ServiceHelper(self)
         self.xs = {}
         self.xn = {}
-        log.debug("ExchangeManagementService.slc_init(self)")
-      
-
+        
+        log.debug("Establishing privileged connection")
+        self.connection = None
 
     @defer.inlineCallbacks
     def op_create_object(self, object, headers, msg):
