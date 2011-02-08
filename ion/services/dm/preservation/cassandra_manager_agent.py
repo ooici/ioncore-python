@@ -51,7 +51,7 @@ class CassandraManagerAgent(ServiceProcess):
     # Declaration of service
     declare = ServiceProcess.service_declare(name='cassandra_manager_agent', version='0.1.0', dependencies=[])
 
-     def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
         ServiceProcess.__init__(self, *args, **kwargs)
         
@@ -90,7 +90,7 @@ class CassandraManagerAgent(ServiceProcess):
             
             # Build a storage resource from the spawn_args dictionary 
             #self.spawn_args.get(...)
-            storage_resource = yield self.rc.create_instance(...)
+            #storage_resource = yield self.rc.create_instance(...)
             #Fill in vals here...
             yield self.rc.put_instance(storage_resource)
         else:
@@ -121,30 +121,31 @@ class CassandraManagerAgent(ServiceProcess):
     def _bootstrap(self):
         
         for keyspace in cassandracluster:
-            cassandra_keyspace = yield self.rc.create_instance(...)
+            #cassandra_keyspace = yield self.rc.create_instance(...)
             yield self.manager.describe_keyspace(cassandra_keyspace)            
             yield self.rc.put_instance(cassandra_keyspace)
         
-        for cf in keyspace
-            cassandra_cf = yield self.rc.create_instance(...)
+        for cf in keyspace:
+            pass
+            #cassandra_cf = yield self.rc.create_instance(...)
             # ...
             # ...
             
         
     @defer.inlineCallbacks
-    def op_create_persistent_archive(self, ???, headers, msg):
+    def op_create_persistent_archive(self, content, headers, msg):
         """Service operation: define a new archive object
         
         What should the args be?
         What happens with credentials for a new keyspace?
         
         """
-        cassandra_keyspace = yield self.rc.create_instance(...)
+        #cassandra_keyspace = yield self.rc.create_instance(...)
         yield self.manager.create_persistent_archive
         yield self.rc.put_instance(cassandra_keyspace)
 
     @defer.inlineCallbacks
-    def op_update_persistent_archive(self, ???, headers, msg):
+    def op_update_persistent_archive(self, content, headers, msg):
         """Service operation: define a new archive object
         
         What should the args be?
@@ -166,14 +167,14 @@ class CassandraManagerAgent(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def op_delete_persistent_archive(self, ???, headers, msg):
+    def op_delete_persistent_archive(self, content, headers, msg):
         """Service operation: define a new archive object
         
         What should the args be?
         What happens with credentials for a new keyspace?
         
         """
-        cassandra_keyspace = yield self.rc.create_instance(...)
+        #cassandra_keyspace = yield self.rc.create_instance(...)
         yield self.manager.create_persistent_archive
         yield self.rc.put_instance(cassandra_keyspace)
    
@@ -181,7 +182,7 @@ class CassandraManagerAgent(ServiceProcess):
    
 
 # Spawn of the process using the module name
-factory = ProcessFactory(PreservationService)
+factory = ProcessFactory(CassandraManagerAgent)
 
 
 class PreservationClient(ServiceClient):
