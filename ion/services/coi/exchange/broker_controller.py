@@ -33,8 +33,7 @@ class BrokerController:
         self._privileged_broker = CONF.getValue('privileged_broker_connection')
         self._amqp_spec = txamqp.spec.load(
             os.path.join(
-                os.path.dirname(ion.__file__), 
-                "..", 
+                os.getcwd(),
                 CONF.getValue('amqp_spec')
             )
         )
