@@ -14,7 +14,7 @@ from twisted.trial import unittest
 
 from ion.test.iontest import IonTestCase
  
-from ion.services.coi.exchange.exchange_broker_controller import BrokerController
+from ion.services.coi.exchange.broker_controller import BrokerController
 
 class ExchangeManagementTest(IonTestCase):
     """
