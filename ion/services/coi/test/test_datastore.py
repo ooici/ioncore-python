@@ -75,7 +75,7 @@ class DataStoreTest(IonTestCase):
         p.id = 5
         p.email = 'd@s.com'
         ph = p.phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '123 456 7890'
         
         ab.owner = p
@@ -88,7 +88,7 @@ class DataStoreTest(IonTestCase):
         p.id = 222
         p.email = 'd222@s.com'
         ph = p.phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '321 456 7890'
     
         ab.person.add()
@@ -134,15 +134,16 @@ class DataStoreTest(IonTestCase):
         log.debug('Process ID:' + str(child_ds2))
         proc_ds2 = self._get_procinstance(child_ds2)
             
-        repo1, ab1 = proc_ds1.workbench.init_repository(addresslink_type,'addressbook')
+        repo1 = proc_ds1.workbench.create_repository(addresslink_type,'addressbook')
             
+        ab1 = repo1.root_object
            
         pa1 = repo1.create_object(person_type)
         pa1.name='David'
         pa1.id = 5
         pa1.email = 'd@s.com'
         ph = pa1.phone.add()
-        ph.type = pa1.WORK
+        ph.type = pa1.PhoneType.WORK
         ph.number = '123 456 7890'
             
         ab1.owner = pa1
@@ -155,7 +156,7 @@ class DataStoreTest(IonTestCase):
         pb1.id = 222
         pb1.email = 'd222@s.com'
         ph = pb1.phone.add()
-        ph.type = pb1.WORK
+        ph.type = pb1.PhoneType.WORK
         ph.number = '321 456 7890'
             
         ab1.person.add()
@@ -253,7 +254,7 @@ class DataStoreTest(IonTestCase):
         p.id = 5
         p.email = 'd@s.com'
         ph = p.phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '123 456 7890'
         
         ab.owner = p
@@ -266,7 +267,7 @@ class DataStoreTest(IonTestCase):
         p.id = 222
         p.email = 'd222@s.com'
         ph = p.phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '321 456 7890'
     
         ab.person.add()

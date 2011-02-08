@@ -380,22 +380,22 @@ class HelloResource(ServiceProcess):
         
         
         # Business logic to modify physical resources goes inside these if statements!
-        if request.life_cycle_operation == request.MessageObject.Activate:
+        if request.life_cycle_operation == request.MessageObject.LifeCycleOperation.ACTIVATE:
            resource.ResourceLifeCycleState = resource.ACTIVE
 
-        elif request.life_cycle_operation == request.MessageObject.Deactivate:
+        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.DEACTIVATE:
            resource.ResourceLifeCycleState = resource.INACTIVE
            
-        elif request.life_cycle_operation == request.MessageObject.Commission:
+        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.COMMISSION:
            resource.ResourceLifeCycleState = resource.COMMISSIONED
            
-        elif request.life_cycle_operation == request.MessageObject.Decommission:
+        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.Decommission:
            resource.ResourceLifeCycleState = resource.DECOMMISSIONED
            
-        elif request.life_cycle_operation == request.MessageObject.Retire:
+        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.Retire:
            resource.ResourceLifeCycleState = resource.RETIRED
            
-        elif request.life_cycle_operation == request.MessageObject.Develop:
+        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.Develop:
            resource.ResourceLifeCycleState = resource.DEVELOPED
 
         yield self.rc.put_instance(resource)
