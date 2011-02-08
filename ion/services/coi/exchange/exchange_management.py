@@ -155,7 +155,16 @@ class ExchangeManagementService(ServiceProcess):
         object.name = name
         object.description = description
         
-        
+
+        yield self.controller.create_exchange(
+                 exchange=exchangespace + '..' + name,
+                 type='direct', 
+                 passive=False, 
+                 durable=False,
+                 auto_delete=False, 
+                 internal=False, 
+                 nowait=False        
+        )
         # Response
         response = yield self.helper.push_object(object)
         self.xn[name] = response.configuration.MyId;
