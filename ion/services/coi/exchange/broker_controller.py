@@ -31,12 +31,22 @@ class BrokerController:
   
     def __init__(self, *args, **kwargs):
         self._privileged_broker = CONF.getValue('privileged_broker_connection')
-        self._amqp_spec = txamqp.spec.load(
-            os.path.join(
+        spec_path = os.path.join(
                 os.getcwd(),
                 CONF.getValue('amqp_spec')
             )
-        )
+        if not os.path.isfile(spec_path):
+            # the working directory is obscured by 
+            # _trial_tmp on the command-line
+            spec_path = os.path.join(
+                os.getcwd(),
+                '..',
+                CONF.getValue('amqp_spec')
+            )
+        if not os.path.isfile(spec_path):
+            log.critical('Could not locate AMQP spec file at: ' + CONF.getValue('amqp_spec'))
+
+        self._amqp_spec = txamqp.spec.load(spec_path)
         self.queues = []
         self.exchanges = []
         self.connectors = []
