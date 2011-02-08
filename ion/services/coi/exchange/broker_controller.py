@@ -59,7 +59,12 @@ class BrokerController:
         try:
             self.client = yield self._connect()
         except txamqp.client.Closed, le:
-            mys = "failed to connect to amqp broker:\n \tusername: %s\n \tpassword: %s\n \thost: %s\n \tport: %s\n \tvhost: %s" % (
+            mys = "failed to connect to amqp broker:\n " +  \
+                "\tusername: %s\n " +                       \
+                "\tpassword: %s\n " +                       \
+                "\thost:     %s\n " +                       \
+                "\tport:     %s\n " +                       \
+                "\tvhost:    %s" % (
                    str(self._privileged_broker['username']),
                    str(self._privileged_broker['password']),
                    str(self._privileged_broker['host']),
