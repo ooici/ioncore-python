@@ -185,6 +185,27 @@ class CassandraManagerService(ServiceProcess):
                     cache.column_metadata[column_index] = self.rc.reference_instance(column)
                     column_index = column_index + 1
 
+    
+    def __set_resource_attrs(self, request, resource):
+        """
+        @param request is the request message passed into the service
+        @param resource is the ion resource that is to be configured by copying attributes from the request
+        @param attrs is a list of attribute names
+        @brief copy the attributes from the request to the ION resource.
+        @todo this should happen in a __setattr__ method
+        """
+        if not request.IsFieldSet('configuration'):       
+            raise CassandraManagerServiceException("The request is not properly formatted. It must have a configuration attribute")  
+         
+        attrs = ["name", "strategy_class", "replication_factor"]
+        for attr in attrs:
+            if request.configuration.IsFieldSet(attr):
+                setattr(resource, attr, getattr(request.configuration, attr))
+            else:
+                resource.ClearField(attr)    
+        return resource        
+                
+        
     @defer.inlineCallbacks
     def op_create_persistent_archive(self, request, headers, msg):
         """
@@ -199,12 +220,16 @@ class CassandraManagerService(ServiceProcess):
         
         log.info("Created resource")
         #Set fields of the persistent_archive_resource from persistent_archive
+        self.__set_resource_attrs(request, persistent_archive_resource)
         
         yield self.rc.put_instance(persistent_archive_resource, "A commit message")
         log.info("Put resource into datastore")
         yield self.manager.create_persistent_archive(persistent_archive)
         
         response = yield self.mc.create_instance(resource_response_type, name="create_persistent_archive_response")
+        
+ 
+        
         response.resource_reference = self.rc.reference_instance(persistent_archive_resource)
         
         # pass the current configuration
@@ -227,6 +252,7 @@ class CassandraManagerService(ServiceProcess):
         persistent_archive = request.configuration
         persistent_archive_resource = yield self.rc.get_instance(request.resource_reference)
         #Check to see if the resource has changed
+        self.__set_resource_attrs(request, persistent_archive_resource)
         log.info("put instance")
         yield self.rc.put_instance(persistent_archive_resource)
         #Do the business logic
