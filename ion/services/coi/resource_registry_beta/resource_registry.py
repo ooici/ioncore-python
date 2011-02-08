@@ -110,7 +110,7 @@ class ResourceRegistryService(ServiceProcess):
         object_utils.set_type_from_obj(res_obj, resource.type)
         
         # State is set to new by default
-        resource.lcs = resource.LifeCycleState.New
+        resource.lcs = resource.LifeCycleState.NEW
         
         resource_repository.commit('Created a new resource!')
 
