@@ -24,6 +24,7 @@ resource_request_type = object_utils.create_type_identifier(object_id=10, versio
 
 
 class CassandraManagerTester(IonTestCase):
+    @itv(CONF)
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -46,18 +47,10 @@ class CassandraManagerTester(IonTestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         log.info("In tearDown")
-        #This yield is needed to use the inlineCallback decorator
         yield self._shutdown_processes()
         yield self._stop_container()
-        #yield "nothing"
-        """
-        try:
-           
-        except Exception, ex:
-            log.info("Exception raised %s " % (ex,))
-        #self.manager.terminate()
-        #
-        """
+        
+    @itv(CONF)
     def test_instantiation_only(self):
         pass
 
@@ -79,7 +72,7 @@ class CassandraManagerTester(IonTestCase):
         log.info("create_response.result " + str(create_response.result))
     
         
-        
+    @itv(CONF)    
     @defer.inlineCallbacks
     def test_update_archive(self):
         
@@ -112,7 +105,8 @@ class CassandraManagerTester(IonTestCase):
         delete_response = yield self.client.delete_persistent_archive(delete_request)
         log.info("delete_response.result " + str(delete_response.result))
         
-        
+     
+    @itv(CONF)   
     @defer.inlineCallbacks
     def test_delete_archive(self):
                 
