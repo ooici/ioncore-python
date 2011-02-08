@@ -7,18 +7,13 @@
 """
 
 import ion.util.ionlog
-import ion.util.procutils as pu
-from ion.core.process.process import ProcessFactory, Process, ProcessClient
+from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.core.messaging.message_client import MessageClient
-from ion.core.object import object_utils
 from ion.core import ioninit
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 from twisted.internet import defer
 
 import ion.services.coi.exchange.resource_wrapper as res_wrapper
-from ion.services.coi.exchange.resource_wrapper import ServiceHelper
+from ion.services.coi.exchange.resource_wrapper import ServiceHelper, ClientHelper
 from ion.services.coi.exchange.broker_controller import BrokerController
 
 CONF = ioninit.config(__name__)
@@ -192,7 +187,8 @@ class ExchangeManagementService(ServiceProcess):
 class ExchangeManagementClient(ServiceClient):
     
     def __init__(self, proc=None, **kwargs):
-        log.debug("ExchangeManagementClient.__init__(self, proc, args)")
+        log.info("ExchangeManagementService.slc_init(...)")
+        self.helper = ClientHelper(proc)
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "exchange_management"
         ServiceClient.__init__(self, proc, **kwargs)
@@ -219,23 +215,65 @@ class ExchangeManagementClient(ServiceClient):
 
 
 
-
+    
     @defer.inlineCallbacks
-    def create_exchangespace(self, msg):
+    def create_exchangespace(self, 
+            name,
+            description,
+            ):
         """
+        Creates an ExchangeSpace.
+        @param name
+                a string uniquely identifying the ExchangeSpace 
+                in all scopes and contexts.
+        @param description 
+                a free text string containing a description of 
+                the ExchangeSpace.
         """
         yield self._check_init()
+        msg = yield self.helper.create_object(res_wrapper.exchangespace_type)
+        msg.configuration.name = name
+        msg.configuration.description = description
+        
         (content, headers, msg) = yield self.rpc_send('create_exchangespace', msg)
         defer.returnValue(content)
 
         
     @defer.inlineCallbacks
-    def create_exchangename(self, msg):
-        """
-        """
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('create_exchangename', msg)
-        defer.returnValue(content)
+    def create_exchangename(
+            self,
+            name,
+            description,
+            exchangespace,
+            type='EXCHANGE_POINT', 
+        ):
+            """
+            Creates an ExchangeName.
+            @param name 
+                    a string uniquely identifying the ExchangeName 
+                    in the scope of the ExchangeSpace.
+            @param description 
+                    a free text string containing a description of 
+                    the ExchangeName.
+            @param exchangespace
+                    a string uniquely identifying the ExchangeSpace
+                    to which this ExchangeName will belong.  This 
+                    must be previously defined with a call to 
+                    create_exchangespace()
+            @param type
+                    a string that must contain one of the following
+                    constants:  'EXCHANGE_POINT', 'PROCESS', 'SERVICE'.
+            """        
+            yield self._check_init()
+    
+            msg = yield self.helper.create_object(res_wrapper.exchangename_type)
+            msg.configuration.name = name
+            msg.configuration.description = description
+            msg.configuration.exchangespace = exchangespace
+            msg.type = type
+    
+            (content, headers, msg) = yield self.rpc_send('create_exchangename', msg)
+            defer.returnValue(content)
 
         
 
