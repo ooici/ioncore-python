@@ -25,6 +25,7 @@ from ion.util.state_object import BasicLifecycleObject
 from ion.core.messaging.ion_reply_codes import ResponseCodes
 from ion.core.process import process
 from ion.core.object import workbench
+from ion.core.object import repository
 from ion.core.object.repository import RepositoryError
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
@@ -237,14 +238,88 @@ class ResourceInstanceError(Exception):
     Exceptoin class for Resource Instance Object
     """
     
+class ResourceProperty(object):
+    
+    def __init__(self, resource_repository, name, doc=None):
+        self.resource_repository = resource_repository
+        self.name = name
+        if doc: self.__doc__ = doc
+        
+    def __get__(self, resource_instance, objtype=None):
+        return getattr(resource_instance._repository.root_object.resource_object, self.name)
+        
+    def __set__(self, wrapper, value):
+        return setattr(resource_instance._repository.root_object.resource_object, self.name)
+        
+    def __delete__(self, wrapper):
+        raise AttributeError('Can not delete a Resource Instance property')
+    
+class ResourceInstanceType(type):
+    """
+    Metaclass that automatically generates subclasses of Wrapper with corresponding enums and
+    pass-through properties for each field in the protobuf descriptor.
+    
+    This approach is generally applicable to wrap data structures. It is extremely powerful!
+    """
+
+    _type_cache = {}
+
+    def __call__(cls, resource_repository, *args, **kwargs):
+        # Cache the custom-built classes
+        
+        # Check that the object we are wrapping is a Google Message object
+        if not isinstance(resource_repository, repository.Repository):
+            raise ResourceInstanceError('ResourceInstance init argument must be an instance of a Repository')
+        
+        if resource_repository.status == repository.Repository.NOTINITIALIZED:
+            raise ResourceInstanceError('ResourceInstance init Repository argument is in an invalid state - checkout first!')
+        
+        if resource_repository.root_object.ObjectType != resource_type:
+            raise ResourceInstanceError('ResourceInstance init Repository is not a resource object!')
+        
+        resource_obj = resource_repository.root_object.resource_object
+        
+        msgType, clsType = type(resource_obj), None
+
+        if msgType in ResourceInstanceType._type_cache:
+            clsType = ResourceInstanceType._type_cache[msgType]
+        else:
+            
+            
+            # Get the class name
+            clsName = '%s_%s' % (cls.__name__, msgType.__name__)
+            clsDict = {}
+                
+            # Now setup the properties to map through to the GPB object
+            resDict = msgType.__dict__
+            
+            for k,v in resDict.items():
+                print 'Key: %s; Type: %s' % (k, type(v))
+                if isinstance(v, gpb_wrapper.WrappedProperty):
+                    prop = ResourceProperty(cls, k )
+                    
+                    clsDict[k] = prop
+                
+            
+
+            clsType = ResourceInstanceType.__new__(ResourceInstanceType, clsName, (cls,), clsDict)
+
+            ResourceInstanceType._type_cache[msgType] = clsType
+
+        # Finally allow the instantiation to occur, but slip in our new class type
+        obj = super(ResourceInstanceType, clsType).__call__(resource_repository, *args, **kwargs)
+        return obj
+    
+    
+    
 class ResourceInstance(object):
     """
     @brief The resoure instance is the vehicle through which a process
     interacts with a resource instance. It hides the git semantics of the data
     store and deals with resource specific properties.
     """
+    __metaclass__ = ResourceInstanceType
     
-    RESOURCE_CLASS = object_utils.get_gpb_class_from_type_id(resource_type)
     # Life Cycle States
     NEW='New'
     ACTIVE='Active'
