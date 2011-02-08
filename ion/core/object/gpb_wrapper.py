@@ -107,8 +107,8 @@ class EnumObject(object):
 
 class WrappedProperty(object):
     
-    def __init__(self, wrapper, name, doc=None):
-        self.wrapper = wrapper
+    #def __init__(self, wrapper, name, doc=None):
+    def __init__(self, name, doc=None):
         self.name = name
         if doc: self.__doc__ = doc
         
@@ -266,14 +266,18 @@ class WrapperType(type):
                 prop = None
                 if field_desc.label == field_desc.LABEL_REPEATED:
                     if field_desc.cpp_type == field_desc.CPPTYPE_MESSAGE:
-                        prop = WrappedRepeatedCompositeProperty(cls, fieldName, doc=fieldType.__doc__)
+                        #prop = WrappedRepeatedCompositeProperty(cls, fieldName, doc=fieldType.__doc__)
+                        prop = WrappedRepeatedCompositeProperty(fieldName, doc=fieldType.__doc__)
                     else:
-                        prop = WrappedRepeatedScalarProperty(cls, fieldName, doc=fieldType.__doc__)
+                        prop = WrappedRepeatedScalarProperty(fieldName, doc=fieldType.__doc__)
+                        #prop = WrappedRepeatedScalarProperty(cls, fieldName, doc=fieldType.__doc__)
                 else:
                     if field_desc.cpp_type == field_desc.CPPTYPE_MESSAGE:
-                        prop = WrappedMessageProperty(cls, fieldName, doc=fieldType.__doc__)
+                        #prop = WrappedMessageProperty(cls, fieldName, doc=fieldType.__doc__)
+                        prop = WrappedMessageProperty(fieldName, doc=fieldType.__doc__)
                     else:
-                        prop = WrappedScalarProperty(cls, fieldName, doc=fieldType.__doc__)
+                        #prop = WrappedScalarProperty(cls, fieldName, doc=fieldType.__doc__)
+                        prop = WrappedScalarProperty(fieldName, doc=fieldType.__doc__)
 
                 clsDict[fieldName] = prop
 
