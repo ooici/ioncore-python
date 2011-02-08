@@ -11,7 +11,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.messaging.message_client import MessageClient
-from ion.play.hello_data_update import HelloDataUpdateClient
+from ion.play.hello_data_update import HelloDataUpdateClient, HelloDataUpdateError
 from ion.test.iontest import IonTestCase
 
 from ion.core.process.process import Process, ProcessClient, ProcessDesc
@@ -22,6 +22,7 @@ from ion.core.object import object_utils
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 resource_request_type = object_utils.create_type_identifier(object_id=10, version=1)
+resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
 
 class HelloDataUpdateTest(IonTestCase):
     """
@@ -92,6 +93,7 @@ class HelloDataUpdateTest(IonTestCase):
         ### request to clobber the state of the resource
         clobber_request_msg = yield self.mc.create_instance(resource_request_type, name='Clobber it!')
         
+        
         # Get the current and make some changes...
         clobber_request_msg.configuration = create_response_msg.configuration
         clobber_request_msg.configuration.title = 'Bad addresses'
@@ -103,6 +105,9 @@ class HelloDataUpdateTest(IonTestCase):
         
         clobber_result_msg = yield hc1.clobber_addressbook_resource(clobber_request_msg)
         
+        if clobber_result_msg.MessageType != resource_response_type:
+            raise HelloDataUpdateError('Expected message type ResourceConfigurationResponse, received %s'
+                                     % str(clobber_request_msg))
         
         ### request to merge the state of the resource
         merge_request_msg = yield self.mc.create_instance(resource_request_type, name='merge me!')
@@ -120,7 +125,12 @@ class HelloDataUpdateTest(IonTestCase):
         
         merge_request_msg.resource_reference = create_response_msg.resource_reference
         
-        result = yield hc1.merge_addressbook_resource(merge_request_msg)
+        merge_result_msg = yield hc1.merge_addressbook_resource(merge_request_msg)
+        
+        if merge_result_msg.MessageType != resource_response_type:
+            # This will terminate the hello service. As an alternative reply okay with an error message
+            raise HelloDataUpdateError('Expected message type ResourceConfigurationResponse, received %s'
+                                     % str(merge_result_msg))
         
         log.info('Tada!')
         
