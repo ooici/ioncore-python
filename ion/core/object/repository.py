@@ -8,10 +8,8 @@
 @author Matt Rodriguez
 
 TODO
-Test merge method.
-Test merging access to merging objects (ReadOnly)
+Refactor Merge to use a proxy repository for the readonly objects - they must live in a seperate workspace.
 
-Make sure delete works for these objects the way we expect!
 """
 
 import ion.util.ionlog
