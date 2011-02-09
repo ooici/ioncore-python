@@ -36,7 +36,7 @@ class HelloTest(IonTestCase):
     @itv(CONF)
     @defer.inlineCallbacks
     def test_hello_performance(self):
-        self.timeout = 300
+        self.timeout = 60
 
         services = [
             {'name':'hello1','module':'ion.play.hello_service','class':'HelloService'},
