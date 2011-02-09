@@ -177,9 +177,9 @@ class PubSubService(ServiceProcess):
         @param topic_tree_name Name of the tree to create
         @retval Topic tree ID on success, None if failure
         """
-        log.debug('Calling EMS to create topic tree')
-        rc = yield self.ems.create_exchangename(exchange_space_name, 'New topic tree', exchange_space_name)
-        log.debug('EMS returned "%s"' % str(rc))
+        log.debug('Calling EMS to create topic tree "%s/%s"' % (exchange_space_name, topic_tree_name))
+        rc = yield self.ems.create_exchangename(topic_tree_name, 'New topic tree', exchange_space_name)
+        #log.debug('EMS returned "%s"' % str(rc))
 
         log.debug('Writing topic tree into registry')
         # Now need to write new topic tree into registry
