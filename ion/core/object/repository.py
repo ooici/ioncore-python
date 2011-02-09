@@ -560,8 +560,10 @@ class Repository(object):
         elif len(branch.commitrefs)>1:
             raise RepositoryError('The Branch is in an invalid state and should have been merged on read!')
         else:
-            # This is a new branch and we must add a place for the commit ref!
+            # This is a new repository and we must add a place for the commit ref!
             branch.commitrefs.add()
+            # Since the commit has no parents, set the root_seed
+            cref.root_seed = self.repository_key
         
         
         # For each branch that we merged from - add a  reference

@@ -31,6 +31,10 @@ commit_type = object_utils.create_type_identifier(object_id=8, version=1)
 mutable_type = object_utils.create_type_identifier(object_id=6, version=1)
 structure_element_type = object_utils.create_type_identifier(object_id=1, version=1)
 
+association_type = object_utils.create_type_identifier(object_id=13, version=1)
+terminology_type = object_utils.create_type_identifier(object_id=14, version=1)
+
+
 class DataStoreError(Exception):
     """
     An exception class for the data store
@@ -177,12 +181,24 @@ class DataStoreService(ServiceProcess):
             
             for key in repo._commit_index.keys():
                 if not key in store_commits:
+                    
+                    attributes = {self.CommitIndexName : str(repo_key)}
+                    
                     wse = self.workbench._hashed_elements.get(key)
                     
-                    mystr = binascii.b2a_hex(wse.serialize())
+                    cref = repo._commit_index.get(key)
+                    if cref.objectroot.ObjectType == association_type:
+                        attributes['subject'] = cref.objectroot.GetLink('subject').key
+                        attributes['predicate'] = cref.objectroot.GetLink('predicate').key
+                        attributes['object'] = cref.objectroot.GetLink('object').key
+                        
+                    elif  cref.objectroot.ObjectType == terminology_type:
+                        attributes['word'] = cref.objectroot.word
+                    
+                    # Should replace this with one put slice command
                     defd = self.c_store.put(key = key,
                                            value = wse.serialize(),
-                                           index_attributes = {self.CommitIndexName : str(repo_key)})
+                                           index_attributes = attributes)
                     def_list.append(defd)
             
         yield defer.DeferredList(def_list)
@@ -254,7 +270,7 @@ class DataStoreService(ServiceProcess):
             # if it is already in memory, don't worry about it...
             if not link.key in self.workbench._hashed_elements:            
                 if link.type == commit_type:
-                    raise DataStoreError('Can not get commits in a fetch!')
+                    # Can get commits for a service in a fetch
                     def_list.append(self.c_store.get(link.key))
                 else:
                     def_list.append(self.b_store.get(link.key))
@@ -297,8 +313,8 @@ class DataStoreService(ServiceProcess):
         def_list = []
         for link in links:
             if not link.key in self.workbench._hashed_elements:            
+                # Can request to get commits in a fetch...
                 if link.type == commit_type:
-                    raise DataStoreError('Can not get commits in a fetch!')
                     def_list.append(self.c_store.get(link.key))
                 else:
                     def_list.append(self.b_store.get(link.key))
@@ -335,11 +351,16 @@ class DataStoreService(ServiceProcess):
         
         def_list = []
         for key, wse in got_objs.items():
-            if wse.type == commit_type:
-                raise DataStoreError('Can not get commits in a fetch!')
-                def_list.append(self.c_store.put(key, wse.serialize()))
-            else:
+            #if wse.type == commit_type:
+            #    raise DataStoreError('Can not get commits in a fetch!')
+            #    def_list.append(self.c_store.put(key, wse.serialize()))
+            #else:
+            #    def_list.append(self.b_store.put(key, wse.serialize()))
+            
+            # Don't ever put commits out of context. This is done by push!
+            if wse.type != commit_type:
                 def_list.append(self.b_store.put(key, wse.serialize()))
+                
             # Add it to the dictionary of objects 
         
         obj_dict.update(got_objs)
