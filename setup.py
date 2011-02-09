@@ -48,6 +48,11 @@ setup( name = 'ioncore',
            'M2Crypto==0.21.1-pl1', # patched version to work with CentOS
            'ionproto'
                           ],
+       entry_points = {
+                        'console_scripts': [
+                            'ion-admin=ion.core.env.ion_admin:main',
+                            ],
+                        },
        include_package_data = True,
        classifiers = [
            'Development Status :: 3 - Alpha',
