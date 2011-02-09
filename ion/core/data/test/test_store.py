@@ -147,6 +147,60 @@ class CassandraStoreTest(IStoreTest):
             log.info("Exception raised in tearDown %s" % (ex,))
             
             
+class IndexStoreTest(IStoreTest):
+
+    #@itv(CONF)
+    def _setup_backend(self):
+        """return a deferred which returns a initiated instance of a
+        backend
+        """
+        return defer.maybeDeferred(store.IndexStore,indices=['full_name', 'state', 'birth_date'])
+
+    #@itv(CONF)
+    @defer.inlineCallbacks
+    def test_get_query_attributes(self):
+        attrs = yield self.ds.get_query_attributes()
+        log.info("attrs %s" % (attrs,))
+        attrs_set = set(attrs)
+        correct_set = set(['full_name', 'state', 'birth_date'])
+        self.failUnlessEqual(attrs_set, correct_set)
+
+    #@itv(CONF)
+    @defer.inlineCallbacks
+    def test_query(self):
+        d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
+        d2 = {'full_name':'Patrick Rothfuss', 'birth_date': '1973', 'state':'WI'}     
+        d3 = {'full_name':'Howard Tayler', 'birth_date': '1968', 'state':'UT'}
+        binary_value1 = 'BinaryValue for Brandon Sanderson'
+        binary_value2 = 'BinaryValue for Patrick Rothfuss'
+        binary_value3 = 'BinaryValue for Howard Tayler'
+        yield self.ds.put('bsanderson',binary_value1, d1)   
+        yield self.ds.put('prothfuss',binary_value2, d2)   
+        yield self.ds.put('htayler',binary_value3, d3) 
+        query_attributes = {'birth_date':'1973'}
+        rows = yield self.ds.query(query_attributes)
+        log.info("Rows returned %s " % (rows,))
+        self.failUnlessEqual(rows['prothfuss'], binary_value2)
+         
+    #@itv(CONF)
+    @defer.inlineCallbacks
+    def test_put(self):
+        d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
+        d2 = {'full_name':'Patrick Rothfuss', 'birth_date': '1973', 'state':'WI'}     
+        d3 = {'full_name':'Howard Tayler', 'birth_date': '1968', 'state':'UT'}
+        binary_value1 = 'BinaryValue for Brandon Sanderson'
+        binary_value2 = 'BinaryValue for Patrick Rothfuss'
+        binary_value3 = 'BinaryValue for Howard Tayler'
+        yield self.ds.put('bsanderson',binary_value1, d1)   
+        yield self.ds.put('prothfuss',binary_value2, d2)   
+        yield self.ds.put('htayler',binary_value3, d3)   
+        val1 = yield self.ds.get('bsanderson')
+        val2 = yield self.ds.get('prothfuss')
+        val3 = yield self.ds.get('htayler')
+        self.failUnlessEqual(val1, binary_value1)
+        self.failUnlessEqual(val2, binary_value2)
+        self.failUnlessEqual(val3, binary_value3)
+            
             
 class CassandraIndexedStoreTest(IStoreTest):
 
@@ -212,52 +266,11 @@ class CassandraIndexedStoreTest(IStoreTest):
         
         return defer.succeed(store)
         
-    #@itv(CONF)
-    @defer.inlineCallbacks
-    def test_get_query_attributes(self):
-        attrs = yield self.ds.get_query_attributes()
-        log.info("attrs %s" % (attrs,))
-        attrs_set = set(attrs)
-        correct_set = set(['full_name', 'state', 'birth_date'])
-        self.failUnlessEqual(attrs_set, correct_set)
-
-    #@itv(CONF)
-    @defer.inlineCallbacks
-    def test_query(self):
-        d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
-        d2 = {'full_name':'Patrick Rothfuss', 'birth_date': '1973', 'state':'WI'}     
-        d3 = {'full_name':'Howard Tayler', 'birth_date': '1968', 'state':'UT'}
-        binary_value1 = 'BinaryValue for Brandon Sanderson'
-        binary_value2 = 'BinaryValue for Patrick Rothfuss'
-        binary_value3 = 'BinaryValue for Howard Tayler'
-        yield self.ds.put('bsanderson',binary_value1, d1)   
-        yield self.ds.put('prothfuss',binary_value2, d2)   
-        yield self.ds.put('htayler',binary_value3, d3) 
-        query_attributes = {'birth_date':'1973'}
-        rows = yield self.ds.query(query_attributes)
-        log.info("Rows returned %s " % (rows,))
-        self.failUnlessEqual(rows[0].key, 'prothfuss')
-         
-    #@itv(CONF)
-    @defer.inlineCallbacks
-    def test_put(self):
-        d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
-        d2 = {'full_name':'Patrick Rothfuss', 'birth_date': '1973', 'state':'WI'}     
-        d3 = {'full_name':'Howard Tayler', 'birth_date': '1968', 'state':'UT'}
-        binary_value1 = 'BinaryValue for Brandon Sanderson'
-        binary_value2 = 'BinaryValue for Patrick Rothfuss'
-        binary_value3 = 'BinaryValue for Howard Tayler'
-        yield self.ds.put('bsanderson',binary_value1, d1)   
-        yield self.ds.put('prothfuss',binary_value2, d2)   
-        yield self.ds.put('htayler',binary_value3, d3)   
-        val1 = yield self.ds.get('bsanderson')
-        val2 = yield self.ds.get('prothfuss')
-        val3 = yield self.ds.get('htayler')
-        self.failUnlessEqual(val1, binary_value1)
-        self.failUnlessEqual(val2, binary_value2)
-        self.failUnlessEqual(val3, binary_value3)
     
     @defer.inlineCallbacks  
     def tearDown(self):
         yield self.ds.terminate()
              
+
+
+

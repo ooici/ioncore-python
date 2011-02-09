@@ -24,11 +24,107 @@ from ion.core.object import object_utils
 
 instrument_resource_type = object_utils.create_type_identifier(object_id=20029, version=1)
 instrument_info_type = object_utils.create_type_identifier(object_id=20030, version=1)
+"""
+package net.ooici.play;
+
+
+message InstrumentResource{
+    enum _MessageTypeIdentifier {
+      _ID = 20029;
+      _VERSION = 1;
+    }
+    optional string name = 1;
+    optional string make = 2;
+    optional string model = 3;
+    optional string serial_number = 4;
+}
+
+message InstrumentInfoObject{
+    enum _MessageTypeIdentifier {
+      _ID = 20030;
+      _VERSION = 1;
+    }
+    optional string name = 1;
+    optional string make = 2;
+    optional string model = 3;
+    optional string serial_number = 4;
+}
+"""
+
 resource_request_type = object_utils.create_type_identifier(object_id=10, version=1)
 resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
+"""
+package net.ooici.core.message;
 
+import "net/ooici/core/link/link.proto";
+
+message ResourceConfigurationRequest{
+    enum _MessageTypeIdentifier {
+      _ID = 10;
+      _VERSION = 1;
+    }
+    
+    // The identifier for the resource to configure
+    optional net.ooici.core.link.CASRef resource_reference = 1;
+
+    // The desired configuration object
+    optional net.ooici.core.link.CASRef configuration = 2;
+    
+    enum LifeCycleOperation {
+	Activate=1;
+	Deactivate=2;
+	Commission=3;
+	Decommission=4;
+	Retire=5;
+	Develope=6;
+    }
+    
+    optional LifeCycleOperation life_cycle_operation = 3;
+    
+}
+
+message ResourceConfigurationResponse{
+    enum _MessageTypeIdentifier {
+      _ID = 12;
+      _VERSION = 1;
+    }
+    
+    // The identifier for the resource to configure
+    optional net.ooici.core.link.CASRef resource_reference = 1;
+
+    // The desired configuration object
+    optional net.ooici.core.link.CASRef configuration = 2;
+    
+    optional string result = 3;
+}
+"""
 resource_reference_type = object_utils.create_type_identifier(object_id=4, version=1)
+"""
+package net.ooici.core.link;
 
+import "net/ooici/core/type/type.proto";
+
+message CASRef {
+    enum _MessageTypeIdentifier {
+        _ID = 3;
+        _VERSION = 1;
+    }
+	required bytes key = 1;
+	required net.ooici.core.type.GPBType type = 2;
+	required bool isleaf = 3;
+}
+
+message IDRef {
+    enum _MessageTypeIdentifier {
+        _ID = 4;
+        _VERSION = 1;
+    }
+	required string key = 1;
+	//required net.ooici.core.type.GPBType type = 2;
+	optional string branch = 3;
+	optional string commit = 4;
+}
+"""
 
 class HelloResourceError(Exception):
     """
@@ -284,22 +380,22 @@ class HelloResource(ServiceProcess):
         
         
         # Business logic to modify physical resources goes inside these if statements!
-        if request.life_cycle_operation == request.MessageObject.Activate:
+        if request.life_cycle_operation == request.MessageObject.LifeCycleOperation.ACTIVATE:
            resource.ResourceLifeCycleState = resource.ACTIVE
 
-        elif request.life_cycle_operation == request.MessageObject.Deactivate:
+        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.DEACTIVATE:
            resource.ResourceLifeCycleState = resource.INACTIVE
            
-        elif request.life_cycle_operation == request.MessageObject.Commission:
+        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.COMMISSION:
            resource.ResourceLifeCycleState = resource.COMMISSIONED
            
-        elif request.life_cycle_operation == request.MessageObject.Decommission:
+        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.Decommission:
            resource.ResourceLifeCycleState = resource.DECOMMISSIONED
            
-        elif request.life_cycle_operation == request.MessageObject.Retire:
+        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.Retire:
            resource.ResourceLifeCycleState = resource.RETIRED
            
-        elif request.life_cycle_operation == request.MessageObject.Develop:
+        elif request.life_cycle_operation == request.MessageObject.LifeCycleOperation.Develop:
            resource.ResourceLifeCycleState = resource.DEVELOPED
 
         yield self.rc.put_instance(resource)

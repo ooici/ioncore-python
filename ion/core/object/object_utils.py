@@ -6,6 +6,7 @@
 """
 
 from ion.util import procutils as pu
+from ion.util.cache import memoize
 
 from net.ooici.core.type import type_pb2
 
@@ -19,6 +20,13 @@ gpb_id_to_class = {}
 class ObjectUtilException(Exception):
     """ Exceptions specific to Object Utilities. """
     pass
+
+def __eq__gpbtype(self, other):
+    ''' Improve performance on GPBType comparisons enormously. '''
+    if self is other: return True
+    if self is None or other is None: return False
+    return self.object_id == other.object_id and self.version == other.version
+setattr(type_pb2.GPBType, '__eq__', __eq__gpbtype)
 
 def sha1hex(val):
     return hashlib.sha1(val).hexdigest().upper()
@@ -40,48 +48,58 @@ def sha1_to_hex(bytes):
     almosthex = map(hex, hex_bytes)
     return ''.join([y[-2:] for y in [x.replace('x', '0') for x in almosthex]]).upper()
 
-def set_type_from_obj(obj, type=None):
-    """    
-    Operates on instances and classes of gpb messages!
-    @TODO Needs cleaning up - should be more robust + get the version 
+@memoize(0)
+def get_enum_from_descriptor(descriptor):
     """
+    @TODO Needs cleaning up - should be more robust + get the version
+    """
+
     ENUM_NAME = '_MessageTypeIdentifier'
     ENUM_ID_NAME = '_ID'
-    
-    if type==None:    
-        ObjectType = type_pb2.GPBType()
-    else:
-        ObjectType = type.GPBMessage
-    
-    descriptor = obj.DESCRIPTOR
+
     if hasattr(descriptor, 'enum_types'):
         for enum_type in descriptor.enum_types:
             if enum_type.name == ENUM_NAME:
                 for val in enum_type.values:
                     if val.name == ENUM_ID_NAME:
-                        ObjectType.object_id=val.number
-                        ObjectType.version = 1
-                        
-                        # Is it bad to return it if it was passed as an arg?
-                        return ObjectType
-                        
-    
+                        return val
+
     raise ObjectUtilException(\
         '''This object has no Message Type Identifier enum: %s'''\
         % (str(descriptor.name)))
+
+@memoize(0)
+def get_type_from_descriptor(descriptor):
+    """    
+    Operates on instances and classes of gpb messages!
+    @TODO Needs cleaning up - should be more robust + get the version 
+    """
+
+    val = get_enum_from_descriptor(descriptor)
+    obj_type = create_type_identifier(val.number, 1)
+    return obj_type
                     
-    
-    
+def get_type_from_obj(obj):
+    return get_type_from_descriptor(obj.DESCRIPTOR)
 
+def set_type_from_obj(obj, type):
+    if isinstance(type, message.Message):
+        gpb_type = type
+    else:
+        gpb_type = object.__getattribute__(type, 'GPBMessage')
 
+    new_type = get_type_from_obj(obj)
+    gpb_type.CopyFrom(new_type)
 
-def create_type_identifier(object_id='', version=''):
+@memoize(0)
+def create_type_identifier(object_id='', version=1):
     """
     This returns an unwrapped GPB object to the application level
     """        
-    ObjectType = type_pb2.GPBType()
-    
+
     try:
+        #ObjectType = type_pb2.GPBType(int(object_id), int(version))
+        ObjectType = type_pb2.GPBType()
         ObjectType.object_id = int(object_id)
         ObjectType.version = int(version)
     except ValueError, ex:
@@ -132,7 +150,7 @@ def get_gpb_class_from_type_id(typeid):
     try:
         return gpb_id_to_class[typeid.object_id]
     except AttributeError, ex:
-        raise ObjectUtilException('The type argument is not a valid type identifier objet: "%s, type: %s "' % (str(typeid), type(typeid)))
+        raise ObjectUtilException('The type argument is not a valid type identifier object: "%s, type: %s "' % (str(typeid), type(typeid)))
     except KeyError, ex:
         raise ObjectUtilException('No Protocol Buffer Message class found for id "%s"' % (str(typeid)))
 
