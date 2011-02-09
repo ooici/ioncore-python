@@ -177,9 +177,9 @@ class PubSubService(ServiceProcess):
         @param topic_tree_name Name of the tree to create
         @retval Topic tree ID on success, None if failure
         """
-        log.debug('Calling EMS to create topic tree')
-        rc = yield self.ems.create_exchangename(exchange_space_name, 'New topic tree', exchange_space_name)
-        log.debug('EMS returned "%s"' % str(rc))
+        log.debug('Calling EMS to create topic tree "%s/%s"' % (exchange_space_name, topic_tree_name))
+        rc = yield self.ems.create_exchangename(topic_tree_name, 'New topic tree', exchange_space_name)
+        #log.debug('EMS returned "%s"' % str(rc))
 
         log.debug('Writing topic tree into registry')
         # Now need to write new topic tree into registry
@@ -374,7 +374,7 @@ class PubSubClient(ServiceClient):
         defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
-    def subscribe(self, topic_regex):
+    def subscribe(self, xs_name, tt_name, topic_regex):
         """
         @brief Called by subscribers, this calls the EMS to setup the data flow
         @param xs_name Exchange space name
@@ -385,7 +385,9 @@ class PubSubClient(ServiceClient):
         @retval Address of queue for ondata() callback and subscription id
         """
         yield self._check_init()
-        payload = {'topic_regex' : topic_regex}
+        payload = {'topic_regex' : topic_regex,
+                'exchange_space_name': xs_name,
+                'topic_tree_name' : tt_name}
         (content, headers, payload) = yield self.rpc_send('subscribe', payload)
         log.debug('retval: %s ' % content['value'])
         defer.returnValue(content['value'])
