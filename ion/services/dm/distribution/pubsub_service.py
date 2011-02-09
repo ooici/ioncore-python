@@ -221,7 +221,7 @@ class PubSubService(ServiceProcess):
 
 
         cstr = "%s/%s" % (topic_tree_id, topic_name)
-        dset = yield rc.create_instance(DSET_TYPE, name=topic_name, description=cstr)
+        dset = yield self.rclient.create_instance(DSET_TYPE, name=topic_name, description=cstr)
 
         dset.open_dap = topic_name
         now = time.time()
