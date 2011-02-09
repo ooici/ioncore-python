@@ -1,3 +1,18 @@
+#################################################################################
+# This code is originally from the Lamson project:
+#
+# Lamson is licensed BSD or GPLv3, whichever you want.  This basically means you
+# shitheads who like using software without giving credit can go on being leeches
+# on the world and tell everyone that you're fucking brilliant and invented all
+# the gear running your shitty little company when really you just borrowed shit
+# from real creators like me.
+#
+# Fuck you very much.
+# --------------------------------------------------------------------------
+#
+#
+# Copyright (c) 2008, Zed A. Shaw
+# All rights reserved.
 """
 Implements Lamson's command line argument parsing system.  It is honestly
 infinitely better than optparse or argparse so it will be released later as a
