@@ -22,7 +22,8 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 #from ion.services.dm.distribution import pubsub_registry
 from ion.core import ioninit
 from ion.core.object import object_utils
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
 
 # Global objects
 CONF = ioninit.config(__name__)
@@ -30,6 +31,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 # References to protobuf message/object definitions
 DSET_TYPE = object_utils.create_type_identifier(object_id=2301, version=1)
+TT_TYPE = object_utils.create_type_identifier(object_id=2306, version=1)
 
 class PubSubService(ServiceProcess):
     """
@@ -49,12 +51,17 @@ class PubSubService(ServiceProcess):
                                           version='0.1.1',
                                           dependencies=[])
 
-    #@defer.inlineCallbacks
-    #def slc_init(self):
+    def slc_init(self):
+        log.debug('PSC starting, creating EMS client')
+        self.ems = ExchangeManagementClient(proc=self)
+        log.debug('Creating ResourceClient')
+        self.rclient = ResourceClient(proc=self)
+
         # Link to registry
         #self.reg = yield pubsub_registry.DataPubsubRegistryClient(proc=self)
 
     # Protocol entry points. Responsible for parsing and unpacking arguments
+    @defer.inlineCallbacks
     def op_declare_topic_tree(self, content, headers, msg):
         try:
             xs_name = content['exchange_space_name']
@@ -62,11 +69,11 @@ class PubSubService(ServiceProcess):
         except KeyError:
             estr = 'Missing information in message!'
             log.exception(estr)
-            self.reply_err(msg, {'value': estr})
+            yield self.reply_err(msg, {'value': estr})
             return
 
         rc = self.declare_topic_tree(xs_name, tt_name)
-        self.reply_ok(msg, {'value': rc})
+        yield self.reply_ok(msg, {'value': rc})
 
     def op_undeclare_topic_tree(self, content, headers, msg):
         try:
@@ -162,6 +169,7 @@ class PubSubService(ServiceProcess):
 
     ##############################################################    
     # API-style entry points. Akin to the twisted protocol/factory
+    @defer.inlineCallbacks
     def declare_topic_tree(self, exchange_space_name, topic_tree_name):
         """
         @brief Create a topic tree
@@ -169,7 +177,21 @@ class PubSubService(ServiceProcess):
         @param topic_tree_name Name of the tree to create
         @retval Topic tree ID on success, None if failure
         """
-        log.error('DTT Not implemented')
+        log.debug('Calling EMS to create topic tree')
+        rc = yield self.ems.create_exchangename(exchange_space_name, 'New topic tree', exchange_space_name)
+        log.debug('EMS returned "%s"' % str(rc))
+
+        log.debug('Writing topic tree into registry')
+        # Now need to write new topic tree into registry
+        ttree = yield self.rclient.create_instance(TT_TYPE, name=topic_tree_name, description='New topic tree')
+
+        ttree.exchange_space_name = exchange_space_name
+        ttree.topic_tree_name = topic_tree_name
+
+        log.debug('About to push topic tree into registry')
+        yield self.rclient.put_instance(ttree, 'declare_topic_tree')
+        log.debug('Wrote TT, id is %s' % ttree.ResourceIdentity)
+        defer.returnValue(ttree.ResourceIdentity)
 
     def undeclare_topic_tree(self, topic_tree_id):
         """
@@ -199,7 +221,6 @@ class PubSubService(ServiceProcess):
 
 
         cstr = "%s/%s" % (topic_tree_id, topic_name)
-        rc = ResourceClient(proc=self)
         dset = yield rc.create_instance(DSET_TYPE, name=topic_name, description=cstr)
 
         dset.open_dap = topic_name
@@ -209,7 +230,7 @@ class PubSubService(ServiceProcess):
         dset.creator.name = 'Otto Niemand'
         log.debug('Dataset object created, pushing/committing "%s"' % cstr)
 
-        yield rc.put_instance(dset, 'Adding dataset/topic %s' % cstr)
+        yield self.rclient.put_instance(dset, 'Adding dataset/topic %s' % cstr)
         log.debug('Commit completed, %s' % dset.ResourceIdentity)
         defer.returnValue(dset.ResourceIdentity)
 

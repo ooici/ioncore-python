@@ -108,7 +108,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         self.cache.column_metadata[0] = column
         
     
-    @itv(CONF)
+    #@itv(CONF)
     def _setUpConnection(self):
         """
         This creates the ion resource objects necessary that hold the information needed to connect
@@ -120,6 +120,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         # Set only one host and port in the host list for now
         cas_host = cassandra_cluster.hosts.add()
         cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
+        #cas_host.host = 'ec2-184-72-14-57.us-west-1.compute.amazonaws.com'
         cas_host.port = 9160
         
         ### Create a Credentials resource - for cassandra a SimplePassword object

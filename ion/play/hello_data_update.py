@@ -25,8 +25,110 @@ from ion.core.object import object_utils
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+"""
+package net.ooici.play;
+
+// Copied from the google example!
+// Changed rules - never use required!
+
+import "net/ooici/core/link/link.proto";
+
+message Person {
+  enum _MessageTypeIdentifier {
+    _ID = 20001;
+    _VERSION = 1;
+  }
+  optional string name = 1;
+  optional int32 id = 2;        // Unique ID number for this person.
+  optional string email = 3;
+
+  enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+  }
+
+  message PhoneNumber {
+    optional string number = 1;
+    optional PhoneType type = 2 [default = HOME];
+  }
+
+  repeated PhoneNumber phone = 4;
+}
+
+// Our address book file is just one of these.
+message AddressBook {
+  enum _MessageTypeIdentifier {
+    _ID = 20002;
+    _VERSION = 1;
+  }
+  repeated Person person = 1;
+  optional Person owner = 2;
+  optional string title = 3;
+}
+
+
+// Our address book file is just one of these.
+message AddressLink {
+  enum _MessageTypeIdentifier {
+    _ID = 20003;
+    _VERSION = 1;
+  }
+  repeated net.ooici.core.link.CASRef person = 1;
+  optional net.ooici.core.link.CASRef owner = 2;
+  optional string title = 3;
+}
+"""
+
 resource_request_type = object_utils.create_type_identifier(object_id=10, version=1)
 resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
+"""
+package net.ooici.core.message;
+
+import "net/ooici/core/link/link.proto";
+
+message ResourceConfigurationRequest{
+    enum _MessageTypeIdentifier {
+      _ID = 10;
+      _VERSION = 1;
+    }
+    
+    // The identifier for the resource to configure
+    optional net.ooici.core.link.CASRef resource_reference = 1;
+
+    // The desired configuration object
+    optional net.ooici.core.link.CASRef configuration = 2;
+    
+    enum LifeCycleOperation {
+	Activate=1;
+	Deactivate=2;
+	Commission=3;
+	Decommission=4;
+	Retire=5;
+	Develope=6;
+    }
+    
+    optional LifeCycleOperation life_cycle_operation = 3;
+    
+}
+
+message ResourceConfigurationResponse{
+    enum _MessageTypeIdentifier {
+      _ID = 12;
+      _VERSION = 1;
+    }
+    
+    // The identifier for the resource to configure
+    optional net.ooici.core.link.CASRef resource_reference = 1;
+
+    // The desired configuration object
+    optional net.ooici.core.link.CASRef configuration = 2;
+    
+    optional string result = 3;
+}
+"""
+
+
 
 class HelloDataUpdateError(Exception):
     """
@@ -152,7 +254,7 @@ class HelloDataUpdate(ServiceProcess):
         response.configuration = resource.ResourceObject
         response.result = 'Clobbered'
          
-        yield self.reply_ok(msg)
+        yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
     def op_merge_addressbook_resource(self, request, headers, msg):
@@ -213,7 +315,7 @@ class HelloDataUpdate(ServiceProcess):
         response.configuration = resource.ResourceObject
         response.result = 'Merged'
             
-        yield self.reply_ok(msg)
+        yield self.reply_ok(msg, response)
 
 
 class HelloDataUpdateClient(ServiceClient):

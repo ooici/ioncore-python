@@ -19,6 +19,61 @@ from ion.core.object import object_utils
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+"""
+package net.ooici.play;
+
+// Copied from the google example!
+// Changed rules - never use required!
+
+import "net/ooici/core/link/link.proto";
+
+message Person {
+  enum _MessageTypeIdentifier {
+    _ID = 20001;
+    _VERSION = 1;
+  }
+  optional string name = 1;
+  optional int32 id = 2;        // Unique ID number for this person.
+  optional string email = 3;
+
+  enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+  }
+
+  message PhoneNumber {
+    optional string number = 1;
+    optional PhoneType type = 2 [default = HOME];
+  }
+
+  repeated PhoneNumber phone = 4;
+}
+
+// Our address book file is just one of these.
+message AddressBook {
+  enum _MessageTypeIdentifier {
+    _ID = 20002;
+    _VERSION = 1;
+  }
+  repeated Person person = 1;
+  optional Person owner = 2;
+  optional string title = 3;
+}
+
+
+// Our address book file is just one of these.
+message AddressLink {
+  enum _MessageTypeIdentifier {
+    _ID = 20003;
+    _VERSION = 1;
+  }
+  repeated net.ooici.core.link.CASRef person = 1;
+  optional net.ooici.core.link.CASRef owner = 2;
+  optional string title = 3;
+}
+"""
+
 
 class HelloMessageError(Exception):
     """

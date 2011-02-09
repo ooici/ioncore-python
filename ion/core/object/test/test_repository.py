@@ -34,7 +34,6 @@ class RepositoryTest(unittest.TestCase):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb
         
-        
     def test_init_repo(self):
         
         
@@ -55,6 +54,18 @@ class RepositoryTest(unittest.TestCase):
         self.assertRaises(workbench.WorkBenchError, self.wb.init_repository, 52)
         
         
+    @defer.inlineCallbacks
+    def test_invalidate(self):
+        
+        repo, person = self.wb.init_repository(person_type)
+        
+        repo.commit('junk commit')
+        
+        # Checkout to invalidate it
+        person_2 = yield repo.checkout('master')
+        
+        self.assertEqual(object.__getattribute__(person,'Invalid'), True)
+        
     def test_wrapper_properties(self):
         """
         Test the basic state of a new wrapper object when it is created
@@ -72,6 +83,25 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(len(simple2.ChildLinks),0)
         self.assertEqual(simple2.IsRoot, True)
         self.assertEqual(simple2.Modified, True)
+        
+        
+    def test_inparents(self):
+            
+        repo, ab = self.wb.init_repository(addresslink_type)
+        
+        ab.person.add()
+            
+        ab2 = repo.create_object(addresslink_type)
+            
+        # Person is a null pointer - put an addresslink in it cause we can...
+        ab.person[0] = ab2
+            
+        # add a link to the person list in the addresslink
+        ab2.person.add()
+        
+        # Should fail due to circular reference!
+        self.failUnlessRaises(repository.RepositoryError, ab2.person.SetLink, 0, ab)
+        
         
     @defer.inlineCallbacks
     def test_branch_checkout(self):
@@ -180,7 +210,7 @@ class RepositoryTest(unittest.TestCase):
         p.id = 5
         p.email = 'd@s.com'
         ph = p.phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '123 456 7890'
         
         ab.owner = p
@@ -194,7 +224,7 @@ class RepositoryTest(unittest.TestCase):
         p.id = 78
         p.email = 'J@s.com'
         ph = p.phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '111 222 3333'
         
         ab.person[1] = p
@@ -231,7 +261,7 @@ class RepositoryTest(unittest.TestCase):
         p.id = 5
         p.email = 'd@s.com'
         ph = p.phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '123 456 7890'
  
         ab.owner = p
@@ -256,7 +286,7 @@ class RepositoryTest(unittest.TestCase):
         p1.id = 5
         p1.email = 'd@s.com'
         ph1 = p1.phone.add()
-        ph1.type = p1.WORK
+        ph1.type = p1.PhoneType.MOBILE
         ph1.number = '123 456 7890'
  
         ab1.owner = p1
@@ -305,7 +335,7 @@ class RepositoryTest(unittest.TestCase):
         p1.id = 5
         p1.email = 'd@s.com'
         ph1 = p1.phone.add()
-        ph1.type = p1.WORK
+        ph1.type = p1.PhoneType.WORK
         ph1.number = '123 456 7890'
         ab.owner = p1
         ab.person.add()
@@ -323,7 +353,7 @@ class RepositoryTest(unittest.TestCase):
         p2.id = 3
         p2.email = 'J@G.com'
         ph2 = p1.phone.add()
-        ph2.type = p1.WORK
+        ph2.type = p1.PhoneType.WORK
         ph2.number = '098 765 4321'
         ab.person.add()
         ab.person[1] = p2
