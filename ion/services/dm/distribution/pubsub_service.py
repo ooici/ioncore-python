@@ -374,7 +374,7 @@ class PubSubClient(ServiceClient):
         defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
-    def subscribe(self, topic_regex):
+    def subscribe(self, xs_name, tt_name, topic_regex):
         """
         @brief Called by subscribers, this calls the EMS to setup the data flow
         @param xs_name Exchange space name
@@ -385,7 +385,9 @@ class PubSubClient(ServiceClient):
         @retval Address of queue for ondata() callback and subscription id
         """
         yield self._check_init()
-        payload = {'topic_regex' : topic_regex}
+        payload = {'topic_regex' : topic_regex,
+                'exchange_space_name': xs_name,
+                'topic_tree_name' : tt_name}
         (content, headers, payload) = yield self.rpc_send('subscribe', payload)
         log.debug('retval: %s ' % content['value'])
         defer.returnValue(content['value'])
