@@ -15,6 +15,7 @@ from twisted.internet import defer
 import ion.services.coi.exchange.resource_wrapper as res_wrapper
 from ion.services.coi.exchange.resource_wrapper import ServiceHelper, ClientHelper
 from ion.services.coi.exchange.broker_controller import BrokerController
+from ion.services.coi.exchange.exchange_types import ExchangeTypes
 
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
@@ -37,6 +38,7 @@ class ExchangeManagementService(ServiceProcess):
         log.info("ExchangeManagementService.slc_init(self)")
         self.helper = ServiceHelper(self)
         self.controller = BrokerController()
+        self.exchange_types = ExchangeTypes(self.controller)
         yield self.controller.start()
         
         self.xs = {}
@@ -127,6 +129,14 @@ class ExchangeManagementService(ServiceProcess):
         not already exist in the system.  request.description must not be
         a trivial string and should provide a useful description of the
         ExchangeSpace.        
+        
+        net.ooici.services.coi.exchange_management.proto defines
+        the following Exchange types:
+            PROCESS = 1;
+            SERVICE = 2;
+            EXCHANGE_POINT = 3;
+            QUEUE = 4;
+
         """
         log.debug('op_create_exchangename()')
         
@@ -155,16 +165,10 @@ class ExchangeManagementService(ServiceProcess):
         object.name = name
         object.description = description
         
+        #if object.type
+        yield self.exchange_types.create_exchange_point(exchangespace, name)
 
-        yield self.controller.create_exchange(
-                 exchange=exchangespace + '..' + name,
-                 type='direct', 
-                 passive=False, 
-                 durable=False,
-                 auto_delete=False, 
-                 internal=False, 
-                 nowait=False        
-        )
+        
         # Response
         response = yield self.helper.push_object(object)
         self.xn[name] = response.configuration.MyId;
@@ -221,7 +225,6 @@ class ExchangeManagementClient(ServiceClient):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send('get_object', msg)
         defer.returnValue(content)
-
 
 
     
@@ -284,7 +287,28 @@ class ExchangeManagementClient(ServiceClient):
             (content, headers, msg) = yield self.rpc_send('create_exchangename', msg)
             defer.returnValue(content)
 
-        
+
+    def bind_receiver(
+            self,
+            exchangespace,
+            exchangename 
+        ):
+            """
+            Binds a receiver process to the provided exchangename
+            defined in the provided exchangespace.
+            
+            @param exchangespace 
+                    a string uniquely identifying the ExchangeSpace
+                    to which the ExchangeName belongs.
+            @param exchangename
+                    a string uniquely identifying the ExchangeName
+                    to which this queue will be created.
+            """ 
+            
+            # This is a psuedo operation which just turns around and 
+            # calls local container methods.       
+
+            
 
 factory = ProcessFactory(ExchangeManagementService)
 
