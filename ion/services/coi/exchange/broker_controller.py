@@ -7,37 +7,37 @@ import txamqp.spec
 from txamqp.protocol import AMQChannel, AMQClient, TwistedDelegate
   
 from twisted.internet import error, protocol, reactor
-from twisted.trial import unittest
-from twisted.internet.defer import inlineCallbacks, Deferred, returnValue, DeferredQueue, DeferredLock
-from twisted.python import failure
-from txamqp.queue import Empty
+from twisted.internet.defer import inlineCallbacks, Deferred, returnValue
 
-import ion
 from ion import ioninit
 from ion.util import ionlog
 
 CONF = ioninit.config(__name__)
 log = ionlog.getLogger(__name__)  
   
-USERNAME='guest'
-PASSWORD='guest'
-VHOST='/'
-HEARTBEAT = 0
   
 class BrokerController:
   
-    clientClass = AMQClient
-    heartbeat = HEARTBEAT
+
   
     def __init__(self, *args, **kwargs):
         self._privileged_broker = CONF.getValue('privileged_broker_connection')
-        self._amqp_spec = txamqp.spec.load(
-            os.path.join(
-                os.path.dirname(ion.__file__), 
-                "..", 
+        spec_path = os.path.join(
+                os.getcwd(),
                 CONF.getValue('amqp_spec')
             )
-        )
+        if not os.path.isfile(spec_path):
+            # the working directory is obscured by 
+            # _trial_tmp on the command-line
+            spec_path = os.path.join(
+                os.getcwd(),
+                '..',
+                CONF.getValue('amqp_spec')
+            )
+        if not os.path.isfile(spec_path):
+            log.critical('Could not locate AMQP spec file at: ' + CONF.getValue('amqp_spec'))
+
+        self._amqp_spec = txamqp.spec.load(spec_path)
         self.queues = []
         self.exchanges = []
         self.connectors = []
@@ -50,15 +50,18 @@ class BrokerController:
         try:
             self.client = yield self._connect()
         except txamqp.client.Closed, le:
-            mys = "failed to connect to amqp broker:\n \tusername: %s\n \tpassword: %s\n \thost: %s\n \tport: %s\n \tvhost: %s" % (
-                   str(self._privileged_broker['username']),
-                   str(self._privileged_broker['password']),
-                   str(self._privileged_broker['host']),
-                   str(self._privileged_broker['port']),
-                   str(self._privileged_broker['vhost'])
-                )
-            print mys
-            raise
+            log.critical(                                       
+                    "failed to connect to amqp broker:\n " +    \
+                    "\tusername: %s\n " +                       \
+                    "\tpassword: %s\n " +                       \
+                    "\thost:     %s\n " +                       \
+                    "\tport:     %s\n " +                       \
+                    "\tvhost:    %s" % (                        
+                                str(self._privileged_broker['username']),
+                                str(self._privileged_broker['password']),
+                                str(self._privileged_broker['host']),
+                                str(self._privileged_broker['port']),
+                                str(self._privileged_broker['vhost'])))
   
         self.channel = yield self.client.channel(1)
         yield self.channel.channel_open()
@@ -72,6 +75,7 @@ class BrokerController:
             yield ch.queue_delete(queue=q)
         for ch, ex in self.exchanges:
             yield ch.exchange_delete(exchange=ex)
+            log.info('broker_controller: delete_exchange()  name=' + ex)
         for connector in self.connectors:
             yield connector.disconnect()
   
@@ -85,16 +89,26 @@ class BrokerController:
         password = self._privileged_broker['password']
         vhost = self._privileged_broker['vhost']
         heartbeat = self._privileged_broker['heartbeat']
-        clientClass = self.clientClass
   
         delegate = TwistedDelegate()
         onConn = Deferred()
-        p = clientClass(delegate, vhost, self._amqp_spec, heartbeat=heartbeat)
+        p = AMQClient(delegate, vhost, self._amqp_spec, heartbeat=heartbeat)
         f = protocol._InstanceFactory(reactor, p, onConn)
         c = reactor.connectTCP(host, port, f)
         def errb(thefailure):
             thefailure.trap(error.ConnectionRefusedError)
-            log.critical( "failed to connect to amqp broker:\n\tusername: %s\n\tpassword: %s\n\thost: %s\n\tport: %s\n\tvhost: %s" % (username, password, host, port, self.broker, self.vhost))
+            log.critical(                                       
+                    "failed to connect to amqp broker:\n " +    \
+                    "\tusername: %s\n " +                       \
+                    "\tpassword: %s\n " +                       \
+                    "\thost:     %s\n " +                       \
+                    "\tport:     %s\n " +                       \
+                    "\tvhost:    %s" % (                        
+                                str(self._privileged_broker['username']),
+                                str(self._privileged_broker['password']),
+                                str(self._privileged_broker['host']),
+                                str(self._privileged_broker['port']),
+                                str(self._privileged_broker['vhost'])))
             thefailure.raiseException()
         onConn.addErrback(errb)
   
@@ -104,41 +118,49 @@ class BrokerController:
         yield client.authenticate(username, password)
         returnValue(client)
   
+  
+    """
+    Creates an exchange.
+    
+    """
+    @inlineCallbacks
+    def create_exchange(
+                 self, 
+                 channel=None, 
+                 ticket=0, 
+                 exchange='',
+                 type='', 
+                 passive=False, 
+                 durable=False,
+                 auto_delete=False, 
+                 internal=False, 
+                 nowait=False,
+                 arguments={}
+                    ):
+        
+        channel = channel or self.channel
+        reply = yield channel.exchange_declare(
+                ticket, 
+                exchange, 
+                type, 
+                passive, 
+                durable, 
+                auto_delete, 
+                internal, nowait, 
+                arguments
+        )
+        self.exchanges.append((channel,exchange))
+        log.info('broker_controller: create_exchange()  name=' + exchange)
+        returnValue(reply)
+  
+
     @inlineCallbacks
     def queue_declare(self, channel=None, *args, **keys):
         channel = channel or self.channel
         reply = yield channel.queue_declare(*args, **keys)
         self.queues.append((channel, reply.queue))
         returnValue(reply)
-  
-    @inlineCallbacks
-    def create_exchange(
-                         self, 
-                         channel=None, 
-                         ticket=0, 
-                         exchange='',
-                         type='', 
-                         passive=False, 
-                         durable=False,
-                         auto_delete=False, 
-                         internal=False, 
-                         nowait=False,
-                         arguments={}
-                                        ):
-        channel = channel or self.channel
-        reply = yield channel.exchange_declare(
-                        ticket, 
-                        exchange, 
-                        type, 
-                        passive, 
-                        durable, 
-                        auto_delete, 
-                        internal, nowait, 
-                        arguments
-                        )
-        self.exchanges.append((channel,exchange))
-        returnValue(reply)
-  
+
 
     @inlineCallbacks
     def consume(self, queueName):

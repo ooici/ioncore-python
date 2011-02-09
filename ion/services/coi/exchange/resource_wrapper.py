@@ -118,6 +118,16 @@ class ServiceHelper:
         
         
     @defer.inlineCallbacks    
+    def create_object_by_id(self, type, name, description):
+        """
+        Creates a ResourceManagement object based on the the parameters
+        provided.
+        """
+        object = yield self.rc.create_instance(type, name, description)
+        yield defer.returnValue(object)
+        
+                
+    @defer.inlineCallbacks    
     def push_object(self, object):
         """
         Pushes a newly created ResourceManagement object to the data
@@ -153,6 +163,7 @@ class ClientHelper:
     """
     def __init__(self, proc):
         self.proc = proc
+        self.rc = ResourceClient(proc=proc)
         self.mc = MessageClient(proc=proc)
     
     @defer.inlineCallbacks    
