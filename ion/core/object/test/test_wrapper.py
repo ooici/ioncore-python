@@ -29,7 +29,31 @@ addressbook_type = object_utils.create_type_identifier(object_id=20002, version=
 attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
 
 class WrapperMethodsTest(unittest.TestCase):
+    
+    def test_derived_wrappers(self):
         
+        ab = gpb_wrapper.Wrapper._create_object(addressbook_type)
+        # Derived wrappers is still empty
+        self.assertEqual(ab.DerivedWrappers, {})
+        
+        # Setting scalar fields does not do anything here...
+        ab.title = 'name'    
+        self.assertEqual(ab.DerivedWrappers, {})
+        
+        persons = ab.person
+        self.assertIn(persons, ab.DerivedWrappers.values())
+        self.assertIn(persons._gpbcontainer.__hash__(), ab.DerivedWrappers.keys())
+        
+        owner = ab.owner
+        self.assertIn(owner, ab.DerivedWrappers.values())
+        self.assertIn(owner.GPBMessage.__hash__(), ab.DerivedWrappers.keys())
+        
+        ref_to_persons = ab.person
+        self.assertEqual(len(ab.DerivedWrappers),2)
+        
+        person = ab.person.add()
+        self.assertIn(person, ab.DerivedWrappers.values())
+        self.assertIn(person.GPBMessage.__hash__(), ab.DerivedWrappers.keys())
         
     def test_set_get_del(self):
         
