@@ -57,9 +57,7 @@ class PubSubService(ServiceProcess):
         log.debug('Creating ResourceClient')
         self.rclient = ResourceClient(proc=self)
 
-        # Link to registry
-        #self.reg = yield pubsub_registry.DataPubsubRegistryClient(proc=self)
-
+        log.debug('PSC slc_init completed')
     # Protocol entry points. Responsible for parsing and unpacking arguments
     @defer.inlineCallbacks
     def op_declare_topic_tree(self, content, headers, msg):

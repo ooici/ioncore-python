@@ -23,15 +23,24 @@ class PST(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
-        #self.timeout = 5
+        self.timeout = 5
         services = [
-            {'name':'pubsub_service',
-             'module':'ion.services.dm.distribution.pubsub_service',
-             'class':'PubSubService'},
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'servicename':'datastore'}},
-            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
-             'spawnargs':{'datastore_service':'datastore'}},
+            {
+                'name':'pubsub_service',
+                'module':'ion.services.dm.distribution.pubsub_service',
+                'class':'PubSubService'
+            },
+            {
+                'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                    'spawnargs':{'servicename':'datastore'}
+            },
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'class':'ResourceRegistryService',
+                    'spawnargs':{'datastore_service':'datastore'}},
             {
                 'name':'exchange_management',
                 'module':'ion.services.coi.exchange.exchange_management',
@@ -49,6 +58,7 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        yield self._shutdown_processes()
         yield self._stop_container()
 
     def test_start_stop(self):
