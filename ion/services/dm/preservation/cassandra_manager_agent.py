@@ -38,7 +38,7 @@ cassandra_cluster_type =  object_utils.create_type_identifier(object_id=2504, ve
 cassandra_keyspace_type =  object_utils.create_type_identifier(object_id=2506, version=1)
 
 # Cache Resource:
-column_family_type =  object_utils.create_type_identifier(object_id=2507, version=1)
+cassandra_column_family_type =  object_utils.create_type_identifier(object_id=2507, version=1)
 resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
 
 
@@ -129,7 +129,7 @@ class CassandraManagerService(ServiceProcess):
         yield self.register_life_cycle_object(manager)
         
         self.manager = manager
-        yield self._bootstrap()
+        #yield self._bootstrap()
         
         
     @defer.inlineCallbacks
@@ -147,7 +147,7 @@ class CassandraManagerService(ServiceProcess):
             persistent_archive = yield self.rc.create_instance(cassandra_keyspace_type, name=ks.name, description="description of " + ks.name)
             persistent_archive.name = ks.name
             for cf in ks.cf_defs:
-                cache = yield self.rc.create_instance(column_family_type, name=cf.name, description="description of " + cf.name)
+                cache = yield self.rc.create_instance(cassandra_column_family_type, name=cf.name, description="description of " + cf.name)
                 cache.name = cf.name
                 column_index = 0
                 for col in cf.column_metadata:
@@ -163,7 +163,7 @@ class CassandraManagerService(ServiceProcess):
                     column_index = column_index + 1
 
     
-    def __set_resource_attrs(self, request, resource):
+    def __set_persistent_archive_resource_attrs(self, request, resource):
         """
         @param request is the request message passed into the service
         @param resource is the ion resource that is to be configured by copying attributes from the request
@@ -180,8 +180,26 @@ class CassandraManagerService(ServiceProcess):
                 setattr(resource, attr, getattr(request.configuration, attr))
             else:
                 resource.ClearField(attr)    
-        return resource        
-                
+        return resource 
+           
+    def __set_cache_resource_attrs(self, request, resource):
+        """
+        @param request is the request message passed into the service
+        @param resource is the ion resource that is to be configured by copying attributes from the request
+        @param attrs is a list of attribute names
+        @brief copy the attributes from the request to the ION resource.
+        @todo this should happen in a __setattr__ method
+        """
+        if not request.IsFieldSet('cache_configuration'):       
+            raise CassandraManagerServiceException("The request is not properly formatted. It must have a cache_configuration attribute")  
+        
+        attrs = ["name"]
+        for attr in attrs:
+            if request.cache_configuration.IsFieldSet(attr):
+                setattr(resource, attr, getattr(request.cache_configuration, attr))
+            else:
+                resource.ClearField(attr)    
+        return resource                 
         
     @defer.inlineCallbacks
     def op_create_persistent_archive(self, request, headers, msg):
@@ -197,7 +215,7 @@ class CassandraManagerService(ServiceProcess):
         
         log.info("Created resource")
         #Set fields of the persistent_archive_resource from persistent_archive
-        self.__set_resource_attrs(request, persistent_archive_resource)
+        self.__set_persistent_archive_resource_attrs(request, persistent_archive_resource)
         
         yield self.rc.put_instance(persistent_archive_resource, "A commit message")
         log.info("Put resource into datastore")
@@ -229,7 +247,7 @@ class CassandraManagerService(ServiceProcess):
         persistent_archive = request.configuration
         persistent_archive_resource = yield self.rc.get_instance(request.resource_reference)
         #Check to see if the resource has changed
-        self.__set_resource_attrs(request, persistent_archive_resource)
+        self.__set_persistent_archive_resource_attrs(request, persistent_archive_resource)
         log.info("put instance")
         yield self.rc.put_instance(persistent_archive_resource)
         #Do the business logic
@@ -270,7 +288,34 @@ class CassandraManagerService(ServiceProcess):
         These methods need a way to pass the persistent_archive and cache objects together in the
         request. 
         """
-        yield 1
+        keyspace = request.persistent_archive.name
+        column_family = request.cache_configuration.name
+        
+        cache_resource = yield self.rc.create_instance(cassandra_column_family_type, name=request.cache_configuration.name, description="Apt description")
+        log.info("Created resource")
+        #Set fields of the persistent_archive_resource from persistent_archive
+        self.__set_cache_resource_attrs(request, cache_resource)
+    
+        
+        yield self.rc.put_instance(cache_resource, "A commit message")
+        log.info("Put resource into datastore")
+        log.info("Creating column family %s.%s" % (keyspace, column_family))
+        yield self.manager.create_cache(request.persistent_archive, request.cache_configuration)
+        
+        response = yield self.mc.create_instance(resource_response_type, name="create_persistent_archive_response")
+    
+        
+        response.resource_reference = self.rc.reference_instance(cache_resource)
+        
+        # pass the current configuration
+        response.configuration = cache_resource.ResourceObject
+        
+        # pass the result of the create operation...
+        response.result = 'Created'
+                
+        # The following line shows how to reply to a message
+        yield self.reply_ok(msg, response)
+        
     
     @defer.inlineCallbacks
     def op_update_cache(self, request, headers, msg):
@@ -278,14 +323,54 @@ class CassandraManagerService(ServiceProcess):
         Service operation: update a cache object
         
         """
-        yield 1
+        log.info("In op_update_cache method")
+        
+        cache_resource = yield self.rc.get_instance(request.resource_reference)
+        
+        self.__set_cache_resource_attrs(request, cache_resource)
+        
+        """
+        Copying the column_metadata into the resource. 
+        In the future we may want to copy the column_metadata from the request into the 
+        cache resource. This will allow us to keep track of the different columns in the ION
+        resource registry. 
+        cache = request.cache_configuration
+        index = 0        
+        for column in cache.column_metadata:
+           
+            cache_resource.column_metadata.add()
+            cache_resource.column_metadata[index] = column
+            index = index + 1
+        """        
+        yield self.rc.put_instance(cache_resource, "A commit message")
+
+        #Do the business logic
+        yield self.manager.update_cache(request.persistent_archive, request.cache_configuration)
+        
+        log.info("created response")
+        response = yield self.mc.create_instance(resource_response_type, name="update_cache_response")
+        response.resource_reference = self.rc.reference_instance(cache_resource)
+        
+        response.configuration = cache_resource.ResourceObject
+        response.result = 'Updated'
+        yield self.reply_ok(msg, response)
+        
          
     @defer.inlineCallbacks
     def op_delete_cache(self, request, headers, msg):       
         """
         Service operation: remove the cache object
         """
-        yield 1
+        
+        #yield self.rc.put_instance(cache_resource, "A commit message")
+        
+        #Do the business logic
+        yield self.manager.remove_cache(request.persistent_archive, request.cache_configuration)
+        
+        log.info("created response")
+        response = yield self.mc.create_instance(resource_response_type, name="delete_cache_response")
+        response.result = 'Deleted'
+        yield self.reply_ok(msg, response)
         
 # Spawn of the process using the module name
 factory = ProcessFactory(CassandraManagerService)
