@@ -94,8 +94,10 @@ class ExchangeManagementTest(IonTestCase):
         """
         for type in res_wrapper.all_types:
             msg = yield self.helper.create_object(res_wrapper.all_types[type])
-            msg.configuration.name = "name"
-            msg.configuration.description = "description"
+            if hasattr(msg.configuration,'name'):
+                msg.configuration.name = "name"
+            if hasattr(msg.configuration,'description'):
+                msg.configuration.description = "description"
             id = yield self.emc._create_object(msg)
             #assert bp.isHash(id) 
 
@@ -110,8 +112,10 @@ class ExchangeManagementTest(IonTestCase):
         for type in res_wrapper.all_types:
             _type = res_wrapper.all_types[type]
             msg = yield self.helper.create_object(res_wrapper.all_types[type])
-            msg.configuration.name = "name"
-            msg.configuration.description = "description"
+            if hasattr(msg.configuration,'name'):
+                msg.configuration.name = "name"
+            if hasattr(msg.configuration,'description'):
+                msg.configuration.description = "description"
 
             id = yield self.emc._create_object(msg)
 
