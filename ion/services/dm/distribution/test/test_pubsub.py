@@ -31,13 +31,19 @@ class PST(IonTestCase):
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'datastore'}},
             {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
-             'spawnargs':{'datastore_service':'datastore'}}
+             'spawnargs':{'datastore_service':'datastore'}},
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+            },
+
             ]
         yield self._start_container()
         self.sup = yield self._spawn_processes(services)
         self.psc = PubSubClient(self.sup)
 
-        self.xs_name = 'ooici'
+        self.xs_name = 'swapmeet'
         self.tt_name = 'science_data'
         self.topic_name = 'http://ooici.net:8001/coads.nc'
 
@@ -50,8 +56,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_topic_tree_creation(self):
-        raise unittest.SkipTest('Waiting for code')
-
         self.tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
         self.failIf(self.tt_id is None)
 

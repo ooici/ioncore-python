@@ -179,7 +179,10 @@ class PubSubService(ServiceProcess):
         """
         log.debug('Calling EMS to create topic tree "%s/%s"' % (exchange_space_name, topic_tree_name))
         rc = yield self.ems.create_exchangename(topic_tree_name, 'New topic tree', exchange_space_name)
-        #log.debug('EMS returned "%s"' % str(rc))
+        if rc == None:
+            log.error('Error in creating exchange name (topic tree')
+            return
+        log.debug('EMS returned "%s"' % str(rc))
 
         log.debug('Writing topic tree into registry')
         # Now need to write new topic tree into registry
