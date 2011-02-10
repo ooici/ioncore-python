@@ -188,6 +188,19 @@ class Repository(object):
         """
         return self._dotgit.branches
     
+    @property
+    def commit_head(self):
+        """
+        Convience method to access the current commit 
+        """
+        if self._detached_head:
+            log.warn('This repository is currently a detached head. The current commit is not at the head of a branch.')
+        
+        if len(self._current_branch.commitrefs) == 1:          
+            return self._current_branch.commitrefs[0]
+        else:
+            raise RepositoryError('Branch should merge on read. Invalid state with more than one commit at the head of a branch!')
+    
     def branch(self, nickname=None):
         """
         @brief Create a new branch from the current commit and switch the workspace to the new branch.

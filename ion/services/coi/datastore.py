@@ -188,9 +188,9 @@ class DataStoreService(ServiceProcess):
                     
                     cref = repo._commit_index.get(key)
                     if cref.objectroot.ObjectType == association_type:
-                        attributes['subject'] = cref.objectroot.GetLink('subject').key
-                        attributes['predicate'] = cref.objectroot.GetLink('predicate').key
-                        attributes['object'] = cref.objectroot.GetLink('object').key
+                        attributes['subject'] = cref.objectroot.subject
+                        attributes['predicate'] = cref.objectroot.predicate
+                        attributes['object'] = cref.objectroot.object
                         
                     elif  cref.objectroot.ObjectType == terminology_type:
                         attributes['word'] = cref.objectroot.word
@@ -202,6 +202,12 @@ class DataStoreService(ServiceProcess):
                     def_list.append(defd)
             
         yield defer.DeferredList(def_list)
+            
+        # Pretty useless to try and debug by reading, but its a start...   
+        #print 'KVS: \n', self.c_store.kvs, '\n\n'
+        
+        #print 'Index: \n', self.c_store.indices, '\n\n'
+            
             
         def_list = []
         # Now put the mutable heads
