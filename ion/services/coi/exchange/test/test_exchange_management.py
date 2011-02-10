@@ -125,6 +125,7 @@ class ExchangeManagementTest(IonTestCase):
             self.assertEqual(type1.version, type2.version)
             log.debug(type1.object_id, type2.object_id, id)
 
+
     @defer.inlineCallbacks
     def test_create_exchange_space(self):
         """
@@ -136,32 +137,19 @@ class ExchangeManagementTest(IonTestCase):
         """
         
         # Case 1:  Expect success
-        msg = yield self.helper.create_object(res_wrapper.exchangespace_type)
-        msg.configuration.name = "TestExchangeSpace"
-        msg.configuration.description = "This is a test!"
-        id = yield self.emc.create_exchangespace(msg)
+        id = yield self.emc.create_exchangespace("TestExchangeSpace", "This is a test!")
 
         # Case 2:  Fail because of lack of name
         try:
-            msg = yield self.helper.create_object(res_wrapper.exchangespace_type)
-            msg.configuration.description = "This is a test!"
-            id = yield self.emc.create_exchangespace(msg)
+            id = yield self.emc.create_exchangespace("", "This is a test!")
             self.fail("EMS accepted invalid exchangespace.name")
         except:
             pass
         
         # Case 3:  Fail because of duplicate name
         try:
-            msg1 = yield self.helper.create_object(res_wrapper.exchangespace_type)
-            msg1.configuration.name = "TestDuplicateExchangeSpace"
-            msg1.configuration.description = "This is a test!"
-            id = yield self.emc.create_exchangespace(msg1)
-
-            msg2 = yield self.helper.create_object(res_wrapper.exchangespace_type)
-            msg2.configuration.name = "TestDuplicateExchangeSpace"
-            msg2.configuration.description = "This is a test of a another type!"
-            id = yield self.emc.create_exchangespace(msg2)
-            
+            id = yield self.emc.create_exchangespace("DuplicateName", "This is a test!")
+            id = yield self.emc.create_exchangespace("DuplicateName", "This is another test!")
             self.fail("EMS accepted invalid exchangespace.name")
         except Exception, err:
             pass
@@ -178,57 +166,35 @@ class ExchangeManagementTest(IonTestCase):
             3) failure on no name
             4) failure on no exchangespace
         """
-        msg = yield self.helper.create_object(res_wrapper.exchangespace_type)
-        msg.configuration.name = "TestExchangeSpace"
-        msg.configuration.description = "This is a test!"
-        id = yield self.emc.create_exchangespace(msg)
 
-        
+        id = yield self.emc.create_exchangespace("TestExchangeSpace", "This is a test!")
+ 
 
         # Case 1:  Expect success
-        msg = yield self.helper.create_object(res_wrapper.exchangename_type)
-        msg.configuration.name = "TestExchangeName"
-        msg.configuration.description = "This is a test!"
-        msg.configuration.exchangespace = "TestExchangeSpace"
-        id = yield self.emc.create_exchangename(msg)
+        id = yield self.emc.create_exchangename("TestExchangeName", "This is a test!", "TestExchangeSpace")
 
 
         # Case 2:  Fail because of lack of name
         try:
-            msg = yield self.helper.create_object(res_wrapper.exchangename_type)
-            msg.configuration.description = "This is a test!"
-            msg.configuration.exchangespace = "TestExchangeSpace"
-            id = yield self.emc.create_exchangename(msg)
+            id = yield self.emc.create_exchangename("", "Forgot a name")
             self.fail("EMS accepted invalid exchangename.name")
         except:
             pass
-
+#
         # Case 3:  Fail because of duplicate name
         try:
-            msg1 = yield self.helper.create_object(res_wrapper.exchangename_type)
-            msg1.configuration.name = "TestDuplicateExchangeName"
-            msg1.configuration.exchangespace = "TestExchangeSpace"
-            msg1.configuration.description = "This is a test!"
-            id = yield self.emc.create_exchangename(msg1)
-
-            msg2 = yield self.helper.create_object(res_wrapper.exchangename_type)
-            msg2.configuration.name = "TestDuplicateExchangeName"
-            msg2.configuration.exchangespace = "TestExchangeSpace"
-            msg2.configuration.description = "This is a test of a another type!"
-            id = yield self.emc.create_exchangename(msg2)
-            
+            id = yield self.emc.create_exchangename("DuplicateName", "Object 1", "TestExchangeSpace")
+            id = yield self.emc.create_exchangename("DuplicateName", "Object 2", "TestExchangeSpace")
             self.fail("EMS accepted invalid exchangename.name")
         except Exception, err:
             # print err
             pass
         
-        # Case 3:  Fail because of duplicate name
+        # Case 4:  Fail because of missing exchange space
         try:
-            msg = yield self.helper.create_object(bp.exchangename_type)
-            msg.configuration.name = "TestBad"
-            msg.configuration.description = "This is a test!"
-            msg.configuration.exchangespace = "TestExchangeSpaceTypo"
-            id = yield self.emc.create_exchangename(msg)
+            id = yield self.emc.create_exchangename("TestExchangeName", "Object 3", "TestExchangeSpace_XYZZY")
+            id = yield self.emc.create_exchangename("TestExchangeName", "Object 3", "")
+            self.fail("EMS accepted invalid exchangename.exchangespace")
         except Exception, err:
             # print err
             pass
