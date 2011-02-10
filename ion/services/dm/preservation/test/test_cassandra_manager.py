@@ -125,7 +125,7 @@ class CassandraManagerTester(IonTestCase):
         log.info("delete_response.result " + str(delete_response.result))
         self.failUnlessEqual(delete_response.result, "Deleted")
     
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_update_cache(self):
         create_request = yield self.mc.create_instance(cassandra_request_type, name='Creating a create_request')
@@ -134,6 +134,8 @@ class CassandraManagerTester(IonTestCase):
         
         create_request.persistent_archive.name = self.keyspace
         create_request.cache_configuration.name = "SomeCF"
+        create_request.cache_configuration.column_type= 'Standard'
+        create_request.cache_configuration.comparator_type='org.apache.cassandra.db.marshal.BytesType'
         
         create_response = yield self.client.create_cache(create_request)
         log.info("create_response.result " + str(create_response.result))
@@ -196,3 +198,33 @@ class CassandraManagerTester(IonTestCase):
         delete_response = yield self.client.delete_persistent_archive(delete_request)
         log.info("delete_response.result " + str(delete_response.result))
         self.failUnlessEqual(delete_response.result, "Deleted")
+        
+    @itv(CONF)
+    @defer.inlineCallbacks
+    def test_delete_cache(self):
+        create_request = yield self.mc.create_instance(cassandra_request_type, name='Creating a create_request')
+        create_request.persistent_archive = create_request.CreateObject(cassandra_keyspace_type)
+        create_request.cache_configuration = create_request.CreateObject(cassandra_column_family_type)
+        
+        create_request.persistent_archive.name = self.keyspace
+        create_request.cache_configuration.name = "SomeCF"
+        create_request.cache_configuration.column_type= 'Standard'
+        create_request.cache_configuration.comparator_type='org.apache.cassandra.db.marshal.BytesType'
+        
+        create_response = yield self.client.create_cache(create_request)
+        log.info("create_response.result " + str(create_response.result))
+        log.info("create_response.resource_reference :" + str(create_response.resource_reference))
+        self.failUnlessEqual(create_response.result, "Created") 
+        
+        
+        
+        delete_request = yield self.mc.create_instance(cassandra_request_type, name='Creating a delete_request')
+        delete_request.persistent_archive = create_request.persistent_archive
+        delete_request.cache_configuration =  create_request.cache_configuration
+        
+        delete_request.resource_reference = create_response.resource_reference
+        log.info("Sending delete_request")
+        
+        delete_response = yield self.client.delete_cache(delete_request)
+        log.info("delete_response.result " + str(delete_response.result))
+        self.failUnlessEqual(delete_response.result, "Deleted")    
