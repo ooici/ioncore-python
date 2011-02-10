@@ -16,7 +16,6 @@ from ion.core.process.service_process import ServiceProcess
 """
 
 # DHE: testing the miros HSM
-import miros
 from instrument_hsm import InstrumentHsm
 
 from ion.agents.instrumentagents.instrument_connection import InstrumentConnection
@@ -24,17 +23,11 @@ from twisted.internet.protocol import ClientCreator
 
 from collections import deque
 
-from ion.core.process.process import Process
-from ion.data.dataobject import ResourceReference
-from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource #, DAPMessageObject
-from ion.services.dm.distribution.pubsub_service import DataPubsubClient
-
-from ion.agents.instrumentagents.instrument_agent import InstrumentDriver, InstrumentAgentClient
-from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient
+from ion.agents.instrumentagents.instrument_agent import InstrumentDriver
+from ion.agents.instrumentagents.instrument_agent import InstrumentDriverClient, publish_msg_type
 from ion.agents.instrumentagents.SBE49_constants import instrument_commands
 from ion.agents.instrumentagents.SBE49_constants import instrument_prompts
 
-import ion.util.procutils as pu
 from threading import Timer
 
 from ion.core.process.process import ProcessFactory
@@ -43,7 +36,9 @@ from ion.core.process.process import ProcessFactory
 # DHE: need to do something like: instCmdTranslator = SBE49_InstCommandXlator()
 #
 
-RESPONSE_TIMEOUT = 5   # 5 second timeout for response from instrument
+RESPONSE_TIMEOUT = 5         # 5 second timeout for response from instrument
+WAKEUP_RESPONSE_TIMEOUT = 2  # 1 second timeout for wakeup response
+MAX_WAKEUP_COUNT = 25        # number of times to send wakeup burst
 
 class SBE49_instCommandXlator():
     commands = {
@@ -67,7 +62,8 @@ class SBE49InstrumentHsm(InstrumentHsm):
         'eventDisconnectReceived',
         'eventDataReceived',
         'eventPromptReceived',
-        'eventResponseTimeout'
+        'eventResponseTimeout',
+        'eventInstrumentAsleep'
     ]
 
     def sendEvent(self, event):
@@ -88,12 +84,15 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.instrument = None
         self.command = None
         self.setConnected(False)
-        self.setTopicDefined(False)
-        self.publish_to = None
-        self.dataQueue = deque()
-        self.cmdQueue = deque()
+        self.outlierQueue = ""
+        self.dataQueue = ""
+        self.publishLine = ""
+        self.cmdQueue = deque([])
+
         self.proto = None
         self.TimeOut = None
+        self.WakeupTimeOut = None
+        self.wakeupCount = 0
     
         self.instCmdXlator = SBE49_instCommandXlator()
         
@@ -117,6 +116,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         self.hsm.addState ( "stateConnecting",     self.stateConnecting,     self.stateConfigured)
         self.hsm.addState ( "stateConnected",      self.stateConnected,      self.stateConfigured)
         self.hsm.addState ( "statePrompted",       self.statePrompted,       self.stateConnected)
+        self.hsm.addState ( "stateWakingInstrument",  self.stateWakingInstrument, self.stateConnected)
         self.hsm.addState ( "stateDisconnecting",  self.stateDisconnecting,  self.stateConfigured)
     
         """
@@ -184,6 +184,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "exit":
             return 0
         elif caller.tEvt['sType'] == "eventCommandReceived":
+            log.info("stateBase state: ignoring event %s;" %(caller.tEvt['sType']))
+            return 0
+        elif caller.tEvt['sType'] == "eventInstrumentAsleep":
             log.info("stateBase state: ignoring event %s;" %(caller.tEvt['sType']))
             return 0
         else:
@@ -273,13 +276,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "exit":
             return 0
         elif caller.tEvt['sType'] == "eventConnectionComplete":
-            #
-            # DHE: Don't transition to the stateConnected state
-            # until we get the prompt.
-            #
-            #self.sendCmd(instrument_prompts.PROMPT_INST)
             self.sendWakeup()
-            # move to stateConnected
             caller.stateTran(self.stateConnected)
             return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
@@ -288,19 +285,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
             #
             caller.stateTran(self.stateDisconnecting)
             return 0
-        # Don't think I should get this here...candidate for deletion
-        elif caller.tEvt['sType'] == "eventPromptReceived":
-            caller.stateTran(self.stateConnected)
-            return 0
         return caller.tEvt['sType']
 
     def stateConnected(self, caller):
         log.info("stateConnected-%s;" %(caller.tEvt['sType']))
         if caller.tEvt['sType'] == "init":
-            """
-            @todo Need a queue of commands from which to pull commands
-            """
-            # Should we send the prompt here?
             return 0
         elif caller.tEvt['sType'] == "entry":
             return 0
@@ -309,23 +298,22 @@ class SBE49InstrumentDriver(InstrumentDriver):
         elif caller.tEvt['sType'] == "eventCommandReceived":
             # We got a command from the agent; need to get the prompt
             # before sending
-            self.sendCmd(instrument_prompts.PROMPT_INST)
-            #self.sendWakeup()
+            self.sendWakeup()
+            # transition to sub-state 'stateWakingInstrument'
+            caller.stateTran(self.stateWakingInstrument)
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
             # send this up to the agent to publish.
-            data = self.dequeueData()            
+            data = self.getPublishLine()            
             log.debug("stateConnected() Calling publish.")
-            self.publish(data, self.publish_to)
-            if 'S>' in data:
-                caller.stateTran(self.statePrompted)
-            else:
-                log.debug("Did not receive prompt")
+            self.publish(publish_msg_type["Data"], "Device", data)
             return 0
         elif caller.tEvt['sType'] == "eventPromptReceived":
             #
             # Transition to the statePrompted state
             #
+            self.wakeupCount = 0
+            self.__terminateWakeupTimer()
             caller.stateTran(self.statePrompted)
             return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
@@ -334,10 +322,35 @@ class SBE49InstrumentDriver(InstrumentDriver):
             #
             caller.stateTran(self.stateDisconnecting)
             return 0
-        elif caller.tEvt['sType'] == "eventResponseTimeout":
-            self.ProcessWakeupResponseTimeout()
+        elif caller.tEvt['sType'] == "eventWakeupTimeout":
+            self.ProcessWakeupTimeout()
             return 0
         return caller.tEvt['sType']
+
+    #
+    # A state that knows how to deal with strange wakeup behavior
+    #
+    def stateWakingInstrument(self, caller):
+        log.info("stateWakingInstrument-%s;" %(caller.tEvt['sType']))
+        if caller.tEvt['sType'] == "init":
+            return 0
+        elif caller.tEvt['sType'] == "entry":
+            return 0
+        elif caller.tEvt['sType'] == "exit":
+            return 0
+        elif caller.tEvt['sType'] == "eventDataReceived":
+            #self.wakeupCount = 0
+            return 0
+        elif caller.tEvt['sType'] == "eventPromptReceived":
+            self.wakeupCount = 0
+            self.__terminateWakeupTimer()
+            caller.stateTran(self.statePrompted)
+            return 0
+        elif caller.tEvt['sType'] == "eventWakeupTimeout":
+            self.ProcessWakeupTimeout()
+            return 0
+        return caller.tEvt['sType']
+
 
     def statePrompted(self, caller):
         log.info("statePrompted-%s;" %(caller.tEvt['sType']))
@@ -360,9 +373,9 @@ class SBE49InstrumentDriver(InstrumentDriver):
             return 0
         elif caller.tEvt['sType'] == "eventDataReceived":
             # send this up to the agent to publish.
-            data = self.dequeueData()            
+            data = self.getPublishLine()            
             log.debug("statePrompted() Calling publish.")
-            self.publish(data, self.publish_to)
+            self.publish(publish_msg_type["Data"], "Device", data)
             # TODO
             # Use CONSTANT STRING HERE
             # What if we go back to connected every time??? Don't think this
@@ -373,6 +386,8 @@ class SBE49InstrumentDriver(InstrumentDriver):
             #    caller.stateTran(self.stateConnected)
             return 0
         elif caller.tEvt['sType'] == "eventPromptReceived":
+            self.wakeupCount = 0
+            self.__terminateWakeupTimer()
             return 0
         elif caller.tEvt['sType'] == "eventDisconnectReceived":
             #
@@ -392,9 +407,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
             self.ProcessCmdResponseTimeout()
             caller.stateTran(self.stateConnected)
             return 0
+        elif caller.tEvt['sType'] == "eventInstrumentAsleep":
+            caller.stateTran(self.stateConnected)
+            return 0
         return caller.tEvt['sType']
 
-    @defer.inlineCallbacks
     def plc_init(self):
         log.debug("SBE49InstrumentDriver.plc_init: spawn_args: %s" %str(self.spawn_args))
         self.instrument_id = self.spawn_args.get('instrument-id', '123')
@@ -405,25 +422,27 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         self.hsm.onStart(self.stateUnconfigured)
 
-        yield self._configure_driver(self.spawn_args)
+        
+        self._configure_driver(self.spawn_args)
+        log.info("INIT DRIVER for instrument ID=%s, ipaddr=%s, port=%s" % (
+            self.instrument_id, self.instrument_ipaddr, self.instrument_ipport))
 
-        log.info("INIT DRIVER for instrument ID=%s, ipaddr=%s, port=%s, publish-to=%s" % (
-            self.instrument_id, self.instrument_ipaddr, self.instrument_ipport, self.publish_to))
+#        self.iaclient = InstrumentAgentClient(proc=self, target=self.proc_supid)
 
-        self.iaclient = InstrumentAgentClient(proc=self, target=self.proc_supid)
-
-        log.debug("Instrument driver initialized")
+#        log.debug("Instrument driver initialized")
 
         self.hsm.sendEvent('eventConfigured');
 
     @defer.inlineCallbacks
     def plc_terminate(self):
         self.__terminateTimer()
+        self.__terminateWakeupTimer()
             
         yield self.op_disconnect(None, None, None)
 
     def __cleanUpConnection(self):
         self.__terminateTimer()
+        self.__terminateWakeupTimer()
             
     def __terminateTimer(self):
         if self.TimeOut != None:
@@ -431,6 +450,11 @@ class SBE49InstrumentDriver(InstrumentDriver):
             self.TimeOut.cancel()
             self.TimeOut = None
         
+    def __terminateWakeupTimer(self):
+        if self.WakeupTimeOut != None:
+            log.debug("Wakeup Timer active: cancelling")
+            self.WakeupTimeOut.cancel()
+            self.WakeupTimeOut = None
 
     def isConnected(self):
         return self.connected
@@ -438,31 +462,52 @@ class SBE49InstrumentDriver(InstrumentDriver):
     def setConnected(self, value):
         self.connected = value;
 
-    def isTopicDefined(self):
-        return self.topicDefined
-
-    def setTopicDefined(self, value):
-        log.info("*******setting topicDefined to %s:" %str(value))
-        self.topicDefined = value;
-
     def setAgentService(self, agent):
         self.agent = agent
         
+    def enqueueOutlier(self, data):
+        self.outlierQueue += data
+
+    def dequeueOutlier(self):
+        outlier = self.outlierQueue
+        log.debug("dequeuePrompt: dequeued outlier: %s" %outlier)
+        self.outlierQueue = ""
+        return outlier
+
+    def lenOutlier(self):
+        return len(self.outlierQueue)
+        
     def enqueueData(self, data):
-        self.dataQueue.append(data)
+        self.dataQueue += data
 
     def dequeueData(self):
-        log.debug("dequeueData: dequeueing command")
-        data = self.dataQueue.popleft()
-        log.debug("dequeueData: dequeued command: %s" %data)
+        data = self.dataQueue
+        #log.debug("dequeueData: dequeued data: %s" %data)
+        self.dataQueue = ""
         return data
+
+    def peekData(self):
+        return self.dataQueue
         
+    def lenData(self):
+        return len(self.dataQueue)
+
+    def getPublishLine(self):
+        data = self.publishLine
+        #log.debug("dequeueData: dequeued data: %s" %data)
+        self.publishLine = ""
+        return data
+
+    def setPublishLine(self, data):
+        log.debug("setPublishLine: line: %s" %data)
+        self.publishLine = data
+
     def enqueueCmd(self, cmd):
         log.debug("enqueueCmd: enqueueing command: %s" %cmd)
         self.cmdQueue.append(cmd)
 
     def dequeueCmd(self):
-        cmd = self.cmdQueue.popleft()
+        cmd = self.cmdQueue.pop()
         #log.debug("dequeueCmd: dequeueing command: %s" %cmd)
         return cmd
 
@@ -478,31 +523,49 @@ class SBE49InstrumentDriver(InstrumentDriver):
             self.TimeOut = None
             self.hsm.sendEvent('eventResponseTimeout');
             
+    def WakeupTimeoutCallback(self):
+        log.info("TimeoutCallback()")
+        if self.WakeupTimeOut != None:
+            self.WakeupTimeOut = None
+            self.hsm.sendEvent('eventWakeupTimeout');
+            
     def ProcessCmdResponseTimeout(self):
         if len(self.cmdQueue) > 0:
             log.error("No response from instrument for cammand \'%s\'" % self.cmdQueue[0])
-            self.publish("No response from instrument for cammand \'%s\'".format(self.cmdQueue[0]), self.publish_to)
+            self.publish(publish_msg_type["Error"], "Device",
+                         "No response from instrument for cammand \'%s\'" % self.cmdQueue[0])
             self.cmdQueue = []
 
-    def ProcessWakeupResponseTimeout(self):
-        if len(self.cmdQueue) > 0:
+    def ProcessWakeupTimeout(self):
+        self.wakeupCount += 1
+        if self.wakeupCount >= MAX_WAKEUP_COUNT:
+            self.wakeupCount = 0
             log.error("No response from instrument for wakeup")
-            self.publish("No response from instrument for wakeup", self.publish_to)
-            self.cmdQueue = []
+            self.publish(publish_msg_type["Error"], "Device",
+                         "No response from instrument for wakeup")
+            if len(self.cmdQueue) > 0:
+               self.cmdQueue = []
+        else:
+            self.sendWakeup()
       
     def sendCmd(self, cmd):
         log.debug("Sending Command: %s" %cmd)
         self.instrument.transport.write(cmd)
-        # TODO: What if self.TimeOut exists and is running?  
+        self.__terminateTimer()
         self.TimeOut = Timer(RESPONSE_TIMEOUT, self.TimeoutCallback)
         self.TimeOut.start()
         
     def sendWakeup(self):
         log.debug("Sending Wakeup")
-        self.instrument.transport.write(instrument_prompts.PROMPT_INST)
-        # TODO: What if self.TimeOut exists and is running?  
-        #self.TimeOut = Timer(RESPONSE_TIMEOUT, self.TimeoutCallback)
-        #self.TimeOut.start()
+        self.instrument.transport.write(instrument_prompts.PROMPT_INST_BURST)
+        #self.instrument.transport.write("\n\n\n\n\n")
+        #
+        # This is supposed to be bad, but it's the only way I can make it work right now.
+        #
+        self.instrument.transport.doWrite()
+        self.__terminateWakeupTimer()
+        self.WakeupTimeOut = Timer(WAKEUP_RESPONSE_TIMEOUT, self.WakeupTimeoutCallback)
+        self.WakeupTimeOut.start()
         
     @defer.inlineCallbacks
     def getConnected(self):
@@ -538,7 +601,20 @@ class SBE49InstrumentDriver(InstrumentDriver):
         log.debug("gotConnected.")
 
         self.instrument = instrument
+        
+        if self.instrument.transport.getTcpNoDelay():
+            log.info("TCP NODELAY is TRUE")
+        else:            
+            log.info("TCP NODELAY is TRUE")
+                
+        log.info("Setting TCP NODELAY")
 
+        self.instrument.transport.setTcpNoDelay(1)
+        if self.instrument.transport.getTcpNoDelay():
+            log.info("TCP NODELAY is TRUE")
+        else:            
+            log.info("TCP NODELAY is TRUE")
+                
         #
         # Don't need this anymore
         #
@@ -562,7 +638,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
 
         self.proto = None
 
-    def gotData(self, data):
+    def gotData(self, dataFrag):
         """
         @brief The instrument protocol object has received data from the
         instrument. 
@@ -570,49 +646,76 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @retval none
         """
         
-        #
-        # TODO: currently doing this here, but this will change to
-        # where it is discovered that the command is valid
-        #
-        if self.TimeOut != None:
-            log.debug("gotData: cancelling timer.")
-            self.TimeOut.cancel()
-            self.TimeOut = None
+        self.__terminateTimer()
+
+        if dataFrag == instrument_prompts.INST_GONE_TO_SLEEP:
+            log.debug("gotData(): Instrument is now asleep.")
+            self.hsm.sendEvent('eventInstrumentAsleep')
         else:
-            log.debug("gotData: NOT cancelling timer")
-        
-        if data == instrument_prompts.INST_PROMPT or \
-              data == instrument_prompts.INST_SLEEPY_PROMPT:
-            log.debug("gotPrompt()")
-            self.hsm.sendEvent('eventPromptReceived')
-        elif data == instrument_prompts.INST_CONFUSED:
-            log.info("Seabird doesn't understand command.")
-        else:
-            log.debug("gotData() %s." % (data))
-            self.enqueueData(data)
-            self.hsm.sendEvent('eventDataReceived')
-        
+            #
+            # check for outlier character; if there, insert into queue first
+            # 
+            if self.lenOutlier() > 0:
+                #log.debug("CULPRIT BEING ADDED")
+                self.enqueueData(self.dequeueOutlier())
+                
+            #log.debug("gotData(): enqueueing dataFrag: %s" % dataFrag)
+            self.enqueueData(dataFrag)
+    
+            #
+            # If we got an INST_PROMPT then we send the eventPromptReceived.
+            #
+            data = self.peekData()
+            if instrument_prompts.INST_PROMPT in data:
+                log.debug("gotData(): prompt received")
+                self.hsm.sendEvent('eventPromptReceived')
+                
+            #
+            # Now process, but only if there's a line terminator
+            #
+            if instrument_prompts.LINE_TERM in data:
+                #
+                # Need to remove anything behind the LINE_TERM; could be
+                # partial INST_PROMPT
+                #
+                parts = data.partition(instrument_prompts.LINE_TERM)
+                if parts[2] != "":
+                    #log.debug("PARTS IS PARTS: %s" % str(parts))
+                    #
+                    # This fragment needs to be added to the next bunch.
+                    #
+                    self.enqueueOutlier(parts[2])
+                    
+                #
+                # If we got an INST_SLEEPY_PROMPT (the instrument
+                # sends this when it's been prompted and was asleep), then we can
+                # send the eventPromptReceived.  We could still have data in the
+                # queue along with, though, so we need to handle that.
+                #
+                if instrument_prompts.INST_SLEEPY_PROMPT in data:
+                    log.debug("gotData2(): sleepy prompt seen")
+                    self.hsm.sendEvent('eventPromptReceived')
+                #log.debug("gotData(): got line of data: sending eventDataReceived.")
+                self.setPublishLine(parts[0])
+                #
+                # TODO: This line returns data but we're just deleting here.
+                #
+                self.dequeueData()                
+                self.hsm.sendEvent('eventDataReceived')
+       
     @defer.inlineCallbacks
-    def publish(self, data, topic):
+    def publish(self, topic, transducer, data):
         """
-        @brief Publish the given data to the given topic.
-        @param data The data to publish
-        @param topic The topic to which to publish.  Currently this is not the
-        topic as defined by pubsub.
-        @retval none
+        Collect some publishable information to hand back to the agent for
+        publishing
+        @param topic The type of topic that is to be published to. Should be one
+        of "StateChange", "ConfigChange", "Error", or "Data".
+        @param transducer The transducer name to indicate which queue to publish on
+        @param data The message to be published
         """
-        log.debug("publish()")
-        if self.isTopicDefined() == True:
-
-            # Create and send a data message
-            result = yield self.dpsc.publish(self, self.topic.reference(), data)
-            if result:
-                log.info('Published Message')
-            else:
-                log.info('Failed to Published Message')
-        else:
-            log.info("NOT READY TO PUBLISH")
-
+        log.debug("SBE49Driver is publishing to the agent value: %s", data)
+        # send it to our supervisor
+        yield self.send(self.proc_supid, "publish", {"Type":topic, "Transducer":transducer, "Value":data})
 
     @defer.inlineCallbacks
     def op_initialize(self, content, headers, msg):
@@ -635,9 +738,21 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         assert(isinstance(content, (list, tuple)))
         result = {}
+        error_msg = None
         for param in content:
-            result[param] = self.__instrument_parameters[param]
-        yield self.reply_ok(msg, result)
+            if (param not in self.__instrument_parameters):
+                # Getting rid of this
+                #yield self.reply_err(msg, "Could not set %s" % param)
+                error_msg = "ERROR: Could not get " + str(param)
+                log.error(error_msg)
+                # NEED TO BREAK OUT HERE: don't send multiple responses
+                break;
+            else:
+                result[param] = self.__instrument_parameters[param]
+        if error_msg:
+            yield self.reply_ok(msg, error_msg)
+        else:            
+            yield self.reply_ok(msg, result)
 
     @defer.inlineCallbacks
     def op_set_params(self, content, headers, msg):
@@ -658,7 +773,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             if (param not in self.__instrument_parameters):
                 # Getting rid of this
                 #yield self.reply_err(msg, "Could not set %s" % param)
-                error_msg = "Could not set " + str(param)
+                error_msg = "ERROR: Could not set " + str(param)
                 log.error(error_msg)
                 # NEED TO BREAK OUT HERE: don't send multiple responses
                 break;
@@ -674,7 +789,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
                     self.enqueueCmd(command)
                     self.hsm.sendEvent('eventCommandReceived')
                 else:
-                    error_msg = str(param) + " is not a settable parameter"
+                    error_msg = "ERROR:" + str(param) + " is not a settable parameter"
                     #log.error("%s is not a settable parameter" % str(param))
                     log.error(error_msg)
                     
@@ -688,37 +803,32 @@ class SBE49InstrumentDriver(InstrumentDriver):
         """
         Execute the given command structure (first element command, rest
         of the elements are arguments)
-        @todo actually do something
+        @todo Consider making this handle multiple commands?
         """
-        assert(isinstance(content, (tuple, list)))
-
-        log.debug("op_execute content: %s" %str(content))
-
+        log.debug("SBE49_driver op_execute content: %s",content)
         if ((content == ()) or (content == [])):
-            yield self.reply_err(msg, "Empty command")
+            yield self.reply_ok(msg, "ERROR: Empty command" + str(content))
             return
-        agentCommands = []
-        for command_set in content:
-            command = command_set[0]
-            if command not in instrument_commands:
-                log.error("Invalid Command: %s" %command)
-                yield self.reply_err(msg, "Invalid Command")
-            else:
-                log.debug("op_execute translating command: %s" % command)
-                instCommand = self.instCmdXlator.translate(command)
-                log.debug("op_execute would send command: %s to instrument" % instCommand)
-                instCommand += instrument_prompts.PROMPT_INST
+        agentCommands = {}
+        
+        if content[0] not in instrument_commands:
+            log.error("Invalid Command: %s", content[0])
+            yield self.reply_err(msg, "ERROR: Invalid Command")
+        else:
+            log.debug("op_execute translating command: %s", content[0])
+            instCommand = self.instCmdXlator.translate(content[0])
+            log.debug("op_execute would send command: %s to instrument", instCommand)
+            instCommand += instrument_prompts.PROMPT_INST
+            self.enqueueCmd(instCommand)
+            """
+            Send the command received event.  This should kick off the
+            appropriate sequence of events to get the command sent.
+            """
+            #self.hsm.onEvent('eventCommandReceived')
+            self.hsm.sendEvent('eventCommandReceived')
 
-                self.enqueueCmd(instCommand)
-
-                """
-                Send the command received event.  This should kick off the
-                appropriate sequence of events to get the command sent.
-                """
-                self.hsm.sendEvent('eventCommandReceived')
-
-                agentCommands.append(command)
-                yield self.reply_ok(msg, agentCommands)
+            agentCommands = {"value":content[0]}
+            yield self.reply_ok(msg, agentCommands)
 
 
     @defer.inlineCallbacks
@@ -732,7 +842,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
         @return Return a tuple of (status_code, dict)
         @todo Remove this? Is it even used?
         """
-        yield self.reply_ok(msg, "a-ok")
+        yield self.reply_ok(msg, {'InstrumentState':"a-ok"})
 
     @defer.inlineCallbacks
     def op_configure_driver(self, content, headers, msg):
@@ -750,7 +860,6 @@ class SBE49InstrumentDriver(InstrumentDriver):
         # Do something here, then adjust test case
         yield self.reply_ok(msg, content)
 
-    @defer.inlineCallbacks
     def _configure_driver(self, params):
         """
         Configures driver params either on startup or on command
@@ -766,21 +875,7 @@ class SBE49InstrumentDriver(InstrumentDriver):
             self.instrument_ipport = params['ipport']
         else:
             log.debug("%%%%%%%% No ipport in params: defaulting to: %s" %self.instrument_ipport)
-            
-        if 'publish-to' in params:
-            self.publish_to = params['publish-to']
-            log.debug("Configured publish-to=" + self.publish_to)
-            self.setTopicDefined(True)
-            
-            # Instantiate a pubsub client
-            self.dpsc = DataPubsubClient(proc=self)
-            
-            self.topic = ResourceReference(RegistryIdentity=self.publish_to, RegistryBranch='master')
-            
-            self.publisher = PublisherResource.create('Test Publisher', self, self.topic, 'DataObject')
-            self.publisher = yield self.dpsc.define_publisher(self.publisher)
-        else:
-            log.debug("%%%%%%%% No publish-to in params")
+
 
 class SBE49InstrumentDriverClient(InstrumentDriverClient):
     """
