@@ -57,6 +57,7 @@ class PubSubService(ServiceProcess):
         log.debug('Creating ResourceClient')
         self.rclient = ResourceClient(proc=self)
 
+
         log.debug('PSC slc_init completed')
     # Protocol entry points. Responsible for parsing and unpacking arguments
     @defer.inlineCallbacks
@@ -175,6 +176,8 @@ class PubSubService(ServiceProcess):
         @param topic_tree_name Name of the tree to create
         @retval Topic tree ID on success, None if failure
         """
+        yield self.ems.create_exchangespace(exchange_space_name, 'Default exchange space')
+
         log.debug('Calling EMS to create topic tree "%s/%s"' % (exchange_space_name, topic_tree_name))
         rc = yield self.ems.create_exchangename(topic_tree_name, 'New topic tree', exchange_space_name)
         if rc == None:
