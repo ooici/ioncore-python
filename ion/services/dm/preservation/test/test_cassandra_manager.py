@@ -77,6 +77,11 @@ class CassandraManagerTester(IonTestCase):
     @itv(CONF)
     @defer.inlineCallbacks
     def test_create_cache(self):
+        """
+        This integration test does not remove the column family from the Cassandra cluster.
+        The test assumes that the ManagerServiceKeyspace exists and tries to add a column family to that keyspace.
+        Do not run it unless you know how to delete the column family using another client. 
+        """
         create_request = yield self.mc.create_instance(cassandra_request_type, name='Creating a create_request')
         create_request.persistent_archive = create_request.CreateObject(cassandra_keyspace_type)
         create_request.cache_configuration = create_request.CreateObject(cassandra_column_family_type)
