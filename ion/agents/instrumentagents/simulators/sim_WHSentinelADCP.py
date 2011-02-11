@@ -30,13 +30,13 @@ INSTRUMENT_ID = "456"
 class CmdPort(protocol.Protocol):
     
     def __init__(self):
-        log.info("CmdPort __init__")
+        log.debug("CmdPort __init__")
         
     def connectionMade(self):
         """
         @brief A client has made a connection:
         """
-        log.info("CmdPort connectionMade")
+        log.debug("CmdPort connectionMade")
         self.factory.connections.append(self)
 
     def dataReceived(self, data):
@@ -212,6 +212,23 @@ class Instrument(protocol.Protocol):
                     log.debug("Starting test samples")
                     self.startTestSamples()
                     self.testRunning = 'true'
+                    
+            elif command == "cb":
+                if not value.isdigit():
+                    self.transport.write(self.bad_parameters_error)
+                elif len(value) != 3:
+                    self.transport.write(self.bad_parameters_error)
+                else:
+                    for i in range(3):
+                        if i == 0:
+                            if not self.checkValueRange(0, 8, int(value[i]), self.bad_parameters_error):
+                                return
+                        elif i == 1:
+                            if not self.checkValueRange(1, 5, int(value[i]), self.bad_parameters_error):
+                                return
+                        elif not self.checkValueRange(1, 2, int(value[i]), self.bad_parameters_error):
+                            return
+                    self.transport.write(self.prompt)
                     
             elif command == "cf":
                 if not value.isdigit():
@@ -427,6 +444,15 @@ class Instrument(protocol.Protocol):
         self.transport.write(self.get_next_sample())
 
     def get_next_sample(self):
+        self.sample_cnt += 1
+        cnt = self.sample_cnt
+        value1 = 10.0 + 5.0 * math.sin(float(cnt) / 5.0)
+        value2 = 7.00012 * random.random()
+        value3 = 3.139 + random.random()
+        value4 = 1.0103 + random.random()
+        valstr = "%1.4f,  %1.5f,   %1.3f,   %1.3f\r\n" % (value1,value2,value3,value4)
+        return valstr
+        """
         return '7F7FF002000612004D008E008001FA0174020000101ECA410035041E02009001' + \
                'B00001400900D0070005001F000000007D1D6E02BA0101053200310064000000' + \
                'C71A5B090000FF00D105000014800008000A0A0B031C0D15000000F6050000DB' + \
@@ -451,7 +477,8 @@ class Instrument(protocol.Protocol):
                '6400000064000000640000006400000064000000640000006400000064000000' + \
                '6400000064000000640000006400000064000000640000006400000064000000' + \
                '6400000064000000640000006400C837C277\r\n'
-
+        """
+        
     def startTestSamples(self):
         # start the test sample timer
         self.lc_testSampler.start(self.testInterval)

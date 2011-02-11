@@ -97,6 +97,14 @@ def create_type_identifier(object_id='', version=1):
     This returns an unwrapped GPB object to the application level
     """        
 
+    # Temporary restriction to version == 1. Temporary sanity check!
+    if version != 1:
+        msg = '''Protocol Buffer Object VERSION in the MessageTypeIdentifier should be 1. \n'''
+        msg += '''Explicit versioning is not yet supported.\n'''
+        msg +='''Arguments to create_type_identifier: object_id - "%s"; version - "%s"'''\
+            % (str(object_id), str(version))
+        raise ObjectUtilException(msg)
+
     try:
         #ObjectType = type_pb2.GPBType(int(object_id), int(version))
         ObjectType = type_pb2.GPBType()
@@ -104,7 +112,7 @@ def create_type_identifier(object_id='', version=1):
         ObjectType.version = int(version)
     except ValueError, ex:
         raise ObjectUtilException(\
-            '''Protocol Buffer Object IDs must be integers:object_id - "%s", version "%s"'''\
+            '''Protocol Buffer Object IDs must be integers:object_id - "%s"; version - "%s"'''\
             % (str(object_id), str(version)))
         
     return ObjectType
@@ -118,7 +126,8 @@ def build_gpb_lookup(rootpath):
 
     ENUM_NAME = '_MessageTypeIdentifier'
     ENUM_ID_NAME = '_ID'
-
+    ENUM_VERSION_NAME = '_VERSION'
+    
     global gpb_id_to_class
     gpb_id_to_class = {}
 
@@ -139,6 +148,15 @@ def build_gpb_lookup(rootpath):
                             for val in enum_type.values:
                                 if val.name == ENUM_ID_NAME:
                                     gpb_id_to_class[val.number] = msg_class
+                                elif val.name == ENUM_VERSION_NAME:
+                                    # Eventually this will implement versioning...
+                                    # For now return an error if the version is not 1
+                                    if val.number != 1:
+                                        msg = '''Protocol Buffer Object VERSION in the MessageTypeIdentifier should be 1. \n'''
+                                        msg += '''Explicit versioning is not yet supported.\n'''
+                                        msg +='''Invalid Object Class: "%s"'''\
+                                            % (str(msg_class.__name__))
+                                        raise ObjectUtilException(msg)
 
 def get_gpb_class_from_type_id(typeid):
     """

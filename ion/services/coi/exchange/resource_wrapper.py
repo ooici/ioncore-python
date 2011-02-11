@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/hello_resource.py
-@author David Stuebe
-@brief An example service definition that can be used as template for resource management.
+@file ion.services.coi.exchange.exchange_resource.py
+@author Brian Fox
+@brief Provides convenience methods to manage exchange management resources.
 """
 
 import ion.util.ionlog
@@ -31,7 +31,7 @@ resource_response_type     = object_utils.create_type_identifier(object_id=12, v
 # All the various google buffer protos are listed below.  It's unnecessary 
 # to redefine these in other modules.  Instead use soemthing like:  
 #
-# import ion.services.coi.exchange.exchange_boilerplate as bp 
+# import ion.services.coi.exchange.exchange_resources as bp 
 # my_type = bp.queue_type
 
 
@@ -118,6 +118,16 @@ class ServiceHelper:
         
         
     @defer.inlineCallbacks    
+    def create_object_by_id(self, type, name, description):
+        """
+        Creates a ResourceManagement object based on the the parameters
+        provided.
+        """
+        object = yield self.rc.create_instance(type, name, description)
+        yield defer.returnValue(object)
+        
+                
+    @defer.inlineCallbacks    
     def push_object(self, object):
         """
         Pushes a newly created ResourceManagement object to the data
@@ -153,6 +163,7 @@ class ClientHelper:
     """
     def __init__(self, proc):
         self.proc = proc
+        self.rc = ResourceClient(proc=proc)
         self.mc = MessageClient(proc=proc)
     
     @defer.inlineCallbacks    

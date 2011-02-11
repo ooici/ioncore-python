@@ -21,7 +21,7 @@ from ion.core.messaging.receiver import Receiver, FanoutReceiver
 from ion.core.pack import app_supervisor
 from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 import ion.util.procutils as pu
-from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
+from ion.services.coi.exchange.agent_client import ExchangeManagementClient
 
 CONF = ioninit.config(__name__)
 CF_announce = CONF.getValue('announce', False)

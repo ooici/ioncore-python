@@ -9,12 +9,15 @@ interface) the choosing and configuring of the backend client must:
     class
 
 A specific service definition probably shouldn't be part of a library
+
+@TODO update to use new methods for Cassandra connections. Needs a cache resource
+to startup!
 """
 from twisted.internet import defer
 
 from ion.core.process import service_process
-from ion.data import store
-from ion.data.backends import cassandra
+from ion.core.data import store
+from ion.core.data import cassandra
 
 class KeyValueStoreService(service_process.ServiceProcess):
     """
@@ -29,7 +32,7 @@ class KeyValueStoreService(service_process.ServiceProcess):
     The general pattern regardless of backend are the two steps.
     """
 
-    storeFactory = cassandra.CassandraFactory
+    #storeFactory = cassandra.CassandraFactory
 
     declare = service_process.ServiceProcess.service_declare(name='keyvaluestore',
                                                             version='0',
@@ -50,11 +53,11 @@ class KeyValueStoreService(service_process.ServiceProcess):
         port = self.spawn_args["port"]
         namespace = self.spawn_args["namespace"]
         process = self
-        store_factory = self.storeFactory(host, port, self)
+        store_factory = 1 #self.storeFactory(host, port, self)
         # The buildStore method uses connectTCP, and therefore is not a
         # deferred function. This means there is not a guarantee the store
         # will be connected by the time messages arrive to the service.
-        self.store = store_factory.buildStore(namespace) #Not sure if this is the best way
+        self.store = 1 #store_factory.buildStore(namespace) #Not sure if this is the best way
                                           #pass in the process instance;
                                           #trying it for now. Comments
                                           #welcome

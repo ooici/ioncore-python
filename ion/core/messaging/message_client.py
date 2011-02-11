@@ -25,6 +25,8 @@ from ion.core.process import process
 from ion.core.object.repository import RepositoryError
 
 from ion.core.object import workbench
+from ion.core.object import repository
+from ion.core.object import gpb_wrapper
 
 from ion.core.object import object_utils
 
@@ -123,8 +125,101 @@ class MessageClient(object):
     
 class MessageInstanceError(Exception):
     """
-    Exceptoin class for Message Instance Object
+    Exception class for Message Instance Object
     """
+    
+class MessageFieldProperty(object):
+    
+    def __init__(self, name, doc=None):
+        self.name = name
+        if doc: self.__doc__ = doc
+        
+    def __get__(self, message_instance, objtype=None):
+        return getattr(message_instance._repository.root_object.message_object, self.name)
+        
+    def __set__(self, message_instance, value):
+        return setattr(message_instance._repository.root_object.message_object, self.name, value)
+        
+    def __delete__(self, wrapper):
+        raise AttributeError('Can not delete a Message Instance property')
+        
+        
+class MessageEnumProperty(object):
+    
+    def __init__(self, name, doc=None):
+        self.name = name
+        if doc: self.__doc__ = doc
+        
+    def __get__(self, message_instance, objtype=None):
+        return getattr(message_instance._repository.root_object.message_object, self.name)
+        
+    def __set__(self, wrapper, value):
+        raise AttributeError('Can not set a Message Instance enum object')
+        
+    def __delete__(self, wrapper):
+        raise AttributeError('Can not delete a Message Instance property')
+    
+class MessageInstanceType(type):
+    """
+    Metaclass that automatically generates subclasses of Wrapper with corresponding enums and
+    pass-through properties for each field in the protobuf descriptor.
+    
+    This approach is generally applicable to wrap data structures. It is extremely powerful!
+    """
+
+    _type_cache = {}
+
+    def __call__(cls, message_repository, *args, **kwargs):
+        # Cache the custom-built classes
+        
+        # Check that the object we are wrapping is a Google Message object
+        if not isinstance(message_repository, repository.Repository):
+            raise MessageInstanceError('MessageInstance init argument must be an instance of a Repository')
+        
+        if message_repository.status == repository.Repository.NOTINITIALIZED:
+            raise MessageInstanceError('MessageInstance init Repository argument is in an invalid state - checkout first!')
+        
+        if message_repository.root_object.ObjectType != ion_message_type:
+            raise MessageInstanceError('MessageInstance init Repository is not a message object!')
+        
+        message_obj = message_repository.root_object.message_object
+        
+        msgType, clsType = type(message_obj), None
+
+        if msgType in MessageInstanceType._type_cache:
+            clsType = MessageInstanceType._type_cache[msgType]
+        else:
+            
+            
+            # Get the class name
+            clsName = '%s_%s' % (cls.__name__, msgType.__name__)
+            clsDict = {}
+                
+            # Now setup the properties to map through to the GPB object
+            resDict = msgType.__dict__
+            
+            for fieldName, message_field in resDict.items():
+                #print 'Key: %s; Type: %s' % (fieldName, type(message_field))
+                if isinstance(message_field, gpb_wrapper.WrappedProperty):
+                    prop = MessageFieldProperty(fieldName )
+                    
+                    clsDict[fieldName] = prop
+                    
+                elif isinstance(message_field, gpb_wrapper.EnumObject):
+                    prop = MessageEnumProperty(fieldName )
+                    
+                    clsDict[fieldName] = prop
+            
+
+            clsType = MessageInstanceType.__new__(MessageInstanceType, clsName, (cls,), clsDict)
+
+            MessageInstanceType._type_cache[msgType] = clsType
+
+        # Finally allow the instantiation to occur, but slip in our new class type
+        obj = super(MessageInstanceType, clsType).__call__(message_repository, *args, **kwargs)
+        return obj
+    
+    
     
 class MessageInstance(object):
     """
@@ -132,6 +227,9 @@ class MessageInstance(object):
     interacts with a message instance. It hides the git semantics of the data
     store and deals with message specific properties.
     """
+        
+    __metaclass__ = MessageInstanceType
+
         
     def __init__(self, message_repository):
         """
@@ -183,60 +281,12 @@ class MessageInstance(object):
         return self.Repository.create_object(type_id)
         
         
-    def __getattribute__(self, key):
-        """
-        @brief We want to expose the message and its object through a uniform
-        interface. To do so we override getattr to expose the data fields of the
-        message object
-        """
-        # Because we have over-riden the default getattribute we must be extremely
-        # careful about how we use it!
-        repo = object.__getattribute__(self, '_repository')
-        
-        message = getattr(repo, '_workspace_root', None)
-
-        message_object = getattr(message, 'message_object', None)
-
-        gpbfields = getattr(message_object, '_gpbFields', [])
-        
-        if key in gpbfields:
-            # If it is a Field defined by the gpb...
-            #value = getattr(res_obj, key)
-            value = message_object.__getattribute__(key)
-                
-        else:
-            # If it is a attribute of this class, use the base class's getattr
-            value = object.__getattribute__(self, key)
-        return value
-        
-        
-    def __setattr__(self,key,value):
-        """
-        @brief We want to expose the message and its object through a uniform
-        interface. To do so we override getattr to expose the data fields of the
-        message object
-        """
-        repo = object.__getattribute__(self, '_repository')
-        
-        message = getattr(repo, '_workspace_root', None)
-        
-        message_object = getattr(message, 'message_object', None)
-
-        gpbfields = getattr(message_object, '_gpbFields', [])
-        
-        if key in gpbfields:
-            # If it is a Field defined by the gpb...
-            #setattr(res_obj, key, value)
-            message_object.__setattr__(key,value)
-                
-        else:
-            v = object.__setattr__(self, key, value)
         
     def ListSetFields(self):
         """
         Return a list of the names of the fields which have been set.
         """
-        return self.ResourceObject.ListSetFields()
+        return self.MessageObject.ListSetFields()
         
     def IsFieldSet(self, field):
         return self.MessageObject.IsFieldSet(field)

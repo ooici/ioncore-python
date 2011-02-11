@@ -8,10 +8,8 @@
 @author Matt Rodriguez
 
 TODO
-Test merge method.
-Test merging access to merging objects (ReadOnly)
+Refactor Merge to use a proxy repository for the readonly objects - they must live in a seperate workspace.
 
-Make sure delete works for these objects the way we expect!
 """
 
 import ion.util.ionlog
@@ -23,12 +21,13 @@ import time
 from twisted.internet import threads, reactor, defer
 
 from ion.core.object import gpb_wrapper
+from ion.core.object import object_utils
 
 from ion.util import procutils as pu
 
-from net.ooici.core.type import type_pb2
-from net.ooici.core.link import link_pb2
-from net.ooici.core.mutable import mutable_pb2
+commit_type = object_utils.create_type_identifier(object_id=8, version=1)
+mutable_type = object_utils.create_type_identifier(object_id=6, version=1)
+branch_type = object_utils.create_type_identifier(object_id=5, version=1)
 
 from ion.core.object import object_utils
 
@@ -131,7 +130,8 @@ class Repository(object):
             self._dotgit.MyId = self.new_id()
         else:
            
-            self._dotgit = self._create_wrapped_object(mutable_pb2.MutableNode, addtoworkspace = False)
+            mutable_cls = object_utils.get_gpb_class_from_type_id(mutable_type)
+            self._dotgit = self._create_wrapped_object(mutable_cls, addtoworkspace = False)
             self._dotgit.repositorykey = pu.create_guid()
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
@@ -163,6 +163,23 @@ class Repository(object):
     
     upstream = property(_get_upstream, _set_upstream)
     
+    def _get_root_object(self):
+        return self._workspace_root
+        
+    def _set_root_object(self, value):
+        if not isinstance(value, gpb_wrapper.Wrapper):
+            raise RepositoryError('Can not set the root object of the repository to a value which is not an instance of Wrapper')
+    
+        if not value.Repository is self:
+            value = self._copy_from_other(value)
+        
+        if not value.MyId in self._workspace:
+            self._workspace[value.MyId] = value
+            
+        self._workspace_root = value
+        
+        
+    root_object = property(_get_root_object, _set_root_object)
     
     @property
     def branches(self):
@@ -388,7 +405,8 @@ class Repository(object):
         self._detached_head = detached
         
         if detached:
-            self._current_branch = self._create_wrapped_object(mutable_pb2.Branch, addtoworkspace=False)
+            branch_cls = object_utils.get_gpb_class_from_type_id(branch_type)
+            self._current_branch = self._create_wrapped_object(branch_cls, addtoworkspace=False)
             bref = self._current_branch.commitrefs.add()
             bref.SetLink(cref)
             self._current_branch.branchkey = 'detached head'
@@ -412,13 +430,15 @@ class Repository(object):
         # Deal with the newest ref seperately
         crefs.remove(head_cref)
             
-        cref = self._create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
+        # make a new commit ref
+        commit_cls = object_utils.get_gpb_class_from_type_id(commit_type)
+        cref = self._create_wrapped_object(commit_cls, addtoworkspace=False)
                     
         cref.date = pu.currenttime()
 
         pref = cref.parentrefs.add()
         pref.SetLinkByName('commitref',head_cref)
-        pref.relationship = pref.Parent
+        pref.relationship = pref.Relationship.PARENT
 
         cref.SetLinkByName('objectroot', head_cref.objectroot)
 
@@ -427,7 +447,7 @@ class Repository(object):
         for ref in crefs:
             pref = cref.parentrefs.add()
             pref.SetLinkByName('commitref',ref)
-            pref.relationship = pref.MergedFrom
+            pref.relationship = pref.Relationship.MERGEDFROM
         
         structure={}                            
         # Add the CRef to the hashed elements
@@ -516,8 +536,10 @@ class Repository(object):
         the current time is used.
         @retval a string which is the commit reference
         """
-        # Now add a Commit Ref     
-        cref = self._create_wrapped_object(mutable_pb2.CommitRef, addtoworkspace=False)
+        # Now add a Commit Ref
+        # make a new commit ref
+        commit_cls = object_utils.get_gpb_class_from_type_id(commit_type)
+        cref = self._create_wrapped_object(commit_cls, addtoworkspace=False)
         
         if not date:
             date = pu.currenttime()
@@ -534,7 +556,7 @@ class Repository(object):
             pref = cref.parentrefs.add()
             parent = branch.commitrefs[0] # get the parent commit ref
             pref.SetLinkByName('commitref',parent)
-            pref.relationship = pref.Parent
+            pref.relationship = pref.Relationship.PARENT
         elif len(branch.commitrefs)>1:
             raise RepositoryError('The Branch is in an invalid state and should have been merged on read!')
         else:
@@ -546,7 +568,7 @@ class Repository(object):
         for mrgd in self._merge_from:
             pref = cref.parentrefs.add()
             pref.SetLinkByName('commitref',mrgd)
-            pref.relationship = pref.MergedFrom
+            pref.relationship = pref.Relationship.MERGEDFROM
             
         cref.comment = comment
         cref.SetLinkByName('objectroot', self._workspace_root)            
@@ -659,7 +681,7 @@ class Repository(object):
         
             while len(cref.parentrefs) >0:
                 for pref in cref.parentrefs:
-                    if pref.relationship == pref.Parent:
+                    if pref.relationship == pref.Relationship.PARENT:
                             cref = pref.commitref
                             log.info('Commit: \n' + str(cref))
                             break # There should be only one parent ancestor from a branch
@@ -711,9 +733,7 @@ class Repository(object):
 
         if addtoworkspace:
             self._workspace[obj_id] = obj
-            
-        obj._activated=True
-            
+                        
         return obj
         
     def new_id(self):
@@ -793,6 +813,7 @@ class Repository(object):
         except KeyError, ex:
             log.info('"get_remote_linked_object": Caught object not found:'+str(ex))
             res = yield self._fetch_remote_objects([link,])
+            # Object is now in the hashed objects dictionary
             obj = self.get_linked_object(link)
         
         defer.returnValue(obj)
@@ -886,6 +907,48 @@ class Repository(object):
         return obj
         
         
+    def _copy_from_other(self, value):
+        """
+        Copy an object from another repository. This method will serialize any
+        content which is not already in the hashed objects. Then read it back in
+        as new objects in this repository. The objects must not already exist in
+        the current repository or it will return an error
+        """
+        if not isinstance(value, gpb_wrapper.Wrapper):
+            raise RepositoryError('Can not copy an object which is not an instance of Wrapper')    
+        
+        if not value.IsRoot:
+            # @TODO provide for transfer by serialization and re instantiation
+            raise RepositoryError('You can not copy only part of a gpb composite, only the root!')
+        
+        if value.Repository is self:
+            raise RepositoryError('Can not copy an object from the same repository')
+            
+        if value.ObjectType.object_id <= 1000 and value.ObjectType.object_id != 4:
+            # This is a core object other than an IDRef to another repository.
+            # Generally this should not happen...
+            log.warn('Copying core objects is not an error but unexpected results may occur.')
+            
+        structure={}
+        value.RecurseCommit(structure)
+        self._hashed_elements.update(structure)
+        
+        # Get the element by creating a temporary link and loading links...
+        link_cls = object_utils.get_gpb_class_from_type_id(self.LinkClassType)
+        link = self._create_wrapped_object(link_cls, addtoworkspace=False)
+        link.key = value.MyId
+        object_utils.set_type_from_obj(value, link.type)
+        
+        self._load_links(link)
+        
+        obj = self.get_linked_object(link)
+        
+        # Get rid of the temporary link
+        obj.ParentLinks.discard(link)
+        
+        return obj
+    
+    
         
     def set_linked_object(self,link, value):        
         # If it is a link - set a link to the value in the wrapper
@@ -893,22 +956,14 @@ class Repository(object):
             raise RepositoryError('Can not set a composite field unless it is of type Link')
                     
         if not value.IsRoot == True:
-            raise RepositoryError('You can not set a link equal to part of a gpb composite!')
+            # @TODO provide for transfer by serialization and re instantiation
+            raise RepositoryError('You can not set a link equal to part of a gpb composite, only the root!')
+            
         
         # if this value is from another repository... you need to load it from the hashed objects into this repository
-        if not value.Repository.repository_key == self.repository_key:
+        if not value.Repository is self:
             
-            if value.Modified:
-                raise RepositoryError('Can not move objects from a foreign repository which are in a modified state. Commit before moving the object.')
-            
-            # Get the element from the hashed elements list
-            element = self._hashed_elements.get(value.MyId)
-            
-            obj = self._load_element(element)
-            
-            self._load_links(obj)
-            
-            value = obj
+            value = self._copy_from_other(value)
         
         
         if link.key == value.MyId:

@@ -16,7 +16,6 @@ from ion.core.cc.shell import control
 from ion.core.object import object_utils
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 
-import net.ooici.cdm.syntactic.cdmdatatype_pb2 as DataType
 
 # --- CC Application interface
 
@@ -152,12 +151,12 @@ def _bootstrap_objects(supid):
     scalar_sid.name = 'stnId'
     
     variable_salinity.name = 'salinity'
-    variable_t.data_type = DataType.INT
-    variable_z.data_type = DataType.FLOAT
-    scalar_lat.data_type = DataType.FLOAT
-    scalar_lon.data_type = DataType.FLOAT
-    scalar_sid.data_type = DataType.INT
-    variable_salinity.data_type = DataType.FLOAT
+    variable_t.data_type = variable_t.DataType.INT
+    variable_z.data_type = variable_z.DataType.FLOAT
+    scalar_lat.data_type = scalar_lat.DataType.FLOAT
+    scalar_lon.data_type = scalar_lon.DataType.FLOAT
+    scalar_sid.data_type = scalar_sid.DataType.INT
+    variable_salinity.data_type = variable_salinity.DataType.FLOAT
     
     
     # Construct the Coordinate Variables: time and depth
@@ -324,7 +323,7 @@ def _create_string_attribute(dataset, name, values):
     '''
     atrib = dataset.CreateObject(attribute_type)
     atrib.name = name
-    atrib.data_type= DataType.STRING
+    atrib.data_type= atrib.DataType.STRING
     atrib.array = dataset.CreateObject(stringArray_type)
     atrib.array.value.extend(values)
     return atrib

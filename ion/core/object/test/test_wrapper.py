@@ -26,21 +26,61 @@ person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
 
+attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
 
 class WrapperMethodsTest(unittest.TestCase):
+    
+    def test_derived_wrappers(self):
         
-    def setUp(self):
-        wb = workbench.WorkBench('No Process Test')
+        ab = gpb_wrapper.Wrapper._create_object(addressbook_type)
+        # Derived wrappers is still empty
+        self.assertEqual(ab.DerivedWrappers, {})
         
-        repo, ab = wb.init_repository(addresslink_type)
+        # Setting scalar fields does not do anything here...
+        ab.title = 'name'    
+        self.assertEqual(ab.DerivedWrappers, {})
         
-        self.repo = repo
-        self.ab = ab
-        self.wb = wb
+        persons = ab.person
+        self.assertIn(persons, ab.DerivedWrappers.values())
+        self.assertIn(persons._gpbcontainer.__hash__(), ab.DerivedWrappers.keys())
+        
+        owner = ab.owner
+        self.assertIn(owner, ab.DerivedWrappers.values())
+        self.assertIn(owner.GPBMessage.__hash__(), ab.DerivedWrappers.keys())
+        
+        ref_to_persons = ab.person
+        self.assertEqual(len(ab.DerivedWrappers),2)
+        
+        person = ab.person.add()
+        self.assertIn(person, ab.DerivedWrappers.values())
+        self.assertIn(person.GPBMessage.__hash__(), ab.DerivedWrappers.keys())
+        
+    def test_set_get_del(self):
+        
+        ab = gpb_wrapper.Wrapper._create_object(addressbook_type)
+        
+        # set a string field
+        ab.title = 'String'
+        
+        # Can not set a string field to an integer
+        self.assertRaises(TypeError, setattr, ab , 'title', 6)
+        
+        # Get a string field
+        self.assertEqual(ab.title, 'String')
+        
+        # Del ?
+        try:
+            del ab.title
+        except AttributeError, ae:
+            return
+        
+        self.fail('Attribute Error not raised by invalid delete request')
+            
+        
         
     def test_set_composite(self):
         
-        repo, ab = self.wb.init_repository(addressbook_type)
+        ab = gpb_wrapper.Wrapper._create_object(addressbook_type)
             
         ab.person.add()
         ab.person.add()
@@ -52,7 +92,7 @@ class WrapperMethodsTest(unittest.TestCase):
         p = ab.person[0]
         
         ph = ab.person[0].phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '123 456 7890'
             
         self.assertEqual(ab.person[1].name, 'David')
@@ -64,37 +104,33 @@ class WrapperMethodsTest(unittest.TestCase):
         
     def test_enum_access(self):
         
-        p = self.repo.create_object(person_type)
-    
+        p = gpb_wrapper.Wrapper._create_object(person_type)
+        
         # Get an enum
-        self.assertEqual(p.MOBILE,0)
-        self.assertEqual(p.HOME,1)
-        self.assertEqual(p.WORK,2)
+        self.assertEqual(p.PhoneType.MOBILE,0)
+        self.assertEqual(p.PhoneType.HOME,1)
+        self.assertEqual(p.PhoneType.WORK,2)
         
         # error to set an enum
-        self.assertRaises(AttributeError, setattr, p, 'MOBILE', 5)
+        self.assertRaises(AttributeError, setattr, p.PhoneType, 'MOBILE', 5)
         
-    
-    
-    #How do I make this a fail unless?   
-    def test_inparents(self):
-            
-        self.ab.person.add()
-            
-        ab2 = self.repo.create_object(addresslink_type)
-            
-        self.ab.person[0] = ab2
-            
-        ab2.person.add()
+    def test_imported_enum_access(self):
         
-        # Should fail due to circular reference!
-        self.failUnlessRaises(repository.RepositoryError, ab2.person.SetLink, 0, self.ab)
+        
+        att = gpb_wrapper.Wrapper._create_object(attribute_type)
+        
+        att.data_type = att.DataType.BOOLEAN
+        
+        self.assertEqual(att.data_type, att.DataType.BOOLEAN)
+        
+        self.assertRaises(AttributeError, setattr, att.DataType, 'BOOLEAN', 5)
+        
         
         
     def test_listsetfields(self):
         
-        self.ab.person.add()
-        p = self.repo.create_object(person_type)
+        p = gpb_wrapper.Wrapper._create_object(person_type)
+
         p.name = 'David'
         p.id = 5
         
@@ -104,6 +140,17 @@ class WrapperMethodsTest(unittest.TestCase):
         self.assertEqual(['name', 'id'], mylist)
         
         
+        
+class TestWrapperMethodsRequiringRepository(unittest.TestCase):
+    
+    def setUp(self):
+        wb = workbench.WorkBench('No Process Test')
+        
+        repo, ab = wb.init_repository(addresslink_type)
+        
+        self.repo = repo
+        self.ab = ab
+        self.wb = wb
         
     def test_clearfield(self):
         """
@@ -263,7 +310,7 @@ class RecurseCommitTest(unittest.TestCase):
         p.id = 5
         p.email = 'd@s.com'
         ph = p.phone.add()
-        ph.type = p.WORK
+        ph.type = p.PhoneType.WORK
         ph.number = '123 456 7890'
         
         ab.person[0] = p
@@ -282,5 +329,94 @@ class RecurseCommitTest(unittest.TestCase):
         
         self.assertEqual(len(ab_se.ChildLinks),1)
         self.assertIn(p.MyId, ab_se.ChildLinks)
+        
+    def test_dag_conflict(self):
+        
+        wb = workbench.WorkBench('No Process Test')
+            
+        repo = wb.create_repository(addresslink_type)
+        
+        repo.root_object.person.add()
+        repo.root_object.person[0] = repo.create_object(person_type)
+        repo.root_object.person[0].name = 'David'
+        repo.root_object.person[0].id = 5
+        
+        repo.root_object.person.add()
+        repo.root_object.person[1] = repo.create_object(person_type)
+        repo.root_object.person[1].name = 'David'
+        repo.root_object.person[1].id = 5
+        
+        p0 = repo.root_object.person[0]
+        p1 = repo.root_object.person[1]
+        
+        strct={}
+        repo.root_object.RecurseCommit(strct)
+        
+        
+        # The address link should now be unmodified
+        self.assertEqual(repo.root_object.Modified, False)
+        
+        # there should be only two objects once hashed!
+        self.assertEqual(len(strct.keys()), 2)
+        
+        # Show that the old references are now invalid
+        self.assertEqual(p0.Invalid, True)
+        self.assertEqual(p1.Invalid, True)
+        
+        # manually update the hashed elements...
+        wb._hashed_elements.update(strct)
+        
+        self.assertIn(repo.root_object.MyId, strct)
+        self.assertIn(repo.root_object.person[0].MyId, strct)
+        self.assertIn(repo.root_object.person[1].MyId, strct)
+            
+        self.assertIdentical(repo.root_object.person[0], repo.root_object.person[1])
+            
+        # Get the committed structure element
+        ab_se = strct.get(repo.root_object.MyId)
+            
+        # Show that the the SE recongnized only 1 child object
+        self.assertEqual(len(ab_se.ChildLinks),1)
+            
+        # There should be two parent links
+        self.assertEqual(len(repo.root_object.person[0].ParentLinks), 2)
+        
+        par1 = repo.root_object.person[0].ParentLinks.pop()
+        par2 = repo.root_object.person[0].ParentLinks.pop()
+        
+        # They are not identical - they came from a set, but they should be equal!
+        self.assertEqual(par1, par2)
+        
+        # Their root should be identical, the addresslink!
+        self.assertIdentical(par1.Root, repo.root_object)
+        self.assertIdentical(par1.Root, par2.Root)
+        
+        
+    def test_reset_same_value(self):
+        
+        wb = workbench.WorkBench('No Process Test')
+            
+        repo = wb.create_repository(addresslink_type)
+        
+        repo.root_object.person.add()
+        repo.root_object.person[0] = repo.create_object(person_type)
+        repo.root_object.person[0].name = 'David'
+        repo.root_object.person[0].id = 5
+        
+        repo.commit('Jokes on me')
+        
+        repo.root_object.person[0].name = 'David'
+        
+        self.assertEqual(repo.root_object.Modified, True)
+        
+        p0 = repo.root_object.person[0]
+        
+        repo.commit('Jokes on you!')
+
+        self.assertEqual(repo.root_object.Modified, False)
+        self.assertEqual(p0.Invalid, False)
+        self.assertEqual(p0.Modified, False)
+        
+        
         
             
