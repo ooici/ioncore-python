@@ -188,9 +188,17 @@ class DataStoreService(ServiceProcess):
                     
                     cref = repo._commit_index.get(key)
                     if cref.objectroot.ObjectType == association_type:
-                        attributes['subject'] = cref.objectroot.subject
-                        attributes['predicate'] = cref.objectroot.predicate
-                        attributes['object'] = cref.objectroot.object
+                        attributes['subject_repository'] = cref.objectroot.subject.key
+                        attributes['subject_branch'] = cref.objectroot.subject.branch
+                        attributes['subject_commit'] = cref.objectroot.subject.commit
+                        
+                        attributes['predicate_repository'] = cref.objectroot.predicate.key
+                        attributes['predicate_branch'] = cref.objectroot.predicate.branch
+                        attributes['predicate_commit'] = cref.objectroot.predicate.commit
+
+                        attributes['object_repository'] = cref.objectroot.object.key
+                        attributes['object_branch'] = cref.objectroot.object.branch
+                        attributes['object_commit'] = cref.objectroot.object.commit
                         
                     elif  cref.objectroot.ObjectType == terminology_type:
                         attributes['word'] = cref.objectroot.word

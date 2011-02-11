@@ -338,9 +338,9 @@ class DataStoreTest(IonTestCase):
         ab3.root_object.title = 'Associated Junk'
         ab3.commit('test3')
         
-        assoc.root_object.subject = ab1.commit_head.MyId
-        assoc.root_object.predicate = ab2.commit_head.MyId
-        assoc.root_object.object = ab3.commit_head.MyId
+        assoc.root_object.subject = proc_ds1.workbench.reference_repository('addressbook1', current_state=True)
+        assoc.root_object.predicate = proc_ds1.workbench.reference_repository('addressbook2', current_state=True)
+        assoc.root_object.object = proc_ds1.workbench.reference_repository('addressbook3', current_state=True)
         assoc.commit('associated!')
         
         print 'ASSOC:', assoc.root_object
