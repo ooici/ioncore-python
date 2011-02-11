@@ -26,6 +26,7 @@ from ion.util.cache import memoize
 import hashlib
 
 structure_element_type = create_type_identifier(object_id=1, version=1)
+link_type = create_type_identifier(object_id=3, version=1)
 
 class OOIObjectError(Exception):
     """
@@ -249,6 +250,7 @@ class WrapperType(type):
             clsDict = {}
                 
             clsDict['_GPBClass'] = gpbMessage.__class__
+            
                                 
             # Now setup the properties to map through to the GPB object
             descriptor = msgType.DESCRIPTOR
@@ -280,13 +282,57 @@ class WrapperType(type):
                 enum_desc = field_desc.enum_type
                 if enum_desc and not enum_desc.name in clsDict:
                     clsDict[enum_desc.name] = EnumObject(enum_desc)
-
+            
+            # Set the object type:
+            if clsDict.has_key('_MessageTypeIdentifier'):
+                mti = clsDict['_MessageTypeIdentifier']
+                type_obj = create_type_identifier(object_id=mti._ID,\
+                                                version=mti._VERSION)
+            else:
+                type_obj = create_type_identifier(object_id=-99,\
+                                                version=1)
+            clsDict['_gpb_type'] = type_obj
+            # type_obj can now be used for adding special methods to the Wrapper for certain types
+            
+            # Special methods for certain object types:
+            
+            # Need a better way to set the type!!!!!
+            if type_obj == link_type:
+                def obj_setlink(self,value):
+                    #if self.Invalid:
+                    if self._invalid:
+                        raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+            
+                    self.Repository.set_linked_object(self,value)
+                    if not self.Modified:
+                        self._set_parents_modified()
+                    return
+                
+                clsDict['SetLink'] = obj_setlink
+            
+            
+            ### Need to understand why this is neccissary! ###
+            def obj_setter(self, k, v):
+                if self._init and not hasattr(self, k):
+                    raise AttributeError(\
+                        '''Cant add properties to the ION object wrapper for object Class "%s".\n'''
+                        '''Unknown property name - "%s"; value - "%s"''' % (self._GPBClass, k, v))
+                super(Wrapper, self).__setattr__(k, v)
+                
+            clsDict['_init'] = False
+            clsDict['__setattr__'] = obj_setter
+            
+            ### It shoud not be possible to set class attributes like this so we need to lock it down ###
+            
+            
             clsType = WrapperType.__new__(WrapperType, clsName, (cls,), clsDict)
-
+            
             WrapperType._type_cache[msgType] = clsType
-
+            
         # Finally allow the instantiation to occur, but slip in our new class type
         obj = super(WrapperType, clsType).__call__(gpbMessage, *args, **kwargs)
+        
+        
         return obj
 
 class Wrapper(object):
@@ -357,7 +403,8 @@ class Wrapper(object):
         checked out branch of a source repository.
         """
         
-        self._gpb_type = None
+        # This filed now comes from the metaclass
+        #self._gpb_type = None
         """
         The Type ID object for the wrapped object of this class
         """
@@ -405,6 +452,9 @@ class Wrapper(object):
         """
         Need to carry a reference to the repository I am in.
         """
+        
+        # Hack to prevent setting properties in a class instance
+        self._init = True
         
     @classmethod
     def _create_object(cls, msgtype):
@@ -488,17 +538,6 @@ class Wrapper(object):
         """
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        
-        if self._gpb_type:
-            return self._gpb_type
-        
-        
-        if hasattr(self,'_MessageTypeIdentifier'):
-            self._gpb_type = create_type_identifier(object_id=self._MessageTypeIdentifier._ID,\
-                                                version=self._MessageTypeIdentifier._VERSION)
-        else:
-            self._gpb_type = create_type_identifier(object_id=-99,\
-                                                version=-99)
         
         return self._gpb_type
     
@@ -609,18 +648,6 @@ class Wrapper(object):
 
     Modified = property(_get_modified, _set_modified)
     
-    
-    def SetLink(self,value):
-        #if self.Invalid:
-        if self._invalid:
-            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-            
-        if not self.ObjectType == self.LinkClassType:
-            raise OOIObjectError('Can not set link for non link type!')
-            
-        self.Repository.set_linked_object(self,value)
-        if not self.Modified:
-            self._set_parents_modified()
             
         
     def SetLinkByName(self,linkname,value):
@@ -870,16 +897,15 @@ class Wrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         # Check the root wrapper objects list of derived wrappers
         objhash = gpbMessage.__hash__()
-        dw = self.DerivedWrappers
-        if objhash in dw:
-            return dw[objhash]
+        if objhash in self.DerivedWrappers:
+            return self.DerivedWrappers[objhash]
         
         # Else make a new one...
         inst = Wrapper(gpbMessage)        
         inst._root = self._root
         
         # Add it to the list of objects which derive from the root wrapper
-        dw[objhash] = inst
+        self.DerivedWrappers[objhash] = inst
         
         return inst
         

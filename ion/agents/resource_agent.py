@@ -216,7 +216,7 @@ class ResourceAgentClient(ProcessClient):
         """
         (content, headers, msg) = yield self.rpc_send('get_lifecycle_state',
                                                       '')
-        defer.returnValue(LCState(content['value']))
+        defer.returnValue(LCState(content))
 
     @defer.inlineCallbacks
     def get_resource_ref(self):
@@ -224,7 +224,7 @@ class ResourceAgentClient(ProcessClient):
         Obtain the resource ID that the resource is registered with.
         """
         (content, headers, msg) = yield self.rpc_send('get_resource_ref', '')
-        defer.returnValue(AgentInstance.decode(content['value']))
+        defer.returnValue(AgentInstance.decode(content))
 
     @defer.inlineCallbacks
     def get_resource_instance(self):
@@ -234,7 +234,7 @@ class ResourceAgentClient(ProcessClient):
         """
         (content, headers, msg) = \
             yield self.rpc_send('get_resource_instance', '')
-        content_decode = AgentInstance.decode(content['value'])
+        content_decode = AgentInstance.decode(content)
         assert(isinstance(content_decode, AgentInstance))
         defer.returnValue(content_decode)
 
@@ -255,4 +255,4 @@ class ResourceAgentClient(ProcessClient):
             (content, headers, msg) = \
               yield self.rpc_send('register_resource', agent_instance.encode())
 
-        defer.returnValue(AgentInstance.decode(content['value']))
+        defer.returnValue(AgentInstance.decode(content))

@@ -94,8 +94,10 @@ class ExchangeManagementTest(IonTestCase):
         """
         for type in res_wrapper.all_types:
             msg = yield self.helper.create_object(res_wrapper.all_types[type])
-            msg.configuration.name = "name"
-            msg.configuration.description = "description"
+            if hasattr(msg.configuration,'name'):
+                msg.configuration.name = "name"
+            if hasattr(msg.configuration,'description'):
+                msg.configuration.description = "description"
             id = yield self.emc._create_object(msg)
             #assert bp.isHash(id) 
 
@@ -110,8 +112,10 @@ class ExchangeManagementTest(IonTestCase):
         for type in res_wrapper.all_types:
             _type = res_wrapper.all_types[type]
             msg = yield self.helper.create_object(res_wrapper.all_types[type])
-            msg.configuration.name = "name"
-            msg.configuration.description = "description"
+            if hasattr(msg.configuration,'name'):
+                msg.configuration.name = "name"
+            if hasattr(msg.configuration,'description'):
+                msg.configuration.description = "description"
 
             id = yield self.emc._create_object(msg)
 
@@ -198,3 +202,29 @@ class ExchangeManagementTest(IonTestCase):
         except Exception, err:
             # print err
             pass
+        
+        
+        
+    @defer.inlineCallbacks
+    def test_create_queue(self):
+        """
+        A test that ensures we can define an exchangename.  Tests 
+        for:
+            1) successful creation 
+            2) failure on duplicate name
+            3) failure on no name
+            4) failure on no exchangespace
+        """
+
+        # We need an exchangespace and an exchangename
+        id = yield self.emc.create_exchangespace("TestExchangeSpace", "This is a test!")
+        id = yield self.emc.create_exchangename("TestExchangeName", "This is a test!", "TestExchangeSpace")
+
+        # Case 1:  Expect success
+        id = yield self.emc.create_queue(
+                            name="TestQueue", 
+                            description="This is a test!", 
+                            exchangespace="TestExchangeSpace", 
+                            exchangename="TestExchangeName",
+                            topic="alt.humar.best-of-usenet"
+                    )

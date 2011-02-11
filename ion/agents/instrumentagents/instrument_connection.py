@@ -36,7 +36,7 @@ class InstrumentConnection(Protocol):
         of state machine or something; for instance, the agent sends a getStatus
         command, we need to know that we're expecting a status message.
         """
-        log.debug("dataReceived! Length: %s, data-[%s]" %(len(data), data))
+        #log.debug("dataReceived! Length: %s, data-[%s]" %(len(data), data))
         self.parent.gotData(data)
 
 
