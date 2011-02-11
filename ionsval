@@ -93,6 +93,8 @@ def main(targetname, sysname, broker_host='localhost', broker_vhost='/'):
     @param broker_host 
     @param broker_vhost 
     """
+    global exit_status
+    exit_status = 4
     run_test(targetname, sysname, broker_host, broker_vhost)
     reactor.run()
     sys.exit(exit_status)
