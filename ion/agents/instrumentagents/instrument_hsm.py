@@ -18,7 +18,9 @@ class InstrumentHsm(Hsm):
         'eventDisconnectComplete',
         'eventDisconnectReceived',
         'eventPromptReceived',
-        'eventResponseTimeout'
+        'eventResponseTimeout',
+        'eventWakeupTimeout',
+        'eventInstrumentAsleep'
     ]
 
     def sendEvent(self, event):

@@ -155,16 +155,26 @@ class BrokerController:
   
 
     @inlineCallbacks
-    def queue_declare(self, channel=None, *args, **keys):
-        channel = channel or self.channel
-        reply = yield channel.queue_declare(*args, **keys)
-        self.queues.append((channel, reply.queue))
-        returnValue(reply)
+    def create_queue(
+                     self, 
+                     name="",
+                     exchangename="",
+                     routingkey=""
+                    ):
+        q = yield self.channel.queue_declare(
+                queue=exchangename + '.' + name, 
+                durable=False, 
+                exclusive=False,
+                auto_delete=True
+        )    
+        b = yield self.channel.queue_bind(
+                queue=exchangename + '.' + name, 
+                exchange=exchangename,
+                routing_key=routingkey
+        )
+
+        # self.queues.append((channel, reply.queue))
+        returnValue(q)
 
 
-    @inlineCallbacks
-    def consume(self, queueName):
-        """Consume from named queue returns the Queue object."""
-        reply = yield self.channel.basic_consume(queue=queueName, no_ack=True)
-        returnValue((yield self.client.queue(reply.consumer_tag)))
   

@@ -260,6 +260,13 @@ class Process(BasicLifecycleObject,ResponseCodes):
         return self.terminate()
         
     @defer.inlineCallbacks
+    def op_ping(self, content, headers, msg):
+        """
+        Service operation: ping reply
+        """
+        yield self.reply_ok(msg, {'pong':'pong'}, {'quiet':True})
+
+    @defer.inlineCallbacks
     def op_terminate(self, content, headers, msg):
         """
         Shutdown operation, on receive of the init message

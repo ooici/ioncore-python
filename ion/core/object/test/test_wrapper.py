@@ -30,6 +30,20 @@ attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
 
 class WrapperMethodsTest(unittest.TestCase):
     
+    
+    def test_object_setter(self):
+        """
+        Make sure that we can't mistakenly add attributes to wrapper objects
+        """
+        ab = gpb_wrapper.Wrapper._create_object(addressbook_type)
+        
+        # set a string field of the wrapper
+        ab.title = 'String'
+                
+        # Check that you can't set properties that don't exist
+        self.assertRaises(AttributeError, setattr, ab, 'foobar', 'bar')
+        
+    
     def test_derived_wrappers(self):
         
         ab = gpb_wrapper.Wrapper._create_object(addressbook_type)

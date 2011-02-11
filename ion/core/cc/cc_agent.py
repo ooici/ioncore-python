@@ -149,7 +149,7 @@ class CCAgent(ResourceAgent):
         """
         Service operation: ping reply
         """
-        yield self.reply_ok(msg, None, {'quiet':True})
+        yield self.reply_ok(msg, {'pong':'pong'}, {'quiet':True})
 
     @defer.inlineCallbacks
     def op_get_info(self, content, headers, msg):
