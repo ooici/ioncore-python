@@ -103,6 +103,7 @@ class IdentityRegistryClient(ServiceClient):
 
     #--#op_find_users = BaseRegistryService.base_find_resource
 
+    @defer.inlineCallbacks
     def find_users(self, user_description,regex=True,ignore_defaults=True, attnames=[]):
         """
         """
@@ -111,6 +112,7 @@ class IdentityRegistryClient(ServiceClient):
 
 
 
+    @defer.inlineCallbacks
     def set_identity_lcstate(self, ooi_id, lcstate):
         """
         """
@@ -124,6 +126,7 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
 
+    @defer.inlineCallbacks
     def set_identity_lcstate_new(self, ooi_id):
         """
         """
@@ -137,6 +140,7 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
 
+    @defer.inlineCallbacks
     def set_identity_lcstate_active(self, ooi_id):
         """
         """
@@ -150,6 +154,7 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
         
+    @defer.inlineCallbacks
     def set_identity_lcstate_inactive(self, ooi_id):
         """
         """
@@ -163,6 +168,7 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
 
+    @defer.inlineCallbacks
     def set_identity_lcstate_decommissioned(self, ooi_id):
         """
         """
@@ -190,6 +196,7 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
 
+    @defer.inlineCallbacks
     def set_identity_lcstate_developed(self, ooi_id):
         """
         """
@@ -203,6 +210,7 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
 
+    @defer.inlineCallbacks
     def set_identity_lcstate_commissioned(self, ooi_id):
         """
         """

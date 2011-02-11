@@ -21,7 +21,6 @@ from ion.services.coi.identity_registry import IdentityRegistryClient
 
 from ion.resources import coi_resource_descriptions
 
-#from ion.services.coi.identity_registry import IdentityRegistryService, IdentityRegistryClient
 from ion.resources.coi_resource_descriptions import IdentityResource
 
 from ion.data import dataobject
@@ -43,7 +42,6 @@ class IdentityWebResource(resource.Resource):
 
         self.putChild('add_user', AddUser(self.client))
         self.putChild('find_user', FindUser(self.client))
-        self.putChild('erase_registry', EraseAllUsers(self.client))
 
     def render(self, request):
         return "IdentityRegistryService"
@@ -119,46 +117,20 @@ class AddUser(resource.Resource):
             request.write('</body></html>')
             request.finish()
 
-        #print str(request)
 
         if (len(request.args) > 0):
-            new_user = coi_resource_descriptions.IdentityResource.create_new_resource()
-            for field_name in new_user.attributes:
-                if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle")):
-                    if (field_name in request.args and len(request.args[field_name]) > 0):
-                        setattr(new_user, field_name, request.args[field_name][0])
-
-            d = self.client.register_user(new_user)
+            #new_user = coi_resource_descriptions.IdentityResource.create_new_resource()
+            #for field_name in new_user.attributes:
+                #if (field_name not in ("RegistryBranch","RegistryIdentity","RegistryCommit", "lifecycle")):
+                    #print field_name
+                    #if (field_name in request.args and len(request.args[field_name]) > 0):
+                    #   setattr(new_user, field_name, request.args[field_name][0])
+            d = self.client.register_user(request.args['certificate'][0], request.args['rsa_private_key'][0]) # user_cert, user_key
             d.addCallback(_cb)
         else:
             user = IdentityResource.create_new_resource()
             return wrap_html(wrap_form(give_form(user) + '<INPUT TYPE="submit" NAME="add" VALUE="Add User" /><p/>\n', "/add_user") + give_links())
 
-        return server.NOT_DONE_YET
-
-class EraseAllUsers(resource.Resource):
-
-    def __init__(self, identity_service_client):
-        resource.Resource.__init__(self)
-        self.client = identity_service_client
-
-    def render(self, request):
-
-        def _cb(result):
-            request.write('<html><body>')
-            request.write("Registry cleared.<br/>")
-            user = IdentityResource.create_new_resource()
-            request.write(wrap_form(give_form(user) + '<INPUT TYPE="submit" NAME="add" VALUE="Add User" /><p/>\n', "/erase_registry"))
-            request.write(give_links())
-            request.write('</body></html>')
-            request.finish()
-
-        if ('confirm' in request.args):
-            d = self.client.clear_identity_registry()
-            d.addCallback(_cb)
-        else:
-            request.write(wrap_html(wrap_form('<INPUT TYPE="submit" NAME="confirm" VALUE="Confirm" /> <INPUT TYPE="submit" NAME="abort" VALUE="Abort" /><p/>\n' + give_links(), "/erase_registry")))
-            request.finish()
         return server.NOT_DONE_YET
 
 
@@ -274,4 +246,4 @@ def main(ns={}):
     ns.update(locals())
 
 #if __name__ == '__main__':
-#main() #main() has to be called on start. this is a maited pair with identservice.py if you are going to alter this line. justify yourself to Roger Unwin
+main() #main() has to be called on start. this is a maited pair with identservice.py if you are going to alter this line. justify yourself to Roger Unwin
