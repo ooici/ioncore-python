@@ -146,15 +146,12 @@ class WorkBench(object):
 
         # Create a new repository to hold this data object
         repository = self.create_repository(idref_type)
-        
         id_ref = repository.root_object
         
-        id_ref.key = repo.repository_key
-        id_ref.branch = repo._current_branch.branchkey
+        # Use the method of the repository we are tagging to set the reference
+        repo.set_repository_reference(id_ref, current_state)
         
-        if current_state:
-            id_ref.commit = repo._current_branch.commitrefs[0].MyId
-            
+        # Commit the new repository object
         repository.commit('Created repository reference')
         
         return id_ref

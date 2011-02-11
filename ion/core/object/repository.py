@@ -181,6 +181,19 @@ class Repository(object):
         
     root_object = property(_get_root_object, _set_root_object)
     
+    
+    def set_repository_reference(self, id_ref, current_state=False):
+        
+        # Don't worry about type checking here....        
+        id_ref.key = self.repository_key
+        id_ref.branch = self._current_branch.branchkey
+        
+        if current_state:
+            id_ref.commit = self._current_branch.commitrefs[0].MyId
+            
+        return id_ref
+    
+    
     @property
     def branches(self):
         """
