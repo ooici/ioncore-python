@@ -69,7 +69,7 @@ class ExchangeManagementTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def xtest_trivial_create_resources(self):
+    def test_trivial_create_resources(self):
         """
         A lower level test to make sure all of our resource definitions are 
         actually usable.  Later on, this code will only be used within the
@@ -87,7 +87,7 @@ class ExchangeManagementTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def xtest_trivial_store_objects(self):
+    def test_trivial_store_objects(self):
         """
         A higher level test that ensures all of our resource definitions
         can be used within the boilerplate convenience wrappers.
@@ -104,7 +104,7 @@ class ExchangeManagementTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def xtest_trivial_retrieve_objects(self):
+    def test_trivial_retrieve_objects(self):
         """
         A higher level test that ensures all of our resource definitions
         can be used within the boilerplate convenience wrappers.
@@ -131,7 +131,7 @@ class ExchangeManagementTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def xtest_create_exchange_space(self):
+    def test_create_exchange_space(self):
         """
         A test that ensures we can define an exchangespace.  Tests 
         for:
@@ -161,7 +161,7 @@ class ExchangeManagementTest(IonTestCase):
 
         
     @defer.inlineCallbacks
-    def xtest_create_exchange_name(self):
+    def test_create_exchange_name(self):
         """
         A test that ensures we can define an exchangename.  Tests 
         for:
