@@ -334,7 +334,7 @@ class IdentityRegistryService(ServiceProcess):
         This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
         It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
-        log.debug('in op_authenticate_user_credentials')
+        log.debug('in op_register_user_credentials')
 
         identity = yield self.rc.create_instance(IDENT_TYPE, name='Identity Registry', description='A place to store identitys')
         identity.certificate = request['user_cert']
