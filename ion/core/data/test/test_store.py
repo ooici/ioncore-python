@@ -35,7 +35,7 @@ from ion.util.itv_decorator import itv
 
 
 simple_password_type = object_utils.create_type_identifier(object_id=2502, version=1)
-columndef_type = object_utils.create_type_identifier(object_id=2503, version=1)
+columndef_type = object_utils.create_type_identifier(object_id=2508, version=1)
 column_family_type = object_utils.create_type_identifier(object_id=2507, version=1)
 cassandra_cluster_type = object_utils.create_type_identifier(object_id=2504, version=1)
 cassandra_keypsace_type = object_utils.create_type_identifier(object_id=2506, version=1)
