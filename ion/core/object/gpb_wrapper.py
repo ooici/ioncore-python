@@ -498,7 +498,7 @@ class Wrapper(object):
                                                 version=self._MessageTypeIdentifier._VERSION)
         else:
             self._gpb_type = create_type_identifier(object_id=-99,\
-                                                version=-99)
+                                                version=1)
         
         return self._gpb_type
     
@@ -870,16 +870,15 @@ class Wrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         # Check the root wrapper objects list of derived wrappers
         objhash = gpbMessage.__hash__()
-        dw = self.DerivedWrappers
-        if objhash in dw:
-            return dw[objhash]
+        if objhash in self.DerivedWrappers:
+            return self.DerivedWrappers[objhash]
         
         # Else make a new one...
         inst = Wrapper(gpbMessage)        
         inst._root = self._root
         
         # Add it to the list of objects which derive from the root wrapper
-        dw[objhash] = inst
+        self.DerivedWrappers[objhash] = inst
         
         return inst
         
