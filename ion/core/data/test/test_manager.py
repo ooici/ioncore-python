@@ -108,7 +108,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         self.cache.column_metadata[0] = column
         
     
-    #@itv(CONF)
+    @itv(CONF)
     def _setUpConnection(self):
         """
         This creates the ion resource objects necessary that hold the information needed to connect

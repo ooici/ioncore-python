@@ -129,7 +129,7 @@ class WorkBenchTest(unittest.TestCase):
         """
         self.repo.commit('testing repository packing')
         
-        serialized = self.wb.pack_repository_commits(self.repo)
+        serialized = self.wb.pack_repository(self.repo)
         
         heads = self.wb.unpack_structure(serialized)
     
@@ -188,7 +188,7 @@ class WorkBenchMergeTest(unittest.TestCase):
         repo1.log_commits('master')
             
         # Serialize it
-        serialized = wb1.pack_repository_commits(repo1)
+        serialized = wb1.pack_repository(repo1)
         
         # Create a new, separate work bench and read it!
         wb2 = workbench.WorkBench('No Process Test')
@@ -207,7 +207,7 @@ class WorkBenchMergeTest(unittest.TestCase):
         commit_ref6 = repo1.commit(comment='f')
         
         # Serialize it
-        serialized = wb1.pack_repository_commits(repo1)
+        serialized = wb1.pack_repository(repo1)
         
         # Create a new, separate work bench and read it!
         heads = wb2.unpack_structure(serialized)
