@@ -218,28 +218,38 @@ class WorkBench(object):
         
         
     @defer.inlineCallbacks
-    def push(self, origin, name):
+    def push(self, origin, name_or_names):
         """
         Push the current state of the repository.
         When the operation is complete - the transfer of all objects in the
         repository is complete.
         """
         targetname = self._process.get_scoped_name('system', origin)
-        repo = self.get_repository(name)
-
-        if repo:
+        
+        if hasattr(name_or_names, '__iter__'):
             
-            #print 'PUSH TARGET: ',targetname
-            content, headers, msg = yield self._process.rpc_send(targetname,'push', repo)
-        
-            response = headers.get(self._process.MSG_RESPONSE)
-            exception = headers.get(self._process.MSG_EXCEPTION)
-        
-            status = headers.get(self._process.MSG_STATUS)
+            repo_or_repos = []
+            for name in name_or_names:
+                repo = self.get_repository(name)
+                if not repo:
+                    raise KeyError('Repository name %s not found in work bench to push!' % name)
+                    
+                repo_or_repos.append(repo)
+                
         else:
-            status = 'OK'
-            response = 'Repository name %s not found in work bench to push!' % name
-            exception = ''
+            name = name_or_names
+            repo_or_repos = self.get_repository(name)
+            if not repo_or_repos:
+                    raise KeyError('Repository name %s not found in work bench to push!' % name)
+
+    
+        #print 'PUSH TARGET: ',targetname
+        content, headers, msg = yield self._process.rpc_send(targetname,'push', repo_or_repos)
+    
+        response = headers.get(self._process.MSG_RESPONSE)
+        exception = headers.get(self._process.MSG_EXCEPTION)
+    
+        status = headers.get(self._process.MSG_STATUS)
 
         if status == 'OK':
             log.info( 'Push returned:'+response)
@@ -400,13 +410,38 @@ class WorkBench(object):
         yield self._process.reply(message,content=cs)
         log.info('op_fetch_linked_objects: Complete!')
         
-    def pack_repository_commits(self,repo):
+    def pack_repositories(self, repos):
+        
+        container_structure = object_utils.get_gpb_class_from_type_id(structure_type)()
+        for repo in repos:
+            log.debug('pack_repositories: Packing repository:\n'+str(repo))
+            container_structure.MergeFrom(self._repo_to_structure(repo))
+
+        print 'CONTAINER',container_structure
+        log.debug('pack_repositories: Packing Complete!')         
+        serialized = container_structure.SerializeToString()
+        
+        return serialized
+        
+        
+        
+    def pack_repository(self,repo):
+        
+        log.debug('pack_repository: Packing repository:\n'+str(repo))
+        container_structure = self._repo_to_structure(repo)
+        
+        log.debug('pack_repository: Packing Complete!')         
+        serialized = container_structure.SerializeToString()
+        return serialized
+        
+        
+    def _repo_to_structure(self,repo):
         """
         pack just the mutable head and the commits!
         By default send all commits in the history. Too damn complex on the other
         side to deal with merge otherwise.
         """
-        log.debug('pack_repository_commits: Packing repository:\n'+str(repo))
+        
         mutable = repo._dotgit
         
         root_obj = self.serialize_mutable(mutable)
@@ -438,11 +473,10 @@ class WorkBench(object):
         for key in obj_set:
             obj_list.append(key)
                 
-        serialized = self._pack_container(root_obj, obj_list)
-        log.debug('pack_repository_commits: Packing Complete!')
-        return serialized
-                
         
+        container_structure = self._pack_container(root_obj, obj_list)
+        
+        return container_structure
         
     def pack_structure(self, wrapper, include_leaf=True):
         """
@@ -516,8 +550,10 @@ class WorkBench(object):
         
         #print 'OBJLIST',obj_list
         
-        serialized = self._pack_container(root_obj, obj_list)
+        container_structure = self._pack_container(root_obj, obj_list)
         log.debug('pack_structure: Packing Complete!')
+        
+        serialized = container_structure.SerializeToString()
         return serialized
         
     def serialize_mutable(self, mutable):
@@ -592,9 +628,7 @@ class WorkBench(object):
         
         
         log.debug('_pack_container: Packed container!')
-        serialized = cs.SerializeToString()
-        
-        return serialized
+        return cs
         
     def unpack_structure(self, serialized_container):
         """

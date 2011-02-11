@@ -22,6 +22,7 @@ from ion.core.object import object_utils
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
+association_type = object_utils.create_type_identifier(object_id=13, version=1)
 
 
 class DataStoreTest(IonTestCase):
@@ -119,9 +120,9 @@ class DataStoreTest(IonTestCase):
         
         # Test to make sure pushing a non existent workbench fails
         
-        response, ex = yield proc_ds1.push('ps2','addressbooksss')
-
-        self.assertNotEqual(response, proc_ds1.ION_SUCCESS)
+        # How do I test raises in a deferred call?
+        #self.assertRaises(KeyError,proc_ds1.push, 'ps2','NonExistentRepositoryName')
+        
         
     @defer.inlineCallbacks
     def test_merge_push(self):
@@ -310,6 +311,53 @@ class DataStoreTest(IonTestCase):
         self.assertEqual(ab_2, ab)
         
         
+        
+    @defer.inlineCallbacks
+    def test_push_associated(self):
+
+
+        child_ds1 = yield self.sup.get_child_id('ds1')
+        log.debug('Process ID:' + str(child_ds1))
+        proc_ds1 = self._get_procinstance(child_ds1)
+        
+        child_ds2 = yield self.sup.get_child_id('ds2')
+        log.debug('Process ID:' + str(child_ds2))
+        proc_ds2 = self._get_procinstance(child_ds2)
+        
+        ab1 = proc_ds1.workbench.create_repository(addresslink_type,'addressbook1')
+        ab2 = proc_ds1.workbench.create_repository(addresslink_type,'addressbook2')
+        ab3 = proc_ds1.workbench.create_repository(addresslink_type,'addressbook3')
+        assoc = proc_ds1.workbench.create_repository(association_type,'association')
+        
+        ab1.root_object.title = 'Junk'
+        ab1.commit('test1')
+        
+        ab2.root_object.title = 'Predicate Junk'
+        ab2.commit('test2')
+        
+        ab3.root_object.title = 'Associated Junk'
+        ab3.commit('test3')
+        
+        assoc.root_object.subject = proc_ds1.workbench.reference_repository('addressbook1', current_state=True)
+        assoc.root_object.predicate = proc_ds1.workbench.reference_repository('addressbook2', current_state=True)
+        assoc.root_object.object = proc_ds1.workbench.reference_repository('addressbook3', current_state=True)
+        assoc.commit('associated!')
+        
+        print 'ASSOC:', assoc.root_object
+        print 'assoc subject:', assoc.root_object.subject
+        
+        
+        obj_list = ['addressbook1','addressbook2','addressbook3','association']
+        
+        response, ex = yield proc_ds1.push('ps2',obj_list)
+            
+        self.assertEqual(response, proc_ds1.ION_SUCCESS)
+        
+        
+        
+        
+        
+                
         
 
     @itv(CONF)
