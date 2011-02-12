@@ -7,18 +7,15 @@
 """
 
 import ion.util.ionlog
-import ion.util.procutils as pu
-from ion.core.process.process import ProcessFactory, Process, ProcessClient
+from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.core.messaging.message_client import MessageClient
-from ion.core.object import object_utils
 from ion.core import ioninit
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 from twisted.internet import defer
 
-import ion.services.coi.exchange.exchange_boilerplate as bp
-from ion.services.coi.exchange.exchange_boilerplate import ServiceHelper
+import ion.services.coi.exchange.resource_wrapper as res_wrapper
+from ion.services.coi.exchange.resource_wrapper import ServiceHelper, ClientHelper
+from ion.services.coi.exchange.broker_controller import BrokerController
+from ion.services.coi.exchange.exchange_types import ExchangeTypes
 
 CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
@@ -35,14 +32,25 @@ class ExchangeManagementService(ServiceProcess):
 
     def __init__(self, *args, **kwargs):
         ServiceProcess.__init__(self, *args, **kwargs)
-        
+
+    @defer.inlineCallbacks
     def slc_init(self):
+        log.info("ExchangeManagementService.slc_init(self)")
         self.helper = ServiceHelper(self)
+        self.controller = BrokerController()
+        self.exchange_types = ExchangeTypes(self.controller)
+        yield self.controller.start()
+        
         self.xs = {}
         self.xn = {}
-        log.debug("ExchangeManagementService.slc_init(self)")
-      
+        
 
+
+    @defer.inlineCallbacks
+    def slc_deactivate(self):
+        log.info("ExchangeManagementService.slc_terminate(self)")
+        yield self.controller.stop()
+        
 
     @defer.inlineCallbacks
     def op_create_object(self, object, headers, msg):
@@ -91,11 +99,11 @@ class ExchangeManagementService(ServiceProcess):
             name = exchangespace.configuration.name.strip()
             description = exchangespace.configuration.description
             if len(name) == 0:
-                raise bp.ExchangeManagementError("exchangespace.name is invalid") 
+                raise res_wrapper.ExchangeManagementError("exchangespace.name is invalid") 
             if self.xs.has_key(name):
-                raise bp.ExchangeManagementError("exchangespace.name already exists") 
+                raise res_wrapper.ExchangeManagementError("exchangespace.name already exists") 
             
-        except bp.ExchangeManagementError, err:
+        except res_wrapper.ExchangeManagementError, err:
             yield self.reply_err(msg, str(err))
             return
         
@@ -121,6 +129,14 @@ class ExchangeManagementService(ServiceProcess):
         not already exist in the system.  request.description must not be
         a trivial string and should provide a useful description of the
         ExchangeSpace.        
+        
+        net.ooici.services.coi.exchange_management.proto defines
+        the following Exchange types:
+            PROCESS = 1;
+            SERVICE = 2;
+            EXCHANGE_POINT = 3;
+            QUEUE = 4;
+
         """
         log.debug('op_create_exchangename()')
         
@@ -133,15 +149,15 @@ class ExchangeManagementService(ServiceProcess):
             description = exchangename.configuration.description
             exchangespace = exchangename.configuration.exchangespace.strip()
             if len(name) == 0:
-                raise bp.ExchangeManagementError("exchangename.name is required") 
+                raise res_wrapper.ExchangeManagementError("exchangename.name is required") 
             if self.xn.has_key(name):
-                raise bp.ExchangeManagementError("exchangename.name already exists") 
+                raise res_wrapper.ExchangeManagementError("exchangename.name already exists") 
             if len(exchangespace) == 0:
-                raise bp.ExchangeManagementError("exchangename.exchangespace is required") 
+                raise res_wrapper.ExchangeManagementError("exchangename.exchangespace is required") 
             if not self.xs.has_key(exchangespace):
-                raise bp.ExchangeManagementError("exchangename.exchangespace doesn't exist") 
+                raise res_wrapper.ExchangeManagementError("exchangename.exchangespace doesn't exist") 
             
-        except bp.ExchangeManagementError, err:
+        except res_wrapper.ExchangeManagementError, err:
             yield self.reply_err(msg, str(err))
             return
         
@@ -149,12 +165,35 @@ class ExchangeManagementService(ServiceProcess):
         object.name = name
         object.description = description
         
+        #if object.type
+        yield self.exchange_types.create_exchange_point(exchangespace, name)
+
         
         # Response
         response = yield self.helper.push_object(object)
         self.xn[name] = response.configuration.MyId;
         log.debug('Created exchangename.  id: %s', response.configuration.MyId)
         yield self.reply_ok(msg, response.configuration.MyId)
+
+
+    @defer.inlineCallbacks
+    def op_create_queue(self, queue, headers, msg):
+        """
+        Creates a queue and binds it to the appropriate namespace and exchange.
+        """
+        q = queue.MessageObject
+        desc = q.configuration.description
+        qname = q.configuration.name
+        xn = q.configuration.exchangename
+        xs = q.configuration.exchangespace
+        topic = q.configuration.topic
+        
+        self.controller.create_queue(qname, xs + "." + xn, topic)
+        
+        log.debug('op_create_queue()')
+        
+        # Object creation
+        yield self.reply_ok(msg, None)
 
 
     @defer.inlineCallbacks
@@ -181,7 +220,8 @@ class ExchangeManagementService(ServiceProcess):
 class ExchangeManagementClient(ServiceClient):
     
     def __init__(self, proc=None, **kwargs):
-        log.debug("ExchangeManagementClient.__init__(self, proc, args)")
+        log.info("ExchangeManagementService.slc_init(...)")
+        self.helper = ClientHelper(proc)
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "exchange_management"
         ServiceClient.__init__(self, proc, **kwargs)
@@ -207,26 +247,109 @@ class ExchangeManagementClient(ServiceClient):
         defer.returnValue(content)
 
 
-
-
+    
     @defer.inlineCallbacks
-    def create_exchangespace(self, msg):
+    def create_exchangespace(self, 
+            name,
+            description,
+            ):
         """
+        Creates an ExchangeSpace.
+        @param name
+                a string uniquely identifying the ExchangeSpace 
+                in all scopes and contexts.
+        @param description 
+                a free text string containing a description of 
+                the ExchangeSpace.
         """
         yield self._check_init()
+        msg = yield self.helper.create_object(res_wrapper.exchangespace_type)
+        msg.configuration.name = name
+        msg.configuration.description = description
+        
         (content, headers, msg) = yield self.rpc_send('create_exchangespace', msg)
         defer.returnValue(content)
 
         
     @defer.inlineCallbacks
-    def create_exchangename(self, msg):
-        """
-        """
-        yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('create_exchangename', msg)
-        defer.returnValue(content)
+    def create_exchangename(
+            self,
+            name,
+            description,
+            exchangespace,
+            type='EXCHANGE_POINT', 
+        ):
+            """
+            Creates an ExchangeName.
+            @param name 
+                    a string uniquely identifying the ExchangeName 
+                    in the scope of the ExchangeSpace.
+            @param description 
+                    a free text string containing a description of 
+                    the ExchangeName.
+            @param exchangespace
+                    a string uniquely identifying the ExchangeSpace
+                    to which this ExchangeName will belong.  This 
+                    must be previously defined with a call to 
+                    create_exchangespace()
+            @param type
+                    a string that must contain one of the following
+                    constants:  'EXCHANGE_POINT', 'PROCESS', 'SERVICE'.
+            """        
+            yield self._check_init()
+    
+            msg = yield self.helper.create_object(res_wrapper.exchangename_type)
+            msg.configuration.name = name
+            msg.configuration.description = description
+            msg.configuration.exchangespace = exchangespace
+            msg.type = type
+    
+            (content, headers, msg) = yield self.rpc_send('create_exchangename', msg)
+            defer.returnValue(content)
 
-        
+
+
+    @defer.inlineCallbacks
+    def create_queue(
+            self,
+            name,
+            description,
+            exchangespace,
+            exchangename,
+            topic
+        ):
+            """
+            Creates a Queue.
+            @param name 
+                    a string uniquely identifying the Queue 
+                    in the scope of the ExchangeSpace and 
+                    ExchangeName.
+            @param description 
+                    a free text string containing a description of 
+                    the ExchangeName.
+            @param exchangespace
+                    a string uniquely identifying the ExchangeSpace
+                    to which ExchangeName belongs.  This must be 
+                    previously defined with a call to create_exchangespace()
+            @param exchangename
+                    a string uniquely identifying the ExchangeName
+                    to which this queue will be bound.  This must be 
+                    previously defined with a call to create_exchangename()
+            """        
+            yield self._check_init()
+    
+            msg = yield self.helper.create_object(res_wrapper.queue_type)
+            msg.configuration.name = name
+            msg.configuration.description = description
+            msg.configuration.exchangespace = exchangespace
+            msg.configuration.exchangename = exchangename
+            msg.configuration.topic = topic
+    
+            (content, headers, msg) = yield self.rpc_send('create_queue', msg)
+            defer.returnValue(content)
+
+
+           
 
 factory = ProcessFactory(ExchangeManagementService)
 

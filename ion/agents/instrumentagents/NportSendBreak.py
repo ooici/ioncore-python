@@ -32,6 +32,7 @@ print "Sending break commands to %s:%s" % (serverHost, serverPort)
 s.connect((serverHost, serverPort)) # connect to server on the port
 
 try:
+    """  old method, more complicated than single command below
     s.send('\x21\x00')                  # start sending break
     data = s.recv(1024)                 # receive up to 1K bytes
     print data
@@ -39,5 +40,11 @@ try:
     s.send('\x22\x00')                  # stop sending break
     data = s.recv(1024)                 # receive up to 1K bytes
     print data
+    """
+    
+    s.send('#\x02\x01\xf4')             # send break for 500 milli seconds (0x1f4 = 500)
+    data = s.recv(1024)                 # receive up to 1K bytes
+    print data                          # should receive '#OK'
+    
 except:
     print "Nport server doesn't seem to be responding, make sure a client is attached to the data port."

@@ -74,6 +74,7 @@ class Instrument(protocol.Protocol):
         'alpha' : prompt,
         'tau' : prompt,
         'start' : prompt,
+        'startnow' : prompt,
         'stop' : prompt,
         'pumpon' : prompt,
         'pumpoff' : prompt,
@@ -184,7 +185,7 @@ class Instrument(protocol.Protocol):
                     log.debug("Starting test samples")
                     self.startTestSamples()
                     self.testRunning = 'true'
-            elif command == "start" or command == "startnow":
+            elif command == "startnow":
                 """
                 @note If start command is received, and the SBE49 is in autonomous
                 mode, and the instrument is not already running a test, start
@@ -254,14 +255,14 @@ class Instrument(protocol.Protocol):
         self.transport.write(self.get_next_sample())
 
     def get_next_sample(self):
-        sampleData = '21.9028,  1.00012,    1.139,   1.0103\n'
+        sampleData = '21.9028,  1.00012,    1.139,   1.0103\r\n'
         self.sample_cnt += 1
         cnt = self.sample_cnt
         value1 = 10.0 + 5.0 * math.sin(float(cnt) / 5.0)
         value2 = 7.00012 * random.random()
         value3 = 3.139 + random.random()
         value4 = 1.0103 + random.random()
-        valstr = "%1.4f,  %1.5f,   %1.3f,   %1.3f\n" % (value1,value2,value3,value4)
+        valstr = "%1.4f,  %1.5f,   %1.3f,   %1.3f\r\n" % (value1,value2,value3,value4)
         #return self.sampleData
         return valstr
 
@@ -324,7 +325,7 @@ class Simulator(object):
                     return NO_PORT_NUMBER_FOUND
         self.state = "STARTED"
         log.info("Started SBE49 simulator for ID %s on port %d" % (self.instrument_id, self.port))
-        return self.port
+        return [self.port, 0]
 
     @defer.inlineCallbacks
     def stop(self):

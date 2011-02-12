@@ -25,6 +25,7 @@ from ion.util.state_object import BasicLifecycleObject
 from ion.core.messaging.ion_reply_codes import ResponseCodes
 from ion.core.process import process
 from ion.core.object import workbench
+from ion.core.object import repository
 from ion.core.object.repository import RepositoryError
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
@@ -105,7 +106,9 @@ class ResourceClient(object):
         yield self._check_init()
         
         # Create a sendable resource object
-        description_repository, resource_description = self.workbench.init_repository(resource_description_type)
+        description_repository = self.workbench.create_repository(resource_description_type)
+        
+        resource_description = description_repository.root_object
         
         # Set the description
         resource_description.name = name
@@ -232,8 +235,101 @@ class ResourceClient(object):
     
 class ResourceInstanceError(Exception):
     """
-    Exceptoin class for Resource Instance Object
+    Exception class for Resource Instance Object
     """
+    
+class ResourceFieldProperty(object):
+    
+    def __init__(self, name, doc=None):
+        self.name = name
+        if doc: self.__doc__ = doc
+        
+    def __get__(self, resource_instance, objtype=None):
+        return getattr(resource_instance._repository.root_object.resource_object, self.name)
+        
+    def __set__(self, resource_instance, value):
+        return setattr(resource_instance._repository.root_object.resource_object, self.name, value)
+        
+    def __delete__(self, wrapper):
+        raise AttributeError('Can not delete a Resource Instance property')
+        
+        
+class ResourceEnumProperty(object):
+    
+    def __init__(self, name, doc=None):
+        self.name = name
+        if doc: self.__doc__ = doc
+        
+    def __get__(self, resource_instance, objtype=None):
+        return getattr(resource_instance._repository.root_object.resource_object, self.name)
+        
+    def __set__(self, wrapper, value):
+        raise AttributeError('Can not set a Resource Instance enum object')
+        
+    def __delete__(self, wrapper):
+        raise AttributeError('Can not delete a Resource Instance property')
+    
+class ResourceInstanceType(type):
+    """
+    Metaclass that automatically generates subclasses of Wrapper with corresponding enums and
+    pass-through properties for each field in the protobuf descriptor.
+    
+    This approach is generally applicable to wrap data structures. It is extremely powerful!
+    """
+
+    _type_cache = {}
+
+    def __call__(cls, resource_repository, *args, **kwargs):
+        # Cache the custom-built classes
+        
+        # Check that the object we are wrapping is a Google Message object
+        if not isinstance(resource_repository, repository.Repository):
+            raise ResourceInstanceError('ResourceInstance init argument must be an instance of a Repository')
+        
+        if resource_repository.status == repository.Repository.NOTINITIALIZED:
+            raise ResourceInstanceError('ResourceInstance init Repository argument is in an invalid state - checkout first!')
+        
+        if resource_repository.root_object.ObjectType != resource_type:
+            raise ResourceInstanceError('ResourceInstance init Repository is not a resource object!')
+        
+        resource_obj = resource_repository.root_object.resource_object
+        
+        msgType, clsType = type(resource_obj), None
+
+        if msgType in ResourceInstanceType._type_cache:
+            clsType = ResourceInstanceType._type_cache[msgType]
+        else:
+            
+            
+            # Get the class name
+            clsName = '%s_%s' % (cls.__name__, msgType.__name__)
+            clsDict = {}
+                
+            # Now setup the properties to map through to the GPB object
+            resDict = msgType.__dict__
+            
+            for fieldName, resource_field in resDict.items():
+                #print 'Key: %s; Type: %s' % (fieldName, type(resource_field))
+                if isinstance(resource_field, gpb_wrapper.WrappedProperty):
+                    prop = ResourceFieldProperty(fieldName )
+                    
+                    clsDict[fieldName] = prop
+                    
+                elif isinstance(resource_field, gpb_wrapper.EnumObject):
+                    prop = ResourceEnumProperty(fieldName )
+                    
+                    clsDict[fieldName] = prop
+            
+
+            clsType = ResourceInstanceType.__new__(ResourceInstanceType, clsName, (cls,), clsDict)
+
+            ResourceInstanceType._type_cache[msgType] = clsType
+
+        # Finally allow the instantiation to occur, but slip in our new class type
+        obj = super(ResourceInstanceType, clsType).__call__(resource_repository, *args, **kwargs)
+        return obj
+    
+    
     
 class ResourceInstance(object):
     """
@@ -241,8 +337,8 @@ class ResourceInstance(object):
     interacts with a resource instance. It hides the git semantics of the data
     store and deals with resource specific properties.
     """
+    __metaclass__ = ResourceInstanceType
     
-    RESOURCE_CLASS = object_utils.get_gpb_class_from_type_id(resource_type)
     # Life Cycle States
     NEW='New'
     ACTIVE='Active'
@@ -273,20 +369,20 @@ class ResourceInstance(object):
         
     @property
     def Repository(self):
-        return object.__getattribute__(self, '_repository')
+        return self._repository
         
     @property
     def Resource(self):
-        repo = object.__getattribute__(self, '_repository')
+        repo = self._repository
         return repo._workspace_root
         
     
     def _get_resource_object(self):
-        repo = object.__getattribute__(self, '_repository')
+        repo = self._repository
         return repo._workspace_root.resource_object
         
     def _set_resource_object(self, value):
-        repo = object.__getattribute__(self, '_repository')
+        repo = self._repository
         if value.ObjectType != self.ResourceType:
             raise ResourceInstanceError('Can not change the type of a resource object!')
         repo._workspace_root.resource_object = value
@@ -396,56 +492,11 @@ class ResourceInstance(object):
         return self.Repository.create_object(type_id)
         
         
-    def __getattribute__(self, key):
-        """
-        @brief We want to expose the resource and its object through a uniform
-        interface. To do so we override getattr to expose the data fields of the
-        resource object
-        """
-        # Because we have over-riden the default getattribute we must be extremely
-        # careful about how we use it!
-        repo = object.__getattribute__(self, '_repository')
-        
-        resource = getattr(repo, '_workspace_root', None)
-
-        resource_object = getattr(resource, 'resource_object', None)
-
-        gpbfields = getattr(resource_object, '_gpbFields', [])
-        
-        if key in gpbfields:
-            # If it is a Field defined by the gpb...
-            #value = getattr(res_obj, key)
-            value = resource_object.__getattribute__(key)
-                
-        else:
-            # If it is a attribute of this class, use the base class's getattr
-            value = object.__getattribute__(self, key)
-        return value
-        
-        
-    def __setattr__(self,key,value):
-        """
-        @brief We want to expose the resource and its object through a uniform
-        interface. To do so we override getattr to expose the data fields of the
-        resource object
-        """
-        repo = object.__getattribute__(self, '_repository')
-        
-        resource = getattr(repo, '_workspace_root', None)
-        
-        resource_object = getattr(resource, 'resource_object', None)
-
-        gpbfields = getattr(resource_object, '_gpbFields', [])
-        
-        if key in gpbfields:
-            # If it is a Field defined by the gpb...
-            #setattr(res_obj, key, value)
-            resource_object.__setattr__(key,value)
-                
-        else:
-            v = object.__setattr__(self, key, value)
-
+    
     def ListSetFields(self):
+        """
+        Return a list of the names of the fields which have been set.
+        """
         return self.ResourceObject.ListSetFields()
 
     def HasField(self, field):
@@ -480,22 +531,23 @@ class ResourceInstance(object):
         """
         # Using IS for comparison - I think this is better than the usual ==
         # Want to force the use of the self.XXXX as the argument!
+                
         if state == self.NEW:        
-            self.Resource.lcs = self.RESOURCE_CLASS.New
+            self.Resource.lcs = self.Resource.LifeCycleState.NEW
         elif state == self.ACTIVE:
-            self.Resource.lcs = self.RESOURCE_CLASS.Active
+            self.Resource.lcs = self.Resource.LifeCycleState.ACTIVE
         elif state == self.INACTIVE:
-            self.Resource.lcs = self.RESOURCE_CLASS.Inactive
+            self.Resource.lcs = self.Resource.LifeCycleState.INACTIVE
         elif state == self.COMMISSIONED:
-            self.Resource.lcs = self.RESOURCE_CLASS.Commissioned
+            self.Resource.lcs = self.Resource.LifeCycleState.COMMISSIONED
         elif state == self.DECOMMISSIONED:
-            self.Resource.lcs = self.RESOURCE_CLASS.Decommissioned
+            self.Resource.lcs = self.Resource.LifeCycleState.DECOMMISSIONED
         elif state == self.RETIRED:
-            self.Resource.lcs = self.RESOURCE_CLASS.Retired
+            self.Resource.lcs = self.Resource.LifeCycleState.RETIRED
         elif state == self.DEVELOPED:
-            self.Resource.lcs = self.RESOURCE_CLASS.Developed
+            self.Resource.lcs = self.Resource.LifeCycleState.DEVELOPED
         elif state == self.UPDATE:
-            self.Resource.lcs = self.RESOURCE_CLASS.Update
+            self.Resource.lcs = self.Resource.LifeCycleState.UPDATE
         else:
             raise Exception('''Invalid argument value state: %s. State must be 
                 one of the class variables defined in Resource Instance''' % str(state))
@@ -505,28 +557,28 @@ class ResourceInstance(object):
         @brief Get the life cycle state of the resource
         """
         state = None
-        if self.Resource.lcs == self.RESOURCE_CLASS.New:
+        if self.Resource.lcs == self.Resource.LifeCycleState.NEW:
             state = self.NEW    
         
-        elif self.Resource.lcs == self.RESOURCE_CLASS.Active:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.ACTIVE:
             state = self.ACTIVE
             
-        elif self.Resource.lcs == self.RESOURCE_CLASS.Inactive:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.INACTIVE:
             state = self.INACTIVE
             
-        elif self.Resource.lcs == self.RESOURCE_CLASS.Commissioned:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.COMMISSIONED:
             state = self.COMMISSIONED
             
-        elif self.Resource.lcs == self.RESOURCE_CLASS.Decommissioned:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.DECOMMISSIONED:
             state = self.DECOMMISSIONED
             
-        elif self.Resource.lcs == self.RESOURCE_CLASS.Retired:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.RETIRED:
             state = self.RETIRED
             
-        elif self.Resource.lcs == self.RESOURCE_CLASS.Developed:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.DEVELOPED:
             state = self.DEVELOPED
         
-        elif self.Resource.lcs == self.RESOURCE_CLASS.Update:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.UPDATE:
             state = self.UPDATE
         
         return state

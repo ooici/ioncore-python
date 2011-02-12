@@ -14,6 +14,10 @@ from zope.interface import implements
 
 from twisted.internet import defer
 
+# Useful for inspecting binary content
+import binascii
+# print binascii.b2a_hex(blob)
+
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -152,12 +156,14 @@ class IndexStore(object):
         @see IStore.put
         """
         for k,v in index_attributes.items():
+            
             kindex = self.indices.get(k, None)
             if not kindex:
                 kindex = {}
                 self.indices[k] = kindex
-            kindex[v]=key
-            
+            kindex[v]= kindex.get(v, set())
+            kindex[v].add(key)
+                        
         return defer.maybeDeferred(self.kvs.update, {key:value})
 
     def remove(self, key):
@@ -188,9 +194,7 @@ class IndexStore(object):
         for k,v in indexed_attributes.items():
             kindex = self.indices.get(k, None)
             if kindex:
-                keys.add(kindex.get(v,None))
-            
-        keys.discard(None)
+                keys.update(kindex.get(v,set()))
         
         result = {}
         for k in keys:
