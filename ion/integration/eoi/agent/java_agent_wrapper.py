@@ -395,21 +395,21 @@ class JavaAgentWrapper(ServiceProcess):
             msg = yield self.mc.create_instance(context_message_type, name="data_context")
             
             # Fill in values
-            msg.source_type    = msg.MessageObject.SOS
-            msg.start_time     = '2008-08-01T00:00:00Z'
-            msg.end_time       = '2008-08-02T00:00:00Z'
+            msg.source_type = msg.SourceType.SOS
+            msg.start_time = '2008-08-01T00:00:00Z'
+            msg.end_time = '2008-08-02T00:00:00Z'
 
             msg.property.append('sea_water_temperature')
             msg.station_id.append('41012')
-
-#            msg.request_type (how can we grab this from a list)
-            msg.top            = 0.0
-            msg.bottom         = 0.0
-            msg.left           = 0.0
-            msg.right          = 0.0
-            msg.base_url       = "http://sdf.ndbc.noaa.gov/sos/server.php?"
-            msg.dataset_url    = ''
-            msg.ncml_mask      = ''
+            
+            msg.request_type = msg.RequestType.CTD
+            msg.top = 0.0
+            msg.bottom = 0.0
+            msg.left = 0.0
+            msg.right = 0.0
+            msg.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
+            msg.dataset_url = ''
+            msg.ncml_mask = ''
             
             
             defer.returnValue(msg)
