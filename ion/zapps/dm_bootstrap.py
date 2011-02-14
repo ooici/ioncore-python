@@ -79,7 +79,7 @@ def start(container, starttype, *args, **kwargs):
     yield emc.create_exchangespace(xs_name, 'DM exchange space')
 
     log.debug('Trying to invoke pubsub controller to create science data exchange point...')
-    yield psc.declare_topic_tree(xs_name, 'science_data')
+    #yield psc.declare_topic_tree(xs_name, 'science_data')
 
     log.debug('DM bootstrapping completed.')
     
