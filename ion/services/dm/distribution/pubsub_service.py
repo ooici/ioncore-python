@@ -176,6 +176,7 @@ class PubSubService(ServiceProcess):
         @param topic_tree_name Name of the tree to create
         @retval Topic tree ID on success, None if failure
         """
+        log.debug('Creating exchange space "%s"' % exchange_space_name)
         yield self.ems.create_exchangespace(exchange_space_name, 'Default exchange space')
 
         log.debug('Calling EMS to create topic tree "%s/%s"' % (exchange_space_name, topic_tree_name))
