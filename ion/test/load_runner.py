@@ -3,6 +3,7 @@
 """
 @file ion/test/load_runner.py
 @author Michael Meisinger
+@author Adam R. Smith
 @brief Spawns a number of Unix processes to create some load
 """
 
@@ -84,8 +85,8 @@ class LoadTestRunner(object):
         self._is_kill = False
 
     @defer.inlineCallbacks
-    def start_load_suite(self, suitecls, spawn_procs, options):
-        print "Start load suite %s" % (suitecls)
+    def start_load_suite(self, suitecls, spawn_procs, options, argv):
+        print 'Starting load suite "%s.%s"...' % (suitecls.__module__, suitecls.__name__)
         numprocs = int(options['count'])
 
         if spawn_procs:
@@ -95,6 +96,7 @@ class LoadTestRunner(object):
             timeout = int(options['timeout'])
             if timeout > 0:
                 load_script.extend(['-t', str(timeout)])
+#            load_script = sys.argv
 
             print "Spawning %s load processes: %s" % (numprocs, options['class'])
 
@@ -103,6 +105,7 @@ class LoadTestRunner(object):
                 load_proc_args = list(load_script)
                 load_proc_args.extend(["-l", str(i)])
                 load_proc_args.extend(options['test_args'])
+                load_proc_args.extend(['-'] + argv)
                 #print "Starting load process %s: %s" % (i, load_proc_args)
 
                 #procProt = TestRunnerProcessProtocol()
@@ -128,16 +131,22 @@ class LoadTestRunner(object):
         else:
             # Start all in same Twisted reactor
             self.mode = "suite-internal"
-            deflist = []
-            for i in range(numprocs):
-                d = self.start_load_proc(suitecls, str(i), options)
-                deflist.append(d)
 
-            dl = defer.DeferredList(deflist)
-            yield dl
+            try:
+                deflist = []
+                for i in range(numprocs):
+                    d = self.start_load_proc(suitecls, str(i), options, argv)
+                    deflist.append(d)
+
+                dl = defer.DeferredList(deflist)
+                yield dl
+            except SystemExit, ex:
+                pass
+            except txamqp.client.Closed, ex:
+                pass
 
     @defer.inlineCallbacks
-    def start_load_proc(self, suitecls, loadid, options):
+    def start_load_proc(self, suitecls, loadid, options, argv):
         """
         Starts a single load in the current processes
         @retval Deferred
@@ -148,7 +157,11 @@ class LoadTestRunner(object):
 
         self.load_procs[load_proc.load_id] = load_proc
 
-        yield defer.maybeDeferred(load_proc.setUp)
+        try:
+            yield defer.maybeDeferred(load_proc.setUp, argv)
+        except SystemExit, ex:
+            return
+
         yield defer.maybeDeferred(load_proc.generate_load)
 
         yield defer.maybeDeferred(load_proc.tearDown)
@@ -166,7 +179,7 @@ class LoadTestRunner(object):
         if self._is_shutdown:
             return
         self._shutdown_deferred = defer.Deferred()
-        self._shutdown_to = reactor.callLater(2, self.shutdown_timeout)
+        self._shutdown_to = reactor.callLater(5, self.shutdown_timeout)
 
         prockeys = sorted(self.load_procs.keys())
         for key in prockeys:
@@ -190,7 +203,18 @@ class LoadTestRunner(object):
             # Parse the options
             options = Options()
             try:
-                options.parseOptions(sys.argv[1:])
+                # Use a separator to distinguish options reserved for derived classes
+                sep = '-'
+                opts, extraOpts = sys.argv[1:], []
+                try:
+                    sepIndex = opts.index(sep)
+                    extraOpts = opts[sepIndex + 1:]
+                    opts = opts[:sepIndex]
+                except ValueError:
+                    pass
+
+                options.parseOptions(opts)
+                
             except usage.UsageError, errortext:
                 print '%s: %s' % (sys.argv[0], errortext)
                 print '%s: Try --help for usage details.' % (sys.argv[0])
@@ -212,11 +236,11 @@ class LoadTestRunner(object):
                 self.timeout_call = reactor.callLater(timeout, self.timeout)
 
             if options['suite']:
-                yield self.start_load_suite(test_class, options['proc'], options)
+                yield self.start_load_suite(test_class, options['proc'], options, extraOpts)
                 print "Load test suite stopped."
             elif options['loadid']:
                 self.mode = "load-process"
-                yield self.start_load_proc(test_class, options['loadid'], options)
+                yield self.start_load_proc(test_class, options['loadid'], options, extraOpts)
             else:
                 self.errout("Wrong arguments: Neither suite nor load process")
 
@@ -231,7 +255,7 @@ class LoadTestRunner(object):
 
         if self._shutdown_deferred:
             #print "cancel shotdown to"
-            self._shutdown_to.cancel()
+            if self._shutdown_to.active(): self._shutdown_to.cancel()
             self._shutdown_deferred.callback(None)
 
         # Need to check for kill condition. Somehow this interferes with the reactor

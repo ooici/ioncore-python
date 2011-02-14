@@ -14,7 +14,7 @@ import os
 from ion.core import ionconst as ic
 from ion.util.config import Config
 
-print "ION (Integrated Observatory Network) core packages initializing (ver. %s)" % (ic.VERSION)
+#print "ION (Integrated Observatory Network) core packages initializing (ver. %s)" % (ic.VERSION)
 
 # ION has a minimum required python version
 import sys

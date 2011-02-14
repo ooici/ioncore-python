@@ -87,8 +87,9 @@ class ProcessExchangeSpace(ExchangeSpace):
         self.exchange = Exchange(name)
 
     @defer.inlineCallbacks
-    def send(self, to_name, message_data):
+    def send(self, to_name, message_data, publisher_config={}, **kwargs):
         pub_config = {'routing_key' : str(to_name)}
+        pub_config.update(publisher_config)
         publisher = yield Publisher.name(self, pub_config)
         yield publisher.send(message_data)
         publisher.close()
@@ -192,6 +193,7 @@ class Consumer(messaging.Consumer):
                                        warn_if_exists=self.warn_if_exists)
             # remember the queue name the broker made for us
             self.queue = reply.queue
+
 
         yield self.backend.queue_bind(queue=self.queue,
                                     exchange=self.exchange,

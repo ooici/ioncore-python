@@ -21,7 +21,7 @@ from ion.core.messaging.receiver import Receiver, FanoutReceiver
 from ion.core.pack import app_supervisor
 from ion.core.process.process import Process, ProcessFactory, ProcessDesc
 import ion.util.procutils as pu
-from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
+from ion.services.coi.exchange.agent_client import ExchangeManagementClient
 
 CONF = ioninit.config(__name__)
 CF_announce = CONF.getValue('announce', False)
@@ -149,7 +149,7 @@ class CCAgent(ResourceAgent):
         """
         Service operation: ping reply
         """
-        yield self.reply_ok(msg, None, {'quiet':True})
+        yield self.reply_ok(msg, {'pong':'pong'}, {'quiet':True})
 
     @defer.inlineCallbacks
     def op_get_info(self, content, headers, msg):
@@ -196,7 +196,8 @@ def start(container, starttype, app_definition, *args, **kwargs):
 
 @defer.inlineCallbacks
 def stop(container, state):
-    log.debug("state: %s" % state)
+
+    #print "state", state
     supdesc = state[0]
     log.info("Terminating CC agent")
     yield supdesc.terminate()

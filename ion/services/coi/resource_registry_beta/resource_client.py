@@ -25,13 +25,10 @@ from ion.util.state_object import BasicLifecycleObject
 from ion.core.messaging.ion_reply_codes import ResponseCodes
 from ion.core.process import process
 from ion.core.object import workbench
+from ion.core.object import repository
 from ion.core.object.repository import RepositoryError
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
-
-from net.ooici.core.type import type_pb2
-from net.ooici.services.coi import resource_framework_pb2
-from net.ooici.core.link import link_pb2
 
 
 from google.protobuf import message
@@ -109,7 +106,9 @@ class ResourceClient(object):
         yield self._check_init()
         
         # Create a sendable resource object
-        description_repository, resource_description = self.workbench.init_repository(resource_description_type)
+        description_repository = self.workbench.create_repository(resource_description_type)
+        
+        resource_description = description_repository.root_object
         
         # Set the description
         resource_description.name = name
@@ -130,7 +129,8 @@ class ResourceClient(object):
         
         self.workbench.set_repository_nickname(res_id, name)
             
-        resource = ResourceInstance(repo.checkout('master'))
+        yield repo.checkout('master')
+        resource = ResourceInstance(repo)
         
         defer.returnValue(resource)
         
@@ -151,7 +151,7 @@ class ResourceClient(object):
         commit = None
         
         # Get the type of the argument and act accordingly
-        if hasattr(resource_id, 'GPBType') and resource_id.GPBType == idref_Type:
+        if hasattr(resource_id, 'ObjectType') and resource_id.ObjectType == idref_Type:
             # If it is a resource reference, unpack it.
             if resource_id.branch:
                 branch = resource_id.branch
@@ -176,9 +176,10 @@ class ResourceClient(object):
             
         # Get the repository
         repo = self.workbench.get_repository(reference)
+        yield repo.checkout(branch)
         
         # Create a resource instance to return
-        resource = ResourceInstance(repo.checkout(branch))
+        resource = ResourceInstance(repo)
             
         self.workbench.set_repository_nickname(reference, resource.ResourceName)
         # Is this a good use of the resource name? Is it safe?
@@ -193,14 +194,11 @@ class ResourceClient(object):
         @param comment is a comment to add about the current state of the resource
         """
         
-        if instance._update_ref != None:
-            raise ResourceClientError('Can not put and instance with an unresolved update!')
-        
         if not comment:
             comment = 'Resource client default commit message'
             
         # Get the repository
-        repository = instance._repository
+        repository = instance.Repository
             
         repository.commit(comment=comment)            
             
@@ -237,8 +235,101 @@ class ResourceClient(object):
     
 class ResourceInstanceError(Exception):
     """
-    Exceptoin class for Resource Instance Object
+    Exception class for Resource Instance Object
     """
+    
+class ResourceFieldProperty(object):
+    
+    def __init__(self, name, doc=None):
+        self.name = name
+        if doc: self.__doc__ = doc
+        
+    def __get__(self, resource_instance, objtype=None):
+        return getattr(resource_instance._repository.root_object.resource_object, self.name)
+        
+    def __set__(self, resource_instance, value):
+        return setattr(resource_instance._repository.root_object.resource_object, self.name, value)
+        
+    def __delete__(self, wrapper):
+        raise AttributeError('Can not delete a Resource Instance property')
+        
+        
+class ResourceEnumProperty(object):
+    
+    def __init__(self, name, doc=None):
+        self.name = name
+        if doc: self.__doc__ = doc
+        
+    def __get__(self, resource_instance, objtype=None):
+        return getattr(resource_instance._repository.root_object.resource_object, self.name)
+        
+    def __set__(self, wrapper, value):
+        raise AttributeError('Can not set a Resource Instance enum object')
+        
+    def __delete__(self, wrapper):
+        raise AttributeError('Can not delete a Resource Instance property')
+    
+class ResourceInstanceType(type):
+    """
+    Metaclass that automatically generates subclasses of Wrapper with corresponding enums and
+    pass-through properties for each field in the protobuf descriptor.
+    
+    This approach is generally applicable to wrap data structures. It is extremely powerful!
+    """
+
+    _type_cache = {}
+
+    def __call__(cls, resource_repository, *args, **kwargs):
+        # Cache the custom-built classes
+        
+        # Check that the object we are wrapping is a Google Message object
+        if not isinstance(resource_repository, repository.Repository):
+            raise ResourceInstanceError('ResourceInstance init argument must be an instance of a Repository')
+        
+        if resource_repository.status == repository.Repository.NOTINITIALIZED:
+            raise ResourceInstanceError('ResourceInstance init Repository argument is in an invalid state - checkout first!')
+        
+        if resource_repository.root_object.ObjectType != resource_type:
+            raise ResourceInstanceError('ResourceInstance init Repository is not a resource object!')
+        
+        resource_obj = resource_repository.root_object.resource_object
+        
+        msgType, clsType = type(resource_obj), None
+
+        if msgType in ResourceInstanceType._type_cache:
+            clsType = ResourceInstanceType._type_cache[msgType]
+        else:
+            
+            
+            # Get the class name
+            clsName = '%s_%s' % (cls.__name__, msgType.__name__)
+            clsDict = {}
+                
+            # Now setup the properties to map through to the GPB object
+            resDict = msgType.__dict__
+            
+            for fieldName, resource_field in resDict.items():
+                #print 'Key: %s; Type: %s' % (fieldName, type(resource_field))
+                if isinstance(resource_field, gpb_wrapper.WrappedProperty):
+                    prop = ResourceFieldProperty(fieldName )
+                    
+                    clsDict[fieldName] = prop
+                    
+                elif isinstance(resource_field, gpb_wrapper.EnumObject):
+                    prop = ResourceEnumProperty(fieldName )
+                    
+                    clsDict[fieldName] = prop
+            
+
+            clsType = ResourceInstanceType.__new__(ResourceInstanceType, clsName, (cls,), clsDict)
+
+            ResourceInstanceType._type_cache[msgType] = clsType
+
+        # Finally allow the instantiation to occur, but slip in our new class type
+        obj = super(ResourceInstanceType, clsType).__call__(resource_repository, *args, **kwargs)
+        return obj
+    
+    
     
 class ResourceInstance(object):
     """
@@ -246,8 +337,8 @@ class ResourceInstance(object):
     interacts with a resource instance. It hides the git semantics of the data
     store and deals with resource specific properties.
     """
+    __metaclass__ = ResourceInstanceType
     
-    RESOURCE_CLASS = object_utils.get_gpb_class_from_type_id(resource_type)
     # Life Cycle States
     NEW='New'
     ACTIVE='Active'
@@ -260,33 +351,70 @@ class ResourceInstance(object):
     
     # Resource update mode
     APPEND = 'Appending new update'
-    SET = 'Setting state equal to this update'
-    MODIFY = 'Merge modifications in this update'
+    CLOBBER = 'Clobber current state with this update'
+    MERGE = 'Merge modifications in this update'
     
     # Resource update Resolutions
     RESOLVED = 'Update resolved' # When a merger occurs with the previous state
     REJECTED = 'Update rejected' # When an update is rejected
-    ACCEPTED = 'Update accepted' # For updates which are accepted as the new state
     
-    def __init__(self, resource):
+    def __init__(self, resource_repository):
         """
         Resource Instance objects are created by the resource client
         """
-        object.__setattr__(self,'_object',None)
+        object.__setattr__(self,'_repository',None)
         
-        self._repository = resource.Repository
+        self._repository = resource_repository
         
-        self._resource = resource
         
-        self._object = self._resource.resource_object
+    @property
+    def Repository(self):
+        return self._repository
         
-        self._update_ref = None
+    @property
+    def Resource(self):
+        repo = self._repository
+        return repo._workspace_root
+        
+    
+    def _get_resource_object(self):
+        repo = self._repository
+        return repo._workspace_root.resource_object
+        
+    def _set_resource_object(self, value):
+        repo = self._repository
+        if value.ObjectType != self.ResourceType:
+            raise ResourceInstanceError('Can not change the type of a resource object!')
+        repo._workspace_root.resource_object = value
+        
+    ResourceObject = property(_get_resource_object, _set_resource_object)
+        
+        
+    @property
+    def CompareToUpdates(self):
+        """
+        @ Brief This methods provides access to the committed resource states that
+        are bing merged into the current version of the Resource.
+        @param ind is the index into list of merged states.
+        @result The result is a list of update objects which are in a read only state.
+        """
+        
+        updates = self.Repository.merge_objects
+        if len(updates)==0:
+            log.warn('Invalid index into MergingResource. Current number of merged states is: %d' % (len(self.Repository.merge_objects)))
+            raise ResourceInstanceError('Invalid index access to Merging Resources. Either there is no merge or you picked an invalid index.')
+        
+        objects=[]
+        for resource in updates:
+            objects.append(resource.resource_object)
+        
+        return objects
         
     def __str__(self):
         output  = '============== Resource ==============\n'
-        output += str(self._resource) + '\n'
+        output += str(self.Resource) + '\n'
         output += '============== Object ==============\n'
-        output += str(self._object) + '\n'
+        output += str(self.ResourceObject) + '\n'
         output += '============ End Resource ============\n'
         return output
         
@@ -297,10 +425,11 @@ class ResourceInstance(object):
         @retval the key for the new version
         """
         
-        branch_key = self._repository.branch()            
+        branch_key = self.Repository.branch()            
         return branch_key
-        
-    def CommitResourceUpdate(self, update, update_mode):
+
+    @defer.inlineCallbacks
+    def MergeResourceUpdate(self, mode, *args):
         """
         Use this method when updating an existing resource.
         This is the recommended pattern for updating a resource. The Resource history will include a special
@@ -309,46 +438,48 @@ class ResourceInstance(object):
         can be put (pushed) to the public datastore.
         
         <Updated State>  
-              |        \
-              |         <Update>
-              |        /
+        |    \          \
+        |    <Update1>  <Update2> ...
+        |    /          /
         <Previous State>
         
         """
-
-        if update.GPBType != self._resource.type:
-            log.debug ('Resource Type does not match update Type')
-            raise ResourceClientError('update_instance argument "update" must be of the same type as the resource')
+        if not self.Repository.status == self.Repository.UPTODATE:
+            raise ResourceInstanceError('Can not merge while the resource is in a modified state')
         
-        current_branchname = self._current_branch.branchkey
+        merge_branches = []
+        for update in args:
         
-        self._repository.branch('update')
+            if update.ObjectType != self.ResourceType:
+                log.debug ('Resource Type does not match update Type')
+                log.debug ('Update type %s; Resource type %s' % (str(update.ObjectType), str(self.ResourceType)))
+                raise ResourceInstanceError('update_instance argument "update" must be of the same type as the resource')
+            
+            current_branchname = self.Repository._current_branch.branchkey
+            
+            # Create and switch to a new branch
+            merge_branches.append(self.Repository.branch())
         
-        # Set the LCS in the resource branch to UPDATE and the object to the update
-        self.ResourceLifeCycleState = self.UPDATE
+            # Set the LCS in the resource branch to UPDATE and the object to the update
+            self.ResourceLifeCycleState = self.UPDATE
         
-        # Copy the update object into resource as the current state object.
-        self._resource.resource_object = update
+            # Copy the update object into resource as the current state object.
+            self.Resource.resource_object = update
         
-        self._repository.commit(comment=str(update_mode))
+            self.Repository.commit(comment=str(mode))
+            
+            yield self.Repository.checkout(branchname=current_branchname)
         
-        self._repository.checkout(branchname=current_branchname)
+        # Set up the merge in the repository
+        for b_name in merge_branches:
+            yield self.Repository.merge(branchname=b_name)
         
-        self._repository.merge(branchname='update')
+            # Remove the merge branch - it is only a local concern
+            self.Repository.remove_branch(b_name)
+        # on the next commit - when put_instance is called - the merge will be complete!
         
         
-    def ResolveResourceUpdate(self, resolution):
-        """
-        Once the state is resolved after an update the resolution is recorded in a
-        new commit - the updated state. This method is called once the resource instance
-        is in that resolved state. The type of resolution is the only argument.
         
-        After resolving the state, put_instance must be called to make the update
-        public.
-        """
-        
-        # Make a commit merging the parent and the merge ref.
-    
     
     
     def CreateObject(self, type_id):
@@ -358,69 +489,39 @@ class ResourceInstance(object):
         @param type_id is the type_id of the object to be created
         @retval the new object which can now be attached to the resource
         """
-        return self._repository.create_object(type_id)
+        return self.Repository.create_object(type_id)
         
         
-    def __getattribute__(self, key):
+    
+    def ListSetFields(self):
         """
-        @brief We want to expose the resource and its object through a uniform
-        interface. To do so we override getattr to expose the data fields of the
-        resource object
+        Return a list of the names of the fields which have been set.
         """
-        # Because we have over-riden the default getattribute we must be extremely
-        # careful about how we use it!
-        res_obj = object.__getattribute__(self, '_object')
+        return self.ResourceObject.ListSetFields()
+
+    def HasField(self, field):
+        log.warn('HasField is depricated because the name is confusing. Use IsFieldSet')
+        return self.IsFieldSet(field)
         
-        gpbfields = []
-        if res_obj:
-            #gpbfields = object.__getattribute__(res_obj,'_gpbFields')
-            gpbfields = res_obj._gpbFields
-        if key in gpbfields:
-            # If it is a Field defined by the gpb...
-            #value = getattr(res_obj, key)
-            value = res_obj.__getattribute__(key)
-                
-        else:
-            # If it is a attribute of this class, use the base class's getattr
-            value = object.__getattribute__(self, key)
-        return value
+    def IsFieldSet(self, field):
+        return self.ResourceObject.IsFieldSet(field)
         
-        
-    def __setattr__(self,key,value):
-        """
-        @brief We want to expose the resource and its object through a uniform
-        interface. To do so we override getattr to expose the data fields of the
-        resource object
-        """
-        res_obj = object.__getattribute__(self, '_object')
-        
-        gpbfields = []
-        if res_obj:
-            #gpbfields = object.__getattribute__(res_obj,'_gpbFields')
-            gpbfields = res_obj._gpbFields
-        
-        if key in gpbfields:
-            # If it is a Field defined by the gpb...
-            #setattr(res_obj, key, value)
-            res_obj.__setattr__(key,value)
-                
-        else:
-            v = object.__setattr__(self, key, value)
-        
+    def ClearField(self, field):
+        return self.ResourceObject.ClearField(field)
         
     @property
     def ResourceIdentity(self):
         """
         @brief Return the resource identity as a string
         """
-        return str(self._resource.identity)
+        return str(self.Resource.identity)
     
     @property
     def ResourceType(self):
         """
-        @brief Returns the resource type - A type identifier object.
+        @brief Returns the resource type - A type identifier object - not the wrapped object.
         """
-        return self._resource.type
+        return self.Resource.type.GPBMessage
     
     def _set_life_cycle_state(self, state):
         """
@@ -430,22 +531,23 @@ class ResourceInstance(object):
         """
         # Using IS for comparison - I think this is better than the usual ==
         # Want to force the use of the self.XXXX as the argument!
+                
         if state == self.NEW:        
-            self._resource.lcs = self.RESOURCE_CLASS.New
+            self.Resource.lcs = self.Resource.LifeCycleState.NEW
         elif state == self.ACTIVE:
-            self._resource.lcs = self.RESOURCE_CLASS.Active
+            self.Resource.lcs = self.Resource.LifeCycleState.ACTIVE
         elif state == self.INACTIVE:
-            self._resource.lcs = self.RESOURCE_CLASS.Inactive
+            self.Resource.lcs = self.Resource.LifeCycleState.INACTIVE
         elif state == self.COMMISSIONED:
-            self._resource.lcs = self.RESOURCE_CLASS.Commissioned
+            self.Resource.lcs = self.Resource.LifeCycleState.COMMISSIONED
         elif state == self.DECOMMISSIONED:
-            self.resource.lcs = self.RESOURCE_CLASS.Decommissioned
+            self.Resource.lcs = self.Resource.LifeCycleState.DECOMMISSIONED
         elif state == self.RETIRED:
-            self.resource.lcs = self.RESOURCE_CLASS.Retired
+            self.Resource.lcs = self.Resource.LifeCycleState.RETIRED
         elif state == self.DEVELOPED:
-            self.resource.lcs = self.RESOURCE_CLASS.Developed
+            self.Resource.lcs = self.Resource.LifeCycleState.DEVELOPED
         elif state == self.UPDATE:
-            self.resource.lcs = self.RESOURCE_CLASS.Update
+            self.Resource.lcs = self.Resource.LifeCycleState.UPDATE
         else:
             raise Exception('''Invalid argument value state: %s. State must be 
                 one of the class variables defined in Resource Instance''' % str(state))
@@ -455,28 +557,28 @@ class ResourceInstance(object):
         @brief Get the life cycle state of the resource
         """
         state = None
-        if self._resource.lcs == self.RESOURCE_CLASS.New:
+        if self.Resource.lcs == self.Resource.LifeCycleState.NEW:
             state = self.NEW    
         
-        elif self._resource.lcs == self.RESOURCE_CLASS.Active:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.ACTIVE:
             state = self.ACTIVE
             
-        elif self._resource.lcs == self.RESOURCE_CLASS.Inactive:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.INACTIVE:
             state = self.INACTIVE
             
-        elif self._resource.lcs == self.RESOURCE_CLASS.Commissioned:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.COMMISSIONED:
             state = self.COMMISSIONED
             
-        elif self._resource.lcs == self.RESOURCE_CLASS.Decommissioned:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.DECOMMISSIONED:
             state = self.DECOMMISSIONED
             
-        elif self._resource.lcs == self.RESOURCE_CLASS.Retired:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.RETIRED:
             state = self.RETIRED
             
-        elif self._resource.lcs == self.RESOURCE_CLASS.Developed:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.DEVELOPED:
             state = self.DEVELOPED
         
-        elif self._resource.lcs == self.RESOURCE_CLASS.Update:
+        elif self.Resource.lcs == self.Resource.LifeCycleState.UPDATE:
             state = self.UPDATE
         
         return state
@@ -490,12 +592,12 @@ class ResourceInstance(object):
         """
         Set the name of the resource object
         """
-        self._resource.name = name
+        self.Resource.name = name
         
     def _get_resource_name(self):
         """
         """
-        return str(self._resource.name)
+        return str(self.Resource.name)
     
     ResourceName = property(_get_resource_name, _set_resource_name)
     """
@@ -505,12 +607,12 @@ class ResourceInstance(object):
     def _set_resource_description(self, description):
         """
         """
-        self._resource.description = description
+        self.Resource.description = description
         
     def _get_resource_description(self):
         """
         """
-        return str(self._resource.description)
+        return str(self.Resource.description)
         
     
     ResourceDescription = property(_get_resource_description, _set_resource_description)

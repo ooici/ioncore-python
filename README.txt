@@ -33,8 +33,13 @@ Step 1: Virtual env
     libraries and dependencies are installed separately from the Python
     system libraries
 ::
-    mkvirtualenv ioncore-python
+    mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 --distribute ioncore-python
     workon ioncore-python
+
+    Note: When troubleshooting issues (since easy_install is easy but has its own problems)
+    , start all over again with a new virtualenv, such as:
+    mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 --distribute ioncore-python2
+    You can remove old virtualenvs using `rmvirtualenv <env_name>`.
 
 Step 2: Core libraries (you can skip this step)
     Install some core libraries first. Sometimes the automatic installer
@@ -67,8 +72,8 @@ Usage
 
 Start empty Python Capability Container shell with:
 ::
-    bin/start-cc -h amoeba.ucsd.edu
-    bin/start-cc   # to run with localhost
+    scripts/start-cc -h amoeba.ucsd.edu
+    scripts/start-cc   # to run with localhost
     # Alternatively the direct call to twistd developer
     twistd -n cc -h amoeba.ucsd.edu
     # To set a sysname, i.e. a "cluster name" for all containers in a cluster
@@ -83,8 +88,8 @@ Start system by executing within the CC shell:
 
 Alternatively (better) from UNIX shell executing a script:
 ::
-    bin/start-cc -h amoeba.ucsd.edu res/scripts/bootstrap.py
-    bin/start-cc -h amoeba.ucsd.edu res/scripts/newcc.py
+    scripts/start-cc -h amoeba.ucsd.edu res/scripts/bootstrap.py
+    scripts/start-cc -h amoeba.ucsd.edu res/scripts/newcc.py
 
 
 Testing
@@ -131,6 +136,13 @@ To compile all code to see if there are Python compile errors anywhere:
 ---------------------------------------------------------------------------
 Change log:
 ===========
+
+2011-1-28:
+- Switched to binary sha1 keys in all objects.
+- Added @ITV decorator to skip itv tests when running 'trial ion'
+
+2011-1-26:
+- Moved scripts in bin/ dir to scripts/ dir.
 
 2011-1-24:
 - Removed IRODS as backend storage configureation option

@@ -12,7 +12,7 @@
 
 setupdict = {
     'name' : 'ioncore',
-    'version' : '0.4.1', #VERSION,
+    'version' : '0.4.3', #VERSION,
     'description' : 'OOI ION Python Capability Container and Core Modules',
     'url': 'http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project',
     'download_url' : 'http://ooici.net/packages',
@@ -36,12 +36,15 @@ try:
 
     setupdict['dependency_links'] = ['http://ooici.net/packages']
     setupdict['packages'].extend(['twisted/plugins'])
+    setupdict['package_data'] = {'twisted.plugins': ['twisted/plugins/cc.py']}
     setupdict['test_suite'] = 'ion'
 
     setupdict['install_requires'] = ['Twisted==10.2.0', 'carrot==0.10.11-txamqp', 'txamqp==0.3',
                                      'simplejson==2.1.2', 'httplib2==0.6.0','msgpack-python==015final',
                                      'gviz_api.py==1.7.0','nimboss','txrabbitmq==0.4', 'Telephus==0.7-beta3.3', 
-                                     'M2Crypto==0.20.2', 'ionproto==0.2.3', 'protobuf==2.3.0-p1']
+                                     #thrift is a dependency of Telephus, which should be included there ideally 
+                                     'thrift==0.2.0', 
+                                     'M2Crypto==0.20.2', 'ionproto==0.3.11']
 
     
     setupdict['include_package_data'] = True
@@ -49,5 +52,5 @@ try:
 
 except ImportError:
     from distutils.core import setup
-    setupdict['packages'] = ['ioncore']
+    setupdict['packages'] = ['ion']
     setup(**setupdict)

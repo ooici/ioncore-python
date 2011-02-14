@@ -11,7 +11,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.process.process import ProcessFactory
-from ion.services.dm.util.eoi_data_stream_producer import CoordinatorClient
+#from ion.services.dm.util.eoi_data_stream_producer import CoordinatorClient
 
 from ion.core.process.service_process import ServiceProcess
 from twisted.internet import defer, protocol, reactor

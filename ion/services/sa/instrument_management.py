@@ -19,7 +19,7 @@ from ion.resources.dm_resource_descriptions import PubSubTopicResource
 from ion.resources.sa_resource_descriptions import InstrumentResource, DataProductResource
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.services.dm.distribution.pubsub_service import DataPubsubClient
+#from ion.services.dm.distribution.pubsub_service import DataPubsubClient
 from ion.services.sa.instrument_registry import InstrumentRegistryClient
 from ion.services.sa.data_product_registry import DataProductRegistryClient
 from ion.services.coi.agent_registry import AgentRegistryClient
@@ -43,7 +43,7 @@ class InstrumentManagementService(ServiceProcess):
         self.irc = InstrumentRegistryClient(proc=self)
         self.dprc = DataProductRegistryClient(proc=self)
         self.arc = AgentRegistryClient(proc=self)
-        self.dpsc = DataPubsubClient(proc=self)
+        #self.dpsc = DataPubsubClient(proc=self)
 
     @defer.inlineCallbacks
     def op_create_new_instrument(self, content, headers, msg):

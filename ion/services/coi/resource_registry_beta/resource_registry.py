@@ -47,8 +47,6 @@ class ResourceRegistryService(ServiceProcess):
     resource_type = object_utils.create_type_identifier(object_id=1102, version=1)
     resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
 
-    RESOURCE_CLASS = object_utils.get_gpb_class_from_type_id(resource_type)
-
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -77,7 +75,7 @@ class ResourceRegistryService(ServiceProcess):
         
         # Check that we got the correct kind of content!
         assert isinstance(content, gpb_wrapper.Wrapper)
-        assert content.GPBType == self.resource_description_type
+        assert content.ObjectType == self.resource_description_type
         
         try:
             id = yield self._register_resource_instance(content)
@@ -112,7 +110,7 @@ class ResourceRegistryService(ServiceProcess):
         object_utils.set_type_from_obj(res_obj, resource.type)
         
         # State is set to new by default
-        resource.lcs = self.RESOURCE_CLASS.New
+        resource.lcs = resource.LifeCycleState.NEW
         
         resource_repository.commit('Created a new resource!')
 

@@ -17,10 +17,18 @@ import ion.util.procutils as pu
 
 from ion.core.object import gpb_wrapper
 from ion.core.object import repository
-#from net.ooici.play import addressbook_pb2
 from net.ooici.core.container import container_pb2
+from ion.core.object import object_utils
+from ion.core.messaging import message_client
+ion_message_type = object_utils.create_type_identifier(object_id=11, version=1)
+
 
 ION_R1_GPB = 'ION R1 GPB'
+
+class CodecError(Exception):
+    """
+    An error class for problems that occur in the codec
+    """
 
 
 class ObjectCodecInterceptor(EnvelopeInterceptor):
@@ -39,9 +47,24 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         print 'note', invocation.note
         print 'workbench', invocation.workbench
         """
+        
+        # Only mess with ION_R1_GPB encoded objects...
         if isinstance(invocation.content, dict) and ION_R1_GPB == invocation.content['encoding']:
-            content = invocation.content['content']
-            invocation.content['content'] = invocation.workbench.unpack_structure(content)        
+            raw_content = invocation.content['content']
+            unpacked_content = invocation.workbench.unpack_structure(raw_content)
+                
+            if hasattr(unpacked_content, 'ObjectType') and \
+                unpacked_content.ObjectType == ion_message_type:
+                # If this content should be returned in a Message Instance
+                content = message_client.MessageInstance(unpacked_content.Repository)
+            
+            else:
+                # Continue to allow the return of non Message Instance objects...
+                content = unpacked_content
+            
+            invocation.content['content'] = content
+            
+            
         
         #print '======= End BEFORE Davids Codec!============'
         
@@ -60,14 +83,18 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         print 'workbench', invocation.workbench
         """
         content = invocation.message['content']
+          
+        if isinstance(content, message_client.MessageInstance):
+            invocation.message['content'] = invocation.workbench.pack_structure(content.Message)
+            invocation.message['encoding'] = ION_R1_GPB
             
-        if isinstance(content, gpb_wrapper.Wrapper):
+        elif isinstance(content, gpb_wrapper.Wrapper):
             invocation.message['content'] = invocation.workbench.pack_structure(content)
         
             invocation.message['encoding'] = ION_R1_GPB      
         
         elif isinstance(content, repository.Repository):
-            invocation.message['content'] = invocation.workbench.pack_repository_commits(content)
+            invocation.message['content'] = invocation.workbench.pack_repository(content)
                      
             invocation.message['encoding'] = ION_R1_GPB
             
@@ -76,6 +103,19 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
             invocation.message['content'] = serialized
             
             invocation.message['encoding'] = ION_R1_GPB
+        
+        elif isinstance(content, list) and len(content)>0:
+                        
+            if isinstance(content[0], repository.Repository):
+                # assume it is a list of repository objects to send
+                
+                
+                print 'PELEPELEPELPELELELPELPELPELPPEEL'
+                
+                invocation.message['content'] = invocation.workbench.pack_repositories(content)
+                     
+                invocation.message['encoding'] = ION_R1_GPB
+                                    
         
         #print '======= End AFTER Davids Codec! ================'
 
