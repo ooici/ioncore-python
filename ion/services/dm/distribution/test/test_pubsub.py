@@ -14,10 +14,12 @@ from ion.services.dm.distribution.pubsub_service import PubSubClient
 from ion.test.iontest import IonTestCase
 from twisted.trial import unittest
 from ion.util.procutils import asleep
+from ion.core import ioninit
 
 from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
+CONF = ioninit.config(__name__)
 
 class PST(IonTestCase):
     """
@@ -66,33 +68,33 @@ class PST(IonTestCase):
     def test_start_stop(self):
         pass
 
-    @itv
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_topic_tree_creation(self):
         self.tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
         self.failIf(self.tt_id is None)
 
-    @itv
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_bad_topic_tree_delete(self):
         rc = yield self.psc.undeclare_topic_tree('fubar')
         self.failIf(rc is None)
 
-    @itv
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_topic_tree_write_delete(self):
         tt_id = yield self.psc.declare_topic_tree(self.xs_name, 'fubar')
         self.failIf(tt_id is None)
         yield self.psc.undeclare_topic_tree(tt_id)
 
-    @itv
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_bad_topic_tree(self):
         raise unittest.SkipTest('Waiting for code')
         rc = yield self.psc.declare_topic_tree(None, None)
         self.failIf(rc is not None)
 
-    @itv
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_tt_create_and_query(self):
         raise unittest.SkipTest('Waiting for code')
@@ -102,7 +104,7 @@ class PST(IonTestCase):
         rc = yield self.psc.query_topic_trees(self.tt_name)
         self.failIf(rc is None)
 
-    @itv
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_tt_crud(self):
         raise unittest.SkipTest('Waiting for code')
@@ -116,7 +118,7 @@ class PST(IonTestCase):
         self.failIf(rc is None)
         self.failIf(len(rc) > 0)
 
-    @itv
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_define_topic(self):
         tt_id = 'fake_topic_id'
@@ -124,7 +126,7 @@ class PST(IonTestCase):
         # Verify that it was created
         self.failIf(topic_id is None)
 
-    @itv
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_topics(self):
         raise unittest.SkipTest('Waiting for code')
@@ -136,7 +138,7 @@ class PST(IonTestCase):
         self.failIf(rc is None)
         self.failIf(len(rc) < 1)
 
-    @itv
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_define_publisher(self):
         raise unittest.SkipTest('Waiting for code')
@@ -145,7 +147,7 @@ class PST(IonTestCase):
         pid = yield self.psc.define_publisher(tt_id, topic_id, 'phubbard')
         self.failIf(pid is None)
 
-    @itv
+    @itv(CONF)
     def test_subscribe(self):
         raise unittest.SkipTest('Waiting for code')
         # @todo Create publisher, send data, verify receipt a la scheduler test code
