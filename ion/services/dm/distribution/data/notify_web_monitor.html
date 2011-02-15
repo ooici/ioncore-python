@@ -1,0 +1,58 @@
+<html>
+    <head>
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script>
+        <style>
+            body {
+                font-family: helvetica, sans-serif;
+                font-size: 11pt;
+                background-color: #efefef;
+                margin: 0px;
+            }
+            #header {
+                background-color: white;
+                color: #333;
+                border-bottom: 1px solid black;
+                padding: 10px;
+                height: 30px;
+            }   
+        </style>
+    </head>
+    <body>
+        <div id='header'>
+            <input id="lastslice" type="hidden" value="0" />
+            <input type="button" id="stopupdates" value="Stop" />
+            <input type="button" id="logreg" value="Log Reg" />
+        </div>
+        <ul id="log"></ul>
+    </body>
+    <script type="text/javascript">
+        var intervalID;
+        $(document).ready(function() { 
+            //intervalID = window.setInterval(function() {
+            //    req = "/data" + $('input#lastslice').val();
+            //    $.getJSON(req, function(data) {
+            //        $('ul#log').append(data.html);
+            //        $('input#lastslice').val(data.lastindex);
+            //    });
+            //}, 2000);
+
+            function getData()
+            {
+                req = "/data/stuff"
+                $.getJSON(req, function(data) {
+                    console.log(data);
+                });
+            }
+            getData();
+
+            $('input#stopupdates').click(function() { 
+                window.clearInterval(intervalID);
+            });
+
+            $('input#logreg').click(function() {
+                $.getJSON('/ctl/_log', function(data) {});
+            });
+        });
+    </script>
+</html>
+
