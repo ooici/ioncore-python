@@ -147,7 +147,7 @@ class CassandraInventoryService(ServiceProcess):
             col.name = "value"
             col.value = row[1]
         
-        response.configuration = rows.ResourceObject  
+        response.configuration = rows_resource.ResourceObject  
         response.result = 'Query complete'
            
         yield self.reply_ok(msg, response)
@@ -185,7 +185,7 @@ class CassandraInventoryClient(ServiceClient):
     @defer.inlineCallbacks
     def query(self, cassandra_row):
         log.info("Called CassandraInventoryService client")
-        (content, headers, msg) = yield self.rpc_send('query', attrs)
+        (content, headers, msg) = yield self.rpc_send('query', cassandra_row)
         defer.returnValue(content)
         
     @defer.inlineCallbacks
