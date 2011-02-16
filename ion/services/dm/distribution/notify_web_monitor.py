@@ -9,7 +9,7 @@ from ion.core.messaging.receiver import Receiver
 from twisted.internet import defer, reactor
 from twisted.web import server, resource, static
 from pkg_resources import resource_filename
-import os
+import os, time
 
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
@@ -43,14 +43,27 @@ class LoggingWebResource(resource.Resource):
             #data = { 'html': msgs,
             #         'lastindex': self._lastindex }
 
-            data = {}
+            print str(request)
+            print str(self._request)
+            try:
+                since = float("".join(self._request))
+            except Exception:
+                since = 0.0
+
+            data = []
             for recv, msgs in self._msgs.items():
-                data[recv.name] = []
+                thisdata = { 'name': recv.name,
+                             'logs': [] }
                 for msg in msgs:
                     #data[recv.name].append(str(msg['content'].additional_data.message)) #msgs
-                    data[recv.name].append(str(msg['content'].additional_data.createdtime))
+                    if float(msg['content'].additional_data.createdtime) > since:
+                        thisdata['logs'].append(str(msg['content'].additional_data.message))
 
-            return json.dumps(data);
+                data.append(thisdata)
+
+            response = { 'data': data,
+                         'lasttime': time.time() }
+            return json.dumps(response);
 
     class GenericRequest(resource.Resource):
         isLeaf = True

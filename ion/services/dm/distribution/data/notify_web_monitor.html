@@ -1,5 +1,6 @@
 <html>
     <head>
+        <title>Notification Monitor</title>
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script>
         <style>
             body {
@@ -28,6 +29,41 @@
     <script type="text/javascript">
         var intervalID;
         $(document).ready(function() { 
+
+            var timeoutid = null;
+
+            function dowork(lasttime, callback)
+            {
+                req = "/data/" + lasttime;
+                console.log("bout to request " + req);
+
+                $.getJSON(req, function(data) {
+                    intervalID = window.setTimeout(dowork, 2000, data.lasttime, callback);           
+                    callback(data);
+                });
+            }
+
+            dowork('', function(data) {
+                console.log(data);
+
+                // find existing ul with name
+
+                for (var i = 0; i < data.data.length; i++)
+                {
+                    var curdata = data.data[i]; 
+                    console.log("name: " + curdata.name + " msgs: " + curdata.logs.length);
+                    ul = $('ul#' + curdata.name);
+                    if (ul.length == 0)
+                    {
+                        ul = $('<ul/>', {'id': curdata.name});
+                        ul.appendTo('body');
+                    }
+
+                    for (var j = 0; j < curdata.logs.length; j++)
+                        $('<li>' + curdata.logs[j] + '</li>').appendTo(ul);
+                }
+            });
+
             //intervalID = window.setInterval(function() {
             //    req = "/data" + $('input#lastslice').val();
             //    $.getJSON(req, function(data) {
@@ -43,10 +79,11 @@
                     console.log(data);
                 });
             }
-            getData();
+            //getData();
 
             $('input#stopupdates').click(function() { 
-                window.clearInterval(intervalID);
+                //window.clearInterval(intervalID);
+                window.clearTimeout(intervalID);
             });
 
             $('input#logreg').click(function() {
