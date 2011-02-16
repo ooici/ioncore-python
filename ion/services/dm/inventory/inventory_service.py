@@ -33,6 +33,10 @@ cassandra_column_family_type =  object_utils.create_type_identifier(object_id=25
 #Credential Resource
 cassandra_credential_type =  object_utils.create_type_identifier(object_id=2503, version=1)
 
+cassandra_indexed_row_type = object_utils.create_type_identifier(object_id=2511, version=1)
+cassandra_rows_type = object_utils.create_type_identifier(object_id=2511, version=1)
+resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
+
 class CassandraInventoryServiceException(Exception):
     """
     Exceptions that originate in the CassandraManagerService class
@@ -118,11 +122,49 @@ class CassandraInventoryService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_query(self, request, headers, msg):
-        yield 1
+        """
+        @Note The goal is to return a dictionary of keys and resourceids.
+        @retval return a cassandra_rows type. The key attribute will be set and each row will contain one column 
+        with the name value.
+        """
         
+        cassandra_row = request.configuration
+        index_attrs = {}
+        for attr in cassandra_row.attrs:
+            index_attrs[attr.attribute_name] = attr.attribute_value
+        results = yield self.store.query(index_attrs)
+        #Now we have to put these back into a response
+        response = yield self.mc.create_instance(resource_response_type, name="query response")
+        
+        rows_resource = yield self.rc.create_instance(cassandra_rows_type, name="rows back",
+                                  description="A description")
+        #The GPB buffer object represents cassandra rows, we could probably get away with just making a dictionary like
+        #object, since that's what query returns.
+        for row in results.items():
+            r = rows_resource.row.add()
+            r.key = row[0]
+            col = r.cols.add()
+            col.name = "value"
+            col.value = row[1]
+        
+        response.configuration = rows.ResourceObject  
+        response.result = 'Query complete'
+           
+        yield self.reply_ok(msg, response)
+            
     @defer.inlineCallbacks
     def op_put(self, request, headers, msg):
-        yield 1
+        cassandra_row = request.configuration
+        key = cassandra_row.key
+        value = cassandra_row.value
+        index_attrs = {}
+        for attr in cassandra_row.attrs:
+            index_attrs[attr.attribute_name] = attr.attribute_value
+        yield self.store.put(key,value,index_attrs)    
+        
+        response = yield self.mc.create_instance(resource_response_type, name="put response")
+        response.result= 'Put complete'
+        yield self.reply_ok(msg, response)
         
 # Spawn of the process using the module name
 factory = ProcessFactory(CassandraInventoryService)
@@ -141,13 +183,13 @@ class CassandraInventoryClient(ServiceClient):
     
       
     @defer.inlineCallbacks
-    def query(self, attrs):
+    def query(self, cassandra_row):
         log.info("Called CassandraInventoryService client")
         (content, headers, msg) = yield self.rpc_send('query', attrs)
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def put(self, key, value, attrs):
+    def put(self, cassandra_row):
         log.info("Called CassandraInventoryService client")
-        (content, headers, msg) = yield self.rpc_send('query', key, value, attrs)
+        (content, headers, msg) = yield self.rpc_send('query', cassandra_row)
         defer.returnValue(content)    
