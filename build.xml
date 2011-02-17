@@ -43,6 +43,11 @@
     <delete dir="${dist}"/>
     <delete dir="ioncore.egg-info"/>
     <delete dir="_trial_temp"/>
+    <echo message="Use 'ant clean-buildout' if you want to clean out buildout directories as well."/>
+  </target>
+
+  <target name="clean-buildout"
+        description="clean up buildout dirs" depends="clean" >
     <echo message="Clean up buildout directories.  Please run `python bootstrap.py` to start buildout."/>
     <delete dir="parts"/>
     <delete dir="develop-eggs"/>
