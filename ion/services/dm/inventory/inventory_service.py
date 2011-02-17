@@ -34,7 +34,7 @@ cassandra_column_family_type =  object_utils.create_type_identifier(object_id=25
 cassandra_credential_type =  object_utils.create_type_identifier(object_id=2503, version=1)
 
 cassandra_indexed_row_type = object_utils.create_type_identifier(object_id=2511, version=1)
-cassandra_rows_type = object_utils.create_type_identifier(object_id=2511, version=1)
+cassandra_rows_type = object_utils.create_type_identifier(object_id=2512, version=1)
 resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
 
 class CassandraInventoryServiceException(Exception):
@@ -81,16 +81,16 @@ class CassandraInventoryService(ServiceProcess):
         """
         #Hard code the storage resource for now. Eventually pass all this into spawn_args
         if self._host is None:
-            raise CassandraInventoryService("The hostname for the Cassandra cluster is not set.")
+            raise CassandraInventoryServiceException("The hostname for the Cassandra cluster is not set.")
         
         if self._port is None:
-            raise CassandraInventoryService("The port for the Cassandra cluster is not set.")
+            raise CassandraInventoryServiceException("The port for the Cassandra cluster is not set.")
         
         if self._username is None:
-            raise CassandraInventoryService("The username for the credentials to authenticate to the Cassandra cluster is not set.")
+            raise CassandraInventoryServiceException("The username for the credentials to authenticate to the Cassandra cluster is not set.")
         
         if self._password is None:
-            raise CassandraInventoryService("The password for the credentials to authenticate to the Cassandra cluster is not set.")
+            raise CassandraInventoryServiceException("The password for the credentials to authenticate to the Cassandra cluster is not set.")
     
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
         cassandra_cluster = yield self.rc.create_instance(cassandra_cluster_type, name="Cassandra cluster", description="OOI Cassandra cluster")
@@ -101,7 +101,8 @@ class CassandraInventoryService(ServiceProcess):
         cas_host.host = self._host
         cas_host.port = self._port
         
-        #Pass these in through the bootstrap
+        #TODO Pass these in through the bootstrap 
+        
         keyspace = "TestKeyspace"
         column_family = "TestCF"
         

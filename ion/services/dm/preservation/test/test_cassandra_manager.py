@@ -3,6 +3,7 @@
 """
 @file ion/services/dm/preservation/test/test_cassandra_manager_service.py
 @author David Stuebe
+@author Matt Rodriguez
 """
 
 import ion.util.ionlog

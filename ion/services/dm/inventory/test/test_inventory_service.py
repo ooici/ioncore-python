@@ -19,11 +19,9 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 from ion.util.itv_decorator import itv
 
-cassandra_keyspace_type = object_utils.create_type_identifier(object_id=2506, version=1)
-cassandra_column_family_type = object_utils.create_type_identifier(object_id=2507, version=1)
-cassandra_request_type = object_utils.create_type_identifier(object_id=2510, version=1)
+
 resource_request_type = object_utils.create_type_identifier(object_id=10, version=1)
-columndef_type = object_utils.create_type_identifier(object_id=2508, version=1)
+cassandra_indexed_row_type = object_utils.create_type_identifier(object_id=2511, version=1)
 
 class CassandraInventoryTester(IonTestCase):
     
@@ -36,13 +34,12 @@ class CassandraInventoryTester(IonTestCase):
              'spawnargs':{'servicename':'datastore'}},
            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
-            {'name': 'cassandra_manager_agent',
+            {'name': 'inventory',
              'module': 'ion.services.dm.inventory.inventory_service',
-             'class':'CassandraManagerAgent'},         
+             'class':'CassandraInventoryService'},         
         ]
         sup = yield self._spawn_processes(services)
         self.client = CassandraInventoryClient(proc=sup)
-        self.keyspace = 'ManagerServiceKeyspace'
         self.mc = MessageClient(proc = self.test_sup)
         
 
@@ -56,22 +53,20 @@ class CassandraInventoryTester(IonTestCase):
     def test_instantiation_only(self):
         pass
 
-    @itv(CONF)
+    #@itv(CONF)
     @defer.inlineCallbacks
-    def test_create_archive(self):
-        """
-        This integration test does not remove the keyspace from the Cassandra cluster. Do not run 
-        it unless you know how to delete the keyspace using another client. 
-        """
+    def test_put_rows(self):
         create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
-        create_request.configuration =  create_request.CreateObject(cassandra_keyspace_type)
-
-        #persistent_archive_repository, cassandra_keyspace  = self.wb.init_repository(cassandra_keyspace_type)
-        create_request.configuration.name = self.keyspace
-        log.info("create_request.configuration " + str(create_request))
-    
-        create_response = yield self.client.create_persistent_archive(create_request)
-        log.info("create_response.result " + str(create_response.result))
-        self.failUnlessEqual(create_response.result, "Created")
-    
+        row =  create_request.CreateObject(cassandra_indexed_row_type)
+        row.key = "Key1"
+        row.value = "Value1"
+        attr_dict = {"Subject":"Who", "Predicate":"Descriptive Verb", "Object": "The thing you're looking for"}
+        for key,value in attr_dict.items():
+            attr = row.attrs.add()
+            attr.attribute_name = key
+            attr.attribute_value = value    
+        
+        create_request.configuration = row
+        create_response = yield self.client.put(create_request)   
+        log.info(create_response.result) 
   
