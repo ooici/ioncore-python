@@ -97,7 +97,7 @@ class HelloErrors(ServiceProcess):
             response.name = 'Matthew'
             response.id = 8
             
-            response.MessageApplicationsResponse = response.ApplicationResponse.SUCCESS
+            response.MessageApplicationResponse = response.ApplicationResponse.SUCCESS
         
         # Let the service just reply okay with no value!
         elif content.MessageName == 'OK':
