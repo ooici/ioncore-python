@@ -12,6 +12,10 @@ from twisted.internet import defer
 from ion.play.hello_errors import HelloErrorsClient
 from ion.test.iontest import IonTestCase
 from ion.core.exception import ReceivedError
+
+from ion.core.messaging import message_client
+
+
 class HelloErrorsTest(IonTestCase):
     """
     Testing example hello service.
@@ -39,7 +43,7 @@ class HelloErrorsTest(IonTestCase):
         he = HelloErrorsClient(proc=sup)
             
         # Create a mesasge client
-        mc = MessageClient(proc=self.test_sup)
+        mc = message_client.MessageClient(proc=self.test_sup)
         
         # Use the message client to create a message object
         # We are using the name to pass simple string arguments to the service
@@ -60,7 +64,10 @@ class HelloErrorsTest(IonTestCase):
           
           
         # Send a request - and reply ok (no content)!
-        result = yield he.replytome("OK")
+        ok = yield mc.create_instance(name="OK")
+            
+        # Send a request - and succeeds!
+        result = yield he.replytome(ok)
             
         log.info('Got Response: '+str(result.MessageObject)) 
         log.info('Got Application Result: '+str(result.MessageApplicationResponse))
@@ -73,7 +80,8 @@ class HelloErrorsTest(IonTestCase):
         self.assertEqual(result.MessageException,'')
           
         # Send a request - and fail!
-        result = yield he.replytome("Fail")
+        fail = yield mc.create_instance(name="Fail")
+        result = yield he.replytome(fail)
             
         log.info('Got Response: '+str(result.MessageObject)) 
         log.info('Got Application Result: '+str(result.MessageApplicationResponse))
@@ -86,7 +94,8 @@ class HelloErrorsTest(IonTestCase):
           
           
         # Send a request - and catch an exception. Reply Ok!
-        result = yield he.replytome("CatchMe_OK")
+        catchme_ok = yield mc.create_instance(name="CatchMe_OK")
+        result = yield he.replytome(catchme_ok)
             
         log.info('Got Response: '+str(result.MessageObject)) 
         log.info('Got Application Result: '+str(result.MessageApplicationResponse))
@@ -99,7 +108,8 @@ class HelloErrorsTest(IonTestCase):
           
             
         # Send a request - and catch an exception. Reply Err!
-        result = yield he.replytome("CatchMe_ERR")
+        catchme_err = yield mc.create_instance(name="CatchMe_ERR")
+        result = yield he.replytome(catchme_err)
             
         log.info('Got Response: '+str(result.MessageObject)) 
         log.info('Got Application Result: '+str(result.MessageApplicationResponse))
@@ -113,7 +123,8 @@ class HelloErrorsTest(IonTestCase):
         
         
         ## Send a request - and catch an exception
-        result = yield he.replytome("Can'tCatchMe")
+        uncaught = yield mc.create_instance(name="Can'tCatchMe")
+        result = yield he.replytome(uncaught)
         
         log.info('Got Response: '+str(result.MessageObject)) 
         log.info('Got Application Result: '+str(result.MessageApplicationResponse))

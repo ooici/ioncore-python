@@ -100,13 +100,13 @@ class HelloErrors(ServiceProcess):
             response.MessageApplicationResponse = response.ApplicationResponse.SUCCESS
         
         # Let the service just reply okay with no value!
-        elif content == 'OK':
+        elif content.MessageName == 'OK':
             response = None
         
         ####
         # A message that fails in the application - with no exception.
         ####
-        elif content == 'Fail':
+        elif content.MessageName == 'Fail':
             
             # Create a message to contain the response... it may or may not have a type beyond the basic message container
             response = yield self.mc.create_instance(name='Example "empty" failure message')
@@ -115,11 +115,11 @@ class HelloErrors(ServiceProcess):
             response.MessageApplicationResponse = response.ApplicationResponse.FAILED
             
         # A message that fails generating an exception 
-        elif content == 'CatchMe_OK':
+        elif content.MessageName == 'CatchMe_OK':
                 
             raise HelloError_OK("I'm supposed to fail and reply_ok")
                 
-        elif content == 'CatchMe_ERR':
+        elif content.MessageName == 'CatchMe_ERR':
             
             raise HelloError_ERR("I'm supposed to fail and reply_err")
             
