@@ -21,6 +21,8 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 
 from ion.core.messaging.message_client import MessageClient
 
+from ion.core.data.store import IIndexStore
+
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
@@ -36,6 +38,7 @@ cassandra_credential_type =  object_utils.create_type_identifier(object_id=2503,
 cassandra_indexed_row_type = object_utils.create_type_identifier(object_id=2511, version=1)
 cassandra_rows_type = object_utils.create_type_identifier(object_id=2512, version=1)
 resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
+resource_request_type = object_utils.create_type_identifier(object_id=10, version=1)
 
 class CassandraInventoryServiceException(Exception):
     """
@@ -117,7 +120,10 @@ class CassandraInventoryService(ServiceProcess):
         
         ### Create a Credentials resource - for cassandra a SimplePassword object
         #cache_repository, simple_password  = self.wb.init_repository(simple_password_type)
-        self.store = CassandraIndexedStore(cassandra_cluster,persistent_archive, cache, simple_password)
+        log.info("Creating Cassandra Store")
+        self._indexed_store = CassandraIndexedStore(cassandra_cluster,persistent_archive,  simple_password,cache)
+        log.info("Created Cassandra Store")
+        
         
         
 
@@ -133,7 +139,7 @@ class CassandraInventoryService(ServiceProcess):
         index_attrs = {}
         for attr in cassandra_row.attrs:
             index_attrs[attr.attribute_name] = attr.attribute_value
-        results = yield self.store.query(index_attrs)
+        results = yield self._indexed_store.query(index_attrs)
         #Now we have to put these back into a response
         response = yield self.mc.create_instance(resource_response_type, name="query response")
         
@@ -161,7 +167,7 @@ class CassandraInventoryService(ServiceProcess):
         index_attrs = {}
         for attr in cassandra_row.attrs:
             index_attrs[attr.attribute_name] = attr.attribute_value
-        yield self.store.put(key,value,index_attrs)    
+        yield self._indexed_store.put(key,value,index_attrs)    
         
         response = yield self.mc.create_instance(resource_response_type, name="put response")
         response.result= 'Put complete'
@@ -175,22 +181,46 @@ class CassandraInventoryClient(ServiceClient):
     """
     This interface will change, because we have to define the ION resources. We probably want
     convenience methods to query by name, type, etc...
+    
+    TODO have this implement the Indexstore interface
     """
     
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'cassandra_inventory_service'
         ServiceClient.__init__(self, proc, **kwargs)
+        
+        self.mc = MessageClient(proc=proc)    
+
     
       
     @defer.inlineCallbacks
-    def query(self, cassandra_row):
+    def query(self, index_attributes):
         log.info("Called CassandraInventoryService client")
+        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
+        for attr_key,attr_value in index_attributes.items():
+            attr = cassandra_row.attrs.add()
+            attr.attribute_name = attr_key
+            attr.attribute_value = attr_value
+            
         (content, headers, msg) = yield self.rpc_send('query', cassandra_row)
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def put(self, cassandra_row):
+    def put(self, key, value, index_attributes={}):
         log.info("Called CassandraInventoryService client")
-        (content, headers, msg) = yield self.rpc_send('query', cassandra_row)
-        defer.returnValue(content)    
+        
+        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
+        cassandra_row.key = key
+        cassandra_row.value = value
+        for attr_key,attr_value in index_attributes.items():
+            attr = cassandra_row.attrs.add()
+            attr.attribute_name = attr_key
+            attr.attribute_value = attr_value 
+        
+        (content, headers, msg) = yield self.rpc_send('put', cassandra_row)
+        defer.returnValue(content)
+        
+           
