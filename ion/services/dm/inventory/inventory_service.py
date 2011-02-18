@@ -22,6 +22,7 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 from ion.core.messaging.message_client import MessageClient
 
 from ion.core.data.store import IIndexStore
+from zope.interface import implements
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -48,6 +49,8 @@ class CassandraInventoryServiceException(Exception):
 class CassandraInventoryService(ServiceProcess):
     """
     @brief CassandraInventoryService
+    
+    TODO, this class does not catch any exceptions from the business logic class. 
     """
 
     # Declaration of service
@@ -173,6 +176,46 @@ class CassandraInventoryService(ServiceProcess):
         response.result= 'Put complete'
         yield self.reply_ok(msg, response)
         
+    @defer.inlineCallbacks
+    def op_get(self, request, headers, msg):   
+        cassandra_row = request.configuration
+        key = cassandra_row.key
+        
+        value = yield self._indexed_store.get(key)
+        
+        response = yield self.mc.create_instance(resource_response_type, name="get response")
+        response.result= 'Get complete'
+        row_resource = yield self.rc.create_instance(cassandra_indexed_row_type, name="value",
+                                  description="A description")
+        row_resource.value = value
+        response.configuration = row_resource.ResourceObject
+        yield self.reply_ok(msg, response)
+         
+    @defer.inlineCallbacks
+    def op_remove(self, request, headers, msg):      
+        cassandra_row = request.configuration
+        key = cassandra_row.key
+        yield self._indexed_store.remove(key)
+        response = yield self.mc.create_instance(resource_response_type, name="remove response")
+        response.result= 'Remove complete'
+        yield self.reply_ok(msg, response)
+        
+     
+    @defer.inlineCallbacks
+    def op_get_query_attributes(self, request, headers, msg):      
+        attr_dict = yield self._indexed_store.get_query_attributes()
+        response = yield self.mc.create_instance(resource_response_type, name="get_query_attributes response")
+        response.result= 'Get complete'
+        row_resource = yield self.rc.create_instance(cassandra_indexed_row_type, name="value",
+                                  description="A description")
+        
+        for attr_key, attr_value in attr_dict.items():
+            attr = row_resource.attr.add()
+            attr.attribute_name = attr_key
+            attr.attribute_value = attr_value
+            
+        response.configuration = row_resource.ResourceObject    
+        yield self.reply_ok(msg, response)
 # Spawn of the process using the module name
 factory = ProcessFactory(CassandraInventoryService)
 
@@ -184,6 +227,7 @@ class CassandraInventoryClient(ServiceClient):
     
     TODO have this implement the Indexstore interface
     """
+    implements(IIndexStore)
     
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
@@ -222,5 +266,32 @@ class CassandraInventoryClient(ServiceClient):
         
         (content, headers, msg) = yield self.rpc_send('put', cassandra_row)
         defer.returnValue(content)
+    
+    @defer.inlineCallbacks
+    def get(self, key):
+        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
+        cassandra_row.key = key
+        (content, headers, msg) = yield self.rpc_send('get', cassandra_row)
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def remove(self, key):
+        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
+        cassandra_row.key = key
+        (content, headers, msg) = yield self.rpc_send('remove', cassandra_row)
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def get_query_attributes(self):
+        """
+        This request does not send any argument. The message is used as a dummy argument.
+        """
+        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
+        (content, headers, msg) = yield self.rpc_send('get_query_attributes', cassandra_row)
+        defer.returnValue(content)
+        
         
            
