@@ -26,7 +26,7 @@ class HelloErrorsTest(IonTestCase):
         yield self._stop_container()
 
     @defer.inlineCallbacks
-    def test_hello(self):
+    def test_hello_errors(self):
             
         services = [
             {'name':'hello_my_error','module':'ion.play.hello_errors','class':'HelloErrors'},
@@ -38,60 +38,82 @@ class HelloErrorsTest(IonTestCase):
         # Create the client
         he = HelloErrorsClient(proc=sup)
             
-        # Send a request - and it succeeds!
-        response, result, ex = yield he.replytome("Succeed")
+        # Send a request - and succeeds!
+        result = yield he.replytome("Succeed")
             
-        log.info('Got Response: '+response) # Should always be a string - a defined response code!
-        log.info('Got Result: '+str(result))
-        log.info('Got Exception: '+ex)
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
+        log.info('Got ION Result: '+str(result.MessageIonResponse))
+        log.info('Got Exception: '+str(result.MessageException))
             
-        self.assertEqual(response,he.ION_SUCCESS)
-        self.assertEqual(result,'Succeeded') # The response defined by the service as the content - can be anything that the interceptor knows how to send
-        self.assertEqual(ex,'')
+        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.SUCCESS)
+        self.assertEqual(result.MessageIonResponse,result.IonResponse.OK) 
+        self.assertEqual(result.MessageException,'')
+          
+          
+        # Send a request - and reply ok (no content)!
+        result = yield he.replytome("OK")
             
-        # Send a request - and fail it!
-        response, result, ex = yield he.replytome("Fail")
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
+        log.info('Got ION Result: '+str(result.MessageIonResponse))
+        log.info('Got Exception: '+str(result.MessageException))
             
-        log.info('Got Response: '+response) # Should always be a string - a defined response code!
-        log.info('Got Result: '+str(result))
-        log.info('Got Exception: '+ex)
+        # The Application Result is automagically set to success!
+        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.SUCCESS)
+        self.assertEqual(result.MessageIonResponse,result.IonResponse.OK) 
+        self.assertEqual(result.MessageException,'')
+          
+        # Send a request - and fail!
+        result = yield he.replytome("Fail")
             
-        self.assertEqual(response,he.APP_FAILED)
-        self.assertEqual(result,'Failed') # The response defined by the service as the content - can be anything that the interceptor knows how to send
-        self.assertEqual(ex,'')
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
+        log.info('Got ION Result: '+str(result.MessageIonResponse))
+        log.info('Got Exception: '+str(result.MessageException))
+            
+        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.FAILED)
+        self.assertEqual(result.MessageIonResponse,result.IonResponse.OK) 
+        self.assertEqual(result.MessageException,'')
+          
+          
+        # Send a request - and catch an exception. Reply Ok!
+        result = yield he.replytome("CatchMe_OK")
+            
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
+        log.info('Got ION Result: '+str(result.MessageIonResponse))
+        log.info('Got Exception: '+str(result.MessageException))
+            
+        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.FAILED)
+        self.assertEqual(result.MessageIonResponse,result.IonResponse.OK) 
+        self.assertEqual(result.MessageException,"I'm supposed to fail and reply_ok")
+          
+            
+        # Send a request - and catch an exception. Reply Err!
+        result = yield he.replytome("CatchMe_ERR")
+            
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
+        log.info('Got ION Result: '+str(result.MessageIonResponse))
+        log.info('Got Exception: '+str(result.MessageException))
+            
+        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.FAILED)
+        self.assertEqual(result.MessageIonResponse,result.IonResponse.INTERNAL_ERROR) 
+        self.assertEqual(result.MessageException,"I'm supposed to fail and reply_err")
         
         
-        # Send a request - and catch an exception
-        response, result, ex = yield he.replytome("CatchMe")
-            
-        log.info('Got Response: '+response) # Should always be a string - a defined response code!
-        log.info('Got Result: '+str(result))
-        log.info('Got Exception: '+ex)
-            
-        self.assertEqual(response,he.APP_FAILED)
-        self.assertEqual(result,'Caught') # The response defined by the service as the content - can be anything that the interceptor knows how to send
-        self.assertEqual(ex,'''I'm supposed to fail''')
-                
-        # Send a request - and catch an exception
-        try:
-            response, result, ex = yield he.replytome("Can'tCatchMe")
-
-        except ReceivedError, re: 
-            # Why is re a list with a dictionary in it?
-            response =  re[0]['response']
-            result = None
-            ex = re[0]['exception']
         
-        # These do not get called - the receiver kills the container.
-        # is that what we want?
-            
-        log.info('Got Response: '+response) # Should always be a string - a defined response code!
-        log.info('Got Result: '+str(result))
-        log.info('Got Exception: '+str(ex))
-            
-        self.assertEqual(response,he.ION_RECEIVER_ERROR)
-        self.assertEqual(result,None) # The response defined by the service as the content - can be anything that the interceptor knows how to send
-        self.assertEqual(ex,'''I'm an uncaught exception!''')
+        ## Send a request - and catch an exception
+        result = yield he.replytome("Can'tCatchMe")
         
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
+        log.info('Got ION Result: '+str(result.MessageIonResponse))
+        log.info('Got Exception: '+str(result.MessageException))
+            
+        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.FAILED)
+        self.assertEqual(result.MessageIonResponse,result.IonResponse.INTERNAL_ERROR) 
+        self.assertEqual(result.MessageException,"I'm an uncaught exception!")
         
         

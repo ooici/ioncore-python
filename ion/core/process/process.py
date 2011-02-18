@@ -448,8 +448,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
             reactor.callLater(0, lambda: rpc_deferred.callback(res))
                 
         elif status == self.ION_ERROR:
-            log.warn('RPC reply is an ERROR: '+str(payload.get(self.MSG_RESPONSE)))
-            log.debug('RPC reply ERROR Content: '+str(content))
+            #log.warn('RPC reply is an ERROR: '+str(payload.get(self.MSG_RESPONSE)))
+            #log.debug('RPC reply ERROR Content: '+str(content))
             err = failure.Failure(ReceivedError(payload, content))
             #rpc_deferred.errback(err)
             # Cannot do the callback right away, because the message is not yet handled
@@ -650,7 +650,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
             
             content = yield self.message_client.create_instance(name='Generic OK Message')
 
-        elif isinstance(content, MessageInstance):
+        if isinstance(content, MessageInstance):
             if not content.Message.IsFieldSet('ion_response'):
                 content.MessageIonResponse = content.IonResponse.OK
                 
@@ -689,18 +689,19 @@ class Process(BasicLifecycleObject,ResponseCodes):
         @retval Deferred for send of reply
         """
         if content is None:
-            
             content = yield self.message_client.create_instance(name='Generic Error Message')
             
-        elif isinstance(content, MessageInstance):
+        if isinstance(content, MessageInstance):
+            
+            if not content.Message.IsFieldSet('application_response'):
+                content.MessageApplicationResponse = content.ApplicationResponse.FAILED
             
             if not content.Message.IsFieldSet('ion_response'):
                 content.MessageIonResponse = content.IonResponse.INTERNAL_ERROR
                 
             if not content.Message.IsFieldSet('exception'):
                 content.MessageException = str(exception)
-                
-        
+                        
         reshdrs = dict()
         # The status is still OK - this is for handled exceptions!
         reshdrs[self.MSG_STATUS] = self.ION_ERROR
