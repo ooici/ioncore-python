@@ -89,7 +89,7 @@ class HelloErrors(ServiceProcess):
         ####        
         # A message that succeeds
         ####
-        if content == 'Succeed':
+        if content.MessageName == 'Succeed':
             
             # Create a message to contain the response...
             response = yield self.mc.create_instance(person_type,name='Example message')

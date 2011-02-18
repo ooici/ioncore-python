@@ -35,11 +35,19 @@ class HelloErrorsTest(IonTestCase):
         #Start the service
         sup = yield self._spawn_processes(services)
             
-        # Create the client
+        # Create the client to the hello errors service
         he = HelloErrorsClient(proc=sup)
             
+        # Create a mesasge client
+        mc = MessageClient(proc=self.test_sup)
+        
+        # Use the message client to create a message object
+        # We are using the name to pass simple string arguments to the service
+        # A real message should be created with a type and the content passed inside the message
+        success = yield mc.create_instance(name="Succeed")
+            
         # Send a request - and succeeds!
-        result = yield he.replytome("Succeed")
+        result = yield he.replytome(success)
             
         log.info('Got Response: '+str(result.MessageObject)) 
         log.info('Got Application Result: '+str(result.MessageApplicationResponse))
