@@ -5,7 +5,7 @@
         <style>
             body {
                 font-family: helvetica, sans-serif;
-                font-size: 11pt;
+                font-size: 8pt;
                 background-color: #efefef;
                 margin: 0px;
             }
@@ -16,11 +16,33 @@
                 padding: 10px;
                 height: 30px;
             }   
+            div.recv {
+                float: left;
+                width: 48%;
+                padding: 2%;
+            }
+
+            div.recv span.decorate {
+                background-color: blue;
+                color: white;
+            }
+            div.recv li span.time {
+                color: black;
+                background-color: #ffff00;
+                padding: 3px;
+            }
+            div.recv li span.DEBUG {
+                color: white;
+                background-color: #a40000;
+            }
+            div.recv li span.INFO {
+                color: white;
+                background-color: #336699;
+            }
         </style>
     </head>
     <body>
         <div id='header'>
-            <input id="lastslice" type="hidden" value="0" />
             <input type="button" id="stopupdates" value="Stop" />
             <input type="button" id="logreg" value="Log Reg" />
         </div>
@@ -51,38 +73,41 @@
                 for (var i = 0; i < data.data.length; i++)
                 {
                     var curdata = data.data[i]; 
-                    console.log("name: " + curdata.name + " msgs: " + curdata.logs.length);
-                    ul = $('ul#' + curdata.name);
+                    //console.log("name: " + curdata.name + " msgs: " + curdata.logs.length);
+                    ul = $('div#' + curdata.name + ' > ul');
                     if (ul.length == 0)
                     {
-                        ul = $('<ul/>', {'id': curdata.name});
-                        ul.appendTo('body');
+                        el = $('<div/>', { 'id':curdata.name, 
+                                           'class':'recv' });
+                        dec = $('<span>' + curdata.name + '</span>').addClass('decorate');
+                        ul = $('<ul/>');
+
+                        dec.appendTo(el);
+                        ul.appendTo(el);
+                        el.appendTo('body');
                     }
 
-                    for (var j = 0; j < curdata.logs.length; j++)
-                        $('<li>' + curdata.logs[j] + '</li>').appendTo(ul);
+                    for (var j = 0; j < curdata.data.length; j++)
+                    {
+                        li = $('<li/>');
+                        li.appendTo(ul);
+                        console.log(curdata.data[j]);
+                        for (var k = 0; k < curdata.data[j].length; k++)
+                        {
+                            var cchild = curdata.data[j][k];
+                            cel = $('<span>' + cchild.content + '</span>');
+                            if (cchild.class)
+                                cel.addClass(cchild.class);
+                            if (cchild.id)
+                                cel.attr('id', cchild.id);
+
+                            cel.appendTo(li);
+                        }
+                    }
                 }
             });
 
-            //intervalID = window.setInterval(function() {
-            //    req = "/data" + $('input#lastslice').val();
-            //    $.getJSON(req, function(data) {
-            //        $('ul#log').append(data.html);
-            //        $('input#lastslice').val(data.lastindex);
-            //    });
-            //}, 2000);
-
-            function getData()
-            {
-                req = "/data/stuff"
-                $.getJSON(req, function(data) {
-                    console.log(data);
-                });
-            }
-            //getData();
-
             $('input#stopupdates').click(function() { 
-                //window.clearInterval(intervalID);
                 window.clearTimeout(intervalID);
             });
 

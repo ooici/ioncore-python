@@ -53,11 +53,18 @@ class LoggingWebResource(resource.Resource):
             data = []
             for recv, msgs in self._msgs.items():
                 thisdata = { 'name': recv.name,
-                             'logs': [] }
-                for msg in msgs:
-                    #data[recv.name].append(str(msg['content'].additional_data.message)) #msgs
-                    if float(msg['content'].additional_data.createdtime) > since:
-                        thisdata['logs'].append(str(msg['content'].additional_data.message))
+                             'data': [] }
+
+                # filter messages for time
+                filtered = [msg for msg in msgs if float(msg['content'].additional_data.createdtime) > since]
+                for msg in filtered:
+                    logentry = [{ 'content': str(msg['content'].additional_data.levelname),
+                                  'class': 'log ' + str(msg['content'].additional_data.levelname) },
+                                { 'content' : str(msg['content'].additional_data.asctime),
+                                  'class': 'time' },
+                                { 'content': str(msg['content'].additional_data.message),
+                                  'class': 'logmsg' }]
+                    thisdata['data'].append(logentry)
 
                 data.append(thisdata)
 
