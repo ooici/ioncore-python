@@ -72,11 +72,11 @@ class MessageClient(object):
         """
         
         ### Let someone else worry about whether the process is spawnded...
-        #if not self.proc.is_spawned():
-        #    yield self.proc.spawn()
+        if not self.proc.is_spawned():
+            yield self.proc.spawn()
         
         #Must use a yield to keep the defered interface
-        yield None
+        #yield None
         assert isinstance(self.workbench, workbench.WorkBench), \
         'Process workbench is not initialized'
 

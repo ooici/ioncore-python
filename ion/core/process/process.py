@@ -21,7 +21,7 @@ from ion.core.id import Id
 from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
 from ion.core.messaging.ion_reply_codes import ResponseCodes
-from ion.core.messaging.message_client import MessageClient
+from ion.core.messaging.message_client import MessageClient, MessageInstance
 
 from ion.core.process.cprocess import IContainerProcess, ContainerProcess
 from ion.data.store import Store

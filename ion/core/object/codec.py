@@ -110,8 +110,6 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
                 # assume it is a list of repository objects to send
                 
                 
-                print 'PELEPELEPELPELELELPELPELPELPPEEL'
-                
                 invocation.message['content'] = invocation.workbench.pack_repositories(content)
                      
                 invocation.message['encoding'] = ION_R1_GPB
