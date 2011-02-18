@@ -310,8 +310,7 @@ class WrapperType(type):
                 
                 clsDict['SetLink'] = obj_setlink
             
-            
-            ### Need to understand why this is neccissary! ###
+            # Try rewriting using slots - would be more efficient
             def obj_setter(self, k, v):
                 if self._init and not hasattr(self, k):
                     raise AttributeError(\

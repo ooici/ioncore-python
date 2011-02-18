@@ -13,6 +13,10 @@ from twisted.internet import defer
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
+from ion.core.messaging import message_client
+
+person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+
 class HelloErrors(ServiceProcess):
     """
     Example service interface
@@ -27,6 +31,8 @@ class HelloErrors(ServiceProcess):
         ServiceProcess.__init__(self, *args, **kwargs)
         log.info('HelloService.__init__()')
 
+        self.mc = message_client.MessageClient(proc = self)
+
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
@@ -35,8 +41,13 @@ class HelloErrors(ServiceProcess):
     def op_replytome(self, content, headers, msg):
         log.info('op_replytome: '+str(content))
 
-        response, result, ex = self.businesslogic4replytome(content)
-        #response, result, ex = yield self.businesslogic4replytome(content)
+        response = self.mc.create_instance(person_type)
+
+        try:
+            response = self.businesslogic4replytome(content, response)
+        except RuntimeError, re:
+            response.
+            yield self.reply_err(msg, exception=re)
 
         # The following line shows how to reply to a message
         # reply is called once and only once no matter the result of the business logic!

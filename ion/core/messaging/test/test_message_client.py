@@ -45,7 +45,7 @@ class MessageClientTest(IonTestCase):
         
         # Create a mesasge client
         mc = message_client.MessageClient(proc=self.test_sup)
-            
+        
         message = yield mc.create_instance(person_type, name='person message')
         
         # test the name property        
@@ -82,4 +82,28 @@ class MessageClientTest(IonTestCase):
                 
         self.assertIsInstance(response, message_client.MessageInstance)
         self.assertEqual(response.name, 'David')
+        
+    
+    @defer.inlineCallbacks
+    def test_message_instance(self):
+        
+        # Create a mesasge client
+        mc = message_client.MessageClient(proc=self.test_sup)
+            
+        # Test a message with no object
+        message = yield mc.create_instance(None, name='person message')
+        
+        # test the ION Response property        
+        self.assertEqual(message.IonResponse.OK, 200)
+        
+        # test the Application Response property        
+        self.assertEqual(message.ApplicationResponse.SUCCESS, 200)
+                
+        # The message objects fields are not accessible...
+        self.assertRaises(AttributeError, setattr, message, 'application_response', message.ApplicationResponse.SUCCESS)
+        
+        # Except throught the the getter/setter properties
+        message.MessageApplicationResponse = message.ApplicationResponse.SUCCESS
+        
+        
         
