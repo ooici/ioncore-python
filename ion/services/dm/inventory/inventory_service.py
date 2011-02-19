@@ -21,7 +21,7 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 
 from ion.core.messaging.message_client import MessageClient
 
-from ion.core.data.store import IIndexStore
+from ion.core.data.store import IIndexStore, IndexStore
 from zope.interface import implements
 
 from ion.core import ioninit
@@ -54,7 +54,7 @@ class CassandraInventoryService(ServiceProcess):
     """
 
     # Declaration of service
-    declare = ServiceProcess.service_declare(name='inventory_service', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='cassandra_inventory_service', version='0.1.0', dependencies=[])
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -125,6 +125,9 @@ class CassandraInventoryService(ServiceProcess):
         #cache_repository, simple_password  = self.wb.init_repository(simple_password_type)
         log.info("Creating Cassandra Store")
         self._indexed_store = CassandraIndexedStore(cassandra_cluster,persistent_archive,  simple_password,cache)
+        self._indexed_store.activate()
+        self._indexed_store.initialize()
+        #self._indexed_store = IndexStore()
         log.info("Created Cassandra Store")
         
         
@@ -247,8 +250,9 @@ class CassandraInventoryClient(ServiceClient):
             attr = cassandra_row.attrs.add()
             attr.attribute_name = attr_key
             attr.attribute_value = attr_value
-            
-        (content, headers, msg) = yield self.rpc_send('query', cassandra_row)
+        
+        create_request.configuration = cassandra_row    
+        (content, headers, msg) = yield self.rpc_send('query', create_request)
         defer.returnValue(content)
         
     @defer.inlineCallbacks
@@ -264,7 +268,8 @@ class CassandraInventoryClient(ServiceClient):
             attr.attribute_name = attr_key
             attr.attribute_value = attr_value 
         
-        (content, headers, msg) = yield self.rpc_send('put', cassandra_row)
+        create_request.configuration = cassandra_row  
+        (content, headers, msg) = yield self.rpc_send('put', create_request)
         defer.returnValue(content)
     
     @defer.inlineCallbacks
@@ -272,7 +277,9 @@ class CassandraInventoryClient(ServiceClient):
         create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
         cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
         cassandra_row.key = key
-        (content, headers, msg) = yield self.rpc_send('get', cassandra_row)
+        
+        create_request.configuration = cassandra_row  
+        (content, headers, msg) = yield self.rpc_send('get',create_request)
         defer.returnValue(content)
         
     @defer.inlineCallbacks
@@ -280,7 +287,9 @@ class CassandraInventoryClient(ServiceClient):
         create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
         cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
         cassandra_row.key = key
-        (content, headers, msg) = yield self.rpc_send('remove', cassandra_row)
+        
+        create_request.configuration = cassandra_row  
+        (content, headers, msg) = yield self.rpc_send('remove', create_request)
         defer.returnValue(content)
         
     @defer.inlineCallbacks
@@ -290,7 +299,8 @@ class CassandraInventoryClient(ServiceClient):
         """
         create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
         cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
-        (content, headers, msg) = yield self.rpc_send('get_query_attributes', cassandra_row)
+        create_request.configuration = cassandra_row  
+        (content, headers, msg) = yield self.rpc_send('get_query_attributes', create_request)
         defer.returnValue(content)
         
         
