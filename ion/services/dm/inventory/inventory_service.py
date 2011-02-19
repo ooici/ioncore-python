@@ -125,8 +125,8 @@ class CassandraInventoryService(ServiceProcess):
         #cache_repository, simple_password  = self.wb.init_repository(simple_password_type)
         log.info("Creating Cassandra Store")
         self._indexed_store = CassandraIndexedStore(cassandra_cluster,persistent_archive,  simple_password,cache)
-        self._indexed_store.activate()
         self._indexed_store.initialize()
+        self._indexed_store.activate()
         #self._indexed_store = IndexStore()
         log.info("Created Cassandra Store")
         
