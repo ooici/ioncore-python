@@ -34,6 +34,7 @@ DSET_TYPE = object_utils.create_type_identifier(object_id=2301, version=1)
 TT_TYPE = object_utils.create_type_identifier(object_id=2306, version=1)
 TOPIC_TYPE = object_utils.create_type_identifier(object_id=2307, version=1)
 
+
 class PubSubService(ServiceProcess):
     """
     @brief Refactored pubsub service
@@ -389,11 +390,40 @@ class PubSubClient(ServiceClient):
         defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
-    def subscribe(self, xs_name, tt_name, topic_regex):
+    def create_queue(self):
+        """
+        @brief Create a message queue, to be used by add_binding
+        @retval Queue address (string) or None
+        """
+        yield self._check_init()
+        (content, headers, payload) = yield self.rpc_send('create_queue')
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
+
+    @defer.inlineCallbacks
+    def add_binding(self, queue, binding):
+        """
+        @brief Add a binding to an existing queue. Idempotent - ok to call more than once! You can
+        also add multiple bindings to an existing queue.
+        @param queue Queue, as returned from create_queue
+        @param binding AMQP binding to attach to queue
+        @retval OK or error
+        """
+
+        yield self._check_init()
+        payload = {'queue': queue,
+                   'binding': binding}
+        (content, headers, payload) = yield self.rpc_send('add_binding', payload)
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
+
+    @defer.inlineCallbacks
+    def subscribe(self, xs_name, tt_name, topic_regex, use_queue=None):
         """
         @brief Called by subscribers, this calls the EMS to setup the data flow
         @param xs_name Exchange space name
         @param tt_name Topic tree name
+        @param use_queue If set, the name of an existing queue to send to
         @param topic_regex Topic of interest. If no publishers, then no data, but no error
         @note Order of calls on publish/subscribe does not matter
         @note creates the queue via EMS
@@ -403,6 +433,9 @@ class PubSubClient(ServiceClient):
         payload = {'topic_regex' : topic_regex,
                 'exchange_space_name': xs_name,
                 'topic_tree_name' : tt_name}
+        if use_queue:
+            payload['use_queue'] = use_queue
+
         (content, headers, payload) = yield self.rpc_send('subscribe', payload)
         log.debug('retval: %s ' % content['value'])
         defer.returnValue(content['value'])
