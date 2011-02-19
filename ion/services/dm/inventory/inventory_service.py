@@ -113,16 +113,16 @@ class CassandraInventoryService(ServiceProcess):
         column_family = "TestCF"
         
         persistent_archive = yield self.rc.create_instance(cassandra_keyspace_type, name=keyspace, description="description of " + keyspace)
+        persistent_archive.name = keyspace
         
         cache = yield self.rc.create_instance(cassandra_column_family_type, name=column_family, description="description of " + column_family)
-        
+        cache.name = column_family
         
         simple_password = yield self.rc.create_instance(cassandra_credential_type, name="Cassandra credentials", description="OOI Cassandra credentials")
         simple_password.username = self._username
         simple_password.password = self._password
         
-        ### Create a Credentials resource - for cassandra a SimplePassword object
-        #cache_repository, simple_password  = self.wb.init_repository(simple_password_type)
+
         log.info("Creating Cassandra Store")
         self._indexed_store = CassandraIndexedStore(cassandra_cluster,persistent_archive,  simple_password,cache)
         self._indexed_store.initialize()
