@@ -69,8 +69,8 @@ class HelloErrors(ServiceProcess):
 
             # Create the response - an empty message and put the exception in it.
             response = yield self.mc.create_instance(MessageName='Example message')
-            response.MessageApplicationResponse = response.ApplicationResponse.FAILED
-            response.MessageException = str(he)
+            response.MessageResponseCode = response.ResponseCodes.BAD_REQUEST
+            response.MessageResponseBody = str(he)
             
             yield self.reply_ok(msg, content=response)
             defer.returnValue(None)
@@ -97,7 +97,7 @@ class HelloErrors(ServiceProcess):
             response.name = 'Matthew'
             response.id = 8
             
-            response.MessageApplicationResponse = response.ApplicationResponse.SUCCESS
+            response.MessageResponseCode = response.ResponseCodes.OK
         
         # Let the service just reply okay with no value!
         elif content.MessageName == 'OK':
@@ -112,7 +112,7 @@ class HelloErrors(ServiceProcess):
             response = yield self.mc.create_instance(MessageName='Example "empty" failure message')
             
             # The person object fields are not set.... the the type of the object
-            response.MessageApplicationResponse = response.ApplicationResponse.FAILED
+            response.MessageResponseCode = response.ResponseCodes.BAD_REQUEST
             
         # A message that fails generating an exception 
         elif content.MessageName == 'CatchMe_OK':

@@ -317,53 +317,70 @@ class MessageInstance(object):
     def ClearField(self, field):
         return self.MessageObject.ClearField(field)
       
-    @property
-    def IonResponse(self):
-        return self.Message.IonResponse
+    #@property
+    #def IonResponse(self):
+    #    return self.Message.IonResponse
+    #  
+    #def _set_message_ion_response(self, value):
+    #    """
+    #    Set the name of the message object
+    #    """
+    #    self.Message.ion_response = value
+    #    
+    #def _get_message_ion_response(self):
+    #    """
+    #    """
+    #    return self.Message.ion_response
+    #
+    #MessageIonResponse = property(_get_message_ion_response, _set_message_ion_response)
       
-    def _set_message_ion_response(self, value):
-        """
-        Set the name of the message object
-        """
-        self.Message.ion_response = value
-        
-    def _get_message_ion_response(self):
-        """
-        """
-        return self.Message.ion_response
+    #@property
+    #def ApplicationResponse(self):
+    #    return self.Repository._workspace_root.ApplicationResponse
+    #    
+    #def _set_message_application_response(self, value):
+    #    """
+    #    Set the name of the message object
+    #    """
+    #    self.Message.application_response = value
+    #    
+    #def _get_message_application_response(self):
+    #    """
+    #    """
+    #    return self.Message.application_response
+    #
+    #MessageApplicationResponse = property(_get_message_application_response, _set_message_application_response)
     
-    MessageIonResponse = property(_get_message_ion_response, _set_message_ion_response)
-      
     @property
-    def ApplicationResponse(self):
-        return self.Repository._workspace_root.ApplicationResponse
+    def ResponseCodes(self):
+        return self.Repository._workspace_root.ResponseCodes
         
-    def _set_message_application_response(self, value):
+    def _set_message_response_code(self, value):
         """
         Set the name of the message object
         """
-        self.Message.application_response = value
+        self.Message.response_code = value
         
-    def _get_message_application_response(self):
+    def _get_message_response_code(self):
         """
         """
-        return self.Message.application_response
+        return self.Message.response_code
     
-    MessageApplicationResponse = property(_get_message_application_response, _set_message_application_response)
+    MessageResponseCode = property(_get_message_response_code, _set_message_response_code)
         
         
-    def _set_message_exception(self, value):
+    def _set_message_response_body(self, value):
         """
         Set the name of the message object
         """
-        self.Message.exception = value
+        self.Message.response_body = value
         
-    def _get_message_exception(self):
+    def _get_message_response_body(self):
         """
         """
-        return self.Message.exception
+        return self.Message.response_body
     
-    MessageException = property(_get_message_exception, _set_message_exception)
+    MessageResponseBody = property(_get_message_response_body, _set_message_response_body)
         
         
     @property

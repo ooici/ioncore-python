@@ -39,7 +39,7 @@ class HelloErrorsBusinessLogicTest(IonTestCase):
         # Use the convience method of the test case to create a message instance
         success = yield self.CreateMessage(MessageName='Succeed')
         result = yield self.he.businesslogic4replytome(success)
-        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.SUCCESS)
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.OK)
         
     @defer.inlineCallbacks
     def test_hello_fail(self):
@@ -47,7 +47,7 @@ class HelloErrorsBusinessLogicTest(IonTestCase):
         # Use the convience method of the test case to create a message instance
         success = yield self.CreateMessage(MessageName='Fail')
         result = yield self.he.businesslogic4replytome(success)
-        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.FAILED)
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.BAD_REQUEST)
 
 class HelloErrorsTest(IonTestCase):
     """
@@ -87,13 +87,11 @@ class HelloErrorsTest(IonTestCase):
         result = yield self.he.replytome(success)
             
         log.info('Got Response: '+str(result.MessageObject)) 
-        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
-        log.info('Got ION Result: '+str(result.MessageIonResponse))
-        log.info('Got Exception: '+str(result.MessageException))
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
             
-        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.SUCCESS)
-        self.assertEqual(result.MessageIonResponse,result.IonResponse.OK) 
-        self.assertEqual(result.MessageException,'')
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.OK)
+        self.assertEqual(result.MessageResponseBody,'')
           
           
     @defer.inlineCallbacks
@@ -105,14 +103,11 @@ class HelloErrorsTest(IonTestCase):
         result = yield self.he.replytome(ok)
             
         log.info('Got Response: '+str(result.MessageObject)) 
-        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
-        log.info('Got ION Result: '+str(result.MessageIonResponse))
-        log.info('Got Exception: '+str(result.MessageException))
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
             
-        # The Application Result is automagically set to success!
-        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.SUCCESS)
-        self.assertEqual(result.MessageIonResponse,result.IonResponse.OK) 
-        self.assertEqual(result.MessageException,'')
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.OK)
+        self.assertEqual(result.MessageResponseBody,'')
           
     @defer.inlineCallbacks
     def test_hello_failure(self):
@@ -121,13 +116,11 @@ class HelloErrorsTest(IonTestCase):
         result = yield self.he.replytome(fail)
             
         log.info('Got Response: '+str(result.MessageObject)) 
-        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
-        log.info('Got ION Result: '+str(result.MessageIonResponse))
-        log.info('Got Exception: '+str(result.MessageException))
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
             
-        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.FAILED)
-        self.assertEqual(result.MessageIonResponse,result.IonResponse.OK) 
-        self.assertEqual(result.MessageException,'')
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.BAD_REQUEST)
+        self.assertEqual(result.MessageResponseBody,'')
           
     @defer.inlineCallbacks
     def test_hello_error_reply_ok(self):
@@ -136,13 +129,11 @@ class HelloErrorsTest(IonTestCase):
         result = yield self.he.replytome(catchme_ok)
             
         log.info('Got Response: '+str(result.MessageObject)) 
-        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
-        log.info('Got ION Result: '+str(result.MessageIonResponse))
-        log.info('Got Exception: '+str(result.MessageException))
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
             
-        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.FAILED)
-        self.assertEqual(result.MessageIonResponse,result.IonResponse.OK) 
-        self.assertEqual(result.MessageException,"I'm supposed to fail and reply_ok")
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.BAD_REQUEST)
+        self.assertEqual(result.MessageResponseBody,"I'm supposed to fail and reply_ok")
           
     @defer.inlineCallbacks
     def test_hello_error_reply_error(self):
@@ -151,13 +142,11 @@ class HelloErrorsTest(IonTestCase):
         result = yield self.he.replytome(catchme_err)
             
         log.info('Got Response: '+str(result.MessageObject)) 
-        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
-        log.info('Got ION Result: '+str(result.MessageIonResponse))
-        log.info('Got Exception: '+str(result.MessageException))
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
             
-        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.FAILED)
-        self.assertEqual(result.MessageIonResponse,result.IonResponse.INTERNAL_ERROR) 
-        self.assertEqual(result.MessageException,"I'm supposed to fail and reply_err")
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.INTERNAL_SERVER_ERROR)
+        self.assertEqual(result.MessageResponseBody,"I'm supposed to fail and reply_err")
         
         
     @defer.inlineCallbacks
@@ -167,12 +156,10 @@ class HelloErrorsTest(IonTestCase):
         result = yield self.he.replytome(uncaught)
         
         log.info('Got Response: '+str(result.MessageObject)) 
-        log.info('Got Application Result: '+str(result.MessageApplicationResponse))
-        log.info('Got ION Result: '+str(result.MessageIonResponse))
-        log.info('Got Exception: '+str(result.MessageException))
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
             
-        self.assertEqual(result.MessageApplicationResponse,result.ApplicationResponse.FAILED)
-        self.assertEqual(result.MessageIonResponse,result.IonResponse.INTERNAL_ERROR) 
-        self.assertEqual(result.MessageException,"I'm an uncaught exception!")
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.INTERNAL_SERVER_ERROR)
+        self.assertEqual(result.MessageResponseBody,"I'm an uncaught exception!")
         
         

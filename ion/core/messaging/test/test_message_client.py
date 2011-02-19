@@ -93,17 +93,15 @@ class MessageClientTest(IonTestCase):
         # Test a message with no object
         message = yield mc.create_instance(None, MessageName='person message')
         
-        # test the ION Response property        
-        self.assertEqual(message.IonResponse.OK, 200)
+        # test the ResponseCodes property        
+        self.assertEqual(message.ResponseCodes.OK, 200)
         
-        # test the Application Response property        
-        self.assertEqual(message.ApplicationResponse.SUCCESS, 200)
                 
         # The message objects fields are not accessible...
-        self.assertRaises(AttributeError, setattr, message, 'application_response', message.ApplicationResponse.SUCCESS)
+        self.assertRaises(AttributeError, setattr, message, 'response_code', message.ResponseCodes.OK)
         
         # Except throught the the getter/setter properties
-        message.MessageApplicationResponse = message.ApplicationResponse.SUCCESS
+        message.MessageResponseCode = message.ResponseCodes.OK
         
         
         

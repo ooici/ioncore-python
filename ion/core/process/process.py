@@ -651,11 +651,9 @@ class Process(BasicLifecycleObject,ResponseCodes):
             content = yield self.message_client.create_instance(MessageName='Generic OK Message')
 
         if isinstance(content, MessageInstance):
-            if not content.Message.IsFieldSet('ion_response'):
-                content.MessageIonResponse = content.IonResponse.OK
                 
-            if not content.Message.IsFieldSet('application_response'):
-                content.MessageApplicationResponse = content.ApplicationResponse.SUCCESS
+            if not content.Message.IsFieldSet('response_code'):
+                content.MessageResponseCode = content.ResponseCodes.OK
             
         self.reply(msg, operation=self.MSG_RESULT, content=content, headers=headers)
 
@@ -693,14 +691,11 @@ class Process(BasicLifecycleObject,ResponseCodes):
             
         if isinstance(content, MessageInstance):
             
-            if not content.Message.IsFieldSet('application_response'):
-                content.MessageApplicationResponse = content.ApplicationResponse.FAILED
-            
-            if not content.Message.IsFieldSet('ion_response'):
-                content.MessageIonResponse = content.IonResponse.INTERNAL_ERROR
+            if not content.Message.IsFieldSet('response_code'):
+                content.MessageResponseCode = content.ResponseCodes.INTERNAL_SERVER_ERROR
                 
-            if not content.Message.IsFieldSet('exception'):
-                content.MessageException = str(exception)
+            if not content.Message.IsFieldSet('response_body'):
+                content.MessageResponseBody = str(exception)
                         
         reshdrs = dict()
         # The status is still OK - this is for handled exceptions!
