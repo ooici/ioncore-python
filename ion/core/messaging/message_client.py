@@ -82,7 +82,7 @@ class MessageClient(object):
 
     
     @defer.inlineCallbacks
-    def create_instance(self, msg_type_id=None, name=''):
+    def create_instance(self, msg_type_id=None, MessageName=''):
         """
         @brief Create an instance of the message type!
         @param msg_type_id is a type identifier object
@@ -97,7 +97,7 @@ class MessageClient(object):
         
         # Set the type and name
         #msg_object.type.GPBMessage.CopyFrom(msg_type_id)
-        msg_object.name = name
+        msg_object.name = MessageName
         
         # For now let the message ID be set by the process that created it?
         msg_object.identity = msg_repo.repository_key

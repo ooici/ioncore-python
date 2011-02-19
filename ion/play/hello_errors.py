@@ -44,6 +44,7 @@ class HelloErrors(ServiceProcess):
 
         self.mc = message_client.MessageClient(proc = self)
 
+
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
@@ -67,7 +68,7 @@ class HelloErrors(ServiceProcess):
             # The calling process must process the response to determine what to do about it...
 
             # Create the response - an empty message and put the exception in it.
-            response = yield self.mc.create_instance(name='Example message')
+            response = yield self.mc.create_instance(MessageName='Example message')
             response.MessageApplicationResponse = response.ApplicationResponse.FAILED
             response.MessageException = str(he)
             
@@ -79,12 +80,11 @@ class HelloErrors(ServiceProcess):
         yield self.reply_ok(msg, content=response)
 
     @defer.inlineCallbacks # The business logic may involve defereds as well!
-    def businesslogic4replytome(self,content):
+    def businesslogic4replytome(self, content):
         """
         Determine how to respond to the message content
         May include headers or even message as part of the business logic if needed
         """
-        
         
         ####        
         # A message that succeeds
@@ -92,7 +92,7 @@ class HelloErrors(ServiceProcess):
         if content.MessageName == 'Succeed':
             
             # Create a message to contain the response...
-            response = yield self.mc.create_instance(person_type,name='Example message')
+            response = yield self.mc.create_instance(person_type,MessageName='Example message')
             # Set response values here... using a person object as an example
             response.name = 'Matthew'
             response.id = 8
@@ -109,7 +109,7 @@ class HelloErrors(ServiceProcess):
         elif content.MessageName == 'Fail':
             
             # Create a message to contain the response... it may or may not have a type beyond the basic message container
-            response = yield self.mc.create_instance(name='Example "empty" failure message')
+            response = yield self.mc.create_instance(MessageName='Example "empty" failure message')
             
             # The person object fields are not set.... the the type of the object
             response.MessageApplicationResponse = response.ApplicationResponse.FAILED

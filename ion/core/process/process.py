@@ -648,7 +648,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
         
         if content is None:
             
-            content = yield self.message_client.create_instance(name='Generic OK Message')
+            content = yield self.message_client.create_instance(MessageName='Generic OK Message')
 
         if isinstance(content, MessageInstance):
             if not content.Message.IsFieldSet('ion_response'):
@@ -689,7 +689,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
         @retval Deferred for send of reply
         """
         if content is None:
-            content = yield self.message_client.create_instance(name='Generic Error Message')
+            content = yield self.message_client.create_instance(MessageName='Generic Error Message')
             
         if isinstance(content, MessageInstance):
             
