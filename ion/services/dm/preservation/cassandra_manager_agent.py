@@ -411,30 +411,30 @@ class CassandraManagerClient(ServiceClient):
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def create_cache(self, persistent_archive):
+    def create_cache(self, cassandra_request):
         """
         @brief create a new archive
-        @param persistent_archive is an ion resource which defines the properties of a Keyspace
+        @param cassandra_request is an ion resource which defines the properties of a Keyspace
         """
         log.info("Called CassandraManagerClient.create_cache")
-        (content, headers, msg) = yield self.rpc_send('create_cache', persistent_archive)
+        (content, headers, msg) = yield self.rpc_send('create_cache', cassandra_request)
         defer.returnValue(content)
       
     @defer.inlineCallbacks    
-    def update_cache(self, persistent_archive):
+    def update_cache(self, cassandra_request):
         """
         @brief update an archive
-        @param persistent_archive is an ion resource which defines the properties of a Keyspace
+        @param cassandra_request is an ion resource which defines the properties of a Keyspace
         """
-        (content, headers, msg) = yield self.rpc_send('update_cache', persistent_archive)
+        (content, headers, msg) = yield self.rpc_send('update_cache', cassandra_request)
         defer.returnValue(content)
     
     @defer.inlineCallbacks
-    def delete_cache(self, persistent_archive):
+    def delete_cache(self, cassandra_request):
         """
         @brief remove an archive
-        @param persistent_archive is an ion resource which defines the properties of a Keyspace
+        @param cassandra_request is an ion resource which defines the properties of a Keyspace
         """
-        (content, headers, msg) = yield self.rpc_send('delete_cache', persistent_archive)
+        (content, headers, msg) = yield self.rpc_send('delete_cache', cassandra_request)
         defer.returnValue(content)    
 

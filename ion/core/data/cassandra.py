@@ -27,14 +27,6 @@ from ion.util.tcp_connections import TCPConnection
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-# Moving to not use CONF. In the store service module, spawn args can be
-# used to pass appropriate configuration parameters.
-#CONF = ioninit.config(__name__)
-#CF_default_keyspace = CONF['default_keyspace']
-#CF_default_colfamily = CONF['default_colfamily']
-#CF_default_cf_super = CONF['default_cf_super']
-#CF_default_namespace = CONF['default_namespace']
-#CF_default_key = CONF['default_key']
 
 
 class CassandraError(Exception):
@@ -360,7 +352,8 @@ class CassandraDataManager(TCPConnection):
                        id=cf_id,
                        column_type=cache.column_type,
                        comparator_type=cache.comparator_type,
-                       column_metadata= cf_column_metadata)         
+                       column_metadata= cf_column_metadata)   
+        log.info("cf_def: " + str(cf_def))      
         yield self.client.system_update_column_family(cf_def) 
     
     @defer.inlineCallbacks    
@@ -410,61 +403,4 @@ class CassandraDataManager(TCPConnection):
         log.info('on_terminate: Lose Connection TCP')
 
 
-### Currently not used...
-#class CassandraFactory(process.ProcessClientBase):
-#    """
-#    The store class attribute is the IStore adapter class that will be used
-#    to Adapt the cassandra client instance.
-#
-#    @note Design note: This is more of an Adapter than a pure Factory. The
-#    intended use is not necessarily to create an arbitrary number of
-#    cassandra client instances, but really to automate the creation of one
-#    client, and then adapt that client to conform to the IStore interface.
-#    """
-#    
-#    # This is the Adapter class. It generates client connections for any
-#    # cassandra class which is instantiated by init(client, kwargs)
-#
-#    def __init__(self, proc=None, presistence_technology=None):
-#        """
-#        @param host defaults to localhost
-#        @param port 9160 is the cassandra default
-#        @param process instance of ion process. If you are calling from an
-#        ion Service, then pass in 'self'. If you need to, you can pass in
-#        the reactor object.
-#        @note This is an experimental idea
-#        @todo Decide on good default for namespace
-#        @note Design Note: These are standard parameters that any StoreFactory 
-#        would need. In particular, the namespace parameter is an
-#        implementation choice to fulfill a [not fully articulated]
-#        architectural need.
-#        """
-#        ProcessClientBase.__init__(self, proc=process, **kwargs)
-#        
-#        self.presistence_technology = presistence_technology
-#        
-#
-#    @defer.inlineCallbacks
-#    def buildStore(self, IonCassandraClient, **kwargs):
-#        """
-#        @param namespace Maps to Cassandra specific columnFamily option
-#        @note For cassandra, there needs to be a conventionaly used
-#        Keyspace option.
-#        """
-#        
-#        # What we have with this
-#        # CassandraFactory class is a mixture of a Factory pattern and an
-#        # Adapter pattern. s is our IStore providing instance the user of
-#        # the factory expects. If we were to make a general "StoreFactory"
-#        # or maybe even an "IStoreFactory" interface, it's behavior would
-#        # be to build/carryout the mechanics of a TCP client connection AND
-#        # then Adapting it and returning the result as an IStore providing
-#        # instance.
-#        
-#        # Create and instance of the ION Client class
-#        instance = IonCassandraClient(self.presistence_technology, **kwargs)
-#        
-#        yield defer.maybeDeferred(self.proc.register_life_cycle_objects.append, instance)
-#        
-#        defer.returnValue(instance)
 
