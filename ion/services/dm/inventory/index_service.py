@@ -74,19 +74,7 @@ class IndexService(ServiceProcess):
         # The api for reply may be refactored later on so that there is just the one argument...
         yield self.reply_ok(msg, person_reply)
 
-    @defer.inlineCallbacks
-    def op_hello_everyone(self, addressbook_msg, headers, msg):
-        log.info('op_hello_everyone: ')
-
-        if addressbook_msg.MessageType  != addresslink_type:
-            # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloError('Unexpected type received \n %s' % str(addressbook_msg))
-            
-        log.info('Received addresbook; Title: ' + addressbook_msg.title)
-        for person in addressbook_msg.person:
-            log.info('Logging Person: \n' +str(person))
-            
-        yield self.reply_ok(msg)
+    
 
 
 class HelloMessageClient(ServiceClient):
