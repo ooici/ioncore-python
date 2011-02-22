@@ -426,7 +426,7 @@ class PubSubClient(ServiceClient):
         @param use_queue If set, the name of an existing queue to send to
         @param topic_regex Topic of interest. If no publishers, then no data, but no error
         @note Order of calls on publish/subscribe does not matter
-        @note creates the queue via EMS
+        @note creates the queue via EMS if required.
         @retval Address of queue for ondata() callback and subscription id
         """
         yield self._check_init()
