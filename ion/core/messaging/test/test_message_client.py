@@ -45,8 +45,8 @@ class MessageClientTest(IonTestCase):
         
         # Create a mesasge client
         mc = message_client.MessageClient(proc=self.test_sup)
-            
-        message = yield mc.create_instance(person_type, name='person message')
+        
+        message = yield mc.create_instance(person_type, MessageName='person message')
         
         # test the name property        
         self.assertEqual(message.MessageName, 'person message')
@@ -75,11 +75,57 @@ class MessageClientTest(IonTestCase):
             
         mc = message_client.MessageClient(proc=self.test_sup)
             
-        message = yield mc.create_instance(person_type, name='person message')
+        message = yield mc.create_instance(person_type, MessageName='person message')
         message.name ='David'
         
         (response, headers, msg) = yield self.test_sup.rpc_send(pid, 'echo', message)
                 
         self.assertIsInstance(response, message_client.MessageInstance)
         self.assertEqual(response.name, 'David')
+        
+    
+    @defer.inlineCallbacks
+    def test_message_instance(self):
+        
+        # Create a mesasge client
+        mc = message_client.MessageClient(proc=self.test_sup)
+            
+        # Test a message with no object
+        message = yield mc.create_instance(None, MessageName='person message')
+        
+        # test the ResponseCodes property        
+        self.assertEqual(message.ResponseCodes.OK, 200)
+        
+                
+        # The message objects fields are not accessible...
+        self.assertRaises(AttributeError, setattr, message, 'response_code', message.ResponseCodes.OK)
+        
+        # Except throught the the getter/setter properties
+        message.MessageResponseCode = message.ResponseCodes.OK
+        
+        
+        
+class IonTestMessageClientTest(IonTestCase):
+    """
+    Testing example hello object service.
+    This example shows how it is possible to create and send strongly typed objects
+    Each time an object is sent it is assigned a new identifier. The example
+    shows how it is possible to move a linked composite from one object to another.
+    """
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
+
+
+    @defer.inlineCallbacks
+    def test_convience_methods(self):
+        
+        
+        msg_instance = yield self.CreateMessage(person_type, MessageName='David', name='david', id=6)
+        
         

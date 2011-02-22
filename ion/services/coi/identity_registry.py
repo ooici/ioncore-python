@@ -323,16 +323,19 @@ class IdentityRegistryService(ServiceProcess):
         """
         log.debug('in op_get_user')
         if request in self._user_dict.values():
-          identity = yield self.rc.get_instance(request)
-          user = {'user_cert' : identity.certificate,
+            identity = yield self.rc.get_instance(request)
+            user = {'user_cert' : identity.certificate,
                   'ooi_id' : identity.ResourceIdentity,
                   'subject' : identity.subject,
                   'lifecycle' : str(identity.ResourceLifeCycleState),
                   'user_private_key' : identity.rsa_private_key}
         
-          yield self.reply_ok(msg, user)
+            yield self.reply_ok(msg, user)
         else:
-          yield self.reply_ok(msg, None)
+            response = yield self.message_client.create_instance(MessageName='person message')
+            response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
+            
+            yield self.reply_ok(msg, response)
         # Above line needs to be altered when FIND is implemented
 
     
@@ -344,7 +347,7 @@ class IdentityRegistryService(ServiceProcess):
         """
         log.debug('in op_register_user_credentials')
 
-        identity = yield self.rc.create_instance(IDENT_TYPE, name='Identity Registry', description='A place to store identitys')
+        identity = yield self.rc.create_instance(IDENT_TYPE, ResourceName='Identity Registry', ResourceDescription='A place to store identitys')
         identity.certificate = request['user_cert']
         identity.rsa_private_key = request['user_private_key']
 

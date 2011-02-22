@@ -118,6 +118,7 @@ class ServiceHelper:
         yield defer.returnValue(object)
         
         
+        
     @defer.inlineCallbacks    
     def create_object_by_id(self, type, name, description):
         """
@@ -135,9 +136,10 @@ class ServiceHelper:
         store.
         """
         yield self.rc.put_instance(object)
-        response = yield self.mc.create_instance(object.ResourceType, name='create_instrument_resource response')
+        response = yield self.mc.create_instance(resource_response_type, MessageName='create_instrument_resource response')
         response.resource_reference = self.rc.reference_instance(object)
         response.configuration = object.ResourceObject
+                
         response.result = 'Created'
         yield defer.returnValue(response)
 
@@ -149,9 +151,10 @@ class ServiceHelper:
         provided.
         """
         object = yield self.rc.get_instance(id)
-        response = yield self.mc.create_instance(object.ResourceType, name='get_object response')
-        response.resource_reference = self.rc.reference_instance(object)
-        response.configuration = object.ResourceObject
+        response = yield self.mc.create_instance(object.ResourceType, MessageName='get_object response')
+        #response.resource_reference = self.rc.reference_instance(object)
+        #response.configuration = object.ResourceObject
+        # The resource does not have the fields?
         yield defer.returnValue(response)
         
         
@@ -169,6 +172,6 @@ class ClientHelper:
     
     @defer.inlineCallbacks    
     def create_object(self, type):
-        msg = yield self.mc.create_instance(resource_request_type, name='create_object')
+        msg = yield self.mc.create_instance(resource_request_type, MessageName='create_object')
         msg.configuration = msg.CreateObject(type)        
         defer.returnValue(msg)

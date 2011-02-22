@@ -201,7 +201,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Test for user not found handled properly.
         bogus_ooi_id = "bogus-ooi_id"
         result = yield self.identity_registry_client.get_user(bogus_ooi_id)
-        self.assertEqual(result, None)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.NOT_FOUND)
 
         # Test if we can find the user we have stuffed in.
         user_description = coi_resource_descriptions.IdentityResource()

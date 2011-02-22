@@ -99,9 +99,9 @@ class DataStoreTest(IonTestCase):
 
         log.info('DataStore1 Push addressbook to DataStore1')
 
-        response, ex = yield proc_ds1.push('ps2','addressbook')
+        result = yield proc_ds1.push('ps2','addressbook')
 
-        self.assertEqual(response, proc_ds1.ION_SUCCESS)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
         log.info('DataStore1 Push addressbook to DataStore1: complete')
 
@@ -165,9 +165,9 @@ class DataStoreTest(IonTestCase):
             
         repo1.commit()
             
-        response, ex = yield proc_ds1.push('ps2','addressbook')
+        result = yield proc_ds1.push('ps2','addressbook')
             
-        self.assertEqual(response, proc_ds1.ION_SUCCESS)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
             
         # Get the uuid for the repository
         repo_key = repo1.repository_key
@@ -205,9 +205,9 @@ class DataStoreTest(IonTestCase):
         
         self.assertEqual(pa1.email,'process1@gmail.com')
             
-        response, ex = yield proc_ds2.push('ps1',repo_key)
+        result = yield proc_ds2.push('ps1',repo_key)
             
-        self.assertEqual(response, proc_ds2.ION_SUCCESS)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
             
         # Assert that the Divergence was recorded!
         repo1.log_commits('master')
@@ -222,9 +222,9 @@ class DataStoreTest(IonTestCase):
         self.assertEqual(ab1.owner.email, 'process1@gmail.com')
         
         # Now push back to ps2 and show that the state is repaired in both locations
-        response, ex = yield proc_ds1.push('ps2',repo_key)
+        result = yield proc_ds1.push('ps2',repo_key)
             
-        self.assertEqual(response, proc_ds2.ION_SUCCESS)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
         # Assert that the Divergence was repaired!
         self.assertEqual(len(repo2.branches[0].commitrefs),1)
         # Checkout the current state
@@ -279,9 +279,9 @@ class DataStoreTest(IonTestCase):
         log.info('DataStore2 Pulls addressbook from DataStore1')
 
 
-        response, ex = yield proc_ds2.pull('ps1','addressbook')
+        result = yield proc_ds2.pull('ps1','addressbook')
 
-        self.assertEqual(response, proc_ds1.ION_SUCCESS)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
         log.info('DataStore2 Pulls addressbook from DataStore1: Complete!')
 
@@ -299,9 +299,9 @@ class DataStoreTest(IonTestCase):
         
         repo_ds2.commit('Modify and pull it back!')
         
-        response, ex = yield proc_ds1.pull('ps2',repo_ds2.repository_key)
+        result = yield proc_ds1.pull('ps2',repo_ds2.repository_key)
         
-        self.assertEqual(response, proc_ds1.ION_SUCCESS)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
         
         self.assertNotIn(repo._dotgit.MyId, repo._workspace)
         
@@ -349,9 +349,9 @@ class DataStoreTest(IonTestCase):
         
         obj_list = ['addressbook1','addressbook2','addressbook3','association']
         
-        response, ex = yield proc_ds1.push('ps2',obj_list)
+        result = yield proc_ds1.push('ps2',obj_list)
             
-        self.assertEqual(response, proc_ds1.ION_SUCCESS)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
         
         
         

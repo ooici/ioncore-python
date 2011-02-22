@@ -16,6 +16,8 @@ from net.ooici.core.type import type_pb2
 from net.ooici.play import addressbook_pb2
 from net.ooici.services.coi import resource_framework_pb2
 
+from ion.core.exception import ReceivedError
+
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper
 
@@ -73,7 +75,12 @@ class ResourceRegistryTest(IonTestCase):
         object_utils.set_type_from_obj(addressbook_pb2.AddressLink, resource_description.type)
         
         # Test the business logic of the register resource instance operation
-        res_id = yield proc_rr2._register_resource_instance(resource_description)
+        result = yield proc_rr2._register_resource_instance(resource_description)
+            
+        if result.MessageResponseCode == result.ResponseCodes.NOT_FOUND:
+            raise ResourceClientError('Pull from datastore failed in resource client! Requested Resource Type Not Found!')
+        else:
+            res_id = str(result.MessageResponseBody)
             
         # Check the result!
         new_repo = proc_ds1.workbench.get_repository(res_id)

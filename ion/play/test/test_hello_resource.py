@@ -72,7 +72,7 @@ class HelloResourceTest(IonTestCase):
         # Create a hello object client
         hc1 = HelloResourceClient(proc=self.test_sup)
         
-        create_request_msg = yield self.mc.create_instance(resource_request_type, name='Create me!')
+        create_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='Create me!')
         
         create_request_msg.configuration = create_request_msg.CreateObject(instrument_info_type)
         
@@ -94,7 +94,7 @@ class HelloResourceTest(IonTestCase):
         self.assertEqual(create_response_msg.configuration.name, 'A CTD')
         
         ### request to update the state of the resource
-        update_request_msg = yield self.mc.create_instance(resource_request_type, name='Update it!')
+        update_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='Update it!')
         
         # Copy from the create request and make some changes...
         update_request_msg.configuration = create_request_msg.configuration
@@ -109,7 +109,7 @@ class HelloResourceTest(IonTestCase):
         
         
         ### request to update the state of the resource
-        lcs_request_msg = yield self.mc.create_instance(resource_request_type, name='Update it!')
+        lcs_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='Update it!')
 
         lcs_request_msg.resource_reference = create_response_msg.resource_reference
         lcs_request_msg.life_cycle_operation = lcs_request_msg.MessageObject.LifeCycleOperation.ACTIVATE

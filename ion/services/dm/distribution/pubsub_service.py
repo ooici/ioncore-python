@@ -236,7 +236,8 @@ class PubSubService(ServiceProcess):
             
         # Step 2: Create the topic resource
         cstr = "%s/%s" % (topic_tree_id, topic_name)
-        topic = yield self.rclient.create_instance(TOPIC_TYPE, name=topic_name, description=cstr)
+
+        topic = yield self.rclient.create_instance(TOPIC_TYPE, ResourceName=topic_name, ResourceDescription=cstr)
         topic.topic_name = topic_name
         topic.routing_key = cstr
         

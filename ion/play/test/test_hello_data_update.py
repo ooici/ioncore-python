@@ -60,7 +60,7 @@ class HelloDataUpdateTest(IonTestCase):
         # Create a hello object client
         hc1 = HelloDataUpdateClient(proc=self.test_sup)
         
-        create_request_msg = yield self.mc.create_instance(resource_request_type, name='Create me!')
+        create_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='Create me!')
         
         create_request_msg.configuration = create_request_msg.CreateObject(addresslink_type)
         
@@ -91,7 +91,7 @@ class HelloDataUpdateTest(IonTestCase):
         
         
         ### request to clobber the state of the resource
-        clobber_request_msg = yield self.mc.create_instance(resource_request_type, name='Clobber it!')
+        clobber_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='Clobber it!')
         
         
         # Get the current and make some changes...
@@ -110,7 +110,7 @@ class HelloDataUpdateTest(IonTestCase):
                                      % str(clobber_request_msg))
         
         ### request to merge the state of the resource
-        merge_request_msg = yield self.mc.create_instance(resource_request_type, name='merge me!')
+        merge_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='merge me!')
         
         merge_request_msg.configuration = create_response_msg.configuration
         
