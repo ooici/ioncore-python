@@ -22,7 +22,7 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 #from ion.services.dm.distribution import pubsub_registry
 from ion.core import ioninit
 from ion.core.object import object_utils
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceClientError
 from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
 
 # Global objects
@@ -32,6 +32,8 @@ log = ion.util.ionlog.getLogger(__name__)
 # References to protobuf message/object definitions
 DSET_TYPE = object_utils.create_type_identifier(object_id=2301, version=1)
 TT_TYPE = object_utils.create_type_identifier(object_id=2306, version=1)
+TOPIC_TYPE = object_utils.create_type_identifier(object_id=2307, version=1)
+
 
 class PubSubService(ServiceProcess):
     """
@@ -57,9 +59,8 @@ class PubSubService(ServiceProcess):
         log.debug('Creating ResourceClient')
         self.rclient = ResourceClient(proc=self)
 
-        # Link to registry
-        #self.reg = yield pubsub_registry.DataPubsubRegistryClient(proc=self)
 
+        log.debug('PSC slc_init completed')
     # Protocol entry points. Responsible for parsing and unpacking arguments
     @defer.inlineCallbacks
     def op_declare_topic_tree(self, content, headers, msg):
@@ -70,9 +71,9 @@ class PubSubService(ServiceProcess):
             estr = 'Missing information in message!'
             log.exception(estr)
             yield self.reply_err(msg, {'value': estr})
-            return
+            defer.returnValue(None)
 
-        rc = self.declare_topic_tree(xs_name, tt_name)
+        rc = yield self.declare_topic_tree(xs_name, tt_name)
         yield self.reply_ok(msg, {'value': rc})
 
     def op_undeclare_topic_tree(self, content, headers, msg):
@@ -95,10 +96,10 @@ class PubSubService(ServiceProcess):
             log.exception(estr)
             self.reply_err(msg, {'value': estr})
             return
-
+ 
         rc = self.query_topic_trees(t_regex)
         self.reply_ok(msg, {'value': rc})
-
+ 
     @defer.inlineCallbacks
     def op_define_topic(self, content, headers, msg):
         try:
@@ -108,7 +109,7 @@ class PubSubService(ServiceProcess):
             estr = 'Missing information in message!'
             log.exception(estr)
             yield self.reply_err(msg, {'value': estr})
-            return
+            defer.returnValue(None)
 
         rc = yield self.define_topic(tt_id, t_name)
         yield self.reply_ok(msg, {'value': rc})
@@ -177,9 +178,15 @@ class PubSubService(ServiceProcess):
         @param topic_tree_name Name of the tree to create
         @retval Topic tree ID on success, None if failure
         """
+        log.debug('Creating exchange space "%s"' % exchange_space_name)
+        yield self.ems.create_exchangespace(exchange_space_name, 'Default exchange space')
+
         log.debug('Calling EMS to create topic tree "%s/%s"' % (exchange_space_name, topic_tree_name))
         rc = yield self.ems.create_exchangename(topic_tree_name, 'New topic tree', exchange_space_name)
-        #log.debug('EMS returned "%s"' % str(rc))
+        if rc == None:
+            log.error('Error in creating exchange name (topic tree')
+            defer.returnValue(None)
+        log.debug('EMS returned "%s"' % str(rc))
 
         log.debug('Writing topic tree into registry')
         # Now need to write new topic tree into registry
@@ -191,6 +198,8 @@ class PubSubService(ServiceProcess):
         log.debug('About to push topic tree into registry')
         yield self.rclient.put_instance(ttree, 'declare_topic_tree')
         log.debug('Wrote TT, id is %s' % ttree.ResourceIdentity)
+        log.debug("Attach a topic with:  client.define_topic('%s', 'topic_name')" % (ttree.ResourceIdentity))
+        
         defer.returnValue(ttree.ResourceIdentity)
 
     def undeclare_topic_tree(self, topic_tree_id):
@@ -219,20 +228,28 @@ class PubSubService(ServiceProcess):
         """
         log.debug('Creating and populating dataset message/object')
 
-
+        # Step 1: Get a handle to the topic's prospective tree
+        try:
+            ttree = yield self.rclient.get_instance(topic_tree_id)
+        except ResourceClientError, ex:
+            log.warn('Could not retreive topic tree instance for given topic_tree_id:  %s' % (ex))
+            
+        # Step 2: Create the topic resource
         cstr = "%s/%s" % (topic_tree_id, topic_name)
-        dset = yield self.rclient.create_instance(DSET_TYPE, name=topic_name, description=cstr)
 
-        dset.open_dap = topic_name
-        now = time.time()
-        dset.last_updated = now
-        dset.date_created = now
-        dset.creator.name = 'Otto Niemand'
-        log.debug('Dataset object created, pushing/committing "%s"' % cstr)
+        topic = yield self.rclient.create_instance(TOPIC_TYPE, ResourceName=topic_name, ResourceDescription=cstr)
+        topic.topic_name = topic_name
+        topic.routing_key = cstr
+        
+        # Step 3: @todo: Create an association between the given topic_tree and the topic being created here
+        
+        # Step 4: Store changes to the topic
+        # @todo: Store changes to whichever resource represents the association between tree and topic
+        log.debug('Topic object created, pushing/committing "%s"' % cstr)
 
-        yield self.rclient.put_instance(dset, 'Adding dataset/topic %s' % cstr)
-        log.debug('Commit completed, %s' % dset.ResourceIdentity)
-        defer.returnValue(dset.ResourceIdentity)
+        yield self.rclient.put_instance(topic, 'Adding dataset/topic %s' % cstr)
+        log.debug('Commit completed, %s' % topic.ResourceIdentity)
+        defer.returnValue(topic.ResourceIdentity)
 
 
     def query_topics(self, exchange_point_name, topic_regex):
@@ -374,11 +391,40 @@ class PubSubClient(ServiceClient):
         defer.returnValue(content['value'])
 
     @defer.inlineCallbacks
-    def subscribe(self, xs_name, tt_name, topic_regex):
+    def create_queue(self):
+        """
+        @brief Create a message queue, to be used by add_binding
+        @retval Queue address (string) or None
+        """
+        yield self._check_init()
+        (content, headers, payload) = yield self.rpc_send('create_queue')
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
+
+    @defer.inlineCallbacks
+    def add_binding(self, queue, binding):
+        """
+        @brief Add a binding to an existing queue. Idempotent - ok to call more than once! You can
+        also add multiple bindings to an existing queue.
+        @param queue Queue, as returned from create_queue
+        @param binding AMQP binding to attach to queue
+        @retval OK or error
+        """
+
+        yield self._check_init()
+        payload = {'queue': queue,
+                   'binding': binding}
+        (content, headers, payload) = yield self.rpc_send('add_binding', payload)
+        log.debug('retval: %s ' % content['value'])
+        defer.returnValue(content['value'])
+
+    @defer.inlineCallbacks
+    def subscribe(self, xs_name, tt_name, topic_regex, use_queue=None):
         """
         @brief Called by subscribers, this calls the EMS to setup the data flow
         @param xs_name Exchange space name
         @param tt_name Topic tree name
+        @param use_queue If set, the name of an existing queue to send to
         @param topic_regex Topic of interest. If no publishers, then no data, but no error
         @note Order of calls on publish/subscribe does not matter
         @note creates the queue via EMS
@@ -388,6 +434,9 @@ class PubSubClient(ServiceClient):
         payload = {'topic_regex' : topic_regex,
                 'exchange_space_name': xs_name,
                 'topic_tree_name' : tt_name}
+        if use_queue:
+            payload['use_queue'] = use_queue
+
         (content, headers, payload) = yield self.rpc_send('subscribe', payload)
         log.debug('retval: %s ' % content['value'])
         defer.returnValue(content['value'])

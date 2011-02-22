@@ -80,6 +80,13 @@ class IonTestCase(unittest.TestCase):
         log.info("============ %s ===" % self.container)
 
     @defer.inlineCallbacks
+    def CreateMessage(self, object_id=None, MessageName='', **kwargs):
+        msg_instance = yield self.test_sup.message_client.create_instance(object_id, MessageName)
+        for k,v in kwargs.items():
+            setattr(msg_instance,k,v)
+        defer.returnValue(msg_instance)
+
+    @defer.inlineCallbacks
     def _start_core_services(self):
         sup = yield bootstrap.spawn_processes(bootstrap.ion_core_services,
                                               self.test_sup)

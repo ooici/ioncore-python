@@ -55,7 +55,7 @@ class HelloMessageTest(IonTestCase):
         mc = MessageClient(proc=self.test_sup)
         
         # Use the message client to create a message object
-        ab_msg = yield mc.create_instance(addresslink_type, name='addressbook message')
+        ab_msg = yield mc.create_instance(addresslink_type, MessageName='addressbook message')
         
         #ab is a message instance of type addresslink 
         ab_msg.title = 'An addressbook object for testing'
@@ -80,7 +80,7 @@ class HelloMessageTest(IonTestCase):
         
         ### Now try making a person object and using the person from the ab message
         # You can move objects from one place to another...
-        person_msg = yield mc.create_instance(person_type, name='my message')
+        person_msg = yield mc.create_instance(person_type, MessageName='my message')
         
         # Use the person we made from the first message
         person_msg.MessageObject = ab_msg.person[0]

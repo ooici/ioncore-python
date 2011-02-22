@@ -21,6 +21,11 @@ CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
 
 
+class EMSError(Exception):
+    """
+    An error class for the ems...
+    """
+
 class ExchangeManagementService(ServiceProcess):
 
 
@@ -302,7 +307,14 @@ class ExchangeManagementClient(ServiceClient):
             msg.configuration.name = name
             msg.configuration.description = description
             msg.configuration.exchangespace = exchangespace
-            msg.type = type
+            if type == 'EXCHANGE_POINT':
+                msg.configuration.type = msg.configuration.Type.EXCHANGE_POINT
+            elif type == 'PROCESS':
+                msg.configuration.type = msg.configuration.Type.PROCESS
+            elif type == 'SERVICE':
+                msg.configuration.type = msg.configuration.Type.SERVICE
+            else:
+                raise EMSError('Invalid type specified in create_exchangename operation')
     
             (content, headers, msg) = yield self.rpc_send('create_exchangename', msg)
             defer.returnValue(content)
