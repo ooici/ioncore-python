@@ -16,6 +16,8 @@ from ion.services.coi import datastore
 
 from ion.core.object import gpb_wrapper
 
+from ion.core.exception import ReceivedError
+
 from ion.core.process.process import ProcessFactory, Process
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
@@ -47,7 +49,6 @@ class ResourceRegistryService(ServiceProcess):
     resource_type = object_utils.create_type_identifier(object_id=1102, version=1)
     resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
 
-
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
         
@@ -78,12 +79,16 @@ class ResourceRegistryService(ServiceProcess):
         assert content.ObjectType == self.resource_description_type
         
         try:
-            id = yield self._register_resource_instance(content)
+            response = yield self._register_resource_instance(content)
+            
         except object_utils.ObjectUtilException, ex:
-            yield self.reply(msg, response_code=self.APP_FAILED, exception=ex)
-            return
+            response = yield self.message_client.create_instance(MessageName='Register Resource Response')
+            response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
+            response.MessageResponseBody = str(ex)
+            
+            yield self.reply_ok(msg, response)
         
-        yield self.reply(msg, content=id)
+        yield self.reply_ok(msg, response)
         
     @defer.inlineCallbacks
     def _register_resource_instance(self, resource_description):
@@ -115,10 +120,14 @@ class ResourceRegistryService(ServiceProcess):
         resource_repository.commit('Created a new resource!')
 
         # push the new resource to the data store        
-        response, exception = yield self.push(self.datastore_service, resource.identity)
-        assert response == self.ION_SUCCESS, 'Push to datastore failed!'
+        result = yield self.push(self.datastore_service, resource.identity)
+        assert result.MessageResponseCode == result.ResponseCodes.OK, 'Push to datastore failed!'
             
-        defer.returnValue(resource.identity)
+        response = yield self.message_client.create_instance(MessageName='Register Resource Response')
+        response.MessageResponseCode = response.ResponseCodes.OK
+        response.MessageResponseBody = resource.identity
+            
+        defer.returnValue(response)
 
 
 
@@ -173,17 +182,16 @@ class ResourceRegistryClient(ServiceClient):
         @param resource_type
         """
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('register_resource_instance', resource_type)
+        
+        try:
+            content, headers, msg = yield self.rpc_send('register_resource_instance', resource_type)
+        except ReceivedError, re:
+            log.debug('Exception in Resource Registry: %s' % str(re))
+            raise ResourceRegistryError('Error during Resource Registry service call: register_resource_instance raised "%s"' % re[1].MessageResponseBody)
         
         log.info('Resource Registry Service reply with new resource ID: '+str(content))
-        response = headers.get(self.MSG_RESPONSE)
-        exception = headers.get(self.MSG_EXCEPTION)
-        
-        if response == self.ION_SUCCESS:
-            defer.returnValue(str(content))
-        else:
-            log.debug('Exception in Resource Registry: %s' % exception)
-            raise ResourceRegistryError('Error during Resource Registry service call: register_resource_instance')
+        defer.returnValue(content)
+
         
 
     #@defer.inlineCallbacks

@@ -14,8 +14,12 @@ from ion.services.dm.distribution.pubsub_service import PubSubClient
 from ion.test.iontest import IonTestCase
 from twisted.trial import unittest
 from ion.util.procutils import asleep
+from ion.core import ioninit
+
+from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
+CONF = ioninit.config(__name__)
 
 class PST(IonTestCase):
     """
@@ -23,44 +27,74 @@ class PST(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
-        #self.timeout = 5
+        self.timeout = 5
         services = [
-            {'name':'pubsub_service',
-             'module':'ion.services.dm.distribution.pubsub_service',
-             'class':'PubSubService'},
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'servicename':'datastore'}},
-            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
-             'spawnargs':{'datastore_service':'datastore'}}
+            {
+                'name':'pubsub_service',
+                'module':'ion.services.dm.distribution.pubsub_service',
+                'class':'PubSubService'
+            },
+            {
+                'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                    'spawnargs':{'servicename':'datastore'}
+            },
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'class':'ResourceRegistryService',
+                    'spawnargs':{'datastore_service':'datastore'}},
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+            },
+
             ]
         yield self._start_container()
         self.sup = yield self._spawn_processes(services)
         self.psc = PubSubClient(self.sup)
 
-        self.xs_name = 'ooici'
+        self.xs_name = 'swapmeet'
         self.tt_name = 'science_data'
         self.topic_name = 'http://ooici.net:8001/coads.nc'
 
     @defer.inlineCallbacks
     def tearDown(self):
+        yield self._shutdown_processes()
         yield self._stop_container()
 
     def test_start_stop(self):
         pass
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_topic_tree_creation(self):
-        raise unittest.SkipTest('Waiting for code')
-
         self.tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
         self.failIf(self.tt_id is None)
 
+    @itv(CONF)
+    @defer.inlineCallbacks
+    def test_bad_topic_tree_delete(self):
+        rc = yield self.psc.undeclare_topic_tree('fubar')
+        self.failIf(rc is None)
+
+    @itv(CONF)
+    @defer.inlineCallbacks
+    def test_topic_tree_write_delete(self):
+        tt_id = yield self.psc.declare_topic_tree(self.xs_name, 'fubar')
+        self.failIf(tt_id is None)
+        yield self.psc.undeclare_topic_tree(tt_id)
+
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_bad_topic_tree(self):
         raise unittest.SkipTest('Waiting for code')
         rc = yield self.psc.declare_topic_tree(None, None)
         self.failIf(rc is not None)
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_tt_create_and_query(self):
         raise unittest.SkipTest('Waiting for code')
@@ -70,6 +104,7 @@ class PST(IonTestCase):
         rc = yield self.psc.query_topic_trees(self.tt_name)
         self.failIf(rc is None)
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_tt_crud(self):
         raise unittest.SkipTest('Waiting for code')
@@ -83,6 +118,7 @@ class PST(IonTestCase):
         self.failIf(rc is None)
         self.failIf(len(rc) > 0)
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_define_topic(self):
         tt_id = 'fake_topic_id'
@@ -90,6 +126,7 @@ class PST(IonTestCase):
         # Verify that it was created
         self.failIf(topic_id is None)
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_topics(self):
         raise unittest.SkipTest('Waiting for code')
@@ -101,6 +138,7 @@ class PST(IonTestCase):
         self.failIf(rc is None)
         self.failIf(len(rc) < 1)
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_define_publisher(self):
         raise unittest.SkipTest('Waiting for code')
@@ -109,6 +147,7 @@ class PST(IonTestCase):
         pid = yield self.psc.define_publisher(tt_id, topic_id, 'phubbard')
         self.failIf(pid is None)
 
+    @itv(CONF)
     def test_subscribe(self):
         raise unittest.SkipTest('Waiting for code')
         # @todo Create publisher, send data, verify receipt a la scheduler test code

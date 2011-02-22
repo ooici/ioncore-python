@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 """
-@file ion/zapps/dm_bootstrap.py
-@author Paul Hubbard
-@date 2/7/11
-@brief DM bootstrap code, create science data space & point
+@file ion/zapps/preservation_manager.py
+@author Matt Rodriguez
+@date 2/14/11
+@brief Preservation Manager application, an application to create Preservation Archives and caches on demand
 """
 
 from twisted.internet import defer
@@ -15,7 +15,7 @@ from ion.core import ioninit
 from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
 from ion.core.process.process import ProcessDesc
 from ion.core.pack import app_supervisor
-from ion.services.dm.distribution.pubsub_service import PubSubClient
+from ion.services.dm.preservation.cassandra_manager_agent import CassandraManagerClient
 
 # Global(s)
 log = ion.util.ionlog.getLogger(__name__)
@@ -44,11 +44,11 @@ def start(container, starttype, *args, **kwargs):
                     'class':'ExchangeManagementService',
                 },
                 {
-                    'name':'pubsub',
-                    'module':'ion.services.dm.distribution.pubsub_service',
-                    'class' : 'PubSubService',
-
-                },
+                    'name': 'cassandra_manager_agent',
+                    'module': 'ion.services.dm.preservation.cassandra_manager_agent',
+                    'class':'CassandraManagerAgent'
+                },    
+                
         ]
 
     log.debug('Starting application supervisor and required services...')
@@ -64,9 +64,8 @@ def start(container, starttype, *args, **kwargs):
 
     log.debug('Starting EMC...')
     emc = ExchangeManagementClient(proc=sup)
-    log.debug('Starting pubsub client')
-    psc = PubSubClient(proc=sup)
-    
+    log.debug('Starting CassandraManagerClient')
+    cassandra_manager = CassandraManagerClient(proc=sup)
     log.info('Started, time for init.')
 
     # Create our exchange space

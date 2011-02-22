@@ -52,8 +52,8 @@ class EOIIngestionTest(IonTestCase):
         
         #print 'Running Ingest:'
         
-        response, dataset_id = yield self.eoi_ic.ingest()
-        
+        dataset_id = yield self.eoi_ic.ingest()
+                
         dataset = yield self.eoi_ic.retrieve(dataset_id)
         
         #print 'Got dataset'

@@ -87,8 +87,9 @@ class ProcessExchangeSpace(ExchangeSpace):
         self.exchange = Exchange(name)
 
     @defer.inlineCallbacks
-    def send(self, to_name, message_data):
+    def send(self, to_name, message_data, publisher_config={}, **kwargs):
         pub_config = {'routing_key' : str(to_name)}
+        pub_config.update(publisher_config)
         publisher = yield Publisher.name(self, pub_config)
         yield publisher.send(message_data)
         publisher.close()

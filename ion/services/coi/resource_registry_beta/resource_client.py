@@ -29,6 +29,7 @@ from ion.core.object import repository
 from ion.core.object.repository import RepositoryError
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
+from ion.core.exception import ReceivedError
 
 
 from google.protobuf import message
@@ -95,7 +96,7 @@ class ResourceClient(object):
 
     
     @defer.inlineCallbacks
-    def create_instance(self, type_id, name, description=''):
+    def create_instance(self, type_id, ResourceName, ResourceDescription=''):
         """
         @brief Ask the resource registry to create the instance!
         @param type_id is a type identifier object
@@ -111,23 +112,29 @@ class ResourceClient(object):
         resource_description = description_repository.root_object
         
         # Set the description
-        resource_description.name = name
-        resource_description.description = description
+        resource_description.name = ResourceName
+        resource_description.description = ResourceDescription
             
         # This is breaking some abstractions - using the GPB directly...
         resource_description.type.GPBMessage.CopyFrom(type_id)
             
-        # Use the registry client to make a new resource        
-        res_id = yield self.registry_client.register_resource_instance(resource_description)
-            
-        response, exception = yield self.workbench.pull(self.datastore_service, res_id)
-        if not response == self.proc.ION_SUCCESS:
-            log.warn(exception)
-            raise ResourceClientError('Pull from datastore failed in resource client!')
-            
+        # Use the registry client to make a new resource
+        result = yield self.registry_client.register_resource_instance(resource_description)
+        
+        if result.MessageResponseCode == result.ResponseCodes.NOT_FOUND:
+            raise ResourceClientError('Pull from datastore failed in resource client! Requested Resource Type Not Found!')
+        #elif :
+        else:
+            res_id = str(result.MessageResponseBody)
+                    
+        result = yield self.workbench.pull(self.datastore_service, res_id)
+        if result.MessageResponseCode != result.ResponseCodes.OK:
+            raise ResourceClientError('Pull from datastore failed in resource client! Resource Not Found!')
+        
+        
         repo = self.workbench.get_repository(res_id)
         
-        self.workbench.set_repository_nickname(res_id, name)
+        self.workbench.set_repository_nickname(res_id, ResourceName)
             
         yield repo.checkout('master')
         resource = ResourceInstance(repo)
@@ -169,11 +176,13 @@ class ResourceClient(object):
                                       \n type: %s \nvalue: %s''' % (type(resource_id), str(resource_id)))    
             
         # Pull the repository
-        response, exception = yield self.workbench.pull(self.datastore_service, reference)
-        if not response == self.proc.ION_SUCCESS:
-            log.warn(exception)
-            raise ResourceClientError('Pull from datastore failed in resource client!')
-            
+        result= yield self.workbench.pull(self.datastore_service, reference)
+        
+        if result.MessageResponseCode == result.ResponseCodes.NOT_FOUND:
+            raise ResourceClientError('Pull from datastore failed in resource client! Resource Not Found!')
+        #elif :
+        
+        
         # Get the repository
         repo = self.workbench.get_repository(reference)
         yield repo.checkout(branch)
@@ -202,9 +211,9 @@ class ResourceClient(object):
             
         repository.commit(comment=comment)            
             
-        response, exception = yield self.workbench.push(self.datastore_service, repository.repository_key)
-        
-        if not response == self.proc.ION_SUCCESS:
+        result = yield self.workbench.push(self.datastore_service, repository.repository_key)
+
+        if not result.MessageResponseCode == result.ResponseCodes.OK :
             raise ResourceClientError('Push to datastore failed during put_instance')
         
 

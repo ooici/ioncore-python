@@ -185,7 +185,7 @@ class HelloResource(ServiceProcess):
         self.instance_counter+=1
         
         # Use the resource client to create a resource!
-        resource = yield self.rc.create_instance(instrument_resource_type, name=name, description='Preposterous instrument resource!')
+        resource = yield self.rc.create_instance(instrument_resource_type, ResourceName=name, ResourceDescription='Preposterous instrument resource!')
         
         ### Set any fields provided by the configuration request
         if request.IsFieldSet('configuration'):
@@ -214,7 +214,7 @@ class HelloResource(ServiceProcess):
         log.info(str(resource))
         
         
-        response = yield self.mc.create_instance(resource_response_type, name='create_instrument_resource response')
+        response = yield self.mc.create_instance(resource_response_type, MessageName='create_instrument_resource response')
         
         # Create a reference to return to the caller
         # This is one pattern - it exposes the resource to the caller
@@ -319,7 +319,7 @@ class HelloResource(ServiceProcess):
         log.info(str(resource))
         
         
-        response = yield self.mc.create_instance(resource_response_type, name='update_instrument_resource response')
+        response = yield self.mc.create_instance(resource_response_type, MessageName='update_instrument_resource response')
         
         # Create a reference to return to the caller
         # This is one pattern - it exposes the resource to the caller

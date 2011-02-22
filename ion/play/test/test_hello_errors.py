@@ -9,9 +9,46 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.play.hello_errors import HelloErrorsClient
+from ion.play.hello_errors import HelloErrorsClient, HelloErrors
 from ion.test.iontest import IonTestCase
 from ion.core.exception import ReceivedError
+
+from ion.core.messaging import message_client
+
+
+class HelloErrorsBusinessLogicTest(IonTestCase):
+    """
+    Testing example hello service.
+    """
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        
+        # Starting the container is required! That way you can use the test supervisor process
+        yield self._start_container()
+
+        self.he = HelloErrors()
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
+
+    @defer.inlineCallbacks
+    def test_hello_success(self):
+                        
+        # Use the convience method of the test case to create a message instance
+        success = yield self.CreateMessage(MessageName='Succeed')
+        result = yield self.he.businesslogic4replytome(success)
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.OK)
+        
+    @defer.inlineCallbacks
+    def test_hello_fail(self):
+                        
+        # Use the convience method of the test case to create a message instance
+        success = yield self.CreateMessage(MessageName='Fail')
+        result = yield self.he.businesslogic4replytome(success)
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.BAD_REQUEST)
+
 class HelloErrorsTest(IonTestCase):
     """
     Testing example hello service.
@@ -20,14 +57,6 @@ class HelloErrorsTest(IonTestCase):
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self._stop_container()
-
-    @defer.inlineCallbacks
-    def test_hello(self):
-            
         services = [
             {'name':'hello_my_error','module':'ion.play.hello_errors','class':'HelloErrors'},
         ]
@@ -35,63 +64,102 @@ class HelloErrorsTest(IonTestCase):
         #Start the service
         sup = yield self._spawn_processes(services)
             
-        # Create the client
-        he = HelloErrorsClient(proc=sup)
+        # Create the client to the hello errors service
+        self.he = HelloErrorsClient(proc=sup)
             
-        # Send a request - and it succeeds!
-        response, result, ex = yield he.replytome("Succeed")
-            
-        log.info('Got Response: '+response) # Should always be a string - a defined response code!
-        log.info('Got Result: '+str(result))
-        log.info('Got Exception: '+ex)
-            
-        self.assertEqual(response,he.ION_SUCCESS)
-        self.assertEqual(result,'Succeeded') # The response defined by the service as the content - can be anything that the interceptor knows how to send
-        self.assertEqual(ex,'')
-            
-        # Send a request - and fail it!
-        response, result, ex = yield he.replytome("Fail")
-            
-        log.info('Got Response: '+response) # Should always be a string - a defined response code!
-        log.info('Got Result: '+str(result))
-        log.info('Got Exception: '+ex)
-            
-        self.assertEqual(response,he.APP_FAILED)
-        self.assertEqual(result,'Failed') # The response defined by the service as the content - can be anything that the interceptor knows how to send
-        self.assertEqual(ex,'')
-        
-        
-        # Send a request - and catch an exception
-        response, result, ex = yield he.replytome("CatchMe")
-            
-        log.info('Got Response: '+response) # Should always be a string - a defined response code!
-        log.info('Got Result: '+str(result))
-        log.info('Got Exception: '+ex)
-            
-        self.assertEqual(response,he.APP_FAILED)
-        self.assertEqual(result,'Caught') # The response defined by the service as the content - can be anything that the interceptor knows how to send
-        self.assertEqual(ex,'''I'm supposed to fail''')
-                
-        # Send a request - and catch an exception
-        try:
-            response, result, ex = yield he.replytome("Can'tCatchMe")
+        # Create a mesasge client
+        self.mc = message_client.MessageClient(proc=self.test_sup)
 
-        except ReceivedError, re: 
-            # Why is re a list with a dictionary in it?
-            response =  re[0]['response']
-            result = None
-            ex = re[0]['exception']
-        
-        # These do not get called - the receiver kills the container.
-        # is that what we want?
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
+
+    @defer.inlineCallbacks
+    def test_hello_success(self):
             
-        log.info('Got Response: '+response) # Should always be a string - a defined response code!
-        log.info('Got Result: '+str(result))
-        log.info('Got Exception: '+str(ex))
+        # Use the message client to create a message object
+        # We are using the name to pass simple string arguments to the service
+        # A real message should be created with a type and the content passed inside the message
+        success = yield self.mc.create_instance(MessageName="Succeed")
             
-        self.assertEqual(response,he.ION_RECEIVER_ERROR)
-        self.assertEqual(result,None) # The response defined by the service as the content - can be anything that the interceptor knows how to send
-        self.assertEqual(ex,'''I'm an uncaught exception!''')
+        # Send a request - and succeeds!
+        result = yield self.he.replytome(success)
+            
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
+            
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.OK)
+        self.assertEqual(result.MessageResponseBody,'')
+          
+          
+    @defer.inlineCallbacks
+    def test_hello_ok(self):
+        # Send a request - and reply ok (no content)!
+        ok = yield self.mc.create_instance(MessageName="OK")
+            
+        # Send a request - and succeeds!
+        result = yield self.he.replytome(ok)
+            
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
+            
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.OK)
+        self.assertEqual(result.MessageResponseBody,'')
+          
+    @defer.inlineCallbacks
+    def test_hello_failure(self):
+        # Send a request - and fail!
+        fail = yield self.mc.create_instance(MessageName="Fail")
+        result = yield self.he.replytome(fail)
+            
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
+            
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.BAD_REQUEST)
+        self.assertEqual(result.MessageResponseBody,'')
+          
+    @defer.inlineCallbacks
+    def test_hello_error_reply_ok(self):
+        # Send a request - and catch an exception. Reply Ok!
+        catchme_ok = yield self.mc.create_instance(MessageName="CatchMe_OK")
+        result = yield self.he.replytome(catchme_ok)
+            
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
+            
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.BAD_REQUEST)
+        self.assertEqual(result.MessageResponseBody,"I'm supposed to fail and reply_ok")
+          
+    @defer.inlineCallbacks
+    def test_hello_error_reply_error(self):
+        # Send a request - and catch an exception. Reply Err!
+        catchme_err = yield self.mc.create_instance(MessageName="CatchMe_ERR")
+        result = yield self.he.replytome(catchme_err)
+            
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
+            
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.INTERNAL_SERVER_ERROR)
+        self.assertEqual(result.MessageResponseBody,"I'm supposed to fail and reply_err")
         
+        
+    @defer.inlineCallbacks
+    def test_hello_uncaught_error(self):
+        ## Send a request - and catch an exception
+        uncaught = yield self.mc.create_instance(MessageName="Can'tCatchMe")
+        result = yield self.he.replytome(uncaught)
+        
+        log.info('Got Response: '+str(result.MessageObject)) 
+        log.info('Got Application Result: '+str(result.MessageResponseCode))
+        log.info('Got Exception: '+str(result.MessageResponseBody))
+            
+        self.assertEqual(result.MessageResponseCode,result.ResponseCodes.INTERNAL_SERVER_ERROR)
+        self.assertEqual(result.MessageResponseBody,"I'm an uncaught exception!")
         
         

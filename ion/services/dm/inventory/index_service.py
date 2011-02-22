@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/hello_message.py
+@file ion/services/dm/inventory/index_service.py
 @author David Stuebe
-@brief An example process definition that can be used as template for message communication.
+@brief A service to provide indexing and search capability of objects in the datastore
 """
 
 import ion.util.ionlog
@@ -17,77 +17,25 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
 
+
+### Need other objects here
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
-"""
-package net.ooici.play;
-
-// Copied from the google example!
-// Changed rules - never use required!
-
-import "net/ooici/core/link/link.proto";
-
-message Person {
-  enum _MessageTypeIdentifier {
-    _ID = 20001;
-    _VERSION = 1;
-  }
-  optional string name = 1;
-  optional int32 id = 2;        // Unique ID number for this person.
-  optional string email = 3;
-
-  enum PhoneType {
-    MOBILE = 0;
-    HOME = 1;
-    WORK = 2;
-  }
-
-  message PhoneNumber {
-    optional string number = 1;
-    optional PhoneType type = 2 [default = HOME];
-  }
-
-  repeated PhoneNumber phone = 4;
-}
-
-// Our address book file is just one of these.
-message AddressBook {
-  enum _MessageTypeIdentifier {
-    _ID = 20002;
-    _VERSION = 1;
-  }
-  repeated Person person = 1;
-  optional Person owner = 2;
-  optional string title = 3;
-}
 
 
-// Our address book file is just one of these.
-message AddressLink {
-  enum _MessageTypeIdentifier {
-    _ID = 20003;
-    _VERSION = 1;
-  }
-  repeated net.ooici.core.link.CASRef person = 1;
-  optional net.ooici.core.link.CASRef owner = 2;
-  optional string title = 3;
-}
-"""
-
-
-class HelloMessageError(Exception):
+class IndexServiceError(Exception):
     """
-    An exception class for the Hello Message example
+    An exception class for the Index Service
     """
 
 
-class HelloMessage(ServiceProcess):
+class IndexService(ServiceProcess):
     """
-    Example process sends message objects
+    The Index Service
     """
 
     # Declaration of service
-    declare = ServiceProcess.service_declare(name='hello_message',
+    declare = ServiceProcess.service_declare(name='index_service',
                                              version='0.1.0',
                                              dependencies=[])
 
@@ -95,24 +43,25 @@ class HelloMessage(ServiceProcess):
         # Service life cycle state. Initialize service here. Can use yields.
         self.mc = MessageClient(proc=self)
         
-        log.info('SLC_INIT HelloProcess')
+        log.info('SLC_INIT Index Service')
 
     @defer.inlineCallbacks
-    def op_hello_person(self, person_msg, headers, msg):
+    def op_find_subject(self, predicate_object, headers, msg):
         log.info('op_hello_person: ')
 
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if person_msg.MessageType != person_type:
+        if predicate_object.MessageType != predicate_object_type:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloMessageError('Unexpected type received \n %s' % str(person_msg))
+            raise IndexServiceError('Unexpected type received \n %s' % str(predicate_object))
             
                 
-        # Creepy hello person object log statements...
-        log.info( 'Hello ' + person_msg.name +'...')
-        log.info('I know your phone number ' + person_msg.name + '... it is: '+ person_msg.phone[0].number)
         
-        person_reply = yield self.mc.create_instance(person_type, MessageName='reply message')
+        
+        
+        
+        
+        list_of_subjects = yield self.mc.create_instance(person_type, name='reply message')
         
         # If you want to move the whole object, you can do that using the getter/setter
         person_reply.MessageObject = person_msg.MessageObject
@@ -125,19 +74,7 @@ class HelloMessage(ServiceProcess):
         # The api for reply may be refactored later on so that there is just the one argument...
         yield self.reply_ok(msg, person_reply)
 
-    @defer.inlineCallbacks
-    def op_hello_everyone(self, addressbook_msg, headers, msg):
-        log.info('op_hello_everyone: ')
-
-        if addressbook_msg.MessageType  != addresslink_type:
-            # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloError('Unexpected type received \n %s' % str(addressbook_msg))
-            
-        log.info('Received addresbook; Title: ' + addressbook_msg.title)
-        for person in addressbook_msg.person:
-            log.info('Logging Person: \n' +str(person))
-            
-        yield self.reply_ok(msg)
+    
 
 
 class HelloMessageClient(ServiceClient):
