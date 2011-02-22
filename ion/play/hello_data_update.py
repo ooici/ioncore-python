@@ -192,7 +192,7 @@ class HelloDataUpdate(ServiceProcess):
         name = 'Addressbook #%d' % self.instance_counter
         self.instance_counter+=1
         
-        resource = yield self.rc.create_instance(addresslink_type, name=name, description='Preposterous names!')
+        resource = yield self.rc.create_instance(addresslink_type, ResourceName=name, ResourceDescription='Preposterous names!')
         
         # the ResourceObject property of the ResourceInstance provides a setter
         # for the value of the entire resource object - it is usefull for creation
@@ -204,7 +204,7 @@ class HelloDataUpdate(ServiceProcess):
         log.info(str(resource))
         
         
-        response = yield self.mc.create_instance(resource_response_type, name='create_addressbook_resource response')
+        response = yield self.mc.create_instance(resource_response_type, MessageName='create_addressbook_resource response')
         
         # Create a reference to return to the caller
         # This is one pattern - it exposes the resource to the caller        
@@ -246,7 +246,7 @@ class HelloDataUpdate(ServiceProcess):
             
         yield self.rc.put_instance(resource)
             
-        response = yield self.mc.create_instance(resource_response_type, name='clobber_addressbook_resource response')
+        response = yield self.mc.create_instance(resource_response_type, MessageName='clobber_addressbook_resource response')
         
         # Create a reference to return to the caller
         # This is one pattern - it exposes the resource to the caller        
@@ -307,7 +307,7 @@ class HelloDataUpdate(ServiceProcess):
             
         yield self.rc.put_instance(resource)
             
-        response = yield self.mc.create_instance(resource_response_type, name='clobber_addressbook_resource response')
+        response = yield self.mc.create_instance(resource_response_type, MessageName='clobber_addressbook_resource response')
         
         # Create a reference to return to the caller
         # This is one pattern - it exposes the resource to the caller        

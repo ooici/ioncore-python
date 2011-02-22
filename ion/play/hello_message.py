@@ -112,7 +112,7 @@ class HelloMessage(ServiceProcess):
         log.info( 'Hello ' + person_msg.name +'...')
         log.info('I know your phone number ' + person_msg.name + '... it is: '+ person_msg.phone[0].number)
         
-        person_reply = yield self.mc.create_instance(person_type, name='reply message')
+        person_reply = yield self.mc.create_instance(person_type, MessageName='reply message')
         
         # If you want to move the whole object, you can do that using the getter/setter
         person_reply.MessageObject = person_msg.MessageObject
