@@ -49,7 +49,7 @@ class Receiver(BasicLifecycleObject):
     rec_messages = {}
     rec_shutoff = False
 
-    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, raw=False):
+    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, raw=False, publisher_config={}):
         """
         @param label descriptive label for the receiver
         @param name the actual exchange name. Used for routing
@@ -59,6 +59,7 @@ class Receiver(BasicLifecycleObject):
         @param group a string grouping multiple receivers
         @param handler a callable for the message handler, shorthand for add_handler
         @param raw if True do not put through receive Interceptors
+        @param publisher_config Additional Publisher configuration params, used by send()
         """
         BasicLifecycleObject.__init__(self)
 
@@ -70,6 +71,7 @@ class Receiver(BasicLifecycleObject):
         self.process = process
         self.group = group
         self.raw = raw
+        self.publisher_config = publisher_config
 
         self.handlers = []
         self.consumer = None
@@ -224,7 +226,9 @@ class Receiver(BasicLifecycleObject):
                                  workbench=wb)
                 inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
                 msg = inv1.message
-            yield ioninit.container_instance.send(msg.get('receiver'), msg)
+
+            # call flow: Container.send -> ExchangeManager.send -> ProcessExchangeSpace.send
+            yield ioninit.container_instance.send(msg.get('receiver'), msg, publisher_config=self.publisher_config)
         except Exception, ex:
             log.exception("Send error")
         else:
