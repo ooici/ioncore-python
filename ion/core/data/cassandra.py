@@ -59,8 +59,8 @@ class CassandraStore(TCPConnection):
         """
         functional wrapper around active client instance
         """
-        import twisted.internet.base
-        twisted.internet.base.DelayedCall.debug = True
+        #import twisted.internet.base
+        #twisted.internet.base.DelayedCall.debug = True
         ### Get the host and port from the Persistent Technology resource
         host = persistent_technology.hosts[0].host
         port = persistent_technology.hosts[0].port
@@ -71,10 +71,13 @@ class CassandraStore(TCPConnection):
         #self._keyspace = getattr(persistent_archive, 'name', None)
         
         #Get the credentials for the cassandra connection
+        log.info("CassandraStore.__init__")
         uname = credentials.username
         pword = credentials.password
         authorization_dictionary = {'username': uname, 'password': pword}
-        
+        log.info("Connecting to %s on port %s " % (host,port))
+        log.info("Using keyspace %s" % (self._keyspace,))
+        log.info("authorization_dictionary; %s" % (str(authorization_dictionary),))
         ### Create the twisted factory for the TCP connection  
         self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
         #self._manager = ManagedCassandraClientFactory(credentials=authorization_dictionary)
@@ -83,12 +86,9 @@ class CassandraStore(TCPConnection):
         TCPConnection.__init__(self,host, port, self._manager)
         self.client = CassandraClient(self._manager)    
         
-        
-        ### Get the column family name from the Cache resource
-        #if hasattr(cache, 'name'):
-        #    raise CassandraError, 'Cassandra Store must be initalized with a ION Cache Resource using the cfCache keyword argument'
         self._cache = cache # Cassandra Column Family maps to an ION Cache resource
         self._cache_name = cache.name
+        log.info("leaving __init__")
         
 
     @defer.inlineCallbacks
@@ -132,15 +132,16 @@ class CassandraStore(TCPConnection):
         yield self.client.remove(key, self._cache_name)
     
     def on_deactivate(self, *args, **kwargs):
+        #self._connector.disconnect()
         self._manager.shutdown()
         log.info('on_deactivate: Lose TCP Connection')
 
     def on_terminate(self, *args, **kwargs):
         log.info("Called CassandraStore.on_terminate")
-        
+        self._connector.disconnect()
         self._manager.shutdown()
         log.info('on_terminate: Lose TCP Connection')
-     
+    
 
 class CassandraIndexedStore(CassandraStore):
     """
@@ -151,7 +152,8 @@ class CassandraIndexedStore(CassandraStore):
     def __init__(self, persistent_technology, persistent_archive, credentials, cache):
         """
         functional wrapper around active client instance
-        """       
+        """
+        log.info("CassandraIndexedStore.__init__")       
         CassandraStore.__init__(self, persistent_technology, persistent_archive, credentials, cache)
         self._cache = cache
         
@@ -177,6 +179,7 @@ class CassandraIndexedStore(CassandraStore):
         """
         make_predicate = lambda attr: {'column_name':attr[0],'op':IndexOperator.EQ,'value':attr[1]}
         predicate_args = map(make_predicate, indexed_attributes.items())
+        
         log.info("predicate_args: %s" %(predicate_args,))
         make_expressions = lambda args: IndexExpression(**args)
         selection_predicate =  map(make_expressions, predicate_args)

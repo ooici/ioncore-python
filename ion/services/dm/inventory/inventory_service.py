@@ -108,9 +108,8 @@ class CassandraInventoryService(ServiceProcess):
         cas_host.port = self._port
         
         #TODO Pass these in through the bootstrap 
-        
         keyspace = "TestKeyspace"
-        column_family = "TestCF"
+        column_family = "TestRDF"
         
         persistent_archive = yield self.rc.create_instance(cassandra_keyspace_type, name=keyspace, description="description of " + keyspace)
         persistent_archive.name = keyspace
@@ -124,9 +123,9 @@ class CassandraInventoryService(ServiceProcess):
         
 
         log.info("Creating Cassandra Store")
-        self._indexed_store = CassandraIndexedStore(cassandra_cluster,persistent_archive,  simple_password,cache)
-        self._indexed_store.initialize()
-        self._indexed_store.activate()
+        self._indexed_store = CassandraIndexedStore(cassandra_cluster, persistent_archive, simple_password, cache)
+        yield self.register_life_cycle_object(self._indexed_store)
+        #yield self._indexed_store.client.set_keyspace("TestKeyspace")
         #self._indexed_store = IndexStore()
         log.info("Created Cassandra Store")
         
@@ -167,6 +166,10 @@ class CassandraInventoryService(ServiceProcess):
             
     @defer.inlineCallbacks
     def op_put(self, request, headers, msg):
+        """
+        @note, puts a row into the Cassandra cluster. 
+        @retval does not return anything
+        """
         cassandra_row = request.configuration
         key = cassandra_row.key
         value = cassandra_row.value
@@ -180,7 +183,12 @@ class CassandraInventoryService(ServiceProcess):
         yield self.reply_ok(msg, response)
         
     @defer.inlineCallbacks
-    def op_get(self, request, headers, msg):   
+    def op_get(self, request, headers, msg):
+        """
+        @note Gets a row from the Cassandra cluster
+        If the row does not exist then leave the value field in the CassandraIndexedRow empty.
+        @retval Returns a Cassandra Row message in the response   
+        """
         cassandra_row = request.configuration
         key = cassandra_row.key
         
@@ -190,12 +198,17 @@ class CassandraInventoryService(ServiceProcess):
         response.result= 'Get complete'
         row_resource = yield self.rc.create_instance(cassandra_indexed_row_type, name="value",
                                   description="A description")
-        row_resource.value = value
+        if value is not None:
+            row_resource.value = value
         response.configuration = row_resource.ResourceObject
         yield self.reply_ok(msg, response)
          
     @defer.inlineCallbacks
-    def op_remove(self, request, headers, msg):      
+    def op_remove(self, request, headers, msg): 
+        """
+        @note removes a row
+        @retval does not return anything
+        """     
         cassandra_row = request.configuration
         key = cassandra_row.key
         yield self._indexed_store.remove(key)
@@ -205,17 +218,21 @@ class CassandraInventoryService(ServiceProcess):
         
      
     @defer.inlineCallbacks
-    def op_get_query_attributes(self, request, headers, msg):      
-        attr_dict = yield self._indexed_store.get_query_attributes()
+    def op_get_query_attributes(self, request, headers, msg):
+        """
+        @note gets the names of the columns that are indexed in the column family
+        @retval returns the names of the columns in a CassandraRow message
+        """      
+        column_list = yield self._indexed_store.get_query_attributes()
         response = yield self.mc.create_instance(resource_response_type, name="get_query_attributes response")
         response.result= 'Get complete'
         row_resource = yield self.rc.create_instance(cassandra_indexed_row_type, name="value",
                                   description="A description")
         
-        for attr_key, attr_value in attr_dict.items():
-            attr = row_resource.attr.add()
-            attr.attribute_name = attr_key
-            attr.attribute_value = attr_value
+        for column_name in column_list:
+            attr = row_resource.attrs.add()
+            attr.attribute_name = column_name
+           
             
         response.configuration = row_resource.ResourceObject    
         yield self.reply_ok(msg, response)
