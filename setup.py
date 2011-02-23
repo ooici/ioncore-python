@@ -46,7 +46,7 @@ setup( name = 'ioncore',
            'Telephus==0.7-beta3.3', 
            'thrift==0.2.0', # thrift is a dependency of Telephus, which should be included there ideally
            'M2Crypto==0.20.2', 
-           'ionproto==0.3.12'
+           'ionproto'
                           ],
        include_package_data = True,
        classifiers = [
