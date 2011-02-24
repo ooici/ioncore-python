@@ -146,23 +146,24 @@ class CassandraInventoryService(ServiceProcess):
             index_attrs[attr.attribute_name] = attr.attribute_value
         results = yield self._indexed_store.query(index_attrs)
         #Now we have to put these back into a response
-        response = yield self.mc.create_instance(resource_response_type, name="query response")
+        response = yield self.mc.create_instance(cassandra_rows_type, name="query response")
         
-        rows_resource = yield self.rc.create_instance(cassandra_rows_type, name="rows back",
-                                  description="A description")
+        
+        #rows_resource = yield self.rc.create_instance(cassandra_rows_type, name="rows back",
+        #                          description="A description")
         #The GPB buffer object represents cassandra rows, we could probably get away with just making a dictionary like
         #object, since that's what query returns.
-        for row in results.items():
-            r = rows_resource.row.add()
-            r.key = row[0]
+        for key,value in results.items():
+            r = response.row.add()
+            r.key = key
             col = r.cols.add()
             col.name = "value"
-            col.value = row[1]
+            col.value = value
         
-        response.configuration = rows_resource.ResourceObject  
-        response.result = 'Query complete'
+        #response
+        #response.result = 'Query complete'
            
-        yield self.reply_ok(msg, response)
+        yield self.reply_ok(msg,response)
             
     @defer.inlineCallbacks
     def op_put(self, request, headers, msg):
