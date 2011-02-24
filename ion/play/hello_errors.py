@@ -146,11 +146,11 @@ class HelloErrorsClient(ServiceClient):
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
-    def replytome(self, text='Hi there'):
+    def replytome(self, message):
         yield self._check_init()
         
         try:
-            (content, headers, msg) = yield self.rpc_send('replytome', text)
+            (content, headers, msg) = yield self.rpc_send('replytome', message)
         except ReceivedError, re:
             
             log.debug('ReceivedError', str(re))

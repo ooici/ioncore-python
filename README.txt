@@ -28,39 +28,38 @@ ioncore-python is compatible with Python 2.5 and higher, but not Python 3.x
 This project has several dependencies on libraries and packages. Most of these
 dependencies are resolved automatically using the provided setup script.
 
-Step 1: Virtual env
-    Create a Python virtual environment using virtualenv. This ensures that all
-    libraries and dependencies are installed separately from the Python
-    system libraries
-::
-    mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 --distribute ioncore-python
-    workon ioncore-python
 
-    Note: When troubleshooting issues (since easy_install is easy but has its own problems)
-    , start all over again with a new virtualenv, such as:
-    mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 --distribute ioncore-python2
-    You can remove old virtualenvs using `rmvirtualenv <env_name>`.
+Example setup to work on ioncore-python:
 
-Step 2: Core libraries (you can skip this step)
-    Install some core libraries first. Sometimes the automatic installer
-    produces errors, if these libraries are not present beforehand.
-::
-    easy_install -U twisted
+mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 your_env_name
+mkdir some_dir_to_keep_it_all_in
+cd some_dir_to_keep_it_all_in
+git clone git@github.com:ooici/ioncore-python.git
+cd ioncore-python
+python bootstrap.py
+bin/buildout 
+bin/trial ion
 
-Step 3: Run the setup script
-::
-    ant install    # This is equivalent to python setup.py install
+Example setup to work on ioncore-python and ion-object-definitions:
 
-This should download and install all the dependencies and will run for a while.
-Check the trace output that there are no substantial errors. You are now ready
-to run.
+mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 your_env_name
+mkdir some_dir_to_keep_it_all_in
+cd some_dir_to_keep_it_all_in
+git clone git@github.com:ooici/ioncore-python.git
+git clone git@github.com:ooici/ion-object-definitions.git
+cd ioncore-python
+cd ../ion-object-definitions
+ant dist
+cd ../ioncore-python
+python bootstrap.py
+bin/buildout -c dev-integration.cfg
+bin/trial ion
+
 
 Current dependencies include:
     twisted, carrot, txamqp, msgpack-python, httplib2, simplejson, Telephus
     gviz_api.py, nimboss, txrabbitmq, M2Crypto-patched, ionproto and protobuf
 
-NOTE: As the project evolves and new code is added, dependencies might change.
-Run the setup script once in a while and when you get errors
 
 *M2Crypto note: requires autoconf, automake, and g++ packages be installed prior.
 
@@ -72,24 +71,23 @@ Usage
 
 Start empty Python Capability Container shell with:
 ::
-    scripts/start-cc -h amoeba.ucsd.edu
-    scripts/start-cc   # to run with localhost
-    # Alternatively the direct call to twistd developer
-    twistd -n cc -h amoeba.ucsd.edu
+    bin/twistd -n cc -h amoeba.ucsd.edu
+    bin/twistd -n cc   # to run with localhost
     # To set a sysname, i.e. a "cluster name" for all containers in a cluster
-    twistd -n cc -h amoeba.ucsd.edu -a sysname=mycluster
+    bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=mycluster
 
 (to end a capability container shell, press Ctrl-D Ctrl-C)
 
-Start system by executing within the CC shell:
+Start system by executing within buildout altered Python shell:
+bin/mypython:
 ><>
     from ion.core import bootstrap
     bootstrap.start()
 
-Alternatively (better) from UNIX shell executing a script:
+Alternatively (better) from executing a script:
 ::
-    scripts/start-cc -h amoeba.ucsd.edu res/scripts/bootstrap.py
-    scripts/start-cc -h amoeba.ucsd.edu res/scripts/newcc.py
+    bin/twistd -n cc -h amoeba.ucsd.edu res/scripts/bootstrap.py
+    bin/twistd -n cc -h amoeba.ucsd.edu res/scripts/newcc.py
 
 
 Testing
@@ -97,15 +95,15 @@ Testing
 
 Run trial test cases (recursively)
 ::
-    trial ion
-    trial ion.core
-    trial ion.services.coi.test.test_resource_registry
+    bin/trial ion
+    bin/trial ion.core
+    bin/trial ion.services.coi.test.test_resource_registry
 
 A good learning example is the HelloService
 ::
-    trial ion.play.test.test_hello
+    bin/trial ion.play.test.test_hello
 
-Or in the CC shell:
+Or in the mypython interpreter:
 ><>
     from ion.play import hello_service
     spawn(hello_service)
@@ -116,18 +114,14 @@ Or in the CC shell:
     hc.hello()
 
 
-Build and Packaging using Ant
+Ant Targets
 =============================
-
-LCAarch provides ANT support (see http://ant.apache.org/).
-To check that ant is installed properly, run
-::  ant
 
 To clean your working directories, run
 ::  ant clean
 
-To install all Python dependencies, run
-::  ant install
+To clean buildout generated directories
+::  ant clean-buildouti
 
 To compile all code to see if there are Python compile errors anywhere:
 ::  ant compile
