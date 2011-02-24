@@ -108,7 +108,7 @@ class CassandraStoreTest(IStoreTest):
         cas_host.port = 9160
         
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
-        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keypsace_type)
+        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keyspace_type)
         # only the name of the keyspace is required
         cassandra_keyspace.name = 'StoreTestKeyspace'
         #cassandra_keyspace.name = 'Keyspace1'
@@ -180,7 +180,7 @@ class IndexStoreTest(IStoreTest):
         query_attributes = {'birth_date':'1973'}
         rows = yield self.ds.query(query_attributes)
         log.info("Rows returned %s " % (rows,))
-        self.failUnlessEqual(rows['prothfuss'], binary_value2)
+        self.failUnlessEqual(rows['prothfuss']['value'], binary_value2)
          
     #@itv(CONF)
     @defer.inlineCallbacks
@@ -197,10 +197,21 @@ class IndexStoreTest(IStoreTest):
         val1 = yield self.ds.get('bsanderson')
         val2 = yield self.ds.get('prothfuss')
         val3 = yield self.ds.get('htayler')
-        self.failUnlessEqual(val1, binary_value1)
-        self.failUnlessEqual(val2, binary_value2)
-        self.failUnlessEqual(val3, binary_value3)
-            
+        self.failUnlessEqual(val1.get('value'), binary_value1)
+        self.failUnlessEqual(val2.get('value'), binary_value2)
+        self.failUnlessEqual(val3.get('value'), binary_value3)
+      
+    @defer.inlineCallbacks
+    def test_put_get_delete(self):
+        # Write, then read to verify same
+        #d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
+        binary_value1 = 'BinaryValue for Brandon Sanderson'
+        key = 'bsanderson'
+        yield self.ds.put(key, binary_value1) 
+        b = yield self.ds.get(key)
+        self.failUnlessEqual(binary_value1, b['value']) 
+        yield self.ds.remove(self.key)
+        
             
 class CassandraIndexedStoreTest(IStoreTest):
 
@@ -225,7 +236,7 @@ class CassandraIndexedStoreTest(IStoreTest):
         cas_host.port = 9160
         
         ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
-        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keypsace_type)
+        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keyspace_type)
         # only the name of the keyspace is required
         cassandra_keyspace.name = 'StoreTestKeyspace'
         #cassandra_keyspace.name = 'Keyspace1'
