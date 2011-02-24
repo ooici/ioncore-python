@@ -32,7 +32,10 @@ class HelloError(ApplicationError):
 
 class HelloErrors(ServiceProcess):
     """
-    Example service interface that includes error handleing
+    Example service interface that includes error handling
+    This service has no purpose. It receives a person message and makes up some
+    business logic based on the name of the person. The result, if any is also
+    a person message. Normally the response would be a different type of object.
     """
     # Declaration of service
     declare = ServiceProcess.service_declare(name='hello_errors',
@@ -55,7 +58,7 @@ class HelloErrors(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_replytome(self, request, headers, msg):
-        log.info('op_replytome: '+str(content))
+        log.info('op_replytome: '+str(request))
         
         response = yield self.businesslogic4replytome(request)
 
@@ -67,62 +70,53 @@ class HelloErrors(ServiceProcess):
     def businesslogic4replytome(self, person_msg):
         """
         Determine how to respond to the message content
-        May include headers or even message as part of the business logic if needed
         """
 
-        #if person_msg.MessageType != person_type:
-        #    raise HelloErrors('Invalid message type recieved')
-
-
+        # Check the type of the content received
+        if person_msg.MessageType != person_type:
+            # Use the response code property of the person message.
+            raise HelloErrors('Invalid message type recieved', person_msg.ResponseCodes.BAD_REQUEST)
+            
+            
         # Simplest example - Just reply okay with no object
-        if response.name == 'John Doe':
+        if person_msg.name == 'John Doe':
+            # When reply_ok is called with None, an empty message is created which
+            # includes a reply ok return code. 
             defer.returnValue(None)
             
         
-        # Build a response message object        
-        response = yield self.message_client.create_instance(person_type,MessageName='Example response message')
-        # Set response values here... using a person object as an example
-        response.name = 'Matthew'
-        response.id = 8
-        
         ####        
-        # A message that succeeds
+        # A message that succeeds - based on the name field of the person message
         ####
-        if request.MessageName == 'Succeed':
+        if person_msg.name == 'Jane Doe':
             
-            # Create a message to contain the response...
-            response.MessageResponseCode = response.ResponseCodes.OK
+            # Build a response message object        
+            response = yield self.message_client.create_instance(person_type,MessageName='Example response message')
+             # Business logic sets the value of the response
+            response.name = 'Matthew'
+            response.id = 8
+            
+            # Set the ResponseCode that we want to use for this result
+            response.MessageResponseCode = response.ResponseCodes.ACCEPTED
+            # A reason, if any for the result...
+            response.MessageResponseBody = 'Jane is a nice person'
             
         ####
         # A message that fails in the application
         ####
-        elif request.MessageName == 'Fail':
+        elif person_msg.name == """Robert); DROP TABLE Students;""":
             
-            # The person object fields are not set.... the the type of the object
-            raise HelloError('This is a failed operation', response.ResponseCodes.BAD_REQUEST)
+            # This is an illegal request, Raise an Error.
+            # Give a reason and a response code! (Get the response code from the person_msg message instance)
+            raise HelloError('This operation faild due to bad request content.', person_msg.ResponseCodes.BAD_REQUEST)
             
-        # A message that fails generating an exception 
-        elif request.MessageName == 'CatchMe_OK':
-                
-            try:
-                # Do some business logic that raises an exception
-                
-                bad = {'value':5}
-                response.name = bad['not here']
-                
-            except KeyError, ex:
-                
-                # Use reply okay and pass the expection in a response object with the exception included.
-                # The calling process must process the response to determine what to do about it...
-                
-                raise HelloError('Caught an exception in the logic and raised the service error', response.ResponseCodes.NOT_FOUND)
                 
         # An example of an uncaught exception
         else:
             
             # This is an uncaught exception - This should never happen!
             # In this case reply_err is called from the base process that dispatched the operation
-            raise RuntimeError("I'm an uncaught exception!")
+            raise Exception("I'm an unexpected exception!")
             
             
         defer.returnValue(response)

@@ -16,7 +16,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.exception import ReceivedError, ApplicationError
+from ion.core.exception import ReceivedError, ApplicationError, ReceivedApplicationError, ReceivedContainerError
 from ion.core.id import Id
 from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
@@ -450,7 +450,18 @@ class Process(BasicLifecycleObject,ResponseCodes):
             reactor.callLater(0, lambda: rpc_deferred.callback(res))
                 
         elif status == self.ION_ERROR:
-            err = failure.Failure(ReceivedError(payload, content))
+            
+            code = -1
+            if isinstance(content, MessageInstance):
+                code = content.MessageResponseCode
+            
+            if 400 <= code and code < 500:
+                err = failure.Failure(ReceivedApplicationError(payload, content))
+            elif 500 <= code and code < 600:
+                err = failure.Failure(ReceivedContainerError(payload, content))
+            else:
+                # Received Error is still the catch all!
+                err = failure.Failure(ReceivedError(payload, content))
             
             #rpc_deferred.errback(err)
             # Cannot do the callback right away, because the message is not yet handled
@@ -478,8 +489,16 @@ class Process(BasicLifecycleObject,ResponseCodes):
         # Perform a dispatch of message by operation
         try:
             res = yield self._dispatch_message(payload, msg, conv)
+            
+        except ApplicationError, ex:
+            # In case of an application error - do not terminate the process!
+            log.exception("*****Application Error in message processing*****")
+            # @todo Should we send an err or rather reject the msg?
+            if msg and msg.payload['reply-to']:
+                yield self.reply_err(msg, exception = ex)
+            
         except Exception, ex:
-            log.exception("*****Error in message processing*****")
+            log.exception("*****Container Error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             if msg and msg.payload['reply-to']:
                 yield self.reply_err(msg, exception = ex)

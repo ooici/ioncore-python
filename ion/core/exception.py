@@ -42,6 +42,17 @@ class ReceivedError(IonError):
             msg = "ERROR received in message"
             IonError.__init__(self, msg)
 
+class ReceivedContainerError(ReceivedError):
+    """
+    An exception to throw for 5XX response codes
+    """
+    
+class ReceivedApplicationError(ReceivedError):
+    """
+    An exception to throw for 4XX response codes
+    """
+
+
 
 #class ReceivedError(IonError):
 #

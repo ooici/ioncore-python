@@ -80,7 +80,7 @@ class IonTestCase(unittest.TestCase):
         log.info("============ %s ===" % self.container)
 
     @defer.inlineCallbacks
-    def CreateMessage(self, object_id=None, MessageName='', **kwargs):
+    def create_message(self, object_id=None, MessageName='', **kwargs):
         """
         @Brief This is a convienence method for creating message instances in a
         test case. The message instance is an envelope for application specific
