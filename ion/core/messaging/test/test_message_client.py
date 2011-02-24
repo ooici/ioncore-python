@@ -126,6 +126,6 @@ class IonTestMessageClientTest(IonTestCase):
     def test_convience_methods(self):
         
         
-        msg_instance = yield self.CreateMessage(person_type, MessageName='David', name='david', id=6)
+        msg_instance = yield self.create_message(person_type, MessageName='David', name='david', id=6)
         
         

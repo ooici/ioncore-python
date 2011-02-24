@@ -73,7 +73,7 @@ class HelloErrorsBusinessLogicTest(IonTestCase):
             
             # Check the response of the result message
             self.assertEqual(ex.response_code,request.ResponseCodes.BAD_REQUEST)
-            self.assertEqual(str(ex), 'This is a failed operation')
+            self.assertEqual(str(ex), 'This operation faild due to bad request content.')
             defer.returnValue(True)
         
         self.fail()
