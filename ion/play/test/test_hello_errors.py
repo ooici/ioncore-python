@@ -17,7 +17,7 @@ from ion.core.messaging import message_client
 from ion.core.object import object_utils
 
 # Use the person object as a simple type of message content
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
 
 
 class HelloErrorsBusinessLogicTest(IonTestCase):
@@ -43,7 +43,7 @@ class HelloErrorsBusinessLogicTest(IonTestCase):
     def test_hello_accept(self):
                         
         # Use the convience method of the test case to create a message instance
-        request = yield self.create_message(object_id=person_type, MessageName='Hello Error Message')
+        request = yield self.create_message(object_id=PERSON_TYPE, MessageName='Hello Error Message')
         request.name = 'Jane Doe'
         request.id = 42 # This is just a field in the person object it has no significance in ION
         request.phone.add()
@@ -64,7 +64,7 @@ class HelloErrorsBusinessLogicTest(IonTestCase):
     def test_hello_fail(self):
                         
         # set little johny droptables name using the kwargs in the convience method
-        request = yield self.create_message(person_type, MessageName='Hello Error Message', name="""Robert); DROP TABLE Students;""")
+        request = yield self.create_message(PERSON_TYPE, MessageName='Hello Error Message', name="""Robert); DROP TABLE Students;""")
         # Don't bother setting other fields...
         
         try:
@@ -84,7 +84,7 @@ class HelloErrorsBusinessLogicTest(IonTestCase):
                         
         # Use the convience method of the test case to create a message instance
         # Keyword arguments can be used to set simple fields in the message
-        request = yield self.create_message(object_id=person_type, MessageName='Hello Error Message', name='John Doe', id=42)
+        request = yield self.create_message(object_id=PERSON_TYPE, MessageName='Hello Error Message', name='John Doe', id=42)
         # Use the long hand method to set fields in the message instance
         request.phone.add()
         request.phone.type = request.PhoneType.WORK
@@ -126,7 +126,7 @@ class HelloErrorsTest(IonTestCase):
     def test_hello_ok(self):
             
         # Create the same message we passed to the business logic test
-        request = yield self.create_message(object_id=person_type, MessageName='Hello Error Message', name='John Doe', id=42)
+        request = yield self.create_message(object_id=PERSON_TYPE, MessageName='Hello Error Message', name='John Doe', id=42)
         # Use the long hand method to set fields in the message instance
         request.phone.add()
         request.phone.type = request.PhoneType.WORK
@@ -146,7 +146,7 @@ class HelloErrorsTest(IonTestCase):
     def test_hello_accept(self):
         
         # Create the same message we passed to the business logic test
-        request = yield self.create_message(object_id=person_type, MessageName='Hello Error Message')
+        request = yield self.create_message(object_id=PERSON_TYPE, MessageName='Hello Error Message')
         request.name = 'Jane Doe'
         request.id = 42 # This is just a field in the person object it has no significance in ION
         request.phone.add()
@@ -159,7 +159,7 @@ class HelloErrorsTest(IonTestCase):
         # Some asserts about the result message
         self.assertEqual(result.MessageResponseCode,result.ResponseCodes.ACCEPTED)
         self.assertEqual(result.MessageResponseBody,'Jane is a nice person')
-        self.assertEqual(result.MessageType, person_type)
+        self.assertEqual(result.MessageType, PERSON_TYPE)
         self.assertEqual(result.name, 'Matthew')
         
           
@@ -167,7 +167,7 @@ class HelloErrorsTest(IonTestCase):
     def test_hello_failure(self):
         
         # set little johny droptables name using the kwargs in the convience method
-        request = yield self.create_message(person_type, MessageName='Hello Error Message', name="""Robert); DROP TABLE Students;""")
+        request = yield self.create_message(PERSON_TYPE, MessageName='Hello Error Message', name="""Robert); DROP TABLE Students;""")
         # Don't bother setting other fields...
         
         # Send a request - and catch the exception!
@@ -185,7 +185,7 @@ class HelloErrorsTest(IonTestCase):
     @defer.inlineCallbacks
     def test_hello_error(self):
         # Send a request - and raise an uncaught exception
-        request = yield self.create_message(person_type, MessageName="Hello Error Message", name="Raise an uncaught exception")
+        request = yield self.create_message(PERSON_TYPE, MessageName="Hello Error Message", name="Raise an uncaught exception")
 
         try:
             result = yield self.hello_errors_client.replytome(request)
@@ -202,7 +202,7 @@ class HelloErrorsTest(IonTestCase):
     @defer.inlineCallbacks
     def test_hello_error_and_recover(self):
         # set little johny droptables name using the kwargs in the convience method
-        request = yield self.create_message(person_type, MessageName='Hello Error Message', name="""Robert); DROP TABLE Students;""")
+        request = yield self.create_message(PERSON_TYPE, MessageName='Hello Error Message', name="""Robert); DROP TABLE Students;""")
         # Don't bother setting other fields...
         
         # Send a request - and catch the exception!
@@ -220,7 +220,7 @@ class HelloErrorsTest(IonTestCase):
         # Now send another message - the service is still active!
             
         # Create the same message we passed to the business logic test
-        request = yield self.create_message(object_id=person_type, MessageName='Hello Error Message')
+        request = yield self.create_message(object_id=PERSON_TYPE, MessageName='Hello Error Message')
         request.name = 'Jane Doe'
         request.id = 42 # This is just a field in the person object it has no significance in ION
         request.phone.add()
@@ -236,7 +236,7 @@ class HelloErrorsTest(IonTestCase):
             
         self.assertEqual(result.MessageResponseCode,result.ResponseCodes.ACCEPTED)
         self.assertEqual(result.MessageResponseBody,'Jane is a nice person')
-        self.assertEqual(result.MessageType, person_type)
+        self.assertEqual(result.MessageType, PERSON_TYPE)
         self.assertEqual(result.name, 'Matthew')
     
     

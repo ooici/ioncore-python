@@ -20,7 +20,7 @@ from ion.core.messaging import message_client
 from ion.core.object import object_utils
 from ion.core.exception import ReceivedError
 
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
 
 
 class HelloError(ApplicationError):
@@ -73,7 +73,7 @@ class HelloErrors(ServiceProcess):
         """
 
         # Check the type of the content received
-        if person_msg.MessageType != person_type:
+        if person_msg.MessageType != PERSON_TYPE:
             # Use the response code property of the person message.
             raise HelloErrors('Invalid message type recieved', person_msg.ResponseCodes.BAD_REQUEST)
             
@@ -91,7 +91,7 @@ class HelloErrors(ServiceProcess):
         if person_msg.name == 'Jane Doe':
             
             # Build a response message object        
-            response = yield self.message_client.create_instance(person_type,MessageName='Example response message')
+            response = yield self.message_client.create_instance(PERSON_TYPE,MessageName='Example response message')
              # Business logic sets the value of the response
             response.name = 'Matthew'
             response.id = 8
@@ -151,17 +151,3 @@ factory = ProcessFactory(HelloErrors)
 
 
 
-"""
-from ion.play import hello_service as h
-spawn(h)
-
-# TODO:
-# supervisor process is #1, our hello_service should be #2.
-# sending to 1 results in a callback with no data, sending to 2 does not
-# ever call back.
-send(1, {'op':'hello','content':'Hello you there!'})
-
-from ion.play.hello_service import HelloServiceClient
-hc = HelloServiceClient()
-hc.hello()
-"""
