@@ -21,7 +21,7 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 
 from ion.core.messaging.message_client import MessageClient
 
-from ion.core.data.store import IIndexStore, IndexStore
+from ion.core.data.store import IIndexStore
 from zope.interface import implements
 
 from ion.core import ioninit
@@ -99,7 +99,7 @@ class CassandraInventoryService(ServiceProcess):
             raise CassandraInventoryServiceException("The password for the credentials to authenticate to the Cassandra cluster is not set.")
     
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
-        cassandra_cluster = yield self.rc.create_instance(cassandra_cluster_type, name="Cassandra cluster", description="OOI Cassandra cluster")
+        cassandra_cluster = yield self.rc.create_instance(cassandra_cluster_type, ResourceName="Cassandra cluster", ResourceDescription="OOI Cassandra cluster")
         #persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(cassandra_cluster_type)
         
         # Set only one host and port in the host list for now
@@ -111,13 +111,13 @@ class CassandraInventoryService(ServiceProcess):
         keyspace = "TestKeyspace"
         column_family = "TestRDF"
         
-        persistent_archive = yield self.rc.create_instance(cassandra_keyspace_type, name=keyspace, description="description of " + keyspace)
+        persistent_archive = yield self.rc.create_instance(cassandra_keyspace_type, ResourceName=keyspace, ResourceDescription="description of " + keyspace)
         persistent_archive.name = keyspace
         
-        cache = yield self.rc.create_instance(cassandra_column_family_type, name=column_family, description="description of " + column_family)
+        cache = yield self.rc.create_instance(cassandra_column_family_type, ResourceName=column_family, ResourceDescription="description of " + column_family)
         cache.name = column_family
         
-        simple_password = yield self.rc.create_instance(cassandra_credential_type, name="Cassandra credentials", description="OOI Cassandra credentials")
+        simple_password = yield self.rc.create_instance(cassandra_credential_type, ResourceName="Cassandra credentials", ResourceDescription="OOI Cassandra credentials")
         simple_password.username = self._username
         simple_password.password = self._password
         
@@ -146,22 +146,18 @@ class CassandraInventoryService(ServiceProcess):
             index_attrs[attr.attribute_name] = attr.attribute_value
         results = yield self._indexed_store.query(index_attrs)
         #Now we have to put these back into a response
-        response = yield self.mc.create_instance(cassandra_rows_type, name="query response")
+        response = yield self.mc.create_instance(cassandra_rows_type, MessageName="query response")
         
-        
-        #rows_resource = yield self.rc.create_instance(cassandra_rows_type, name="rows back",
-        #                          description="A description")
+    
         #The GPB buffer object represents cassandra rows, we could probably get away with just making a dictionary like
         #object, since that's what query returns.
         for key,value in results.items():
-            r = response.row.add()
+            r = response.rows.add()
             r.key = key
             col = r.cols.add()
-            col.name = "value"
+            col.column_name = "value"
             col.value = value
         
-        #response
-        #response.result = 'Query complete'
            
         yield self.reply_ok(msg,response)
             
@@ -179,9 +175,10 @@ class CassandraInventoryService(ServiceProcess):
             index_attrs[attr.attribute_name] = attr.attribute_value
         yield self._indexed_store.put(key,value,index_attrs)    
         
-        response = yield self.mc.create_instance(resource_response_type, name="put response")
+        response = yield self.mc.create_instance(resource_response_type, MessageName="put response")
         response.result= 'Put complete'
         yield self.reply_ok(msg, response)
+        
         
     @defer.inlineCallbacks
     def op_get(self, request, headers, msg):
@@ -193,15 +190,12 @@ class CassandraInventoryService(ServiceProcess):
         cassandra_row = request.configuration
         key = cassandra_row.key
         
-        value = yield self._indexed_store.get(key)
-        
-        response = yield self.mc.create_instance(resource_response_type, name="get response")
-        response.result= 'Get complete'
-        row_resource = yield self.rc.create_instance(cassandra_indexed_row_type, name="value",
-                                  description="A description")
+        value = yield self._indexed_store.get(key)        
+        response = yield self.mc.create_instance(cassandra_indexed_row_type, MessageName="get response")
+
         if value is not None:
-            row_resource.value = value
-        response.configuration = row_resource.ResourceObject
+            response.value = value
+        
         yield self.reply_ok(msg, response)
          
     @defer.inlineCallbacks
@@ -213,7 +207,7 @@ class CassandraInventoryService(ServiceProcess):
         cassandra_row = request.configuration
         key = cassandra_row.key
         yield self._indexed_store.remove(key)
-        response = yield self.mc.create_instance(resource_response_type, name="remove response")
+        response = yield self.mc.create_instance(resource_response_type, MessageName="remove response")
         response.result= 'Remove complete'
         yield self.reply_ok(msg, response)
         
@@ -225,17 +219,12 @@ class CassandraInventoryService(ServiceProcess):
         @retval returns the names of the columns in a CassandraRow message
         """      
         column_list = yield self._indexed_store.get_query_attributes()
-        response = yield self.mc.create_instance(resource_response_type, name="get_query_attributes response")
-        response.result= 'Get complete'
-        row_resource = yield self.rc.create_instance(cassandra_indexed_row_type, name="value",
-                                  description="A description")
+        response = yield self.mc.create_instance(cassandra_indexed_row_type, MessageName="get_query_attributes response")
         
         for column_name in column_list:
-            attr = row_resource.attrs.add()
+            attr = response.attrs.add()
             attr.attribute_name = column_name
-           
-            
-        response.configuration = row_resource.ResourceObject    
+             
         yield self.reply_ok(msg, response)
 # Spawn of the process using the module name
 factory = ProcessFactory(CassandraInventoryService)
@@ -262,7 +251,7 @@ class CassandraInventoryClient(ServiceClient):
     @defer.inlineCallbacks
     def query(self, index_attributes):
         log.info("Called CassandraInventoryService client")
-        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        create_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a create_request')
         cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
         for attr_key,attr_value in index_attributes.items():
             attr = cassandra_row.attrs.add()
@@ -277,7 +266,7 @@ class CassandraInventoryClient(ServiceClient):
     def put(self, key, value, index_attributes={}):
         log.info("Called CassandraInventoryService client")
         
-        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        create_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a create_request')
         cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
         cassandra_row.key = key
         cassandra_row.value = value
@@ -292,7 +281,7 @@ class CassandraInventoryClient(ServiceClient):
     
     @defer.inlineCallbacks
     def get(self, key):
-        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        create_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a create_request')
         cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
         cassandra_row.key = key
         
@@ -302,7 +291,7 @@ class CassandraInventoryClient(ServiceClient):
         
     @defer.inlineCallbacks
     def remove(self, key):
-        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        create_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a create_request')
         cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
         cassandra_row.key = key
         
@@ -315,7 +304,7 @@ class CassandraInventoryClient(ServiceClient):
         """
         This request does not send any argument. The message is used as a dummy argument.
         """
-        create_request = yield self.mc.create_instance(resource_request_type, name='Creating a create_request')
+        create_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a create_request')
         cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
         create_request.configuration = cassandra_row  
         (content, headers, msg) = yield self.rpc_send('get_query_attributes', create_request)

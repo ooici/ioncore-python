@@ -4,7 +4,7 @@
 @file ion/services/dm/preservation/test/test_cassandra_manager_service.py
 @author Matt Rodriguez
 """
-from ion.util import procutils as pu    
+  
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class CassandraInventoryTester(IonTestCase):
         value = "Value1"
         attr_dict = {"Subject":"Who", "Predicate":"Descriptive Verb", "Object": "The thing you're looking for"}
         put_response = yield self.client.put(key,value,attr_dict)   
-        log.info(create_response.result) 
+        
         self.failUnlessEqual(put_response.result, "Put complete")
          
     @defer.inlineCallbacks
@@ -81,8 +81,16 @@ class CassandraInventoryTester(IonTestCase):
         put_response2 = yield self.client.put(key2, value2, attr_dict2)
         put_response3 = yield self.client.put(key3, value3, attr_dict3)
         index_attrs = {"Subject":"Me"}
-        create_response = yield self.client.query(index_attrs)
-          
+        cassandra_rows = yield self.client.query(index_attrs)
+        values = []
+        for row in cassandra_rows.rows:
+            log.info(row.key)
+            col = row.cols[0]
+            values.append(col.value)
+        correct_set = set(("Value1", "Value3"))    
+        query_set = set(values)
+        self.failUnlessEqual(correct_set, query_set)
+            
     @defer.inlineCallbacks
     def test_get(self):
         key = "Key1"
@@ -90,7 +98,7 @@ class CassandraInventoryTester(IonTestCase):
         attr_dict = {"Subject":"Who", "Predicate":"Descriptive Verb", "Object": "The thing you're looking for"} 
         put_response = yield self.client.put(key,value,attr_dict)
         get_response = yield self.client.get(key)
-        self.failUnlessEqual(get_response.configuration.value, value)
+        self.failUnlessEqual(get_response.value, value)
         
         
     @defer.inlineCallbacks
@@ -107,8 +115,8 @@ class CassandraInventoryTester(IonTestCase):
         
     @defer.inlineCallbacks
     def test_get_query_attributes(self):
-        query_attributes_response = yield self.client.get_query_attributes()
-        cassandra_row = query_attributes_response.configuration
+        cassandra_row = yield self.client.get_query_attributes()
+        
         index_attrs = []
         for attr in cassandra_row.attrs:
             log.info(attr.attribute_name)
