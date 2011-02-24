@@ -9,29 +9,49 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-class IONError(StandardError):
+class IonError(StandardError):
     pass
 
     # @todo Some better str output
 
-class ConfigurationError(IONError):
+class ConfigurationError(IonError):
     pass
 
-class StartupError(IONError):
+class StartupError(IonError):
     pass
 
-class IllegalStateError(IONError):
+class IllegalStateError(IonError):
     pass
 
-class ReceivedError(IONError):
+class ApplicationError(IonError):
+    
+    def __init__(self, reason, response_code):
+        
+        # Set up the exception
+        IonError.__init__(self, reason)
+        
+        # Set the response code
+        self.response_code = response_code
 
-    def __init__(self, *args, **kwargs):
-        if len(args) == 2 and type(args[0]) is dict and type(args[1]) is dict:
-            headers = args[0]
-            content = args[1]
+
+class ReceivedError(IonError):
+
+    def __init__(self, headers, content):
             self.msg_headers = headers
             self.msg_content = content
-            msg = content.get('errmsg', "ERROR received in message")
-            IONError.__init__(self, msg)
-        else:
-            IONError.__init__(self, *args, **kwargs)
+            msg = "ERROR received in message"
+            IonError.__init__(self, msg)
+
+
+#class ReceivedError(IonError):
+#
+#    def __init__(self, *args, **kwargs):
+#        if len(args) == 2 and type(args[0]) is dict and type(args[1]) is dict:
+#            headers = args[0]
+#            content = args[1]
+#            self.msg_headers = headers
+#            self.msg_content = content
+#            msg = content.get('errmsg', "ERROR received in message")
+#            IonError.__init__(self, msg)
+#        else:
+#            IonError.__init__(self, *args, **kwargs)

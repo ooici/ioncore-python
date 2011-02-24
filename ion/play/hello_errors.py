@@ -3,12 +3,15 @@
 """
 @file ion/play/hello_errors.py
 @author David Stuebe
-@brief An example service that has error checking
+@brief Most services will have to handle possible exceptions in their business
+logic. This is an example service that demostrates how to do that.
 """
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
+
+from ion.core.exception import ApplicationError
 
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
@@ -20,17 +23,16 @@ from ion.core.exception import ReceivedError
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 
 
-class HelloError_ERR(Exception):
-    """An Exception class for the hello errors example
+class HelloError(ApplicationError):
     """
-
-class HelloError_OK(Exception):
-    """An Exception class for the hello errors example
+    An Exception class for the hello errors example
+    It inherits from the Application Error. Give a 'reason' and a 'response_code'
+    when throwing a ApplicationError!
     """
 
 class HelloErrors(ServiceProcess):
     """
-    Example service interface
+    Example service interface that includes error handleing
     """
     # Declaration of service
     declare = ServiceProcess.service_declare(name='hello_errors',
@@ -42,7 +44,9 @@ class HelloErrors(ServiceProcess):
         ServiceProcess.__init__(self, *args, **kwargs)
         log.info('HelloService.__init__()')
 
-        self.mc = message_client.MessageClient(proc = self)
+        ## you can either define your own message client or use the one defined
+        ## for the process
+        #self.mc = message_client.MessageClient(proc = self)
 
 
     def slc_init(self):
@@ -50,84 +54,74 @@ class HelloErrors(ServiceProcess):
         pass
 
     @defer.inlineCallbacks
-    def op_replytome(self, content, headers, msg):
+    def op_replytome(self, request, headers, msg):
         log.info('op_replytome: '+str(content))
-
-        try:
-            response = yield self.businesslogic4replytome(content)
         
-        except HelloError_ERR, he:
-            # Use replay error to pass the exception and raise a Reciever Error in the calling process
-            
-            yield self.reply_err(msg, exception=he)
-            # reply_err will automatically create a response message if you don't provide one and put the passed exception in it.
-            defer.returnValue(None)
-            
-        except HelloError_OK, he:
-            # Use reply okay and pass the expection in a response object with the exception included.
-            # The calling process must process the response to determine what to do about it...
-
-            # Create the response - an empty message and put the exception in it.
-            response = yield self.mc.create_instance(MessageName='Example message')
-            response.MessageResponseCode = response.ResponseCodes.BAD_REQUEST
-            response.MessageResponseBody = str(he)
-            
-            yield self.reply_ok(msg, content=response)
-            defer.returnValue(None)
+        response = yield self.businesslogic4replytome(request)
 
         # If no exception is raised, use reply okay and pass the response
         # reply is called once and only once no matter the result of the business logic!
         yield self.reply_ok(msg, content=response)
 
     @defer.inlineCallbacks # The business logic may involve defereds as well!
-    def businesslogic4replytome(self, content):
+    def businesslogic4replytome(self, person_msg):
         """
         Determine how to respond to the message content
         May include headers or even message as part of the business logic if needed
         """
+
+        #if person_msg.MessageType != person_type:
+        #    raise HelloErrors('Invalid message type recieved')
+
+
+        # Simplest example - Just reply okay with no object
+        if response.name == 'John Doe':
+            defer.returnValue(None)
+            
+        
+        # Build a response message object        
+        response = yield self.message_client.create_instance(person_type,MessageName='Example response message')
+        # Set response values here... using a person object as an example
+        response.name = 'Matthew'
+        response.id = 8
         
         ####        
         # A message that succeeds
         ####
-        if content.MessageName == 'Succeed':
+        if request.MessageName == 'Succeed':
             
             # Create a message to contain the response...
-            response = yield self.mc.create_instance(person_type,MessageName='Example message')
-            # Set response values here... using a person object as an example
-            response.name = 'Matthew'
-            response.id = 8
-            
             response.MessageResponseCode = response.ResponseCodes.OK
-        
-        # Let the service just reply okay with no value!
-        elif content.MessageName == 'OK':
-            response = None
-        
-        ####
-        # A message that fails in the application - with no exception.
-        ####
-        elif content.MessageName == 'Fail':
             
-            # Create a message to contain the response... it may or may not have a type beyond the basic message container
-            response = yield self.mc.create_instance(MessageName='Example "empty" failure message')
+        ####
+        # A message that fails in the application
+        ####
+        elif request.MessageName == 'Fail':
             
             # The person object fields are not set.... the the type of the object
-            response.MessageResponseCode = response.ResponseCodes.BAD_REQUEST
+            raise HelloError('This is a failed operation', response.ResponseCodes.BAD_REQUEST)
             
         # A message that fails generating an exception 
-        elif content.MessageName == 'CatchMe_OK':
+        elif request.MessageName == 'CatchMe_OK':
                 
-            raise HelloError_OK("I'm supposed to fail and reply_ok")
+            try:
+                # Do some business logic that raises an exception
                 
-        elif content.MessageName == 'CatchMe_ERR':
-            
-            raise HelloError_ERR("I'm supposed to fail and reply_err")
-            
-            
-        # An example of an uncaught exception - this does not yet work as I expect
+                bad = {'value':5}
+                response.name = bad['not here']
+                
+            except KeyError, ex:
+                
+                # Use reply okay and pass the expection in a response object with the exception included.
+                # The calling process must process the response to determine what to do about it...
+                
+                raise HelloError('Caught an exception in the logic and raised the service error', response.ResponseCodes.NOT_FOUND)
+                
+        # An example of an uncaught exception
         else:
-            # This is an uncaught exception
-            # we want to make sure that reply is not called from the application
+            
+            # This is an uncaught exception - This should never happen!
+            # In this case reply_err is called from the base process that dispatched the operation
             raise RuntimeError("I'm an uncaught exception!")
             
             
@@ -148,18 +142,13 @@ class HelloErrorsClient(ServiceClient):
     @defer.inlineCallbacks
     def replytome(self, message):
         yield self._check_init()
-        
-        try:
-            (content, headers, msg) = yield self.rpc_send('replytome', message)
-        except ReceivedError, re:
             
-            log.debug('ReceivedError', str(re))
-            content = re[1]
-            
+        log.debug('Client Sending: '+str(message))
+        (result, headers, msg) = yield self.rpc_send('replytome', message)
         
-        log.debug('Service reply: '+str(content))
+        log.debug('Service Replied: '+str(result))
 
-        defer.returnValue(content)
+        defer.returnValue(result)
 
 
 
