@@ -16,7 +16,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.exception import ReceivedError
+from ion.core.exception import ReceivedError, ApplicationError, ReceivedApplicationError, ReceivedContainerError
 from ion.core.id import Id
 from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
@@ -280,12 +280,12 @@ class Process(BasicLifecycleObject,ResponseCodes):
         try:
             yield self.terminate()
             if msg != None:
-                yield self.reply(msg)
+                yield self.reply_ok(msg)
         except Exception, ex:
             
             log.error('Error during op_terminate: ' + str(ex))
             raise ProcessError("Process %s TERMINATE ERROR" % (self.id))
-            # Let the mesg dispatcher catch the error
+            ### Let the mesg dispatcher catch the error
             #if msg != None:
             #    yield self.reply_err(msg, content=None, exception=ex, response_code = "Process %s TERMINATE ERROR" % (self.id))
 
@@ -419,7 +419,9 @@ class Process(BasicLifecycleObject,ResponseCodes):
         except Exception, ex:
             log.exception('Error in process %s receive ' % self.proc_name)
             if msg and msg.payload['reply-to']:
-                yield self.reply_err(msg, content=None, exception=ex)
+                yield self.reply_err(msg, exception=ex)
+                
+                #@Todo How do we know if the message was ack'ed here?
 
     @defer.inlineCallbacks
     def _receive_rpc(self, payload, msg):
@@ -448,9 +450,19 @@ class Process(BasicLifecycleObject,ResponseCodes):
             reactor.callLater(0, lambda: rpc_deferred.callback(res))
                 
         elif status == self.ION_ERROR:
-            #log.warn('RPC reply is an ERROR: '+str(payload.get(self.MSG_RESPONSE)))
-            #log.debug('RPC reply ERROR Content: '+str(content))
-            err = failure.Failure(ReceivedError(payload, content))
+            
+            code = -1
+            if isinstance(content, MessageInstance):
+                code = content.MessageResponseCode
+            
+            if 400 <= code and code < 500:
+                err = failure.Failure(ReceivedApplicationError(payload, content))
+            elif 500 <= code and code < 600:
+                err = failure.Failure(ReceivedContainerError(payload, content))
+            else:
+                # Received Error is still the catch all!
+                err = failure.Failure(ReceivedError(payload, content))
+            
             #rpc_deferred.errback(err)
             # Cannot do the callback right away, because the message is not yet handled
             reactor.callLater(0, lambda: rpc_deferred.errback(err))
@@ -477,11 +489,19 @@ class Process(BasicLifecycleObject,ResponseCodes):
         # Perform a dispatch of message by operation
         try:
             res = yield self._dispatch_message(payload, msg, conv)
-        except Exception, ex:
-            log.exception("*****Error in message processing*****")
+            
+        except ApplicationError, ex:
+            # In case of an application error - do not terminate the process!
+            log.exception("*****Application Error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             if msg and msg.payload['reply-to']:
-                yield self.reply_err(msg, content=None, exception = str(ex))
+                yield self.reply_err(msg, exception = ex)
+            
+        except Exception, ex:
+            log.exception("*****Container Error in message processing*****")
+            # @todo Should we send an err or rather reject the msg?
+            if msg and msg.payload['reply-to']:
+                yield self.reply_err(msg, exception = ex)
 
             if CF_fail_fast:
                 yield self.terminate()
@@ -507,9 +527,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
             # @todo: Requeue would be ok, but does not work (Rabbit limitation)
             #d = msg.requeue()
-            #if msg and msg.payload['reply-to']:
-                #yield self.reply_err(msg, content=None, response_code = text)
-            #return    
+            
+            # Let the error back handle the exception 
             raise ProcessError(text)
 
 
@@ -657,23 +676,6 @@ class Process(BasicLifecycleObject,ResponseCodes):
             
         self.reply(msg, operation=self.MSG_RESULT, content=content, headers=headers)
 
-    #def reply_uncaught_err(self, msg, content=None, response_code='', exception='', headers={}):
-    #    """
-    #    Reply to a message with an uncaught exception using an error message and
-    #    an indication of the error.
-    #    @content any sendable type to be converted to dict, or dict (untouched)
-    #    @exception an instance of Exception
-    #    @response_code a more informative error message
-    #    @retval Deferred for send of reply
-    #    """
-    #    reshdrs = dict()
-    #    reshdrs[self.MSG_STATUS] = str(self.ION_ERROR)
-    #    reshdrs[self.MSG_RESPONSE] = str(response_code)
-    #    reshdrs[self.MSG_EXCEPTION] = str(exception)
-        #
-        #reshdrs.update(headers)
-        #    
-        #return self.reply(msg, content=content, headers=reshdrs)
         
     @defer.inlineCallbacks
     def reply_err(self, msg, content=None, headers=None, exception=None):
@@ -692,15 +694,17 @@ class Process(BasicLifecycleObject,ResponseCodes):
         if isinstance(content, MessageInstance):
             
             if not content.Message.IsFieldSet('response_code'):
-                content.MessageResponseCode = content.ResponseCodes.INTERNAL_SERVER_ERROR
+                
+                if isinstance(exception, ApplicationError):
+                    content.MessageResponseCode = exception.response_code
+                else:
+                    content.MessageResponseCode = content.ResponseCodes.INTERNAL_SERVER_ERROR
                 
             if not content.Message.IsFieldSet('response_body'):
                 content.MessageResponseBody = str(exception)
                         
         reshdrs = dict()
-        # The status is still OK - this is for handled exceptions!
         reshdrs[self.MSG_STATUS] = self.ION_ERROR
-        #reshdrs[self.MSG_EXCEPTION] = str(exception)
         
         if headers != None:
             reshdrs.update(headers)

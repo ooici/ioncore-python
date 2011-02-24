@@ -39,7 +39,6 @@ class TestSBE49(IonTestCase):
         self.assertNotEqual(self.SimulatorPort, 0)
 
         services = [
-            {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
             {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
 
             {'name':'SBE49_Driver','module':'ion.agents.instrumentagents.SBE49_driver','class':'SBE49InstrumentDriver','spawnargs':{'ipport':self.SimulatorPort}}

@@ -397,6 +397,8 @@ class MessageInstance(object):
         """
         if self._repository._workspace_root.IsFieldSet('message_object'):
             return self._repository._workspace_root.GetLink('message_object').GPBMessage.type
+        else:
+            return None
     
     def _set_message_name(self, name):
         """

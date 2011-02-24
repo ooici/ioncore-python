@@ -42,7 +42,6 @@ class TestWHSentinelADCP(IonTestCase):
         self.assertNotEqual(self.SimulatorPort, 0)
 
         services = [
-            {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
             {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'PubSubService'},
 
             {'name':'WHSentinelADCP_Driver','module':'ion.agents.instrumentagents.WHSentinelADCP_driver','class':'WHSentinelADCPInstrumentDriver','spawnargs':{'ipport':self.SimulatorPort,'ipportCmd':self.CmdPort}}

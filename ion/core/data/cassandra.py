@@ -27,14 +27,6 @@ from ion.util.tcp_connections import TCPConnection
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-# Moving to not use CONF. In the store service module, spawn args can be
-# used to pass appropriate configuration parameters.
-#CONF = ioninit.config(__name__)
-#CF_default_keyspace = CONF['default_keyspace']
-#CF_default_colfamily = CONF['default_colfamily']
-#CF_default_cf_super = CONF['default_cf_super']
-#CF_default_namespace = CONF['default_namespace']
-#CF_default_key = CONF['default_key']
 
 
 class CassandraError(Exception):
@@ -67,8 +59,8 @@ class CassandraStore(TCPConnection):
         """
         functional wrapper around active client instance
         """
-        import twisted.internet.base
-        twisted.internet.base.DelayedCall.debug = True
+        #import twisted.internet.base
+        #twisted.internet.base.DelayedCall.debug = True
         ### Get the host and port from the Persistent Technology resource
         host = persistent_technology.hosts[0].host
         port = persistent_technology.hosts[0].port
@@ -79,10 +71,13 @@ class CassandraStore(TCPConnection):
         #self._keyspace = getattr(persistent_archive, 'name', None)
         
         #Get the credentials for the cassandra connection
+        log.info("CassandraStore.__init__")
         uname = credentials.username
         pword = credentials.password
         authorization_dictionary = {'username': uname, 'password': pword}
-        
+        log.info("Connecting to %s on port %s " % (host,port))
+        log.info("Using keyspace %s" % (self._keyspace,))
+        log.info("authorization_dictionary; %s" % (str(authorization_dictionary),))
         ### Create the twisted factory for the TCP connection  
         self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
         #self._manager = ManagedCassandraClientFactory(credentials=authorization_dictionary)
@@ -91,12 +86,9 @@ class CassandraStore(TCPConnection):
         TCPConnection.__init__(self,host, port, self._manager)
         self.client = CassandraClient(self._manager)    
         
-        
-        ### Get the column family name from the Cache resource
-        #if hasattr(cache, 'name'):
-        #    raise CassandraError, 'Cassandra Store must be initalized with a ION Cache Resource using the cfCache keyword argument'
         self._cache = cache # Cassandra Column Family maps to an ION Cache resource
         self._cache_name = cache.name
+        log.info("leaving __init__")
         
 
     @defer.inlineCallbacks
@@ -140,15 +132,16 @@ class CassandraStore(TCPConnection):
         yield self.client.remove(key, self._cache_name)
     
     def on_deactivate(self, *args, **kwargs):
+        #self._connector.disconnect()
         self._manager.shutdown()
         log.info('on_deactivate: Lose TCP Connection')
 
     def on_terminate(self, *args, **kwargs):
         log.info("Called CassandraStore.on_terminate")
-        
+        self._connector.disconnect()
         self._manager.shutdown()
         log.info('on_terminate: Lose TCP Connection')
-     
+    
 
 class CassandraIndexedStore(CassandraStore):
     """
@@ -159,7 +152,8 @@ class CassandraIndexedStore(CassandraStore):
     def __init__(self, persistent_technology, persistent_archive, credentials, cache):
         """
         functional wrapper around active client instance
-        """       
+        """
+        log.info("CassandraIndexedStore.__init__")       
         CassandraStore.__init__(self, persistent_technology, persistent_archive, credentials, cache)
         self._cache = cache
         
@@ -185,6 +179,7 @@ class CassandraIndexedStore(CassandraStore):
         """
         make_predicate = lambda attr: {'column_name':attr[0],'op':IndexOperator.EQ,'value':attr[1]}
         predicate_args = map(make_predicate, indexed_attributes.items())
+        
         log.info("predicate_args: %s" %(predicate_args,))
         make_expressions = lambda args: IndexExpression(**args)
         selection_predicate =  map(make_expressions, predicate_args)
@@ -360,7 +355,8 @@ class CassandraDataManager(TCPConnection):
                        id=cf_id,
                        column_type=cache.column_type,
                        comparator_type=cache.comparator_type,
-                       column_metadata= cf_column_metadata)         
+                       column_metadata= cf_column_metadata)   
+        log.info("cf_def: " + str(cf_def))      
         yield self.client.system_update_column_family(cf_def) 
     
     @defer.inlineCallbacks    
@@ -410,61 +406,4 @@ class CassandraDataManager(TCPConnection):
         log.info('on_terminate: Lose Connection TCP')
 
 
-### Currently not used...
-#class CassandraFactory(process.ProcessClientBase):
-#    """
-#    The store class attribute is the IStore adapter class that will be used
-#    to Adapt the cassandra client instance.
-#
-#    @note Design note: This is more of an Adapter than a pure Factory. The
-#    intended use is not necessarily to create an arbitrary number of
-#    cassandra client instances, but really to automate the creation of one
-#    client, and then adapt that client to conform to the IStore interface.
-#    """
-#    
-#    # This is the Adapter class. It generates client connections for any
-#    # cassandra class which is instantiated by init(client, kwargs)
-#
-#    def __init__(self, proc=None, presistence_technology=None):
-#        """
-#        @param host defaults to localhost
-#        @param port 9160 is the cassandra default
-#        @param process instance of ion process. If you are calling from an
-#        ion Service, then pass in 'self'. If you need to, you can pass in
-#        the reactor object.
-#        @note This is an experimental idea
-#        @todo Decide on good default for namespace
-#        @note Design Note: These are standard parameters that any StoreFactory 
-#        would need. In particular, the namespace parameter is an
-#        implementation choice to fulfill a [not fully articulated]
-#        architectural need.
-#        """
-#        ProcessClientBase.__init__(self, proc=process, **kwargs)
-#        
-#        self.presistence_technology = presistence_technology
-#        
-#
-#    @defer.inlineCallbacks
-#    def buildStore(self, IonCassandraClient, **kwargs):
-#        """
-#        @param namespace Maps to Cassandra specific columnFamily option
-#        @note For cassandra, there needs to be a conventionaly used
-#        Keyspace option.
-#        """
-#        
-#        # What we have with this
-#        # CassandraFactory class is a mixture of a Factory pattern and an
-#        # Adapter pattern. s is our IStore providing instance the user of
-#        # the factory expects. If we were to make a general "StoreFactory"
-#        # or maybe even an "IStoreFactory" interface, it's behavior would
-#        # be to build/carryout the mechanics of a TCP client connection AND
-#        # then Adapting it and returning the result as an IStore providing
-#        # instance.
-#        
-#        # Create and instance of the ION Client class
-#        instance = IonCassandraClient(self.presistence_technology, **kwargs)
-#        
-#        yield defer.maybeDeferred(self.proc.register_life_cycle_objects.append, instance)
-#        
-#        defer.returnValue(instance)
 

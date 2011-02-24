@@ -40,7 +40,6 @@ class TestInstrumentAgent(IonTestCase):
 
         # Start an instrument agent
         processes = [
-            {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
             {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
             {'name':'agent_registry',
              'module':'ion.services.coi.agent_registry',
