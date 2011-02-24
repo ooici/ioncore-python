@@ -21,6 +21,8 @@ from ion.core.id import Id
 from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
 from ion.core.messaging.ion_reply_codes import ResponseCodes
+from ion.core.messaging.message_client import MessageClient, MessageInstance
+
 from ion.core.process.cprocess import IContainerProcess, ContainerProcess
 from ion.data.store import Store
 from ion.interact.conversation import Conversation
@@ -40,6 +42,7 @@ processes = {}
 
 # @todo CHANGE: Static store (kvs) to register process instances with names
 procRegistry = Store()
+
 
 class IProcess(Interface):
     """
@@ -140,6 +143,9 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
         #The Workbench for all object repositories used by this process
         self.workbench = workbench.WorkBench(self)
+        
+        # Create a message Client
+        self.message_client = MessageClient(proc = self)
         
         # A list of other kinds of life cycle objects which are tied to the process 
         self._registered_life_cycle_objects=[]
@@ -260,6 +266,13 @@ class Process(BasicLifecycleObject,ResponseCodes):
         return self.terminate()
         
     @defer.inlineCallbacks
+    def op_ping(self, content, headers, msg):
+        """
+        Service operation: ping reply
+        """
+        yield self.reply_ok(msg, {'pong':'pong'}, {'quiet':True})
+
+    @defer.inlineCallbacks
     def op_terminate(self, content, headers, msg):
         """
         Shutdown operation, on receive of the init message
@@ -269,8 +282,12 @@ class Process(BasicLifecycleObject,ResponseCodes):
             if msg != None:
                 yield self.reply(msg)
         except Exception, ex:
-            if msg != None:
-                yield self.reply_uncaught_err(msg, content=None, exception=ex, response_code = "Process %s TERMINATE ERROR" % (self.id))
+            
+            log.error('Error during op_terminate: ' + str(ex))
+            raise ProcessError("Process %s TERMINATE ERROR" % (self.id))
+            # Let the mesg dispatcher catch the error
+            #if msg != None:
+            #    yield self.reply_err(msg, content=None, exception=ex, response_code = "Process %s TERMINATE ERROR" % (self.id))
 
     @defer.inlineCallbacks
     def on_terminate(self, msg=None, *args, **kwargs):
@@ -402,7 +419,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
         except Exception, ex:
             log.exception('Error in process %s receive ' % self.proc_name)
             if msg and msg.payload['reply-to']:
-                yield self.reply_uncaught_err(msg, content=None, exception=ex, response_code=self.ION_RECEIVER_ERROR)
+                yield self.reply_err(msg, content=None, exception=ex)
 
     @defer.inlineCallbacks
     def _receive_rpc(self, payload, msg):
@@ -431,8 +448,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
             reactor.callLater(0, lambda: rpc_deferred.callback(res))
                 
         elif status == self.ION_ERROR:
-            log.warn('RPC reply is an ERROR: '+str(payload.get(self.MSG_RESPONSE)))
-            log.debug('RPC reply ERROR Content: '+str(content))
+            #log.warn('RPC reply is an ERROR: '+str(payload.get(self.MSG_RESPONSE)))
+            #log.debug('RPC reply ERROR Content: '+str(content))
             err = failure.Failure(ReceivedError(payload, content))
             #rpc_deferred.errback(err)
             # Cannot do the callback right away, because the message is not yet handled
@@ -464,7 +481,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
             log.exception("*****Error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             if msg and msg.payload['reply-to']:
-                yield self.reply_uncaught_err(msg, content=None, exception = str(ex), response_code=self.ION_RECEIVER_ERROR)
+                yield self.reply_err(msg, content=None, exception = str(ex))
 
             if CF_fail_fast:
                 yield self.terminate()
@@ -490,9 +507,11 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
             # @todo: Requeue would be ok, but does not work (Rabbit limitation)
             #d = msg.requeue()
-            if msg and msg.payload['reply-to']:
-                yield self.reply_uncaught_err(msg, content=None, response_code = text)
-            return
+            #if msg and msg.payload['reply-to']:
+                #yield self.reply_err(msg, content=None, response_code = text)
+            #return    
+            raise ProcessError(text)
+
 
         # Regular message handling in expected state
         pu.log_message(msg)
@@ -583,7 +602,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
         #convid = send + "#" + Process.convIdCnt
         return convid
 
-    def reply(self, msg, operation=None, content=None, response_code='',exception='', headers={}):
+    def reply(self, msg, operation=None, content=None, headers={}):
         """
         @brief Replies to a given message, continuing the ongoing conversation
         @retval Deferred or None
@@ -602,10 +621,6 @@ class Process(BasicLifecycleObject,ResponseCodes):
         # Values in the headers KWarg take precidence over the response_code and exception KWargs!
         reshdrs = dict()
         
-        if not response_code:
-            response_code = self.ION_SUCCESS
-        reshdrs[self.MSG_RESPONSE] = str(response_code)
-        reshdrs[self.MSG_EXCEPTION] = str(exception)
         
         # MSG STATUS is set automatically!
         #reshdrs[self.MSG_STATUS] = self.ION_OK
@@ -614,6 +629,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
             
         return self.send(pu.get_process_id(recv), operation, content, reshdrs, reply=True)
 
+    @defer.inlineCallbacks
     def reply_ok(self, msg, content=None, headers={}):
         """
         Boilerplate method that replies to a given message with a success
@@ -630,28 +646,37 @@ class Process(BasicLifecycleObject,ResponseCodes):
         # used for backward compatibility!
         #log.info('''REPLY_OK is depricated - please use "reply"''')
         
-        return self.reply(msg, operation=self.MSG_RESULT, content=content, headers=headers)
-
-    def reply_uncaught_err(self, msg, content=None, response_code='', exception='', headers={}):
-        """
-        Reply to a message with an uncaught exception using an error message and
-        an indication of the error.
-        @content any sendable type to be converted to dict, or dict (untouched)
-        @exception an instance of Exception
-        @response_code a more informative error message
-        @retval Deferred for send of reply
-        """
-        reshdrs = dict()
-        reshdrs[self.MSG_STATUS] = str(self.ION_ERROR)
-        reshdrs[self.MSG_RESPONSE] = str(response_code)
-        reshdrs[self.MSG_EXCEPTION] = str(exception)
-        
-        reshdrs.update(headers)
+        if content is None:
             
-        return self.reply(msg, content=content, headers=reshdrs)
+            content = yield self.message_client.create_instance(MessageName='Generic OK Message')
+
+        if isinstance(content, MessageInstance):
+                
+            if not content.Message.IsFieldSet('response_code'):
+                content.MessageResponseCode = content.ResponseCodes.OK
+            
+        self.reply(msg, operation=self.MSG_RESULT, content=content, headers=headers)
+
+    #def reply_uncaught_err(self, msg, content=None, response_code='', exception='', headers={}):
+    #    """
+    #    Reply to a message with an uncaught exception using an error message and
+    #    an indication of the error.
+    #    @content any sendable type to be converted to dict, or dict (untouched)
+    #    @exception an instance of Exception
+    #    @response_code a more informative error message
+    #    @retval Deferred for send of reply
+    #    """
+    #    reshdrs = dict()
+    #    reshdrs[self.MSG_STATUS] = str(self.ION_ERROR)
+    #    reshdrs[self.MSG_RESPONSE] = str(response_code)
+    #    reshdrs[self.MSG_EXCEPTION] = str(exception)
+        #
+        #reshdrs.update(headers)
+        #    
+        #return self.reply(msg, content=content, headers=reshdrs)
         
-        
-    def reply_err(self, msg, content=None, headers=None, exception=None, response_code=''):
+    @defer.inlineCallbacks
+    def reply_err(self, msg, content=None, headers=None, exception=None):
         """
         Boilerplate method for reply to a message which lead to an application
         level error. The result can include content, a caught exception and an
@@ -661,16 +686,26 @@ class Process(BasicLifecycleObject,ResponseCodes):
         @response_code an ION application level defined error code for a handled exception
         @retval Deferred for send of reply
         """
+        if content is None:
+            content = yield self.message_client.create_instance(MessageName='Generic Error Message')
+            
+        if isinstance(content, MessageInstance):
+            
+            if not content.Message.IsFieldSet('response_code'):
+                content.MessageResponseCode = content.ResponseCodes.INTERNAL_SERVER_ERROR
+                
+            if not content.Message.IsFieldSet('response_body'):
+                content.MessageResponseBody = str(exception)
+                        
         reshdrs = dict()
         # The status is still OK - this is for handled exceptions!
-        reshdrs[self.MSG_STATUS] = str(self.ION_ERROR)
-        #reshdrs[self.MSG_APP_ERROR] = str(response_code)
-        reshdrs[self.MSG_EXCEPTION] = str(exception)
+        reshdrs[self.MSG_STATUS] = self.ION_ERROR
+        #reshdrs[self.MSG_EXCEPTION] = str(exception)
         
         if headers != None:
             reshdrs.update(headers)
             
-        return self.reply(msg, operation=self.MSG_RESULT, content=content, headers=reshdrs)
+        self.reply(msg, operation=self.MSG_RESULT, content=content, headers=reshdrs)
 
     def get_conversation(self, headers):
         convid = headers.get('conv-id', None)

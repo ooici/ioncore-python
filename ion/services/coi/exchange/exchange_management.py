@@ -21,6 +21,11 @@ CONF = ioninit.config(__name__)
 log = ion.util.ionlog.getLogger(__name__)
 
 
+class EMSError(Exception):
+    """
+    An error class for the ems...
+    """
+
 class ExchangeManagementService(ServiceProcess):
 
 
@@ -177,6 +182,26 @@ class ExchangeManagementService(ServiceProcess):
 
 
     @defer.inlineCallbacks
+    def op_create_queue(self, queue, headers, msg):
+        """
+        Creates a queue and binds it to the appropriate namespace and exchange.
+        """
+        q = queue.MessageObject
+        desc = q.configuration.description
+        qname = q.configuration.name
+        xn = q.configuration.exchangename
+        xs = q.configuration.exchangespace
+        topic = q.configuration.topic
+        
+        self.controller.create_queue(qname, xs + "." + xn, topic)
+        
+        log.debug('op_create_queue()')
+        
+        # Object creation
+        yield self.reply_ok(msg, None)
+
+
+    @defer.inlineCallbacks
     def op_update_exchangename(self, request, headers, msg):
         """
         Updates an ExchangeSpace distributed resource using the parameter 
@@ -282,33 +307,61 @@ class ExchangeManagementClient(ServiceClient):
             msg.configuration.name = name
             msg.configuration.description = description
             msg.configuration.exchangespace = exchangespace
-            msg.type = type
+            if type == 'EXCHANGE_POINT':
+                msg.configuration.type = msg.configuration.Type.EXCHANGE_POINT
+            elif type == 'PROCESS':
+                msg.configuration.type = msg.configuration.Type.PROCESS
+            elif type == 'SERVICE':
+                msg.configuration.type = msg.configuration.Type.SERVICE
+            else:
+                raise EMSError('Invalid type specified in create_exchangename operation')
     
             (content, headers, msg) = yield self.rpc_send('create_exchangename', msg)
             defer.returnValue(content)
 
 
-    def bind_receiver(
+
+    @defer.inlineCallbacks
+    def create_queue(
             self,
+            name,
+            description,
             exchangespace,
-            exchangename 
+            exchangename,
+            topic
         ):
             """
-            Binds a receiver process to the provided exchangename
-            defined in the provided exchangespace.
-            
-            @param exchangespace 
+            Creates a Queue.
+            @param name 
+                    a string uniquely identifying the Queue 
+                    in the scope of the ExchangeSpace and 
+                    ExchangeName.
+            @param description 
+                    a free text string containing a description of 
+                    the ExchangeName.
+            @param exchangespace
                     a string uniquely identifying the ExchangeSpace
-                    to which the ExchangeName belongs.
+                    to which ExchangeName belongs.  This must be 
+                    previously defined with a call to create_exchangespace()
             @param exchangename
                     a string uniquely identifying the ExchangeName
-                    to which this queue will be created.
-            """ 
-            
-            # This is a psuedo operation which just turns around and 
-            # calls local container methods.       
+                    to which this queue will be bound.  This must be 
+                    previously defined with a call to create_exchangename()
+            """        
+            yield self._check_init()
+    
+            msg = yield self.helper.create_object(res_wrapper.queue_type)
+            msg.configuration.name = name
+            msg.configuration.description = description
+            msg.configuration.exchangespace = exchangespace
+            msg.configuration.exchangename = exchangename
+            msg.configuration.topic = topic
+    
+            (content, headers, msg) = yield self.rpc_send('create_queue', msg)
+            defer.returnValue(content)
 
-            
+
+           
 
 factory = ProcessFactory(ExchangeManagementService)
 

@@ -21,7 +21,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core import ioninit
 from ion.core.exception import ReceivedError
 import ion.util.procutils as pu
-from ion.core.process import process
+#from ion.core.process import process
 from ion.core.object.repository import RepositoryError
 
 from ion.core.object import workbench
@@ -56,8 +56,8 @@ class MessageClient(object):
         interact with the OOICI.
         """
         if not proc:
-            proc = process.Process()
-        
+            #proc = process.Process()
+            raise MessageClientError('Message Client can not be used without a process')
         self.proc = proc
         
         # The message client is backed by a process workbench.
@@ -70,34 +70,41 @@ class MessageClient(object):
         Called in client methods to ensure that there exists a spawned process
         to send and receive messages
         """
+        
+        ### Let someone else worry about whether the process is spawnded...
         if not self.proc.is_spawned():
             yield self.proc.spawn()
         
+        #Must use a yield to keep the defered interface
+        #yield None
         assert isinstance(self.workbench, workbench.WorkBench), \
         'Process workbench is not initialized'
 
     
     @defer.inlineCallbacks
-    def create_instance(self, msg_type_id, name=''):
+    def create_instance(self, msg_type_id=None, MessageName=''):
         """
         @brief Create an instance of the message type!
         @param msg_type_id is a type identifier object
         @retval message is a MInstance object
         """
         yield self._check_init()
-        
+
         # Create a sendable message object
-        msg_repo, msg_object = self.workbench.init_repository(ion_message_type)
+        msg_repo= self.workbench.create_repository(ion_message_type)
+        
+        msg_object = msg_repo._workspace_root
         
         # Set the type and name
-        msg_object.type.GPBMessage.CopyFrom(msg_type_id)
-        msg_object.name = name
+        #msg_object.type.GPBMessage.CopyFrom(msg_type_id)
+        msg_object.name = MessageName
         
         # For now let the message ID be set by the process that created it?
         msg_object.identity = msg_repo.repository_key
         
         # Add an empty message object of the requested type
-        msg_object.message_object = msg_repo.create_object(msg_type_id)
+        if msg_type_id:
+            msg_object.message_object = msg_repo.create_object(msg_type_id)
         
         # make a local commit 
         msg_repo.commit('Message object instantiated')
@@ -209,10 +216,21 @@ class MessageInstanceType(type):
                     prop = MessageEnumProperty(fieldName )
                     
                     clsDict[fieldName] = prop
+                
+                
+            # Try rewriting using slots - would be more efficient...
+            def obj_setter(self, k, v):
+                if self._init and not hasattr(self, k):
+                    raise AttributeError(\
+                        '''Cant add properties to the ION Message Instance.\n'''
+                        '''Unknown property name - "%s"; value - "%s"''' % (k, v))
+                super(MessageInstance, self).__setattr__(k, v)
+                
+            clsDict['_init'] = False
+            clsDict['__setattr__'] = obj_setter
             
-
             clsType = MessageInstanceType.__new__(MessageInstanceType, clsName, (cls,), clsDict)
-
+                
             MessageInstanceType._type_cache[msgType] = clsType
 
         # Finally allow the instantiation to occur, but slip in our new class type
@@ -235,26 +253,27 @@ class MessageInstance(object):
         """
         message Instance objects are created by the message client
         """
-        object.__setattr__(self,'_repository',None)
+        self._repository = None
         
         self._repository = message_repository
             
+        self._init = True
+            
     @property
     def Repository(self):
-        return object.__getattribute__(self, '_repository')
+        return self._repository
         
     @property
     def Message(self):
-        repo = object.__getattribute__(self, '_repository')
-        return repo._workspace_root
+        return self._repository._workspace_root
         
     
     def _get_message_object(self):
-        repo = object.__getattribute__(self, '_repository')
+        repo = self._repository
         return repo._workspace_root.message_object
         
     def _set_message_object(self, value):
-        repo = object.__getattribute__(self, '_repository')
+        repo = self._repository
         if value.ObjectType != self.MessageType:
             raise MessageInstanceError('Can not change the type of a message object!')
         repo._workspace_root.message_object = value
@@ -297,6 +316,72 @@ class MessageInstance(object):
         
     def ClearField(self, field):
         return self.MessageObject.ClearField(field)
+      
+    #@property
+    #def IonResponse(self):
+    #    return self.Message.IonResponse
+    #  
+    #def _set_message_ion_response(self, value):
+    #    """
+    #    Set the name of the message object
+    #    """
+    #    self.Message.ion_response = value
+    #    
+    #def _get_message_ion_response(self):
+    #    """
+    #    """
+    #    return self.Message.ion_response
+    #
+    #MessageIonResponse = property(_get_message_ion_response, _set_message_ion_response)
+      
+    #@property
+    #def ApplicationResponse(self):
+    #    return self.Repository._workspace_root.ApplicationResponse
+    #    
+    #def _set_message_application_response(self, value):
+    #    """
+    #    Set the name of the message object
+    #    """
+    #    self.Message.application_response = value
+    #    
+    #def _get_message_application_response(self):
+    #    """
+    #    """
+    #    return self.Message.application_response
+    #
+    #MessageApplicationResponse = property(_get_message_application_response, _set_message_application_response)
+    
+    @property
+    def ResponseCodes(self):
+        return self.Repository._workspace_root.ResponseCodes
+        
+    def _set_message_response_code(self, value):
+        """
+        Set the name of the message object
+        """
+        self.Message.response_code = value
+        
+    def _get_message_response_code(self):
+        """
+        """
+        return self.Message.response_code
+    
+    MessageResponseCode = property(_get_message_response_code, _set_message_response_code)
+        
+        
+    def _set_message_response_body(self, value):
+        """
+        Set the name of the message object
+        """
+        self.Message.response_body = value
+        
+    def _get_message_response_body(self):
+        """
+        """
+        return self.Message.response_body
+    
+    MessageResponseBody = property(_get_message_response_body, _set_message_response_body)
+        
         
     @property
     def MessageIdentity(self):
@@ -310,7 +395,8 @@ class MessageInstance(object):
         """
         @brief Returns the message type - A type identifier object - not the wrapped object.
         """
-        return self.Message.type.GPBMessage
+        if self._repository._workspace_root.IsFieldSet('message_object'):
+            return self._repository._workspace_root.GetLink('message_object').GPBMessage.type
     
     def _set_message_name(self, name):
         """

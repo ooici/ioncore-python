@@ -17,6 +17,8 @@ from ion.core.object import gpb_wrapper
 from ion.core.object import workbench
 from ion.core.object import object_utils
 
+from ion.core.exception import ReceivedError
+
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient, ResourceRegistryError
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
@@ -57,7 +59,7 @@ class ResourceClientTest(IonTestCase):
     @defer.inlineCallbacks
     def test_create_resource(self):
                 
-        resource = yield self.rc.create_instance(addresslink_type, name='Test AddressLink Resource', description='A test resource')
+        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
         
         self.assertIsInstance(resource, ResourceInstance)
         self.assertEqual(resource.ResourceLifeCycleState, resource.NEW)
@@ -67,7 +69,7 @@ class ResourceClientTest(IonTestCase):
     @defer.inlineCallbacks
     def test_get_resource(self):
                         
-        resource = yield self.rc.create_instance(addresslink_type, name='Test AddressLink Resource', description='A test resource')
+        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
             
         res_id = resource.ResourceIdentity
             
@@ -91,7 +93,7 @@ class ResourceClientTest(IonTestCase):
     @defer.inlineCallbacks
     def test_read_your_writes(self):
             
-        resource = yield self.rc.create_instance(addresslink_type, name='Test AddressLink Resource', description='A test resource')
+        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
             
         self.assertEqual(resource.ResourceType, addresslink_type)
             
@@ -137,7 +139,7 @@ class ResourceClientTest(IonTestCase):
             
         
         # Create the resource object    
-        resource = yield self.rc.create_instance(addresslink_type, name='Test AddressLink Resource', description='A test resource')
+        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
                 
         person = resource.CreateObject(person_type)
         
@@ -195,8 +197,8 @@ class ResourceClientTest(IonTestCase):
         #self.assertRaises(ResourceRegistryError, self.rc.create_instance, invalid_type, name='Test AddressLink Resource', description='A test resource')
         
         try:
-            resource = yield self.rc.create_instance(invalid_type, name='Test AddressLink Resource', description='A test resource')
-        except ResourceRegistryError, ex:
+            resource = yield self.rc.create_instance(invalid_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
+        except ResourceClientError, ex:
             return
         
         self.fail('This test should raise an exception and return in the except!')
@@ -206,7 +208,7 @@ class ResourceClientTest(IonTestCase):
     def test_merge_update(self):
         
         # Create the resource object    
-        resource = yield self.rc.create_instance(addresslink_type, name='Test AddressLink Resource', description='A test resource')
+        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
                 
         person = resource.CreateObject(person_type)
         

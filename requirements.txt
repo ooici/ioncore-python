@@ -16,6 +16,6 @@ twotp==0.7
 txAMQP==0.3
 txrabbitmq==0.4
 zope.interface==3.6.1
-ionproto==0.3.9
+ionproto==0.3.12
 protobuf==2.3.0-p1
 .

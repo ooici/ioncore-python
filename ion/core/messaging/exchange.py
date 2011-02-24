@@ -126,9 +126,9 @@ class ExchangeManager(BasicLifecycleObject):
         consumer = yield Consumer.name(self.exchange_space, name_config)
         defer.returnValue(consumer)
 
-    def send(self, to_name, message_data, exchange_space=None):
+    def send(self, to_name, message_data, exchange_space=None, **kwargs):
         """
         Sends a message
         """
         exchange_space = exchange_space or self.container.exchange_manager.exchange_space
-        return exchange_space.send(to_name, message_data)
+        return exchange_space.send(to_name, message_data, **kwargs)

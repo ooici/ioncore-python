@@ -18,6 +18,8 @@ from ion.core.object import object_utils
 from ion.core.object import repository
 from ion.core.object import gpb_wrapper
 
+from ion.core.exception import ReceivedError
+
 from twisted.internet import defer
 
 import ion.util.ionlog
@@ -174,28 +176,35 @@ class WorkBench(object):
         #print 'PULL Targetname: ', targetname
         #print 'PULL RepoName: ', repo_name
         
-        heads, headers, msg = yield self._process.rpc_send(targetname,'pull', repo_name)
-        
-        response = headers.get(self._process.MSG_RESPONSE)
-        exception = headers.get(self._process.MSG_EXCEPTION)
-        status = headers.get(self._process.MSG_STATUS)
-        
-        # Handle the response if the repo was not found
-        if response != self._process.ION_SUCCESS:
-            defer.returnValue((response, exception))
+        try:
+            content, headers, msg = yield self._process.rpc_send(targetname,'pull', repo_name)
+        except ReceivedError, re:
             
+            log.debug('ReceivedError', str(re))
+            content = re[1]        
+            raise WorkBenchError('Pull Operation faild with an exception: "%s"' % str(re))
+            
+            
+        # it is a message instance...
+        if hasattr(content, 'MessageResponseCode'):
+            if content.MessageResponseCode == content.ResponseCodes.NOT_FOUND:
+                defer.returnValue(content)
+        else:
+            # assume that we got a list of heads to load as repositories...
+            heads = content
+        
+        
         for head in heads:
             repo = self._load_repo_from_mutable(head)
             
-        # Where to get objects not yet transfered.
-        repo.upstream['service'] = origin
-        repo.upstream['process'] = headers.get('reply-to')
+            # Where to get objects not yet transfered.
+            repo.upstream['service'] = origin
+            repo.upstream['process'] = headers.get('reply-to')
             
-        # Get the objects in the repository - modify to get only head?
-        #yield self._fetch_repo_objects(repo, headers.get('reply-to'))
-        # should have a return value to make sure this worked... ?
-        
-        defer.returnValue((response, exception))
+        # Later there will aways be a message instance, for now fake out the interface 
+        response = yield self._process.message_client.create_instance(MessageName='Pull Response')
+        response.MessageResponseCode = response.ResponseCodes.OK
+        defer.returnValue(response)
         
     @defer.inlineCallbacks
     def op_pull(self,content, headers, msg):
@@ -214,40 +223,49 @@ class WorkBench(object):
         if repo:
             yield self._process.reply(msg,content=repo)
         else:
-            yield self._process.reply(msg,response_code=self._process.APP_RESOURCE_NOT_FOUND)
+            
+            response = yield self._process.message_client.create_instance(MessageName='Pull Response')
+            response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
+            
+            yield self._process.reply_ok(msg, content=response)
         
         
     @defer.inlineCallbacks
-    def push(self, origin, name):
+    def push(self, origin, name_or_names):
         """
         Push the current state of the repository.
         When the operation is complete - the transfer of all objects in the
         repository is complete.
         """
         targetname = self._process.get_scoped_name('system', origin)
-        repo = self.get_repository(name)
-
-        if repo:
-            
-            #print 'PUSH TARGET: ',targetname
-            content, headers, msg = yield self._process.rpc_send(targetname,'push', repo)
         
-            response = headers.get(self._process.MSG_RESPONSE)
-            exception = headers.get(self._process.MSG_EXCEPTION)
-        
-            status = headers.get(self._process.MSG_STATUS)
-        else:
-            status = 'OK'
-            response = 'Repository name %s not found in work bench to push!' % name
-            exception = ''
-
-        if status == 'OK':
-            log.info( 'Push returned:'+response)
-            defer.returnValue((response, exception))
-
-        else:
-            raise WorkBenchError('Push returned an exception!' % exception)
+        if hasattr(name_or_names, '__iter__'):
             
+            repo_or_repos = []
+            for name in name_or_names:
+                repo = self.get_repository(name)
+                if not repo:
+                    raise KeyError('Repository name %s not found in work bench to push!' % name)
+                    
+                repo_or_repos.append(repo)
+                
+        else:
+            name = name_or_names
+            repo_or_repos = self.get_repository(name)
+            if not repo_or_repos:
+                    raise KeyError('Repository name %s not found in work bench to push!' % name)
+
+    
+        #print 'PUSH TARGET: ',targetname
+        try:
+            content, headers, msg = yield self._process.rpc_send(targetname,'push', repo_or_repos)
+        except ReceivedError, re:
+            
+            log.debug('ReceivedError', str(re))
+            content = re[1]
+            raise WorkBenchError('Push returned an exception! "%s"' % content.response_body)
+            
+        defer.returnValue(content)
 
         
     @defer.inlineCallbacks
@@ -259,13 +277,19 @@ class WorkBench(object):
         """
         log.info('op_push: received content: %s' % heads)
                 
+        #@TODO Add try catch and return value to this method!
+                
         for head in heads:
             repo = self._load_repo_from_mutable(head)
                 
             yield self._fetch_repo_objects(repo, headers.get('reply-to'))
             
+            
+        response = yield self._process.message_client.create_instance(MessageName='Push Response')
+        response.MessageResponseCode = response.ResponseCodes.OK            
+            
         # The following line shows how to reply to a message
-        yield self._process.reply_ok(msg)
+        yield self._process.reply_ok(msg, response)
         log.info('op_push: Complete!')
 
         
@@ -400,13 +424,38 @@ class WorkBench(object):
         yield self._process.reply(message,content=cs)
         log.info('op_fetch_linked_objects: Complete!')
         
-    def pack_repository_commits(self,repo):
+    def pack_repositories(self, repos):
+        
+        container_structure = object_utils.get_gpb_class_from_type_id(structure_type)()
+        for repo in repos:
+            log.debug('pack_repositories: Packing repository:\n'+str(repo))
+            container_structure.MergeFrom(self._repo_to_structure(repo))
+
+        #print 'CONTAINER',container_structure
+        log.debug('pack_repositories: Packing Complete!')         
+        serialized = container_structure.SerializeToString()
+        
+        return serialized
+        
+        
+        
+    def pack_repository(self,repo):
+        
+        log.debug('pack_repository: Packing repository:\n'+str(repo))
+        container_structure = self._repo_to_structure(repo)
+        
+        log.debug('pack_repository: Packing Complete!')         
+        serialized = container_structure.SerializeToString()
+        return serialized
+        
+        
+    def _repo_to_structure(self,repo):
         """
         pack just the mutable head and the commits!
         By default send all commits in the history. Too damn complex on the other
         side to deal with merge otherwise.
         """
-        log.debug('pack_repository_commits: Packing repository:\n'+str(repo))
+        
         mutable = repo._dotgit
         
         root_obj = self.serialize_mutable(mutable)
@@ -438,11 +487,10 @@ class WorkBench(object):
         for key in obj_set:
             obj_list.append(key)
                 
-        serialized = self._pack_container(root_obj, obj_list)
-        log.debug('pack_repository_commits: Packing Complete!')
-        return serialized
-                
         
+        container_structure = self._pack_container(root_obj, obj_list)
+        
+        return container_structure
         
     def pack_structure(self, wrapper, include_leaf=True):
         """
@@ -457,9 +505,11 @@ class WorkBench(object):
         
         repo = wrapper.Repository
         
-        if not repo.status == repo.UPTODATE:
-            repo.commit(comment='Sending message with wrapper %s'% wrapper.MyId)
         
+        if not repo.status == repo.UPTODATE:
+            comment='Commiting to send message with wrapper object'
+            repo.commit(comment=comment)
+            
         obj_set=set()
         root_obj = None
         obj_list = []
@@ -516,8 +566,10 @@ class WorkBench(object):
         
         #print 'OBJLIST',obj_list
         
-        serialized = self._pack_container(root_obj, obj_list)
+        container_structure = self._pack_container(root_obj, obj_list)
         log.debug('pack_structure: Packing Complete!')
+        
+        serialized = container_structure.SerializeToString()
         return serialized
         
     def serialize_mutable(self, mutable):
@@ -592,9 +644,7 @@ class WorkBench(object):
         
         
         log.debug('_pack_container: Packed container!')
-        serialized = cs.SerializeToString()
-        
-        return serialized
+        return cs
         
     def unpack_structure(self, serialized_container):
         """

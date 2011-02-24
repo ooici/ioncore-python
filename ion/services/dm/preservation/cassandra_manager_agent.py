@@ -109,7 +109,7 @@ class CassandraManagerService(ServiceProcess):
             raise CassandraManagerServiceException("The password for the credentials to authenticate to the Cassandra cluster is not set.")
     
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
-        cassandra_cluster = yield self.rc.create_instance(cassandra_cluster_type, name="Cassandra cluster", description="OOI Cassandra cluster")
+        cassandra_cluster = yield self.rc.create_instance(cassandra_cluster_type, ResourceName="Cassandra cluster", ResourceDescription="OOI Cassandra cluster")
         #persistent_technology_repository, cassandra_cluster  = self.wb.init_repository(cassandra_cluster_type)
         
         # Set only one host and port in the host list for now
@@ -119,7 +119,7 @@ class CassandraManagerService(ServiceProcess):
         
         ### Create a Credentials resource - for cassandra a SimplePassword object
         #cache_repository, simple_password  = self.wb.init_repository(simple_password_type)
-        simple_password = yield self.rc.create_instance(simple_password_type, name="Cassandra credentials", description="OOI Cassandra credentials")
+        simple_password = yield self.rc.create_instance(simple_password_type, ResourceName="Cassandra credentials", ResourceDescription="OOI Cassandra credentials")
         simple_password.username = self._username
         simple_password.password = self._password
         
@@ -144,14 +144,14 @@ class CassandraManagerService(ServiceProcess):
         desc = yield self.manager._describe_keyspaces()
         log.info(str(desc))
         for ks in desc:
-            persistent_archive = yield self.rc.create_instance(cassandra_keyspace_type, name=ks.name, description="description of " + ks.name)
+            persistent_archive = yield self.rc.create_instance(cassandra_keyspace_type, ResourceName=ks.name, ResourceDescription="description of " + ks.name)
             persistent_archive.name = ks.name
             for cf in ks.cf_defs:
-                cache = yield self.rc.create_instance(cassandra_column_family_type, name=cf.name, description="description of " + cf.name)
+                cache = yield self.rc.create_instance(cassandra_column_family_type, ResourceName=cf.name, ResourceDescription="description of " + cf.name)
                 cache.name = cf.name
                 column_index = 0
                 for col in cf.column_metadata:
-                    column = yield self.rc.create_instance(columndef_type,name=col.name, description="description of " + col.name)
+                    column = yield self.rc.create_instance(columndef_type, ResourceName=col.name, ResourceDescription="description of " + col.name)
                     column.column_name = col.name
                     column.validation_class = col.validation_class
                     if col.index_name is not None:
@@ -209,8 +209,8 @@ class CassandraManagerService(ServiceProcess):
         log.info("Called CassandraManagerService.op_create_persistent_archive")
         persistent_archive = request.configuration
         log.info("request.configuration %s" % (request.configuration,))
-        persistent_archive_resource = yield self.rc.create_instance(cassandra_keyspace_type, name=persistent_archive.name,
-                                  description="A description")
+        persistent_archive_resource = yield self.rc.create_instance(cassandra_keyspace_type, ResourceName=persistent_archive.name,
+                                  ResourceDescription="A description")
         
         
         log.info("Created resource")
@@ -221,7 +221,7 @@ class CassandraManagerService(ServiceProcess):
         log.info("Put resource into datastore")
         yield self.manager.create_persistent_archive(persistent_archive)
         
-        response = yield self.mc.create_instance(resource_response_type, name="create_persistent_archive_response")
+        response = yield self.mc.create_instance(resource_response_type, MessageName="create_persistent_archive_response")
         
  
         
@@ -254,7 +254,7 @@ class CassandraManagerService(ServiceProcess):
         yield self.manager.update_persistent_archive(persistent_archive)
         
         log.info("created response")
-        response = yield self.mc.create_instance(resource_response_type, name="update_persistent_archive_response")
+        response = yield self.mc.create_instance(resource_response_type, MessageName="update_persistent_archive_response")
         response.resource_reference = self.rc.reference_instance(persistent_archive_resource)
         
         response.configuration = persistent_archive_resource.ResourceObject
@@ -273,7 +273,7 @@ class CassandraManagerService(ServiceProcess):
         #We want to delete this resource from the registry here
         
         yield self.manager.remove_persistent_archive(persistent_archive)
-        response = yield self.mc.create_instance(resource_response_type, name="delete_persistent_archive_response")
+        response = yield self.mc.create_instance(resource_response_type, MessageName="delete_persistent_archive_response")
         response.resource_reference = self.rc.reference_instance(persistent_archive_resource)
         
         response.configuration = persistent_archive_resource.ResourceObject
@@ -291,7 +291,7 @@ class CassandraManagerService(ServiceProcess):
         keyspace = request.persistent_archive.name
         column_family = request.cache_configuration.name
         
-        cache_resource = yield self.rc.create_instance(cassandra_column_family_type, name=request.cache_configuration.name, description="Apt description")
+        cache_resource = yield self.rc.create_instance(cassandra_column_family_type, ResourceName=request.cache_configuration.name, ResourceDescription="Apt description")
         log.info("Created resource")
         #Set fields of the persistent_archive_resource from persistent_archive
         self.__set_cache_resource_attrs(request, cache_resource)
@@ -302,7 +302,7 @@ class CassandraManagerService(ServiceProcess):
         log.info("Creating column family %s.%s" % (keyspace, column_family))
         yield self.manager.create_cache(request.persistent_archive, request.cache_configuration)
         
-        response = yield self.mc.create_instance(resource_response_type, name="create_persistent_archive_response")
+        response = yield self.mc.create_instance(resource_response_type, MessageName="create_persistent_archive_response")
     
         
         response.resource_reference = self.rc.reference_instance(cache_resource)
@@ -348,7 +348,7 @@ class CassandraManagerService(ServiceProcess):
         yield self.manager.update_cache(request.persistent_archive, request.cache_configuration)
         
         log.info("created response")
-        response = yield self.mc.create_instance(resource_response_type, name="update_cache_response")
+        response = yield self.mc.create_instance(resource_response_type, MessageName="update_cache_response")
         response.resource_reference = self.rc.reference_instance(cache_resource)
         
         response.configuration = cache_resource.ResourceObject
@@ -368,7 +368,7 @@ class CassandraManagerService(ServiceProcess):
         yield self.manager.remove_cache(request.persistent_archive, request.cache_configuration)
         
         log.info("created response")
-        response = yield self.mc.create_instance(resource_response_type, name="delete_cache_response")
+        response = yield self.mc.create_instance(resource_response_type, MessageName="delete_cache_response")
         response.result = 'Deleted'
         yield self.reply_ok(msg, response)
         

@@ -25,6 +25,11 @@ ion_message_type = object_utils.create_type_identifier(object_id=11, version=1)
 
 ION_R1_GPB = 'ION R1 GPB'
 
+class CodecError(Exception):
+    """
+    An error class for problems that occur in the codec
+    """
+
 
 class ObjectCodecInterceptor(EnvelopeInterceptor):
     """
@@ -89,7 +94,7 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
             invocation.message['encoding'] = ION_R1_GPB      
         
         elif isinstance(content, repository.Repository):
-            invocation.message['content'] = invocation.workbench.pack_repository_commits(content)
+            invocation.message['content'] = invocation.workbench.pack_repository(content)
                      
             invocation.message['encoding'] = ION_R1_GPB
             
@@ -98,6 +103,17 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
             invocation.message['content'] = serialized
             
             invocation.message['encoding'] = ION_R1_GPB
+        
+        elif isinstance(content, list) and len(content)>0:
+                        
+            if isinstance(content[0], repository.Repository):
+                # assume it is a list of repository objects to send
+                
+                
+                invocation.message['content'] = invocation.workbench.pack_repositories(content)
+                     
+                invocation.message['encoding'] = ION_R1_GPB
+                                    
         
         #print '======= End AFTER Davids Codec! ================'
 

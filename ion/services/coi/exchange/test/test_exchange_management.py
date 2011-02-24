@@ -79,7 +79,7 @@ class ExchangeManagementTest(IonTestCase):
         for type in res_wrapper.all_types:
             _name = type + " name"
             _desc = type + " description"
-            resource = yield rc.create_instance(res_wrapper.all_types[type], name=_name, description=_desc)
+            resource = yield rc.create_instance(res_wrapper.all_types[type], ResourceName=_name, ResourceDescription=_desc)
             self.assertIsInstance(resource, ResourceInstance)
             self.assertEqual(resource.ResourceLifeCycleState, resource.NEW)
             self.assertEqual(resource.ResourceName, _name)
@@ -94,10 +94,16 @@ class ExchangeManagementTest(IonTestCase):
         """
         for type in res_wrapper.all_types:
             msg = yield self.helper.create_object(res_wrapper.all_types[type])
-            msg.configuration.name = "name"
-            msg.configuration.description = "description"
+            if hasattr(msg.configuration,'name'):
+                msg.configuration.name = "name"
+            if hasattr(msg.configuration,'description'):
+                msg.configuration.description = "description"
+                                
             id = yield self.emc._create_object(msg)
-            #assert bp.isHash(id) 
+            
+            
+            #assert bp.isHash(id)
+            
 
 
 
@@ -108,17 +114,19 @@ class ExchangeManagementTest(IonTestCase):
         can be used within the boilerplate convenience wrappers.
         """
         for type in res_wrapper.all_types:
-            _type = res_wrapper.all_types[type]
+            #_type = res_wrapper.all_types[type]
             msg = yield self.helper.create_object(res_wrapper.all_types[type])
-            msg.configuration.name = "name"
-            msg.configuration.description = "description"
-
+            if hasattr(msg.configuration,'name'):
+                msg.configuration.name = "name"
+            if hasattr(msg.configuration,'description'):
+                msg.configuration.description = "description"
+            
             id = yield self.emc._create_object(msg)
-
+            
             obj1 = msg.MessageObject
             key = id.GPBMessage.key
             obj2 = yield self.emc._get_object(key)
-
+            
             type1 = obj1.GPBMessage.configuration.type
             type2 = obj2.MessageType
             self.assertEqual(type1.object_id, type2.object_id)
@@ -198,3 +206,29 @@ class ExchangeManagementTest(IonTestCase):
         except Exception, err:
             # print err
             pass
+        
+        
+        
+    @defer.inlineCallbacks
+    def test_create_queue(self):
+        """
+        A test that ensures we can define an exchangename.  Tests 
+        for:
+            1) successful creation 
+            2) failure on duplicate name
+            3) failure on no name
+            4) failure on no exchangespace
+        """
+
+        # We need an exchangespace and an exchangename
+        id = yield self.emc.create_exchangespace("TestExchangeSpace", "This is a test!")
+        id = yield self.emc.create_exchangename("TestExchangeName", "This is a test!", "TestExchangeSpace")
+
+        # Case 1:  Expect success
+        id = yield self.emc.create_queue(
+                            name="TestQueue", 
+                            description="This is a test!", 
+                            exchangespace="TestExchangeSpace", 
+                            exchangename="TestExchangeName",
+                            topic="alt.humar.best-of-usenet"
+                    )

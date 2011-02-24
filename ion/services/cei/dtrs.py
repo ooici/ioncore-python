@@ -125,7 +125,9 @@ class DeployableTypeRegistryClient(ServiceClient):
             })
         except ReceivedError, re:
             #raise DeployableTypeLookupError(re.msg_content.get('value'))
-            raise DeployableTypeLookupError(re[0]['exception'])
+            # This is killing me. It will be refactored anyway - so just put the whole exception for now
+            #raise DeployableTypeLookupError(re[0]['exception'])
+            raise DeployableTypeLookupError(re)
             
         defer.returnValue({
             'document' : content.get('document'),
