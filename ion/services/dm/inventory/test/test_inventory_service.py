@@ -25,6 +25,7 @@ cassandra_indexed_row_type = object_utils.create_type_identifier(object_id=2511,
 
 class CassandraInventoryTester(IonTestCase):
     
+    @itv(CONF) 
     @defer.inlineCallbacks
     def setUp(self):
         yield self._start_container()
@@ -43,20 +44,20 @@ class CassandraInventoryTester(IonTestCase):
         self.mc = MessageClient(proc = self.test_sup)
         
         
-
+    @itv(CONF) 
     @defer.inlineCallbacks
     def tearDown(self):
         log.info("In tearDown")
         yield self._shutdown_processes()
         yield self._stop_container()
     
-    
+    @itv(CONF)  
     def test_instantiation_only(self):
         log.info("In test_instantiation_only")
         
-    #@itv(CONF)    
+    @itv(CONF)    
     @defer.inlineCallbacks
-    def test_put_rows(self):
+    def test_put(self):
         log.info("In test_put_rows")
         
         key = "Key1"
@@ -65,7 +66,8 @@ class CassandraInventoryTester(IonTestCase):
         put_response = yield self.client.put(key,value,attr_dict)   
         
         self.failUnlessEqual(put_response.result, "Put complete")
-         
+     
+    @itv(CONF)       
     @defer.inlineCallbacks
     def test_query(self): 
         key1 = "Key1"
@@ -90,7 +92,8 @@ class CassandraInventoryTester(IonTestCase):
         correct_set = set(("Value1", "Value3"))    
         query_set = set(values)
         self.failUnlessEqual(correct_set, query_set)
-            
+    
+    @itv(CONF)          
     @defer.inlineCallbacks
     def test_get(self):
         key = "Key1"
@@ -100,7 +103,7 @@ class CassandraInventoryTester(IonTestCase):
         get_response = yield self.client.get(key)
         self.failUnlessEqual(get_response.value, value)
         
-        
+    @itv(CONF)      
     @defer.inlineCallbacks
     def test_remove(self):
         key = "Key1"
@@ -112,7 +115,7 @@ class CassandraInventoryTester(IonTestCase):
         log.info(get_response.configuration.value)
         self.failUnlessEqual(get_response.configuration.value,"")
         
-        
+    @itv(CONF)      
     @defer.inlineCallbacks
     def test_get_query_attributes(self):
         cassandra_row = yield self.client.get_query_attributes()
