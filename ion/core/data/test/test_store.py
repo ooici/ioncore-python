@@ -197,20 +197,10 @@ class IndexStoreTest(IStoreTest):
         val1 = yield self.ds.get('bsanderson')
         val2 = yield self.ds.get('prothfuss')
         val3 = yield self.ds.get('htayler')
-        self.failUnlessEqual(val1.get('value'), binary_value1)
-        self.failUnlessEqual(val2.get('value'), binary_value2)
-        self.failUnlessEqual(val3.get('value'), binary_value3)
+        self.failUnlessEqual(val1, binary_value1)
+        self.failUnlessEqual(val2, binary_value2)
+        self.failUnlessEqual(val3, binary_value3)
       
-    @defer.inlineCallbacks
-    def test_put_get_delete(self):
-        # Write, then read to verify same
-        #d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
-        binary_value1 = 'BinaryValue for Brandon Sanderson'
-        key = 'bsanderson'
-        yield self.ds.put(key, binary_value1) 
-        b = yield self.ds.get(key)
-        self.failUnlessEqual(binary_value1, b['value']) 
-        yield self.ds.remove(self.key)
         
             
 class CassandraIndexedStoreTest(IStoreTest):

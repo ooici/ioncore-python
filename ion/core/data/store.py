@@ -158,7 +158,11 @@ class IndexStore(object):
         """
         @see IStore.get
         """
-        return defer.maybeDeferred(self.kvs.get, key, None)
+        row = self.kvs.get(key, None)
+        if row is None:
+            defer.returnValue(None)
+        else:
+            return defer.maybeDeferred(row.get, "value")
 
     def put(self, key, value, index_attributes={}):
         """
