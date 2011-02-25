@@ -19,8 +19,7 @@ from ion.core.object import repository
 from ion.core.object import gpb_wrapper
 
 from ion.core.exception import ReceivedError
-
-from twisted.internet import defer
+from ion.core.object.gpb_wrapper import OOIObjectError
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -178,7 +177,7 @@ class WorkBench(object):
         except ReceivedError, re:
             
             log.debug('ReceivedError', str(re))
-            content = re[1]        
+            #content = re[1]        
             raise WorkBenchError('Pull Operation faild with an exception: "%s"' % str(re))
             
             
