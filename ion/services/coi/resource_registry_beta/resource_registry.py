@@ -16,7 +16,7 @@ from ion.services.coi import datastore
 
 from ion.core.object import gpb_wrapper
 
-from ion.core.exception import ReceivedError
+from ion.core.exception import ReceivedError, ApplicationError
 
 from ion.core.process.process import ProcessFactory, Process
 from ion.core.process.service_process import ServiceProcess, ServiceClient
@@ -30,7 +30,7 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
 
-class ResourceRegistryError(Exception):
+class ResourceRegistryError(ApplicationError):
     """
     An exception class for errors in the resource registry
     """
@@ -78,24 +78,17 @@ class ResourceRegistryService(ServiceProcess):
         assert isinstance(content, gpb_wrapper.Wrapper)
         assert content.ObjectType == self.resource_description_type
         
-        try:
-            response = yield self._register_resource_instance(content)
-            
-        except object_utils.ObjectUtilException, ex:
-            response = yield self.message_client.create_instance(MessageName='Register Resource Response')
-            response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
-            response.MessageResponseBody = str(ex)
-            
-            yield self.reply_ok(msg, response)
+       
+        response = yield self._register_resource_instance(content)
+       
         
         yield self.reply_ok(msg, response)
         
     @defer.inlineCallbacks
     def _register_resource_instance(self, resource_description):
         
-        # Get the repository that the object is in
-        msg_repo = resource_description.Repository
-            
+        # Create the response object...
+        response = yield self.message_client.create_instance(MessageContentTypeID=None)
         
         # Create a new repository to hold this resource
         resource_repository, resource = self.workbench.init_repository(resource_type)
@@ -104,7 +97,10 @@ class ResourceRegistryService(ServiceProcess):
         resource.identity = resource_repository.repository_key
             
         # Create the new resource object
-        res_obj = resource_repository.create_object(resource_description.type)
+        try:
+            res_obj = resource_repository.create_object(resource_description.type)
+        except object_utils.ObjectUtilException, ex:
+            raise ResourceRegistryError(ex, response.ResponseCodes.NOT_FOUND)
         # Set the object as the child of the resource
         resource.SetLinkByName('resource_object', res_obj)
             
@@ -123,7 +119,7 @@ class ResourceRegistryService(ServiceProcess):
         result = yield self.push(self.datastore_service, resource.identity)
         assert result.MessageResponseCode == result.ResponseCodes.OK, 'Push to datastore failed!'
             
-        response = yield self.message_client.create_instance(MessageName='Register Resource Response')
+        
         response.MessageResponseCode = response.ResponseCodes.OK
         response.MessageResponseBody = resource.identity
             
@@ -183,11 +179,7 @@ class ResourceRegistryClient(ServiceClient):
         """
         yield self._check_init()
         
-        try:
-            content, headers, msg = yield self.rpc_send('register_resource_instance', resource_type)
-        except ReceivedError, re:
-            log.debug('Exception in Resource Registry: %s' % str(re))
-            raise ResourceRegistryError('Error during Resource Registry service call: register_resource_instance raised "%s"' % re[1].MessageResponseBody)
+        content, headers, msg = yield self.rpc_send('register_resource_instance', resource_type)
         
         log.info('Resource Registry Service reply with new resource ID: '+str(content))
         defer.returnValue(content)

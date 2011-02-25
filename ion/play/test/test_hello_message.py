@@ -80,7 +80,7 @@ class HelloMessageTest(IonTestCase):
         
         ### Now try making a person object and using the person from the ab message
         # You can move objects from one place to another...
-        person_msg = yield mc.create_instance(person_type, MessageName='my message')
+        person_msg = yield mc.create_instance(MessageContentTypeID=person_type)
         
         # Use the person we made from the first message
         person_msg.MessageObject = ab_msg.person[0]

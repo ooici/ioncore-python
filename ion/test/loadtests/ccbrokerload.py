@@ -242,10 +242,10 @@ class CCBrokerTest(LoadTest):
             yield self._send_messages(lorem_ipsum, 5)
 
     @defer.inlineCallbacks
-    def _create_message(self, msg_type_id, name='', **kwargs):
+    def _create_message(self, MessageContentTypeID, name='', **kwargs):
         """ Convenience wrapper to create a message with prepopulated attributes. """
         
-        msg = yield self.mc.create_instance(msg_type_id, name)
+        msg = yield self.mc.create_instance(MessageContentTypeID, name)
         for k,v in kwargs.iteritems():
             setattr(msg, k, v)
         defer.returnValue(msg)

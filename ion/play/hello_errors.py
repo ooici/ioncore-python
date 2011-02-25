@@ -81,8 +81,10 @@ class HelloErrors(ServiceProcess):
         # Simplest example - Just reply okay with no object
         if person_msg.name == 'John Doe':
             # When reply_ok is called with None, an empty message is created which
-            # includes a reply ok return code. 
-            defer.returnValue(None)
+            # includes a reply ok return code.
+            response = yield self.message_client.create_instance(MessageContentTypeID=None)
+            response.MessageResponseCode = response.ResponseCodes.OK
+            defer.returnValue(response)
             
         
         ####        
@@ -91,7 +93,7 @@ class HelloErrors(ServiceProcess):
         if person_msg.name == 'Jane Doe':
             
             # Build a response message object        
-            response = yield self.message_client.create_instance(PERSON_TYPE,MessageName='Example response message')
+            response = yield self.message_client.create_instance(MessageContentTypeID=PERSON_TYPE)
              # Business logic sets the value of the response
             response.name = 'Matthew'
             response.id = 8

@@ -80,20 +80,19 @@ class IonTestCase(unittest.TestCase):
         log.info("============ %s ===" % self.container)
 
     @defer.inlineCallbacks
-    def create_message(self, object_id=None, MessageName='', **kwargs):
+    def create_message(self, MessageContentTypeID, MessageName='', **kwargs):
         """
         @Brief This is a convienence method for creating message instances in a
         test case. The message instance is an envelope for application specific
         messages. The IonTest uses the message client built into the test
         supervisor process.
-        @param object_id is the type of message to go in the message instance
-        @param MessageName is a string name - metadata for the envelope of the
-        message
+        @param MessageContentTypeID is the type of message to go in the message instance
+        @param MessageName is a depricated concept in the architecture. Do not use it.
         @param kwargs The IonTest method allows key word arguments which will
         attempt to set fields in the message object. The message client does not
         provide this capability, but it could be added if it is helpful.
         """
-        msg_instance = yield self.test_sup.message_client.create_instance(object_id, MessageName)
+        msg_instance = yield self.test_sup.message_client.create_instance(MessageContentTypeID, MessageName)
         for k,v in kwargs.items():
             setattr(msg_instance,k,v)
         defer.returnValue(msg_instance)

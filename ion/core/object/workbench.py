@@ -199,7 +199,7 @@ class WorkBench(object):
             repo.upstream['process'] = headers.get('reply-to')
             
         # Later there will aways be a message instance, for now fake out the interface 
-        response = yield self._process.message_client.create_instance(MessageName='Pull Response')
+        response = yield self._process.message_client.create_instance(MessageContentTypeID=None)
         response.MessageResponseCode = response.ResponseCodes.OK
         defer.returnValue(response)
         
@@ -221,7 +221,7 @@ class WorkBench(object):
             yield self._process.reply(msg,content=repo)
         else:
             
-            response = yield self._process.message_client.create_instance(MessageName='Pull Response')
+            response = yield self._process.message_client.create_instance(MessageContentTypeID=None)
             response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
             
             yield self._process.reply_ok(msg, content=response)
@@ -282,7 +282,7 @@ class WorkBench(object):
             yield self._fetch_repo_objects(repo, headers.get('reply-to'))
             
             
-        response = yield self._process.message_client.create_instance(MessageName='Push Response')
+        response = yield self._process.message_client.create_instance(MessageContentTypeID=None)
         response.MessageResponseCode = response.ResponseCodes.OK            
             
         # The following line shows how to reply to a message

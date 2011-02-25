@@ -82,10 +82,11 @@ class MessageClient(object):
 
     
     @defer.inlineCallbacks
-    def create_instance(self, msg_type_id=None, MessageName=''):
+    def create_instance(self, MessageContentTypeID, MessageName=''):
         """
         @brief Create an instance of the message type!
-        @param msg_type_id is a type identifier object
+        @param MessageContentTypeID is a type identifier object
+        @param MessageName is a depricated architectural concept. Please do not use it!
         @retval message is a MInstance object
         """
         yield self._check_init()
@@ -95,16 +96,16 @@ class MessageClient(object):
         
         msg_object = msg_repo._workspace_root
         
-        # Set the type and name
-        #msg_object.type.GPBMessage.CopyFrom(msg_type_id)
-        msg_object.name = MessageName
+        if MessageName:
+            log.info('MessageName is a depricated architectural concept. Please do not use it!')
+            msg_object.name = MessageName
         
         # For now let the message ID be set by the process that created it?
         msg_object.identity = msg_repo.repository_key
         
         # Add an empty message object of the requested type
-        if msg_type_id:
-            msg_object.message_object = msg_repo.create_object(msg_type_id)
+        if MessageContentTypeID:
+            msg_object.message_object = msg_repo.create_object(MessageContentTypeID)
         
         # make a local commit 
         msg_repo.commit('Message object instantiated')
