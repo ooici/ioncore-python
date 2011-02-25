@@ -332,7 +332,7 @@ class IdentityRegistryService(ServiceProcess):
         
             yield self.reply_ok(msg, user)
         else:
-            response = yield self.message_client.create_instance(MessageName='person message')
+            response = yield self.message_client.create_instance(MessageContentTypeID=None)
             response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
             
             yield self.reply_ok(msg, response)

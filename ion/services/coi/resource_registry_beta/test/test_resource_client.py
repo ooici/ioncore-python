@@ -11,6 +11,8 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
+from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+
 from net.ooici.core.type import type_pb2
 from net.ooici.play import addressbook_pb2
 from ion.core.object import gpb_wrapper
@@ -198,8 +200,9 @@ class ResourceClientTest(IonTestCase):
         
         try:
             resource = yield self.rc.create_instance(invalid_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
-        except ResourceClientError, ex:
-            return
+        except ReceivedApplicationError, ex:
+            log.info(ex)
+            defer.returnValue(True)
         
         self.fail('This test should raise an exception and return in the except!')
         
