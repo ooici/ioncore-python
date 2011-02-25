@@ -64,6 +64,8 @@ class CassandraInventoryService(ServiceProcess):
         self._port = self.spawn_args.get('bootstrap_args', CONF.getValue('port'))
         self._username = self.spawn_args.get('bootstrap_args', CONF.getValue('username'))
         self._password = self.spawn_args.get('bootstrap_args',CONF.getValue('password'))
+        self._keyspace = self.spawn_args.get('bootstrap_args',CONF.getValue('keyspace'))
+        self._column_family = self.spawn_args.get('bootstrap_args',CONF.getValue('column_family'))
         # Create a Resource Client 
         self.rc = ResourceClient(proc=self)    
         self.mc = MessageClient(proc=self)    
@@ -97,6 +99,12 @@ class CassandraInventoryService(ServiceProcess):
         
         if self._password is None:
             raise CassandraInventoryServiceException("The password for the credentials to authenticate to the Cassandra cluster is not set.")
+        
+        if self._keyspace is None:
+            raise CassandraInventoryServiceException("The keyspace for is not set.")
+        
+        if self._column_family is None:
+            raise CassandraInventoryServiceException("The column family is not set.")
     
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
         cassandra_cluster = yield self.rc.create_instance(cassandra_cluster_type, ResourceName="Cassandra cluster", ResourceDescription="OOI Cassandra cluster")
@@ -108,14 +116,14 @@ class CassandraInventoryService(ServiceProcess):
         cas_host.port = self._port
         
         #TODO Pass these in through the bootstrap 
-        keyspace = "TestKeyspace"
-        column_family = "TestRDF"
+        #self._keyspace = "TestKeyspace"
+        #self._column_family = "TestRDF"
         
-        persistent_archive = yield self.rc.create_instance(cassandra_keyspace_type, ResourceName=keyspace, ResourceDescription="description of " + keyspace)
-        persistent_archive.name = keyspace
+        persistent_archive = yield self.rc.create_instance(cassandra_keyspace_type, ResourceName=self._keyspace, ResourceDescription="description of " + self._keyspace)
+        persistent_archive.name = self._keyspace
         
-        cache = yield self.rc.create_instance(cassandra_column_family_type, ResourceName=column_family, ResourceDescription="description of " + column_family)
-        cache.name = column_family
+        cache = yield self.rc.create_instance(cassandra_column_family_type, ResourceName=self._column_family, ResourceDescription="description of " + self._column_family)
+        cache.name = self._column_family
         
         simple_password = yield self.rc.create_instance(cassandra_credential_type, ResourceName="Cassandra credentials", ResourceDescription="OOI Cassandra credentials")
         simple_password.username = self._username
@@ -125,8 +133,7 @@ class CassandraInventoryService(ServiceProcess):
         log.info("Creating Cassandra Store")
         self._indexed_store = CassandraIndexedStore(cassandra_cluster, persistent_archive, simple_password, cache)
         yield self.register_life_cycle_object(self._indexed_store)
-        #yield self._indexed_store.client.set_keyspace("TestKeyspace")
-        #self._indexed_store = IndexStore()
+
         log.info("Created Cassandra Store")
         
         
