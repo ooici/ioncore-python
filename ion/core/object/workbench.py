@@ -2,6 +2,7 @@
 """
 @file ion/core/object/workbench.py
 @author David Stuebe
+@author Matt Rodriguez
 @brief Workbench for operating on GPB backed object structures
 
 TODO
@@ -258,7 +259,6 @@ class WorkBench(object):
         except ReceivedError, re:
             
             log.debug('ReceivedError', str(re))
-            content = re[1]
             raise WorkBenchError('Push returned an exception! "%s"' % content.response_body)
             
         defer.returnValue(content)
