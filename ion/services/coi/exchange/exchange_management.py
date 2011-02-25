@@ -115,13 +115,12 @@ class ExchangeManagementService(ServiceProcess):
         # Field population
         object.name = name
         object.description = description
-        
-        
+
         # Response
         response = yield self.helper.push_object(object)
         self.xs[name] = response.configuration.MyId;
-        log.debug('Created exchangespace.  id: %s', response.configuration.MyId)
-        yield self.reply_ok(msg, response.configuration.MyId)
+        log.debug('Created exchangespace.  id: %s', response.resource_reference)
+        yield self.reply_ok(msg, response)
 
 
 
