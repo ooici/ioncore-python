@@ -147,7 +147,7 @@ class CassandraInventoryService(ServiceProcess):
         with the name value.
         """
         
-        cassandra_row = request.configuration
+        cassandra_row = request
         index_attrs = {}
         for attr in cassandra_row.attrs:
             index_attrs[attr.attribute_name] = attr.attribute_value
@@ -174,7 +174,7 @@ class CassandraInventoryService(ServiceProcess):
         @note, puts a row into the Cassandra cluster. 
         @retval does not return anything
         """
-        cassandra_row = request.configuration
+        cassandra_row = request
         key = cassandra_row.key
         value = cassandra_row.value
         index_attrs = {}
@@ -192,9 +192,10 @@ class CassandraInventoryService(ServiceProcess):
         """
         @note Gets a row from the Cassandra cluster
         If the row does not exist then leave the value field in the CassandraIndexedRow empty.
-        @retval Returns a Cassandra Row message in the response   
+        @request is a CassandraRow message object
+        @retval Returns a CassandraRow message in the response   
         """
-        cassandra_row = request.configuration
+        cassandra_row = request
         key = cassandra_row.key
         
         value = yield self._indexed_store.get(key)        
@@ -212,7 +213,7 @@ class CassandraInventoryService(ServiceProcess):
         @request is a CassandraRow message object
         @retval does not return anything
         """     
-        cassandra_row = request.configuration
+        cassandra_row = request
         key = cassandra_row.key
         yield self._indexed_store.remove(key)
         response = yield self.mc.create_instance(resource_response_type, MessageName="remove response")
@@ -259,52 +260,49 @@ class CassandraInventoryClient(ServiceClient):
     @defer.inlineCallbacks
     def query(self, index_attributes):
         log.info("Called CassandraInventoryService client")
-        create_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a create_request')
-        cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
+        
+        cassandra_row = yield self.mc.create_instance(cassandra_indexed_row_type, MessageName='Creating a create_request')
+        
         for attr_key,attr_value in index_attributes.items():
             attr = cassandra_row.attrs.add()
             attr.attribute_name = attr_key
             attr.attribute_value = attr_value
         
-        create_request.configuration = cassandra_row    
-        (content, headers, msg) = yield self.rpc_send('query', create_request)
+
+        (content, headers, msg) = yield self.rpc_send('query', cassandra_row)
         defer.returnValue(content)
         
     @defer.inlineCallbacks
     def put(self, key, value, index_attributes={}):
         log.info("Called CassandraInventoryService client")
         
-        create_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a create_request')
-        cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
+        cassandra_row = yield self.mc.create_instance(cassandra_indexed_row_type, MessageName='Creating a create_request')
         cassandra_row.key = key
         cassandra_row.value = value
+        
         for attr_key,attr_value in index_attributes.items():
             attr = cassandra_row.attrs.add()
             attr.attribute_name = attr_key
             attr.attribute_value = attr_value 
         
-        create_request.configuration = cassandra_row  
-        (content, headers, msg) = yield self.rpc_send('put', create_request)
+        (content, headers, msg) = yield self.rpc_send('put', cassandra_row)
         defer.returnValue(content)
     
     @defer.inlineCallbacks
     def get(self, key):
-        create_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a create_request')
-        cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
-        cassandra_row.key = key
         
-        create_request.configuration = cassandra_row  
-        (content, headers, msg) = yield self.rpc_send('get',create_request)
+        cassandra_row = yield self.mc.create_instance(cassandra_indexed_row_type, MessageName='Creating a create_request')
+        cassandra_row.key = key
+          
+        (content, headers, msg) = yield self.rpc_send('get',cassandra_row)
         defer.returnValue(content)
         
     @defer.inlineCallbacks
     def remove(self, key):
-        create_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a create_request')
-        cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
+        cassandra_row = yield self.mc.create_instance(cassandra_indexed_row_type, MessageName='Creating a create_request')
         cassandra_row.key = key
-        
-        create_request.configuration = cassandra_row  
-        (content, headers, msg) = yield self.rpc_send('remove', create_request)
+          
+        (content, headers, msg) = yield self.rpc_send('remove', cassandra_row)
         defer.returnValue(content)
         
     @defer.inlineCallbacks
@@ -312,10 +310,10 @@ class CassandraInventoryClient(ServiceClient):
         """
         This request does not send any argument. The message is used as a dummy argument.
         """
-        create_request = yield self.mc.create_instance(resource_request_type, MessageName='Creating a create_request')
-        cassandra_row =  create_request.CreateObject(cassandra_indexed_row_type)
-        create_request.configuration = cassandra_row  
-        (content, headers, msg) = yield self.rpc_send('get_query_attributes', create_request)
+        
+        cassandra_row = yield self.mc.create_instance(cassandra_indexed_row_type, MessageName='Creating a create_request')
+        
+        (content, headers, msg) = yield self.rpc_send('get_query_attributes', cassandra_row)
         defer.returnValue(content)
         
         
