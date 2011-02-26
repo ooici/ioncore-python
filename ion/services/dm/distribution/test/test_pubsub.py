@@ -26,7 +26,7 @@ log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 
 # Message types
-XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
+#XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
 
 class PST(IonTestCase):
     """
@@ -76,18 +76,18 @@ class PST(IonTestCase):
     def test_start_stop(self):
         pass
 
-    @defer.inlineCallbacks
-    def test_xs_creation(self):
-        # Try and create the 'swapmeet' exchange space
-
-        msg = yield self.mc.create_instance(XS_TYPE)
-        msg.exchange_space_name = self.xs_name
-
-        xs_id = yield self.psc.declare_exchange_space(msg)
-
-        log.debug('XS create returns id' % str(xs_id))
-        self.failIf(xs_id == None)
-        self.failIf(xs_id == '')
+#    @defer.inlineCallbacks
+#    def test_xs_creation(self):
+#        # Try and create the 'swapmeet' exchange space
+#
+#        msg = yield self.mc.create_instance(XS_TYPE)
+#        msg.exchange_space_name = self.xs_name
+#
+#        xs_id = yield self.psc.declare_exchange_space(msg)
+#
+#        log.debug('XS create returns id' % str(xs_id))
+#        self.failIf(xs_id == None)
+#        self.failIf(xs_id == '')
 
     @itv(CONF)
     @defer.inlineCallbacks
