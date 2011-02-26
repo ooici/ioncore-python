@@ -209,6 +209,7 @@ class CassandraInventoryService(ServiceProcess):
     def op_remove(self, request, headers, msg): 
         """
         @note removes a row
+        @request is a CassandraRow message object
         @retval does not return anything
         """     
         cassandra_row = request.configuration

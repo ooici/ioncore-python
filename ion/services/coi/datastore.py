@@ -3,7 +3,7 @@
 """
 @file ion/services/coi/datastore.py
 @author David Stuebe
-
+@author Matt Rodriguez
 @TODO
 use persistent key:value store in work bench to persist push and get pull!
 """
@@ -14,14 +14,12 @@ from twisted.internet import defer
 
 import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess, ServiceClient
+from ion.core.process.service_process import ServiceProcess
 
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper
 from ion.core.data import store
 from ion.core.data import cassandra
-
-import binascii
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -147,10 +145,10 @@ class DataStoreService(ServiceProcess):
                 self.workbench._hashed_elements[store_head.key]=store_head
                 
                 # Get the commits using the query interface
-                blobs = yield self.c_store.query({self.CommitIndexName:repo_key})
+                rows = yield self.c_store.query({self.CommitIndexName:repo_key})
                     
-                for key, blob in blobs.items():
-                    #print 'BLOB key: "%s"; value: "%s"' % (binascii.b2a_hex(key), binascii.b2a_hex(blob))
+                for key, columns in rows.items():
+                    blob = columns["value"]
                     wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
                     assert key == wse.key, 'Calculated key does not match the stored key!'
                     store_commits[wse.key] = wse
@@ -247,10 +245,10 @@ class DataStoreService(ServiceProcess):
             self.workbench._hashed_elements[store_head.key]=store_head
                 
             # Get the commits using the query interface
-            blobs = yield self.c_store.query({self.CommitIndexName:repo_key})
+            rows = yield self.c_store.query({self.CommitIndexName:repo_key})
                 
-            for key, blob in blobs.items():
-                #print 'BLOB key: "%s"; value: "%s"' % (binascii.b2a_hex(key), binascii.b2a_hex(blob))
+            for key, columns in rows.items():
+                blob = columns["value"]
                 wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
                 assert key == wse.key, 'Calculated key does not match the stored key!'
                 store_commits[wse.key] = wse
