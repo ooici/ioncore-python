@@ -16,14 +16,21 @@ from twisted.trial import unittest
 from ion.util.procutils import asleep
 from ion.core import ioninit
 
+from ion.core.object import object_utils
+from ion.core.messaging.message_client import MessageClient
+
+
 from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 
+# Message types
+XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
+
 class PST(IonTestCase):
     """
-    New tests to match the updated code for R1C2
+    New tests to match the updated code for R1C3
     """
     @defer.inlineCallbacks
     def setUp(self):
@@ -55,6 +62,7 @@ class PST(IonTestCase):
         yield self._start_container()
         self.sup = yield self._spawn_processes(services)
         self.psc = PubSubClient(self.sup)
+        self.mc = MessageClient(proc=self.sup)
 
         self.xs_name = 'swapmeet'
         self.tt_name = 'science_data'
@@ -67,6 +75,19 @@ class PST(IonTestCase):
 
     def test_start_stop(self):
         pass
+
+    @defer.inlineCallbacks
+    def test_xs_creation(self):
+        # Try and create the 'swapmeet' exchange space
+
+        msg = yield self.mc.create_instance(XS_TYPE)
+        msg.exchange_space_name = self.xs_name
+
+        xs_id = yield self.psc.declare_exchange_space(msg)
+
+        log.debug('XS create returns id' % str(xs_id))
+        self.failIf(xs_id == None)
+        self.failIf(xs_id == '')
 
     @itv(CONF)
     @defer.inlineCallbacks

@@ -14,9 +14,6 @@ from zope.interface import implements
 
 from twisted.internet import defer
 
-# Useful for inspecting binary content
-import binascii
-# print binascii.b2a_hex(blob)
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -134,6 +131,18 @@ class IndexStore(object):
     Memory implementation of an asynchronous key/value store, using a dict.
     Simulates typical usage of using a client connection to a backend
     technology.
+    
+    @note
+    self.kvs is a dictionary of dictionaries where the keys are row keys and
+    the values are a dictionary representing the columns. The 
+        
+        { key_1:  {name_1:val_1, name_2:val2_1, ... name_n:val_n ,
+          key_2: {name_1:val_1, name_2:val2_1, ... name_n:val_n ,
+          ...
+          key_n: {name_1:val_1, name_2:val2_1, ... name_n:val_n }
+    
+    self.indices is an index to map attribute names to attribute values to keys
+        {attr_names:{attr_value: set( keys)}}.
     """
     implements(IIndexStore)
 
@@ -149,7 +158,11 @@ class IndexStore(object):
         """
         @see IStore.get
         """
-        return defer.maybeDeferred(self.kvs.get, key, None)
+        row = self.kvs.get(key, None)
+        if row is None:
+            defer.returnValue(None)
+        else:
+            return defer.maybeDeferred(row.get, "value")
 
     def put(self, key, value, index_attributes={}):
         """
@@ -164,7 +177,7 @@ class IndexStore(object):
             kindex[v]= kindex.get(v, set())
             kindex[v].add(key)
                         
-        return defer.maybeDeferred(self.kvs.update, {key:value})
+        return defer.maybeDeferred(self.kvs.update, {key: dict({"value":value},**index_attributes)})
 
     def remove(self, key):
         """
@@ -183,12 +196,14 @@ class IndexStore(object):
         Rows are returned that have columns set to the value specified in 
         the dictionary
         
-        @retVal a thrift representation of the rows returned by the query.
+        @retVal A data structure representing Cassandra rows. See the class
+        docstring for the description of the data structure.
         """
         
         return defer.maybeDeferred(self._query, indexed_attributes)
         
     def _query(self, indexed_attributes={}):
+        
         keys = set()
         
         for k,v in indexed_attributes.items():
@@ -203,6 +218,7 @@ class IndexStore(object):
                 result[k] = self.kvs.get(k)
                 
         return result
+        
         
     def get_query_attributes(self):
         """
