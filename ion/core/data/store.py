@@ -100,7 +100,14 @@ class IIndexStore(IStore):
         @param key  an immutable key to be associated with a value
         @param value  an object to be associated with the key. The caller must
                 not modify this object after it was
+        @param index_attributes a dictionary of attributes by which to index this value of this key
         @retval Deferred, for success of this operation
+        """
+
+    def update_index(key, index_attributes):
+        """
+        @param key  an immutable key associated with a value
+        @param index_attributes an update to the dictionary of attributes by which to index this value of this key
         """
 
     def remove(key):
@@ -165,7 +172,7 @@ class IndexStore(object):
         """
         row = self.kvs.get(key, None)
         if row is None:
-            defer.succeed(None)
+            return defer.succeed(None)
         else:
             return defer.maybeDeferred(row.get, "value")
 
@@ -184,6 +191,13 @@ class IndexStore(object):
             kindex[v].add(key)
                         
         return defer.maybeDeferred(self.kvs.update, {key: dict({"value":value},**index_attributes)})
+
+
+    def update_index(self, key, index_attributes):
+
+
+        return defer.succeed(None)
+
 
     def remove(self, key):
         """

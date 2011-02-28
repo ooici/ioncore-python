@@ -183,7 +183,9 @@ class Repository(object):
     
     
     def set_repository_reference(self, id_ref, current_state=False):
-        
+        """
+        Fill in a IDREF Object using the current state of the repository
+        """
         # Don't worry about type checking here....        
         id_ref.key = self.repository_key
         id_ref.branch = self._current_branch.branchkey
@@ -204,7 +206,7 @@ class Repository(object):
     @property
     def commit_head(self):
         """
-        Convience method to access the current commit 
+        Convenience method to access the current commit
         """
         if self._detached_head:
             log.warn('This repository is currently a detached head. The current commit is not at the head of a branch.')
@@ -213,7 +215,20 @@ class Repository(object):
             return self._current_branch.commitrefs[0]
         else:
             raise RepositoryError('Branch should merge on read. Invalid state with more than one commit at the head of a branch!')
-    
+
+    def current_heads(self):
+        """
+        Convenience method to get a list of the current head commits
+        """
+        heads = []
+
+        for branch in self.branches:
+            heads.extend(branch.commitrefs)
+
+        return heads
+
+
+
     def branch(self, nickname=None):
         """
         @brief Create a new branch from the current commit and switch the workspace to the new branch.

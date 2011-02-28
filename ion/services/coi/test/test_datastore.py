@@ -41,6 +41,8 @@ class DataStoreTest(IonTestCase):
         yield self._start_container()
 
         services = [
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService'},
+
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'ps1'}
                 },

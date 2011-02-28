@@ -259,7 +259,7 @@ class WorkBench(object):
         except ReceivedError, re:
             
             log.debug('ReceivedError', str(re))
-            raise WorkBenchError('Push returned an exception! "%s"' % content.response_body)
+            raise WorkBenchError('Push returned an exception! "%s"' % re.msg_content)
             
         defer.returnValue(content)
 

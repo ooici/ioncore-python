@@ -57,7 +57,8 @@ class DataStoreService(ServiceProcess):
     COMMIT_STORE = 'commit_store_class'
     BLOB_STORE = 'blob_store_class'
     
-    CommitIndexName = 'repository'
+    COMMIT_REPOSITORY_INDEX = 'repository'
+    COMMIT_BRANCH_INDEX = 'repository'
     
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -69,7 +70,7 @@ class DataStoreService(ServiceProcess):
         self._backend_cls_names = {}
         #self.spawn_args['_class'] = self.spawn_args.get('_class', CONF.getValue('_class', default='ion.data.store.Store'))
         self._backend_cls_names[self.MUTABLE_STORE] = self.spawn_args.get(self.MUTABLE_STORE, CONF.getValue(self.MUTABLE_STORE, default='ion.core.data.store.Store'))
-        self._backend_cls_names[self.COMMIT_STORE] = self.spawn_args.get(self.COMMIT_STORE, CONF.getValue(self.COMMIT_STORE, default='ion.core.data.store.IndexStore'))
+        self._backend_cls_names[self.COMMIT_STORE] = self.spawn_args.get(self.COMMIT_STORE, CONF.getValue(self.COMMIT_STORE, default='ion.core.data.index_store_service.IndexStoreServiceClient'))
         self._backend_cls_names[self.BLOB_STORE] = self.spawn_args.get(self.BLOB_STORE, CONF.getValue(self.BLOB_STORE, default='ion.core.data.store.Store'))
             
         self._backend_classes={}
@@ -111,7 +112,7 @@ class DataStoreService(ServiceProcess):
         if issubclass(self._backend_classes[self.COMMIT_STORE], cassandra.CassandraStore):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
         else:
-            self.c_store = yield defer.maybeDeferred(self._backend_classes[self.COMMIT_STORE])
+            self.c_store = yield defer.maybeDeferred(self._backend_classes[self.COMMIT_STORE], self)
         
         if issubclass(self._backend_classes[self.BLOB_STORE], cassandra.CassandraStore):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
@@ -145,7 +146,7 @@ class DataStoreService(ServiceProcess):
                 self.workbench._hashed_elements[store_head.key]=store_head
                 
                 # Get the commits using the query interface
-                rows = yield self.c_store.query({self.CommitIndexName:repo_key})
+                rows = yield self.c_store.query({self.COMMIT_REPOSITORY_INDEX:repo_key})
                     
                 for key, columns in rows.items():
                     blob = columns["value"]
@@ -179,12 +180,17 @@ class DataStoreService(ServiceProcess):
             
             for key in repo._commit_index.keys():
                 if not key in store_commits:
-                    
-                    attributes = {self.CommitIndexName : str(repo_key)}
-                    
-                    wse = self.workbench._hashed_elements.get(key)
-                    
+
+                    # Set the repository name for the commit
+                    attributes = {self.COMMIT_REPOSITORY_INDEX : str(repo_key)}
+
                     cref = repo._commit_index.get(key)
+                    
+                    for branch in  repo.branches:
+                        # If this is currently the head commit - set
+                        if cref in branch.commitrefs:
+                            attributes[self.COMMIT_BRANCH_INDEX] = branch.branchkey
+                                        
                     if cref.objectroot.ObjectType == association_type:
                         attributes['subject_repository'] = cref.objectroot.subject.key
                         attributes['subject_branch'] = cref.objectroot.subject.branch
@@ -200,6 +206,9 @@ class DataStoreService(ServiceProcess):
                         
                     elif  cref.objectroot.ObjectType == terminology_type:
                         attributes['word'] = cref.objectroot.word
+                    
+                    # get the wrapped structure element to put in...
+                    wse = self.workbench._hashed_elements.get(key)
                     
                     # Should replace this with one put slice command
                     defd = self.c_store.put(key = key,
@@ -245,7 +254,7 @@ class DataStoreService(ServiceProcess):
             self.workbench._hashed_elements[store_head.key]=store_head
                 
             # Get the commits using the query interface
-            rows = yield self.c_store.query({self.CommitIndexName:repo_key})
+            rows = yield self.c_store.query({self.COMMIT_REPOSITORY_INDEX:repo_key})
                 
             for key, columns in rows.items():
                 blob = columns["value"]

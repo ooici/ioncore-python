@@ -165,7 +165,13 @@ class CassandraIndexedStore(CassandraStore):
         """
         index_attributes['value'] = value
         yield self.client.batch_insert(key, self._cache_name, index_attributes)
-        
+
+    def update_index(self, key, index_attributes):
+
+        defer.succeed(None)
+
+
+
     @defer.inlineCallbacks    
     def query(self, indexed_attributes_eq={},indexed_attributes_gt={}):
         """

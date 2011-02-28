@@ -328,6 +328,66 @@ class IndexStoreTest(IStoreTest):
         self.failUnlessEqual(val2, binary_value2)
         self.failUnlessEqual(val3, binary_value3)
 
+
+    @defer.inlineCallbacks
+    def test_update_index_blank(self):
+
+        yield self.put_stuff_for_tests()
+
+        new_attrs = {'birth_date': '1969'}
+
+        self.d4.update(new_attrs)
+
+        yield self.ds.update_index('jstewart', new_attrs)
+
+        query_attributes = {'birth_date':'1969'}
+        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
+        log.info("Rows returned %s " % (rows,))
+        self.assertEqual(rows['jstewart']['value'], self.binary_value4)
+        self.assertEqual(len(rows),1)
+
+        for key in self.d4.keys():
+            self.assertIn(key, rows['jstewart'])
+
+
+    @defer.inlineCallbacks
+    def test_update_index_existing(self):
+
+        yield self.put_stuff_for_tests()
+
+        new_attrs = {'birth_date': '1969'}
+
+        self.d2.update(new_attrs)
+
+        yield self.ds.update_index('prothfuss', new_attrs)
+
+        query_attributes = {'birth_date':'1969'}
+        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
+        log.info("Rows returned %s " % (rows,))
+        self.assertEqual(rows['prothfuss']['value'], self.binary_value2)
+        self.assertEqual(len(rows),1)
+
+        for key in self.d2.keys():
+            self.assertIn(key, rows['prothfuss'])
+
+
+    @defer.inlineCallbacks
+    def test_update_index_value_error(self):
+
+        yield self.put_stuff_for_tests()
+
+        new_attrs = {'value': '1969'}
+
+        try:
+            yield self.ds.update_index('prothfuss', new_attrs)
+
+        except store.IndexStoreError, ise:
+            defer.returnValue(None)
+
+        self.fail('Did not raise Index Store Error')
+
+
+
 class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
 
     @defer.inlineCallbacks

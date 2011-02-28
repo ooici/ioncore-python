@@ -21,7 +21,7 @@ from ion.core.data.cassandra import CassandraIndexedStore
 
 from ion.core.messaging.message_client import MessageClient
 
-from ion.core.data.store import IIndexStore, IndexStore
+from ion.core.data.store import IIndexStore, IndexStore, IndexStoreError
 from zope.interface import implements
 
 from ion.core import ioninit
@@ -33,6 +33,7 @@ QUERY_ATTRIBUTES_TYPE = object_utils.create_type_identifier(object_id=17, versio
 ROW_TYPE = object_utils.create_type_identifier(object_id=18, version=1)
 ROWS_TYPE = object_utils.create_type_identifier(object_id=19, version=1)
 INDEXED_ATTRIBUTES_TYPE = object_utils.create_type_identifier(object_id=20, version=1)
+ROW_INDEX_UPDATE_TYPE = object_utils.create_type_identifier(object_id=21, version=1)
 
 
 class IndexStoreServiceException(Exception):
@@ -137,7 +138,17 @@ class IndexStoreService(ServiceProcess):
 
         yield self.reply_ok(msg)
         
-        
+
+    @defer.inlineCallbacks
+    def op_update_index(self, request, headers, msg):
+        key = request.key
+        index_attrs = {}
+        for col in request.cols:
+            index_attrs[col.column_name] = col.column_value
+        yield self._indexed_store.update_index(key,index_attrs)
+
+        yield self.reply_ok(msg)
+
     @defer.inlineCallbacks
     def op_get(self, request, headers, msg):
         """
@@ -245,13 +256,37 @@ class IndexStoreServiceClient(ServiceClient):
         for attr_key,attr_value in index_attributes.items():
             col = row.cols.add()
             col.column_name = attr_key
-            col.column_value = attr_value
+            col.column_value = str(attr_value)
         
         (content, headers, msg) = yield self.rpc_send('put', row)
         
 
         defer.returnValue(content)
-    
+
+    def update_index(self, key, index_attributes):
+        """
+        use
+        """
+
+        update = yield self.mc.create_instance(ROW_INDEX_UPDATE_TYPE)
+        row.key = key
+
+        for attr_key,attr_value in index_attributes.items():
+
+            if attr_key == 'value':
+                raise IndexStoreError('Can not update the value column!')
+
+            col = row.cols.add()
+            col.column_name = attr_key
+            col.column_value = str(attr_value)
+
+        (content, headers, msg) = yield self.rpc_send('update_index', row)
+
+
+        defer.succeed(None)
+
+
+
     @defer.inlineCallbacks
     def get(self, key):
         log.info("Called Index Store Service client: get")
