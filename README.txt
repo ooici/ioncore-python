@@ -38,6 +38,7 @@ cd some_dir_to_keep_it_all_in
 git clone git@github.com:ooici/ioncore-python.git
 cd ioncore-python
 python bootstrap.py
+ant clean
 bin/buildout -c development.cfg
 bin/trial ion
 
@@ -54,16 +55,18 @@ cd ../ion-object-definitions
 (Refer to ion-object-definitions README.txt for build instructions)
 cd ../ioncore-python
 python bootstrap.py
+ant clean
 bin/buildout -c dev-integration.cfg
 bin/trial ion
 
 ionproto Clean up Note:
 =======================
-For some reason, buildout might not get the latest ionproto after 
-repeated builds.  Fix is to manually remove the cached egg and run
-buildout again (bin/buildout -c ...) so buildout
-will go to the package server for the lastest:
-    rm -r eggs/ionproto*.egg
+buildout might not get the latest ionproto after 
+repeated builds since there's already an egg in the cache eggs/ dir. 
+You can do: rm -r eggs/ionproto*.egg
+    or 
+Run 
+ant clean
 
 Current dependencies:
 ====================
