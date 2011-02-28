@@ -30,7 +30,7 @@
  </target>
 
  <target name="clean"
-     description="clean up" >
+     description="clean up"> 
     <delete>
       <fileset dir="${src}" includes="**/*.pyc"/>
     </delete>
@@ -38,9 +38,16 @@
     <delete dir="${dist}"/>
     <delete dir="ioncore.egg-info"/>
     <delete dir="_trial_temp"/>
+    <antcall target="remeggs"/>
   </target>
 
-  <target name="remeggs">
+  <target name="dir.check">
+      <condition property="dir.exists">
+          <available file="eggs" type="dir"/>
+      </condition>
+  </target>
+
+  <target name="remeggs" depends="dir.check" if="dir.exists">
       <echo message="Remove buildout eggs eggs/ionprot*"/>
       <delete includeemptydirs="true">
            <fileset dir="eggs" includes="**/ionproto*/" />
