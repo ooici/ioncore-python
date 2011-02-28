@@ -158,15 +158,23 @@ class BrokerController:
     def create_queue(
                      self, 
                      name="",
-                     exchangename="",
-                     routingkey=""
                     ):
         q = yield self.channel.queue_declare(
-                queue=exchangename + '.' + name, 
+                queue=name, 
                 durable=False, 
                 exclusive=False,
                 auto_delete=True
         )    
+        returnValue(q)
+
+
+    @inlineCallbacks
+    def create_binding(
+                    self,
+                    name="",
+                    exchangename="",
+                    routingkey=""
+                       ):
         b = yield self.channel.queue_bind(
                 queue=exchangename + '.' + name, 
                 exchange=exchangename,
@@ -174,7 +182,7 @@ class BrokerController:
         )
 
         # self.queues.append((channel, reply.queue))
-        returnValue(q)
+        returnValue(b)
 
 
   

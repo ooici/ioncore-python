@@ -39,6 +39,7 @@ RESPONSE_TYPE = object_utils.create_type_identifier(object_id=12, version=1)
 REGEX_TYPE = object_utils.create_type_identifier(object_id=2306, version=1)
 IDLIST_TYPE = object_utils.create_type_identifier(object_id=2312, version=1)
 XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
+XP_TYPE = object_utils.create_type_identifier(object_id=2309, version=1)
 
 class PSSException(Exception):
     """
@@ -80,16 +81,16 @@ class PubSubService(ServiceProcess):
     @defer.inlineCallbacks
     def op_declare_exchange_space(self, request, headers, msg):
         log.debug('Here we go')
-        if request.MessageType != REQUEST_TYPE:
+        if request.MessageType != XS_TYPE:
             raise PSSException('Bad message, expected a request type, got %s' % str(request))
 
 
         log.debug('Calling EMS to create the exchange space...')
         # For now, use timestamp as description
         description = str(time.time())
-        id = yield self.ems.create_exchangespace(request.exchange_space_name, description=description)
+        xsid = yield self.ems.create_exchangespace(request.exchange_space_name, description)
 
-        log.debug('EMS returns ID %s' % id)
+        log.debug('EMS returns ID %s' % xsid.resource_reference)
 
         # Write ID into registry
         log.debug('Creating RC instance')
@@ -99,18 +100,29 @@ class PubSubService(ServiceProcess):
 
         log.debug('Operation completed, creating response message')
 
-        response = yield self.mc.create_instance(RESPONSE_TYPE, MessageName='declare_xs response')
+        response = yield self.mc.create_instance(IDLIST_TYPE, MessageName='declare_xs response')
 
         log.debug('Response created')
 
-        response.resource_reference = self.rclient.reference_instance(id)
+        response.id_list.add()
+        response.id_list[0]=xsid.resource_reference
 
-        response.result = 'OK'
+        response.MessageResponseCode = response.ResponseCodes.OK
 
         log.debug('Responding...')
 
         yield self.reply_ok(msg, response)
         log.debug('DXS completed')
+
+    @defer.inlineCallbacks
+    def op_declare_exchange_point(self, request, headers, msg):
+        log.debug('DXP starting')
+        if request.MessageType != XP_TYPE:
+            raise PSSException('Bad message, expected exchange point type')
+
+        log.debug('Calling EMS to create the exchange point')
+        xpid = yield self.ems.create_exchangename()
+
 
 
     @defer.inlineCallbacks

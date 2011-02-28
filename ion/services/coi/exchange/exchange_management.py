@@ -192,7 +192,7 @@ class ExchangeManagementService(ServiceProcess):
         xs = q.configuration.exchangespace
         topic = q.configuration.topic
         
-        self.controller.create_queue(qname, xs + "." + xn, topic)
+        self.controller.create_queue(xs + "." + xn)
         
         log.debug('op_create_queue()')
         
