@@ -51,7 +51,7 @@ git clone git@github.com:ooici/ioncore-python.git
 git clone git@github.com:ooici/ion-object-definitions.git
 cd ioncore-python
 cd ../ion-object-definitions
-ant dist (follow ion-object-definitions README for updated instruction)
+(Refer to ion-object-definitions README.txt for build instructions)
 cd ../ioncore-python
 python bootstrap.py
 bin/buildout -c dev-integration.cfg
