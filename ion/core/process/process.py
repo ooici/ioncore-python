@@ -503,8 +503,9 @@ class Process(BasicLifecycleObject,ResponseCodes):
             if msg and msg.payload['reply-to']:
                 yield self.reply_err(msg, exception = ex)
 
-            if CF_fail_fast:
-                yield self.terminate()
+            # The supervisor will also call shutdown child procs. This causes a recursive error when using fail fast!
+            #if CF_fail_fast:
+            #    yield self.terminate()
                 # Send exit message to supervisor
         finally:
             # @todo This is late here (potentially after a reply_err before)
@@ -522,6 +523,17 @@ class Process(BasicLifecycleObject,ResponseCodes):
         @retval Deferred
         """
         if not self._get_state() == "ACTIVE":
+
+
+            # Detect and handle request to terminate
+            # This does not yet work properly with fail fast...
+            if 'op'in payload and payload['op'] == 'terminate':
+
+                if self._get_state() != BasicStates.S_TERMINATED:
+                    yield self.terminate()
+                else:
+                    yield self.reply_ok(msg)
+
             text = "Process %s in invalid state %s." % (self.proc_name, self._get_state())
             log.error(text)
 

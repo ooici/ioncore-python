@@ -2,9 +2,10 @@
 
 
 """
-@file ion/services/dm/preservation/inventory_service.py
+@file ion/core/data/index_store_service.py
 @author Matt Rodriguez
-@brief agent controlling preservation of OOI Data
+@author David Stuebe
+@brief Service which fronts the index store capability through the messaging to a single back end.
 """
 
 import ion.util.ionlog
@@ -41,20 +42,23 @@ cassandra_rows_type = object_utils.create_type_identifier(object_id=2512, versio
 resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
 resource_request_type = object_utils.create_type_identifier(object_id=10, version=1)
 
-class CassandraInventoryServiceException(Exception):
+class IndexStoreServiceException(Exception):
     """
-    Exceptions that originate in the CassandraManagerService class
+    Exceptions that originate in the IndexStoreService class
     """
 
-class CassandraInventoryService(ServiceProcess):
+class IndexStoreService(ServiceProcess):
     """
-    @brief CassandraInventoryService
-    
+    @brief IndexStoreService
+
+    This is not a ION service. It is part of a test harness to provide a pure, in memory backend for the data store
+    and the association service
+
     TODO, this class does not catch any exceptions from the business logic class. 
     """
 
     # Declaration of service
-    declare = ServiceProcess.service_declare(name='cassandra_inventory_service', version='0.1.0', dependencies=[])
+    declare = ServiceProcess.service_declare(name='index_store_service', version='0.1.0', dependencies=[])
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -89,22 +93,22 @@ class CassandraInventoryService(ServiceProcess):
         """
         #Hard code the storage resource for now. Eventually pass all this into spawn_args
         if self._host is None:
-            raise CassandraInventoryServiceException("The hostname for the Cassandra cluster is not set.")
+            raise IndexStoreServiceException("The hostname for the Cassandra cluster is not set.")
         
         if self._port is None:
-            raise CassandraInventoryServiceException("The port for the Cassandra cluster is not set.")
+            raise IndexStoreServiceException("The port for the Cassandra cluster is not set.")
         
         if self._username is None:
-            raise CassandraInventoryServiceException("The username for the credentials to authenticate to the Cassandra cluster is not set.")
+            raise IndexStoreServiceException("The username for the credentials to authenticate to the Cassandra cluster is not set.")
         
         if self._password is None:
-            raise CassandraInventoryServiceException("The password for the credentials to authenticate to the Cassandra cluster is not set.")
+            raise IndexStoreServiceException("The password for the credentials to authenticate to the Cassandra cluster is not set.")
         
         if self._keyspace is None:
-            raise CassandraInventoryServiceException("The keyspace for is not set.")
+            raise IndexStoreServiceException("The keyspace for is not set.")
         
         if self._column_family is None:
-            raise CassandraInventoryServiceException("The column family is not set.")
+            raise IndexStoreServiceException("The column family is not set.")
     
         ### Create a persistence_technology resource - for cassandra a CassandraCluster object
         cassandra_cluster = yield self.rc.create_instance(cassandra_cluster_type, ResourceName="Cassandra cluster", ResourceDescription="OOI Cassandra cluster")
@@ -236,10 +240,10 @@ class CassandraInventoryService(ServiceProcess):
              
         yield self.reply_ok(msg, response)
 # Spawn of the process using the module name
-factory = ProcessFactory(CassandraInventoryService)
+factory = ProcessFactory(IndexStoreService)
 
 
-class CassandraInventoryClient(ServiceClient):
+class IndexStoreServiceClient(ServiceClient):
     """
     This interface will change, because we have to define the ION resources. We probably want
     convenience methods to query by name, type, etc...
@@ -250,7 +254,7 @@ class CassandraInventoryClient(ServiceClient):
     
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = 'cassandra_inventory_service'
+            kwargs['targetname'] = 'index_store_service'
         ServiceClient.__init__(self, proc, **kwargs)
         
         self.mc = MessageClient(proc=proc)    

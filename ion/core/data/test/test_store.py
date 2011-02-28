@@ -20,9 +20,11 @@ from uuid import uuid4
 
 from twisted.trial import unittest
 from twisted.internet import defer
+from ion.test.iontest import IonTestCase
 
 from ion.core.data import store
 from ion.core.data import cassandra
+from ion.core.data import index_store_service
 
 # Import the workbench and the Persistent Archive Resource Objects!
 from ion.core.object import workbench
@@ -42,36 +44,43 @@ cassandra_keyspace_type = object_utils.create_type_identifier(object_id=2506, ve
 
 class IStoreTest(unittest.TestCase):
 
-    #@itv(CONF)
     @defer.inlineCallbacks
     def setUp(self):
         self.timeout = 10
         self.ds = yield self._setup_backend()
-        self.key = str(uuid4())
-        self.value = str(uuid4())
 
-    #@itv(CONF)
+        # Test strings
+        #self.key = str(uuid4())
+        #self.value = str(uuid4())
+
+        # Test Bytes
+        self.key = object_utils.sha1bin(str(uuid4()))
+        self.value = object_utils.sha1bin(str(uuid4()))
+
+
+
     def _setup_backend(self):
         """return a deferred which returns a initiated instance of a
         backend
         """
         return defer.maybeDeferred(store.Store)
 
-    #@itv(CONF)
+    #def test_instantiate(self):
+    #    pass
+
     @defer.inlineCallbacks
     def test_get_none(self):
         # Make sure we can't read the not-written
         rc = yield self.ds.get(self.key)
-        self.failUnlessEqual(rc, None)
+        self.assertEqual(rc, None)
+        print 'PASSED!'
 
-    #@itv(CONF)
     @defer.inlineCallbacks
     def test_write_and_delete(self):
         # Hmm, simplest op, just looking for exceptions
         yield self.ds.put(self.key, self.value)
         yield self.ds.remove(self.key)
 
-    #@itv(CONF)
     @defer.inlineCallbacks
     def test_delete(self):
         yield self.ds.put(self.key, self.value)
@@ -79,7 +88,6 @@ class IStoreTest(unittest.TestCase):
         rc = yield self.ds.get(self.key)
         self.failUnlessEqual(rc, None)
 
-    #@itv(CONF)
     @defer.inlineCallbacks
     def test_put_get_delete(self):
         # Write, then read to verify same
@@ -141,7 +149,7 @@ class CassandraStoreTest(IStoreTest):
     
     @defer.inlineCallbacks
     def tearDown(self):
-        try:       
+        try:
             yield self.ds.terminate()
         except Exception, ex:
             log.info("Exception raised in tearDown %s" % (ex,))
@@ -149,14 +157,12 @@ class CassandraStoreTest(IStoreTest):
             
 class IndexStoreTest(IStoreTest):
 
-    #@itv(CONF)
     def _setup_backend(self):
         """return a deferred which returns a initiated instance of a
         backend
         """
         return defer.maybeDeferred(store.IndexStore,indices=['full_name', 'state', 'birth_date'])
 
-    #@itv(CONF)
     @defer.inlineCallbacks
     def test_get_query_attributes(self):
         attrs = yield self.ds.get_query_attributes()
@@ -165,7 +171,6 @@ class IndexStoreTest(IStoreTest):
         correct_set = set(['full_name', 'state', 'birth_date'])
         self.failUnlessEqual(attrs_set, correct_set)
 
-    #@itv(CONF)
     @defer.inlineCallbacks
     def test_query(self):
         d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
@@ -182,7 +187,6 @@ class IndexStoreTest(IStoreTest):
         log.info("Rows returned %s " % (rows,))
         self.failUnlessEqual(rows['prothfuss']['value'], binary_value2)
          
-    #@itv(CONF)
     @defer.inlineCallbacks
     def test_put(self):
         d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
@@ -200,10 +204,37 @@ class IndexStoreTest(IStoreTest):
         self.failUnlessEqual(val1, binary_value1)
         self.failUnlessEqual(val2, binary_value2)
         self.failUnlessEqual(val3, binary_value3)
-      
-        
-            
-class CassandraIndexedStoreTest(IStoreTest):
+
+class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
+
+    @defer.inlineCallbacks
+    def _setup_backend(self):
+        """
+        Start the service and setup the client to the backend for the test.
+        """
+
+        yield self._start_container()
+        self.timeout = 30
+        services = [
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
+             'spawnargs':{'indices':['full_name', 'state', 'birth_date']}},
+
+        ]
+        sup = yield self._spawn_processes(services)
+        client = index_store_service.IndexStoreServiceClient(proc=sup)
+
+        defer.returnValue(client)
+
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        log.info("In tearDown")
+
+        yield self._shutdown_processes()
+        yield self._stop_container()
+
+
+class CassandraIndexedStoreTest(IndexStoreTest):
 
     @itv(CONF)
     def _setup_backend(self):

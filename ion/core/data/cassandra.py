@@ -195,14 +195,12 @@ class CassandraIndexedStore(CassandraStore):
         # Create a list of dictionaries as a pythonic return value.   
         result ={}
         for row in rows:
-            
+
+            row_vals = {}
             for column in row.columns:
-                if column.column.name == 'value':
-                    result[row.key] = column.column.value
-                    break
-            else:
-                raise KeyError('Cassandra column "value" not found in row.')
-            
+                row_vals[column.column.name] = column.column.value
+            result[row.key] = row_vals
+
         defer.returnValue(result)
         
     @defer.inlineCallbacks

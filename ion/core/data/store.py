@@ -160,7 +160,7 @@ class IndexStore(object):
         """
         row = self.kvs.get(key, None)
         if row is None:
-            defer.returnValue(None)
+            defer.succeed(None)
         else:
             return defer.maybeDeferred(row.get, "value")
 
