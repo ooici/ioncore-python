@@ -60,8 +60,9 @@ bin/trial ion
 ionproto Clean up Note:
 =======================
 For some reason, buildout might not get the latest ionproto after 
-repeated builds.  Fix is to manually remove the cached egg so buildout
-will go to the package server for the lastest::
+repeated builds.  Fix is to manually remove the cached egg and run
+buildout again (bin/buildout -c ...) so buildout
+will go to the package server for the lastest:
     rm -r eggs/ionproto*.egg
 
 Current dependencies:
