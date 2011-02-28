@@ -167,7 +167,7 @@ class CassandraIndexedStore(CassandraStore):
         yield self.client.batch_insert(key, self._cache_name, index_attributes)
         
     @defer.inlineCallbacks    
-    def query(self, indexed_attributes={}):
+    def query(self, indexed_attributes_eq={},indexed_attributes_gt={}):
         """
         Search for rows in the Cassandra instance.
     
@@ -177,13 +177,39 @@ class CassandraIndexedStore(CassandraStore):
         
         @retVal a dictionary containing the keys and values which match the query.
         """
-        make_predicate = lambda attr: {'column_name':attr[0],'op':IndexOperator.EQ,'value':attr[1]}
-        predicate_args = map(make_predicate, indexed_attributes.items())
+
+        # Map the index attributes for equal to!
+        selection_predicate_eq=[]
+        if indexed_attributes_eq:
+
+            make_predicate_eq = lambda attr: {'column_name':attr[0],'op':IndexOperator.EQ,'value':attr[1]}
+            predicate_args_eq = map(make_predicate_eq, indexed_attributes_eq.items())
+
+            log.info("predicate_args_eq: %s" %(predicate_args_eq,))
+            make_expressions_eq = lambda args: IndexExpression(**args)
+            selection_predicate_eq =  map(make_expressions_eq, predicate_args_eq)
+            log.info("selection_predicate_eq %s " % (selection_predicate_eq,))
+
+        # Map the index attributes for greater than!
+        selection_predicate_gt=[]
+        if indexed_attributes_gt:
+            make_predicate_gt = lambda attr: {'column_name':attr[0],'op':IndexOperator.GT,'value':attr[1]}
+            predicate_args_gt = map(make_predicate_gt, indexed_attributes_gt.items())
+
+            log.info("predicate_args_gt: %s" %(predicate_args_gt,))
+            make_expressions_gt = lambda args: IndexExpression(**args)
+            selection_predicate_gt =  map(make_expressions_gt, predicate_args_gt)
+            log.info("selection_predicate_gt %s " % (selection_predicate_gt,))
+
+
+        selection_predicate=[]
+        selection_predicate.extend(selection_predicate_eq)
+        selection_predicate.extend(selection_predicate_gt)
+
         
-        log.info("predicate_args: %s" %(predicate_args,))
-        make_expressions = lambda args: IndexExpression(**args)
-        selection_predicate =  map(make_expressions, predicate_args)
+
         log.info("selection_predicate %s " % (selection_predicate,))
+
         rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicate)
         #rows = yield self.client.get_indexed_slices(self._cache_name, [IndexExpression(op=IndexOperator.EQ, value='UT', column_name='state')])
         

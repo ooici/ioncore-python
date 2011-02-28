@@ -161,7 +161,10 @@ class IndexStoreTest(IStoreTest):
         """return a deferred which returns a initiated instance of a
         backend
         """
-        return defer.maybeDeferred(store.IndexStore,indices=['full_name', 'state', 'birth_date'])
+
+        ds = store.IndexStore(indices=['full_name', 'state', 'birth_date'])
+
+        return defer.succeed(ds)
 
     @defer.inlineCallbacks
     def test_get_query_attributes(self):
@@ -171,22 +174,142 @@ class IndexStoreTest(IStoreTest):
         correct_set = set(['full_name', 'state', 'birth_date'])
         self.failUnlessEqual(attrs_set, correct_set)
 
+
+
+    # Test a single query, single result
     @defer.inlineCallbacks
-    def test_query(self):
-        d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
-        d2 = {'full_name':'Patrick Rothfuss', 'birth_date': '1973', 'state':'WI'}     
-        d3 = {'full_name':'Howard Tayler', 'birth_date': '1968', 'state':'UT'}
-        binary_value1 = 'BinaryValue for Brandon Sanderson'
-        binary_value2 = 'BinaryValue for Patrick Rothfuss'
-        binary_value3 = 'BinaryValue for Howard Tayler'
-        yield self.ds.put('bsanderson',binary_value1, d1)   
-        yield self.ds.put('prothfuss',binary_value2, d2)   
-        yield self.ds.put('htayler',binary_value3, d3) 
+    def test_query_single(self):
+
+        yield self.put_stuff_for_tests()
+
         query_attributes = {'birth_date':'1973'}
-        rows = yield self.ds.query(query_attributes)
+        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
         log.info("Rows returned %s " % (rows,))
-        self.failUnlessEqual(rows['prothfuss']['value'], binary_value2)
-         
+        self.assertEqual(rows['prothfuss']['value'], self.binary_value2)
+        self.assertEqual(len(rows),1)
+        for key in self.d2.keys():
+            self.assertIn(key, rows['prothfuss'])
+
+    # Test a single query, multiple result
+    @defer.inlineCallbacks
+    def test_query_single_2(self):
+
+        yield self.put_stuff_for_tests()
+
+        query_attributes = {'state':'UT'}
+        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
+        log.info("Rows returned %s " % (rows,))
+        self.assertEqual(rows['bsanderson']['value'], self.binary_value1)
+        self.assertEqual(rows['htayler']['value'], self.binary_value3)
+        self.assertEqual(rows['jstewart']['value'], self.binary_value4)
+        self.assertEqual(len(rows),3)
+        for key in self.d1.keys():
+            self.assertIn(key, rows['bsanderson'])
+
+        for key in self.d3.keys():
+            self.assertIn(key, rows['htayler'])
+
+        for key in self.d4.keys():
+            self.assertIn(key, rows['jstewart'])
+
+
+    # Tests multiple atts
+    @defer.inlineCallbacks
+    def test_query_multiple(self):
+
+        yield self.put_stuff_for_tests()
+
+        query_attributes = {'birth_date':'1973', 'state':'WI'}
+        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
+        log.info("Rows returned %s " % (rows,))
+        self.assertEqual(rows['prothfuss']['value'], self.binary_value2)
+        self.assertEqual(len(rows),1)
+
+
+    # Tests no result
+    @defer.inlineCallbacks
+    def test_query_no_resuluts(self):
+
+        yield self.put_stuff_for_tests()
+
+        query_attributes = {'birth_date':'1978', 'state':'WI'}
+        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
+        log.info("Rows returned %s " % (rows,))
+        self.assertEqual(len(rows),0)
+
+
+    # Tests greater than 1970 and state == UT
+    @defer.inlineCallbacks
+    def test_query_greater_and_eq(self):
+
+        yield self.put_stuff_for_tests()
+
+        query_attributes_gt = {'birth_date':'1970'}
+        query_attributes_eq = {'state':'UT'}
+
+        rows = yield self.ds.query(indexed_attributes_eq=query_attributes_eq,
+                                   indexed_attributes_gt=query_attributes_gt)
+
+        log.info("Rows returned %s " % (rows,))
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows['bsanderson']['value'], self.binary_value1)
+        for key in self.d1.keys():
+            self.assertIn(key, rows['bsanderson'])
+
+
+    # Tests greater than
+    @defer.inlineCallbacks
+    def test_query_greater_and_eq_2(self):
+
+        yield self.put_stuff_for_tests()
+
+        # Test whether the value is there...
+        query_attributes_gt = {'birth_date':''}
+        query_attributes_eq = {'state':'UT'}
+
+        rows = yield self.ds.query(indexed_attributes_eq=query_attributes_eq,
+                                   indexed_attributes_gt=query_attributes_gt)
+
+        log.info("Rows returned %s " % (rows,))
+        self.assertEqual(len(rows),2)
+        self.assertEqual(rows['bsanderson']['value'], self.binary_value1)
+        self.assertEqual(rows['htayler']['value'], self.binary_value3)
+        self.assertEqual(len(rows),2)
+        for key in self.d1.keys():
+            self.assertIn(key, rows['bsanderson'])
+
+        for key in self.d3.keys():
+            self.assertIn(key, rows['htayler'])
+
+
+    @defer.inlineCallbacks
+    def put_stuff_for_tests(self):
+        """
+        helper method for loading some data to test the query functions
+        """
+        self.d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
+        self.d2 = {'full_name':'Patrick Rothfuss', 'birth_date': '1973', 'state':'WI'}
+        self.d3 = {'full_name':'Howard Tayler', 'birth_date': '1968', 'state':'UT'}
+
+        # Add one more that has no DOB
+        self.d4 = {'full_name':'John Stewart', 'state':'UT'}
+
+        self.binary_value1 = 'BinaryValue for Brandon Sanderson'
+        self.binary_value2 = 'BinaryValue for Patrick Rothfuss'
+        self.binary_value3 = 'BinaryValue for Howard Tayler'
+
+        self.binary_value4 = 'BinaryValue for John Stewart'
+
+
+        yield self.ds.put('bsanderson',self.binary_value1, self.d1)
+        yield self.ds.put('prothfuss',self.binary_value2, self.d2)
+        yield self.ds.put('htayler',self.binary_value3, self.d3)
+
+        yield self.ds.put('jstewart',self.binary_value4, self.d4)
+
+
+
+
     @defer.inlineCallbacks
     def test_put(self):
         d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
@@ -234,7 +357,7 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
         yield self._stop_container()
 
 
-class CassandraIndexedStoreTest(IndexStoreTest):
+class CassandraIndexStoreTest(IndexStoreTest):
 
     @itv(CONF)
     def _setup_backend(self):

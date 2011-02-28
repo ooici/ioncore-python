@@ -110,7 +110,7 @@ class IIndexStore(IStore):
      
         """
         
-    def query(self, indexed_attributes={}):
+    def query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):
         """
         Search for rows in the Cassandra instance.
     
@@ -125,6 +125,11 @@ class IIndexStore(IStore):
         """
         Return the column names that are indexed.
         """
+
+class IndexStoreError(Exception):
+    """
+    An exception class for the index store
+    """
 
 class IndexStore(object):
     """
@@ -174,6 +179,7 @@ class IndexStore(object):
             if not kindex:
                 kindex = {}
                 self.indices[k] = kindex
+            # Create a set of keys if it does not already exist
             kindex[v]= kindex.get(v, set())
             kindex[v].add(key)
                         
@@ -188,7 +194,7 @@ class IndexStore(object):
             del self.kvs[key]            
         return defer.succeed(None)
         
-    def query(self, indexed_attributes={}):
+    def query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):
         """
         Search for rows in the Cassandra instance.
     
@@ -200,17 +206,54 @@ class IndexStore(object):
         docstring for the description of the data structure.
         """
         
-        return defer.maybeDeferred(self._query, indexed_attributes)
+        return defer.maybeDeferred(self._query, indexed_attributes_eq, indexed_attributes_gt)
         
-    def _query(self, indexed_attributes={}):
-        
+    def _query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):
+        """
+
+        """
         keys = set()
-        
-        for k,v in indexed_attributes.items():
+
+
+        ###
+        # Handle the equal to attributes
+        # To be Consistent with Cassandra - there must be at least one eq expression
+        ###
+        try:
+            k,v = indexed_attributes_eq.popitem()
             kindex = self.indices.get(k, None)
             if kindex:
                 keys.update(kindex.get(v,set()))
-        
+
+        except KeyError, ke:
+            log.info('No indexed_attributes_eq')
+            raise IndexStoreError('Invalid arguments to IndexStore - must provide at least one equal to operator for search!')
+
+
+        for k,v in indexed_attributes_eq.items():
+            # abort if the set of keys is empty - all operations are intersections
+            if len(keys) == 0:
+                return {}
+
+            kindex = self.indices.get(k, None)
+            if kindex:
+                # Use the intersection - each index attribute restricts the returned list!
+                keys.intersection_update(kindex.get(v,set()))
+
+        ###
+        # Handle the greater than to attributes
+        ###
+        for k,v in indexed_attributes_gt.items():
+            kindex = self.indices.get(k, None)
+            if kindex:
+                # Find all the attribute values greater than specified
+                matches = set()
+                for attr_val in kindex.keys():
+                    if attr_val > v:
+                        matches.update(kindex.get(attr_val,set()))
+                keys.intersection_update(matches)
+
+
         result = {}
         for k in keys:
             # This is stupid, but now remove effectively works - delete keys are no longer visible!

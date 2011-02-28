@@ -29,9 +29,10 @@ CONF = ioninit.config(__name__)
 
 
 
-INDEX_ATTRIBUTES_TYPE = object_utils.create_type_identifier(object_id=2511, version=1)
-ROWS_TYPE = object_utils.create_type_identifier(object_id=2512, version=1)
-ROW_TYPE = object_utils.create_type_identifier(object_id=9797, version=1)
+QUERY_ATTRIBUTES_TYPE = object_utils.create_type_identifier(object_id=17, version=1)
+ROW_TYPE = object_utils.create_type_identifier(object_id=18, version=1)
+ROWS_TYPE = object_utils.create_type_identifier(object_id=19, version=1)
+INDEXED_ATTRIBUTES_TYPE = object_utils.create_type_identifier(object_id=20, version=1)
 
 
 class IndexStoreServiceException(Exception):
@@ -89,10 +90,17 @@ class IndexStoreService(ServiceProcess):
         with the name value.
         """
         
-        index_attrs = {}
-        for attr in request.attrs:
-            index_attrs[attr.attribute_name] = attr.attribute_value
-        results = yield self._indexed_store.query(index_attrs)
+        index_attrs_eq = {}
+        for attr in request.attrs_eq:
+            index_attrs_eq[attr.attribute_name] = attr.attribute_value
+
+        index_attrs_gt = {}
+        for attr in request.attrs_gt:
+            index_attrs_gt[attr.attribute_name] = attr.attribute_value
+
+
+        results = yield self._indexed_store.query(indexed_attributes_eq=index_attrs_eq,
+                                                  indexed_attributes_gt=index_attrs_gt)
         #Now we have to put these back into a response
         response = yield self.message_client.create_instance(ROWS_TYPE)
         
@@ -168,11 +176,9 @@ class IndexStoreService(ServiceProcess):
         @retval returns the names of the columns in a CassandraRow message
         """      
         column_list = yield self._indexed_store.get_query_attributes()
-        response = yield self.message_client.create_instance(INDEX_ATTRIBUTES_TYPE)
+        response = yield self.message_client.create_instance(INDEXED_ATTRIBUTES_TYPE)
         
-        for column_name in column_list:
-            attr = response.attrs.add()
-            attr.attribute_name = column_name
+        response.attributes.extend(column_list)
              
         yield self.reply_ok(msg, response)
 # Spawn of the process using the module name
@@ -198,16 +204,20 @@ class IndexStoreServiceClient(ServiceClient):
     
       
     @defer.inlineCallbacks
-    def query(self, index_attributes):
+    def query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):
         log.info("Called Index Store Service client: Query")
         
-        request = yield self.mc.create_instance(INDEX_ATTRIBUTES_TYPE)
+        request = yield self.mc.create_instance(QUERY_ATTRIBUTES_TYPE)
         
-        for attr_key,attr_value in index_attributes.items():
-            attr = request.attrs.add()
+        for attr_key,attr_value in indexed_attributes_eq.items():
+            attr = request.attrs_eq.add()
             attr.attribute_name = attr_key
             attr.attribute_value = attr_value
-        
+
+        for attr_key,attr_value in indexed_attributes_gt.items():
+            attr = request.attrs_gt.add()
+            attr.attribute_name = attr_key
+            attr.attribute_value = attr_value
 
         (result, headers, msg) = yield self.rpc_send('query', request)
 
@@ -271,11 +281,7 @@ class IndexStoreServiceClient(ServiceClient):
         
         (result, headers, msg) = yield self.rpc_send('get_query_attributes','')
 
-        attrs=[]
-        for attr in result.attrs:
-            attrs.append(attr.attribute_name)
-
-        defer.returnValue(attrs)
+        defer.returnValue(result.attributes)
         
         
            
