@@ -26,7 +26,7 @@ log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 
 # Message types
-#XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
+XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
 
 class PST(IonTestCase):
     """
