@@ -57,8 +57,8 @@ class DataStoreService(ServiceProcess):
     COMMIT_STORE = 'commit_store_class'
     BLOB_STORE = 'blob_store_class'
     
-    COMMIT_REPOSITORY_INDEX = 'repository'
-    COMMIT_BRANCH_INDEX = 'repository'
+    COMMIT_REPOSITORY_INDEX = 'repository_key'
+    COMMIT_BRANCH_INDEX = 'repository_branch'
     
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
