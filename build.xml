@@ -29,7 +29,7 @@
     <py-compile dir="${src}" pythonpath="${src}" optimize="0"/>
  </target>
 
- <target name="clean" depends="remeggs"
+ <target name="clean"
      description="clean up" >
     <delete>
       <fileset dir="${src}" includes="**/*.pyc"/>
