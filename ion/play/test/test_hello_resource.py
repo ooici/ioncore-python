@@ -74,7 +74,7 @@ class HelloResourceTest(IonTestCase):
         
         create_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='Create me!')
         
-        create_request_msg. = create_request_msg.CreateObject(instrument_info_type)
+        create_request_msg.configuration = create_request_msg.CreateObject(instrument_info_type)
         
         create_request_msg.configuration.name = 'A CTD'
         create_request_msg.configuration.make = 'SeaBird'

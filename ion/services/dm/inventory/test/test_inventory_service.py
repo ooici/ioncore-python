@@ -67,7 +67,7 @@ class CassandraInventoryTester(IonTestCase):
         
         self.failUnlessEqual(put_response.result, "Put complete")
      
-    @itv(CONF)       
+    @itv(CONF)     
     @defer.inlineCallbacks
     def test_query(self): 
         key1 = "Key1"
@@ -112,8 +112,8 @@ class CassandraInventoryTester(IonTestCase):
         put_response = yield self.client.put(key,value,attr_dict)  
         remove_response = yield self.client.remove(key)
         get_response = yield self.client.get(key)
-        log.info(get_response.configuration.value)
-        self.failUnlessEqual(get_response.configuration.value,"")
+        log.info(get_response.value)
+        self.failUnlessEqual(get_response.value,"")
         
     @itv(CONF)      
     @defer.inlineCallbacks

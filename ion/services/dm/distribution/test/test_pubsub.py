@@ -26,7 +26,7 @@ log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 
 # Message types
-XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
+#XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
 
 class PST(IonTestCase):
     """
@@ -98,7 +98,6 @@ class PST(IonTestCase):
         xs_id = yield self.psc.declare_exchange_space(msg)
 
         self.failIf(len(xs_id.id_list) > 0)
-
 
     @itv(CONF)
     @defer.inlineCallbacks

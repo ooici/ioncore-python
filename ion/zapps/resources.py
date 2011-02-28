@@ -66,7 +66,7 @@ def stop(container, state):
     supdesc = state[0]
     log.info("Terminating CC agent")
     yield supdesc.terminate()
-    
+    gi
     
 # Create CDM Type Objects
 dataset_type = object_utils.create_type_identifier(object_id=10001, version=1)
@@ -91,8 +91,8 @@ def _bootstrap_objects(supid):
     rc = ResourceClient(proc=sup)
     
     # Create the dataset resource
-    dataset = yield rc.create_instance(dataset_type, name='Test CDM Resource dataset',
-                                       description='A test resource')
+    dataset = yield rc.create_instance(dataset_type, ResourceName='Test CDM Resource dataset',
+                                       ResourceDescription='A test resource')
     
     # Attach the root group
     group = dataset.CreateObject(group_type)
