@@ -85,9 +85,20 @@ class PST(IonTestCase):
 
         xs_id = yield self.psc.declare_exchange_space(msg)
 
-        log.debug('XS create returns id' % str(xs_id))
-        self.failIf(xs_id == None)
-        self.failIf(xs_id == '')
+        self.failIf(len(xs_id.id_list) == 0)
+        self.failIf(xs_id.id_list[0] == '')
+
+    @defer.inlineCallbacks
+    def test_bad_xs_creation(self):
+        raise unittest.SkipTest('EMS doesnt do paramater validation yet')
+        # Make sure it fails if you skip the argument
+
+        msg = yield self.mc.create_instance(XS_TYPE)
+
+        xs_id = yield self.psc.declare_exchange_space(msg)
+
+        self.failIf(len(xs_id.id_list) > 0)
+
 
     @itv(CONF)
     @defer.inlineCallbacks
