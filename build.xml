@@ -38,7 +38,7 @@
     <delete dir="${dist}"/>
     <delete dir="ioncore.egg-info"/>
     <delete dir="_trial_temp"/>
-    <antcall target="remeggs"/>
+    <!--<antcall target="remeggs"/>-->
   </target>
 
   <target name="dir.check">
