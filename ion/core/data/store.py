@@ -8,7 +8,7 @@
 @brief base interface for all key-value stores in the system and default
         in memory implementation
 """
-
+import os
 from zope.interface import Interface
 from zope.interface import implements
 
@@ -186,7 +186,7 @@ class IndexStore(object):
         
         if not index_attribute_names.issubset(query_attribute_names):
             bad_attrs = index_attribute_names.difference(query_attribute_names)
-            raise IndexStoreError("These attributes %s are not indexed." % (" ".join(bad_attrs),))
+            raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
         
         for k, v in index_attributes.items():
             kindex = self.indices.get(k, None)

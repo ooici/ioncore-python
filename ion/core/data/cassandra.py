@@ -10,6 +10,7 @@
         Cassandra datastore backend
 @note Test cases for the cassandra backend are now in ion.data.test.test_store
 """
+import os
 
 from twisted.internet import defer
 
@@ -146,7 +147,9 @@ class CassandraStore(TCPConnection):
 
 class CassandraIndexedStore(CassandraStore):
     """
-    
+    An Adapter class that provides the ability to use secondary indexes in Cassandra. It
+    extends the IStore interface by adding a query and update_index method. It provides functionality
+    for associating attributes with a value. These attributes are used in the query functionality. 
     """
     implements(store.IIndexStore)
     
@@ -169,9 +172,10 @@ class CassandraIndexedStore(CassandraStore):
         """
         log.info("key: %s value: %s index_attributes %s" % (key,value,index_attributes))
         yield self._check_index(index_attributes)
+        #We need to make a deep copy of the index_attributes argument because the code modifies a mutable default arguments.
         row = dict(index_attributes)
-        #row = index_attributes
         row['value'] = value
+        log.info("Adding value to the row")
         yield self.client.batch_insert(key, self._cache_name, row)
 
     @defer.inlineCallbacks
@@ -203,7 +207,7 @@ class CassandraIndexedStore(CassandraStore):
         
         if not index_attribute_names.issubset(query_attribute_names):
             bad_attrs = index_attribute_names.difference(query_attribute_names)
-            raise IndexStoreError("These attributes %s are not indexed." % (" ".join(bad_attrs),))
+            raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
         
         defer.returnValue(None)
 
