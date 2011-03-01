@@ -982,7 +982,10 @@ class Repository(object):
         # If it is a link - set a link to the value in the wrapper
         if link.ObjectType != link.LinkClassType:
             raise RepositoryError('Can not set a composite field unless it is of type Link')
-                    
+
+        if not isinstance(value, gpb_wrapper.Wrapper):
+            raise RepositoryError('You can not assign an object link equal to a none GPB Wrapper value. Value type %s' % type(value))
+
         if not value.IsRoot == True:
             # @TODO provide for transfer by serialization and re instantiation
             raise RepositoryError('You can not set a link equal to part of a gpb composite, only the root!')
