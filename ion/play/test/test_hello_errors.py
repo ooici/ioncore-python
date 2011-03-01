@@ -2,8 +2,8 @@
 
 """
 @file ion/play/test/test_hello_errors.py
-@test ion.play.hello_service Example unit tests for sample code.
-@author Michael Meisinger
+@test ion.play.hello_service Example unit tests which demonstrates the error handeling of the service and the client
+@author David Stuebe
 """
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -11,18 +11,34 @@ from twisted.internet import defer
 
 from ion.play.hello_errors import HelloErrorsClient, HelloErrors, HelloError
 from ion.test.iontest import IonTestCase
-from ion.core.exception import ReceivedError, ReceivedApplicationError, ReceivedContainerError
+from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
 from ion.core.messaging import message_client
 from ion.core.object import object_utils
 
 # Use the person object as a simple type of message content
+# from net.ooici.play addressbook.proto
 PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
+"""
+message Person {
+  enum _MessageTypeIdentifier {
+    _ID = 20001;
+    _VERSION = 1;
+  }
+  optional string name = 1;
+  optional int32 id = 2;        // Unique ID number for this person.
+  optional string email = 3;
 
+  enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+  }
+"""
 
 class HelloErrorsBusinessLogicTest(IonTestCase):
     """
-    Testing example hello service.
+    Testing example hello service business logic
     """
 
     @defer.inlineCallbacks
@@ -42,7 +58,7 @@ class HelloErrorsBusinessLogicTest(IonTestCase):
     @defer.inlineCallbacks
     def test_hello_accept(self):
                         
-        # Use the convience method of the test case to create a message instance
+        # Use the convenience method of the test case to create a message instance
         request = yield self.create_message(MessageContentTypeID=PERSON_TYPE)
         request.name = 'Jane Doe'
         request.id = 42 # This is just a field in the person object it has no significance in ION
@@ -62,8 +78,9 @@ class HelloErrorsBusinessLogicTest(IonTestCase):
         
     @defer.inlineCallbacks
     def test_hello_fail(self):
-                        
-        # set little johny droptables name using the kwargs in the convience method
+
+        ### The create_message method of the ION Test case allows simple fields to be set inline using kwargs
+        # set little johny droptables name using the kwargs in the convenence method
         request = yield self.create_message(MessageContentTypeID=PERSON_TYPE, name="""Robert); DROP TABLE Students;""")
         # Don't bother setting other fields...
         
@@ -82,7 +99,7 @@ class HelloErrorsBusinessLogicTest(IonTestCase):
     @defer.inlineCallbacks
     def test_hello_ok(self):
                         
-        # Use the convience method of the test case to create a message instance
+        # Use the convenience method of the test case to create a message instance
         # Keyword arguments can be used to set simple fields in the message
         request = yield self.create_message(MessageContentTypeID=PERSON_TYPE, name='John Doe', id=42)
         # Use the long hand method to set fields in the message instance
@@ -98,11 +115,13 @@ class HelloErrorsBusinessLogicTest(IonTestCase):
 
 class HelloErrorsTest(IonTestCase):
     """
-    Testing example hello service.
+    Testing example hello service via the service client
     """
 
     @defer.inlineCallbacks
     def setUp(self):
+
+        # Start the container
         yield self._start_container()
         services = [
             {'name':'hello_my_error','module':'ion.play.hello_errors','class':'HelloErrors'},

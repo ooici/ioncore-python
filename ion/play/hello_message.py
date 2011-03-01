@@ -10,23 +10,16 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-import ion.util.procutils as pu
-from ion.core.process.process import ProcessFactory, Process, ProcessClient
+from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
+from ion.core.exception import ApplicationError
 
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+# from net.ooici.play addressbook.proto
+PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
 """
-package net.ooici.play;
-
-// Copied from the google example!
-// Changed rules - never use required!
-
-import "net/ooici/core/link/link.proto";
-
 message Person {
   enum _MessageTypeIdentifier {
     _ID = 20001;
@@ -50,19 +43,11 @@ message Person {
   repeated PhoneNumber phone = 4;
 }
 
-// Our address book file is just one of these.
-message AddressBook {
-  enum _MessageTypeIdentifier {
-    _ID = 20002;
-    _VERSION = 1;
-  }
-  repeated Person person = 1;
-  optional Person owner = 2;
-  optional string title = 3;
-}
+"""
 
-
-// Our address book file is just one of these.
+# from net.ooici.play addressbook.proto
+ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
+"""
 message AddressLink {
   enum _MessageTypeIdentifier {
     _ID = 20003;
@@ -75,7 +60,7 @@ message AddressLink {
 """
 
 
-class HelloMessageError(Exception):
+class HelloMessageError(ApplicationError):
     """
     An exception class for the Hello Message example
     """
@@ -99,42 +84,54 @@ class HelloMessage(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_hello_person(self, person_msg, headers, msg):
+        """
+        @brief Respond to a simple message
+        @param params person_msg GPB, 20001/1, a person object from net.ooici.play.
+        @retval response, GPB 20001/1, a person message if successful.
+        """
         log.info('op_hello_person: ')
 
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if person_msg.MessageType != person_type:
-            # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloMessageError('Unexpected type received \n %s' % str(person_msg))
+        if person_msg.MessageType != PERSON_TYPE:
+            # This will send an error message and reset the state of the hello service
+            raise HelloMessageError('Unexpected type received \n %s' % str(person_msg), person_msg.ResponseCodes.BAD_REQUEST)
             
                 
         # Creepy hello person object log statements...
         log.info( 'Hello ' + person_msg.name +'...')
         log.info('I know your phone number ' + person_msg.name + '... it is: '+ person_msg.phone[0].number)
-        
-        person_reply = yield self.mc.create_instance(MessageContentTypeID=person_type)
+
+        # Create a response message object
+        person_reply = yield self.mc.create_instance(MessageContentTypeID=PERSON_TYPE)
         
         # If you want to move the whole object, you can do that using the getter/setter
         person_reply.MessageObject = person_msg.MessageObject
         
-        # Change something...
-        
+        # Change something about the reply
         person_reply.name = person_reply.name + ' stuebe'
-        
-        # The following line shows how to reply to a message
-        # The api for reply may be refactored later on so that there is just the one argument...
+
+        # Set a response code in the message - see net.ooici.core.message.ion_message.proto for details on responses
+        person_reply.MessageResponseCode = person_reply.ResponseCodes.OK
+
+        # The following line shows how to reply with a message object
         yield self.reply_ok(msg, person_reply)
 
     @defer.inlineCallbacks
-    def op_hello_everyone(self, addressbook_msg, headers, msg):
+    def op_hello_everyone(self, addresslink_msg, headers, msg):
+        """
+        @brief Respond to a simple message
+        @param params addresslink_msg GPB, 20003/1, a addresslink object from net.ooici.play.
+        @retval ack - a message envelope with ResponseCode OK and no content.
+        """
         log.info('op_hello_everyone: ')
 
-        if addressbook_msg.MessageType  != addresslink_type:
+        if addresslink_msg.MessageType  != ADDRESSLINK_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloError('Unexpected type received \n %s' % str(addressbook_msg))
+            raise HelloMessageError('Unexpected type received \n %s' % str(addresslink_msg), addresslink_msg.ResponseCodes.BAD_REQUEST)
             
-        log.info('Received addresbook; Title: ' + addressbook_msg.title)
-        for person in addressbook_msg.person:
+        log.info('Received addreslink; Title: ' + addresslink_msg.title)
+        for person in addresslink_msg.person:
             log.info('Logging Person: \n' +str(person))
             
         yield self.reply_ok(msg)
@@ -155,6 +152,11 @@ class HelloMessageClient(ServiceClient):
 
     @defer.inlineCallbacks
     def hello_person(self, msg):
+        """
+        @brief Respond to a simple message
+        @param params person_msg GPB, 20001/1, a person object from net.ooici.play.
+        @retval response, GPB 20001/1, a person message if successful.
+        """
         yield self._check_init()
         
         (content, headers, msg) = yield self.rpc_send('hello_person', msg)
@@ -163,6 +165,11 @@ class HelloMessageClient(ServiceClient):
         
     @defer.inlineCallbacks
     def hello_everyone(self, msg):
+        """
+        @brief Respond to a simple message
+        @param params addresslink_msg GPB, 20003/1, a addresslink object from net.ooici.play.
+        @retval ack - a message envelope with ResponseCode OK and no content.
+        """
         yield self._check_init()
         
         (content, headers, msg) = yield self.rpc_send('hello_everyone', msg)

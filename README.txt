@@ -30,6 +30,7 @@ dependencies are resolved automatically using the provided setup script.
 
 
 Example setup to work on ioncore-python:
+========================================
 
 mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 your_env_name
 mkdir some_dir_to_keep_it_all_in
@@ -37,10 +38,12 @@ cd some_dir_to_keep_it_all_in
 git clone git@github.com:ooici/ioncore-python.git
 cd ioncore-python
 python bootstrap.py
-bin/buildout 
+ant clean
+bin/buildout -c development.cfg
 bin/trial ion
 
 Example setup to work on ioncore-python and ion-object-definitions:
+===================================================================
 
 mkvirtualenv --no-site-packages --python=/usr/bin/python2.5 your_env_name
 mkdir some_dir_to_keep_it_all_in
@@ -49,19 +52,25 @@ git clone git@github.com:ooici/ioncore-python.git
 git clone git@github.com:ooici/ion-object-definitions.git
 cd ioncore-python
 cd ../ion-object-definitions
-ant dist
+(Refer to ion-object-definitions README.txt for build instructions)
 cd ../ioncore-python
 python bootstrap.py
+ant clean
 bin/buildout -c dev-integration.cfg
 bin/trial ion
 
+ionproto Clean up Note:
+=======================
+buildout might not get the latest ionproto after 
+repeated builds since there's already an egg in the cache eggs/ dir. 
+You can do: rm -r eggs/ionproto*.egg
+    or 
+Run 
+ant clean
 
-Current dependencies include:
-    twisted, carrot, txamqp, msgpack-python, httplib2, simplejson, Telephus
-    gviz_api.py, nimboss, txrabbitmq, M2Crypto-patched, ionproto and protobuf
-
-
-*M2Crypto note: requires autoconf, automake, and g++ packages be installed prior.
+Current dependencies:
+====================
+M2Crypto note: Needs swig installed on the O.S.
 
 
 Usage

@@ -29,8 +29,8 @@
     <py-compile dir="${src}" pythonpath="${src}" optimize="0"/>
  </target>
 
-  <target name="clean"
-        description="clean up" >
+ <target name="clean"
+     description="clean up"> 
     <delete>
       <fileset dir="${src}" includes="**/*.pyc"/>
     </delete>
@@ -38,8 +38,22 @@
     <delete dir="${dist}"/>
     <delete dir="ioncore.egg-info"/>
     <delete dir="_trial_temp"/>
-    <echo message="Use 'ant clean-buildout' if you want to clean out buildout directories as well."/>
+    <antcall target="remeggs"/>
   </target>
+
+  <target name="dir.check">
+      <condition property="dir.exists">
+          <available file="eggs" type="dir"/>
+      </condition>
+  </target>
+
+  <target name="remeggs" depends="dir.check" if="dir.exists">
+      <echo message="Remove buildout eggs eggs/ionprot*"/>
+      <delete includeemptydirs="true">
+           <fileset dir="eggs" includes="**/ionproto*/" />
+       </delete>
+    <echo message="Use 'ant clean-buildout' if you want to completely clean out buildout directories."/>
+   </target>
 
   <target name="clean-buildout"
         description="clean up buildout dirs" depends="clean" >

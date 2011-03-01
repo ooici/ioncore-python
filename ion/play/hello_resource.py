@@ -10,20 +10,18 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-import ion.util.procutils as pu
-from ion.core.process.process import ProcessFactory, Process, ProcessClient
+from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
 from ion.core.messaging.message_client import MessageClient
+from ion.core.exception import ApplicationError
 
-
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 
 from ion.core.object import object_utils
 
-instrument_resource_type = object_utils.create_type_identifier(object_id=20029, version=1)
-instrument_info_type = object_utils.create_type_identifier(object_id=20030, version=1)
+# from net.ooici.play instrument_example.proto
+INSTRUMENT_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=20029, version=1)
 """
 package net.ooici.play;
 
@@ -39,6 +37,12 @@ message InstrumentResource{
     optional string serial_number = 4;
 }
 
+"""
+# from net.ooici.play instrument_example.proto
+
+INSTRUMENT_INFO_TYPE = object_utils.create_type_identifier(object_id=20030, version=1)
+"""
+
 message InstrumentInfoObject{
     enum _MessageTypeIdentifier {
       _ID = 20030;
@@ -51,8 +55,7 @@ message InstrumentInfoObject{
 }
 """
 
-resource_request_type = object_utils.create_type_identifier(object_id=10, version=1)
-resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
+RESOURCE_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
 """
 package net.ooici.core.message;
 
@@ -83,6 +86,10 @@ message ResourceConfigurationRequest{
     
 }
 
+"""
+
+RESOURCE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=12, version=1)
+"""
 message ResourceConfigurationResponse{
     enum _MessageTypeIdentifier {
       _ID = 12;
@@ -98,7 +105,8 @@ message ResourceConfigurationResponse{
     optional string result = 3;
 }
 """
-resource_reference_type = object_utils.create_type_identifier(object_id=4, version=1)
+
+RESOURCE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 """
 package net.ooici.core.link;
 
@@ -126,7 +134,7 @@ message IDRef {
 }
 """
 
-class HelloResourceError(Exception):
+class HelloResourceError(ApplicationError):
     """
     An exception class for the Hello Resource example
     """
@@ -135,6 +143,9 @@ class HelloResourceError(Exception):
 class HelloResource(ServiceProcess):
     """
     Example service which manages a set of resources.
+
+    In this example we have defined a Request and Response type which may generally be useful, but it is not a
+    canonical message type. It provides a common pattern for working with resources.
     
     """
 
@@ -158,26 +169,27 @@ class HelloResource(ServiceProcess):
     @defer.inlineCallbacks
     def op_create_instrument_resource(self, request, headers, msg):
         """
-        This method assumes that the caller provides an Instrument Info Object
+        @Brief This method assumes that the caller provides an Instrument Info Object
         in a Resource Configuration Request message which should be made into a
         resource.
-        
-        This is the standard pattern for working with a resource.
-        
+
+        @param params request GPB, 10/1, a request to operate on a resource
+        @retval response, GPB 12/1, a response from the service which handles the resource
         """
         log.info('op_create_instrument_resource: ')
 
-        # Check only the type recieved and linked object types. All fields are
+        # Check only the type received and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if request.MessageType != resource_request_type:
+        if request.MessageType != RESOURCE_REQUEST_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloDataUpdateError('Expected message type ResourceConfigurationRequest, received %s'
-                                     % str(request))
+            raise HelloResourceError('Expected message type ResourceConfigurationRequest, received %s'
+                                     % str(request), request.ResponseCodes.BAD_REQUEST)
             
         ### Check the type of the configuration request
         if request.IsFieldSet('resource_reference'):
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloResourceError('Expected message with NO resource_reference field, received an illegal message!')
+            raise HelloResourceError('Expected message with NO resource_reference field, received an illegal message!',
+                                     request.ResponseCodes.BAD_REQUEST)
             
         # Attributes of a resource like name and description should be controlled
         # by the service that manages them
@@ -185,16 +197,17 @@ class HelloResource(ServiceProcess):
         self.instance_counter+=1
         
         # Use the resource client to create a resource!
-        resource = yield self.rc.create_instance(instrument_resource_type, ResourceName=name, ResourceDescription='Preposterous instrument resource!')
+        resource = yield self.rc.create_instance(INSTRUMENT_RESOURCE_TYPE, ResourceName=name, ResourceDescription='Preposterous instrument resource!')
         
         ### Set any fields provided by the configuration request
         if request.IsFieldSet('configuration'):
             
             ### Check the type of the configuration request
-            if request.configuration.ObjectType != instrument_info_type:
+            if request.configuration.ObjectType != INSTRUMENT_INFO_TYPE:
                 # This will terminate the hello service. As an alternative reply okay with an error message
                 raise HelloResourceError('Expected message type InstrumentInfoRequest, received %s; type %s'
-                                         % (str(request.configuration), str(request.configuration.ObjectClass)))
+                                         % (str(request.configuration), str(request.configuration.ObjectClass)),
+                                         request.ResponseCodes.BAD_REQUEST)
                 
             if request.configuration.IsFieldSet('name'):
                 resource.name = request.configuration.name
@@ -214,7 +227,7 @@ class HelloResource(ServiceProcess):
         log.info(str(resource))
         
         
-        response = yield self.mc.create_instance(resource_response_type, MessageName='create_instrument_resource response')
+        response = yield self.mc.create_instance(MessageContentTypeID = RESOURCE_RESPONSE_TYPE)
         
         # Create a reference to return to the caller
         # This is one pattern - it exposes the resource to the caller
@@ -224,9 +237,9 @@ class HelloResource(ServiceProcess):
         
         # pass the current configuration
         response.configuration = resource.ResourceObject
-        
-        # pass the result of the create operation...
-        response.result = 'Created'
+
+        # Set a response code in the message envelope
+        response.MessageResponseCode = response.ResponseCodes.OK
                 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)
@@ -235,40 +248,46 @@ class HelloResource(ServiceProcess):
     @defer.inlineCallbacks
     def op_update_instrument_resource(self, request, headers, msg):
         """
-        This method is an example using a standard resource update request.
+        @Brief This method is an example using a standard resource update request.
         It contains two parts, the reference to the resource to update and the
         state of the resource which should be set.
+
+        @param params request GPB, 10/1, a request to operate on a resource
+        @retval response, GPB 12/1, a response from the service which handles the resource
         """
         
         log.info('op_update_instrument_resource: ')
             
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if request.MessageType != resource_request_type:
+        if request.MessageType != RESOURCE_REQUEST_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message type ResourceConfigurationRequest, received %s'
-                                     % str(request))
+                                     % str(request), request.ResponseCodes.BAD_REQUEST )
         
         ### Check the type of the configuration request
         if not request.IsFieldSet('configuration'):
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message with configuration field of type InstrumentInfoRequest, received empty configuration!')
 
-        if request.configuration.ObjectType != instrument_info_type:
+        if request.configuration.ObjectType != INSTRUMENT_INFO_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message with configuration field of type InstrumentInfoRequest, received %s; type %s'
-                    % (str(request.configuration), str(request.configuration.ObjectClass)))
+                    % (str(request.configuration), str(request.configuration.ObjectClass)),
+                                     request.ResponseCodes.BAD_REQUEST)
 
         ### Check the type of the configuration request
         if not request.IsFieldSet('resource_reference'):
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloResourceError('Expected message with resource_reference field of type IDRef, received empty resource_reference!')
+            raise HelloResourceError('Expected message with resource_reference field of type IDRef, received empty resource_reference!',
+                                     request.ResponseCodes.BAD_REQUEST)
             
-        if request.resource_reference.ObjectType != resource_reference_type:
+        if request.resource_reference.ObjectType != RESOURCE_REFERENCE_TYPE:
 
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message with resource_reference field of type IDRef, received %s; type %s'
-                    % (str(request.resource_reference), str(request.resource_reference.ObjectClass)))
+                    % (str(request.resource_reference), str(request.resource_reference.ObjectClass)),
+                                     request.ResponseCodes.BAD_REQUEST)
 
 
             
@@ -319,7 +338,7 @@ class HelloResource(ServiceProcess):
         log.info(str(resource))
         
         
-        response = yield self.mc.create_instance(resource_response_type, MessageName='update_instrument_resource response')
+        response = yield self.mc.create_instance(MessageContentTypeID = RESOURCE_RESPONSE_TYPE)
         
         # Create a reference to return to the caller
         # This is one pattern - it exposes the resource to the caller
@@ -330,8 +349,7 @@ class HelloResource(ServiceProcess):
         # pass the current configuration
         response.configuration = resource.ResourceObject
         
-        # pass the result of the create operation...
-        response.result = 'Created'
+        response.MessageResponseCode = response.ResponseCodes.OK
                 
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)
@@ -343,36 +361,43 @@ class HelloResource(ServiceProcess):
         This method is an example using a standard resource update request.
         It contains two parts, the reference to the resource to update and the
         state of the resource which should be set.
+
+        @param params request GPB, 10/1, a request to operate on a resource
+        @retval simple ack message
         """
         
         log.info('op_set_instrument_resource_life_cycle: ')
             
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if request.MessageType != resource_request_type:
+        if request.MessageType != RESOURCE_REQUEST_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message type ResourceConfigurationRequest, received %s'
-                                     % str(request))
+                                     % str(request), request.ResponseCodes.BAD_REQUEST)
         
         ### Check the type of the configuration request
         if request.IsFieldSet('configuration'):
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloResourceError('Expected message with NO configuration field, received an illegal message!')
+            raise HelloResourceError('Expected message with NO configuration field, received an illegal message!',
+                                     request.ResponseCodes.BAD_REQUEST)
         
         ### Check the type of the configuration request
         if not request.IsFieldSet('resource_reference'):
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloResourceError('Expected message with resource_reference field of type IDRef, received empty configuration!')
+            raise HelloResourceError('Expected message with resource_reference field of type IDRef, received empty configuration!',
+                                     request.ResponseCodes.BAD_REQUEST)
             
-        if request.resource_reference.ObjectType != resource_reference_type:
+        if request.resource_reference.ObjectType != RESOURCE_REFERENCE_TYPE:
 
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message with resource_reference field of type IDRef, received %s; type %s'
-                    % (str(request.resource_reference), str(request.resource_reference.ObjectClass)))
+                    % (str(request.resource_reference), str(request.resource_reference.ObjectClass)),
+                                     request.ResponseCodes.BAD_REQUEST)
 
         if not request.IsFieldSet('life_cycle_operation'):
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloResourceError('Expected message with a life_cycle_operation field, received an illegal message!')
+            raise HelloResourceError('Expected message with a life_cycle_operation field, received an illegal message!',
+                                     request.ResponseCodes.BAD_REQUEST)
             ### Don't need to check the type of the lco field... it is gpb defined
             
         # Get the current state of the resource

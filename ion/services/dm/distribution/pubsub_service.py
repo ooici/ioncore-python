@@ -15,6 +15,7 @@ import time
 
 from twisted.internet import defer
 
+from ion.core.exception import ApplicationError
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core import ioninit
@@ -39,8 +40,9 @@ RESPONSE_TYPE = object_utils.create_type_identifier(object_id=12, version=1)
 REGEX_TYPE = object_utils.create_type_identifier(object_id=2306, version=1)
 IDLIST_TYPE = object_utils.create_type_identifier(object_id=2312, version=1)
 XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
+XP_TYPE = object_utils.create_type_identifier(object_id=2309, version=1)
 
-class PSSException(Exception):
+class PSSException(ApplicationError):
     """
     Exception class for the pubsub service.
     """
@@ -68,44 +70,54 @@ class PubSubService(ServiceProcess):
                                           dependencies=[])
 
     def slc_init(self):
-        log.debug('PubSubService starting')
         self.ems = ExchangeManagementClient(proc=self)
-        log.debug('Creating ResourceClient')
         self.rclient = ResourceClient(proc=self)
         self.mc = MessageClient(proc=self)
 
-        log.debug('PSS slc_init completed')
+        # @todo Lists to replace find/query in registry
+        self.xs_list = dict()
+        self.xp_list = dict()
+        self.topic_list = dict()
+        self.pub_list = dict()
+        self.sub_list = dict()
 
     # Protocol entry points. Responsible for parsing and unpacking arguments
     @defer.inlineCallbacks
     def op_declare_exchange_space(self, request, headers, msg):
         log.debug('Here we go')
-        if request.MessageType != REQUEST_TYPE:
-            raise PSSException('Bad message, expected a request type, got %s' % str(request))
+        if request.MessageType != XS_TYPE:
+            raise PSSException('Bad message, expected a request type, got %s' % str(request),
+                               request.ResponseCodes.BAD_REQUEST)
 
 
         log.debug('Calling EMS to create the exchange space...')
         # For now, use timestamp as description
         description = str(time.time())
-        id = yield self.ems.create_exchangespace(request.exchange_space_name, description=description)
+        xsid = yield self.ems.create_exchangespace(request.exchange_space_name, description)
 
-        log.debug('EMS returns ID %s' % id)
+        log.debug('EMS returns ID %s' % xsid.resource_reference)
 
         # Write ID into registry
         log.debug('Creating RC instance')
-        xs = yield self.rclient.create_instance(XS_TYPE, ResourceName=request.exchange_space_name, ResourceDescription=description)
+        xs = yield self.rclient.create_instance(XS_TYPE, ResourceName=request.exchange_space_name,
+                                                ResourceDescription=description)
         log.debug('Writing RC record')
         yield self.rclient.put_instance(xs)
 
         log.debug('Operation completed, creating response message')
 
-        response = yield self.mc.create_instance(RESPONSE_TYPE, MessageName='declare_xs response')
+        response = yield self.mc.create_instance(IDLIST_TYPE, MessageName='declare_xs response')
 
-        log.debug('Response created')
+        log.debug('Response message created')
 
-        response.resource_reference = self.rclient.reference_instance(id)
+        response.id_list.add()
+        response.id_list[0]=xsid.resource_reference
 
-        response.result = 'OK'
+        response.MessageResponseCode = response.ResponseCodes.OK
+
+        # save to list
+        log.debug('Saving to internal list...')
+        self.xs_list[xsid.resource_reference] = request.exchange_space_name
 
         log.debug('Responding...')
 
@@ -114,110 +126,27 @@ class PubSubService(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def op_declare_topic_tree(self, content, headers, msg):
+    def op_undeclare_exchange_space(self, request, headers, msg):
+
+        # Typecheck the message
+        if request.MessageType != REQUEST_TYPE:
+            raise PSSException('Bad message type received', request.ResponseCodes.BAD_REQUEST)
+
+        log.debug('Looking for XS entry...')
         try:
-            xs_name = content['exchange_space_name']
-            tt_name = content['topic_tree_name']
+            rc = self.xs_list[request.resource_reference]
         except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            yield self.reply_err(msg, {'value': estr})
-            defer.returnValue(None)
+            response = yield self.mc.create_instance(RESPONSE_TYPE)
+            response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
+            yield self.reply_ok(msg, response)
 
-        rc = yield self.declare_topic_tree(xs_name, tt_name)
-        yield self.reply_ok(msg, {'value': rc})
+        log.warn('Here is where we ask EMS to remove the XS')
+        response = yield self.mc.create_instance(RESPONSE_TYPE)
+        response.MessageResponseCode = response.ResponseCodes.OK
 
-    def op_undeclare_topic_tree(self, content, headers, msg):
-        try:
-            tt_id = content['topic_tree_id']
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            self.reply_err(msg, {'value': estr})
-            return
+        yield self.reply_ok(msg, response)
 
-        rc = self.undeclare_topic_tree(tt_id)
-        self.reply_ok(msg, {'value': rc})
 
-    def op_query_topic_trees(self, content, headers, msg):
-        try:
-            t_regex = content['topic_regex']
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            self.reply_err(msg, {'value': estr})
-            return
- 
-        rc = self.query_topic_trees(t_regex)
-        self.reply_ok(msg, {'value': rc})
- 
-    @defer.inlineCallbacks
-    def op_define_topic(self, content, headers, msg):
-        try:
-            tt_id = content['topic_tree_id']
-            t_name = content['topic_name']
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            yield self.reply_err(msg, {'value': estr})
-            defer.returnValue(None)
-
-        rc = yield self.define_topic(tt_id, t_name)
-        yield self.reply_ok(msg, {'value': rc})
-
-    def op_query_topics(self, content, headers, msg):
-        try:
-            xp_name = content['exchange_point_name']
-            t_regex = content['topic_regex']
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            self.reply_err(msg, {'value': estr})
-            return
-
-        rc = self.query_topics(xp_name, t_regex)
-        self.reply_ok(msg, {'value': rc})
-
-    def op_define_publisher(self, content, headers, msg):
-        try:
-            tt_id = content['topic_tree_id']
-            topic_id = content['topic_id']
-            p_name = content['publisher_name']
-            cred = content['credentials']
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            self.reply_err(msg, {'value': estr})
-            return
-
-        rc = self.define_publisher(tt_id, topic_id, p_name, cred)
-        self.reply_ok(msg, {'value': rc})
-
-    def op_subscribe(self, content, headers, msg):
-        try:
-            t_regex = content['topic_regex']
-            xs_name = content['exchange_space_name']
-            tt_name = content['topic_tree_name']
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            self.reply_err(msg, {'value': estr})
-            return
-
-        rc = self.subscribe(xs_name, tt_name, t_regex)
-        self.reply_ok(msg, {'value': rc})
-
-    def op_unsubscribe(self, content, headers, msg):
-        try:
-            s_id = content['subscription_id']
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            self.reply_err(msg, {'value': estr})
-            return
-
-        rc = self.unsubscribe(s_id)
-        self.reply_ok(msg, {'value': rc})
 
     ##############################################################    
     # API-style entry points. Akin to the twisted protocol/factory
@@ -253,21 +182,6 @@ class PubSubService(ServiceProcess):
         
         defer.returnValue(ttree.ResourceIdentity)
 
-    def undeclare_topic_tree(self, topic_tree_id):
-        """
-        @brief Remove a topic tree
-        @param topic_tree_id ID, as returned from declare_topic_tree
-        @retval None
-        """
-        log.error('UDTT not implemented')
-
-    def query_topic_trees(self, topic_regex):
-        """
-        @brief Registry query, return all trees that match the regex
-        @param topic_regex Regular expression to match against
-        @retval List, possibly empty, of topic tree names
-        """
-        log.error('QTT not implemented')
 
     @defer.inlineCallbacks
     def define_topic(self, topic_tree_id, topic_name):
@@ -301,101 +215,6 @@ class PubSubService(ServiceProcess):
         yield self.rclient.put_instance(topic, 'Adding dataset/topic %s' % cstr)
         log.debug('Commit completed, %s' % topic.ResourceIdentity)
         defer.returnValue(topic.ResourceIdentity)
-
-
-    def query_topics(self, exchange_point_name, topic_regex):
-        """
-        @brief Query topics within an exchange point
-        @param exchange_point_name Exchange point to inspect (scope)
-        @param topic_regex Regex to match
-        @retval List, possibly empty, of topic names
-        """
-        log.error('QT not implemented')
-
-    def define_publisher(self, topic_tree_id, topic_id, publisher_name, credentials=None):
-        """
-        @brief Called by the publisher, this drops through to the resource registry
-        @param topic_tree_id Tree where we'll publish
-        @param publisher_name Human-readable publisher ID string, e.g. "Doc X's buoy data for NYC harbor"
-        @param credentials Unused hook for auth*
-        @retval Transciever instance with send() method hooked up to correct topic
-        """
-        log.error('DP not implemented')
-
-    def subscribe(self, xs_name, tt_name, topic_regex):
-        """
-        @brief Called by subscribers, this calls the EMS to setup the data flow
-        @param xs_name Exchange space name
-        @param tt_name Topic tree name
-        @param topic_regex Topic of interest. If no publishers, then no data, but no error
-        @note Order of calls on publish/subscribe does not matter
-        @note creates the queue via EMS
-        @retval Address of queue for ondata() callback and resource id
-        """
-        log.error('Sub not implemented')
-
-    def unsubscribe(self, subscription_id):
-        """
-        @brief Remove subscription
-        @param subscription_id ID from subscribe calS
-        @retval OK if no problems, error otherwise
-        """
-        log.error('Unsub not implemented')
-
-class OldStylePubSubClient(ServiceClient):
-    """
-    @brief Refactor of client for new interfaces
-    @see http://oceanobservatories.org/spaces/display/CIDev/Pubsub+controller
-    """
-    def __init__(self, proc=None, **kwargs):
-        if not 'targetname' in kwargs:
-            kwargs['targetname'] = "pubsub"
-        ServiceClient.__init__(self, proc, **kwargs)
-
-    def declare_exchange_space(self, exchange_space_name):
-        pass
-
-    def undeclare_exchange_space(self, exchange_space_id):
-        pass
-
-    def query_exchange_spaces(self, exchange_space_regex):
-        pass
-
-    def declare_exchange_point(self, exchange_space_id, exchange_point_name):
-        pass
-
-    def undeclare_exchange_point(self, exchange_point_id):
-        pass
-
-    def query_exchange_points(self, exchange_point_regex):
-        pass
-
-    def declare_topic(self, exchange_space_id, exchange_point_id, topic_name):
-        pass
-
-    def undeclare_topic(self, topic_id):
-        pass
-
-    def query_topics(self, topic_regex):
-        pass
-
-    def declare_publisher(self, exchange_space_id, exchange_point_id, topic_id, publisher_name, credentials=None):
-        pass
-
-    def undeclare_publisher(self, publisher_id):
-        pass
-
-    def query_publishers(self, publisher_regex):
-        pass
-
-    def subscribe(self, exchange_space_id, exchange_point_id, topic_regex, use_queue=None):
-        pass
-
-    def unsubscribe(self, subscription_id):
-        pass
-
-    def create_queue(self, exchange_space_id, exchange_point_id):
-        pass
 
 
 class PubSubClient(ServiceClient):
@@ -444,47 +263,179 @@ class PubSubClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('query_exchange_spaces', params)
         defer.returnValue(content)
 
+    @defer.inlineCallbacks
     def declare_exchange_point(self, params):
-        pass
+        """
+        @brief Declare/create and exchange point, which is a topic-routed exchange
+        @note Must have parent exchange space id before calling this
+        @param params GPB 2309/1, with exchange_point_name and exchange_space_id filled in
+        @retval GPB 2312/1, zero length if error.
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('declare_exchange_point', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def undeclare_exchange_point(self, params):
-        pass
+        """
+        @brief Remove an exchange point by ID
+        @param params Exchange point ID, GPB 10/1, in field resource_reference
+        @retval Generic return GPB 11/1
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('undeclare_exchange_point', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def query_exchange_points(self, params):
-        pass
+        """
+        @brief List exchange points that match a regular expression
+        @param params GPB, 2306/1, with 'regex' filled in
+        @retval GPB, 2312/1, maybe zero-length if no matches.
+        @retval error return also possible
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('query_exchange_points', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def declare_topic(self, params):
-        pass
+        """
+        @brief Declare/create a topic in a given xs.xp. A topic is usually a dataset name.
+        @param params GPB 2307/1, with xs and xp_ids set
+        @retval GPB 2312/1, zero-length if error
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('declare_topic', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def undeclare_topic(self, params):
-        pass
+        """
+        @brief Remove a topic by ID
+        @param params Topic ID, GPB 10/1, in field resource_reference
+        @retval Generic return GPB 11/1
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('undeclare_topic', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def query_topics(self, params):
-        pass
+        """
+        @brief List topics that match a regular expression
+        @param params GPB, 2306/1, with 'regex' filled in
+        @retval GPB, 2312/1, maybe zero-length if no matches.
+        @retval error return also possible
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('query_topics', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def declare_publisher(self, params):
-        pass
+        """
+        @brief Declare/create a publisher in a given xs.xp.topic.
+        @param params GPB 2310/1, with xs, xp and topic_ids set
+        @retval GPB 2312/1, zero-length if error
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('declare_publisher', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def undeclare_publisher(self, params):
-        pass
+        """
+        @brief Remove a publisher by ID
+        @param params Publisher ID, GPB 10/1, in field resource_reference
+        @retval Generic return GPB 11/1
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('undeclare_publisher', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def query_publishers(self, params):
-        pass
+        """
+        @brief List publishers that match a regular expression
+        @param params GPB, 2306/1, with 'regex' filled in
+        @retval GPB, 2312/1, maybe zero-length if no matches.
+        @retval error return also possible
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('query_publishers', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def undeclare_publisher(self, params):
-        pass
+        """
+        @brief Remove a publisher by ID
+        @param params Publisher ID, GPB 10/1, in field resource_reference
+        @retval Generic return GPB 11/1
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('undeclare_publisher', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def subscribe(self, params):
-        pass
+        """
+        @brief The core operation, subscribe to a dataset/source by xs.xp.topic
+        @note Not fully fleshed out yet, interface subject to change
+        @param params GPB 2311/1
+        @retval GPB 2312/1, zero-length if a problem
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('subscribe', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def unsubscribe(self, params):
-        pass
+        """
+        @brief Remove a subscription by ID
+        @param params Subscription ID, GPB 10/1, in field resource_reference
+        @retval Generic return GPB 11/1
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('unsubscribe', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def create_queue(self, params):
-        pass
+        """
+        @brief Create a listener queue for a subscription
+        @param GPB 2308/1
+        @retval None
+        """
+        yield self._check_init()
 
+        (content, headers, msg) = yield self.rpc_send('create_queue', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
     def add_binding(self, params):
-        pass
-    
+        """
+        @brief Add a binding to an existing queue
+        @param params GPB 2314/1
+        @retval None
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('add_binding', params)
+        defer.returnValue(content)
+
+        
 # Spawn off the process using the module name
 factory = ProcessFactory(PubSubService)
