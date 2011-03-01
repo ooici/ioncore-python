@@ -70,7 +70,7 @@ class DataStoreService(ServiceProcess):
         self._backend_cls_names = {}
         #self.spawn_args['_class'] = self.spawn_args.get('_class', CONF.getValue('_class', default='ion.data.store.Store'))
         self._backend_cls_names[self.MUTABLE_STORE] = self.spawn_args.get(self.MUTABLE_STORE, CONF.getValue(self.MUTABLE_STORE, default='ion.core.data.store.Store'))
-        self._backend_cls_names[self.COMMIT_STORE] = self.spawn_args.get(self.COMMIT_STORE, CONF.getValue(self.COMMIT_STORE, default='ion.core.data.index_store_service.IndexStoreServiceClient'))
+        self._backend_cls_names[self.COMMIT_STORE] = self.spawn_args.get(self.COMMIT_STORE, CONF.getValue(self.COMMIT_STORE, default='ion.core.data.store.IndexStore'))
         self._backend_cls_names[self.BLOB_STORE] = self.spawn_args.get(self.BLOB_STORE, CONF.getValue(self.BLOB_STORE, default='ion.core.data.store.Store'))
             
         self._backend_classes={}
@@ -112,8 +112,13 @@ class DataStoreService(ServiceProcess):
         if issubclass(self._backend_classes[self.COMMIT_STORE], cassandra.CassandraStore):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
         else:
-            self.c_store = yield defer.maybeDeferred(self._backend_classes[self.COMMIT_STORE], self)
-        
+            indices = ['subject_repository','subject_branch','subject_commit',
+                       'predicate_repository','predicate_branch','predicate_commit',
+                       'object_repository','object_branch','object_commit', 'word',
+                        self.COMMIT_REPOSITORY_INDEX,  self.COMMIT_BRANCH_INDEX]
+            
+            self.c_store = yield defer.maybeDeferred(self._backend_classes[self.COMMIT_STORE], self, **{'indices':indices})
+
         if issubclass(self._backend_classes[self.BLOB_STORE], cassandra.CassandraStore):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
         else:

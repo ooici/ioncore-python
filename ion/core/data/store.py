@@ -178,8 +178,8 @@ class IndexStore(object):
 
 
     def _update_index(self, key, index_attributes):
-        log.info("In _update_index")
-        log.info("key %s index_attributes %s" % (key,index_attributes))
+        log.debug("In _update_index")
+        log.debug("key %s index_attributes %s" % (key,index_attributes))
         #Ensure that we are updating attributes that are indexed.
         query_attribute_names = set(self.indices.keys())
         index_attribute_names = set(index_attributes.keys())
@@ -217,7 +217,7 @@ class IndexStore(object):
         
         Raises an IndexStoreException if you try to update an attribute that is not indexed.
         """
-        log.info("In update_index")        
+        log.debug("In update_index")
         self._update_index(key, index_attributes)
         self.kvs[key].update(index_attributes)
         return defer.succeed(None)
@@ -243,7 +243,7 @@ class IndexStore(object):
         @retVal A data structure representing Cassandra rows. See the class
         docstring for the description of the data structure.
         """
-        log.info(self.kvs)
+        #log.info(self.kvs)
         return defer.maybeDeferred(self._query, indexed_attributes_eq, indexed_attributes_gt)
         
     def _query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):

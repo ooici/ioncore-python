@@ -76,7 +76,7 @@ class IndexStoreService(ServiceProcess):
 
         self._indexed_store = IndexStore(indices=self.indices)
 
-        log.info("Created Cassandra Store")
+        log.info("Created Index Store Service")
         
         
         
