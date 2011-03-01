@@ -8,7 +8,6 @@
 """
 
 from twisted.internet import defer
-from twisted.trial import unittest
 
 from ion.play.rot13_service import Rot13Service, Rot13Client, REQUEST_TYPE, RESPONSE_TYPE
 
@@ -23,21 +22,34 @@ from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
+
 BAD_MSG = object_utils.create_type_identifier(object_id=10, version=1)
 
 class RUnit(IonTestCase):
     def setUp(self):
         self.timeout = 5
+        return self._start_container()
 
-    def notest_algorithm(self):
+    def tearDown(self):
+        return self._stop_container()
+
+    @defer.inlineCallbacks
+    def test_algorithm(self):
         """
-        Unit test of rot13 algorithm plg GPB mechanics.
+        Unit test of rot13 algorithm plus GPB mechanics.
         """
         dut = Rot13Service()
-        rc = dut.rot13('abcsdsd')
-        self.failUnlessEqual('nopfqfq', rc)
+
+        msg = yield self.create_message(REQUEST_TYPE)
+        msg.input_string = 'abcsdsd'
+
+        rc = yield dut.rot13(msg)
+
+        self.failUnlessEqual('nopfqfq', rc.output_string)
 
 class R13Test(IonTestCase):
+    #######################################################
+    # Integration tests, declared as such via itv decorator
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -60,8 +72,6 @@ class R13Test(IonTestCase):
     def tearDown(self):
         yield self._stop_container()
 
-    #######################################################
-    # Integration tests, declared as such via itv decorator
     @itv(CONF)
     def test_start_stop(self):
         """

@@ -44,8 +44,6 @@ class Rot13Service(ServiceProcess):
         # Service class initializer. Basic config, but no yields allowed.
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        self.mc = MessageClient(proc=self)
-
     @defer.inlineCallbacks
     def op_rot13(self, content, headers, msg):
         # Check for correct protocol buffer type
@@ -76,7 +74,8 @@ class Rot13Service(ServiceProcess):
         out_str = encoder.encode(in_gpb.input_string)[0]
 
         # Compose reply message to be returned
-        reply = yield self.mc.create_instance(RESPONSE_TYPE)
+        mc = MessageClient(proc=self)
+        reply = yield mc.create_instance(RESPONSE_TYPE)
         reply.output_string = out_str
         
         defer.returnValue(reply)
