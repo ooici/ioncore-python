@@ -8,78 +8,67 @@
 """
 
 from ion.core.messaging import messaging
+from ion.core.process.process import Process
 from ion.core.messaging.receiver import Receiver
 from ion.services.dm.distribution.pubsub_service import PubSubClient
 from twisted.internet import defer
 
-class Publisher(Receiver):
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
+class Publisher(Process):
     """
     @brief This represents publishers of (mostly) science data. Intended use is
     to be instantiated within another class/process/codebase, as an object for sending data to OOI.
     @note All returns are HTTP return codes, 2xx for success, etc, unless otherwise noted.
     """
 
-    #@defer.inlineCallbacks
-    def on_initialize(self, *args, **kwargs):
-        """
-        @retval 
-        """
-        #assert self.xname, "Receiver must have a name"
+    def __init__(self, xp_name=None, routing_key=None, credentials=None, *args, **kwargs):
 
-        #name_config = messaging.worker(self.xname)
-        #name_config.update({'name_type':'worker'})
+        Process.__init__(self, *args, **kwargs)
 
-        self._resource_id = ''
-        self._exchange_point = ''
+        assert xp_name and routing_key
 
+        self._xp_name = xp_name
+        self._routing_key = routing_key
+        self._credentials = credentials
+
+        # TODO: will the user specify this? will the PSC get it?
+        publisher_config = { 'exchange'      : xp_name,
+                             'exchange_type' : 'topic',
+                             'durable': False,
+                             'mandatory': True,
+                             'immediate': False,
+                             'warn_if_exists': False }
+
+        self._recv = Receiver(routing_key, process=self, publisher_config=publisher_config)
         self._pubsub_client = PubSubClient()
 
-        # don't do this, we don't want to declare a queue
-        #yield self._init_receiver(name_config, store_config=True)
+        # monkey patch receiver as we don't want any of its initialize or activate items running, but we want it to be in the right state
+        def noop(*args, **kwargs):
+            pass
 
-    @defer.inlineCallbacks
-    def register(self, xp_name, topic_id, publisher_name, credentials):
-        """
-        @brief Register a new publisher, also does the access control step.
-        @param xp_name Name of exchange point to use
-        @param topic_id Topic to publish to
-        @param publisher_name Name of new publisher process, free-form string
-        @param credentials Placeholder for auth* tokens
-        @retval OK or error
-        @note saves resource id to self._resource_id
-        """
-        ret = yield self._pubsub_client.define_publisher(xp_name, topic_id, publisher_name, credentials)
-        defer.returnValue(ret)
+        self._recv.on_initialize = noop
+        self._recv.on_activate = noop
 
-    def unregister(self):
-        """
-        @brief Remove a registration when done
-        @note Uses class variables self._resource_id and self._exchange_point
-        @retval Return code only
-        """
-        pass
+    def on_activate(self, *args, **kwargs):
+        Process.on_activate(self, *args, **kwargs)
 
-    def publish(self, topic, data):
+        self._recv.attach() # calls initialize/activate, gets receiver in correct state for publishing
+
+    def publish(self, data):
         """
         @brief Publish data on a specified resource id/topic
-        @param topic Topic to send to, in form of dataset.variable
         @param data Data, OOI-format, protocol-buffer encoded
         @retval Deferred on send, not RPC
         """
-        return self.send(exchange_point=self._exchange_point, topic=topic, resource_id=self._resource_id, data=data)
+        kwargs = { 'recipient' : self._routing_key,
+                   'content'   : data,
+                   'headers'   : {},
+                   'operation' : None } #,
+                   #'sender'    : self.xname }
 
-    def send(self, exchange_point='', topic='', resource_id='', data='', **kwargs):
-        """
-        @return Deferred on send.
-        """
-        # TODO: exchange_point, resource_id
-        return Receiver.send(self, recipient=topic, content=data, headers={}, op='', **kwargs)
-
-    def on_activate(self, *args, **kwargs):
-        """
-        Overrides the base class on_activate, which would try to listen to a queue. We're not listening with a PublisherReceiver.
-        """
-        pass
+        return self._recv.send(**kwargs)
 
 # =================================================================================
 
@@ -88,7 +77,7 @@ class PublisherFactory(object):
     A factory class for building Publisher objects.
     """
 
-    def __init__(self, xp_name=None, topic_id=None, publisher_name=None, credentials=None):
+    def __init__(self, xp_name=None, credentials=None):
         """
         Initializer. Sets default properties for calling the build method.
 
@@ -96,17 +85,13 @@ class PublisherFactory(object):
         build method.
 
         @param  xp_name     Name of exchange point to use
-        @param  topic_id    Topic to publish to
-        @param  publisher_name Name of new publisher process, free-form string
         @param  credentials Placeholder for auth* tokens
         """
         self._xp_name           = xp_name
-        self._topic_id          = topic_id
-        self._publisher_name    = publisher_name
         self._credentials       = credentials
 
     @defer.inlineCallbacks
-    def build(self, xp_name=None, topic_id=None, publisher_name=None, credentials=None):
+    def build(self, routing_key, xp_name=None, credentials=None):
         """
         Creates a publisher and calls register on it.
 
@@ -114,21 +99,54 @@ class PublisherFactory(object):
         was initialized. If None is specified for any of the parameters, or they are not filled out as
         keyword arguments, the defaults take precedence.
 
+        @param  routing_key The AMQP routing key that the Publisher will publish its data to.
         @param  xp_name     Name of exchange point to use
-        @param  topic_id    Topic to publish to
-        @param  publisher_name Name of new publisher process, free-form string
         @param  credentials Placeholder for auth* tokens
         """
         xp_name         = xp_name or self._xp_name
-        topic_id        = topic_id or self._topic_id
-        publisher_name  = publisher_name or self._publisher_name
         credentials     = credentials or self._credentials
 
-        pub = Publisher(publisher_name)  # TODO: what goes for its name?
-        pub.attach()
-        yield pub.register(xp_name, topic_id, publisher_name, credentials)
+        pub = Publisher(xp_name=xp_name, routing_key=routing_key, credentials=credentials)
+        yield pub.initialize()
+        yield pub.activate()
+        #yield pub.register(xp_name, topic_id, publisher_name, credentials)
 
         defer.returnValue(pub)
+
+# =================================================================================
+
+class TestPubRecv(Receiver):
+    def __init__(self, *args, **kwargs):
+        """
+        @param binding_key The binding key to use. By default, uses the computed xname, but can take a top
+ic based string with wildcards.
+        """
+        binding_key = kwargs.pop("binding_key", None)
+        Receiver.__init__(self, *args, **kwargs)
+        if binding_key == None:
+            binding_key = self.xname
+
+        self.binding_key = binding_key
+
+    @defer.inlineCallbacks
+    def on_initialize(self, *args, **kwargs):
+        """
+        @retval Deferred
+        """
+        assert self.xname, "Receiver must have a name"
+
+        name_config = messaging.worker(self.xname)        # TODO: this needs auto_delete: False, but only for the queues, not the exchange. No way to specify that.
+        name_config.update({'name_type':'worker', 'binding_key':self.binding_key, 'routing_key':self.binding_key})
+
+        #log.info("CONF IN " + name_config.__str__())
+
+        yield self._init_receiver(name_config, store_config=True)
+
+        self.add_handler(self.blab)
+
+    def blab(self, content, msg):
+        msg.ack()
+        log.error("Message %s" % str(content))
 
 # =================================================================================
 
