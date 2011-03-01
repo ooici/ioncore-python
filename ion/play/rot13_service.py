@@ -33,7 +33,7 @@ class R13Exception(ApplicationError):
 class Rot13Service(ServiceProcess):
     """
     This service is an example Ion service that replies to a message with the content
-    processed by the rot13 algorithm.
+    processed by the rot13 algorithm, the simplest possible Caeserean cipher.
     """
 
     declare = ServiceProcess.service_declare(name='rot13',
@@ -41,11 +41,9 @@ class Rot13Service(ServiceProcess):
                                           dependencies=[])
 
     def __init__(self, *args, **kwargs):
-        if kwargs:
-            # Service class initializer. Basic config, but no yields allowed.
-            ServiceProcess.__init__(self, *args, **kwargs)
+        # Service class initializer. Basic config, but no yields allowed.
+        ServiceProcess.__init__(self, *args, **kwargs)
 
-    def slc_init(self):
         self.mc = MessageClient(proc=self)
 
     @defer.inlineCallbacks
@@ -61,25 +59,28 @@ class Rot13Service(ServiceProcess):
                                content.ResponseCodes.BAD_REQUEST)
 
         # Call actual service to do the work
-        log.debug('Starting R13 decode....')
-        rval = self.rot13(content.input_string)
-
-        log.debug('Encode complete, composing reply...')
-        # Compose reply
-        reply = yield self.mc.create_instance(RESPONSE_TYPE)
-        reply.output_string = rval
-
+        log.debug('Starting R13 en/decode....')
+        reply = yield self.rot13(content)
+        log.debug('Encode completed')
         # Off it goes
         yield self.reply_ok(msg, reply)
 
         log.debug('R13 completed')
 
-    def rot13(self, in_str):
+    @defer.inlineCallbacks
+    def rot13(self, in_gpb):
         """
-        Service implementation. Strings in and out, no transport/protocol here.
+        Service logic, GPB in and out.
         """
         encoder = codecs.lookup('rot13')
-        return encoder.encode(in_str)[0]
+        out_str = encoder.encode(in_gpb.input_string)[0]
+
+        # Compose reply message to be returned
+        reply = yield self.mc.create_instance(RESPONSE_TYPE)
+        reply.output_string = out_str
+        
+        defer.returnValue(reply)
+
 
 class Rot13Client(ServiceClient):
     def __init__(self, proc=None, **kwargs):
