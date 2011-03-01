@@ -56,7 +56,7 @@ class IStoreTest(unittest.TestCase):
         # Test Bytes
         self.key = object_utils.sha1bin(str(uuid4()))
         self.value = object_utils.sha1bin(str(uuid4()))
-
+        defer.returnValue(None)
 
 
     def _setup_backend(self):
@@ -80,6 +80,7 @@ class IStoreTest(unittest.TestCase):
         # Hmm, simplest op, just looking for exceptions
         yield self.ds.put(self.key, self.value)
         yield self.ds.remove(self.key)
+        defer.returnValue(None)
 
     @defer.inlineCallbacks
     def test_delete(self):
@@ -87,7 +88,8 @@ class IStoreTest(unittest.TestCase):
         yield self.ds.remove(self.key)
         rc = yield self.ds.get(self.key)
         self.failUnlessEqual(rc, None)
-
+        defer.returnValue(None)
+        
     @defer.inlineCallbacks
     def test_put_get_delete(self):
         # Write, then read to verify same
@@ -95,7 +97,7 @@ class IStoreTest(unittest.TestCase):
         b = yield self.ds.get(self.key)
         self.failUnlessEqual(self.value, b)
         yield self.ds.remove(self.key)
-
+        defer.returnValue(None)
 
 class CassandraStoreTest(IStoreTest):
 
@@ -165,7 +167,7 @@ class IndexStoreTest(IStoreTest):
         ds = store.IndexStore(indices=['full_name', 'state', 'birth_date'])
 
         return defer.succeed(ds)
-
+    
     @defer.inlineCallbacks
     def test_get_query_attributes(self):
         attrs = yield self.ds.get_query_attributes()
@@ -173,7 +175,7 @@ class IndexStoreTest(IStoreTest):
         attrs_set = set(attrs)
         correct_set = set(['full_name', 'state', 'birth_date'])
         self.failUnlessEqual(attrs_set, correct_set)
-
+        defer.returnValue(None)
 
 
     # Test a single query, single result
@@ -189,7 +191,8 @@ class IndexStoreTest(IStoreTest):
         self.assertEqual(len(rows),1)
         for key in self.d2.keys():
             self.assertIn(key, rows['prothfuss'])
-
+        
+        defer.returnValue(None)
     # Test a single query, multiple result
     @defer.inlineCallbacks
     def test_query_single_2(self):
@@ -212,7 +215,8 @@ class IndexStoreTest(IStoreTest):
         for key in self.d4.keys():
             self.assertIn(key, rows['jstewart'])
 
-
+            
+   
     # Tests multiple atts
     @defer.inlineCallbacks
     def test_query_multiple(self):
@@ -224,7 +228,7 @@ class IndexStoreTest(IStoreTest):
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(rows['prothfuss']['value'], self.binary_value2)
         self.assertEqual(len(rows),1)
-
+        
 
     # Tests no result
     @defer.inlineCallbacks
@@ -236,7 +240,7 @@ class IndexStoreTest(IStoreTest):
         rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(len(rows),0)
-
+        
 
     # Tests greater than 1970 and state == UT
     @defer.inlineCallbacks
@@ -256,7 +260,8 @@ class IndexStoreTest(IStoreTest):
         for key in self.d1.keys():
             self.assertIn(key, rows['bsanderson'])
 
-
+        
+        
     # Tests greater than
     @defer.inlineCallbacks
     def test_query_greater_and_eq_2(self):
@@ -274,14 +279,17 @@ class IndexStoreTest(IStoreTest):
         self.assertEqual(len(rows),2)
         self.assertEqual(rows['bsanderson']['value'], self.binary_value1)
         self.assertEqual(rows['htayler']['value'], self.binary_value3)
-        self.assertEqual(len(rows),2)
+        
         for key in self.d1.keys():
             self.assertIn(key, rows['bsanderson'])
 
         for key in self.d3.keys():
             self.assertIn(key, rows['htayler'])
+        
 
 
+        
+        
     @defer.inlineCallbacks
     def put_stuff_for_tests(self):
         """
@@ -299,7 +307,11 @@ class IndexStoreTest(IStoreTest):
         self.binary_value3 = 'BinaryValue for Howard Tayler'
 
         self.binary_value4 = 'BinaryValue for John Stewart'
-
+        
+        yield self.ds.remove('bsanderson')
+        yield self.ds.remove('prothfuss')
+        yield self.ds.remove('htayler')
+        yield self.ds.remove('jstewart')
 
         yield self.ds.put('bsanderson',self.binary_value1, self.d1)
         yield self.ds.put('prothfuss',self.binary_value2, self.d2)
@@ -307,27 +319,20 @@ class IndexStoreTest(IStoreTest):
 
         yield self.ds.put('jstewart',self.binary_value4, self.d4)
 
-
+        
 
 
     @defer.inlineCallbacks
     def test_put(self):
-        d1 = {'full_name':'Brandon Sanderson', 'birth_date': '1975', 'state':'UT'}
-        d2 = {'full_name':'Patrick Rothfuss', 'birth_date': '1973', 'state':'WI'}     
-        d3 = {'full_name':'Howard Tayler', 'birth_date': '1968', 'state':'UT'}
-        binary_value1 = 'BinaryValue for Brandon Sanderson'
-        binary_value2 = 'BinaryValue for Patrick Rothfuss'
-        binary_value3 = 'BinaryValue for Howard Tayler'
-        yield self.ds.put('bsanderson',binary_value1, d1)   
-        yield self.ds.put('prothfuss',binary_value2, d2)   
-        yield self.ds.put('htayler',binary_value3, d3)   
+        yield self.put_stuff_for_tests()
         val1 = yield self.ds.get('bsanderson')
         val2 = yield self.ds.get('prothfuss')
         val3 = yield self.ds.get('htayler')
-        self.failUnlessEqual(val1, binary_value1)
-        self.failUnlessEqual(val2, binary_value2)
-        self.failUnlessEqual(val3, binary_value3)
-
+        self.failUnlessEqual(val1, self.binary_value1)
+        self.failUnlessEqual(val2, self.binary_value2)
+        self.failUnlessEqual(val3, self.binary_value3)
+        
+        
 
     @defer.inlineCallbacks
     def test_update_index_blank(self):
@@ -338,7 +343,7 @@ class IndexStoreTest(IStoreTest):
 
         self.d4.update(new_attrs)
 
-        yield self.ds.update_index('jstewart', new_attrs)
+        d = yield self.ds.update_index('jstewart', new_attrs)
 
         query_attributes = {'birth_date':'1969'}
         rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
@@ -348,7 +353,7 @@ class IndexStoreTest(IStoreTest):
 
         for key in self.d4.keys():
             self.assertIn(key, rows['jstewart'])
-
+        
 
     @defer.inlineCallbacks
     def test_update_index_existing(self):
@@ -358,9 +363,9 @@ class IndexStoreTest(IStoreTest):
         new_attrs = {'birth_date': '1969'}
 
         self.d2.update(new_attrs)
-
+        log.info("Updating the index")
         yield self.ds.update_index('prothfuss', new_attrs)
-
+        log.info("Done updating the index")
         query_attributes = {'birth_date':'1969'}
         rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
         log.info("Rows returned %s " % (rows,))
@@ -369,8 +374,9 @@ class IndexStoreTest(IStoreTest):
 
         for key in self.d2.keys():
             self.assertIn(key, rows['prothfuss'])
-
-
+        
+        
+    
     @defer.inlineCallbacks
     def test_update_index_value_error(self):
 
@@ -385,7 +391,7 @@ class IndexStoreTest(IStoreTest):
             defer.returnValue(None)
 
         self.fail('Did not raise Index Store Error')
-
+        
 
 
 class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
@@ -419,7 +425,7 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
 
 class CassandraIndexStoreTest(IndexStoreTest):
 
-    @itv(CONF)
+    
     def _setup_backend(self):
         """
         @note The column_metadata in the cache is not correct. The column family on the 
@@ -485,6 +491,7 @@ class CassandraIndexStoreTest(IndexStoreTest):
     @defer.inlineCallbacks  
     def tearDown(self):
         yield self.ds.terminate()
+        
              
 
 

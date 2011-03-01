@@ -21,6 +21,7 @@ from telephus.cassandra.ttypes import NotFoundException, KsDef, CfDef
 from telephus.cassandra.ttypes import ColumnDef, IndexExpression, IndexOperator
 
 from ion.core.data import store
+from ion.core.data.store import IndexStoreError
 
 from ion.util.tcp_connections import TCPConnection
 
@@ -161,16 +162,50 @@ class CassandraIndexedStore(CassandraStore):
     def put(self, key, value, index_attributes={}):
         """
         Istore put, plus a dictionary of indexed stuff
-        The dictionary contains keys for the column name and the index value
+        
+        @param key The key to the Cassandra row
+        @param value The value of the value column in the Cassandra row
+        @param index_attributes The dictionary contains keys for the column name and the index value
         """
-        index_attributes['value'] = value
-        yield self.client.batch_insert(key, self._cache_name, index_attributes)
+        log.info("key: %s value: %s index_attributes %s" % (key,value,index_attributes))
+        d = yield self._check_index(index_attributes)
+        row = dict(index_attributes)
+        #row = index_attributes
+        row['value'] = value
+        yield self.client.batch_insert(key, self._cache_name, row)
 
+    @defer.inlineCallbacks
     def update_index(self, key, index_attributes):
-
+        """
+        @brief Update the index attributes, but keep the value the same. 
+        @param key The key to the row.
+        @param index_attributes A dictionary of column names and values. These attributes
+        can be used to query the store to return rows based on the value of the attributes.
+        """
+        yield self._check_index(index_attributes)
+        log.info("Updating index for key %s attrs %s " % ( key, index_attributes))
+        yield self.client.batch_insert(key, self._cache_name, index_attributes)
         defer.succeed(None)
 
-
+    @defer.inlineCallbacks
+    def _check_index(self, index_attributes):
+        """
+        Ensure that the index_attribute keys are columns that are indexed in the column family.
+        
+        This method raises an exception if the index_attribute dictionary has keys that 
+        are not the names of the columns indexed.
+        """
+        query_attributes = yield self.get_query_attributes()
+        query_attribute_names = set(query_attributes)
+        index_attribute_names = set(index_attributes.keys())
+        log.info(index_attribute_names)
+        log.info(query_attribute_names)
+        
+        if not index_attribute_names.issubset(query_attribute_names):
+            bad_attrs = index_attribute_names.difference(query_attribute_names)
+            raise IndexStoreError("These attributes %s are not indexed." % (" ".join(bad_attrs),))
+        
+        defer.returnValue(None)
 
     @defer.inlineCallbacks    
     def query(self, indexed_attributes_eq={},indexed_attributes_gt={}):
@@ -183,7 +218,7 @@ class CassandraIndexedStore(CassandraStore):
         
         @retVal a dictionary containing the keys and values which match the query.
         """
-
+        log.info(self._cache_name)
         # Map the index attributes for equal to!
         selection_predicate_eq=[]
         if indexed_attributes_eq:

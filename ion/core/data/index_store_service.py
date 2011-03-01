@@ -146,7 +146,7 @@ class IndexStoreService(ServiceProcess):
         for col in request.cols:
             index_attrs[col.column_name] = col.column_value
         yield self._indexed_store.update_index(key,index_attrs)
-
+        log.info("In op_update_index")
         yield self.reply_ok(msg)
 
     @defer.inlineCallbacks
@@ -263,12 +263,13 @@ class IndexStoreServiceClient(ServiceClient):
 
         defer.returnValue(content)
 
+    @defer.inlineCallbacks
     def update_index(self, key, index_attributes):
         """
         use
         """
 
-        update = yield self.mc.create_instance(ROW_INDEX_UPDATE_TYPE)
+        row = yield self.mc.create_instance(ROW_INDEX_UPDATE_TYPE)
         row.key = key
 
         for attr_key,attr_value in index_attributes.items():
@@ -283,7 +284,7 @@ class IndexStoreServiceClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('update_index', row)
 
 
-        defer.succeed(None)
+        defer.returnValue(None)
 
 
 
