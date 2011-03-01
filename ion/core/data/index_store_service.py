@@ -16,8 +16,6 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.object import object_utils
 
-from ion.core.data.cassandra import CassandraIndexedStore
-
 
 from ion.core.messaging.message_client import MessageClient
 

@@ -168,7 +168,7 @@ class CassandraIndexedStore(CassandraStore):
         @param index_attributes The dictionary contains keys for the column name and the index value
         """
         log.info("key: %s value: %s index_attributes %s" % (key,value,index_attributes))
-        d = yield self._check_index(index_attributes)
+        yield self._check_index(index_attributes)
         row = dict(index_attributes)
         #row = index_attributes
         row['value'] = value

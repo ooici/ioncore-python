@@ -343,7 +343,7 @@ class IndexStoreTest(IStoreTest):
 
         self.d4.update(new_attrs)
 
-        d = yield self.ds.update_index('jstewart', new_attrs)
+        yield self.ds.update_index('jstewart', new_attrs)
 
         query_attributes = {'birth_date':'1969'}
         rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
@@ -387,7 +387,7 @@ class IndexStoreTest(IStoreTest):
         try:
             yield self.ds.update_index('prothfuss', new_attrs)
 
-        except store.IndexStoreError, ise:
+        except store.IndexStoreError:
             defer.returnValue(None)
 
         self.fail('Did not raise Index Store Error')

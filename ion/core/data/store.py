@@ -263,7 +263,7 @@ class IndexStore(object):
             if kindex:
                 keys.update(kindex.get(v,set()))
 
-        except KeyError, ke:
+        except KeyError:
             log.info('No indexed_attributes_eq')
             raise IndexStoreError('Invalid arguments to IndexStore - must provide at least one equal to operator for search!')
 
