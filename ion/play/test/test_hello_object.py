@@ -2,7 +2,7 @@
 
 """
 @file ion/play/test/test_hello_object.py
-@test ion.play.hello_object Example unit tests for sample code.
+@test ion.play.hello_object Example unit tests for working with objects
 @author David Stuebe
 """
 import ion.util.ionlog
@@ -13,14 +13,49 @@ from twisted.internet import defer
 from ion.play.hello_object import HelloObjectClient
 from ion.test.iontest import IonTestCase
 
-from ion.core.process.process import Process, ProcessClient, ProcessDesc
-from ion.core import bootstrap
-
 from ion.core.object import object_utils
 
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+# from net.ooici.play addressbook.proto
+PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
+"""
+message Person {
+  enum _MessageTypeIdentifier {
+    _ID = 20001;
+    _VERSION = 1;
+  }
+  optional string name = 1;
+  optional int32 id = 2;        // Unique ID number for this person.
+  optional string email = 3;
 
+  enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+  }
+
+  message PhoneNumber {
+    optional string number = 1;
+    optional PhoneType type = 2 [default = HOME];
+  }
+
+  repeated PhoneNumber phone = 4;
+}
+
+"""
+
+# from net.ooici.play addressbook.proto
+ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
+"""
+message AddressLink {
+  enum _MessageTypeIdentifier {
+    _ID = 20003;
+    _VERSION = 1;
+  }
+  repeated net.ooici.core.link.CASRef person = 1;
+  optional net.ooici.core.link.CASRef owner = 2;
+  optional string title = 3;
+}
+"""
 
 class HelloObjectTest(IonTestCase):
     """
@@ -28,6 +63,9 @@ class HelloObjectTest(IonTestCase):
     This example shows how it is possible to create and send strongly typed objects
     Each time an object is sent it is assigned a new identifier. The example
     shows how it is possible to move a linked composite from one object to another.
+
+    This example deals with objects - The canonical examples hello_message and hello_resource are the preferred
+    reference for implementation of services.
     """
 
     @defer.inlineCallbacks
@@ -49,15 +87,15 @@ class HelloObjectTest(IonTestCase):
             
         # Each process has a object work bench. In the test we can get a work bench
         # from the test supervisor process.
-        repo, ab = self.test_sup.workbench.init_repository(addresslink_type)
+        repo, ab = self.test_sup.workbench.init_repository(ADDRESSLINK_TYPE)
         
         ab.title = 'An addressbook object for testing'
         
         # Add a new entry in the list (repeated) persons of the addressbook
         ab.person.add()
-    
+
         # Make a new person object to go in the list
-        person = repo.create_object(person_type)
+        person = repo.create_object(PERSON_TYPE)
         person.name = 'david'
         person.id = 59
         person.email = 'stringgggg'

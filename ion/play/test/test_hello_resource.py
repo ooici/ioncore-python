@@ -19,24 +19,95 @@ from ion.test.iontest import IonTestCase
 from ion.core.messaging.message_client import MessageClient
 
 
-from ion.core.process.process import Process, ProcessClient, ProcessDesc
-from ion.core import bootstrap
-
 from ion.core.object import object_utils
 
-instrument_resource_type = object_utils.create_type_identifier(object_id=20029, version=1)
-instrument_info_type = object_utils.create_type_identifier(object_id=20030, version=1)
-resource_request_type = object_utils.create_type_identifier(object_id=10, version=1)
-resource_response_type = object_utils.create_type_identifier(object_id=12, version=1)
+# from net.ooici.play instrument_example.proto
+INSTRUMENT_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=20029, version=1)
+"""
+package net.ooici.play;
 
 
-class HelloResourceTest(IonTestCase):
-    """
-    Testing example hello object service.
-    This example shows how it is possible to create and send strongly typed objects
-    Each time an object is sent it is assigned a new identifier. The example
-    shows how it is possible to move a linked composite from one object to another.
-    """
+message InstrumentResource{
+    enum _MessageTypeIdentifier {
+      _ID = 20029;
+      _VERSION = 1;
+    }
+    optional string name = 1;
+    optional string make = 2;
+    optional string model = 3;
+    optional string serial_number = 4;
+}
+
+"""
+# from net.ooici.play instrument_example.proto
+
+INSTRUMENT_INFO_TYPE = object_utils.create_type_identifier(object_id=20030, version=1)
+"""
+
+message InstrumentInfoObject{
+    enum _MessageTypeIdentifier {
+      _ID = 20030;
+      _VERSION = 1;
+    }
+    optional string name = 1;
+    optional string make = 2;
+    optional string model = 3;
+    optional string serial_number = 4;
+}
+"""
+
+RESOURCE_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
+"""
+package net.ooici.core.message;
+
+import "net/ooici/core/link/link.proto";
+
+message ResourceConfigurationRequest{
+    enum _MessageTypeIdentifier {
+      _ID = 10;
+      _VERSION = 1;
+    }
+    
+    // The identifier for the resource to configure
+    optional net.ooici.core.link.CASRef resource_reference = 1;
+
+    // The desired configuration object
+    optional net.ooici.core.link.CASRef configuration = 2;
+    
+    enum LifeCycleOperation {
+	Activate=1;
+	Deactivate=2;
+	Commission=3;
+	Decommission=4;
+	Retire=5;
+	Develope=6;
+    }
+    
+    optional LifeCycleOperation life_cycle_operation = 3;
+    
+}
+
+"""
+
+RESOURCE_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=12, version=1)
+"""
+message ResourceConfigurationResponse{
+    enum _MessageTypeIdentifier {
+      _ID = 12;
+      _VERSION = 1;
+    }
+    
+    // The identifier for the resource to configure
+    optional net.ooici.core.link.CASRef resource_reference = 1;
+
+    // The desired configuration object
+    optional net.ooici.core.link.CASRef configuration = 2;
+    
+    optional string result = 3;
+}
+"""
+
+
 
 class HelloResourceTest(IonTestCase):
     """
@@ -72,9 +143,9 @@ class HelloResourceTest(IonTestCase):
         # Create a hello object client
         hc1 = HelloResourceClient(proc=self.test_sup)
         
-        create_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='Create me!')
+        create_request_msg = yield self.mc.create_instance(MessageContentTypeID = RESOURCE_REQUEST_TYPE)
         
-        create_request_msg.configuration = create_request_msg.CreateObject(instrument_info_type)
+        create_request_msg.configuration = create_request_msg.CreateObject(INSTRUMENT_INFO_TYPE)
         
         create_request_msg.configuration.name = 'A CTD'
         create_request_msg.configuration.make = 'SeaBird'
@@ -94,7 +165,7 @@ class HelloResourceTest(IonTestCase):
         self.assertEqual(create_response_msg.configuration.name, 'A CTD')
         
         ### request to update the state of the resource
-        update_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='Update it!')
+        update_request_msg = yield self.mc.create_instance(RESOURCE_REQUEST_TYPE)
         
         # Copy from the create request and make some changes...
         update_request_msg.configuration = create_request_msg.configuration
@@ -109,7 +180,7 @@ class HelloResourceTest(IonTestCase):
         
         
         ### request to update the state of the resource
-        lcs_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='Update it!')
+        lcs_request_msg = yield self.mc.create_instance(RESOURCE_REQUEST_TYPE)
 
         lcs_request_msg.resource_reference = create_response_msg.resource_reference
         lcs_request_msg.life_cycle_operation = lcs_request_msg.MessageObject.LifeCycleOperation.ACTIVATE
