@@ -58,6 +58,7 @@ class Rot13Service(ServiceProcess):
 
         # Call actual service to do the work
         log.debug('Starting R13 en/decode....')
+        log.debug(headers)
         reply = yield self.rot13(content)
         log.debug('Encode completed')
         # Off it goes
