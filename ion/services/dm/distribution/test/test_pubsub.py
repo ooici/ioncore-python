@@ -9,7 +9,7 @@
 import ion.util.ionlog
 from twisted.internet import defer
 
-from ion.services.dm.distribution.pubsub_service import PubSubClient
+from ion.services.dm.distribution.pubsub_service import PubSubClient, REQUEST_TYPE
 #from ion.services.dm.distribution.publisher_subscriber import Subscriber
 from ion.test.iontest import IonTestCase
 from twisted.trial import unittest
@@ -19,6 +19,7 @@ from ion.core import ioninit
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 
+from ion.core.exception import ReceivedError, ReceivedApplicationError, ReceivedContainerError
 
 from ion.util.itv_decorator import itv
 
@@ -87,6 +88,35 @@ class PST(IonTestCase):
 
         self.failIf(len(xs_id.id_list) == 0)
         self.failIf(xs_id.id_list[0] == '')
+
+
+    @defer.inlineCallbacks
+    def test_xs_exceptions(self):
+        """
+        Test new exception raising
+        """
+        wrong_type = object_utils.create_type_identifier(object_id=10, version=1)
+        bad_msg = yield self.mc.create_instance(wrong_type)
+
+        try:
+            yield self.psc.declare_exchange_space(bad_msg)
+        except ReceivedApplicationError:
+            pass
+        else:
+            self.fail('Did not get the expected exception from a bad request to PSC!')
+
+    @defer.inlineCallbacks
+    def test_undeclare_xs(self):
+        msg = yield self.mc.create_instance(XS_TYPE)
+        msg.exchange_space_name = self.xs_name
+
+        xs_id = yield self.psc.declare_exchange_space(msg)
+
+        msg = yield self.mc.create_instance(REQUEST_TYPE)
+        msg.resource_reference = xs_id.id_list[0]
+
+        rc = yield self.psc.undeclare_exchange_space(msg)
+        
 
     @defer.inlineCallbacks
     def test_bad_xs_creation(self):
