@@ -63,11 +63,9 @@ class StackLocal(object):
         attrs[key] = val
         return val
 
-    def __getattr__(self, key):
-        ''' Get an attribute that was defined by any parent stack frame of the current. '''
-
+    def __get(self, key):
         if not key in self.attr_frames:
-            raise AttributeError('There is no attribute named "%s" in the current stack.')
+            return None
 
         attr_frame = self.attr_frames[key]
 
@@ -77,23 +75,37 @@ class StackLocal(object):
             if frame is attr_frame:
                 attrs = self.frame_attrs[frame]
                 if not key in attrs:
-                    raise AttributeError('There is no attribute named "%s" in the current stack.')
+                    return None
 
                 return attrs[key]
 
             frame = frame.f_back
 
-        raise AttributeError('There is no attribute named "%s" in the current stack.')
+        return None
+
+    def __getattr__(self, key):
+        ''' Get an attribute that was defined by any parent stack frame of the current. '''
+        val = self.__get(key)
+        if val is None:
+            raise AttributeError('There is no attribute named "%s" in the current stack.')
+        return val
+
+    def get(self, key, defaultVal=None):
+        val = self.__get(key)
+        if val is None:
+            return defaultVal
+        return val
 
 if __name__ == '__main__':
     context = StackLocal()
 
     def level_3():
         msg = context.msg
-        try:
-            foo = context.foo
-        except AttributeError, ex:
-            foo = None
+        #try:
+        #    foo = context.foo
+        #except AttributeError, ex:
+        #    foo = None
+        foo = context.get('foo', None)
 
         pass
 
