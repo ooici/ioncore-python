@@ -20,6 +20,9 @@ from ion.core import ioninit
 
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
+from ion.core.messaging.receiver import Receiver
+from ion.core.messaging import messaging
+import ion.util.procutils as pu
 
 from ion.core.exception import ReceivedError, ReceivedApplicationError, ReceivedContainerError
 
@@ -92,4 +95,50 @@ class TestPublisher(IonTestCase):
         self.failUnless(pub3._get_state() == BasicStates.S_ACTIVE)
         self.failUnless(pub3._recv.publisher_config.has_key("exchange") and pub3._recv.publisher_config['exchange'] == "afakeexchange")
 
+    class TestPubRecv(Receiver):
+        """
+        A Test Receiver to listen to publishings.
+
+        TODO: move this into base receiver?
+        """
+        def __init__(self, *args, **kwargs):
+            binding_key = kwargs.pop('binding_key', None)
+            self.msgs = []
+            Receiver.__init__(self, *args, **kwargs)
+            if binding_key == None:
+               binding_key = self.xname
+
+            self.binding_key = binding_key
+
+        @defer.inlineCallbacks
+        def on_initialize(self, *args, **kwargs):
+            name_config = messaging.worker(self.xname)
+            name_config.update({'name_type':'worker', 'binding_key':self.binding_key, 'routing_key':self.binding_key})
+
+            yield self._init_receiver(name_config, store_config=True)
+
+            self.add_handler(self.blab)
+
+        def blab(self, content, msg):
+            msg.ack()
+            self.msgs.append(content['content'])
+
+    @defer.inlineCallbacks
+    def test_publish(self):
+        fact = PublisherFactory(xp_name="magnet.topic")
+
+        pub = yield fact.build(routing_key="arf.test")
+
+        testsub = self.TestPubRecv(name="arf.test", binding_key="arf.test")
+        yield testsub.attach()
+
+        # send a message
+        yield pub.publish("this is a sample, beats are fresh")
+
+        # sleep just a bit to let message go through
+        yield pu.asleep(1.0)
+
+        # we should see it now in the testsub's collection
+        self.failUnlessEqual(len(testsub.msgs), 1)
+        self.failUnlessEqual(testsub.msgs[0], "this is a sample, beats are fresh")
 
