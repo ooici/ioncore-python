@@ -95,35 +95,31 @@ class PubSubService(ServiceProcess):
         description = str(time.time())
         xsid = yield self.ems.create_exchangespace(request.exchange_space_name, description)
 
-        log.debug('EMS returns ID %s' % xsid.resource_reference)
+        log.debug('EMS returns ID %s for name %s' % (xsid.resource_reference.key, request.exchange_space_name))
 
         # Write ID into registry
         log.debug('Creating RC instance')
         xs = yield self.rclient.create_instance(XS_TYPE, ResourceName=request.exchange_space_name,
                                                 ResourceDescription=description)
-        log.debug('Writing RC record')
+        log.debug('Writing resource record')
         yield self.rclient.put_instance(xs)
 
         log.debug('Operation completed, creating response message')
 
         response = yield self.mc.create_instance(IDLIST_TYPE, MessageName='declare_xs response')
 
-        log.debug('Response message created')
-
+        log.debug('Populating response message')
         response.id_list.add()
         response.id_list[0]=xsid.resource_reference
-
         response.MessageResponseCode = response.ResponseCodes.OK
 
         # save to list
         log.debug('Saving to internal list...')
-        self.xs_list[xsid.resource_reference] = request.exchange_space_name
+        self.xs_list[xsid.resource_reference.key] = request.exchange_space_name
 
-        log.debug(self.xs_list)
         log.debug('Responding...')
-
         yield self.reply_ok(msg, response)
-        log.debug('DXS completed')
+        log.debug('DXS completed OK')
 
 
     @defer.inlineCallbacks
@@ -183,26 +179,37 @@ class PubSubService(ServiceProcess):
             raise PSSException('Bad message, expected a request type, got %s' % str(request),
                                request.ResponseCodes.BAD_REQUEST)
 
-
+        # Lookup the XS ID in the dictionary
         try:
-            xs_id = self.xs_list[request.exchange_space_id]
+            xs_name = self.xs_list[request.exchange_space_id.key]
+            log.debug('Found XS %s/%s' % (request.exchange_space_id.key, xs_name))
         except KeyError:
-            raise PSSException('Unable to locate XS ID %s' % request.exchange_space_id,
+            raise PSSException('Unable to locate XS ID %s' % request.exchange_space_id.key,
                                request.ResponseCodes.BAD_REQUEST)
 
-        xpid = yield self.ems.create_exchangename(request.exchange_point_name, str(time.time()), xs_id)
+        # Found XS ID, now call EMS
+        description = str(time.time())
+        xpid = yield self.ems.create_exchangename(request.exchange_point_name, description, xs_name)
 
-        log.debug('EMS completed, returned "%s"' % str(xpid))
+        log.debug('EMS completed, returned XP ID "%s"' % str(xpid))
 
+        log.debug('Saving XP to registry')
+        xp_resource = yield self.rclient.create_instance(XP_TYPE, ResourceName=request.exchange_point_name,
+                                           ResourceDescription=description)
+        # @todo ask DS about proper way to do this...
+        yield self.rclient.put_instance(xp_resource)
+
+        log.debug('Creating reply')
         reply = yield self.mc.create_instance(IDLIST_TYPE)
         reply.id_list.add()
         reply.id_list[0] = xpid.resource_reference
 
         log.debug('Saving XPID to internal list')
-        self.xp_list[xpid.resource_reference] = request.exchange_point_name
+        self.xp_list[xpid.resource_reference.key] = request.exchange_point_name
 
         log.debug('DXP responding')
         yield self.reply_ok(msg, reply)
+        log.debug('DXP completed OK')
 
 
     ##############################################################    
