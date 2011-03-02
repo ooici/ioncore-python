@@ -6,6 +6,9 @@
 @brief Context storage utilities, aka thread-local.
 """
 
+import sys
+import weakref
+
 class StackLocal(object):
     '''
     StackLocal provides an interface matching threading.local as close as possible for situations where thread/greenlet context is not possible.
