@@ -84,3 +84,61 @@ class StackLocal(object):
             frame = frame.f_back
 
         raise AttributeError('There is no attribute named "%s" in the current stack.')
+
+if __name__ == '__main__':
+    context = StackLocal()
+
+    def level_3():
+        msg = context.msg
+        try:
+            foo = context.foo
+        except AttributeError, ex:
+            foo = None
+
+        pass
+
+    def level_2():
+        return level_3()
+
+    def level_1():
+        return level_2()
+
+    def fake_request():
+        context.msg = 'foo'
+
+        def request_context_1():
+            # Should get 'foo'
+            level_1()
+
+        def request_context_2():
+            # Should get 'foo2'
+            context.msg = 'foo2'
+            level_1()
+
+        def request_context_3():
+            # Should get 'foo3'
+            context.msg = 'foo3'
+            level_1()
+
+        def request_context_4():
+            # Should get 'foo3'
+            level_1()
+
+        def request_context_5():
+            # Should get 'bar5'
+            context.foo = 'bar5'
+            level_1()
+
+        def request_context_6():
+            # Should get 'None'
+            level_1()
+
+        request_context_1()
+        request_context_2()
+        request_context_3()
+        request_context_4()
+        request_context_5()
+        request_context_6()
+
+    fake_request()
+    
