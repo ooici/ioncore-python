@@ -12,7 +12,7 @@ and defining subscriptions.
 """
 
 import time
-
+import re
 from twisted.internet import defer
 
 from ion.core.exception import ApplicationError
@@ -119,6 +119,7 @@ class PubSubService(ServiceProcess):
         log.debug('Saving to internal list...')
         self.xs_list[xsid.resource_reference] = request.exchange_space_name
 
+        log.debug(self.xs_list)
         log.debug('Responding...')
 
         yield self.reply_ok(msg, response)
@@ -140,12 +141,68 @@ class PubSubService(ServiceProcess):
             response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
             yield self.reply_ok(msg, response)
 
+        # @todo Call EMS to remove the XS
         log.warn('Here is where we ask EMS to remove the XS')
         response = yield self.mc.create_instance(RESPONSE_TYPE)
         response.MessageResponseCode = response.ResponseCodes.OK
 
         yield self.reply_ok(msg, response)
 
+    @defer.inlineCallbacks
+    def op_query_exchange_spaces(self, request, headers, msg):
+        # Typecheck the message
+        if request.MessageType != REGEX_TYPE:
+            raise PSSException('Bad message type received', request.ResponseCodes.BAD_REQUEST)
+
+        log.debug('Looking for XS entries...')
+        # This is probably better written as a list comprehension. Or something.
+        rc = []
+        p = re.compile(request.regex)
+        for cur_key, cur_entry in self.xs_list.iteritems():
+            if p.match(cur_entry):
+                rc.append(cur_key)
+
+        log.debug('Matches to "%s" are: "%s"' % (request.regex, str(rc)))
+        response = yield self.mc.create_instance(IDLIST_TYPE)
+        response.MessageResponseCode = response.ResponseCodes.OK
+
+        idx = 0
+        for x in rc:
+            response.id_list.add()
+            response.id_list[idx] = x
+            idx += 1
+
+        yield self.reply_ok(msg, response)
+
+
+    @defer.inlineCallbacks
+    def op_declare_exchange_point(self, request, headers, msg):
+        log.debug('Starting DXP')
+
+        if request.MessageType != XP_TYPE:
+            raise PSSException('Bad message, expected a request type, got %s' % str(request),
+                               request.ResponseCodes.BAD_REQUEST)
+
+
+        try:
+            xs_id = self.xs_list[request.exchange_space_id]
+        except KeyError:
+            raise PSSException('Unable to locate XS ID %s' % request.exchange_space_id,
+                               request.ResponseCodes.BAD_REQUEST)
+
+        xpid = yield self.ems.create_exchangename(request.exchange_point_name, str(time.time()), xs_id)
+
+        log.debug('EMS completed, returned "%s"' % str(xpid))
+
+        reply = yield self.mc.create_instance(IDLIST_TYPE)
+        reply.id_list.add()
+        reply.id_list[0] = xpid.resource_reference
+
+        log.debug('Saving XPID to internal list')
+        self.xp_list[xpid.resource_reference] = request.exchange_point_name
+
+        log.debug('DXP responding')
+        yield self.reply_ok(msg, reply)
 
 
     ##############################################################    
