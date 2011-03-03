@@ -25,6 +25,6 @@ class FindDataResources(object):
         log.info('FindDataResources.__init__()')
         
     #@defer.inlineCallbacks
-    def findDataResources(self, userID, spacial, temporal):
+    def findDataResources(self, msg):
         log.debug("findDataResources Worker Class!")        
         return 'something useful'        

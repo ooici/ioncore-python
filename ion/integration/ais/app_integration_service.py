@@ -17,10 +17,14 @@ from ion.core.object import object_utils
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
+from ion.core.messaging.message_client import MessageClient
 
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources
+from ion.integration.ais.ais_object_identifiers import aisRequestMsgType
 
-dataResource_type = object_utils.create_type_identifier(object_id=2301, version=1)
+addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
+person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+
 
 class AppIntegrationService(ServiceProcess):
     """
@@ -33,7 +37,10 @@ class AppIntegrationService(ServiceProcess):
 
     def __init__(self, *args, **kwargs):
         ServiceProcess.__init__(self, *args, **kwargs)
-        self.rc = ResourceClient(proc=self)
+        
+        self.rc = ResourceClient(proc = self)
+        self.mc = MessageClient(proc = self)
+    
         log.info('AppIntegrationService.__init__()')
 
     def slc_init(self):
@@ -50,7 +57,48 @@ class AppIntegrationService(ServiceProcess):
         try:
             worker = FindDataResources()
             # THIS WILL DO A YIELD IN NEAR FUTURE
-            returnValue = worker.findDataResources('userID', 'Spacial', 'Temporal')
+            """
+            Need to build up a GPB Message;
+             - get request message object from message client
+             - build up request  message
+             - get find data resources message from message client
+             - build up find data resources payload message
+             - send to worker class
+             - get results
+             - get response message object from messagse client
+             - build up response message
+             - get response message payload
+             - build up response message payload
+            """
+
+            ## DHE NEW CODE BEGIN
+            # Use the message client to create a message object
+            ### DHE: This is temporary; we won't be passing addresslink_type here, but we will need to pass a GPB
+            log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
+            reqMsg = yield self.mc.create_instance(aisRequestMsgType)
+            ab_msg = yield self.mc.create_instance(addresslink_type, MessageName='addressbook message')
+            log.debug('DHE: test_app_integration! addressbook instantiated.\n')        
+            
+            #ab is a message instance of type addresslink 
+            ab_msg.title = 'An addressbook object for testing'
+    
+            # Add a new entry in the list (repeated) persons of the addressbook
+            ab_msg.person.add()
+    
+            # Make a new person object to go in the list
+            ab_msg.person[0] = ab_msg.CreateObject(person_type)
+            ab_msg.person[0].name = 'david'
+            ab_msg.person[0].id = 59
+            ab_msg.person[0].email = 'stringgggg'
+            ab_msg.person[0].phone.add()
+            ab_msg.person[0].phone[0].number = '401 789 6224'
+            
+            log.info('AddressBook! \n' + str(ab_msg))        
+            ## DHE NEW CODE BEGIN
+
+
+        
+            returnValue = worker.findDataResources(ab_msg)
             log.debug('worker returned: ' + returnValue)
             yield self.reply_ok(msg, {'value' : 'newDataResourceIdentity'})
         #    userId = content['userId']
