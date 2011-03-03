@@ -9,6 +9,10 @@
 import sys
 import weakref
 
+class temp(object):
+    def __init__(self, f):
+        self.f = f
+
 class StackLocal(object):
     '''
     StackLocal provides an interface matching threading.local as close as possible for situations where thread/greenlet context is not possible.
@@ -21,6 +25,9 @@ class StackLocal(object):
     If you think of the call chains as a tree, this attribute is now shared by all nodes (stack frames) that are child nodes of the root frame where it was defined.
     When child nodes (function calls/stack frames) modify the value of the attribute, a new root is not created: all other children of that root will see the change.
     This emulates thread-local storage reasonably well for situations where you cannot use threading.local.
+
+    Note that StackLocal currently leaks memory slowly. It is intended to be used as a placeholder until proper
+    thread-local storage can be swapped in.
     '''
 
     frame_attrs = None
@@ -44,21 +51,25 @@ class StackLocal(object):
 
         frame = None
         if key in self.attr_frames: # Try to find the root frame for this attribute
-            frames = self.attr_frames[key]
+            attr_frame = self.attr_frames[key]
 
-            frame = sys._getframe()
+            frame = sys._getframe(1)
             while frame:
-                if frame in self.frame_attrs:
+                if repr(frame) == attr_frame:
                     break
                 frame = frame.f_back
 
         if frame is None:
-            self.attr_frames[key] = frame = sys._getframe(1)
+            frame = sys._getframe(1)
+            frameid = repr(frame)
+            self.attr_frames[key] = frameid
 
-        if frame in self.frame_attrs:
-            attrs = self.frame_attrs[frame]
+        frameid = repr(frame)
+
+        if frameid in self.frame_attrs:
+            attrs = self.frame_attrs[frameid]
         else:
-            self.frame_attrs[frame] = attrs = {}
+            self.frame_attrs[frameid] = attrs = {}
 
         attrs[key] = val
         return val
@@ -72,8 +83,9 @@ class StackLocal(object):
         # Ensure the definition frame for this attribute is a parent of the current frame
         frame = sys._getframe(1)
         while frame:
-            if frame is attr_frame:
-                attrs = self.frame_attrs[frame]
+            frameid = repr(frame)
+            if frameid == attr_frame:
+                attrs = self.frame_attrs[frameid]
                 if not key in attrs:
                     return None
 
@@ -98,13 +110,12 @@ class StackLocal(object):
 
 if __name__ == '__main__':
     context = StackLocal()
+    frame = sys._getframe()
+    t = temp(frame)
+    ref = weakref.ref(t)
 
     def level_3():
         msg = context.msg
-        #try:
-        #    foo = context.foo
-        #except AttributeError, ex:
-        #    foo = None
         foo = context.get('foo', None)
 
         pass
@@ -117,6 +128,7 @@ if __name__ == '__main__':
 
     def fake_request():
         context.msg = 'foo'
+        #context.foo = None
 
         def request_context_1():
             # Should get 'foo'
