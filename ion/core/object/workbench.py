@@ -58,7 +58,10 @@ class WorkBench(object):
         A dictionary - shared between repositories for hashed objects
         """  
         self._hashed_elements={}
-      
+
+
+        #@TODO Consider using an index store in the Workbench to keep a cache of associations and keep track of objects
+
       
     def create_repository(self, root_type=None, nickname=None):
         """
@@ -85,9 +88,7 @@ class WorkBench(object):
         
             repo._workspace_root = rootobj
         
-        elif root_type ==None:
-            rootobj = None
-        else:
+        elif root_type is not None:
             raise WorkBenchError('Invalid root type argument passed in create_repository')
         
         

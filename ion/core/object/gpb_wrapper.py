@@ -25,8 +25,12 @@ from ion.util.cache import memoize
 
 import hashlib
 
-structure_element_type = create_type_identifier(object_id=1, version=1)
-link_type = create_type_identifier(object_id=3, version=1)
+STRUCTURE_ELEMENT_TYPE = create_type_identifier(object_id=1, version=1)
+LINK_TYPE = create_type_identifier(object_id=3, version=1)
+
+# Types which require specialization!
+CDM_VARIABLE_TYPE = create_type_identifier(object_id=10024, version=1)
+CDM_GROUP_TYPE = create_type_identifier(object_id=10020, version=1)
 
 class OOIObjectError(Exception):
     """
@@ -133,7 +137,7 @@ class WrappedMessageProperty(WrappedProperty):
         field = getattr(wrapper.GPBMessage, self.name)
         result = wrapper._rewrap(field)
 
-        if result.ObjectType == wrapper.LinkClassType:
+        if result.ObjectType == LINK_TYPE:
             result = wrapper.Repository.get_linked_object(result)
 
         return result
@@ -286,29 +290,16 @@ class WrapperType(type):
             # Set the object type:
             if clsDict.has_key('_MessageTypeIdentifier'):
                 mti = clsDict['_MessageTypeIdentifier']
-                type_obj = create_type_identifier(object_id=mti._ID,\
+                obj_type = create_type_identifier(object_id=mti._ID,\
                                                 version=mti._VERSION)
             else:
-                type_obj = create_type_identifier(object_id=-99,\
+                obj_type = create_type_identifier(object_id=-99,\
                                                 version=1)
-            clsDict['_gpb_type'] = type_obj
-            # type_obj can now be used for adding special methods to the Wrapper for certain types
+            clsDict['_gpb_type'] = obj_type
+            # the obj_type can now be used for adding special methods to the Wrapper for certain types
             
             # Special methods for certain object types:
-            
-            # Need a better way to set the type!!!!!
-            if type_obj == link_type:
-                def obj_setlink(self,value):
-                    #if self.Invalid:
-                    if self._invalid:
-                        raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-            
-                    self.Repository.set_linked_object(self,value)
-                    if not self.Modified:
-                        self._set_parents_modified()
-                    return
-                
-                clsDict['SetLink'] = obj_setlink
+            WrapperType._add_specializations(cls, obj_type, clsDict)
             
             # Try rewriting using slots - would be more efficient
             def obj_setter(self, k, v):
@@ -333,6 +324,62 @@ class WrapperType(type):
         
         
         return obj
+
+
+
+    def _add_specializations(cls, obj_type, clsDict):
+
+
+        def _get_attribute_by_name(self, name=''):
+            """
+            Specialized method for CDM Objects to get the attribute object by its name
+            """
+            if not name or not isinstance(name, str):
+                raise OOIObjectError('Invalid attribute name requested: "%s"' % str(name))
+
+            for att in self.attributes:
+                if att.name == name:
+                    return att
+            else:
+                raise OOIObjectError('Requested attribute name not found: "%s"' % str(name))
+
+
+        def _get_variable_by_name(self, name=''):
+            """
+            Specialized method for CDM Objects to get the variable object by its name
+            """
+            if not name or not isinstance(name, str):
+                raise OOIObjectError('Invalid attribute name requested: "%s"' % str(name))
+
+            for var in self.variables:
+                if var.name == name:
+                    return var
+            else:
+                raise OOIObjectError('Requested attribute name not found: "%s"' % str(name))
+
+
+        if obj_type == LINK_TYPE:
+            def obj_setlink(self,value):
+                if self._invalid:
+                    raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+                self.Repository.set_linked_object(self,value)
+                if not self.Modified:
+                    self._set_parents_modified()
+                return
+
+            clsDict['SetLink'] = obj_setlink
+        
+        elif obj_type == CDM_GROUP_TYPE:
+
+            clsDict['GetAttributeByName'] = _get_attribute_by_name
+            clsDict['GetVariableByName'] = _get_variable_by_name
+
+        elif obj_type == CDM_VARIABLE_TYPE:
+            
+            clsDict['GetAttributeByName'] = _get_attribute_by_name
+
+
 
 class Wrapper(object):
     '''
@@ -369,8 +416,7 @@ class Wrapper(object):
 
     __metaclass__ = WrapperType
         
-    LinkClassType = create_type_identifier(object_id=3, version=1)
-        
+
     def __init__(self, gpbMessage):
         """
         Initialize the Wrapper class and set up it message type.
@@ -664,7 +710,7 @@ class Wrapper(object):
         link = getattr(gpb,linkname)
         link = self._rewrap(link)
         
-        if not link.ObjectType == self.LinkClassType:
+        if not link.ObjectType == LINK_TYPE:
             raise OOIObjectError('The field "%s" is not a link!' % linkname)
         return link
          
@@ -855,7 +901,7 @@ class Wrapper(object):
                     for item in gpb_field:
                         
                         wrapped_item = self._rewrap(item)
-                        if wrapped_item.ObjectType == wrapped_item.LinkClassType:
+                        if wrapped_item.ObjectType == LINK_TYPE:
                             self.ChildLinks.add(wrapped_item)
                         else:
                             wrapped_item.FindChildLinks()
@@ -868,7 +914,7 @@ class Wrapper(object):
                         continue
                     
                     item = self._rewrap(gpb_field)
-                    if item.ObjectType == item.LinkClassType:
+                    if item.ObjectType == LINK_TYPE:
                         self.ChildLinks.add(item)
                     else:
                         item.FindChildLinks()
@@ -970,7 +1016,7 @@ class Wrapper(object):
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
-        if self.ObjectType == self.LinkClassType:
+        if self.ObjectType == LINK_TYPE:
             msg = '\nkey: %s \ntype { %s }' % (sha1_to_hex(self.GPBMessage.key), self.GPBMessage.type)
         else:
             msg = '\n' +self.GPBMessage.__str__()
@@ -1103,7 +1149,7 @@ class Wrapper(object):
         """
         Helper method for ClearField
         """
-        if self.ObjectType == self.LinkClassType:
+        if self.ObjectType == LINK_TYPE:
             child_obj = self.Repository.get_linked_object(self)
             # Remove this link from the list of parents
             child_obj.ParentLinks.remove(self)
@@ -1137,9 +1183,7 @@ class ContainerWrapper(object):
     This class is only for use with containers.RepeatedCompositeFieldContainer
     It is not needed for repeated scalars!
     """
-    
-    LinkClassType = create_type_identifier(object_id=3, version=1)
-    
+        
     def __init__(self, wrapper, gpbcontainer):
         # Be careful - this is a hard link
         self._wrapper = wrapper
@@ -1196,7 +1240,7 @@ class ContainerWrapper(object):
         
         item = self._gpbcontainer.__getitem__(key)
         item = self._wrapper._rewrap(item)
-        if item.ObjectType == self.LinkClassType:
+        if item.ObjectType == LINK_TYPE:
             self.Repository.set_linked_object(item, value)
         else:
             raise OOIObjectError('It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
@@ -1214,7 +1258,7 @@ class ContainerWrapper(object):
         
         item = self._gpbcontainer.__getitem__(key)
         item = self._wrapper._rewrap(item)
-        if item.ObjectType == self.LinkClassType:
+        if item.ObjectType == LINK_TYPE:
             self.Repository.set_linked_object(item, value)
         else:
             raise OOIObjectError('It is illegal to set a value of a repeated composit field unless it is a CASRef - Link')
@@ -1229,7 +1273,7 @@ class ContainerWrapper(object):
             
         value = self._gpbcontainer.__getitem__(key)
         value = self._wrapper._rewrap(value)
-        if value.ObjectType == self.LinkClassType:
+        if value.ObjectType == LINK_TYPE:
             value = self.Repository.get_linked_object(value)
         return value
     
@@ -1240,7 +1284,7 @@ class ContainerWrapper(object):
             
         link = self._gpbcontainer.__getitem__(key)
         link = self._wrapper._rewrap(link)
-        assert link.ObjectType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
+        assert link.ObjectType == LINK_TYPE, 'The field "%s" is not a link!' % linkname
         return link
         
     def GetLinks(self):
@@ -1250,7 +1294,7 @@ class ContainerWrapper(object):
         links = self._gpbcontainer[:] # Get all the links!
         for link in links:
             link = self._wrapper._rewrap(link)
-            assert link.ObjectType == self.LinkClassType, 'The field "%s" is not a link!' % linkname
+            assert link.ObjectType == LINK_TYPE, 'The field "%s" is not a link!' % linkname
             wrapper_list.append(link)
         return wrapper_list
     
@@ -1494,12 +1538,12 @@ class StructureElement(object):
         if se:
             self._element = se
         else:
-            self._element = get_gpb_class_from_type_id(structure_element_type)()
+            self._element = get_gpb_class_from_type_id(STRUCTURE_ELEMENT_TYPE)()
         self.ChildLinks = set()
         
     @classmethod
     def parse_structure_element(cls,blob):
-        se = get_gpb_class_from_type_id(structure_element_type)()
+        se = get_gpb_class_from_type_id(STRUCTURE_ELEMENT_TYPE)()
         se.ParseFromString(blob)
         return cls(se)
         
