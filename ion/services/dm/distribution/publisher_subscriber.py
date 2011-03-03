@@ -240,7 +240,7 @@ class SubscriberFactory(object):
     Factory to create Subscribers.
     """
 
-    def __init__(self, xp_name=None, topic_regex=None, subscriber_type=None):
+    def __init__(self, xp_name=None, binding_key=None, queue_name=None, subscriber_type=None, credentials=None):
         """
         Initializer. Sets default properties for calling the build method.
 
@@ -248,7 +248,10 @@ class SubscriberFactory(object):
         build method.
 
         @param  xp_name     Name of exchange point to use
-        @param  topic_regex Dataset of topic of interest, using amqp regex
+        @param  binding_key The binding key to use for the Subscriber. If specified, the queue will have this binding
+                            key bound to it.
+        @param  queue_name  The queue name to use for the Subscriber. If specified, the queue may either exist or be
+                            created. If not specified, an anonymous queue is created.
         @param  subscriber_type Specific derived Subscriber type to use. You can define a custom
                             Subscriber derived class if you want to share the implementation
                             across multiple Subscribers. If left None, the standard Subscriber
@@ -256,10 +259,13 @@ class SubscriberFactory(object):
         """
 
         self._xp_name           = xp_name
-        self._topic_regex       = topic_regex
+        self._binding_key       = binding_key
+        self._queue_name        = queue_name
         self._subscriber_type   = subscriber_type
+        self._credentials       = credentials
 
-    def build(self, xp_name=None, topic_regex=None, subscriber_type=None, handler=None):
+    @defer.inlineCallbacks
+    def build(self, xp_name=None, binding_key=None, queue_name=None, handler=None, subscriber_type=Subscriber, credentials=None):
         """
         Creates a subscriber.
 
@@ -270,7 +276,10 @@ class SubscriberFactory(object):
         @param  proc        The process the subscriber should attach to. May be None to create an
                             anonymous process contained in the Subscriber instance itself.
         @param  xp_name     Name of exchange point to use
-        @param  topic_regex Dataset of topic of interest, using amqp regex
+        @param  binding_key The binding key to use for the Subscriber. If specified, the queue will have this binding
+                            key bound to it.
+        @param  queue_name  The queue name to use for the Subscriber. If specified, the queue may either exist or be
+                            created. If not specified, an anonymous queue is created.
         @param  subscriber_type Specific derived Subscriber type to use. You can define a custom
                             Subscriber derived class if you want to share the implementation
                             across multiple Subscribers. If left None, the standard Subscriber
@@ -279,15 +288,20 @@ class SubscriberFactory(object):
                             a bound method of the process owning this Subscriber, but may be any
                             callable taking a data param. If this is left None, the subscriber_type
                             must be set to a derived Subscriber that overrides the ondata method.
+        @param  credenitials Subscriber credentials (not currently used).
         """
         xp_name         = xp_name or self._xp_name
-        topic_regex     = topic_regex or self._topic_regex
+        binding_key     = binding_key or self._binding_key
+        queue_name      = queue_name or self._queue_name
         subscriber_type = subscriber_type or self._subscriber_type or Subscriber
+        credentials     = credentials or self._credentials
 
-        sub = subscriber_type(xp_name) # TODO: name here, gets reset later? so doesn't matter?
-        sub.subscribe(xp_name, topic_regex)
+        sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, credentials=credentials)
+        yield sub.initialize()
+        yield sub.activate()
+
         if handler != None:
             sub.ondata = handler
 
-        return sub
+        defer.returnValue(sub)
 
