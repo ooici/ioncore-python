@@ -243,77 +243,42 @@ class IndexStore(object):
         @retVal A data structure representing Cassandra rows. See the class
         docstring for the description of the data structure.
         """
-        eq_filter = lambda x: x[2] == Query.EQ
-        gt_filter = lambda x: x[2] == Query.GT
-        
-        make_tuples = lambda x: (x[0], x[1])
         predicates = query_predicates.get_predicates()
         
+        eq_filter = lambda x: x[2] == Query.EQ
         preds_eq = filter(eq_filter, predicates)
-        preds_gt = filter(gt_filter, predicates)
-        preds_tuples_eq = map(make_tuples, preds_eq)
-        preds_tuples_gt = map(make_tuples, preds_gt)
-        
-        indexed_attributes_eq = dict(preds_tuples_eq)
-        indexed_attributes_gt = dict(preds_tuples_gt)
-
-        return defer.maybeDeferred(self._query, indexed_attributes_eq, indexed_attributes_gt)
-        
-    def _query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):
-        """
-
-        """
         keys = set()
-
-
-        ###
-        # Handle the equal to attributes
-        # To be Consistent with Cassandra - there must be at least one eq expression
-        ###
-        try:
-            k,v = indexed_attributes_eq.popitem()
+        if len(preds_eq) == 0:
+            raise IndexStoreError('Invalid arguments to IndexStore - must provide at least one equal to operator for search!')
+        else:
+            k,v,pred = preds_eq.pop()
             kindex = self.indices.get(k, None)
             if kindex:
                 keys.update(kindex.get(v,set()))
-
-        except KeyError:
-            log.info('No indexed_attributes_eq')
-            raise IndexStoreError('Invalid arguments to IndexStore - must provide at least one equal to operator for search!')
-
-
-        for k,v in indexed_attributes_eq.items():
-            # abort if the set of keys is empty - all operations are intersections
-            if len(keys) == 0:
-                return {}
-
-            kindex = self.indices.get(k, None)
-            if kindex:
-                # Use the intersection - each index attribute restricts the returned list!
-                keys.intersection_update(kindex.get(v,set()))
-
-        ###
-        # Handle the greater than to attributes
-        ###
-        for k,v in indexed_attributes_gt.items():
-            kindex = self.indices.get(k, None)
-            if kindex:
-                # Find all the attribute values greater than specified
+        
+        for k,v,p in predicates:
+            kindex = self.indices.get(k,None)
+            if p == Query.EQ:
+                
+                if kindex:
+                    keys.intersection_update(kindex.get(v,set()))
+            elif p == Query.GT:
+                
                 matches = set()
                 for attr_val in kindex.keys():
                     if attr_val > v:
                         matches.update(kindex.get(attr_val,set()))
                 keys.intersection_update(matches)
-
-
+        
+        log.info("keys: "+ str(keys))
         result = {}
         for k in keys:
             # This is stupid, but now remove effectively works - delete keys are no longer visible!
             if self.kvs.has_key(k):
                 result[k] = self.kvs.get(k)
                 
-        return result
-        
-        
+        return defer.succeed(result)                
+
     def get_query_attributes(self):
         """
         Return the column names that are indexed.
