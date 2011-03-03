@@ -248,7 +248,7 @@ class WrapperType(type):
             # Get the class name
             clsName = '%s_%s' % (cls.__name__, msgType.__name__)
             clsDict = {}
-                
+
             clsDict['_GPBClass'] = gpbMessage.__class__
             
                                 

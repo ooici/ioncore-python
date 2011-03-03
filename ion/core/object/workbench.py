@@ -32,7 +32,7 @@ structure_type = object_utils.create_type_identifier(object_id=2, version=1)
 
 idref_type = object_utils.create_type_identifier(object_id=4, version=1)
 gpbtype_type = object_utils.create_type_identifier(object_id=9, version=1)
-
+ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 
 class WorkBenchError(Exception):
     """
@@ -112,8 +112,49 @@ class WorkBench(object):
         repo = self.create_repository(root_type, nickname)
         
         return repo, repo.root_object
-        
-    def set_repository_nickname(self,repositorykey, nickname):
+
+
+    def create_association(self, subject, predicate, obj):
+        """
+        @Brief Create an association repository object in your workbench
+        @param subject is a resource instance or a repository object
+        @param predicate is a resource instance or a repository object
+        @param object is a resource instance or a repository object
+        @retval association_repo is a repository object for the association.
+        """
+        # Create a new repository to hold this data object
+        association_repo = self.create_repository(ASSOCIATION_TYPE)
+
+        self._set_association(association_repo, subject, 'subject')
+        self._set_association(association_repo, predicate, 'predicate')
+        self._set_association(association_repo, obj, 'object')
+
+
+
+        return association_repo
+
+
+    def _set_association(self,  association_repo, thing, partname):
+
+        if hasattr(thing, 'Repository'):
+            # Allow passing a Resource Instance to create an association
+            thing = thing.Repository
+
+
+        if not isinstance(thing, repository.Repository):
+            log.error('Association Error: type, value', type(thing),str(thing))
+            raise WorkBenchError('Invalid object passed to Create Association. Only Resource Instances or Object Repositories can be passed as subject, predicate or object')
+
+
+        id_ref = association_repo.create_object(idref_type)
+        thing.set_repository_reference(id_ref, current_state=True)
+
+        association_repo.root_object.SetLinkByName(partname,id_ref)
+
+
+
+
+    def set_repository_nickname(self, repositorykey, nickname):
         # Should this throw an error if that nickname already exists?
         self._repository_nicknames[nickname] = repositorykey    
         
@@ -139,9 +180,9 @@ class WorkBench(object):
         self._repos[repo.repository_key] = repo
        
     def reference_repository(self, repo_key, current_state=False):
-    
+
         repo = self.get_repository(repo_key)
-        
+
         if current_state == True:
             if repo.status != repo.UPTODATE:
                 raise WorkBenchError('Can not reference the current state of a repository which has been modified but not committed')

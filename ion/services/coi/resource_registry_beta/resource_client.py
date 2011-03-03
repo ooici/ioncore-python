@@ -177,6 +177,7 @@ class ResourceClient(object):
             
         # Pull the repository
         result= yield self.workbench.pull(self.datastore_service, reference)
+
         
         if result.MessageResponseCode == result.ResponseCodes.NOT_FOUND:
             raise ResourceClientError('Pull from datastore failed in resource client! Resource Not Found!')
@@ -328,7 +329,20 @@ class ResourceInstanceType(type):
                     prop = ResourceEnumProperty(fieldName )
                     
                     clsDict[fieldName] = prop
-            
+
+            # Try rewriting using slots - would be more efficient...
+            def obj_setter(self, k, v):
+                # For the resource instance, there is only one class propety to set,
+                # so just create it using object.__setattr__
+                if not hasattr(self, k):
+                    raise AttributeError(\
+                        '''Cant add properties to the ION Resource Instance.\n'''
+                        '''Unknown property name - "%s"; value - "%s"''' % (k, v))
+                super(ResourceInstance, self).__setattr__(k, v)
+
+            clsDict['__setattr__'] = obj_setter
+
+
 
             clsType = ResourceInstanceType.__new__(ResourceInstanceType, clsName, (cls,), clsDict)
 
