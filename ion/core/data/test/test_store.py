@@ -30,6 +30,7 @@ from ion.core.data import index_store_service
 from ion.core.object import workbench
 
 from ion.core.object import object_utils
+from ion.core.data.store import Query
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -189,8 +190,10 @@ class IndexStoreTest(IStoreTest):
     @defer.inlineCallbacks
     def test_query_single(self):
 
-        query_attributes = {'birth_date':'1973'}
-        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
+        
+        query = Query()
+        query.add_predicate_eq('birth_date', '1973')
+        rows = yield self.ds.query(query)
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(rows['prothfuss']['value'], self.binary_value2)
         self.assertEqual(len(rows),1)
@@ -202,8 +205,9 @@ class IndexStoreTest(IStoreTest):
     @defer.inlineCallbacks
     def test_query_single_2(self):
 
-        query_attributes = {'state':'UT'}
-        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
+        query = Query()
+        query.add_predicate_eq('state', 'UT')
+        rows = yield self.ds.query(query)
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(rows['bsanderson']['value'], self.binary_value1)
         self.assertEqual(rows['htayler']['value'], self.binary_value3)
@@ -223,10 +227,11 @@ class IndexStoreTest(IStoreTest):
     # Tests multiple atts
     @defer.inlineCallbacks
     def test_query_multiple(self):
-
-
-        query_attributes = {'birth_date':'1973', 'state':'WI'}
-        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
+        
+        query = Query()
+        query.add_predicate_eq('birth_date','1973')
+        query.add_predicate_eq('state','WI')
+        rows = yield self.ds.query(query)
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(rows['prothfuss']['value'], self.binary_value2)
         self.assertEqual(len(rows),1)
@@ -235,11 +240,11 @@ class IndexStoreTest(IStoreTest):
     # Tests no result
     @defer.inlineCallbacks
     def test_query_no_resuluts(self):
-
-        yield self.put_stuff_for_tests()
-
-        query_attributes = {'birth_date':'1978', 'state':'WI'}
-        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
+        query = Query()
+        
+        query.add_predicate_eq('birth_date', '1978')
+        query.add_predicate_eq('state', 'WI')
+        rows = yield self.ds.query(query)
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(len(rows),0)
         
@@ -248,11 +253,10 @@ class IndexStoreTest(IStoreTest):
     @defer.inlineCallbacks
     def test_query_greater_and_eq(self):
 
-        query_attributes_gt = {'birth_date':'1970'}
-        query_attributes_eq = {'state':'UT'}
-
-        rows = yield self.ds.query(indexed_attributes_eq=query_attributes_eq,
-                                   indexed_attributes_gt=query_attributes_gt)
+        query = Query()
+        query.add_predicate_gt('birth_date','1970')
+        query.add_predicate_eq('state','UT')
+        rows = yield self.ds.query(query)
 
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(len(rows),1)
@@ -265,13 +269,12 @@ class IndexStoreTest(IStoreTest):
     # Tests greater than
     @defer.inlineCallbacks
     def test_query_greater_and_eq_2(self):
-
-        # Test whether the value is there...
-        query_attributes_gt = {'birth_date':''}
-        query_attributes_eq = {'state':'UT'}
-
-        rows = yield self.ds.query(indexed_attributes_eq=query_attributes_eq,
-                                   indexed_attributes_gt=query_attributes_gt)
+        
+        query = Query()
+        query.add_predicate_gt('birth_date','')
+        query.add_predicate_eq('state','UT')
+        
+        rows = yield self.ds.query(query)
 
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(len(rows),2)
@@ -340,9 +343,9 @@ class IndexStoreTest(IStoreTest):
         self.d4.update(new_attrs)
 
         yield self.ds.update_index('jstewart', new_attrs)
-
-        query_attributes = {'birth_date':'1969'}
-        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
+        query = Query()
+        query.add_predicate_eq('birth_date', '1969')
+        rows = yield self.ds.query(query)
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(rows['jstewart']['value'], self.binary_value4)
         self.assertEqual(len(rows),1)
@@ -360,8 +363,9 @@ class IndexStoreTest(IStoreTest):
         log.info("Updating the index")
         yield self.ds.update_index('prothfuss', new_attrs)
         log.info("Done updating the index")
-        query_attributes = {'birth_date':'1969'}
-        rows = yield self.ds.query(indexed_attributes_eq=query_attributes)
+        query = Query()
+        query.add_predicate_eq('birth_date', '1969')
+        rows = yield self.ds.query(query)
         log.info("Rows returned %s " % (rows,))
         self.assertEqual(rows['prothfuss']['value'], self.binary_value2)
         self.assertEqual(len(rows),1)

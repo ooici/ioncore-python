@@ -232,7 +232,7 @@ class IndexStore(object):
             del self.kvs[key]            
         return defer.succeed(None)
         
-    def query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):
+    def query(self, query_predicates):
         """
         Search for rows in the Cassandra instance.
     
@@ -243,7 +243,20 @@ class IndexStore(object):
         @retVal A data structure representing Cassandra rows. See the class
         docstring for the description of the data structure.
         """
-        log.info(self.kvs)
+        eq_filter = lambda x: x[2] == Query.EQ
+        gt_filter = lambda x: x[2] == Query.GT
+        
+        make_tuples = lambda x: (x[0], x[1])
+        predicates = query_predicates.get_predicates()
+        
+        preds_eq = filter(eq_filter, predicates)
+        preds_gt = filter(gt_filter, predicates)
+        preds_tuples_eq = map(make_tuples, preds_eq)
+        preds_tuples_gt = map(make_tuples, preds_gt)
+        
+        indexed_attributes_eq = dict(preds_tuples_eq)
+        indexed_attributes_gt = dict(preds_tuples_gt)
+
         return defer.maybeDeferred(self._query, indexed_attributes_eq, indexed_attributes_gt)
         
     def _query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):
@@ -306,6 +319,27 @@ class IndexStore(object):
         Return the column names that are indexed.
         """
         return defer.maybeDeferred(self.indices.keys)
+
+class Query:
+    """
+    Class that holds the predicates used to query an IndexStore.
+    """
+    
+    EQ = "EQ"
+    GT = "GT"
+    def __init__(self):
+        self._predicates = []
+
+    def add_predicate_eq(self, name, value):
+        self._predicates.append((name,value,Query.EQ))
+    
+    def add_predicate_gt(self, name, value):
+        self._predicates.append((name,value,Query.GT))
+        
+    def get_predicates(self):
+        return self._predicates    
+        
+    
 
     
 class IDataManager(Interface):
