@@ -23,6 +23,8 @@ is skipped.
 """
 
 from twisted.trial import unittest
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 class itv(object):
 
@@ -30,9 +32,16 @@ class itv(object):
         self.config = config
 
     def __call__(self, func):
-            
+
+        # Get the config for a particular test - the developer can
+        # choose to run a particular test using this
         run_test = self.config.getValue(func.__name__, False)
-        
+
+        # This is a global override to run all ITV
+        if CONF.getValue('Run ITV Tests', False):
+           run_test = True
+
+
         if run_test:
             my_func = func
             

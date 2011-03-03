@@ -40,15 +40,25 @@ class DataStoreTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
+        indices = ['subject_repository','subject_branch','subject_commit',
+                       'predicate_repository','predicate_branch','predicate_commit',
+                       'object_repository','object_branch','object_commit', 'word',
+                       'repository_key', 'repository_branch']
+
         services = [
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
+                'spawnargs':{'indices':indices} },
+
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'servicename':'ps1'}
+             'spawnargs':{'servicename':'ps1','commit_store_class':'ion.core.data.index_store_service.IndexStoreServiceClient'}
                 },
             {'name':'ds2','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{'servicename':'ps2'}
                 }
         ]
 
+        # Data Store Tests are written assuming two different backends - one for each data store.
+        # Need to build a separate set of tests to excercise cassandra/index store service as common back end!
 
         self.sup = yield self._spawn_processes(services)
 

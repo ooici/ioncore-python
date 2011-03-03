@@ -103,6 +103,8 @@ class ResourceClient(object):
         @param name is a string, a name for the new resource
         @param description is a string describing the resource
         @retval resource is a ResourceInstance object
+
+        @TODO pull the associations that go with this resource
         """
         yield self._check_init()
         
@@ -149,7 +151,9 @@ class ResourceClient(object):
         @param resource_id can be either a string resource identity or an IDRef
         object which specifies the resource identity as well as optional parameters
         version and version state.
-        @retval the specified ResourceInstance 
+        @retval the specified ResourceInstance
+
+        @TODO pull the associations that go with this resource
         """
         yield self._check_init()
         
@@ -177,6 +181,7 @@ class ResourceClient(object):
             
         # Pull the repository
         result= yield self.workbench.pull(self.datastore_service, reference)
+
         
         if result.MessageResponseCode == result.ResponseCodes.NOT_FOUND:
             raise ResourceClientError('Pull from datastore failed in resource client! Resource Not Found!')
@@ -201,6 +206,8 @@ class ResourceClient(object):
         @breif Write the current state of the resource to the data store
         @param instance is a ResourceInstance object to be written
         @param comment is a comment to add about the current state of the resource
+
+        @TODO push the associations that go with this resource
         """
         
         if not comment:
@@ -227,7 +234,29 @@ class ResourceClient(object):
         yield self._check_init()
             
         raise NotImplementedError, "Interface Method Not Implemented"
-        
+
+    def create_association(self,subject, predicate, obj):
+        """
+        This method is still experimental
+        """
+        association = self.workbench.create_association(subject, predicate, obj)
+
+        # @TODO Now what - what should we do with the association? Stash it in the workbench?
+
+        # For now - put a reference to it in the resource instance
+        if isinstance(subject, ResourceInstance):
+            subject._associations.append(association)
+
+        if isinstance(predicate, ResourceInstance):
+            predicate._associations.append(association)
+
+        if isinstance(object, ResourceInstance):
+            object._associations.append(association)
+
+        # No return val - don't touch the associations in the process!
+
+
+
     def reference_instance(self, instance, current_state=False):
         """
         @brief Reference Resource creates a data object which can be used as a
@@ -328,7 +357,20 @@ class ResourceInstanceType(type):
                     prop = ResourceEnumProperty(fieldName )
                     
                     clsDict[fieldName] = prop
-            
+
+            # Try rewriting using slots - would be more efficient...
+            def obj_setter(self, k, v):
+                # For the resource instance, there is only one class propety to set,
+                # so just create it using object.__setattr__
+                if not hasattr(self, k):
+                    raise AttributeError(\
+                        '''Cant add properties to the ION Resource Instance.\n'''
+                        '''Unknown property name - "%s"; value - "%s"''' % (k, v))
+                super(ResourceInstance, self).__setattr__(k, v)
+
+            clsDict['__setattr__'] = obj_setter
+
+
 
             clsType = ResourceInstanceType.__new__(ResourceInstanceType, clsName, (cls,), clsDict)
 
@@ -342,9 +384,12 @@ class ResourceInstanceType(type):
     
 class ResourceInstance(object):
     """
-    @brief The resoure instance is the vehicle through which a process
+    @brief The resource instance is the vehicle through which a process
     interacts with a resource instance. It hides the git semantics of the data
     store and deals with resource specific properties.
+
+    @TODO how do we make sure that there is only one resource instance per resource? If the process creates multiple
+    resource instances to wrap the same resource we are in trouble. Need to find a way to keep a cache of the instances
     """
     __metaclass__ = ResourceInstanceType
     
@@ -374,6 +419,9 @@ class ResourceInstance(object):
         object.__setattr__(self,'_repository',None)
         
         self._repository = resource_repository
+
+        # association list
+        object.__setattr__(self,'_associations',[])
         
         
     @property

@@ -4,7 +4,7 @@
 @file ion/play/hello_errors.py
 @author David Stuebe
 @brief Most services will have to handle possible exceptions in their business
-logic. This is an example service that demostrates how to do that.
+logic. This is an example service that demonstrates how to do that.
 """
 
 import ion.util.ionlog
@@ -16,11 +16,25 @@ from ion.core.exception import ApplicationError
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.core.messaging import message_client
 from ion.core.object import object_utils
-from ion.core.exception import ReceivedError
 
 PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
+"""
+message Person {
+  enum _MessageTypeIdentifier {
+    _ID = 20001;
+    _VERSION = 1;
+  }
+  optional string name = 1;
+  optional int32 id = 2;        // Unique ID number for this person.
+  optional string email = 3;
+
+  enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+  }
+"""
 
 
 class HelloError(ApplicationError):
@@ -32,7 +46,7 @@ class HelloError(ApplicationError):
 
 class HelloErrors(ServiceProcess):
     """
-    Example service interface that includes error handling
+    Example service interface that includes rigorous error handling
     This service has no purpose. It receives a person message and makes up some
     business logic based on the name of the person. The result, if any is also
     a person message. Normally the response would be a different type of object.
@@ -58,6 +72,11 @@ class HelloErrors(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_replytome(self, request, headers, msg):
+        """
+        @brief Reply to a request returning a reply message, an ack, or raising an exception
+        @param params request GPB, 20001/1, a person object from net.ooici.play
+        @retval response, GPB 20001/1, a person message if successful.
+        """
         log.info('op_replytome: '+str(request))
         
         response = yield self.businesslogic4replytome(request)
@@ -137,6 +156,11 @@ class HelloErrorsClient(ServiceClient):
 
     @defer.inlineCallbacks
     def replytome(self, message):
+        """
+        @brief Reply to a request message returning a reply message, an ack, or raising an exception
+        @param params request GPB, 20001/1, a person object from net.ooici.play
+        @retval response, GPB 20001/1, a person message if successful.
+        """
         yield self._check_init()
             
         log.debug('Client Sending: '+str(message))

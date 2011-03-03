@@ -8,7 +8,7 @@
 @brief base interface for all key-value stores in the system and default
         in memory implementation
 """
-
+import os
 from zope.interface import Interface
 from zope.interface import implements
 
@@ -100,7 +100,14 @@ class IIndexStore(IStore):
         @param key  an immutable key to be associated with a value
         @param value  an object to be associated with the key. The caller must
                 not modify this object after it was
+        @param index_attributes a dictionary of attributes by which to index this value of this key
         @retval Deferred, for success of this operation
+        """
+
+    def update_index(key, index_attributes):
+        """
+        @param key  an immutable key associated with a value
+        @param index_attributes an update to the dictionary of attributes by which to index this value of this key
         """
 
     def remove(key):
@@ -110,7 +117,7 @@ class IIndexStore(IStore):
      
         """
         
-    def query(self, indexed_attributes={}):
+    def query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):
         """
         Search for rows in the Cassandra instance.
     
@@ -125,6 +132,11 @@ class IIndexStore(IStore):
         """
         Return the column names that are indexed.
         """
+
+class IndexStoreError(Exception):
+    """
+    An exception class for the index store
+    """
 
 class IndexStore(object):
     """
@@ -160,35 +172,67 @@ class IndexStore(object):
         """
         row = self.kvs.get(key, None)
         if row is None:
-            defer.returnValue(None)
+            return defer.succeed(None)
         else:
             return defer.maybeDeferred(row.get, "value")
 
-    def put(self, key, value, index_attributes={}):
-        """
-        @see IStore.put
-        """
-        for k,v in index_attributes.items():
-            
+
+    def _update_index(self, key, index_attributes):
+        log.debug("In _update_index")
+        log.debug("key %s index_attributes %s" % (key,index_attributes))
+        #Ensure that we are updating attributes that are indexed.
+        query_attribute_names = set(self.indices.keys())
+        index_attribute_names = set(index_attributes.keys())
+        
+        if not index_attribute_names.issubset(query_attribute_names):
+            bad_attrs = index_attribute_names.difference(query_attribute_names)
+            raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
+        
+        for k, v in index_attributes.items():
             kindex = self.indices.get(k, None)
             if not kindex:
                 kindex = {}
                 self.indices[k] = kindex
-            kindex[v]= kindex.get(v, set())
+            # Create a set of keys if it does not already exist
+            kindex[v] = kindex.get(v, set())
             kindex[v].add(key)
+
+    def put(self, key, value, index_attributes={}):
+        """
+        @see IStore.put
+        Raises an exception if index_attibutes contains attributes that are not indexed
+        by the underlying store.
+        """
+        self._update_index(key, index_attributes)
                         
         return defer.maybeDeferred(self.kvs.update, {key: dict({"value":value},**index_attributes)})
-
+    
+    
+    def update_index(self, key, index_attributes):
+        """
+        @brief Update the index attributes, but keep the value the same. 
+        @param key The key to the row.
+        @param index_attributes A dictionary of column names and values. These attributes
+        can be used to query the store to return rows based on the value of the attributes.
+        
+        Raises an IndexStoreException if you try to update an attribute that is not indexed.
+        """
+        log.debug("In update_index")
+        self._update_index(key, index_attributes)
+        self.kvs[key].update(index_attributes)
+        return defer.succeed(None)
+        
+    
     def remove(self, key):
         """
         @see IStore.remove
         """
-        # could test for existance of key. this will error otherwise
+        # could test for existence of key. this will error otherwise
         if self.kvs.has_key(key):
             del self.kvs[key]            
         return defer.succeed(None)
         
-    def query(self, indexed_attributes={}):
+    def query(self, query_predicates):
         """
         Search for rows in the Cassandra instance.
     
@@ -199,34 +243,70 @@ class IndexStore(object):
         @retVal A data structure representing Cassandra rows. See the class
         docstring for the description of the data structure.
         """
+        predicates = query_predicates.get_predicates()
         
-        return defer.maybeDeferred(self._query, indexed_attributes)
-        
-    def _query(self, indexed_attributes={}):
-        
+        eq_filter = lambda x: x[2] == Query.EQ
+        preds_eq = filter(eq_filter, predicates)
         keys = set()
-        
-        for k,v in indexed_attributes.items():
+        if len(preds_eq) == 0:
+            raise IndexStoreError('Invalid arguments to IndexStore - must provide at least one equal to operator for search!')
+        else:
+            k,v,pred = preds_eq.pop()
             kindex = self.indices.get(k, None)
             if kindex:
                 keys.update(kindex.get(v,set()))
         
+        for k,v,p in predicates:
+            kindex = self.indices.get(k,None)
+            if p == Query.EQ:
+                
+                if kindex:
+                    keys.intersection_update(kindex.get(v,set()))
+            elif p == Query.GT:
+                
+                matches = set()
+                for attr_val in kindex.keys():
+                    if attr_val > v:
+                        matches.update(kindex.get(attr_val,set()))
+                keys.intersection_update(matches)
+        
+        log.info("keys: "+ str(keys))
         result = {}
         for k in keys:
             # This is stupid, but now remove effectively works - delete keys are no longer visible!
             if self.kvs.has_key(k):
                 result[k] = self.kvs.get(k)
                 
-        return result
-        
-        
+        return defer.succeed(result)                
+
     def get_query_attributes(self):
         """
         Return the column names that are indexed.
         """
         return defer.maybeDeferred(self.indices.keys)
-        
 
+class Query:
+    """
+    Class that holds the predicates used to query an IndexStore.
+    """
+    
+    EQ = "EQ"
+    GT = "GT"
+    def __init__(self):
+        self._predicates = []
+
+    def add_predicate_eq(self, name, value):
+        self._predicates.append((name,value,Query.EQ))
+    
+    def add_predicate_gt(self, name, value):
+        self._predicates.append((name,value,Query.GT))
+        
+    def get_predicates(self):
+        return self._predicates    
+        
+    
+
+    
 class IDataManager(Interface):
     """
     @note Proposed class to fulfill preservation service management?

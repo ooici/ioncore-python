@@ -12,7 +12,7 @@ from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
 from ion.core.messaging.message_client import MessageClient
-from ion.services.dm.inventory.inventory_service import CassandraInventoryClient
+from ion.core.data.index_store_service import IndexStoreServiceClient
 from ion.core.object import object_utils
 
 from ion.core import ioninit
@@ -23,7 +23,7 @@ from ion.util.itv_decorator import itv
 resource_request_type = object_utils.create_type_identifier(object_id=10, version=1)
 cassandra_indexed_row_type = object_utils.create_type_identifier(object_id=2511, version=1)
 
-class CassandraInventoryTester(IonTestCase):
+class IndexStoreServiceTester(IonTestCase):
     
     @itv(CONF) 
     @defer.inlineCallbacks
@@ -36,11 +36,11 @@ class CassandraInventoryTester(IonTestCase):
            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
              {'name': 'inventory',
-             'module': 'ion.services.dm.inventory.inventory_service',
-             'class':'CassandraInventoryService'}         
+             'module': 'ion.core.data.index_store_service',
+             'class':'IndexStoreService'}
         ]
         sup = yield self._spawn_processes(services)
-        self.client = CassandraInventoryClient(proc=sup)
+        self.client = IndexStoreServiceClient(proc=sup)
         self.mc = MessageClient(proc = self.test_sup)
         
         

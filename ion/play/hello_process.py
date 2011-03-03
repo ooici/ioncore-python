@@ -17,6 +17,7 @@ from ion.core.process.process import ProcessFactory, Process, ProcessClient
 class HelloProcess(Process):
     """
     Example process
+    This process passes strings as messages.
     """
 
 

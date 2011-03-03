@@ -57,7 +57,8 @@ class DataStoreService(ServiceProcess):
     COMMIT_STORE = 'commit_store_class'
     BLOB_STORE = 'blob_store_class'
     
-    CommitIndexName = 'repository'
+    COMMIT_REPOSITORY_INDEX = 'repository_key'
+    COMMIT_BRANCH_INDEX = 'repository_branch'
     
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -111,8 +112,13 @@ class DataStoreService(ServiceProcess):
         if issubclass(self._backend_classes[self.COMMIT_STORE], cassandra.CassandraStore):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
         else:
-            self.c_store = yield defer.maybeDeferred(self._backend_classes[self.COMMIT_STORE])
-        
+            indices = ['subject_repository','subject_branch','subject_commit',
+                       'predicate_repository','predicate_branch','predicate_commit',
+                       'object_repository','object_branch','object_commit', 'word',
+                        self.COMMIT_REPOSITORY_INDEX,  self.COMMIT_BRANCH_INDEX]
+            
+            self.c_store = yield defer.maybeDeferred(self._backend_classes[self.COMMIT_STORE], self, **{'indices':indices})
+
         if issubclass(self._backend_classes[self.BLOB_STORE], cassandra.CassandraStore):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
         else:
@@ -145,7 +151,7 @@ class DataStoreService(ServiceProcess):
                 self.workbench._hashed_elements[store_head.key]=store_head
                 
                 # Get the commits using the query interface
-                rows = yield self.c_store.query({self.CommitIndexName:repo_key})
+                rows = yield self.c_store.query({self.COMMIT_REPOSITORY_INDEX:repo_key})
                     
                 for key, columns in rows.items():
                     blob = columns["value"]
@@ -179,12 +185,17 @@ class DataStoreService(ServiceProcess):
             
             for key in repo._commit_index.keys():
                 if not key in store_commits:
-                    
-                    attributes = {self.CommitIndexName : str(repo_key)}
-                    
-                    wse = self.workbench._hashed_elements.get(key)
-                    
+
+                    # Set the repository name for the commit
+                    attributes = {self.COMMIT_REPOSITORY_INDEX : str(repo_key)}
+
                     cref = repo._commit_index.get(key)
+                    
+                    for branch in  repo.branches:
+                        # If this is currently the head commit - set
+                        if cref in branch.commitrefs:
+                            attributes[self.COMMIT_BRANCH_INDEX] = branch.branchkey
+                                        
                     if cref.objectroot.ObjectType == association_type:
                         attributes['subject_repository'] = cref.objectroot.subject.key
                         attributes['subject_branch'] = cref.objectroot.subject.branch
@@ -200,6 +211,9 @@ class DataStoreService(ServiceProcess):
                         
                     elif  cref.objectroot.ObjectType == terminology_type:
                         attributes['word'] = cref.objectroot.word
+                    
+                    # get the wrapped structure element to put in...
+                    wse = self.workbench._hashed_elements.get(key)
                     
                     # Should replace this with one put slice command
                     defd = self.c_store.put(key = key,
@@ -245,7 +259,7 @@ class DataStoreService(ServiceProcess):
             self.workbench._hashed_elements[store_head.key]=store_head
                 
             # Get the commits using the query interface
-            rows = yield self.c_store.query({self.CommitIndexName:repo_key})
+            rows = yield self.c_store.query({self.COMMIT_REPOSITORY_INDEX:repo_key})
                 
             for key, columns in rows.items():
                 blob = columns["value"]

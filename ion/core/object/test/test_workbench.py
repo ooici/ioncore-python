@@ -35,8 +35,9 @@ class WorkBenchTest(unittest.TestCase):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb
         
-        repo, ab = self.wb.init_repository(addresslink_type)
+        repo = self.wb.create_repository(addresslink_type)
 
+        ab = repo.root_object
                         
         p = repo.create_object(person_type)
         p.name='David'
@@ -171,7 +172,31 @@ class WorkBenchTest(unittest.TestCase):
         self.assertEqual(repo, self.wb.get_repository('David'))
         self.assertIsInstance(rootobj, gpb_wrapper.Wrapper)
         
-        
+    def test_associations(self):
+
+        # Copy the address book object from the setup method to three new objects and use them in an association
+        self.ab.title = 'subject'
+        subject = self.wb.create_repository(addresslink_type)
+        subject.root_object = self.ab
+        subject.commit('a subject')
+
+        self.ab.title = 'predicate'
+        predicate = self.wb.create_repository(addresslink_type)
+        predicate.root_object = self.ab
+        predicate.commit('a predicate')
+
+        self.ab.title = 'object'
+        obj = self.wb.create_repository(addresslink_type)
+        obj.root_object = self.ab
+        obj.commit('a object')
+
+
+        association = self.wb.create_association(subject, predicate, obj)
+
+        self.assertEqual(association.root_object.subject.key, subject.repository_key)
+        self.assertEqual(association.root_object.predicate.key, predicate.repository_key)
+        self.assertEqual(association.root_object.object.key, obj.repository_key)
+
         
 class WorkBenchMergeTest(unittest.TestCase):
         

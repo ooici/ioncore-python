@@ -10,22 +10,17 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-import ion.util.procutils as pu
+from ion.core.exception import ApplicationError
 from ion.core.process.process import ProcessFactory, Process, ProcessClient
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
+
+
 from ion.core.object import object_utils
 
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+# from net.ooici.play addressbook.proto
+PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
 """
-package net.ooici.play;
-
-// Copied from the google example!
-// Changed rules - never use required!
-
-import "net/ooici/core/link/link.proto";
-
 message Person {
   enum _MessageTypeIdentifier {
     _ID = 20001;
@@ -49,19 +44,11 @@ message Person {
   repeated PhoneNumber phone = 4;
 }
 
-// Our address book file is just one of these.
-message AddressBook {
-  enum _MessageTypeIdentifier {
-    _ID = 20002;
-    _VERSION = 1;
-  }
-  repeated Person person = 1;
-  optional Person owner = 2;
-  optional string title = 3;
-}
+"""
 
-
-// Our address book file is just one of these.
+# from net.ooici.play addressbook.proto
+ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
+"""
 message AddressLink {
   enum _MessageTypeIdentifier {
     _ID = 20003;
@@ -72,7 +59,7 @@ message AddressLink {
   optional string title = 3;
 }
 """
-class HelloError(Exception):
+class HelloObjectError(ApplicationError):
     """
     An exception class for the Hello Object example
     """
@@ -94,13 +81,19 @@ class HelloObject(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_hello_person(self, person, headers, msg):
+        """
+        @brief Respond to a simple message
+        @param params person GPB, 20001/1, a person object from net.ooici.play.
+        @retval response, GPB 20001/1, a person message if successful.
+        """
         log.info('op_hello_person: ')
 
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
-        if person.ObjectType != person_type:
+        if person.ObjectType != PERSON_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloError('Unexpected type received %s; type: %s' % (str(person), str(person.ObjectType)))
+            raise HelloObjectError('Unexpected type received %s; type: %s' % (str(person), str(person.ObjectType)),
+                                   person.ResponseCodes.BAD_REQUEST)
             
                 
         # Creepy hello person object log statements...
@@ -118,15 +111,21 @@ class HelloObject(ServiceProcess):
         yield self.reply_ok(msg, person)
 
     @defer.inlineCallbacks
-    def op_hello_everyone(self, addressbook, headers, msg):
+    def op_hello_everyone(self, addresslink, headers, msg):
+        """
+        @brief Respond to a simple message
+        @param params addresslink GPB, 20003/1, a addresslink object from net.ooici.play.
+        @retval ack - a message envelope with ResponseCode OK and no content.
+        """
         log.info('op_hello_everyone: ')
 
-        if addressbook.ObjectType != addresslink_type:
+        if addresslink.ObjectType != ADDRESSLINK_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise HelloError('Unexpected type received %s; type: %s' % (str(addressbook), str(addressbook.ObjectType)))
+            raise HelloObjectError('Unexpected type received %s; type: %s' % (str(addresslink), str(addresslink.ObjectType)),
+                                   addresslink.ResponseCodes.BAD_REQUEST)
             
-        log.info('Received addresbook; Title: ' + addressbook.title)
-        for person in addressbook.person:
+        log.info('Received addresslink; Title: ' + addresslink.title)
+        for person in addresslink.person:
             log.info('Logging Person: \n' +str(person))
             
         yield self.reply_ok(msg)
@@ -147,6 +146,11 @@ class HelloObjectClient(ServiceClient):
 
     @defer.inlineCallbacks
     def hello_person(self, msg):
+        """
+        @brief Respond to a simple message
+        @param params person GPB, 20001/1, a person object from net.ooici.play.
+        @retval response, GPB 20001/1, a person message if successful.
+        """
         yield self._check_init()
         
         (content, headers, msg) = yield self.rpc_send('hello_person', msg)
@@ -155,6 +159,11 @@ class HelloObjectClient(ServiceClient):
         
     @defer.inlineCallbacks
     def hello_everyone(self, msg):
+        """
+        @brief Respond to a simple message
+        @param params addresslink GPB, 20003/1, a addresslink object from net.ooici.play.
+        @retval ack - a message envelope with ResponseCode OK and no content.
+        """
         yield self._check_init()
         
         (content, headers, msg) = yield self.rpc_send('hello_everyone', msg)
@@ -165,14 +174,3 @@ class HelloObjectClient(ServiceClient):
 # Spawn of the process using the module name
 factory = ProcessFactory(HelloObject)
 
-
-
-"""
-from ion.play import hello_service as h
-spawn(h)
-send(1, {'op':'hello','content':'Hello you there!'})
-
-from ion.play.hello_service import HelloServiceClient
-hc = HelloServiceClient(1)
-hc.hello()
-"""
