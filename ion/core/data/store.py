@@ -8,7 +8,7 @@
 @brief base interface for all key-value stores in the system and default
         in memory implementation
 """
-
+import os
 from zope.interface import Interface
 from zope.interface import implements
 
@@ -186,7 +186,7 @@ class IndexStore(object):
         
         if not index_attribute_names.issubset(query_attribute_names):
             bad_attrs = index_attribute_names.difference(query_attribute_names)
-            raise IndexStoreError("These attributes %s are not indexed." % (" ".join(bad_attrs),))
+            raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
         
         for k, v in index_attributes.items():
             kindex = self.indices.get(k, None)
@@ -232,7 +232,7 @@ class IndexStore(object):
             del self.kvs[key]            
         return defer.succeed(None)
         
-    def query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):
+    def query(self, query_predicates):
         """
         Search for rows in the Cassandra instance.
     
@@ -243,69 +243,68 @@ class IndexStore(object):
         @retVal A data structure representing Cassandra rows. See the class
         docstring for the description of the data structure.
         """
-        #log.info(self.kvs)
-        return defer.maybeDeferred(self._query, indexed_attributes_eq, indexed_attributes_gt)
+        predicates = query_predicates.get_predicates()
         
-    def _query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):
-        """
-
-        """
+        eq_filter = lambda x: x[2] == Query.EQ
+        preds_eq = filter(eq_filter, predicates)
         keys = set()
-
-
-        ###
-        # Handle the equal to attributes
-        # To be Consistent with Cassandra - there must be at least one eq expression
-        ###
-        try:
-            k,v = indexed_attributes_eq.popitem()
+        if len(preds_eq) == 0:
+            raise IndexStoreError('Invalid arguments to IndexStore - must provide at least one equal to operator for search!')
+        else:
+            k,v,pred = preds_eq.pop()
             kindex = self.indices.get(k, None)
             if kindex:
                 keys.update(kindex.get(v,set()))
-
-        except KeyError:
-            log.info('No indexed_attributes_eq')
-            raise IndexStoreError('Invalid arguments to IndexStore - must provide at least one equal to operator for search!')
-
-
-        for k,v in indexed_attributes_eq.items():
-            # abort if the set of keys is empty - all operations are intersections
-            if len(keys) == 0:
-                return {}
-
-            kindex = self.indices.get(k, None)
-            if kindex:
-                # Use the intersection - each index attribute restricts the returned list!
-                keys.intersection_update(kindex.get(v,set()))
-
-        ###
-        # Handle the greater than to attributes
-        ###
-        for k,v in indexed_attributes_gt.items():
-            kindex = self.indices.get(k, None)
-            if kindex:
-                # Find all the attribute values greater than specified
+        
+        for k,v,p in predicates:
+            kindex = self.indices.get(k,None)
+            if p == Query.EQ:
+                
+                if kindex:
+                    keys.intersection_update(kindex.get(v,set()))
+            elif p == Query.GT:
+                
                 matches = set()
                 for attr_val in kindex.keys():
                     if attr_val > v:
                         matches.update(kindex.get(attr_val,set()))
                 keys.intersection_update(matches)
-
-
+        
+        log.info("keys: "+ str(keys))
         result = {}
         for k in keys:
             # This is stupid, but now remove effectively works - delete keys are no longer visible!
             if self.kvs.has_key(k):
                 result[k] = self.kvs.get(k)
                 
-        return result
-        
-        
+        return defer.succeed(result)                
+
     def get_query_attributes(self):
         """
         Return the column names that are indexed.
         """
         return defer.maybeDeferred(self.indices.keys)
+
+class Query:
+    """
+    Class that holds the predicates used to query an IndexStore.
+    """
+    
+    EQ = "EQ"
+    GT = "GT"
+    def __init__(self):
+        self._predicates = []
+
+    def add_predicate_eq(self, name, value):
+        self._predicates.append((name,value,Query.EQ))
+    
+    def add_predicate_gt(self, name, value):
+        self._predicates.append((name,value,Query.GT))
+        
+    def get_predicates(self):
+        return self._predicates    
+        
+    
 
     
 class IDataManager(Interface):
