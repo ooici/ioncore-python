@@ -28,6 +28,7 @@ from ion.data.store import Store
 from ion.interact.conversation import Conversation
 from ion.interact.message import Message
 import ion.util.procutils as pu
+from ion.util.context import StackLocal
 from ion.util.state_object import BasicLifecycleObject, BasicStates
 
 from ion.core.object import workbench
@@ -42,6 +43,10 @@ processes = {}
 
 # @todo CHANGE: Static store (kvs) to register process instances with names
 procRegistry = Store()
+
+# "thread local" context storage for 
+# minimally retaining user-id from request message
+request = StackLocal()
 
 
 class IProcess(Interface):
@@ -411,6 +416,13 @@ class Process(BasicLifecycleObject,ResponseCodes):
         messages.
         """
         try:
+            # Check if there is a user id in the header, stash if so
+            if 'user-id' in payload:
+                log.info('>>> [%s] receive(): payload user id [%s] <<<' % (self.proc_name, payload['user-id']))
+            else:
+                log.info('>>> [%s] receive(): payload anonymous request <<<' % (self.proc_name))
+            request.user_id = payload.get('user-id', 'ANONYMOUS')
+            request.expiry = payload.get('expiry', '0')
             # Check if this response is in reply to an outstanding RPC call
             if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
                 yield self._receive_rpc(payload, msg)
@@ -576,6 +588,11 @@ class Process(BasicLifecycleObject,ResponseCodes):
         @brief Sends a message RPC style and waits for conversation message reply.
         @retval a Deferred with the message value on receipt
         """
+        if headers:
+            if 'user-id' in headers:
+                log.info('>>> [%s] rpc_send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
+            else:
+                log.info('>>> [%s] rpc_send(): headers anonymous request <<<' % (self.proc_name))
         msgheaders = self._prepare_message(headers)
         convid = msgheaders['conv-id']
         # Create a new deferred that the caller can yield on to wait for RPC
@@ -604,6 +621,11 @@ class Process(BasicLifecycleObject,ResponseCodes):
         Starts a new conversation.
         @retval Deferred for send of message
         """
+        if headers:
+            if 'user-id' in headers:
+                log.info('>>> [%s] send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
+            else:
+                log.info('>>> [%s] send(): headers anonymous request <<<' % (self.proc_name))
         msgheaders = self._prepare_message(headers)
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders)
@@ -623,6 +645,12 @@ class Process(BasicLifecycleObject,ResponseCodes):
             msgheaders['conv-id'] = convid
             msgheaders['conv-seq'] = 1
             self.conversations[convid] = Conversation()
+        if not 'user-id' in msgheaders:
+            msgheaders['user-id'] = request.get('user_id', 'ANONYMOUS')
+            log.info('>>> [%s] _prepare_message(): set user id [%s] <<<' % (self.proc_name, msgheaders['user-id']))
+        if not 'expiry' in msgheaders:
+            msgheaders['expiry'] = request.get('expiry', '0')
+            log.info('>>> [%s] _prepare_message(): set expiry [%s] <<<' % (self.proc_name, msgheaders['expiry']))
         return msgheaders
 
     def _create_convid(self):
@@ -841,6 +869,13 @@ class ProcessClient(ProcessClientBase):
         Sends an RPC message to the specified target via originator process
         """
         return self.proc.rpc_send(self.target, *args)
+    
+    def rpc_send_protected(self, operation, content, user_id='ANONYMOUS', expiry='0'):
+        """
+        Sends an RPC message to the specified target via originator process
+        """
+        headers = {'user-id':user_id, 'expiry':expiry}
+        return self.proc.rpc_send(self.target, operation, content, headers)
 
     def send(self, *args):
         """
