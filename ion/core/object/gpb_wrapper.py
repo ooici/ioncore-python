@@ -435,7 +435,7 @@ class WrapperType(type):
             raise RuntimeError("Method not implemented!")
 
 
-        def _get_attribute_by_name(self, name=''):
+        def _find_attribute_by_name(self, name=''):
             """
             Specialized method for CDM Objects to get the attribute object by its name
             """
@@ -450,7 +450,7 @@ class WrapperType(type):
                 raise OOIObjectError('Requested attribute name not found: "%s"' % str(name))
 
 
-        def _get_variable_by_name(self, name=''):
+        def _find_variable_by_name(self, name=''):
             """
             Specialized method for CDM Objects to get the variable object by its name
             """
@@ -484,12 +484,12 @@ class WrapperType(type):
             clsDict['AddGroup'] = _add_group_to_group
             clsDict['AddAttribute'] = _add_attribute
             clsDict['AddDimension'] = _add_dimension
-            clsDict['GetAttributeByName'] = _get_attribute_by_name
-            clsDict['GetVariableByName'] = _get_variable_by_name
+            clsDict['FindAttributeByName'] = _find_attribute_by_name
+            clsDict['FindVariableByName'] = _find_variable_by_name
 
         elif obj_type == CDM_VARIABLE_TYPE:
             
-            clsDict['GetAttributeByName'] = _get_attribute_by_name
+            clsDict['FindAttributeByName'] = _find_attribute_by_name
 
 
 
