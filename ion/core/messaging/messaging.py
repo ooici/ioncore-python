@@ -10,9 +10,53 @@ from twisted.internet import defer
 
 from carrot import connection
 from carrot import messaging
+from txamqp.client import TwistedDelegate
 
 from ion.core.cc.store import Store
 from ion.util.state_object import BasicLifecycleObject
+
+class AMQPEvents(TwistedDelegate):
+    """
+    This class defines handlers for asynchronous amqp events (events the
+    broker can raise at any time).
+    """
+
+    def __init__(self, manager):
+        TwistedDelegate.__init__(self)
+        self.manager = manager
+
+    def basic_deliver(self, ch, msg):
+        """notify container when an error occurs during message delivery
+
+        ch._deliver comes from carrot.backends.txamqplib. Delivered
+        messages are routed to their endpoint receiver via the amqp channel
+        that the receivers consumer was created with.
+        This delivery plumbing is definitely messy and hacky. We used to
+        use a TwistedDelegate subclass called
+        carrot.backends.txamqplib.InterceptionPoint, where the ch._deliver
+        made slightly more sense. 
+        """
+        d = defer.maybeDeferred(ch._deliver, msg)
+        d.addErrback(self.manager.delivery_error, msg) #XXX
+
+    def basic_return(self, ch, msg):
+        """implement this to handle messages that could not be delivered to
+        a queue or consumer
+        """
+
+    def channel_flow(self, ch, msg):
+        """implement this to handle a broker flow control request
+        """
+
+    def close(self, reason):
+        """The AMQClient protocol calls this as a result of a
+        connectionLost event. The TwistedDelegate.close method finishes
+        shutting off the client, and we get a chance to react to the event
+        here.
+        """
+        TwistedDelegate.close(self, reason)
+        self.manager.connectionLost(reason) #XXX notify container that we lost the connection
+
 
 class MessageSpace(BasicLifecycleObject):
     """
@@ -20,9 +64,14 @@ class MessageSpace(BasicLifecycleObject):
     Follows a basic life cycle.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, exchange_manager, *args, **kwargs):
+        """
+        @param exchange_manager So we can link our states. If I'm in a bad
+        state, then I need to notify ExchangeManager.
+        """
         BasicLifecycleObject.__init__(self)
         self.connection = None
+        self.exchange_manager = exchange_manager
 
         # Immediately transition to READY state
         self.initialize(*args, **kwargs)
@@ -37,18 +86,32 @@ class MessageSpace(BasicLifecycleObject):
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
         assert not self.connection._connection, "Already connected to broker"
-        yield self.connection.connect()
+        amqpEvents = AMQPEvents(self)
+        yield self.connection.connect(amqpEvents)
 
     def on_deactivate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
 
     def on_terminate(self, *args, **kwargs):
-        # @note Carrot has a different close() on the BrokerConnection
-        # @note lostConnection does not return anything
-        return self.connection._connection.transport.loseConnection()
+        return self.connection.close()
 
     def on_error(self, *args, **kwargs):
-        raise RuntimeError("Illegal state change for MessageSpace")
+        #raise RuntimeError("Illegal state change for MessageSpace")
+        self.exchange_manager.error(*args, **kwargs)
+
+    def delivery_error(self, msg):
+        """
+        @param msg Message that resulted in a delivery error
+        @notes Is this always a fatal error?
+        """
+
+    def connectionLost(self, reason):
+        """
+        This is a fatal error. Trigger error state now!
+        """
+        # Not sure if the exchange manager should be able to fail for other
+        # reasons...so let's just fail the container directly!
+        self.exchange_manager.container.error(reason)
 
     def __repr__(self):
         params = ['hostname',

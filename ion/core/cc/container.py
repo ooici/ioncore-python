@@ -130,7 +130,14 @@ class Container(BasicLifecycleObject):
         Container._started = False
 
     def on_error(self, *args, **kwargs):
-        raise RuntimeError("Illegal state change for container")
+        """this might be where reactor.stop should happen
+        reactor.stop should call stopService on the CapabilityContainer
+        Sevice, so we shouldn't need to do that here.
+        The only problem is, this gets called more than once...duh! ;-p
+        """
+        #raise RuntimeError("Illegal state change for container")
+        from twisted.internet import reactor
+        reactor.stop() 
 
     # --- Container API -----------
 

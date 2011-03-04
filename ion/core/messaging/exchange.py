@@ -46,7 +46,8 @@ class ExchangeManager(BasicLifecycleObject):
         heartbeat = int(self.config['broker_heartbeat'])
 
         # Is a BrokerConnection instance (no action at this point)
-        self.message_space = MessageSpace(hostname=hostname,
+        self.message_space = MessageSpace(self,
+                                hostname=hostname,
                                 port=port,
                                 virtual_host=virtual_host,
                                 heartbeat=heartbeat)
