@@ -337,6 +337,7 @@ class WrapperType(type):
 
     def _add_specializations(cls, obj_type, clsDict):
 
+        #-----------------------------------#
         # Wrapper_Group Specialized Methods #
         #-----------------------------------#
         def _add_group_to_group(self, name=''):
@@ -505,8 +506,9 @@ class WrapperType(type):
             return result
         
         
+        #---------------------------------------#
         # Wrapper_Attribute Specialized Methods #
-        #-----------------------------------#
+        #---------------------------------------#
         def _get_attribute_value_by_index(self, index = 0):
             """
             Specialized method for CDM Objects to find an attribute value by its index
@@ -535,6 +537,23 @@ class WrapperType(type):
             """
             return len(self.array.value)
         
+        
+        #--------------------------------------#
+        # Wrapper_Variable Specialized Methods #
+        #--------------------------------------#
+        def _get_variable_units(self):
+            """
+            Specialized method for CDM Objects to retrieve the value of a variable object's 'units' attribute
+            """
+            result = None
+            units = _find_attribute_by_name(self, 'units')
+            if units != None and len(units.array.value) > 0:
+                result = units.array.value[0]
+            
+            # @attention: Sometimes units come back as unicode values..  we can provide a trap here
+            #             to convert them, but this may not be necessary.  Lets discuss [TPL]
+            return result
+
 
         #--------------------------------------------------------------#
         # Attach specialized methods to object class dictionaries here #
@@ -572,6 +591,8 @@ class WrapperType(type):
         elif obj_type == CDM_VARIABLE_TYPE:
             
             clsDict['FindAttributeByName'] = _find_attribute_by_name
+            clsDict['GetUnits'] = _get_variable_units
+            clsDict['AddAttribute'] = _add_attribute
 
 
 
