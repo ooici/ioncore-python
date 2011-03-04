@@ -459,27 +459,33 @@ class WrapperType(type):
             if not name or not isinstance(name, str):
                 raise OOIObjectError('Invalid attribute name requested: "%s"' % str(name))
 
-
+            result = None
             for att in self.attributes:
                 if att.name == name:
-                    return att
-            else:
+                    result = att
+                    break
+            if None == result:
                 raise OOIObjectError('Requested attribute name not found: "%s"' % str(name))
 
+            return result
 
         def _find_variable_by_name(self, name=''):
             """
             Specialized method for CDM Objects to find the variable object by its name
             """
             if not name or not isinstance(name, str):
-                raise OOIObjectError('Invalid attribute name requested: "%s"' % str(name))
+                raise OOIObjectError('Invalid variable name requested: "%s"' % str(name))
 
+            result = None
             for var in self.variables:
                 if var.name == name:
-                    return var
-            else:
-                raise OOIObjectError('Requested attribute name not found: "%s"' % str(name))
+                    result = var
+                    break
+            if None == result:
+                raise OOIObjectError('Requested variable name not found: "%s"' % str(name))
 
+            return result
+        
 
         #--------------------------------------------------------------#
         # Attach specialized methods to object class dictionaries here #
