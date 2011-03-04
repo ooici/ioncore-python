@@ -9,7 +9,7 @@
 
 from ion.core.messaging import messaging
 from ion.core.process.process import Process
-from ion.core.messaging.receiver import Receiver
+from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.services.dm.distribution.pubsub_service import PubSubClient
 from twisted.internet import defer
 
@@ -108,69 +108,57 @@ class PublisherFactory(object):
         credentials     = credentials or self._credentials
 
         pub = Publisher(xp_name=xp_name, routing_key=routing_key, credentials=credentials)
-        yield pub.initialize()
-        yield pub.activate()
+        yield pub.spawn()
         #yield pub.register(xp_name, topic_id, publisher_name, credentials)
 
         defer.returnValue(pub)
 
 # =================================================================================
 
-class Subscriber(Receiver):
+class Subscriber(Process):
     """
     @brief This represents subscribers, both user-driven and internal (e.g. dataset persister)
     @note All returns are HTTP return codes, 2xx for success, etc, unless otherwise noted.
     @todo Need a subscriber receiver that can hook into the topic xchg mechanism
     """
-    def __init__(self, *args, **kwargs):
-        """
-        Save class variables for later
-        """
-        self._resource_id = ''
-        self._exchange_point = ''
+
+    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, *args, **kwargs):
+
+        Process.__init__(self, *args, **kwargs)
+
+        assert xp_name
+
+        self._xp_name       = xp_name
+        self._binding_key   = binding_key
+        self._queue_name    = queue_name
+        self._credentials   = credentials
 
         self._pubsub_client = PubSubClient()
 
-        kwargs = kwargs.copy()
-        kwargs['handler'] = self._receive_handler
+        # set up comms details
+        consumer_config = { 'exchange' : self._xp_name,
+                            'exchange_type' : 'topic',  # TODO
+                            'durable': False,
+                            'mandatory': True,
+                            'immediate': False,
+                            'warn_if_exists': False,
+                            'routing_key' : self._binding_key,      # may be None, if so, no binding is made to the queue (routing_key is incorrectly named in the dict used by Receiver)
+                            'queue' : self._queue_name,              # may be None, if so, the queue is made anonymously (and stored in receiver's consumer.queue attr)
+                          }
 
-        binding_key = kwargs.pop("binding_key", None)
-        Receiver.__init__(self, *args, **kwargs)
-
-        if binding_key == None:
-            binding_key = self.xname
-
-        self.binding_key = binding_key
-
-    @defer.inlineCallbacks
-    def on_initialize(self, *args, **kwargs):
-        """
-        @retval Deferred
-        """
-        assert self.xname, "Receiver must have a name"
-
-        name_config = messaging.worker(self.xname)
-        #TODO: needs routing_key or it doesn't bind to the binding key - find where that occurs
-        #TODO: auto_delete gets clobbered in Consumer.name by exchange space dict config - rewrite - maybe not possible if exchange is set to auto_delete always
-        name_config.update({'name_type':'worker', 'binding_key':self.binding_key, 'routing_key':self.binding_key, 'auto_delete':False})
-
-        yield self._init_receiver(name_config, store_config=True)
+        # TODO: name?
+        self._recv = WorkerReceiver(self.id.full + "_recv", process=self, handler=self._receive_handler, consumer_config=consumer_config)
 
     @defer.inlineCallbacks
-    def subscribe(self, xp_name, topic_regex):
+    def on_activate(self, *args, **kwargs):
+       yield self.subscribe()
+
+    @defer.inlineCallbacks
+    def subscribe(self):
         """
-        @brief Register a topic to subscribe to. Results will be sent to our private queue.
-        @note Allow third-party subscriptions?
-        @note Allow multiple subscriptions?
-        @param xp_name Name of exchange point to use
-        @param topic_regex Dataset topic of interest, using amqp regex
-        @retval Return code only, with new queue automagically hooked up to ondata()?
         """
-        # TODO: xp_name not taken by PSC?
-        self._resource_id = yield self._pubsub_client.subscribe(topic_regex)
-        self.xname = self._resource_id      # ugh this can't be good
-        self.attach()          # "declares" queue in initialize, listens to queue in activate
-        defer.returnValue(True)
+        # TODO: PSC interaction?
+        yield self._recv.attach()
 
     def unsubscribe(self):
         """
@@ -196,7 +184,7 @@ class Subscriber(Receiver):
         @param data Data packet/message matching subscription
         @retval None, may daisy chain output back into messaging system
         """
-        raise NotImplemented('Must be implmented by subclass')
+        raise NotImplementedError('Must be implemented by subclass')
 
 
 # =================================================================================
@@ -263,8 +251,7 @@ class SubscriberFactory(object):
         credentials     = credentials or self._credentials
 
         sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, credentials=credentials)
-        yield sub.initialize()
-        yield sub.activate()
+        yield sub.spawn()
 
         if handler != None:
             sub.ondata = handler
