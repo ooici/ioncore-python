@@ -435,9 +435,26 @@ class WrapperType(type):
             raise RuntimeError("Method not implemented!")
 
 
+        def _find_group_by_name(self, name=''):
+            """
+            Specialized method for CDM Objects to find the group object by its name
+            """
+            if not name or not isinstance(name, str):
+                raise OOIObjectError('Invalid group name requested: "%s"' % str(name))
+
+            result = None
+            for group in self.groups:
+                if group.name == name:
+                    result = group
+                    break
+            if None == result:
+                raise OOIObjectError('Requested group name not found: "%s"' % str(name))
+            
+            return result
+
         def _find_attribute_by_name(self, name=''):
             """
-            Specialized method for CDM Objects to get the attribute object by its name
+            Specialized method for CDM Objects to find the attribute object by its name
             """
             if not name or not isinstance(name, str):
                 raise OOIObjectError('Invalid attribute name requested: "%s"' % str(name))
@@ -452,7 +469,7 @@ class WrapperType(type):
 
         def _find_variable_by_name(self, name=''):
             """
-            Specialized method for CDM Objects to get the variable object by its name
+            Specialized method for CDM Objects to find the variable object by its name
             """
             if not name or not isinstance(name, str):
                 raise OOIObjectError('Invalid attribute name requested: "%s"' % str(name))
@@ -484,6 +501,7 @@ class WrapperType(type):
             clsDict['AddGroup'] = _add_group_to_group
             clsDict['AddAttribute'] = _add_attribute
             clsDict['AddDimension'] = _add_dimension
+            clsDict['FindGroupByName'] = _find_group_by_name
             clsDict['FindAttributeByName'] = _find_attribute_by_name
             clsDict['FindVariableByName'] = _find_variable_by_name
 
