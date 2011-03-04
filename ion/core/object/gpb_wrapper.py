@@ -416,7 +416,7 @@ class WrapperType(type):
                 raise OOIObjectError('Invalid dimension name: "%s" -- please specify a non-empty string name' % str(name))
             
             if not isinstance(length, int) or length <= 0:
-                raise OOIObjectError('Invalid dimension length: "%s" -- please specify a positive integer for length' % str(name))
+                raise OOIObjectError('Invalid dimension length: "%s" -- please specify a positive integer for length' % str(length))
                 
             
             dim = self.Repository.create_object(CDM_DIMENSION_TYPE)
@@ -469,6 +469,24 @@ class WrapperType(type):
 
             return result
 
+        
+        def _find_dimension_by_name(self, name=''):
+            """
+            Specialized method for CDM Objects to find a dimension object by its name
+            """
+            if not name or not isinstance(name, str):
+                raise OOIObjectError('Invalid dimension name requested: "%s"' % str(name))
+
+            result = None
+            for dim in self.dimensions:
+                if dim.name == name:
+                    result = dim
+                    break
+            if None == result:
+                raise OOIObjectError('Requested dimension name not found: "%s"' % str(name))
+
+            return result
+
         def _find_variable_by_name(self, name=''):
             """
             Specialized method for CDM Objects to find the variable object by its name
@@ -509,6 +527,7 @@ class WrapperType(type):
             clsDict['AddDimension'] = _add_dimension
             clsDict['FindGroupByName'] = _find_group_by_name
             clsDict['FindAttributeByName'] = _find_attribute_by_name
+            clsDict['FindDimensionByName'] = _find_dimension_by_name
             clsDict['FindVariableByName'] = _find_variable_by_name
 
         elif obj_type == CDM_VARIABLE_TYPE:
