@@ -419,10 +419,24 @@ class Process(BasicLifecycleObject,ResponseCodes):
             # Check if there is a user id in the header, stash if so
             if 'user-id' in payload:
                 log.info('>>> [%s] receive(): payload user id [%s] <<<' % (self.proc_name, payload['user-id']))
+                request.user_id = payload.get('user-id')
+                log.info('>>> [%s] receive(): Set/updated stashed user_id: [%s]' % (self.proc_name, request.get('user_id')))
             else:
                 log.info('>>> [%s] receive(): payload anonymous request <<<' % (self.proc_name))
-            request.user_id = payload.get('user-id', 'ANONYMOUS')
-            request.expiry = payload.get('expiry', '0')
+                if request.get('user_id', 'Not set') == 'Not set':
+                    request.user_id = 'ANONYMOUS'
+                    log.info('>>> [%s] receive(): Set stashed user_id to ANONYMOUS' % (self.proc_name))
+                else:
+                    log.info('>>> [%s] receive(): Kept stashed user_id the same: [%s]' % (self.proc_name, request.get('user_id')))
+            if 'expiry' in payload:
+                request.expiry = payload.get('expiry')
+                log.info('>>> [%s] receive(): Set/updated stashed expiry: [%s]' % (self.proc_name, request.get('expiry')))
+            else:
+                if request.get('expiry', 'Not set') == 'Not set':
+                    request.expiry = '0'
+                    log.info('>>> [%s] receive(): Set stashed expiry to 0' % (self.proc_name))
+                else:
+                    log.info('>>> [%s] receive(): Kept stashed expiry the same: [%s]' % (self.proc_name, request.get('expiry')))
             # Check if this response is in reply to an outstanding RPC call
             if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
                 yield self._receive_rpc(payload, msg)
@@ -592,7 +606,9 @@ class Process(BasicLifecycleObject,ResponseCodes):
             if 'user-id' in headers:
                 log.info('>>> [%s] rpc_send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
             else:
-                log.info('>>> [%s] rpc_send(): headers anonymous request <<<' % (self.proc_name))
+                log.info('>>> [%s] rpc_send(): user-id not specified in headers <<<' % (self.proc_name))
+        else:
+            log.info('>>> [%s] rpc_send(): headers not specified <<<' % (self.proc_name))
         msgheaders = self._prepare_message(headers)
         convid = msgheaders['conv-id']
         # Create a new deferred that the caller can yield on to wait for RPC
@@ -625,7 +641,9 @@ class Process(BasicLifecycleObject,ResponseCodes):
             if 'user-id' in headers:
                 log.info('>>> [%s] send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
             else:
-                log.info('>>> [%s] send(): headers anonymous request <<<' % (self.proc_name))
+                log.info('>>> [%s] send(): user-id not specified in headers <<<' % (self.proc_name))
+        else:
+            log.info('>>> [%s] send(): headers not specified <<<' % (self.proc_name))
         msgheaders = self._prepare_message(headers)
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders)
@@ -647,10 +665,14 @@ class Process(BasicLifecycleObject,ResponseCodes):
             self.conversations[convid] = Conversation()
         if not 'user-id' in msgheaders:
             msgheaders['user-id'] = request.get('user_id', 'ANONYMOUS')
-            log.info('>>> [%s] _prepare_message(): set user id [%s] <<<' % (self.proc_name, msgheaders['user-id']))
+            log.info('>>> [%s] _prepare_message(): set user id in msgheaders from stashed user_id [%s] <<<' % (self.proc_name, msgheaders['user-id']))
+        else:
+            log.info('>>> [%s] _prepare_message(): using user id from msgheaders [%s] <<<' % (self.proc_name, msgheaders['user-id']))
         if not 'expiry' in msgheaders:
             msgheaders['expiry'] = request.get('expiry', '0')
-            log.info('>>> [%s] _prepare_message(): set expiry [%s] <<<' % (self.proc_name, msgheaders['expiry']))
+            log.info('>>> [%s] _prepare_message(): set expiry in msgheaders from stashed expiry [%s] <<<' % (self.proc_name, msgheaders['expiry']))
+        else:
+            log.info('>>> [%s] _prepare_message(): using expiry from msgheaders [%s] <<<' % (self.proc_name, msgheaders['expiry']))
         return msgheaders
 
     def _create_convid(self):
@@ -676,6 +698,12 @@ class Process(BasicLifecycleObject,ResponseCodes):
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
             headers['conv-seq'] = int(ionMsg.get('conv-seq',0)) + 1
+        if not 'user-id' in headers:
+            headers['user-id'] = request.get('user_id', 'ANONYMOUS')
+            log.info('>>> [%s] _prepare_message(): set user id [%s] <<<' % (self.proc_name, headers['user-id']))
+        if not 'expiry' in headers:
+            headers['expiry'] = request.get('expiry', '0')
+            log.info('>>> [%s] _prepare_message(): set expiry [%s] <<<' % (self.proc_name, headers['expiry']))
             
         # Values in the headers KWarg take precidence over the response_code and exception KWargs!
         reshdrs = dict()
