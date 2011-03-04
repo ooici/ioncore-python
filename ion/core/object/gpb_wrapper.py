@@ -24,13 +24,21 @@ from google.protobuf import descriptor
 from ion.util.cache import memoize
 
 import hashlib
+import types
 
 STRUCTURE_ELEMENT_TYPE = create_type_identifier(object_id=1, version=1)
 LINK_TYPE = create_type_identifier(object_id=3, version=1)
 
 # Types which require specialization!
+CDM_DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
 CDM_VARIABLE_TYPE = create_type_identifier(object_id=10024, version=1)
 CDM_GROUP_TYPE = create_type_identifier(object_id=10020, version=1)
+CDM_DIMENSION_TYPE = create_type_identifier(object_id=10018, version=1)
+CDM_ATTRIBUTE_TYPE = create_type_identifier(object_id=10017, version=1)
+CDM_ARRAY_INT32_TYPE = create_type_identifier(object_id=10009, version=1)
+CDM_ARRAY_FLOAT32_TYPE = create_type_identifier(object_id=10013, version=1)
+CDM_ARRAY_STRING_TYPE = create_type_identifier(object_id=10015, version=1)
+
 
 class OOIObjectError(Exception):
     """
@@ -329,6 +337,103 @@ class WrapperType(type):
 
     def _add_specializations(cls, obj_type, clsDict):
 
+        # Wrapper_Group Specialized Methods #
+        #-----------------------------------#
+        def _add_group_to_group(self, name=''):
+            """
+            Specialized method for CDM (group) Objects to append a group object with the given name
+            """
+            if not name or not isinstance(name, str):
+                raise OOIObjrectError('Invalid group name: "%s" -- please specify a non-empty string name' % str(name))
+            
+            group = self.Repository.create_object(CDM_GROUP_TYPE)
+            group.name = name
+            group_ref = self.groups.add()
+            group_ref.SetLink(group)
+        
+        
+        def _add_attribute(self, name=None, values=None):
+            """
+            Specialized method for CDM (group) Objects to append a group object with the given name
+            """
+            if not name or not isinstance(name, str):
+                raise OOIObjectError('Invalid attribute name: "%s" -- please specify a non-empty string name' % str(name))
+            if not values or not isinstance(values, list):
+                raise OOIObjectError('Invalid attribute values: "%s" -- please specify a list for the argument "values"' % str(values))
+            
+            # @todo: all items must be the same type...  this includes ommiting/casting null values
+            #        since they will cause an error when stored in the GPB array representation
+            list_type = types.NoneType
+            for item in values:
+                if list_type == types.NoneType:
+                    # Determine the type of values in this list...
+                    list_type = type(item)
+                else:
+                    # ...and ensure all values are the same type or None
+                    next_type = type(item)
+                    if next_type != types.NoneType and next_type != list_type:
+                        raise OOIObjectError('Invalid attribute value list: "%s" -- All items in this list must be of the same type or the value None' % str(values))
+                
+            log.debug('Type of list is "%s" for list: "%s"' % (str(list_type), str(values)))
+            
+            # Create the new attribute
+            atrib = self.Repository.create_object(CDM_ATTRIBUTE_TYPE)
+            atrib.name = name
+
+            # Set the datatype based on the type of values being given
+            # @todo: add support for remaining array types (currently only string attributes are even used)
+            def _attach_int32_array(parent, atrib_inst):
+                atrib_inst.data_type = atrib_inst.DataType.INT
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_INT32_TYPE)
+            def _attach_float32_array(parent, atrib_inst):
+                atrib_inst.data_type = atrib_inst.DataType.FLOAT
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_FLOAT32_TYPE)
+            def _attach_string_array(parent, atrib_inst):
+                # @todo: modify this to support unicode types (GPB stringArray already supports it)
+                atrib_inst.data_type = atrib_inst.DataType.STRING
+                atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_STRING_TYPE)
+            
+            attach_array_definitions = {types.StringType : _attach_string_array,
+                                        types.IntType : _attach_int32_array,
+                                        types.FloatType : _attach_float32_array}
+            
+            attach_array_definitions[list_type](self, atrib)
+#            attach_array_definitions[list_type](self, None)
+            
+            # Extend the attribute value array with the given values list
+            atrib.array.value.extend(values)
+            
+            # Attach the attribute resource instance to its parent resource via CASRef linking 
+            atrib_ref = self.attributes.add()
+            atrib_ref.SetLink(atrib)
+        
+        
+        def _add_dimension(self, name=None, length=-1, variable_length=True):
+            """
+            Specialized method for CDM Objects to append a dimension object with the given name and length
+            """
+            if not name or not isinstance(name, str):
+                raise OOIObjectError('Invalid dimension name: "%s" -- please specify a non-empty string name' % str(name))
+            
+            if not isinstance(length, int) or length <= 0:
+                raise OOIObjectError('Invalid dimension length: "%s" -- please specify a positive integer for length' % str(name))
+                
+            
+            dim = self.Repository.create_object(CDM_DIMENSION_TYPE)
+            dim.name = name
+            dim.length = length
+            dim.variable_length = variable_length
+            dim_ref = self.dimensions.add()
+            dim_ref.SetLink(dim)
+
+        
+        def _add_variable(self, name=None, data_type='', shape=['', '', '']):
+            """
+            Specialized method for CDM Objects to append a variable object with the given name, data_type, and shape
+            """
+            # @todo: need to reconsider useability before implementing this method
+            raise RuntimeError("Method not implemented!")
+
 
         def _get_attribute_by_name(self, name=''):
             """
@@ -336,6 +441,7 @@ class WrapperType(type):
             """
             if not name or not isinstance(name, str):
                 raise OOIObjectError('Invalid attribute name requested: "%s"' % str(name))
+
 
             for att in self.attributes:
                 if att.name == name:
@@ -358,6 +464,9 @@ class WrapperType(type):
                 raise OOIObjectError('Requested attribute name not found: "%s"' % str(name))
 
 
+        #--------------------------------------------------------------#
+        # Attach specialized methods to object class dictionaries here #
+        #--------------------------------------------------------------#
         if obj_type == LINK_TYPE:
             def obj_setlink(self,value):
                 if self._invalid:
@@ -372,6 +481,9 @@ class WrapperType(type):
         
         elif obj_type == CDM_GROUP_TYPE:
 
+            clsDict['AddGroup'] = _add_group_to_group
+            clsDict['AddAttribute'] = _add_attribute
+            clsDict['AddDimension'] = _add_dimension
             clsDict['GetAttributeByName'] = _get_attribute_by_name
             clsDict['GetVariableByName'] = _get_variable_by_name
 
