@@ -66,7 +66,7 @@ class CCBrokerTestProcess(ServiceProcess):
 
         # Make sure to log stuff in case there are performance issues with logging.
         log.info('Received a simple message of length %d.' % (len(msg.body)))
-        reply = yield self.mc.create_instance(simple_type, name='simple message reply')
+        reply = yield self.mc.create_instance(simple_type, MessageName='simple message reply')
 
         reply.MessageObject = simple_msg.MessageObject
         # Just reverse the contents.
