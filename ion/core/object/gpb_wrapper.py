@@ -504,6 +504,21 @@ class WrapperType(type):
 
             return result
         
+        
+        # Wrapper_Attribute Specialized Methods #
+        #-----------------------------------#
+        def _get_attribute_value_by_index(self, index = 0):
+            """
+            Specialized method for CDM Objects to find the variable object by its name
+            """
+            if not isinstance(index, int):
+                raise OOIObjectError('Invalid array index requested: "%s"' % str(index))
+            # @todo: determine if you can have an empty array -- if so, check for empty here
+            if index < 0 or index >= len(self.array.value):
+                raise OOIObjectError('Given array index out of bounds: %i -- valid range: 0 to %i' % (int(index), len(self.array.value) - 1))
+                
+            return self.array.value[index]
+        
 
         #--------------------------------------------------------------#
         # Attach specialized methods to object class dictionaries here #
@@ -525,10 +540,16 @@ class WrapperType(type):
             clsDict['AddGroup'] = _add_group_to_group
             clsDict['AddAttribute'] = _add_attribute
             clsDict['AddDimension'] = _add_dimension
+            # clsDict['AddVariable'] = _add_variable
             clsDict['FindGroupByName'] = _find_group_by_name
             clsDict['FindAttributeByName'] = _find_attribute_by_name
             clsDict['FindDimensionByName'] = _find_dimension_by_name
             clsDict['FindVariableByName'] = _find_variable_by_name
+
+
+        elif obj_type == CDM_ATTRIBUTE_TYPE:
+            
+            clsDict['GetValue'] = _get_attribute_value_by_index
 
         elif obj_type == CDM_VARIABLE_TYPE:
             
