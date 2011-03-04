@@ -20,6 +20,7 @@ from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper
 from ion.core.data import store
 from ion.core.data import cassandra
+from ion.core.data.store import Query
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -151,7 +152,9 @@ class DataStoreService(ServiceProcess):
                 self.workbench._hashed_elements[store_head.key]=store_head
                 
                 # Get the commits using the query interface
-                rows = yield self.c_store.query({self.COMMIT_REPOSITORY_INDEX:repo_key})
+                q = Query()
+                q.add_predicate_eq(self.COMMIT_REPOSITORY_INDEX, repo_key)
+                rows = yield self.c_store.query(q)
                     
                 for key, columns in rows.items():
                     blob = columns["value"]
@@ -162,7 +165,7 @@ class DataStoreService(ServiceProcess):
                     
                 # Load these commits into the workbench
                 self.workbench._hashed_elements.update(store_commits)
-                    
+
                 repo = self.workbench._load_repo_from_mutable(store_head)
                     
                 # Check to make sure the mutable is upto date with the commits...
@@ -259,7 +262,9 @@ class DataStoreService(ServiceProcess):
             self.workbench._hashed_elements[store_head.key]=store_head
                 
             # Get the commits using the query interface
-            rows = yield self.c_store.query({self.COMMIT_REPOSITORY_INDEX:repo_key})
+            q = Query()
+            q.add_predicate_eq(self.COMMIT_REPOSITORY_INDEX, repo_key)
+            rows = yield self.c_store.query(q)
                 
             for key, columns in rows.items():
                 blob = columns["value"]

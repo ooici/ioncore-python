@@ -45,7 +45,7 @@ setup( name = 'ioncore',
            'txrabbitmq==0.4', 
            'Telephus==0.7-beta3.3', 
            'thrift==0.2.0', # thrift is a dependency of Telephus, which should be included there ideally
-           'M2Crypto==0.20.2', 
+           'M2Crypto==0.21.1-pl1', # patched version to work with CentOS
            'ionproto'
                           ],
        include_package_data = True,
