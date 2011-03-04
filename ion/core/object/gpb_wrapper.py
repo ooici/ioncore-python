@@ -509,7 +509,7 @@ class WrapperType(type):
         #-----------------------------------#
         def _get_attribute_value_by_index(self, index = 0):
             """
-            Specialized method for CDM Objects to find the variable object by its name
+            Specialized method for CDM Objects to find the attribute object by its name
             """
             if not isinstance(index, int):
                 raise OOIObjectError('Invalid array index requested: "%s"' % str(index))
@@ -518,6 +518,15 @@ class WrapperType(type):
                 raise OOIObjectError('Given array index out of bounds: %i -- valid range: 0 to %i' % (int(index), len(self.array.value) - 1))
                 
             return self.array.value[index]
+
+        
+        def _get_attribute_values(self):
+            """
+            Specialized method for CDM Objects to retreive all attribute objects
+            """
+            # Create a copy of the values array
+            result = [item for item in self.array.value]
+            return result
         
 
         #--------------------------------------------------------------#
@@ -550,6 +559,7 @@ class WrapperType(type):
         elif obj_type == CDM_ATTRIBUTE_TYPE:
             
             clsDict['GetValue'] = _get_attribute_value_by_index
+            clsDict['GetValues'] = _get_attribute_values
 
         elif obj_type == CDM_VARIABLE_TYPE:
             
