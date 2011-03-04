@@ -41,6 +41,7 @@ class Publisher(Process):
                              'immediate': False,
                              'warn_if_exists': False }
 
+        # we use base Receiver here as we only send with it, no consumption which the base Receiver doesn't do well
         self._recv = Receiver(routing_key, process=self, publisher_config=publisher_config)
         self._pubsub_client = PubSubClient()
 
@@ -112,41 +113,6 @@ class PublisherFactory(object):
         #yield pub.register(xp_name, topic_id, publisher_name, credentials)
 
         defer.returnValue(pub)
-
-# =================================================================================
-
-class TestPubRecv(Receiver):
-    def __init__(self, *args, **kwargs):
-        """
-        @param binding_key The binding key to use. By default, uses the computed xname, but can take a top
-ic based string with wildcards.
-        """
-        binding_key = kwargs.pop("binding_key", None)
-        Receiver.__init__(self, *args, **kwargs)
-        if binding_key == None:
-            binding_key = self.xname
-
-        self.binding_key = binding_key
-
-    @defer.inlineCallbacks
-    def on_initialize(self, *args, **kwargs):
-        """
-        @retval Deferred
-        """
-        assert self.xname, "Receiver must have a name"
-
-        name_config = messaging.worker(self.xname)        # TODO: this needs auto_delete: False, but only for the queues, not the exchange. No way to specify that.
-        name_config.update({'name_type':'worker', 'binding_key':self.binding_key, 'routing_key':self.binding_key})
-
-        #log.info("CONF IN " + name_config.__str__())
-
-        yield self._init_receiver(name_config, store_config=True)
-
-        self.add_handler(self.blab)
-
-    def blab(self, content, msg):
-        msg.ack()
-        log.error("Message %s" % str(content))
 
 # =================================================================================
 
