@@ -18,7 +18,7 @@ from ion.test.iontest import IonTestCase
 from net.ooici.play import addressbook_pb2
 
 from ion.core.object import gpb_wrapper
-from ion.core.object import repository
+from ion.core.object.gpb_wrapper import LINK_TYPE
 from ion.core.object import workbench
 from ion.core.object import object_utils
 
@@ -279,7 +279,7 @@ class NodeLinkTest(unittest.TestCase):
             
             wL = self.ab.person.add()
             
-            self.assertEqual(wL.ObjectType, wL.LinkClassType)
+            self.assertEqual(wL.ObjectType, LINK_TYPE)
             
             p = self.repo.create_object(person_type)
             

@@ -10,6 +10,7 @@
         Cassandra datastore backend
 @note Test cases for the cassandra backend are now in ion.data.test.test_store
 """
+import os
 
 from twisted.internet import defer
 
@@ -21,6 +22,8 @@ from telephus.cassandra.ttypes import NotFoundException, KsDef, CfDef
 from telephus.cassandra.ttypes import ColumnDef, IndexExpression, IndexOperator
 
 from ion.core.data import store
+from ion.core.data.store import Query
+
 from ion.core.data.store import IndexStoreError
 
 from ion.util.tcp_connections import TCPConnection
@@ -146,7 +149,9 @@ class CassandraStore(TCPConnection):
 
 class CassandraIndexedStore(CassandraStore):
     """
-    
+    An Adapter class that provides the ability to use secondary indexes in Cassandra. It
+    extends the IStore interface by adding a query and update_index method. It provides functionality
+    for associating attributes with a value. These attributes are used in the query functionality. 
     """
     implements(store.IIndexStore)
     
@@ -159,7 +164,7 @@ class CassandraIndexedStore(CassandraStore):
         self._cache = cache
         
     @defer.inlineCallbacks
-    def put(self, key, value, index_attributes={}):
+    def put(self, key, value, index_attributes=None):
         """
         Istore put, plus a dictionary of indexed stuff
         
@@ -167,12 +172,13 @@ class CassandraIndexedStore(CassandraStore):
         @param value The value of the value column in the Cassandra row
         @param index_attributes The dictionary contains keys for the column name and the index value
         """
+        if index_attributes is None:
+            index_attributes = {}
         log.info("key: %s value: %s index_attributes %s" % (key,value,index_attributes))
         yield self._check_index(index_attributes)
-        row = dict(index_attributes)
-        #row = index_attributes
-        row['value'] = value
-        yield self.client.batch_insert(key, self._cache_name, row)
+        index_attributes['value'] = value
+        log.info("Adding value to the row")
+        yield self.client.batch_insert(key, self._cache_name, index_attributes)
 
     @defer.inlineCallbacks
     def update_index(self, key, index_attributes):
@@ -203,12 +209,12 @@ class CassandraIndexedStore(CassandraStore):
         
         if not index_attribute_names.issubset(query_attribute_names):
             bad_attrs = index_attribute_names.difference(query_attribute_names)
-            raise IndexStoreError("These attributes %s are not indexed." % (" ".join(bad_attrs),))
+            raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
         
         defer.returnValue(None)
 
     @defer.inlineCallbacks    
-    def query(self, indexed_attributes_eq={},indexed_attributes_gt={}):
+    def query(self, query_predicates):
         """
         Search for rows in the Cassandra instance.
     
@@ -217,52 +223,27 @@ class CassandraIndexedStore(CassandraStore):
         the dictionary
         
         @retVal a dictionary containing the keys and values which match the query.
+        
+        raises a CassandraError if the query_predicate object is malformed.
         """
         log.info(self._cache_name)
-        # Map the index attributes for equal to!
-        selection_predicate_eq=[]
-        if indexed_attributes_eq:
+        predicates = query_predicates.get_predicates()
+        def fix_preds(query_tuple):
+            if query_tuple[2] == Query.EQ:
+                new_pred = IndexOperator.EQ
+            elif query_tuple[2] == Query.GT:
+                new_pred = IndexOperator.GT
+            else:
+                raise CassandraError("Illegal predicate value")
+            args = {'column_name':query_tuple[0], 'op':new_pred, 'value': query_tuple[1]}
+            return IndexExpression(**args)
+        selection_predicates = map(fix_preds, predicates)
+        log.info("selection_predicate %s " % (selection_predicates,))
 
-            make_predicate_eq = lambda attr: {'column_name':attr[0],'op':IndexOperator.EQ,'value':attr[1]}
-            predicate_args_eq = map(make_predicate_eq, indexed_attributes_eq.items())
-
-            log.info("predicate_args_eq: %s" %(predicate_args_eq,))
-            make_expressions_eq = lambda args: IndexExpression(**args)
-            selection_predicate_eq =  map(make_expressions_eq, predicate_args_eq)
-            log.info("selection_predicate_eq %s " % (selection_predicate_eq,))
-
-        # Map the index attributes for greater than!
-        selection_predicate_gt=[]
-        if indexed_attributes_gt:
-            make_predicate_gt = lambda attr: {'column_name':attr[0],'op':IndexOperator.GT,'value':attr[1]}
-            predicate_args_gt = map(make_predicate_gt, indexed_attributes_gt.items())
-
-            log.info("predicate_args_gt: %s" %(predicate_args_gt,))
-            make_expressions_gt = lambda args: IndexExpression(**args)
-            selection_predicate_gt =  map(make_expressions_gt, predicate_args_gt)
-            log.info("selection_predicate_gt %s " % (selection_predicate_gt,))
-
-
-        selection_predicate=[]
-        selection_predicate.extend(selection_predicate_eq)
-        selection_predicate.extend(selection_predicate_gt)
-
-        
-
-        log.info("selection_predicate %s " % (selection_predicate,))
-
-        rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicate)
-        #rows = yield self.client.get_indexed_slices(self._cache_name, [IndexExpression(op=IndexOperator.EQ, value='UT', column_name='state')])
-        
-        #print len(rows)
-        #print rows[0].columns[0].column.name, rows[0].columns[0].column.value
-        #print dir(rows)
-        #print dir(rows[0])
-        
-        # Create a list of dictionaries as a pythonic return value.   
+        rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicates)
+  
         result ={}
         for row in rows:
-
             row_vals = {}
             for column in row.columns:
                 row_vals[column.column.name] = column.column.value

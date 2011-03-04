@@ -25,9 +25,11 @@ from ion.core.object import object_utils
 
 from ion.util import procutils as pu
 
-commit_type = object_utils.create_type_identifier(object_id=8, version=1)
+COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
 mutable_type = object_utils.create_type_identifier(object_id=6, version=1)
 branch_type = object_utils.create_type_identifier(object_id=5, version=1)
+LINK_TYPE = object_utils.create_type_identifier(object_id=3, version=1)
+
 
 from ion.core.object import object_utils
 
@@ -42,9 +44,6 @@ class Repository(object):
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet (No commit checked out)'
 
-    CommitClassType = object_utils.create_type_identifier(object_id=8, version=1)
-    LinkClassType = object_utils.create_type_identifier(object_id=3, version=1)
-    
     def __init__(self, head=None):
         
         
@@ -472,7 +471,7 @@ class Repository(object):
         crefs.remove(head_cref)
             
         # make a new commit ref
-        commit_cls = object_utils.get_gpb_class_from_type_id(commit_type)
+        commit_cls = object_utils.get_gpb_class_from_type_id(COMMIT_TYPE)
         cref = self._create_wrapped_object(commit_cls, addtoworkspace=False)
                     
         cref.date = pu.currenttime()
@@ -579,7 +578,7 @@ class Repository(object):
         """
         # Now add a Commit Ref
         # make a new commit ref
-        commit_cls = object_utils.get_gpb_class_from_type_id(commit_type)
+        commit_cls = object_utils.get_gpb_class_from_type_id(COMMIT_TYPE)
         cref = self._create_wrapped_object(commit_cls, addtoworkspace=False)
         
         if not date:
@@ -788,7 +787,7 @@ class Repository(object):
      
     def get_linked_object(self, link):
                 
-        if link.ObjectType != self.LinkClassType:
+        if link.ObjectType != LINK_TYPE:
             raise RepositoryError('Illegal argument type in get_linked_object.')
                 
                 
@@ -831,11 +830,11 @@ class Repository(object):
         #self.set_linked_object(link, obj)
         obj.AddParentLink(link)
         
-        if obj.ObjectType == self.CommitClassType:
+        if obj.ObjectType == COMMIT_TYPE:
             self._commit_index[obj.MyId]=obj
             obj.ReadOnly = True
                 
-        elif link.Root.ObjectType == self.CommitClassType:
+        elif link.Root.ObjectType == COMMIT_TYPE:
             # if the link is a commit but the linked object is not then it is a root object
             # The default for a root object should be ReadOnly = False
             self._workspace[obj.MyId]=obj
@@ -977,7 +976,7 @@ class Repository(object):
         self._hashed_elements.update(structure)
         
         # Get the element by creating a temporary link and loading links...
-        link_cls = object_utils.get_gpb_class_from_type_id(self.LinkClassType)
+        link_cls = object_utils.get_gpb_class_from_type_id(LINK_TYPE)
         link = self._create_wrapped_object(link_cls, addtoworkspace=False)
         link.key = value.MyId
         object_utils.set_type_from_obj(value, link.type)
@@ -995,7 +994,7 @@ class Repository(object):
         
     def set_linked_object(self,link, value):        
         # If it is a link - set a link to the value in the wrapper
-        if link.ObjectType != link.LinkClassType:
+        if link.ObjectType != LINK_TYPE:
             raise RepositoryError('Can not set a composite field unless it is of type Link')
 
         if not isinstance(value, gpb_wrapper.Wrapper):
