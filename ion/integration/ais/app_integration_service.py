@@ -19,8 +19,13 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 from ion.core.messaging.message_client import MessageClient
 
+# import GPB type identifiers for AIS
+from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
+from ion.integration.ais.ais_object_identifiers import UPDATE_USER_TYPE, UPDATE_USER_DISPATCH_QUEUE_TYPE
+
+# import working classes for AIS
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources
-from ion.integration.ais.ais_object_identifiers import aisRequestMsgType
+from ion.integration.ais.RegisterUser.RegisterUser import RegisterUser
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -139,6 +144,20 @@ class AppIntegrationService(ServiceProcess):
         yield self.reply_ok(msg, {'value' : 'http://a.download.url.edu'})
 
     @defer.inlineCallbacks
+    def op_updateUser(self, content, headers, msg):
+        log.info('op_updateUser: '+str(content))
+        try:
+            worker = RegisterUser()
+            worker.updateUser();
+            yield self.reply_ok(msg, {'value' : 'value'})
+        except KeyError:
+            estr = 'Missing information in message!'
+            log.exception(estr)
+            yield self.reply_err(msg, estr)
+
+        return
+        
+    @defer.inlineCallbacks
     def findInstance(self, id, msg):
         try:
             yield self.rc.get_instance(id)
@@ -159,7 +178,7 @@ class AppIntegrationService(ServiceProcess):
             excArgs = "<no args>"
         excTb = traceback.format_exception(cla, exc, trbk)
         return '\n'.join(excTb)
-                    
+                  
 
 class AppIntegrationServiceClient(ServiceClient):
     """
@@ -201,6 +220,15 @@ class AppIntegrationServiceClient(ServiceClient):
         payload = {'userId' : userId,
                    'dataResourceId' : dataResourceId}
         (content, headers, payload) = yield self.rpc_send('createDownloadURL', payload)
+        log.info('Service reply: ' + str(content))
+        defer.returnValue(content)
+ 
+    @defer.inlineCallbacks
+    def updateUser(self, certificate, key):
+        yield self._check_init()
+        payload = {'certificate' : certificate,
+                   'key' : key}
+        (content, headers, payload) = yield self.rpc_send('updateUser', payload)
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         

@@ -81,4 +81,15 @@ class AppIntegrationTest(IonTestCase):
         #outcome1 = yield self.aisc.createDataResource(ab_msg)
         outcome1 = yield self.aisc.findDataResources(ab_msg)
         log.debug('DHE: findDataResources returned:\n'+str(outcome1))
+
+    @defer.inlineCallbacks
+    def test_updateUser(self):
+
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+
+        # This is temporary; we won't be passing strings here, we will need to pass a GPB      
+        log.debug('Calling updateUser!!...')
+        reply = yield self.aisc.updateUser("some certificate", "some key")
+        log.debug('updateUser returned:\n'+str(reply))
         
