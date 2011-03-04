@@ -9,13 +9,11 @@
 import ion.util.ionlog
 from twisted.internet import defer
 
-from ion.services.dm.distribution.publisher_subscriber import Publisher, PublisherFactory
+from ion.services.dm.distribution.publisher_subscriber import Publisher, PublisherFactory, Subscriber, SubscriberFactory
 from ion.util.state_object import BasicStates
 #from ion.services.dm.distribution.pubsub_service import PubSubClient, REQUEST_TYPE
 #from ion.services.dm.distribution.publisher_subscriber import Subscriber
 from ion.test.iontest import IonTestCase
-from twisted.trial import unittest
-from ion.util.procutils import asleep
 from ion.core import ioninit
 
 from ion.core.object import object_utils
@@ -141,4 +139,31 @@ class TestPublisher(IonTestCase):
         # we should see it now in the testsub's collection
         self.failUnlessEqual(len(testsub.msgs), 1)
         self.failUnlessEqual(testsub.msgs[0], "this is a sample, beats are fresh")
+
+# #####################################################################################
+
+class TestSubscriber(IonTestCase):
+    """
+    """
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._shutdown_processes()
+        yield self._stop_container()
+
+    #@defer.inlineCallbacks
+    def test_subscriber_create(self):
+        """
+        Create/activate a subscriber without factories.  Make sure all required components are present.
+        """
+
+        self.failUnlessRaises(AssertionError, Subscriber)   # needs xp_name
+
+        sub = Subscriber(xp_name="magnet.topic")
+        self.failUnlessIsInstance(sub, Subscriber)
+
+        # hmm.. activating this subscriber (via spawn) would create an anonymous queue with no binding to it, how to test this?
 
