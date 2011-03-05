@@ -76,17 +76,23 @@ class PST(IonTestCase):
         pass
 
     @defer.inlineCallbacks
-    def test_xs_creation(self):
+    def _create_xs(self):
         # Try and create the 'swapmeet' exchange space
 
         msg = yield self.mc.create_instance(XS_TYPE)
         msg.exchange_space_name = self.xs_name
 
         xs_id = yield self.psc.declare_exchange_space(msg)
+        defer.returnValue(xs_id)
+
+
+    @defer.inlineCallbacks
+    def test_xs_creation(self):
+        # Try and create the 'swapmeet' exchange space
+        xs_id = yield self._create_xs()
 
         self.failIf(len(xs_id.id_list) == 0)
         self.failIf(xs_id.id_list[0] == '')
-
 
     @defer.inlineCallbacks
     def test_xs_exceptions(self):
@@ -105,10 +111,8 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_undeclare_xs(self):
-        msg = yield self.mc.create_instance(XS_TYPE)
-        msg.exchange_space_name = self.xs_name
 
-        xs_id = yield self.psc.declare_exchange_space(msg)
+        xs_id = yield self._create_xs()
 
         msg = yield self.mc.create_instance(REQUEST_TYPE)
         msg.resource_reference = xs_id.id_list[0]
@@ -128,11 +132,7 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_xs_query(self):
-
-        msg = yield self.mc.create_instance(XS_TYPE)
-        msg.exchange_space_name = self.xs_name
-
-        xs_id = yield self.psc.declare_exchange_space(msg)
+        xs_id = yield self._create_xs()
 
         self.failUnless(len(xs_id.id_list) > 0)
         log.debug('exchange declared')
@@ -141,19 +141,28 @@ class PST(IonTestCase):
 
         log.debug('querying now')
         idlist = yield self.psc.query_exchange_spaces(msg)
-        log.debug(idlist)
+        self.failUnless(len(idlist.id_list) > 0)
 
     @defer.inlineCallbacks
-    def test_xp_creation(self):
-        msg = yield self.mc.create_instance(XS_TYPE)
-        msg.exchange_space_name = self.xs_name
-
-        xs_id = yield self.psc.declare_exchange_space(msg)
-
+    def _create_xp(self, xs_id):
         msg = yield self.mc.create_instance(XP_TYPE)
         msg.exchange_point_name = self.xp_name
         msg.exchange_space_id = xs_id.id_list[0]
 
         xp_id = yield self.psc.declare_exchange_point(msg)
+        defer.returnValue(xp_id)
+
+    @defer.inlineCallbacks
+    def test_xp_creation(self):
+        xs_id = yield self._create_xs()
+        xp_id = yield self._create_xp(xs_id)
 
         self.failUnless(len(xp_id.id_list) > 0)
+
+    @defer.inlineCallbacks
+    def test_undeclare_xp(self):
+        xs_id = yield self._create_xs()
+        xp_id = yield self._create_xp(xs_id)
+        
+
+        pass

@@ -42,6 +42,11 @@ IDLIST_TYPE = object_utils.create_type_identifier(object_id=2312, version=1)
 XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
 XP_TYPE = object_utils.create_type_identifier(object_id=2309, version=1)
 
+# Resource GPB objects
+XS_RES_TYPE = object_utils.create_type_identifier(object_id=2315, version=1)
+XP_RES_TYPE = object_utils.create_type_identifier(object_id=2316, version=1)
+
+
 class PSSException(ApplicationError):
     """
     Exception class for the pubsub service.
@@ -98,24 +103,25 @@ class PubSubService(ServiceProcess):
         log.debug('EMS returns ID %s for name %s' % (xsid.resource_reference.key, request.exchange_space_name))
 
         # Write ID into registry
-        log.debug('Creating RC instance')
-        xs = yield self.rclient.create_instance(XS_TYPE, ResourceName=request.exchange_space_name,
-                                                ResourceDescription=description)
+        log.debug('Creating resource instance')
+        registry_entry = yield self.rclient.create_instance(XS_RES_TYPE, ResourceName=request.exchange_space_name,
+                                                            ResourceDescription=request.exchange_space_name)
+        # Populate registry entry message
+        registry_entry.exchange_space_name = request.exchange_space_name
+        registry_entry.exchange_space_id = xsid.resource_reference
+
         log.debug('Writing resource record')
-        yield self.rclient.put_instance(xs)
+        xs_resource_id = yield self.rclient.put_instance(registry_entry)
 
         log.debug('Operation completed, creating response message')
-
         response = yield self.mc.create_instance(IDLIST_TYPE, MessageName='declare_xs response')
-
-        log.debug('Populating response message')
         response.id_list.add()
-        response.id_list[0]=xsid.resource_reference
+        response.id_list[0]=xs_resource_id.resource_reference
         response.MessageResponseCode = response.ResponseCodes.OK
 
         # save to list
         log.debug('Saving to internal list...')
-        self.xs_list[xsid.resource_reference.key] = request.exchange_space_name
+        self.xs_list[xs_resource_id.resource_reference.key] = request.exchange_space_name
 
         log.debug('Responding...')
         yield self.reply_ok(msg, response)
@@ -138,6 +144,7 @@ class PubSubService(ServiceProcess):
             yield self.reply_ok(msg, response)
 
         # @todo Call EMS to remove the XS
+        # @todo Remove resource record too
         log.warn('Here is where we ask EMS to remove the XS')
         response = yield self.mc.create_instance(RESPONSE_TYPE)
         response.MessageResponseCode = response.ResponseCodes.OK
@@ -151,10 +158,14 @@ class PubSubService(ServiceProcess):
             raise PSSException('Bad message type received', request.ResponseCodes.BAD_REQUEST)
 
         log.debug('Looking for XS entries...')
+        yield self._do_query(request, self.xs_list)
+
+    @defer.inlineCallbacks
+    def _do_query(self, request, res_list):
         # This is probably better written as a list comprehension. Or something.
         rc = []
         p = re.compile(request.regex)
-        for cur_key, cur_entry in self.xs_list.iteritems():
+        for cur_key, cur_entry in self.res_list.iteritems():
             if p.match(cur_entry):
                 rc.append(cur_key)
 
@@ -169,7 +180,6 @@ class PubSubService(ServiceProcess):
             idx += 1
 
         yield self.reply_ok(msg, response)
-
 
     @defer.inlineCallbacks
     def op_declare_exchange_point(self, request, headers, msg):
@@ -194,91 +204,78 @@ class PubSubService(ServiceProcess):
         log.debug('EMS completed, returned XP ID "%s"' % str(xpid))
 
         log.debug('Saving XP to registry')
-        xp_resource = yield self.rclient.create_instance(XP_TYPE, ResourceName=request.exchange_point_name,
+        xp_resource = yield self.rclient.create_instance(XP_RES_TYPE, ResourceName=request.exchange_point_name,
                                            ResourceDescription=description)
-        # @todo ask DS about proper way to do this...
-        yield self.rclient.put_instance(xp_resource)
+
+        xp_resource.exchange_space_name = xs_name
+        xp_resource.exchange_space_id = request.exchange_space_id
+        xp_resource.exchange_point_id = xpid
+        xp_resource.exchange_point_name = request.exchange_point_name
+
+        xp_resource_id = yield self.rclient.put_instance(xp_resource)
 
         log.debug('Creating reply')
         reply = yield self.mc.create_instance(IDLIST_TYPE)
         reply.id_list.add()
-        reply.id_list[0] = xpid.resource_reference
+        reply.id_list[0] = xp_resource_id.resource_reference
 
         log.debug('Saving XPID to internal list')
-        self.xp_list[xpid.resource_reference.key] = request.exchange_point_name
+        self.xp_list[xp_resource_id.resource_reference.key] = request.exchange_point_name
 
         log.debug('DXP responding')
         yield self.reply_ok(msg, reply)
         log.debug('DXP completed OK')
 
-
-    ##############################################################    
-    # API-style entry points. Akin to the twisted protocol/factory
     @defer.inlineCallbacks
-    def declare_topic_tree(self, exchange_space_name, topic_tree_name):
-        """
-        @brief Create a topic tree
-        @param exchange_space_name Exchange space where the tree will live
-        @param topic_tree_name Name of the tree to create
-        @retval Topic tree ID on success, None if failure
-        """
-        log.debug('Creating exchange space "%s"' % exchange_space_name)
-        yield self.ems.create_exchangespace(exchange_space_name, 'Default exchange space')
+    def op_undeclare_exchange_point(self, request, headers, msg):
+        log.debug('UDXP starting')
 
-        log.debug('Calling EMS to create topic tree "%s/%s"' % (exchange_space_name, topic_tree_name))
-        rc = yield self.ems.create_exchangename(topic_tree_name, 'New topic tree', exchange_space_name)
-        if rc == None:
-            log.error('Error in creating exchange name (topic tree')
-            defer.returnValue(None)
-        log.debug('EMS returned "%s"' % str(rc))
-
-        log.debug('Writing topic tree into registry')
-        # Now need to write new topic tree into registry
-        ttree = yield self.rclient.create_instance(TT_TYPE, name=topic_tree_name, description='New topic tree')
-
-        ttree.exchange_space_name = exchange_space_name
-        ttree.topic_tree_name = topic_tree_name
-
-        log.debug('About to push topic tree into registry')
-        yield self.rclient.put_instance(ttree, 'declare_topic_tree')
-        log.debug('Wrote TT, id is %s' % ttree.ResourceIdentity)
-        log.debug("Attach a topic with:  client.define_topic('%s', 'topic_name')" % (ttree.ResourceIdentity))
-        
-        defer.returnValue(ttree.ResourceIdentity)
+        if request.MessageType != REQUEST_TYPE:
+            raise PSSException('Bad message type',
+                               request.ResponseCodes.BAD_REQUEST)
 
 
-    @defer.inlineCallbacks
-    def define_topic(self, topic_tree_id, topic_name):
-        """
-        @brief Within a topic tree, define a topic. Usually a dataset name by convention.
-        @param topic_tree_id ID, as returned from op_declare_topic_tree
-        @param topic_name Name to declare
-        @retval Topic ID, or None if error
-        """
-        log.debug('Creating and populating dataset message/object')
-
-        # Step 1: Get a handle to the topic's prospective tree
+        # Try to lookup the XP in the dictionary
+        log.debug('Looking for XP ID %s' % request.resource_reference.key)
         try:
-            ttree = yield self.rclient.get_instance(topic_tree_id)
-        except ResourceClientError, ex:
-            log.warn('Could not retreive topic tree instance for given topic_tree_id:  %s' % (ex))
-            
-        # Step 2: Create the topic resource
-        cstr = "%s/%s" % (topic_tree_id, topic_name)
+            xp_name = self.xp_list[request.resource_reference.key]
+            log.debug('XP found, %s/%s' % (request.resource_reference.key, xp_name))
+        except KeyError:
+            raise PSSException('Unable to locate XP ID',
+                               request.ResponseCodes.BAD_REQUEST)
 
-        topic = yield self.rclient.create_instance(TOPIC_TYPE, ResourceName=topic_name, ResourceDescription=cstr)
-        topic.topic_name = topic_name
-        topic.routing_key = cstr
-        
-        # Step 3: @todo: Create an association between the given topic_tree and the topic being created here
-        
-        # Step 4: Store changes to the topic
-        # @todo: Store changes to whichever resource represents the association between tree and topic
-        log.debug('Topic object created, pushing/committing "%s"' % cstr)
+        # @todo Look up XS via XPID, call EMS to remove same
+        log.warn('This is where the Actual Work Goes...')
 
-        yield self.rclient.put_instance(topic, 'Adding dataset/topic %s' % cstr)
-        log.debug('Commit completed, %s' % topic.ResourceIdentity)
-        defer.returnValue(topic.ResourceIdentity)
+
+    @defer.inlineCallbacks
+    def op_query_exchange_points(self, request, headers, msg):
+        log.debug('Starting XP query')
+        # Validate the input
+        if request.MessageType != REGEX_TYPE:
+            raise PSSException('Bad message type, expected regex query',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        if not request.IsFieldSet('regex'):
+            raise PSSException('Bad message, regex missing',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
+        yield self._do_query(request, self.xp_list)
+
+    @defer.inlineCallbacks
+    def op_declare_topic(self, request, headers, msg):
+        log.debug('Declare topic starting')
+        if request.MessageType != TOPIC_TYPE:
+            raise PSSException('Bad message type, expected a topic',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # @todo Look up XS, XP as parameters
+        description = str(time.time())
+        tid = yield self.ems.create_topic(...)
+
+
+
 
 
 class PubSubClient(ServiceClient):
@@ -477,7 +474,7 @@ class PubSubClient(ServiceClient):
         defer.returnValue(content)
 
     @defer.inlineCallbacks
-    def create_queue(self, params):
+    def declare_queue(self, params):
         """
         @brief Create a listener queue for a subscription
         @param GPB 2308/1
@@ -485,7 +482,7 @@ class PubSubClient(ServiceClient):
         """
         yield self._check_init()
 
-        (content, headers, msg) = yield self.rpc_send('create_queue', params)
+        (content, headers, msg) = yield self.rpc_send('declare_queue', params)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
