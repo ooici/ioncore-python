@@ -57,9 +57,10 @@ class IndexStoreService(ServiceProcess):
         # Service class initializer. Basic config, but no yields allowed.
         ServiceProcess.__init__(self, *args, **kwargs)
 
-
+        log.info(self.spawn_args)
         self.indices = self.spawn_args.get('indices',  [])
-
+        log.info(self.indices)
+        
     #@defer.inlineCallbacks
     def slc_activate(self, *args):
         """
@@ -74,7 +75,7 @@ class IndexStoreService(ServiceProcess):
         system!
         
         """
-
+        
         self._indexed_store = IndexStore(indices=self.indices)
 
         log.info("Created Index Store Service")
@@ -196,9 +197,10 @@ class IndexStoreService(ServiceProcess):
         """      
         column_list = yield self._indexed_store.get_query_attributes()
         response = yield self.message_client.create_instance(INDEXED_ATTRIBUTES_TYPE)
-        
+        log.info(column_list)
         response.attributes.extend(column_list)
-             
+
+        log.info("replying for get_query_attributes")         
         yield self.reply_ok(msg, response)
 # Spawn of the process using the module name
 factory = ProcessFactory(IndexStoreService)
@@ -233,17 +235,7 @@ class IndexStoreServiceClient(ServiceClient):
             attr.attribute_name = attr_key
             attr.attribute_value = attr_value    
             attr.predicate_type = pred_type
-        """
-        for attr_key,attr_value in indexed_attributes_eq.items():
-            attr = request.attrs_eq.add()
-            attr.attribute_name = attr_key
-            attr.attribute_value = attr_value
 
-        for attr_key,attr_value in indexed_attributes_gt.items():
-            attr = request.attrs_gt.add()
-            attr.attribute_name = attr_key
-            attr.attribute_value = attr_value
-        """
         (result, headers, msg) = yield self.rpc_send('query', request)
 
 

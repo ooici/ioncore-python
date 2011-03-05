@@ -13,6 +13,7 @@ from ion.test.iontest import IonTestCase
 
 from ion.core.messaging.message_client import MessageClient
 from ion.core.data.index_store_service import IndexStoreServiceClient
+from ion.core.data.store import Query
 from ion.core.object import object_utils
 
 from ion.core import ioninit
@@ -35,9 +36,10 @@ class IndexStoreServiceTester(IonTestCase):
              'spawnargs':{'servicename':'datastore'}},
            {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
-             {'name': 'inventory',
+             {'name': 'index_store_service',
              'module': 'ion.core.data.index_store_service',
-             'class':'IndexStoreService'}
+             'class':'IndexStoreService',
+             'spawnargs':{'indices':["Subject", "Predicate", "Object"]}}
         ]
         sup = yield self._spawn_processes(services)
         self.client = IndexStoreServiceClient(proc=sup)
@@ -64,8 +66,7 @@ class IndexStoreServiceTester(IonTestCase):
         value = "Value1"
         attr_dict = {"Subject":"Who", "Predicate":"Descriptive Verb", "Object": "The thing you're looking for"}
         put_response = yield self.client.put(key,value,attr_dict)   
-        
-        self.failUnlessEqual(put_response.result, "Put complete")
+    
      
     @itv(CONF)     
     @defer.inlineCallbacks
@@ -82,13 +83,15 @@ class IndexStoreServiceTester(IonTestCase):
         put_response1 = yield self.client.put(key1, value1, attr_dict1)
         put_response2 = yield self.client.put(key2, value2, attr_dict2)
         put_response3 = yield self.client.put(key3, value3, attr_dict3)
-        index_attrs = {"Subject":"Me"}
-        cassandra_rows = yield self.client.query(index_attrs)
+        query_predicates = Query()
+        query_predicates.add_predicate_eq("Subject", "Me")
+        
+        cassandra_rows = yield self.client.query(query_predicates)
+        log.info(cassandra_rows)
         values = []
-        for row in cassandra_rows.rows:
-            log.info(row.key)
-            col = row.cols[0]
-            values.append(col.value)
+        for k,v in cassandra_rows.items():
+            values.append(v["value"])
+
         correct_set = set(("Value1", "Value3"))    
         query_set = set(values)
         self.failUnlessEqual(correct_set, query_set)
@@ -101,7 +104,7 @@ class IndexStoreServiceTester(IonTestCase):
         attr_dict = {"Subject":"Who", "Predicate":"Descriptive Verb", "Object": "The thing you're looking for"} 
         put_response = yield self.client.put(key,value,attr_dict)
         get_response = yield self.client.get(key)
-        self.failUnlessEqual(get_response.value, value)
+        self.failUnlessEqual(get_response, value)
         
     @itv(CONF)      
     @defer.inlineCallbacks
@@ -112,19 +115,14 @@ class IndexStoreServiceTester(IonTestCase):
         put_response = yield self.client.put(key,value,attr_dict)  
         remove_response = yield self.client.remove(key)
         get_response = yield self.client.get(key)
-        log.info(get_response.value)
-        self.failUnlessEqual(get_response.value,"")
+        log.info(get_response)
+        self.failUnlessEqual(get_response, None)
         
     @itv(CONF)      
     @defer.inlineCallbacks
     def test_get_query_attributes(self):
-        cassandra_row = yield self.client.get_query_attributes()
-        
-        index_attrs = []
-        for attr in cassandra_row.attrs:
-            log.info(attr.attribute_name)
-            index_attrs.append(attr.attribute_name)
-            
+        index_attrs = yield self.client.get_query_attributes()
+    
         correct_set = set(["Subject", "Predicate", "Object"])
         index_attrs_set = set(index_attrs)
         self.failUnlessEqual(correct_set, index_attrs_set)
