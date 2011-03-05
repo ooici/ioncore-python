@@ -179,7 +179,7 @@ class Container(BasicLifecycleObject):
         """
         log.info('exchangeConnectionLost %s' % (str(reason),))
         from twisted.internet import reactor
-        #reactor.stop()
+        reactor.stop()
 
     def __str__(self):
         return "CapabilityContainer(state=%s,%r)" % (
