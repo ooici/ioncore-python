@@ -14,6 +14,8 @@ from txamqp.client import TwistedDelegate
 
 from ion.core.cc.store import Store
 from ion.util.state_object import BasicLifecycleObject
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
 
 class AMQPEvents(TwistedDelegate):
     """
@@ -43,11 +45,20 @@ class AMQPEvents(TwistedDelegate):
         """implement this to handle messages that could not be delivered to
         a queue or consumer
         """
+        log.warning("""basic.return event received! This means the broker\
+                could not guarantee reliable delivery for a message sent\
+                from a process in this container.""")
 
     def channel_flow(self, ch, msg):
         """implement this to handle a broker flow control request
         """
+        log.warning('channel.flow event received')
 
+    def channel_alert(self, ch, msg):
+        """implement this to handle a broker channel.alert notification.
+        """
+        log.warning('channel.alert event received')
+        
     def close(self, reason):
         """The AMQClient protocol calls this as a result of a
         connectionLost event. The TwistedDelegate.close method finishes
@@ -93,7 +104,7 @@ class MessageSpace(BasicLifecycleObject):
         raise NotImplementedError("Not implemented")
 
     def on_terminate(self, *args, **kwargs):
-        return self.connection.close()
+        return defer.maybeDeferred(self.connection.close)
 
     def on_error(self, *args, **kwargs):
         #raise RuntimeError("Illegal state change for MessageSpace")
@@ -107,11 +118,10 @@ class MessageSpace(BasicLifecycleObject):
 
     def connectionLost(self, reason):
         """
-        This is a fatal error. Trigger error state now!
+        AMQP Client triggers this event when it has a conenctionLost event
+        itself.
         """
-        # Not sure if the exchange manager should be able to fail for other
-        # reasons...so let's just fail the container directly!
-        self.exchange_manager.container.error(reason)
+        self.exchange_manager.connectionLost(reason) # perpetuate the event
 
     def __repr__(self):
         params = ['hostname',

@@ -135,9 +135,7 @@ class Container(BasicLifecycleObject):
         Sevice, so we shouldn't need to do that here.
         The only problem is, this gets called more than once...duh! ;-p
         """
-        #raise RuntimeError("Illegal state change for container")
-        from twisted.internet import reactor
-        reactor.stop() 
+        raise RuntimeError("Illegal state change for container")
 
     # --- Container API -----------
 
@@ -169,6 +167,19 @@ class Container(BasicLifecycleObject):
 
     def start_rel(self, rel_filename):
         pass
+
+    # Container Events
+
+    def exchangeConnectionLost(self, reason):
+        """
+        The exchange manager notifies the container when the amqp
+        connection closes by triggering this event.
+        The connection closure could be expected (if the exchange manager
+        is terminated) or unexpected, indicating an error situation.
+        """
+        log.info('exchangeConnectionLost %s' % (str(reason),))
+        from twisted.internet import reactor
+        #reactor.stop()
 
     def __str__(self):
         return "CapabilityContainer(state=%s,%r)" % (
