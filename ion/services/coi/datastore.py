@@ -22,16 +22,41 @@ from ion.core.data import store
 from ion.core.data import cassandra
 from ion.core.data.store import Query
 
+
+from ion.services.dm.preservation.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
+from ion.services.dm.preservation.storage_configuration_utility import COMMIT_COLUMN_NAMES
+from ion.services.dm.preservation.storage_configuration_utility import REPOSITORY_KEY, BRANCH_NAME
+
+from ion.services.dm.preservation.storage_configuration_utility import SUBJECT_KEY, SUBJECT_BRANCH, SUBJECT_COMMIT
+from ion.services.dm.preservation.storage_configuration_utility import PREDICATE_KEY, PREDICATE_BRANCH, PREDICATE_COMMIT
+from ion.services.dm.preservation.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT
+
+from ion.services.dm.preservation.storage_configuration_utility import KEYWORD
+
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
-link_type = object_utils.create_type_identifier(object_id=3, version=1)
-commit_type = object_utils.create_type_identifier(object_id=8, version=1)
-mutable_type = object_utils.create_type_identifier(object_id=6, version=1)
-structure_element_type = object_utils.create_type_identifier(object_id=1, version=1)
 
-association_type = object_utils.create_type_identifier(object_id=13, version=1)
-terminology_type = object_utils.create_type_identifier(object_id=14, version=1)
+LINK_TYPE = object_utils.create_type_identifier(object_id=3, version=1)
+COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
+MUTABLE_TYPE = object_utils.create_type_identifier(object_id=6, version=1)
+STRUCTURE_ELEMENT_TYPE = object_utils.create_type_identifier(object_id=1, version=1)
+
+ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
+TERMINOLOGY_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
+
+
+# Set some constants based on the config file:
+
+cache_list = storage_conf.getValue('cache configuration',[])
+for cache in cache_list:
+    if cache.get('blobs'):
+        break
+else:
+    raise
+
+
+
 
 
 class DataStoreError(Exception):
@@ -51,8 +76,6 @@ class DataStoreService(ServiceProcess):
     declare = ServiceProcess.service_declare(name='datastore',
                                              version='0.1.0',
                                              dependencies=[])
-
-    LinkClassType = object_utils.create_type_identifier(object_id=3, version=1)
 
     MUTABLE_STORE = 'mutable_store_class'
     COMMIT_STORE = 'commit_store_class'
@@ -135,7 +158,7 @@ class DataStoreService(ServiceProcess):
         for head in heads:
             
             # Extract the repository key from the mutable
-            raw_mutable = object_utils.get_gpb_class_from_type_id(mutable_type)()
+            raw_mutable = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)()
             raw_mutable.ParseFromString(head.value)
             repo_key = str(raw_mutable.repositorykey)
             
@@ -199,7 +222,7 @@ class DataStoreService(ServiceProcess):
                         if cref in branch.commitrefs:
                             attributes[self.COMMIT_BRANCH_INDEX] = branch.branchkey
                                         
-                    if cref.objectroot.ObjectType == association_type:
+                    if cref.objectroot.ObjectType == ASSOCIATION_TYPE:
                         attributes['subject_repository'] = cref.objectroot.subject.key
                         attributes['subject_branch'] = cref.objectroot.subject.branch
                         attributes['subject_commit'] = cref.objectroot.subject.commit
@@ -212,7 +235,7 @@ class DataStoreService(ServiceProcess):
                         attributes['object_branch'] = cref.objectroot.object.branch
                         attributes['object_commit'] = cref.objectroot.object.commit
                         
-                    elif  cref.objectroot.ObjectType == terminology_type:
+                    elif  cref.objectroot.ObjectType == TERMINOLOGY_TYPE:
                         attributes['word'] = cref.objectroot.word
                     
                     # get the wrapped structure element to put in...
@@ -294,13 +317,13 @@ class DataStoreService(ServiceProcess):
         # Elements is a dictionary of wrapped structure elements
         for se in elements.values():
             
-            assert se.type == link_type, 'This is not a link element!'
-            link = object_utils.get_gpb_class_from_type_id(link_type)()
+            assert se.type == LINK_TYPE, 'This is not a link element!'
+            link = object_utils.get_gpb_class_from_type_id(LINK_TYPE)()
             link.ParseFromString(se.value)
                 
             # if it is already in memory, don't worry about it...
             if not link.key in self.workbench._hashed_elements:            
-                if link.type == commit_type:
+                if link.type == COMMIT_TYPE:
                     # Can get commits for a service in a fetch
                     def_list.append(self.c_store.get(link.key))
                 else:
@@ -345,7 +368,7 @@ class DataStoreService(ServiceProcess):
         for link in links:
             if not link.key in self.workbench._hashed_elements:            
                 # Can request to get commits in a fetch...
-                if link.type == commit_type:
+                if link.type == COMMIT_TYPE:
                     def_list.append(self.c_store.get(link.key))
                 else:
                     def_list.append(self.b_store.get(link.key))
@@ -382,14 +405,14 @@ class DataStoreService(ServiceProcess):
         
         def_list = []
         for key, wse in got_objs.items():
-            #if wse.type == commit_type:
+            #if wse.type == COMMIT_TYPE:
             #    raise DataStoreError('Can not get commits in a fetch!')
             #    def_list.append(self.c_store.put(key, wse.serialize()))
             #else:
             #    def_list.append(self.b_store.put(key, wse.serialize()))
             
             # Don't ever put commits out of context. This is done by push!
-            if wse.type != commit_type:
+            if wse.type != COMMIT_TYPE:
                 def_list.append(self.b_store.put(key, wse.serialize()))
                 
             # Add it to the dictionary of objects 
