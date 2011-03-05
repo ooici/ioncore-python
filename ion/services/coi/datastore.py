@@ -48,16 +48,6 @@ TERMINOLOGY_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
 
 # Set some constants based on the config file:
 
-cache_list = storage_conf.getValue('cache configuration',[])
-for cache in cache_list:
-    if cache.get('blobs'):
-        break
-else:
-    raise
-
-
-
-
 
 class DataStoreError(Exception):
     """
@@ -77,42 +67,27 @@ class DataStoreService(ServiceProcess):
                                              version='0.1.0',
                                              dependencies=[])
 
-    MUTABLE_STORE = 'mutable_store_class'
-    COMMIT_STORE = 'commit_store_class'
-    BLOB_STORE = 'blob_store_class'
-    
-    COMMIT_REPOSITORY_INDEX = 'repository_key'
-    COMMIT_BRANCH_INDEX = 'repository_branch'
-    
+
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
         
-        #assert isinstance(backend, store.IStore)
-        #self.backend = backend
-        ServiceProcess.__init__(self, *args, **kwargs)        
+        ServiceProcess.__init__(self, *args, **kwargs)
             
         self._backend_cls_names = {}
-        #self.spawn_args['_class'] = self.spawn_args.get('_class', CONF.getValue('_class', default='ion.data.store.Store'))
-        self._backend_cls_names[self.MUTABLE_STORE] = self.spawn_args.get(self.MUTABLE_STORE, CONF.getValue(self.MUTABLE_STORE, default='ion.core.data.store.Store'))
-        self._backend_cls_names[self.COMMIT_STORE] = self.spawn_args.get(self.COMMIT_STORE, CONF.getValue(self.COMMIT_STORE, default='ion.core.data.store.IndexStore'))
-        self._backend_cls_names[self.BLOB_STORE] = self.spawn_args.get(self.BLOB_STORE, CONF.getValue(self.BLOB_STORE, default='ion.core.data.store.Store'))
+        self._backend_cls_names[COMMIT_CACHE] = self.spawn_args.get(COMMIT_CACHE, CONF.getValue(COMMIT_CACHE, default='ion.core.data.store.IndexStore'))
+        self._backend_cls_names[BLOB_CACHE] = self.spawn_args.get(BLOB_CACHE, CONF.getValue(BLOB_CACHE, default='ion.core.data.store.Store'))
             
         self._backend_classes={}
-            
-        self._backend_classes[self.MUTABLE_STORE] = pu.get_class(self._backend_cls_names[self.MUTABLE_STORE])
-        assert store.IStore.implementedBy(self._backend_classes[self.MUTABLE_STORE]), \
-            'The back end class to store mutable objects passed to the data store does not implement the required ISTORE interface.'
-            
-        self._backend_classes[self.COMMIT_STORE] = pu.get_class(self._backend_cls_names[self.COMMIT_STORE])
-        assert store.IIndexStore.implementedBy(self._backend_classes[self.COMMIT_STORE]), \
+
+        self._backend_classes[COMMIT_CACHE] = pu.get_class(self._backend_cls_names[COMMIT_CACHE])
+        assert store.IIndexStore.implementedBy(self._backend_classes[COMMIT_CACHE]), \
             'The back end class to store commit objects passed to the data store does not implement the required IIndexSTORE interface.'
             
-        self._backend_classes[self.BLOB_STORE] = pu.get_class(self._backend_cls_names[self.BLOB_STORE])
-        assert store.IStore.implementedBy(self._backend_classes[self.BLOB_STORE]), \
+        self._backend_classes[BLOB_CACHE] = pu.get_class(self._backend_cls_names[BLOB_CACHE])
+        assert store.IStore.implementedBy(self._backend_classes[BLOB_CACHE]), \
             'The back end class to store blob objects passed to the data store does not implement the required ISTORE interface.'
             
         # Declare some variables to hold the store instances
-        self.m_store = None
         self.c_store = None
         self.b_store = None
             
@@ -128,25 +103,17 @@ class DataStoreService(ServiceProcess):
     @defer.inlineCallbacks
     def slc_activate(self):
         
-        if issubclass(self._backend_classes[self.MUTABLE_STORE], cassandra.CassandraStore):
-            raise NotImplementedError('Startup for cassandra store is not yet complete')
-        else:
-            self.m_store = yield defer.maybeDeferred(self._backend_classes[self.MUTABLE_STORE])
-        
-        if issubclass(self._backend_classes[self.COMMIT_STORE], cassandra.CassandraStore):
-            raise NotImplementedError('Startup for cassandra store is not yet complete')
-        else:
-            indices = ['subject_repository','subject_branch','subject_commit',
-                       'predicate_repository','predicate_branch','predicate_commit',
-                       'object_repository','object_branch','object_commit', 'word',
-                        self.COMMIT_REPOSITORY_INDEX,  self.COMMIT_BRANCH_INDEX]
-            
-            self.c_store = yield defer.maybeDeferred(self._backend_classes[self.COMMIT_STORE], self, **{'indices':indices})
 
-        if issubclass(self._backend_classes[self.BLOB_STORE], cassandra.CassandraStore):
+        if issubclass(self._backend_classes[COMMIT_CACHE], cassandra.CassandraStore):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
         else:
-            self.b_store = yield defer.maybeDeferred(self._backend_classes[self.BLOB_STORE])
+
+            self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE], self, **{'indices':COMMIT_COLUMN_NAMES})
+
+        if issubclass(self._backend_classes[BLOB_CACHE], cassandra.CassandraStore):
+            raise NotImplementedError('Startup for cassandra store is not yet complete')
+        else:
+            self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE])
         
 
     
@@ -163,27 +130,26 @@ class DataStoreService(ServiceProcess):
             repo_key = str(raw_mutable.repositorykey)
             
             # Get the mutable
-            store_head = None
             store_commits = {}
 
+            # keep track of all the commits read during this push...
             pushed_repos[repo_key] = store_commits
 
-            blob = yield self.m_store.get(repo_key)
-            # if the store has a version of the repo - then load it
-            if blob:
-                store_head = gpb_wrapper.StructureElement.parse_structure_element(blob)
-                self.workbench._hashed_elements[store_head.key]=store_head
-                
-                # Get the commits using the query interface
-                q = Query()
-                q.add_predicate_eq(self.COMMIT_REPOSITORY_INDEX, repo_key)
-                rows = yield self.c_store.query(q)
-                    
-                for key, columns in rows.items():
-                    blob = columns["value"]
-                    wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-                    assert key == wse.key, 'Calculated key does not match the stored key!'
-                    store_commits[wse.key] = wse
+            # Get the commits using the query interface
+            q = Query()
+            q.add_predicate_eq(REPOSITORY_KEY, repo_key)
+            rows = yield self.c_store.query(q)
+
+            if rows:
+
+                stored_repo = self.workbench.create_repository(repository_key=repo_key)
+
+
+            for key, columns in rows.items():
+                blob = columns["value"]
+                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                assert key == wse.key, 'Calculated key does not match the stored key!'
+                store_commits[wse.key] = wse
                     
                     
                 # Load these commits into the workbench
@@ -213,14 +179,14 @@ class DataStoreService(ServiceProcess):
                 if not key in store_commits:
 
                     # Set the repository name for the commit
-                    attributes = {self.COMMIT_REPOSITORY_INDEX : str(repo_key)}
+                    attributes = {REPOSITORY_KEY : str(repo_key)}
 
                     cref = repo._commit_index.get(key)
                     
                     for branch in  repo.branches:
                         # If this is currently the head commit - set
                         if cref in branch.commitrefs:
-                            attributes[self.COMMIT_BRANCH_INDEX] = branch.branchkey
+                            attributes[BRANCH_NAME] = branch.branchkey
                                         
                     if cref.objectroot.ObjectType == ASSOCIATION_TYPE:
                         attributes['subject_repository'] = cref.objectroot.subject.key
@@ -286,7 +252,7 @@ class DataStoreService(ServiceProcess):
                 
             # Get the commits using the query interface
             q = Query()
-            q.add_predicate_eq(self.COMMIT_REPOSITORY_INDEX, repo_key)
+            q.add_predicate_eq(REPOSITORY_KEY, repo_key)
             rows = yield self.c_store.query(q)
                 
             for key, columns in rows.items():

@@ -63,14 +63,14 @@ class WorkBench(object):
         #@TODO Consider using an index store in the Workbench to keep a cache of associations and keep track of objects
 
       
-    def create_repository(self, root_type=None, nickname=None):
+    def create_repository(self, root_type=None, nickname=None, repository_key=None):
         """
         New better method to initialize a repository.
         The init_repository method returns both the repo and the root object.
         This is awkward. Now that the repository has a root_object property, it
         is better to just return the repository.
         """
-        repo = repository.Repository()
+        repo = repository.Repository(repository_key=repository_key)
         repo._workbench = self
             
         repo._hashed_elements = self._hashed_elements

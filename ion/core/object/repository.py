@@ -44,7 +44,7 @@ class Repository(object):
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet (No commit checked out)'
 
-    def __init__(self, head=None):
+    def __init__(self, head=None, repository_key=None):
         
         
         #self.status  is a property determined by the workspace root object status
@@ -131,7 +131,11 @@ class Repository(object):
            
             mutable_cls = object_utils.get_gpb_class_from_type_id(mutable_type)
             self._dotgit = self._create_wrapped_object(mutable_cls, addtoworkspace = False)
-            self._dotgit.repositorykey = pu.create_guid()
+
+            if repository_key:
+                self._dotgit.repositorykey = repository_key
+            else:
+                self._dotgit.repositorykey = pu.create_guid()
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
         It is not 'stored' in the index - it lives in the workspace
