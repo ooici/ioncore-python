@@ -80,7 +80,7 @@ class AppIntegrationService(ServiceProcess):
             # Use the message client to create a message object
             ### DHE: This is temporary; we won't be passing addresslink_type here, but we will need to pass a GPB
             log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
-            reqMsg = yield self.mc.create_instance(aisRequestMsgType)
+            reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
             ab_msg = yield self.mc.create_instance(addresslink_type, MessageName='addressbook message')
             log.debug('DHE: test_app_integration! addressbook instantiated.\n')        
             
