@@ -144,12 +144,14 @@ class AppIntegrationService(ServiceProcess):
         yield self.reply_ok(msg, {'value' : 'http://a.download.url.edu'})
 
     @defer.inlineCallbacks
-    def op_updateUser(self, content, headers, msg):
-        log.info('op_updateUser: '+str(content))
+    def op_registerUser(self, content, headers, msg):
+        log.info('op_registerUser: \n'+str(content))
         try:
             worker = RegisterUser()
-            worker.updateUser();
-            yield self.reply_ok(msg, {'value' : 'value'})
+            worker.init(self)
+            log.info('op_registerUser: calling worker')
+            response = yield worker.registerUser(content);
+            yield self.reply_ok(msg, response)
         except KeyError:
             estr = 'Missing information in message!'
             log.exception(estr)
@@ -224,11 +226,9 @@ class AppIntegrationServiceClient(ServiceClient):
         defer.returnValue(content)
  
     @defer.inlineCallbacks
-    def updateUser(self, certificate, key):
+    def registerUser(self, message):
         yield self._check_init()
-        payload = {'certificate' : certificate,
-                   'key' : key}
-        (content, headers, payload) = yield self.rpc_send('updateUser', payload)
+        (content, headers, payload) = yield self.rpc_send('registerUser', message)
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         

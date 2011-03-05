@@ -16,15 +16,27 @@ from ion.integration.ais.ais_object_identifiers import UPDATE_USER_TYPE, UPDATE_
 
 class RegisterUser():
     
-   def __init__(self, *args, **kwargs):
-      self.irc = IdentityRegistryClient()
-      log.info('RegisterUser.__init__()')
+   def init(self, ais):
+      log.info('RegisterUser.init()')
+      self.irc = IdentityRegistryClient(proc=ais)
         
-   def updateUserDispatcherQueue ():
-      log.info('RegisterUser.UpdateUserDispatcherQueue()')
+   @defer.inlineCallbacks
+   def updateUserDispatcherQueue (self, msg):
+      log.info('RegisterUser.updateUserDispatcherQueue()\n'+str(msg))
+      result = yield self.irc.update_user(msg)
+      defer.returnValue(result)
 
-   def updateUser (msg):
-      log.info('RegisterUser.UpdateUser()')
+   @defer.inlineCallbacks
+   def updateUser (self, msg):
+      log.info('RegisterUser.updateUser()\n'+str(msg))
+      result = yield self.irc.update_user(msg)
+      defer.returnValue(result)
+
+   @defer.inlineCallbacks
+   def registerUser (self, msg):
+      log.info('RegisterUser.registerUser()\n'+str(msg))
+      result = yield self.irc.register_user(msg.message_parameters_reference.certificate, msg.message_parameters_reference.rsa_private_key)
+      defer.returnValue(result)
 
 
 

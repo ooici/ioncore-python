@@ -18,6 +18,12 @@ from ion.test.iontest import IonTestCase
 
 from ion.core.object import object_utils
 
+# import GPB type identifiers for AIS
+from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
+from ion.integration.ais.ais_object_identifiers import REGISTER_USER_TYPE, \
+                                                       UPDATE_USER_TYPE,   \
+                                                       UPDATE_USER_DISPATCH_QUEUE_TYPE
+
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 
@@ -36,6 +42,7 @@ class AppIntegrationTest(IonTestCase):
              'spawnargs':{'servicename':'datastore'}},
             {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
+            {'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}
         ]
         sup = yield self._spawn_processes(services)
 
@@ -83,13 +90,16 @@ class AppIntegrationTest(IonTestCase):
         log.debug('DHE: findDataResources returned:\n'+str(outcome1))
 
     @defer.inlineCallbacks
-    def test_updateUser(self):
+    def test_registerUser(self):
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
 
-        # This is temporary; we won't be passing strings here, we will need to pass a GPB      
-        log.debug('Calling updateUser!!...')
-        reply = yield self.aisc.updateUser("some certificate", "some key")
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUser request')
+        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
+        msg.message_parameters_reference.certificate = "test certificate"
+        msg.message_parameters_reference.rsa_private_key = "test key"
+        log.debug('Calling registerUser!!...')
+        reply = yield self.aisc.registerUser(msg)
         log.debug('updateUser returned:\n'+str(reply))
         
