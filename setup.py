@@ -35,7 +35,7 @@ setup( name = 'ioncore',
        test_suite = 'ion',
        install_requires = [
            'Twisted==10.2.0', 
-           'carrot==0.10.11-txamqp', 
+           'carrot==0.10.13-txamqp', 
            'txamqp==0.3',
            'simplejson==2.1.2', 
            'httplib2==0.6.0',

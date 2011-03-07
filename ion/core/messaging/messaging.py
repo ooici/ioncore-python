@@ -86,6 +86,7 @@ class MessageSpace(BasicLifecycleObject):
 
         # Immediately transition to READY state
         self.initialize(*args, **kwargs)
+        self.closing = False # State that determines if we expect a close event
 
     def on_initialize(self, *args, **kwargs):
         """
@@ -93,6 +94,7 @@ class MessageSpace(BasicLifecycleObject):
         instance.
         """
         self.connection = connection.BrokerConnection(*args, **kwargs)
+        self.closing = False # State that determines if we expect a close event
 
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
@@ -104,6 +106,7 @@ class MessageSpace(BasicLifecycleObject):
         raise NotImplementedError("Not implemented")
 
     def on_terminate(self, *args, **kwargs):
+        self.closing = True
         return defer.maybeDeferred(self.connection.close)
 
     def on_error(self, *args, **kwargs):
@@ -121,7 +124,8 @@ class MessageSpace(BasicLifecycleObject):
         AMQP Client triggers this event when it has a conenctionLost event
         itself.
         """
-        self.exchange_manager.connectionLost(reason) # perpetuate the event
+        if not self.closing: #only notify of unexpected closure
+            self.exchange_manager.connectionLost(reason) # perpetuate the event
 
     def __repr__(self):
         params = ['hostname',
