@@ -4,7 +4,6 @@ Thrift==0.2.0
 Twisted==10.2.0
 amqplib==0.6.1
 anyjson==0.2.5
-apache-libcloud==0.3.1
 carrot==0.10.13-txamqp
 gviz-api.py==1.7.0
 httplib2==0.6.0
