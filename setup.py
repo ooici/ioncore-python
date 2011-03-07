@@ -41,8 +41,6 @@ setup( name = 'ioncore',
            'httplib2==0.6.0',
            'msgpack-python==015final',
            'gviz_api.py==1.7.0', 
-           'nimboss',
-           'txrabbitmq==0.4', 
            'Telephus==0.7-beta3.3', 
            'thrift==0.2.0', # thrift is a dependency of Telephus, which should be included there ideally
            'M2Crypto==0.21.1-pl1', # patched version to work with CentOS
