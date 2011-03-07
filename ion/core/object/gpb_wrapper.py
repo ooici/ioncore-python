@@ -479,10 +479,20 @@ class WrapperType(type):
                 raise OOIObjectError('Invalid dimension name requested: "%s"' % str(name))
 
             result = None
-            for dim in self.dimensions:
-                if dim.name == name:
-                    result = dim
-                    break
+            
+            if obj_type == CDM_VARIABLE_TYPE:
+                for dim in self.shape:
+                    if dim.name == name:
+                        result = dim
+                        break
+            else:
+                for dim in self.dimensions:
+                    if dim.name == name:
+                        result = dim
+                        break
+                
+                
+                
             if None == result:
                 raise OOIObjectError('Requested dimension name not found: "%s"' % str(name))
 
@@ -541,7 +551,7 @@ class WrapperType(type):
         #--------------------------------------#
         # Wrapper_Variable Specialized Methods #
         #--------------------------------------#
-        def _get_variable_units(self):
+        def _get_var_units(self):
             """
             Specialized method for CDM Objects to retrieve the value of a variable object's 'units' attribute
             """
@@ -550,11 +560,25 @@ class WrapperType(type):
             if units != None and len(units.array.value) > 0:
                 result = units.array.value[0]
             
-            # @attention: Sometimes units come back as unicode values..  we can provide a trap here
-            #             to convert them, but this may not be necessary.  Lets discuss [TPL]
+            # @attention: Sometimes (string) attribute values come back as unicode values..  we can provide
+            #             a trap here to convert them, but this may not be necessary.  Lets discuss [TPL]
             return result
 
-
+        
+        def _get_var_std_name(self):
+            """
+            Specialized method for CDM Objects to retrieve the value of a variable object's 'standard_name' attribute
+            """
+            result = None
+            name = _find_attribute_by_name(self, 'standard_name')
+            if name != None and len(name.array.value) > 0:
+                result = name.array.value[0]
+            
+            # @attention: Sometimes (string) attribute values come back as unicode values..  we can provide
+            #             a trap here to convert them, but this may not be necessary.  Lets discuss [TPL]
+            return result
+        
+        
         #--------------------------------------------------------------#
         # Attach specialized methods to object class dictionaries here #
         #--------------------------------------------------------------#
@@ -580,19 +604,25 @@ class WrapperType(type):
             clsDict['FindAttributeByName'] = _find_attribute_by_name
             clsDict['FindDimensionByName'] = _find_dimension_by_name
             clsDict['FindVariableByName'] = _find_variable_by_name
+            # clsDict['SetAttribute'] = _set_attribute
+            # clsDict['SetDimension'] = _set_dimension
 
 
         elif obj_type == CDM_ATTRIBUTE_TYPE:
             
             clsDict['GetValue'] = _get_attribute_value_by_index
             clsDict['GetValues'] = _get_attribute_values
+            # clsDict['SetValues'] = _get_attribute_values
+            # clsDict['SetValues'] = _get_attribute_values
             clsDict['GetLength'] = _get_attribute_values_length
 
         elif obj_type == CDM_VARIABLE_TYPE:
             
+            clsDict['GetUnits'] = _get_var_units
+            clsDict['GetStandardName'] = _get_var_std_name
+            clsDict['AddAttribute'] = _add_attribute            
             clsDict['FindAttributeByName'] = _find_attribute_by_name
-            clsDict['GetUnits'] = _get_variable_units
-            clsDict['AddAttribute'] = _add_attribute
+            clsDict['FindDimensionByName'] = _find_dimension_by_name
 
 
 
