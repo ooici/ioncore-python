@@ -165,5 +165,97 @@ class TestSubscriber(IonTestCase):
         sub = Subscriber(xp_name="magnet.topic")
         self.failUnlessIsInstance(sub, Subscriber)
 
+    @defer.inlineCallbacks
+    def test_subscriber_factory_create(self):
+        sf = SubscriberFactory()
+
+        # needs an xp_name, so this build should fail
+        self.failUnlessFailure(sf.build(), AssertionError)
+
+        sub = yield sf.build(xp_name="magnet.topic")
+        self.failUnlessIsInstance(sub, Subscriber)
+        self.failUnless(sub._get_state() == BasicStates.S_ACTIVE)
+
+        # now lets make a factory where we can specify the xp_name as a default
+        sf2 = SubscriberFactory(xp_name="magnet.topic")
+
+        sub2 = yield sf2.build()
+
+        self.failUnlessIsInstance(sub2, Subscriber)
+        self.failUnless(sub2._get_state() == BasicStates.S_ACTIVE)
+        self.failUnless(sub2._recv.consumer_config.has_key("exchange") and sub2._recv.consumer_config['exchange'] == "magnet.topic")
+
+        # use the same factory to override the default xp_name
+        sub3 = yield sf2.build(xp_name="afakeexchange")
+
+        self.failUnlessIsInstance(sub3, Subscriber)
+        self.failUnless(sub3._get_state() == BasicStates.S_ACTIVE)
+        self.failUnless(sub3._recv.consumer_config.has_key("exchange") and sub3._recv.consumer_config['exchange'] == "afakeexchange")
+
+    @defer.inlineCallbacks
+    def test_subscriber_queue_bindings(self):
+        """
+        Tests the various combinations of queue and binding specifications.
+
+        TODO: not good ways of testing these, need broker interaction to really tell
+        """
+        sf = SubscriberFactory(xp_name="magnet.topic")
+        sub = yield sf.build()
+        self.failUnlessIsInstance(sub, Subscriber)
+
         # hmm.. activating this subscriber (via spawn) would create an anonymous queue with no binding to it, how to test this?
+        # let's just see if it sets sub._recv.backend.queue to an anonymous queue name
+        self.failUnless(hasattr(sub._recv.consumer, 'queue'))
+
+        sub = yield sf.build(binding_key="arf.test")
+        self.failUnless(hasattr(sub._recv.consumer, 'queue'))
+        #self.failUnless(sub._recv.consumer         # TODO: TEST BINDING?
+
+        # when you specify a queue, it doesn't get saved as an attr
+        sub = yield sf.build(binding_key="arf.test", queue_name="arfbark")
+        #self.failIf(hasattr(sub._recv.consumer, 'queue'))
+        self.failUnless(sub._recv.consumer.queue == "arfbark")
+
+        # it's okay to specify a queue with no binding
+        sub = yield sf.build(queue_name="ardtest")
+        self.failUnless(sub._recv.consumer.queue == "ardtest")
+
+# #####################################################################################
+
+class TestPublisherAndSubscriber(IonTestCase):
+    """
+    """
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._shutdown_processes()
+        yield self._stop_container()
+
+    @defer.inlineCallbacks
+    def test_publish_subscribe(self):
+        """
+        """
+
+        pf = PublisherFactory(xp_name="magnet.topic")
+        sf = SubscriberFactory(xp_name="magnet.topic")
+
+        msgs = []
+        def handle_msg(content):
+            msgs.append(content['content'])
+
+        pub = yield pf.build(routing_key='arf_test')
+        sub = yield sf.build(binding_key='arf_test', handler=handle_msg)
+
+        yield pub.publish('get stuck in')
+        yield pu.asleep(1.0)
+        self.failUnless(len(msgs)==1 and msgs[0] == "get stuck in")
+
+        self.failUnlessRaises(AssertionError, Subscriber)   # needs xp_name
+
+        sub = Subscriber(xp_name="magnet.topic")
+        self.failUnlessIsInstance(sub, Subscriber)
+
 
