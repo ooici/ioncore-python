@@ -35,12 +35,6 @@ class RegisterUser():
       defer.returnValue(result)
 
    @defer.inlineCallbacks
-   def updateUser (self, msg):
-      log.info('RegisterUser.updateUser()\n'+str(msg))
-      result = yield self.irc.update_user(msg)
-      defer.returnValue(result)
-
-   @defer.inlineCallbacks
    def registerUser (self, msg):
       log.info('RegisterUser.registerUser()\n'+str(msg))
       result = yield self.irc.authenticate_user(msg.message_parameters_reference.certificate,
