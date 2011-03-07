@@ -609,7 +609,47 @@ class WorkBench(object):
         
         serialized = container_structure.SerializeToString()
         return serialized
-        
+
+
+    def list_repository_commits(self, repo):
+
+
+        if not repo.status == repo.UPTODATE:
+            comment='Commiting to send message with wrapper object'
+            repo.commit(comment=comment)
+
+        cref_set = set()
+        for branch in repo.branches:
+
+            for cref in branch.commitrefs:
+                cref_set.add(cref)
+
+        obj_set = set()
+
+        while len(cref_set)>0:
+            new_set = set()
+
+            for cref in cref_set:
+                obj_set.add(cref.MyId)
+
+                for prefs in cref.parentrefs:
+                    new_set.add(prefs.commitref)
+
+                    ### HOW CAN WE CHECK IF IT IS ALREADY THERE?
+
+            # Now recurse on the ancestors
+            cref_set = new_set
+
+
+        # Now make a list of just the keys that we want to send!
+        obj_list = []
+        for key in obj_set:
+            obj_list.append(key)
+
+        return items
+
+
+
     def serialize_mutable(self, mutable):
         """
         
