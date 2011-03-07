@@ -21,7 +21,7 @@ from ion.core.messaging.message_client import MessageClient
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
-from ion.integration.ais.ais_object_identifiers import UPDATE_USER_TYPE, UPDATE_USER_DISPATCH_QUEUE_TYPE
+from ion.integration.ais.ais_object_identifiers import UPDATE_USER_EMAIL_TYPE, UPDATE_USER_DISPATCH_QUEUE_TYPE
 
 # import working classes for AIS
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources
