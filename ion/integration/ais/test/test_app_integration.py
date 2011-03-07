@@ -57,7 +57,7 @@ class AppIntegrationTest(IonTestCase):
         yield self._stop_container()
 
     @defer.inlineCallbacks
-    def test_app_integration(self):
+    def test_findDataResources(self):
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
