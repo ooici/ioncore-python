@@ -4,7 +4,6 @@
 from ion.core.object import object_utils
 
 # AIS GPBs from ion-object-definitions/net/ooici/integration/ais/ais_request_response.proto
-
 AIS_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9001, version=1)
 """
 message ApplicationIntegrationServiceRequestMsg{
