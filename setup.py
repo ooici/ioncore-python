@@ -17,7 +17,7 @@ setup( name = 'ioncore',
        version = '0.4.4',
        description = 'OOI ION Python Capability Container and Core Modules',
        url = 'http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project',
-       download_url = 'http://ooici.net/packages',
+       download_url = 'http://ooici.net/releases',
        license = 'Apache 2.0',
        author = 'Michael Meisinger',
        author_email = 'mmeisinger@ucsd.edu',
@@ -25,7 +25,7 @@ setup( name = 'ioncore',
 
        packages = find_packages() + ['twisted/plugins'],
        dependency_links = [
-           'http://ooici.net/packages'
+           'http://ooici.net/releases'
                           ],
        package_data = {
            'twisted.plugins' : [
@@ -38,7 +38,6 @@ setup( name = 'ioncore',
            'carrot==0.10.13-txamqp', 
            'txamqp==0.3',
            'simplejson==2.1.2', 
-           'httplib2==0.6.0',
            'msgpack-python==015final',
            'gviz_api.py==1.7.0', 
            'Telephus==0.7-beta3.3', 

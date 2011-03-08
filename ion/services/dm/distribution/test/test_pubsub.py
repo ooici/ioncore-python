@@ -9,8 +9,9 @@
 import ion.util.ionlog
 from twisted.internet import defer
 
-from ion.services.dm.distribution.pubsub_service import PubSubClient, REQUEST_TYPE
-#from ion.services.dm.distribution.publisher_subscriber import Subscriber
+from ion.services.dm.distribution.pubsub_service import PubSubClient, \
+    REQUEST_TYPE, REGEX_TYPE, XP_TYPE, XS_TYPE, PUBLISHER_TYPE, SUBSCRIBER_TYPE
+
 from ion.test.iontest import IonTestCase
 from twisted.trial import unittest
 from ion.util.procutils import asleep
@@ -19,15 +20,13 @@ from ion.core import ioninit
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 
-from ion.core.exception import ReceivedError, ReceivedApplicationError, ReceivedContainerError
+from ion.core.exception import ReceivedApplicationError
 
 from ion.util.itv_decorator import itv
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
 
-# Message types
-XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
 
 class PST(IonTestCase):
     """
@@ -63,11 +62,13 @@ class PST(IonTestCase):
         yield self._start_container()
         self.sup = yield self._spawn_processes(services)
         self.psc = PubSubClient(self.sup)
-        self.mc = MessageClient(proc=self.sup)
 
+        # Fixed parameters for these tests
         self.xs_name = 'swapmeet'
-        self.tt_name = 'science_data'
+        self.xp_name = 'science_data'
         self.topic_name = 'http://ooici.net:8001/coads.nc'
+        self.publisher_name = 'Otto Niemand' # Hey, it's thematically correct.
+        self.credentials = 'Little to none'
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -78,17 +79,23 @@ class PST(IonTestCase):
         pass
 
     @defer.inlineCallbacks
-    def test_xs_creation(self):
+    def _create_xs(self):
         # Try and create the 'swapmeet' exchange space
 
-        msg = yield self.mc.create_instance(XS_TYPE)
+        msg = yield self.create_message(XS_TYPE)
         msg.exchange_space_name = self.xs_name
 
         xs_id = yield self.psc.declare_exchange_space(msg)
+        defer.returnValue(xs_id)
+
+
+    @defer.inlineCallbacks
+    def test_xs_creation(self):
+        # Try and create the 'swapmeet' exchange space
+        xs_id = yield self._create_xs()
 
         self.failIf(len(xs_id.id_list) == 0)
         self.failIf(xs_id.id_list[0] == '')
-
 
     @defer.inlineCallbacks
     def test_xs_exceptions(self):
@@ -96,7 +103,7 @@ class PST(IonTestCase):
         Test new exception raising
         """
         wrong_type = object_utils.create_type_identifier(object_id=10, version=1)
-        bad_msg = yield self.mc.create_instance(wrong_type)
+        bad_msg = yield self.create_message(wrong_type)
 
         try:
             yield self.psc.declare_exchange_space(bad_msg)
@@ -107,111 +114,157 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_undeclare_xs(self):
-        msg = yield self.mc.create_instance(XS_TYPE)
-        msg.exchange_space_name = self.xs_name
+        raise unittest.SkipTest('Blocked on EMS')
 
-        xs_id = yield self.psc.declare_exchange_space(msg)
+        xs_id = yield self._create_xs()
 
-        msg = yield self.mc.create_instance(REQUEST_TYPE)
+        msg = yield self.create_message(REQUEST_TYPE)
         msg.resource_reference = xs_id.id_list[0]
 
-        rc = yield self.psc.undeclare_exchange_space(msg)
-        
+        yield self.psc.undeclare_exchange_space(msg)
 
     @defer.inlineCallbacks
     def test_bad_xs_creation(self):
         raise unittest.SkipTest('EMS doesnt do paramater validation yet')
         # Make sure it fails if you skip the argument
 
-        msg = yield self.mc.create_instance(XS_TYPE)
+        msg = yield self.create_message(XS_TYPE)
 
         xs_id = yield self.psc.declare_exchange_space(msg)
 
         self.failIf(len(xs_id.id_list) > 0)
 
-    @itv(CONF)
     @defer.inlineCallbacks
-    def test_topic_tree_creation(self):
-        self.tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
-        self.failIf(self.tt_id is None)
+    def test_xs_query(self):
+        raise unittest.SkipTest('Query is broken')
 
-    @itv(CONF)
+        xs_id = yield self._create_xs()
+
+        self.failUnless(len(xs_id.id_list) > 0)
+        log.debug('exchange declared')
+        msg = yield self.create_message(REGEX_TYPE)
+        msg.regex = self.xs_name
+
+        log.debug('querying now')
+        idlist = yield self.psc.query_exchange_spaces(msg)
+        self.failUnless(len(idlist.id_list) > 0)
+
     @defer.inlineCallbacks
-    def test_bad_topic_tree_delete(self):
-        rc = yield self.psc.undeclare_topic_tree('fubar')
-        self.failIf(rc is None)
+    def _create_xp(self, xs_id):
+        msg = yield self.create_message(XP_TYPE)
+        msg.exchange_point_name = self.xp_name
+        msg.exchange_space_id = xs_id.id_list[0]
 
-    @itv(CONF)
+        xp_id = yield self.psc.declare_exchange_point(msg)
+        defer.returnValue(xp_id)
+
     @defer.inlineCallbacks
-    def test_topic_tree_write_delete(self):
-        tt_id = yield self.psc.declare_topic_tree(self.xs_name, 'fubar')
-        self.failIf(tt_id is None)
-        yield self.psc.undeclare_topic_tree(tt_id)
+    def test_xp_creation(self):
+        raise unittest.SkipTest('Blocked on EMS, returning something weird')
 
-    @itv(CONF)
+        xs_id = yield self._create_xs()
+        xp_id = yield self._create_xp(xs_id)
+
+        self.failUnless(len(xp_id.id_list) > 0)
+
     @defer.inlineCallbacks
-    def test_bad_topic_tree(self):
-        raise unittest.SkipTest('Waiting for code')
-        rc = yield self.psc.declare_topic_tree(None, None)
-        self.failIf(rc is not None)
+    def test_undeclare_xp(self):
+        raise unittest.SkipTest('Blocked on EMS, returning something weird')
 
-    @itv(CONF)
+        xs_id = yield self._create_xs()
+        xp_id = yield self._create_xp(xs_id)
+
+        msg = self.create_message(REQUEST_TYPE)
+        msg.resource_reference = xp_id
+
+        # Should throw an error if problem, trial will catch same as failure
+        yield self.psc.undeclare_exchange_point(msg)
+
     @defer.inlineCallbacks
-    def test_tt_create_and_query(self):
-        raise unittest.SkipTest('Waiting for code')
-        # create a topic tree, query to look for it
-        tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
-        self.failIf(tt_id is None)
-        rc = yield self.psc.query_topic_trees(self.tt_name)
-        self.failIf(rc is None)
+    def _declare_topic(self, xs=None, xp=None):
+        if not xs:
+            xs = yield self._create_xs()
+        if not xp:
+            xp = yield self._create_xp(xs_id)
 
-    @itv(CONF)
+        msg = yield self.create_message(TOPIC_TYPE)
+        msg.exchange_space_id = xs
+        msg.exchange_point_id = xp
+        msg.topic_name = self.topic_name
+
+        topic_id = yield self.psc.declare_topic(msg)
+        defer.returnValue(topic_id)
+
     @defer.inlineCallbacks
-    def test_tt_crud(self):
-        raise unittest.SkipTest('Waiting for code')
-        # Test create/query/rm/query on topic trees
-        tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
-        tt_list = yield self.psc.query_topic_trees(self.tt_name)
-        self.failIf(tt_list is None)
-        rc = yield self.psc.undeclare_topic_tree(tt_id)
-        self.failIf(rc is None)
-        rc = yield self.psc.query_topic_trees('.+')
-        self.failIf(rc is None)
-        self.failIf(len(rc) > 0)
+    def test_declare_topic(self):
+        raise unittest.SkipTest('Blocked on EMS')
+        topic_id = yield self._declare_topic()
+        self.failUnless(len(topic_id.id_list) > 0)
 
-    @itv(CONF)
     @defer.inlineCallbacks
-    def test_define_topic(self):
-        tt_id = 'fake_topic_id'
-        topic_id = yield self.psc.define_topic(tt_id, self.topic_name)
-        # Verify that it was created
-        self.failIf(topic_id is None)
+    def test_undeclare_topic(self):
+        raise unittest.SkipTest('Blocked on EMS')
+        topic_id = yield self._declare_topic()
+        self.failUnless(len(topic_id.id_list) > 0)
+        msg = self.create_message(REQUEST_TYPE)
+        msg.resource_reference = topic_id
 
-    @itv(CONF)
+        yield self.psc.undeclare_topic(msg)
+
+        # @todo do a query and verify it's gone...
+
     @defer.inlineCallbacks
-    def test_topics(self):
-        raise unittest.SkipTest('Waiting for code')
-        tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
-        topic_id = yield self.psc.define_topic(tt_id, self.topic_name)
-        # Verify that it was created
-        self.failIf(topic_id is None)
-        rc = yield self.psc.query_topics(self.tt_name, '.+')
-        self.failIf(rc is None)
-        self.failIf(len(rc) < 1)
+    def test_query_topics(self):
+        raise unittest.SkipTest('Blocked on EMS')
+        yield self._declare_topic()
 
-    @itv(CONF)
+        msg = self.create_message(REGEX_TYPE)
+        msg.regex = '.+'
+
+        topic_list = self.psc.query_topics(msg)
+
+        self.failUnless(len(topic_list.id_list) >= 1)
+
     @defer.inlineCallbacks
-    def test_define_publisher(self):
-        raise unittest.SkipTest('Waiting for code')
-        tt_id = yield self.psc.declare_topic_tree(self.xs_name, self.tt_name)
-        topic_id = yield self.psc.define_topic(tt_id, self.topic_name)
-        pid = yield self.psc.define_publisher(tt_id, topic_id, 'phubbard')
-        self.failIf(pid is None)
+    def _declare_publisher(self):
+        xs_id = yield self._create_xs()
+        xp_id = yield self._create_xp(xs_id)
+        topic_id = yield self._declare_topic(xs=xsid, xp=xp_id)
 
-    @itv(CONF)
+        msg = self.create_message(PUBLISHER_TYPE)
+        msg.exchange_space_id = xs_id
+        msg.exchange_point_id = xp_id
+        msg.topic_id = topic_id
+        msg.publisher_name = self.publisher_name
+        msg.credentials = self.credentials
+
+        pid = yield self.psc.declare_publisher(msg)
+        defer.returnValue(pid)
+
+    @defer.inlineCallbacks
+    def test_declare_publisher(self):
+        raise unittest.SkipTest('Blocked on EMS')
+        pid = yield self._declare_publisher()
+        self.failUnless(len(pid.id_list) > 0)
+
+    @defer.inlineCallbacks
     def test_subscribe(self):
-        raise unittest.SkipTest('Waiting for code')
-        # @todo Create publisher, send data, verify receipt a la scheduler test code
-        #sub = Subscriber('fake', process=self.sup)
+        raise unittest.SkipTest('Blocked on EMS')
+        xs_id = yield self._create_xs()
+        xp_id = yield self._create_xp(xs_id)
+        topic_id = yield self._declare_topic(xs=xsid, xp=xp_id)
+
+        msg = self.create_message(SUBSCRIBER_TYPE)
+
+        msg.exchange_space_id = xs_id
+        msg.exchange_point_id = xp_id
+        msg.topic_id = topic_id
+
+        rc = yield self.psc.subscribe(msg)
+        self.failUnless(len(rc.id_list) > 0)
+
+    def test_declare_queue(self):
         pass
 
+    def test_add_binding(self):
+        pass    
