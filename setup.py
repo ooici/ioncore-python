@@ -35,19 +35,22 @@ setup( name = 'ioncore',
        test_suite = 'ion',
        install_requires = [
            'Twisted==10.2.0', 
-           'carrot==0.10.11-txamqp', 
+           'carrot==0.10.13-txamqp', 
            'txamqp==0.3',
            'simplejson==2.1.2', 
            'httplib2==0.6.0',
            'msgpack-python==015final',
            'gviz_api.py==1.7.0', 
-           'nimboss',
-           'txrabbitmq==0.4', 
            'Telephus==0.7-beta3.3', 
            'thrift==0.2.0', # thrift is a dependency of Telephus, which should be included there ideally
            'M2Crypto==0.21.1-pl1', # patched version to work with CentOS
            'ionproto'
                           ],
+       entry_points = {
+                        'console_scripts': [
+                            'ion-admin=ion.core.env.ion_admin:main',
+                            ],
+                        },
        include_package_data = True,
        classifiers = [
            'Development Status :: 3 - Alpha',

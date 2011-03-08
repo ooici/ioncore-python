@@ -9,7 +9,7 @@ from txamqp.protocol import AMQChannel, AMQClient, TwistedDelegate
 from twisted.internet import error, protocol, reactor
 from twisted.internet.defer import inlineCallbacks, Deferred, returnValue
 
-from ion import ioninit
+from ion.core import ioninit
 from ion.util import ionlog
 
 CONF = ioninit.config(__name__)
