@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 """
-@file ion/data/backends/cassandra.py
+@file ion/core/data/cassandra.py
 @author Paul Hubbard
 @author Michael Meisinger
 @author Paul Hubbard
 @author Dorian Raymer
 @author Matt Rodriguez
+@author David Stuebe
 @brief Implementation of ion.data.store.IStore using Telephus to interface a
         Cassandra datastore backend
 @note Test cases for the cassandra backend are now in ion.data.test.test_store
@@ -147,6 +148,7 @@ class CassandraStore(TCPConnection):
         log.info('on_terminate: Lose TCP Connection')
     
 
+
 class CassandraIndexedStore(CassandraStore):
     """
     An Adapter class that provides the ability to use secondary indexes in Cassandra. It
@@ -265,8 +267,9 @@ class CassandraIndexedStore(CassandraStore):
         
         
         defer.returnValue(indexes)
-    
-    
+
+
+
 
 class CassandraStorageResource:
     """
