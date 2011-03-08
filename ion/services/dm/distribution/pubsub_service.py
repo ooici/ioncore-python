@@ -22,7 +22,7 @@ from ion.core import ioninit
 import ion.util.ionlog
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceClientError
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
 
 # Global objects
@@ -31,6 +31,10 @@ log = ion.util.ionlog.getLogger(__name__)
 
 # References to protobuf message/object definitions
 TOPIC_TYPE = object_utils.create_type_identifier(object_id=2307, version=1)
+PUBLISHER_TYPE = object_utils.create_type_identifier(object_id=2310, version=1)
+SUBSCRIBER_TYPE = object_utils.create_type_identifier(object_id=2311, version=1)
+QUEUE_TYPE = object_utils.create_type_identifier(object_id=2308, version=1)
+BINDING_TYPE = object_utils.create_type_identifier(object_id=2314, version=1)
 
 # Generic request and response wrapper message types
 REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
@@ -45,7 +49,11 @@ XP_TYPE = object_utils.create_type_identifier(object_id=2309, version=1)
 # Resource GPB objects
 XS_RES_TYPE = object_utils.create_type_identifier(object_id=2315, version=1)
 XP_RES_TYPE = object_utils.create_type_identifier(object_id=2316, version=1)
-
+TOPIC_RES_TYPE = object_utils.create_type_identifier(object_id=2317, version=1)
+PUBLISHER_RES_TYPE = object_utils.create_type_identifier(object_id=2318, version=1)
+SUBSCRIBER_RES_TYPE = object_utils.create_type_identifier(object_id=2319, version=1)
+QUEUE_RES_TYPE = object_utils.create_type_identifier(object_id=2321, version=1)
+BINDING_RES_TYPE = object_utils.create_type_identifier(object_id=2320, version=1)
 
 class PSSException(ApplicationError):
     """
@@ -85,8 +93,9 @@ class PubSubService(ServiceProcess):
         self.topic_list = dict()
         self.pub_list = dict()
         self.sub_list = dict()
+        self.q_list = dict()
+        self.binding_list = dict()
 
-    # Protocol entry points. Responsible for parsing and unpacking arguments
     @defer.inlineCallbacks
     def op_declare_exchange_space(self, request, headers, msg):
         log.debug('Here we go')
@@ -130,7 +139,7 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_undeclare_exchange_space(self, request, headers, msg):
-
+        log.debug('UDXP starting')
         # Typecheck the message
         if request.MessageType != REQUEST_TYPE:
             raise PSSException('Bad message type received', request.ResponseCodes.BAD_REQUEST)
@@ -203,15 +212,17 @@ class PubSubService(ServiceProcess):
 
         log.debug('EMS completed, returned XP ID "%s"' % str(xpid))
 
-        log.debug('Saving XP to registry')
-        xp_resource = yield self.rclient.create_instance(XP_RES_TYPE, ResourceName=request.exchange_point_name,
-                                           ResourceDescription=description)
+        xp_resource = yield self.rclient.create_instance(XP_RES_TYPE,
+                                                         ResourceName=request.exchange_point_name,
+                                                         ResourceDescription=description)
 
+        log.debug('creating xp resource and populating')
         xp_resource.exchange_space_name = xs_name
         xp_resource.exchange_space_id = request.exchange_space_id
         xp_resource.exchange_point_id = xpid
         xp_resource.exchange_point_name = request.exchange_point_name
 
+        log.debug('Saving XP to registry')
         xp_resource_id = yield self.rclient.put_instance(xp_resource)
 
         log.debug('Creating reply')
@@ -244,9 +255,9 @@ class PubSubService(ServiceProcess):
             raise PSSException('Unable to locate XP ID',
                                request.ResponseCodes.BAD_REQUEST)
 
-        # @todo Look up XS via XPID, call EMS to remove same
+        # @todo Look up XS via XPID, call EMS to remove same...
         log.warn('This is where the Actual Work Goes...')
-
+        yield self.reply_err(msg)
 
     @defer.inlineCallbacks
     def op_query_exchange_points(self, request, headers, msg):
@@ -270,12 +281,235 @@ class PubSubService(ServiceProcess):
             raise PSSException('Bad message type, expected a topic',
                                request.ResponseCodes.BAD_REQUEST)
 
-        # @todo Look up XS, XP as parameters
+        try:
+            xs_name = self.xs_list[request.exchange_space_id.key]
+            xp_name = self.xp_list[request.exchange_point_id.key]
+        except KeyError:
+            log.exception('Error looking up exchange space or point')
+            raise PSSException('Unable to look up exchange space or point',
+                               request.ResponseCodes.BAD_REQUEST)
         description = str(time.time())
-        tid = yield self.ems.create_topic(...)
+        tid = yield self.ems.create_topic(xs_name, xp_name, request.topic_name, description)
+
+        log.debug('creating and populating the resource')
+        topic_resource = yield self.rclient.create_instance(TOPIC_RES_TYPE)
+        topic_resource.exchange_space_name = xs_name
+        topic_resource.exchange_point_name = xp_name
+        topic_resource.topic_name = request.topic_name
+        topic_resource.topic_id = tid
+        topic_resource.exchange_space_id = request.exchange_space_id
+        topic_resource.exchange_point_id = request.exchange_point_id
+
+        log.debug('Saving resource...')
+        res_id = yield self.rclient.put_instance(topic_resource)
+
+        log.debug('Creating reply')
+        reply = yield self.mc.create_instance(IDLIST_TYPE)
+        reply.id_list.add()
+        reply.id_list[0] = res_id.resource_reference
+
+        log.debug('Saving topic to internal list...')
+        self.topic_list[res_id.resource_reference.key] = request.topic_name
+
+        yield self.reply_ok(msg, reply)
+
+    @defer.inlineCallbacks
+    def op_query_topics(self, request, headers, msg):
+        log.debug('topic query starting')
+        # Input validation... GIGO, after all. Or should we rename that 'Gigli'?
+        if request.MessageType != REGEX_TYPE:
+            raise PSSException('Bad message type, expected regex query',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        if not request.IsFieldSet('regex'):
+            raise PSSException('Bad message, regex missing',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        yield self._do_query(request, self.topic_list)
+
+    @defer.inlineCallbacks
+    def op_declare_publisher(self, request, headers, msg):
+        log.debug('Starting DP')
+        if request.MessageType != PUBLISHER_TYPE:
+            raise PSSException('Bad message type, expected PublisherMsg',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # Verify that IDs exist - not sure if this is the correct order or not...
+        try:
+            xs_name = self.xs_list[request.exchange_space_id.key]
+            xp_name = self.xp_list[request.exchange_point_id.key]
+            topic_name = self.topic_list[request.topic_id]
+        except KeyError:
+            log.exception('Error looking up publisher context!')
+            raise PSSException('Bad publisher request, cannot locate context',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        log.debug('Publisher context is %s/%s/%s' % (xs_name, xp_name, topic_name))
+        description = str(time.time())
+        publ_id = yield self.ems.create_publisher(xs_name, xp_name, topic_name,
+                                                  request.publisher_name,
+                                                  request.credentials, description)
+        log.debug('pub id is ' + publ_id.resource_reference.key)
+
+        log.debug('creating and populating the publ resource')
+        publ_resource = yield self.rclient.create_instance(PUBLISHER_RES_TYPE)
+        publ_resource.exchange_space_id = request.exchange_space_id
+        publ_resource.exchange_point_id = request.exchange_point_id
+        publ_resource.topic_id = request.topic_id
+        publ_resource.publisher_name = request.publisher_name
+        publ_resource.credentials = request.credentials
+        publ_resource.publisher_id = publ_id
+
+        log.debug('Saving publ resource....')
+        publ_res_id = yield self.rclient.put_instance(publ_resource)
+        log.debug('Creating reply')
+        reply = self.mc.create_instance(IDLIST_TYPE)
+        reply.id_list.add()
+        reply.id_list[0] = publ_res_id.resource_reference
+
+        log.debug('Saving publisher to internal list...')
+        self.pub_list[publ_res_id.resource_reference.key] = request.publisher_name
+
+        yield self.reply_ok(msg, reply)
+
+    @defer.inlineCallbacks
+    def op_undeclare_publisher(self, request, headers, msg):
+        log.debug('UDP starting')
+
+        if request.MessageType != REQUEST_TYPE:
+            raise PSSException('Bad message type',
+                               request.ResponseCodes.BAD_REQUEST)
 
 
+        # Try to lookup in the dictionary
+        log.debug('Looking for publ ID %s' % request.resource_reference.key)
+        try:
+            pub_name = self.pub_list[request.resource_reference.key]
+            log.debug('Publisher found, %s/%s' % (request.resource_reference.key, pub_name))
+        except KeyError:
+            raise PSSException('Unable to locate publisher ID %s' % request.resource_reference.key,
+                               request.ResponseCodes.BAD_REQUEST)
 
+        # @todo Using publisher ID, lookup exchange space and point and topic from registry
+        log.warn('This is where the Actual Work Goes...')
+
+        yield self.reply_err(msg)
+
+
+    @defer.inlineCallbacks
+    def op_subscribe(self, request, headers, msg):
+        log.debug('PSC subscribe starting')
+        if request.MessageType != SUBSCRIBER_TYPE:
+            raise PSSException('Bad message type, expected SubscriberMsg',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        try:
+            xs_name = self.xs_list[request.exchange_space_id.key]
+            xp_name = self.xp_list[request.exchange_point_id.key]
+            topic_name = self.topic_list[request.topic_id.key]
+        except KeyError:
+            log.exception('Error looking up subscription context!')
+            raise PSSException('Bad subscription request, cannot locate context',
+                               request.ResponseCodes.BAD_REQUEST)
+
+
+        # Hmm, is EMS gonna return a string queue name/address or what?
+        # Assume a string for now.
+        # We return a resource ref, which then must be looked up. Hmm. Change
+        # to string return?
+        q_name = yield self.ems.subscribe(xs_name, xp_name, topic_name)
+
+        # Save into registry
+        log.debug('Saving subscription into registry')
+        sub_resource = yield self.rclient.create_instance(SUBSCRIBER_RES_TYPE)
+        sub_resource.exchange_space_id = request.exchange_space_id
+        sub_resource.exchange_point_id = request.exchange_point_id
+        sub_resource.topic_id = request.topic_id
+        sub_resource.queue_name = q_name
+
+        sub_res_id = yield self.rclient.put_instance(sub_resource)
+
+        reply = yield self.mc.create_instance(IDLIST_TYPE)
+        reply.id_list.add()
+        reply.id_list[0] = sub_res_id.resource_reference
+
+        log.debug('Saving to internal list')
+        self.sub_list[sub_res_id.resource_reference.key] = request.subscriber_name
+        yield self.reply_ok(msg, reply)
+
+
+    @defer.inlineCallbacks
+    def op_unsubscribe(self, request, headers, msg):
+        log.debug('Starting unsub')
+        if request.MessageType != REQUEST_TYPE:
+            raise PSSException('Bad message type, expected request type',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        try:
+            sub_name = self.sub_list[request.resource_reference.key]
+        except KeyError:
+            log.exception('Unable to locate subscription!')
+            raise PSSException('Could not locate subscription ID',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # @todo Call EMS, delete from registry
+        log.warn('Theres a wee bit of code left to do here....')
+        yield self.reply_err(msg)
+
+    @defer.inlineCallbacks
+    def op_declare_queue(self, request, headers, msg):
+        log.debug('DQ starting')
+        if request.MessageType != QUEUE_TYPE:
+            raise PSSException('Bad message type, expected QueueMsg',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        try:
+            xs_name = self.xs_list[request.exchange_space_id.key]
+            xp_name = self.xp_list[request.exchange_point_id.key]
+            topic_name = self.topic_list[request.topic_id]
+            sub_name = self.sub_list[request.subscriber_id]
+        except KeyError:
+            log.exception('Error looking up queue context!')
+            raise PSSException('Bad queue request, cannot locate context',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        log.debug('Queue context is %s/%s/%s/%s' %
+                  (xs_name, xp_name, topic_name, sub_name))
+
+        description = str(time.time())
+        q_name = yield self.ems.declare_queue(xs_name, xp_name, topic_name,
+                                     request.queue_name, description)
+
+        q_resource = yield self.mc.create_instance(QUEUE_RES_TYPE)
+        q_resource.exchange_space_id = request.exchange_space_id
+        q_resource.exchange_point_id = request.exchange_point_id
+        q_resource.topic_id = request.topic_id
+        q_resource.subscriber_id = request.subscriber_id
+        q_resource.queue_name = q_name
+
+        q_id = yield self.rclient.put_instance(q_resource)
+        log.debug('Saving q into dictionary')
+        self.q_list[q_resource.resource_reference.key] = q_name
+
+        reply = yield self.mc.create_instance(IDLIST_TYPE)
+        reply.id_list.add()
+        reply.id_list[0] = q_id.resource_reference
+
+        yield self.reply_ok(msg, reply)
+
+
+    @defer.inlineCallbacks
+    def op_add_binding(self, request, headers, msg):
+        log.debug('PSC AB starting')
+        if request.MessageType != QUEUE_TYPE:
+            raise PSSException('Bad message type, expected BindingMsg',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # Hmm, what's required to add a binding?? Something like this?
+        rc = yield self.ems.add_binding(request.queue_name, request.binding)
+
+        # If so, do we need registries for this at all?
+        yield self.reply_ok(msg)
 
 
 class PubSubClient(ServiceClient):
