@@ -80,8 +80,10 @@ class AppIntegrationService(ServiceProcess):
             log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
             reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
             reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_MSG_TYPE)
-            reqMsg.message_parameters_reference.spatial.lat = 32.87521
-            reqMsg.message_parameters_reference.spatial.lon = -117.274609
+            reqMsg.message_parameters_reference.spatial.minLatitude = 32.87521
+            reqMsg.message_parameters_reference.spatial.maxLatitude = 32.97521
+            reqMsg.message_parameters_reference.spatial.minLongitude = -117.274609
+            reqMsg.message_parameters_reference.spatial.maxLongitude = -117.174609
                         
             returnValue = worker.findDataResources(reqMsg)
             log.debug('worker returned: ' + returnValue)
