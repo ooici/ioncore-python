@@ -10,15 +10,17 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
+from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
 
-from ion.integration.ais.ais_object_identifiers import UPDATE_USER_TYPE, UPDATE_USER_DISPATCH_QUEUE_TYPE
+from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, AIS_REQUEST_MSG_TYPE, OOI_ID_TYPE
 
 class RegisterUser():
     
    def init(self, ais):
       log.info('RegisterUser.init()')
       self.irc = IdentityRegistryClient(proc=ais)
+      self.mc = ais.mc
         
    @defer.inlineCallbacks
    def updateUserDispatcherQueue (self, msg):
@@ -27,16 +29,26 @@ class RegisterUser():
       defer.returnValue(result)
 
    @defer.inlineCallbacks
-   def updateUser (self, msg):
-      log.info('RegisterUser.updateUser()\n'+str(msg))
+   def updateUserEmail (self, msg):
+      log.info('RegisterUser.updateUserDispatcherQueue()\n'+str(msg))
       result = yield self.irc.update_user(msg)
       defer.returnValue(result)
 
    @defer.inlineCallbacks
    def registerUser (self, msg):
       log.info('RegisterUser.registerUser()\n'+str(msg))
-      result = yield self.irc.register_user(msg.message_parameters_reference.certificate, msg.message_parameters_reference.rsa_private_key)
-      defer.returnValue(result)
+      result = yield self.irc.authenticate_user(msg.message_parameters_reference.certificate,
+                                                msg.message_parameters_reference.rsa_private_key)
+      if result == None:   # TODO: fix this so it works with IR (and fix IR)
+         log.info('RegisterUser.registerUser(): user exists in IR\n'+str(result))
+      else:
+         result = yield self.irc.register_user(msg.message_parameters_reference.certificate,
+                                               msg.message_parameters_reference.rsa_private_key)
+         log.info('RegisterUser.registerUser(): added new user in IR\n'+str(result))
+      msg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS RegisterUser response')
+      msg.message_parameters_reference = msg.CreateObject(OOI_ID_TYPE)
+      msg.message_parameters_reference.ooi_id = result
+      defer.returnValue(msg)
 
 
 

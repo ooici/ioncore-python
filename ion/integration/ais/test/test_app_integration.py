@@ -21,8 +21,9 @@ from ion.core.object import object_utils
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
 from ion.integration.ais.ais_object_identifiers import REGISTER_USER_TYPE, \
-                                                       UPDATE_USER_TYPE,   \
-                                                       UPDATE_USER_DISPATCH_QUEUE_TYPE
+                                                       UPDATE_USER_EMAIL_TYPE,   \
+                                                       UPDATE_USER_DISPATCH_QUEUE_TYPE, \
+                                                       OOI_ID_TYPE
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -95,7 +96,7 @@ class AppIntegrationTest(IonTestCase):
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
 
-        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUser request')
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
         msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
         msg.message_parameters_reference.certificate = """-----BEGIN CERTIFICATE-----
 MIIEMzCCAxugAwIBAgICBQAwDQYJKoZIhvcNAQEFBQAwajETMBEGCgmSJomT8ixkARkWA29yZzEX
@@ -141,7 +142,11 @@ Vc2vO7pUIp3kqzRd5ovijfMB5nYwygTB4FwepWY5eVfXAoGBAIqrLKhRzdpGL0Vp2jwtJJiMShKm
 WJ1c7fBskgAVk8jJzbEgMxuVeurioYqj0Cn7hFQoLc+npdU5byRti+4xjZBXSmmjo4Y7ttXGvBrf
 c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 -----END RSA PRIVATE KEY-----"""
-        log.debug('Calling registerUser!!...')
         reply = yield self.aisc.registerUser(msg)
-        log.debug('updateUser returned:\n'+str(reply))
+        log.debug('registerUser returned:\n'+str(reply))
+        log.debug('registerUser returned:\n'+str(reply.message_parameters_reference))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+        if reply.message_parameters_reference.ObjectType != OOI_ID_TYPE:
+            self.fail('response does not contain an OOI_ID GPB')
         
