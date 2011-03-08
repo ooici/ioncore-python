@@ -405,8 +405,10 @@ class IdentityRegistryService(ServiceProcess):
            log.debug(str(identity.ResourceIdentity))
            yield self.reply_ok(msg, identity.ResourceIdentity)
         else:
-           log.debug('returning None')
-           yield self.reply_ok(msg, None)  # Should this be none? or False or something else
+           log.debug('returning NOT_FOUND')
+           response = yield self.message_client.create_instance(MessageContentTypeID=None)
+           response.MessageResponseCode = response.ResponseCodes.NOT_FOUND          
+           yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
     def op_update_user(self, request, headers, msg):

@@ -39,7 +39,9 @@ class RegisterUser(object):
       log.info('RegisterUser.registerUser()\n'+str(msg))
       result = yield self.irc.authenticate_user(msg.message_parameters_reference.certificate,
                                                 msg.message_parameters_reference.rsa_private_key)
-      if result == None:   # TODO: fix this so it works with IR (and fix IR)
+      print "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ result type:"
+      print type(result)
+      if type(result) == str:   
          log.info('RegisterUser.registerUser(): user exists in IR\n'+str(result))
       else:
          result = yield self.irc.register_user(msg.message_parameters_reference.certificate,
