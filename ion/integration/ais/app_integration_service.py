@@ -77,41 +77,15 @@ class AppIntegrationService(ServiceProcess):
              - build up response message payload
             """
 
-            ## DHE NEW CODE BEGIN
-            # Use the message client to create a message object
-            ### DHE: This is temporary; we won't be passing addresslink_type here, but we will need to pass a GPB
             log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
-            #reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
-            #reqMsg.CreateObject(FIND_DATA_RESOURCES_MSG_TYPE)
-            ab_msg = yield self.mc.create_instance(addresslink_type, MessageName='addressbook message')
-            log.debug('DHE: test_app_integration! addressbook instantiated.\n')        
-            
-            #ab is a message instance of type addresslink 
-            ab_msg.title = 'An addressbook object for testing'
-    
-            # Add a new entry in the list (repeated) persons of the addressbook
-            ab_msg.person.add()
-    
-            # Make a new person object to go in the list
-            ab_msg.person[0] = ab_msg.CreateObject(person_type)
-            ab_msg.person[0].name = 'david'
-            ab_msg.person[0].id = 59
-            ab_msg.person[0].email = 'stringgggg'
-            ab_msg.person[0].phone.add()
-            ab_msg.person[0].phone[0].number = '401 789 6224'
-            
-            log.info('AddressBook! \n' + str(ab_msg))        
-            ## DHE NEW CODE BEGIN
-
-
-        
-            returnValue = worker.findDataResources(ab_msg)
+            reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
+            reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_MSG_TYPE)
+            reqMsg.message_parameters_reference.spatial.lat = 32.87521
+            reqMsg.message_parameters_reference.spatial.lon = -117.274609
+                        
+            returnValue = worker.findDataResources(reqMsg)
             log.debug('worker returned: ' + returnValue)
             yield self.reply_ok(msg, {'value' : 'newDataResourceIdentity'})
-        #    userId = content['userId']
-        #    published = content['published']
-        #    spacial = content['spacial']
-        #    temporal = content['temporal']
         except KeyError:
             estr = 'Missing information in message!'
             log.exception(estr)

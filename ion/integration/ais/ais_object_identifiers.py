@@ -7,7 +7,7 @@ AIS_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9001, versi
 AIS_RESPONSE_MSG_TYPE = object_utils.create_type_identifier(object_id=9002, version=1)
 
 # FindDataResources GPBs
-FIND_DATA_RESOURCES_MSG_TYPE = object_utils.create_type_identifier(object_id=9131, version=1)
+FIND_DATA_RESOURCES_MSG_TYPE = object_utils.create_type_identifier(object_id=9031, version=1)
 """
 message FindDataResourcesMsg {
    enum _MessageTypeIdentifier {
