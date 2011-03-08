@@ -438,19 +438,26 @@ class WrapperType(type):
             # @todo: Find a better way to ensure DataType is a valid value in cdmdatatype enum
             if not data_type or not isinstance(data_type, int):
                 raise OOIObjectError('Invalid data_type requested: "%s"' % str(data_type))
+            
+            var = self.Repository.create_object(CDM_VARIABLE_TYPE)
+            var.name = name
+            var.data_type = data_type
+
             # @note: shape is allowed to be null for scalar variables
             if shape is not None:
                 for dim in shape:
                     if dim is None:
                         raise OOIObjectError('Invalid shape given -- encountered null entries: "%s".  ' % str(shape))
-                    elif not isinstance(dim, Wrapper) or not isinstance(dim.ObjectType, CDM_DIMENSION_TYPE):
+                    elif not hasattr(dim, 'ObjectType') or dim.ObjectType != CDM_DIMENSION_TYPE:
                         raise OOIObjectError('Invalid shape given -- shape must provide a list of CDM dimension objects: "%s"' % str(shape))
+                    else:
+                        # Add this dimension to the variable's shape!
+                        dim_ref = var.shape.add()
+                        dim_ref.SetLink(dim)
             
-            var = self.Repository.create_object(CDM_VARIABLE_TYPE)
-            var.name = name
-            var.data_type = data_type
-            var.shape = shape
-
+            var_ref = self.variables.add()
+            var_ref.SetLink(var)
+            
 
         def _find_group_by_name(self, name=''):
             """
@@ -675,6 +682,25 @@ class WrapperType(type):
             return result
         
         
+        #------------------------------------------------------------------------#
+        # Additional helper methods for attaching specialized attributes/methods #
+        #------------------------------------------------------------------------#
+        def __add_data_type_enum(clsDict):
+                print "\n\n\nAdding DataType enun to Group...."
+                # Get a handle to the data_type field from the variable class
+                VAR_CLASS = get_gpb_class_from_type_id(CDM_VARIABLE_TYPE)
+                field_desc = None
+                for name, desc in VAR_CLASS.DESCRIPTOR.fields_by_name.items():
+                    if name == "data_type":
+                        print "\n\n\n\nFound data_type descriptor!"
+                        field_desc = desc
+                
+                # Add the enum definitions from the data_type field (can only be one - DataType)
+                enum_desc = field_desc.enum_type
+                if enum_desc and not enum_desc.name in clsDict:
+                    clsDict[enum_desc.name] = EnumObject(enum_desc)
+
+        
         #--------------------------------------------------------------#
         # Attach specialized methods to object class dictionaries here #
         #--------------------------------------------------------------#
@@ -705,10 +731,8 @@ class WrapperType(type):
             clsDict['SetAttribute'] = _set_attribute
             clsDict['SetDimension'] = _set_dimension
             
-            # Create a attribute wrapper
-            # Extract data_type object from clsDict
-            # 
-            # atrib = self.Repository.create_object(CDM_ATTRIBUTE_TYPE)
+            # Allow the DataType enum to be accessible by this Wrapper...
+            __add_data_type_enum(clsDict)
             
 
         elif obj_type == CDM_ATTRIBUTE_TYPE:
@@ -727,7 +751,11 @@ class WrapperType(type):
             clsDict['AddAttribute'] = _add_attribute            
             clsDict['FindAttributeByName'] = _find_attribute_by_name
             clsDict['FindDimensionByName'] = _find_dimension_by_name
-            # value adds are currently manual
+            clsDict['FindAttributeIndexByName'] = _find_attribute_index_by_name
+            # ?? clsDict['SetAttribute'] = _set_attribute
+            # ?? clsDict['SetDimension'] = _set_dimension
+            
+            # @attention: Value adds are currently manual
 
 
 class Wrapper(object):
