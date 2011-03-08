@@ -48,7 +48,7 @@ message ApplicationIntegrationServiceError{
 """
 
 # FindDataResources GPBs from ion-object-definitions/net/ooici/integration/ais/findDataResources/find_data_resources.proto
-FIND_DATA_RESOURCES_MSG_TYPE = object_utils.create_type_identifier(object_id=9131, version=1)
+FIND_DATA_RESOURCES_MSG_TYPE = object_utils.create_type_identifier(object_id=9031, version=1)
 """
 message FindDataResourcesMsg {
    enum _MessageTypeIdentifier {

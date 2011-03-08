@@ -23,10 +23,8 @@ from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS
 from ion.integration.ais.ais_object_identifiers import REGISTER_USER_TYPE, \
                                                        UPDATE_USER_EMAIL_TYPE,   \
                                                        UPDATE_USER_DISPATCH_QUEUE_TYPE, \
-                                                       OOI_ID_TYPE
-
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+                                                       OOI_ID_TYPE, \
+                                                       FIND_DATA_RESOURCES_MSG_TYPE
 
 
 class AppIntegrationTest(IonTestCase):
@@ -64,30 +62,16 @@ class AppIntegrationTest(IonTestCase):
         mc = MessageClient(proc=self.test_sup)
 
         # Use the message client to create a message object
-        ### DHE: This is temporary; we won't be passing addresslink_type here, but we will need to pass a GPB
-        log.debug('DHE: test_app_integration! instantiating addressbook resource.\n')        
-        ab_msg = yield mc.create_instance(addresslink_type, MessageName='addressbook message')
-        log.debug('DHE: test_app_integration! addressbook instantiated.\n')        
-        
-        #ab is a message instance of type addresslink 
-        ab_msg.title = 'An addressbook object for testing'
+        log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_MSG_TYPE)
+        reqMsg.message_parameters_reference.spatial.minLatitude = 32.87521
+        reqMsg.message_parameters_reference.spatial.maxLatitude = 32.97521
+        reqMsg.message_parameters_reference.spatial.minLongitude = -117.274609
+        reqMsg.message_parameters_reference.spatial.maxLongitude = -117.174609
 
-        # Add a new entry in the list (repeated) persons of the addressbook
-        ab_msg.person.add()
-
-        # Make a new person object to go in the list
-        ab_msg.person[0] = ab_msg.CreateObject(person_type)
-        ab_msg.person[0].name = 'david'
-        ab_msg.person[0].id = 59
-        ab_msg.person[0].email = 'stringgggg'
-        ab_msg.person[0].phone.add()
-        ab_msg.person[0].phone[0].number = '401 789 6224'
-        
-        log.info('AddressBook! \n' + str(ab_msg))        
-        
         log.debug('DHE: Calling findDateResource!!...')
-        #outcome1 = yield self.aisc.createDataResource(ab_msg)
-        outcome1 = yield self.aisc.findDataResources(ab_msg)
+        outcome1 = yield self.aisc.findDataResources(reqMsg)
         log.debug('DHE: findDataResources returned:\n'+str(outcome1))
 
     @defer.inlineCallbacks
