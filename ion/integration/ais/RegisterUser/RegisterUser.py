@@ -15,10 +15,10 @@ from ion.services.coi.identity_registry import IdentityRegistryClient
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, AIS_REQUEST_MSG_TYPE, OOI_ID_TYPE
 
-class RegisterUser():
+class RegisterUser(object):
     
-   def init(self, ais):
-      log.info('RegisterUser.init()')
+   def __init__(self, ais):
+      log.info('RegisterUser.__init__()')
       self.irc = IdentityRegistryClient(proc=ais)
       self.mc = ais.mc
         
@@ -46,8 +46,9 @@ class RegisterUser():
                                                msg.message_parameters_reference.rsa_private_key)
          log.info('RegisterUser.registerUser(): added new user in IR\n'+str(result))
       msg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS RegisterUser response')
-      msg.message_parameters_reference = msg.CreateObject(OOI_ID_TYPE)
-      msg.message_parameters_reference.ooi_id = result
+      msg.message_parameters_reference.add()
+      msg.message_parameters_reference[0] = msg.CreateObject(OOI_ID_TYPE)
+      msg.message_parameters_reference[0].ooi_id = result
       defer.returnValue(msg)
 
 

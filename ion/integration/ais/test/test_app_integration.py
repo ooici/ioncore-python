@@ -147,6 +147,6 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        if reply.message_parameters_reference.ObjectType != OOI_ID_TYPE:
+        if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
         

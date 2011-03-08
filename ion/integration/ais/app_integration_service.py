@@ -149,8 +149,7 @@ class AppIntegrationService(ServiceProcess):
     def op_registerUser(self, content, headers, msg):
         log.info('op_registerUser: \n'+str(content))
         try:
-            worker = RegisterUser()
-            worker.init(self)
+            worker = RegisterUser(self)
             log.info('op_registerUser: calling worker')
             response = yield worker.registerUser(content);
             yield self.reply_ok(msg, response)
