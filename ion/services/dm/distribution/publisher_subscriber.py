@@ -121,25 +121,26 @@ class PublisherFactory(object):
 
 # =================================================================================
 
-class Subscriber(Process):
+class Subscriber(BasicLifecycleObject):
     """
     @brief This represents subscribers, both user-driven and internal (e.g. dataset persister)
     @note All returns are HTTP return codes, 2xx for success, etc, unless otherwise noted.
     @todo Need a subscriber receiver that can hook into the topic xchg mechanism
     """
 
-    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, *args, **kwargs):
+    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None, *args, **kwargs):
 
-        Process.__init__(self, *args, **kwargs)
+        BasicLifecycleObject.__init__(self)
 
-        assert xp_name
+        assert xp_name and process
 
         self._xp_name       = xp_name
         self._binding_key   = binding_key
         self._queue_name    = queue_name
         self._credentials   = credentials
+        self._process       = process
 
-        self._pubsub_client = PubSubClient()
+        self._pubsub_client = PubSubClient(process=process)
 
         # set up comms details
         consumer_config = { 'exchange' : self._xp_name,
@@ -153,7 +154,11 @@ class Subscriber(Process):
                           }
 
         # TODO: name?
-        self._recv = WorkerReceiver(self.id.full + "_recv", process=self, handler=self._receive_handler, consumer_config=consumer_config)
+        name = process.id.full + "_subscriber_recv_" + str(len(process._registered_life_cycle_objects))
+        self._recv = WorkerReceiver(name, process=process, handler=self._receive_handler, consumer_config=consumer_config)
+
+    def on_initialize(self, *args, **kwargs):
+        pass
 
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
@@ -200,7 +205,7 @@ class SubscriberFactory(object):
     Factory to create Subscribers.
     """
 
-    def __init__(self, xp_name=None, binding_key=None, queue_name=None, subscriber_type=None, credentials=None):
+    def __init__(self, xp_name=None, binding_key=None, queue_name=None, subscriber_type=None, process=None, credentials=None):
         """
         Initializer. Sets default properties for calling the build method.
 
@@ -216,16 +221,18 @@ class SubscriberFactory(object):
                             Subscriber derived class if you want to share the implementation
                             across multiple Subscribers. If left None, the standard Subscriber
                             class is used.
+        @param  process     Process that Subscribers will be attached to.
         """
 
         self._xp_name           = xp_name
         self._binding_key       = binding_key
         self._queue_name        = queue_name
         self._subscriber_type   = subscriber_type
+        self._process           = process
         self._credentials       = credentials
 
     @defer.inlineCallbacks
-    def build(self, xp_name=None, binding_key=None, queue_name=None, handler=None, subscriber_type=Subscriber, credentials=None):
+    def build(self, xp_name=None, binding_key=None, queue_name=None, handler=None, subscriber_type=Subscriber, process=None, credentials=None):
         """
         Creates a subscriber.
 
@@ -248,16 +255,18 @@ class SubscriberFactory(object):
                             a bound method of the process owning this Subscriber, but may be any
                             callable taking a data param. If this is left None, the subscriber_type
                             must be set to a derived Subscriber that overrides the ondata method.
-        @param  credenitials Subscriber credentials (not currently used).
+        @param  process     Process that Subscribers will be attached to.
+        @param  credentials Subscriber credentials (not currently used).
         """
         xp_name         = xp_name or self._xp_name
         binding_key     = binding_key or self._binding_key
         queue_name      = queue_name or self._queue_name
         subscriber_type = subscriber_type or self._subscriber_type or Subscriber
+        process         = process or self._process
         credentials     = credentials or self._credentials
 
-        sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, credentials=credentials)
-        yield sub.spawn()
+        sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, process=process, credentials=credentials)
+        yield process.register_life_cycle_object(sub)
 
         if handler != None:
             sub.ondata = handler

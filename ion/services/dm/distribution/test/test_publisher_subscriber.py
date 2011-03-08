@@ -188,30 +188,59 @@ class TestSubscriber(IonTestCase):
         Create/activate a subscriber without factories.  Make sure all required components are present.
         """
 
+        # subscriber needs a process
+        proc = Process()
+        yield proc.spawn()
+
         self.failUnlessRaises(AssertionError, Subscriber)   # needs xp_name
 
-        sub = Subscriber(xp_name="magnet.topic")
+        # test all combinations of arguments (not really necessary as Subscriber currently only has two required args,
+        # but this keeps it in line with the Publisher test above and makes it simple to add another range of tests
+        # later)
+        args = [('xp_name','magnet.topic'),
+                ('process',proc)]
+
+        for i in itertools.combinations(args, 1):
+            self.failUnlessRaises(AssertionError, Subscriber, **dict(i))    # dict(i): {'xp_name':'magnet.topic'}
+
+        # all required arguments
+        sub = Subscriber(**dict(args))
         self.failUnlessIsInstance(sub, Subscriber)
 
     @defer.inlineCallbacks
     def test_subscriber_factory_create(self):
+        # subscriber needs a process
+        proc = Process()
+        yield proc.spawn()
+
         sf = SubscriberFactory()
 
-        # needs an xp_name, so this build should fail
+        # needs an xp_name and a process, so this build should fail
         self.failUnlessFailure(sf.build(), AssertionError)
 
-        sub = yield sf.build(xp_name="magnet.topic")
+        # test all combinations of arguments (not really necessary as Subscriber currently only has two required args,
+        # but this keeps it in line with the Publisher test above and makes it simple to add another range of tests
+        # later)
+        args = [('xp_name','magnet.topic'),
+                ('process',proc)]
+
+        for i in itertools.combinations(args, 1):
+            self.failUnlessFailure(sf.build(**dict(i)), AssertionError)    # dict(i): {'xp_name':'magnet.topic'}
+
+        sub = yield sf.build(**dict(args))
         self.failUnlessIsInstance(sub, Subscriber)
         self.failUnless(sub._get_state() == BasicStates.S_ACTIVE)
+        self.failUnless(sub._process == proc)
 
-        # now lets make a factory where we can specify the xp_name as a default
-        sf2 = SubscriberFactory(xp_name="magnet.topic")
+        # now lets make a factory where we can specify the xp_name and process as defaults
+        sf2 = SubscriberFactory(**dict(args))
 
         sub2 = yield sf2.build()
 
         self.failUnlessIsInstance(sub2, Subscriber)
         self.failUnless(sub2._get_state() == BasicStates.S_ACTIVE)
         self.failUnless(sub2._recv.consumer_config.has_key("exchange") and sub2._recv.consumer_config['exchange'] == "magnet.topic")
+        self.failUnless(sub2._process == proc)
 
         # use the same factory to override the default xp_name
         sub3 = yield sf2.build(xp_name="afakeexchange")
@@ -219,6 +248,7 @@ class TestSubscriber(IonTestCase):
         self.failUnlessIsInstance(sub3, Subscriber)
         self.failUnless(sub3._get_state() == BasicStates.S_ACTIVE)
         self.failUnless(sub3._recv.consumer_config.has_key("exchange") and sub3._recv.consumer_config['exchange'] == "afakeexchange")
+        self.failUnless(sub3._process == proc)
 
     @defer.inlineCallbacks
     def test_subscriber_queue_bindings(self):
@@ -227,7 +257,11 @@ class TestSubscriber(IonTestCase):
 
         TODO: not good ways of testing these, need broker interaction to really tell
         """
-        sf = SubscriberFactory(xp_name="magnet.topic")
+        # subscriber needs a Process
+        proc = Process()
+        yield proc.spawn()
+
+        sf = SubscriberFactory(xp_name="magnet.topic", process=proc)
         sub = yield sf.build()
         self.failUnlessIsInstance(sub, Subscriber)
 
@@ -271,7 +305,7 @@ class TestPublisherAndSubscriber(IonTestCase):
         yield proc.spawn()
 
         pf = PublisherFactory(xp_name="magnet.topic", process=proc)
-        sf = SubscriberFactory(xp_name="magnet.topic")
+        sf = SubscriberFactory(xp_name="magnet.topic", process=proc)
 
         msgs = []
         def handle_msg(content):
@@ -286,7 +320,5 @@ class TestPublisherAndSubscriber(IonTestCase):
 
         self.failUnlessRaises(AssertionError, Subscriber)   # needs xp_name
 
-        sub = Subscriber(xp_name="magnet.topic")
-        self.failUnlessIsInstance(sub, Subscriber)
 
 
