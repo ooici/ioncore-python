@@ -98,7 +98,7 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_declare_exchange_space(self, request, headers, msg):
-        log.debug('Here we go')
+        log.debug('DXS starting')
         if request.MessageType != XS_TYPE:
             raise PSSException('Bad message, expected a request type, got %s' % str(request),
                                request.ResponseCodes.BAD_REQUEST)
@@ -109,28 +109,34 @@ class PubSubService(ServiceProcess):
         description = str(time.time())
         xsid = yield self.ems.create_exchangespace(request.exchange_space_name, description)
 
-        log.debug('EMS returns ID %s for name %s' % (xsid.resource_reference.key, request.exchange_space_name))
+        log.debug('EMS returns ID %s for name %s' %
+                  (xsid.resource_reference.key, request.exchange_space_name))
 
         # Write ID into registry
         log.debug('Creating resource instance')
-        registry_entry = yield self.rclient.create_instance(XS_RES_TYPE, ResourceName=request.exchange_space_name,
-                                                            ResourceDescription=request.exchange_space_name)
+        registry_entry = yield self.rclient.create_instance(XS_RES_TYPE, 'Niemand')
+
         # Populate registry entry message
+        log.debug('Populating resource instance')
         registry_entry.exchange_space_name = request.exchange_space_name
         registry_entry.exchange_space_id = xsid.resource_reference
 
         log.debug('Writing resource record')
-        xs_resource_id = yield self.rclient.put_instance(registry_entry)
+        yield self.rclient.put_instance(registry_entry)
+        log.debug('Getting resource ID')
+        xs_resource_id = self.rclient.reference_instance(registry_entry)
 
         log.debug('Operation completed, creating response message')
-        response = yield self.mc.create_instance(IDLIST_TYPE, MessageName='declare_xs response')
+
+        response = yield self.mc.create_instance(IDLIST_TYPE)
+        log.debug('Populating return message')
         response.id_list.add()
-        response.id_list[0]=xs_resource_id.resource_reference
+        response.id_list[0] = xs_resource_id
         response.MessageResponseCode = response.ResponseCodes.OK
 
         # save to list
         log.debug('Saving to internal list...')
-        self.xs_list[xs_resource_id.resource_reference.key] = request.exchange_space_name
+        self.xs_list[xs_resource_id.key] = request.exchange_space_name
 
         log.debug('Responding...')
         yield self.reply_ok(msg, response)
@@ -174,7 +180,7 @@ class PubSubService(ServiceProcess):
         # This is probably better written as a list comprehension. Or something.
         rc = []
         p = re.compile(request.regex)
-        for cur_key, cur_entry in self.res_list.iteritems():
+        for cur_key, cur_entry in res_list.iteritems():
             if p.match(cur_entry):
                 rc.append(cur_key)
 
@@ -188,6 +194,7 @@ class PubSubService(ServiceProcess):
             response.id_list[idx] = x
             idx += 1
 
+        log.debug('Query complete')
         yield self.reply_ok(msg, response)
 
     @defer.inlineCallbacks
@@ -212,26 +219,26 @@ class PubSubService(ServiceProcess):
 
         log.debug('EMS completed, returned XP ID "%s"' % str(xpid))
 
-        xp_resource = yield self.rclient.create_instance(XP_RES_TYPE,
-                                                         ResourceName=request.exchange_point_name,
-                                                         ResourceDescription=description)
+        xp_resource = yield self.rclient.create_instance(XP_RES_TYPE, 'Niemand')
 
         log.debug('creating xp resource and populating')
+
         xp_resource.exchange_space_name = xs_name
         xp_resource.exchange_space_id = request.exchange_space_id
         xp_resource.exchange_point_id = xpid
         xp_resource.exchange_point_name = request.exchange_point_name
 
         log.debug('Saving XP to registry')
-        xp_resource_id = yield self.rclient.put_instance(xp_resource)
+        yield self.rclient.put_instance(xp_resource)
+        xp_resource_id = self.rclient.reference_instance(xp_resource)
 
         log.debug('Creating reply')
         reply = yield self.mc.create_instance(IDLIST_TYPE)
         reply.id_list.add()
-        reply.id_list[0] = xp_resource_id.resource_reference
+        reply.id_list[0] = xp_resource_id
 
         log.debug('Saving XPID to internal list')
-        self.xp_list[xp_resource_id.resource_reference.key] = request.exchange_point_name
+        self.xp_list[xp_resource_id.key] = request.exchange_point_name
 
         log.debug('DXP responding')
         yield self.reply_ok(msg, reply)
@@ -292,7 +299,7 @@ class PubSubService(ServiceProcess):
         tid = yield self.ems.create_topic(xs_name, xp_name, request.topic_name, description)
 
         log.debug('creating and populating the resource')
-        topic_resource = yield self.rclient.create_instance(TOPIC_RES_TYPE)
+        topic_resource = yield self.rclient.create_instance(TOPIC_RES_TYPE, 'Niemand')
         topic_resource.exchange_space_name = xs_name
         topic_resource.exchange_point_name = xp_name
         topic_resource.topic_name = request.topic_name
@@ -352,7 +359,7 @@ class PubSubService(ServiceProcess):
         log.debug('pub id is ' + publ_id.resource_reference.key)
 
         log.debug('creating and populating the publ resource')
-        publ_resource = yield self.rclient.create_instance(PUBLISHER_RES_TYPE)
+        publ_resource = yield self.rclient.create_instance(PUBLISHER_RES_TYPE, 'Niemand')
         publ_resource.exchange_space_id = request.exchange_space_id
         publ_resource.exchange_point_id = request.exchange_point_id
         publ_resource.topic_id = request.topic_id
@@ -421,7 +428,7 @@ class PubSubService(ServiceProcess):
 
         # Save into registry
         log.debug('Saving subscription into registry')
-        sub_resource = yield self.rclient.create_instance(SUBSCRIBER_RES_TYPE)
+        sub_resource = yield self.rclient.create_instance(SUBSCRIBER_RES_TYPE, 'Niemand')
         sub_resource.exchange_space_id = request.exchange_space_id
         sub_resource.exchange_point_id = request.exchange_point_id
         sub_resource.topic_id = request.topic_id
