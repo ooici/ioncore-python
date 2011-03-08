@@ -14,7 +14,7 @@ except ImportError:
     from distutils.core import setup
 
 setup( name = 'ioncore',
-       version = '0.4.3',
+       version = '0.4.4',
        description = 'OOI ION Python Capability Container and Core Modules',
        url = 'http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project',
        download_url = 'http://ooici.net/packages',
@@ -44,7 +44,7 @@ setup( name = 'ioncore',
            'Telephus==0.7-beta3.3', 
            'thrift==0.2.0', # thrift is a dependency of Telephus, which should be included there ideally
            'M2Crypto==0.21.1-pl1', # patched version to work with CentOS
-           'ionproto'
+           'ionproto>=0.3.13'
                           ],
        entry_points = {
                         'console_scripts': [
