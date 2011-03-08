@@ -77,15 +77,7 @@ class AppIntegrationService(ServiceProcess):
              - build up response message payload
             """
 
-            log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
-            reqMsg = yield self.mc.create_instance(AIS_REQUEST_MSG_TYPE)
-            reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_MSG_TYPE)
-            reqMsg.message_parameters_reference.spatial.minLatitude = 32.87521
-            reqMsg.message_parameters_reference.spatial.maxLatitude = 32.97521
-            reqMsg.message_parameters_reference.spatial.minLongitude = -117.274609
-            reqMsg.message_parameters_reference.spatial.maxLongitude = -117.174609
-                        
-            returnValue = worker.findDataResources(reqMsg)
+            returnValue = worker.findDataResources(msg)
             log.debug('worker returned: ' + returnValue)
             yield self.reply_ok(msg, {'value' : 'newDataResourceIdentity'})
         except KeyError:
@@ -173,14 +165,8 @@ class AppIntegrationServiceClient(ServiceClient):
     #def findDataResources(self, userId, published, spacial, temporal):
     def findDataResources(self, msg):
         yield self._check_init()
-        log.debug("findDataResources: sending message to findDataResources")
-        #payload = {'userId' : userId,
-        #           'published' : published,
-        #           'spacial' : spacial,
-        #           'temporal' : temporal}
+        log.debug("findDataResources: sending %s message to findDataResources" % str(msg))
         (content, headers, payload) = yield self.rpc_send('findDataResources', msg)
-        #(content, headers, payload) = yield self.rpc_send('createDataResource', msg)
-        #content = 'test'
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         
