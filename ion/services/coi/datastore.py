@@ -23,15 +23,15 @@ from ion.core.data import cassandra
 from ion.core.data.store import Query
 
 
-from ion.services.dm.preservation.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
-from ion.services.dm.preservation.storage_configuration_utility import COMMIT_COLUMN_NAMES
-from ion.services.dm.preservation.storage_configuration_utility import REPOSITORY_KEY, BRANCH_NAME
+from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
+from ion.core.data.storage_configuration_utility import COMMIT_COLUMN_NAMES
+from ion.core.data.storage_configuration_utility import REPOSITORY_KEY, BRANCH_NAME
 
-from ion.services.dm.preservation.storage_configuration_utility import SUBJECT_KEY, SUBJECT_BRANCH, SUBJECT_COMMIT
-from ion.services.dm.preservation.storage_configuration_utility import PREDICATE_KEY, PREDICATE_BRANCH, PREDICATE_COMMIT
-from ion.services.dm.preservation.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT
+from ion.core.data.storage_configuration_utility import SUBJECT_KEY, SUBJECT_BRANCH, SUBJECT_COMMIT
+from ion.core.data.storage_configuration_utility import PREDICATE_KEY, PREDICATE_BRANCH, PREDICATE_COMMIT
+from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT
 
-from ion.services.dm.preservation.storage_configuration_utility import KEYWORD
+from ion.core.data.storage_configuration_utility import KEYWORD
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
