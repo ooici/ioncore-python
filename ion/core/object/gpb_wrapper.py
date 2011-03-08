@@ -357,6 +357,7 @@ class WrapperType(type):
             """
             Specialized method for CDM (group) Objects to append a group object with the given name
             """
+            # @attention: Should we allow an empty list of values for an attribute?
             if not name or not isinstance(name, str):
                 raise OOIObjectError('Invalid attribute name: "%s" -- please specify a non-empty string name' % str(name))
             if not values or not isinstance(values, list):
@@ -428,12 +429,27 @@ class WrapperType(type):
             dim_ref.SetLink(dim)
 
         
-        def _add_variable(self, name=None, data_type='', shape=['', '', '']):
+        def _add_variable(self, name, data_type, shape=[]):
             """
             Specialized method for CDM Objects to append a variable object with the given name, data_type, and shape
             """
-            # @todo: need to reconsider useability before implementing this method
-            raise RuntimeError("Method not implemented!")
+            if not name or not isinstance(name, str) or name == '':
+                raise OOIObjectError('Invalid variable name requested: "%s"' % str(data_type))
+            # @todo: Find a better way to ensure DataType is a valid value in cdmdatatype enum
+            if not data_type or not isinstance(data_type, int):
+                raise OOIObjectError('Invalid data_type requested: "%s"' % str(data_type))
+            # @note: shape is allowed to be null for scalar variables
+            if shape is not None:
+                for dim in shape:
+                    if dim is None:
+                        raise OOIObjectError('Invalid shape given -- encountered null entries: "%s".  ' % str(shape))
+                    elif not isinstance(dim, Wrapper) or not isinstance(dim.ObjectType, CDM_DIMENSION_TYPE):
+                        raise OOIObjectError('Invalid shape given -- shape must provide a list of CDM dimension objects: "%s"' % str(shape))
+            
+            var = self.Repository.create_object(CDM_VARIABLE_TYPE)
+            var.name = name
+            var.data_type = data_type
+            var.shape = shape
 
 
         def _find_group_by_name(self, name=''):
@@ -457,6 +473,7 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find the attribute object by its name
             """
+            # @attention: Should this find operate on the variable's standard_name attribute when avail?
             if not name or not isinstance(name, str):
                 raise OOIObjectError('Invalid attribute name requested: "%s"' % str(name))
 
@@ -514,7 +531,86 @@ class WrapperType(type):
                 raise OOIObjectError('Requested variable name not found: "%s"' % str(name))
 
             return result
+
         
+        def _find_variable_index_by_name(self, name=''):
+            """
+            Specialized method for CDM Objects to find the variable object's index by the variable's name
+            """
+            if not name or not isinstance(name, str):
+                raise OOIObjectError('Invalid variable name requested: "%s"' % str(name))
+
+            result = -1
+            for i in xrange(0, len(self.variables)):
+                var = self.variables[i]
+                if var is not None and var.name == name:
+                    result = i
+                    break
+
+            if -1 == result:
+                raise OOIObjectError('Requested variable not found: "%s"' % str(name))
+
+            return result
+
+        
+        def _find_attribute_index_by_name(self, name=''):
+            """
+            Specialized method for CDM Objects to find the attribute object's index by the attribute's name
+            """
+            if not name or not isinstance(name, str):
+                raise OOIObjectError('Invalid attribute name requested: "%s"' % str(name))
+
+            result = -1
+            for i in xrange(0, len(self.attributes)):
+                atrib = self.attributes[i]
+                if atrib is not None and atrib.name == name:
+                    result = i
+                    break
+
+            if -1 == result:
+                raise OOIObjectError('Requested attribute not found: "%s"' % str(name))
+
+            return result
+        
+        
+        def __remove_attribute(self, name):
+            """
+            Removes an attribute with the given name from this CDM Object (GROUP)
+            """
+            idx = _find_attribute_index_by_name(self, name)
+            self.attributes.__delitem__(idx)
+            
+        
+        def _set_attribute(self, name, values=[]):
+            """
+            Specialized method for CDM Objects to set values for existing attributes
+            """
+            # @attention: Should we allow an empty list of values for an attribute?
+            if not name or not isinstance(name, str):
+                raise OOIObjectError('Invalid attribute name: "%s" -- please specify a non-empty string name' % str(name))
+            if not values or not isinstance(values, list):
+                raise OOIObjectError('Invalid attribute values: "%s" -- please specify a list for the argument "values"' % str(values))
+
+            __remove_attribute(self, name)
+            _add_attribute(self, name, values)
+        
+        
+        def _set_dimension(self, name, length):
+            """
+            Specialized method for CDM Objects to set fields for existing dimensions
+            """
+            if not name or not isinstance(name, str):
+                raise OOIObjectError('Invalid dimension name: "%s" -- please specify a non-empty string name' % str(name))
+            # @attention: Can a dimension have a length of zero??
+            if not isinstance(length, int) or length <= 0:
+                raise OOIObjectError('Invalid dimension length: "%s" -- please specify a positive integer for length' % str(length))
+
+            dim = _find_dimension_by_name(self, name)
+            if dim.variable_length and length != dim.length:
+                raise OOIObjectError('Cannot change the length of a dimension when dimension.variable_length is set to False.  Old length: %s.  New length: %s.' % (str(dim.length), str(length)))
+            
+            dim.length = length
+
         
         #---------------------------------------#
         # Wrapper_Attribute Specialized Methods #
@@ -546,7 +642,7 @@ class WrapperType(type):
             Specialized method for CDM Objects to find the length of an attribute object's values
             """
             return len(self.array.value)
-        
+
         
         #--------------------------------------#
         # Wrapper_Variable Specialized Methods #
@@ -599,22 +695,30 @@ class WrapperType(type):
             clsDict['AddGroup'] = _add_group_to_group
             clsDict['AddAttribute'] = _add_attribute
             clsDict['AddDimension'] = _add_dimension
-            # clsDict['AddVariable'] = _add_variable
+            clsDict['AddVariable'] = _add_variable
             clsDict['FindGroupByName'] = _find_group_by_name
             clsDict['FindAttributeByName'] = _find_attribute_by_name
             clsDict['FindDimensionByName'] = _find_dimension_by_name
             clsDict['FindVariableByName'] = _find_variable_by_name
-            # clsDict['SetAttribute'] = _set_attribute
-            # clsDict['SetDimension'] = _set_dimension
-
+            clsDict['FindVariableIndexByName'] = _find_variable_index_by_name
+            clsDict['FindAttributeIndexByName'] = _find_attribute_index_by_name
+            clsDict['SetAttribute'] = _set_attribute
+            clsDict['SetDimension'] = _set_dimension
+            
+            # Create a attribute wrapper
+            # Extract data_type object from clsDict
+            # 
+            # atrib = self.Repository.create_object(CDM_ATTRIBUTE_TYPE)
+            
 
         elif obj_type == CDM_ATTRIBUTE_TYPE:
             
             clsDict['GetValue'] = _get_attribute_value_by_index
             clsDict['GetValues'] = _get_attribute_values
-            # clsDict['SetValues'] = _get_attribute_values
+            # clsDict['SetValue'] = _get_attribute_values
             # clsDict['SetValues'] = _get_attribute_values
             clsDict['GetLength'] = _get_attribute_values_length
+            
 
         elif obj_type == CDM_VARIABLE_TYPE:
             
@@ -623,7 +727,7 @@ class WrapperType(type):
             clsDict['AddAttribute'] = _add_attribute            
             clsDict['FindAttributeByName'] = _find_attribute_by_name
             clsDict['FindDimensionByName'] = _find_dimension_by_name
-
+            # value adds are currently manual
 
 
 class Wrapper(object):
