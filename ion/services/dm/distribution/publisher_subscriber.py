@@ -7,7 +7,7 @@
 @brief Publisher/Subscriber classes for attaching to processes
 """
 
-from ion.core.messaging import messaging
+from ion.util.state_object import BasicLifecycleObject
 from ion.core.process.process import Process
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.services.dm.distribution.pubsub_service import PubSubClient
@@ -16,22 +16,23 @@ from twisted.internet import defer
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-class Publisher(Process):
+class Publisher(BasicLifecycleObject):
     """
     @brief This represents publishers of (mostly) science data. Intended use is
     to be instantiated within another class/process/codebase, as an object for sending data to OOI.
     @note All returns are HTTP return codes, 2xx for success, etc, unless otherwise noted.
     """
 
-    def __init__(self, xp_name=None, routing_key=None, credentials=None, *args, **kwargs):
+    def __init__(self, xp_name=None, routing_key=None, credentials=None, process=None, *args, **kwargs):
 
-        Process.__init__(self, *args, **kwargs)
+        BasicLifecycleObject.__init__(self)
 
-        assert xp_name and routing_key
+        assert xp_name and routing_key and process
 
         self._xp_name = xp_name
         self._routing_key = routing_key
         self._credentials = credentials
+        self._process = process
 
         # TODO: will the user specify this? will the PSC get it?
         publisher_config = { 'exchange'      : xp_name,
@@ -42,8 +43,8 @@ class Publisher(Process):
                              'warn_if_exists': False }
 
         # we use base Receiver here as we only send with it, no consumption which the base Receiver doesn't do well
-        self._recv = Receiver(routing_key, process=self, publisher_config=publisher_config)
-        self._pubsub_client = PubSubClient()
+        self._recv = Receiver(routing_key, process=process, publisher_config=publisher_config)
+        self._pubsub_client = PubSubClient(process=process)
 
         # monkey patch receiver as we don't want any of its initialize or activate items running, but we want it to be in the right state
         def noop(*args, **kwargs):
@@ -52,9 +53,10 @@ class Publisher(Process):
         self._recv.on_initialize = noop
         self._recv.on_activate = noop
 
-    def on_activate(self, *args, **kwargs):
-        Process.on_activate(self, *args, **kwargs)
+    def on_initialize(self, *args, **kwargs):
+        pass
 
+    def on_activate(self, *args, **kwargs):
         self._recv.attach() # calls initialize/activate, gets receiver in correct state for publishing
 
     def publish(self, data):
@@ -78,7 +80,7 @@ class PublisherFactory(object):
     A factory class for building Publisher objects.
     """
 
-    def __init__(self, xp_name=None, credentials=None):
+    def __init__(self, xp_name=None, credentials=None, process=None):
         """
         Initializer. Sets default properties for calling the build method.
 
@@ -87,12 +89,14 @@ class PublisherFactory(object):
 
         @param  xp_name     Name of exchange point to use
         @param  credentials Placeholder for auth* tokens
+        @param  process     Owning process of the Publisher.
         """
         self._xp_name           = xp_name
         self._credentials       = credentials
+        self._process           = process
 
     @defer.inlineCallbacks
-    def build(self, routing_key, xp_name=None, credentials=None):
+    def build(self, routing_key, xp_name=None, credentials=None, process=None):
         """
         Creates a publisher and calls register on it.
 
@@ -103,12 +107,14 @@ class PublisherFactory(object):
         @param  routing_key The AMQP routing key that the Publisher will publish its data to.
         @param  xp_name     Name of exchange point to use
         @param  credentials Placeholder for auth* tokens
+        @param  process     Owning process of the Publisher.
         """
         xp_name         = xp_name or self._xp_name
         credentials     = credentials or self._credentials
+        process         = process or self._process
 
-        pub = Publisher(xp_name=xp_name, routing_key=routing_key, credentials=credentials)
-        yield pub.spawn()
+        pub = Publisher(xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process)
+        yield process.register_life_cycle_object(pub)     # brings the publisher to whatever state the process is in
         #yield pub.register(xp_name, topic_id, publisher_name, credentials)
 
         defer.returnValue(pub)

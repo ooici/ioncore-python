@@ -18,6 +18,8 @@ from ion.core import ioninit
 
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
+from ion.core.process.process import Process
+import itertools
 from ion.core.messaging.receiver import Receiver
 from ion.core.messaging import messaging
 import ion.util.procutils as pu
@@ -47,49 +49,70 @@ class TestPublisher(IonTestCase):
         Create/activate a publisher without factories.  Make sure all required components are present.
         """
 
-        # "Publisher" is a callable, remember
-        self.failUnlessRaises(AssertionError, Publisher)                                    # needs both xp_name and routing_key
-        self.failUnlessRaises(AssertionError, Publisher, **{'xp_name':'magnet.topic'})      # needs routing_key
-        self.failUnlessRaises(AssertionError, Publisher, **{'routing_key':'arf.test'})      # needs xp_name
+        # Publishers need to be owned by a process
+        proc = Process()
+        yield proc.spawn()
 
-        pub1 = Publisher(xp_name="magnet.topic", routing_key="arf.test")                    # all requirements satisfied
+        # "Publisher" is a callable, remember
+        self.failUnlessRaises(AssertionError, Publisher)                                    # needs xp_name, routing_key, process
+
+        # test all possible combinations of arguments that should fail, first singles, then doubles
+        args = [('xp_name', 'magnet_topic'),
+                ('routing_key', 'arf.test'),
+                ('process', proc)]
+
+        for i in itertools.combinations(args, 1):
+            self.failUnlessRaises(AssertionError, Publisher, **dict(i))     # dict(i): {'xp_name': 'magnet.topic'}
+
+        for i in itertools.combinations(args, 2):
+            self.failUnlessRaises(AssertionError, Publisher, **dict(i))     # dict(i): {'xp_name': 'magnet.topic', 'routing_key': 'arf.test'}
+
+        # now construct one with everything correct
+        pub1 = Publisher(**dict(args))      # all requirements satisfied
         self.failUnlessIsInstance(pub1, Publisher)
 
-        # now attach it
-        yield pub1.initialize()
-        yield pub1.activate()
+        # now attach it to the process
+        yield proc.register_life_cycle_object(pub1)
 
-        self.failUnless(pub1._get_state() == BasicStates.S_ACTIVE)
+        self.failUnless(pub1._get_state() == BasicStates.S_ACTIVE)      # register_life_cycle_object will move the publisher to match the proc's state
 
     @defer.inlineCallbacks
     def test_publisher_factory_create(self):
+
+        # a Publisher is attached to a process
+        proc = Process()
+        yield proc.spawn()
 
         # factory without any args doesn't fill in xp_name
         fact = PublisherFactory()
 
         # we didn't specify xp_name in factory creation nor here, so it will error
-        self.failUnlessFailure(fact.build(routing_key='arf.test'), AssertionError)
+        yield self.failUnlessFailure(fact.build('arf.test'), AssertionError)
+        yield self.failUnlessFailure(fact.build('arf.test', process=proc), AssertionError)
 
-        # specify both
-        pub = yield fact.build(routing_key="arf.test", xp_name="magnet.topic")
+        # specify all
+        pub = yield fact.build("arf.test", xp_name="magnet.topic", process=proc)
 
         # we should get an active Publisher back here
         self.failUnlessIsInstance(pub, Publisher)
         self.failUnless(pub._get_state() == BasicStates.S_ACTIVE)
+        self.failUnless(pub._process == proc)
 
         # now lets make a factory where we can specify the xp_name as a default
         fact2 = PublisherFactory(xp_name="magnet.topic")
 
-        pub2 = yield fact2.build(routing_key="arf.test")
+        pub2 = yield fact2.build("arf.test", process=proc)
 
         self.failUnlessIsInstance(pub2, Publisher)
+        self.failUnless(pub2._process == proc)
         self.failUnless(pub2._get_state() == BasicStates.S_ACTIVE)
         self.failUnless(pub2._recv.publisher_config.has_key("exchange") and pub2._recv.publisher_config['exchange'] == "magnet.topic")
 
         # use the same factory to override the default xp_name
-        pub3 = yield fact2.build(routing_key="arf.test", xp_name="afakeexchange")
+        pub3 = yield fact2.build("arf.test", xp_name="afakeexchange", process=proc)
 
         self.failUnlessIsInstance(pub3, Publisher)
+        self.failUnless(pub3._process == proc)
         self.failUnless(pub3._get_state() == BasicStates.S_ACTIVE)
         self.failUnless(pub3._recv.publisher_config.has_key("exchange") and pub3._recv.publisher_config['exchange'] == "afakeexchange")
 
@@ -123,7 +146,12 @@ class TestPublisher(IonTestCase):
 
     @defer.inlineCallbacks
     def test_publish(self):
-        fact = PublisherFactory(xp_name="magnet.topic")
+
+        # a publisher needs a Process
+        proc = Process()
+        yield proc.spawn()
+
+        fact = PublisherFactory(xp_name="magnet.topic", process=proc)
 
         pub = yield fact.build(routing_key="arf.test")
 
@@ -239,7 +267,10 @@ class TestPublisherAndSubscriber(IonTestCase):
         """
         """
 
-        pf = PublisherFactory(xp_name="magnet.topic")
+        proc = Process()
+        yield proc.spawn()
+
+        pf = PublisherFactory(xp_name="magnet.topic", process=proc)
         sf = SubscriberFactory(xp_name="magnet.topic")
 
         msgs = []
