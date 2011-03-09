@@ -47,7 +47,7 @@ class AppIntegrationService(ServiceProcess):
         self.rc = ResourceClient(proc = self)
         self.mc = MessageClient(proc = self)
     
-        log.info('AppIntegrationService.__init__()')
+        log.debug('AppIntegrationService.__init__()')
 
     def slc_init(self):
         pass
@@ -115,42 +115,28 @@ class AppIntegrationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_registerUser(self, content, headers, msg):
-        log.info('op_registerUser: \n'+str(content))
-        try:
-            worker = RegisterUser()
-            worker.init(self)
-            log.info('op_registerUser: calling worker')
-            response = yield worker.registerUser(content);
-            yield self.reply_ok(msg, response)
-        except KeyError:
-            estr = 'Missing information in message!'
-            log.exception(estr)
-            yield self.reply_err(msg, estr)
-
-        return
+        log.debug('op_registerUser: \n'+str(content))
+        worker = RegisterUser(self)
+        log.debug('op_registerUser: calling worker')
+        response = yield worker.registerUser(content);
+        yield self.reply_ok(msg, response)
         
     @defer.inlineCallbacks
-    def findInstance(self, id, msg):
-        try:
-            yield self.rc.get_instance(id)
-            yield self.reply_ok(msg, {'value' : 'value'})
-        except Exception, ex:
-            exInfo = self.formatExceptionInfo()
-            estr = 'Object lookup failed with exception: ' + exInfo
-            log.exception(estr)
-            yield self.reply_err(msg, estr)
-            return
-       
-    def formatExceptionInfo(self, maxTBlevel=5):
-        cla, exc, trbk = sys.exc_info()
-        excName = cla.__name__
-        try:
-            excArgs = exc.__dict__["args"]
-        except KeyError:
-            excArgs = "<no args>"
-        excTb = traceback.format_exception(cla, exc, trbk)
-        return '\n'.join(excTb)
-                  
+    def op_updateUserEmail(self, content, headers, msg):
+        log.debug('op_updateUserEmail: \n'+str(content))
+        worker = RegisterUser(self)
+        log.debug('op_updateUserEmail: calling worker')
+        response = yield worker.updateUserEmail(content);
+        yield self.reply_ok(msg, response)
+        
+    @defer.inlineCallbacks
+    def op_updateUserDispatcherQueue(self, content, headers, msg):
+        log.debug('op_updateUserDispatcherQueue: \n'+str(content))
+        worker = RegisterUser(self)
+        log.debug('op_updateUserDispatcherQueue: calling worker')
+        response = yield worker.updateUserDispatcherQueue(content);
+        yield self.reply_ok(msg, response)
+                         
 
 class AppIntegrationServiceClient(ServiceClient):
     """
@@ -192,8 +178,25 @@ class AppIntegrationServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def registerUser(self, message):
         yield self._check_init()
+        log.debug("AIS_client.registerUser: sending following message to registerUser:\n%s" % str(message))
         (content, headers, payload) = yield self.rpc_send('registerUser', message)
-        log.info('Service reply: ' + str(content))
+        log.debug('AIS_client.registerUser: IR Service reply:\n' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def updateUserEmail(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.updateUserEmail: sending following message to registerUser:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('updateUserEmail', message)
+        log.debug('AIS_client.registerUser: IR Service reply:\n' + str(content))
+        defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def updateUserDispatcherQueue(self, message):
+        yield self._check_init()
+        log.debug("AIS_client.updateUserDispatcherQueue: sending following message to registerUser:\n%s" % str(message))
+        (content, headers, payload) = yield self.rpc_send('updateUserDispatcherQueue', message)
+        log.debug('AIS_client.registerUser: IR Service reply:\n' + str(content))
         defer.returnValue(content)
         
 

@@ -3,7 +3,7 @@
 #
 from ion.core.object import object_utils
 
-# AIS GPBs
+# AIS GPBs from ion-object-definitions/net/ooici/integration/ais/ais_request_response.proto
 AIS_REQUEST_MSG_TYPE = object_utils.create_type_identifier(object_id=9001, version=1)
 """
 message ApplicationIntegrationServiceRequestMsg{
@@ -26,13 +26,27 @@ message ApplicationIntegrationServiceResponseMsg{
     }
     
     // The message parameters object
-    optional net.ooici.core.link.CASRef message_parameters_reference = 1;
+    repeated net.ooici.core.link.CASRef message_parameters_reference = 1;
     
     optional string result = 2;
 }
 """
 
-# FindDataResources GPBs
+AIS_RESPONSE_ERROR_TYPE = object_utils.create_type_identifier(object_id=9003, version=1)
+"""
+message ApplicationIntegrationServiceError{
+    enum _MessageTypeIdentifier {
+      _ID = 9003;
+      _VERSION = 1;
+    }
+    
+    optional string error_num = 1;
+    
+    optional string error_str = 2;
+}
+"""
+
+# FindDataResources GPBs from ion-object-definitions/net/ooici/integration/ais/findDataResources/find_data_resources.proto
 FIND_DATA_RESOURCES_MSG_TYPE = object_utils.create_type_identifier(object_id=9031, version=1)
 """
 message FindDataResourcesMsg {
@@ -46,7 +60,7 @@ message FindDataResourcesMsg {
 }
 """
 
-# RegisterUser GPBs
+# RegisterUser GPBs from ion-object-definitions/net/ooici/integration/ais/registerUser/register_user.proto
 REGISTER_USER_TYPE = object_utils.create_type_identifier(object_id=9101, version=1)
 """
 message RegisterUser {

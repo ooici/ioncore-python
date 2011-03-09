@@ -80,8 +80,11 @@ class AppIntegrationTest(IonTestCase):
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
 
+        # create the register_user request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
         msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
+        
+        # fill in the certificate and key
         msg.message_parameters_reference.certificate = """-----BEGIN CERTIFICATE-----
 MIIEMzCCAxugAwIBAgICBQAwDQYJKoZIhvcNAQEFBQAwajETMBEGCgmSJomT8ixkARkWA29yZzEX
 MBUGCgmSJomT8ixkARkWB2NpbG9nb24xCzAJBgNVBAYTAlVTMRAwDgYDVQQKEwdDSUxvZ29uMRsw
@@ -126,11 +129,27 @@ Vc2vO7pUIp3kqzRd5ovijfMB5nYwygTB4FwepWY5eVfXAoGBAIqrLKhRzdpGL0Vp2jwtJJiMShKm
 WJ1c7fBskgAVk8jJzbEgMxuVeurioYqj0Cn7hFQoLc+npdU5byRti+4xjZBXSmmjo4Y7ttXGvBrf
 c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 -----END RSA PRIVATE KEY-----"""
+
+        # try to register this user for the first time
         reply = yield self.aisc.registerUser(msg)
         log.debug('registerUser returned:\n'+str(reply))
-        log.debug('registerUser returned:\n'+str(reply.message_parameters_reference))
+        log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        if reply.message_parameters_reference.ObjectType != OOI_ID_TYPE:
+        if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
+        FirstOoiId = reply.message_parameters_reference[0].ooi_id
+        log.info("test_registerUser: first time registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
+            
+        # try to re-register this user for a second time
+        reply = yield self.aisc.registerUser(msg)
+        log.debug('registerUser returned:\n'+str(reply))
+        log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
+        if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
+            self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+        if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
+            self.fail('response does not contain an OOI_ID GPB')
+        if FirstOoiId != reply.message_parameters_reference[0].ooi_id:
+            self.fail("re-registration did not return the same OoiId as registration")
+        log.info("test_registerUser: re-registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
         
