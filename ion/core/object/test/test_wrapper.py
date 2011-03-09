@@ -7,6 +7,7 @@
 """
 
 import ion.util.ionlog
+from twisted.trial.unittest import SkipTest
 log = ion.util.ionlog.getLogger(__name__)
 from uuid import uuid4
 
@@ -18,15 +19,17 @@ from ion.test.iontest import IonTestCase
 from net.ooici.play import addressbook_pb2
 
 from ion.core.object import gpb_wrapper
-from ion.core.object.gpb_wrapper import LINK_TYPE
+from ion.core.object.gpb_wrapper import LINK_TYPE, CDM_DATASET_TYPE, OOIObjectError
 from ion.core.object import workbench
 from ion.core.object import object_utils
+
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
 
 attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
+
 
 class WrapperMethodsTest(unittest.TestCase):
     
@@ -153,6 +156,644 @@ class WrapperMethodsTest(unittest.TestCase):
         # returned list is in order of field identifier
         self.assertEqual(['name', 'id'], mylist)
         
+
+class TestSpecializedCdmMethods(unittest.TestCase):
+    """
+    """
+    # @todo: See the warning at test_SetAttribute_for_group
+    # @todo: Implement test_SetDimension
+    # @todo: Implement test_FindVariableIndexByName_for group
+    # @todo: Implement test_FindVariableIndexByName_for variable
+    # @todo: Implement test_FindAttributeIndexByName_for group
+    def setUp(self):
+        # Step 1: Perform initial setup
+        wb = workbench.WorkBench('No Process Test')
+        repo, ds = wb.init_repository(CDM_DATASET_TYPE)
+        
+        self.repo = repo
+        self.wb = wb
+        self.ds = ds
+        
+        # Step 2: Perform necessary pretests (these may have side-effects)
+        self.pretest_MakeRootGroup()
+        
+        # Step 3: Finish setup as needed
+        #    We need a root group to work with in following tests..  this is
+        #    taken care of in self.pretest_MakeRootGroup()
+        
+    
+    def pretest_MakeRootGroup(self):
+        """
+        This pretest is not handled by twistd like methods prefixed with test_.
+        This method is simply called by setUp() to check various preconditions
+        and then build the root_group of the dataset, to be used by subsequent
+        methods.  --  Don't be confused..  this is just a normal method.
+        """
+        self.assertEqual(None, self.ds.root_group)
+        
+        self.assertRaises(TypeError, self.ds.MakeRootGroup, 5)
+        self.assertEqual(None, self.ds.root_group)
+        self.assertRaises(TypeError, self.ds.MakeRootGroup, None)
+        self.assertEqual(None, self.ds.root_group)
+        
+        self.ds.MakeRootGroup('test_group')
+        self.assertNotEqual(None, self.ds.root_group)
+        self.assertEqual('test_group', self.ds.root_group.name)
+        
+        self.assertRaises(OOIObjectError, self.ds.MakeRootGroup, 'new_root_group')
+        
+        # @attention: Since this is a pretest..  leave the new root_group attached
+        #             to the dataset (we will need it for all add'l tests
+    
+    def test_AddGroup(self):
+        self.assertEqual(len(self.ds.root_group.groups), 0)
+        
+        # Test invalid arguments
+        self.assertRaises(TypeError, self.ds.root_group.AddGroup, 5)
+        self.assertEqual(len(self.ds.root_group.groups), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddGroup, None)
+        self.assertEqual(len(self.ds.root_group.groups), 0)
+        self.assertRaises(ValueError, self.ds.root_group.AddGroup, '')
+        self.assertEqual(len(self.ds.root_group.groups), 0)
+        # @todo: Must we disallow groups named by the empty string??
+        
+        # Test legitimate arguments
+        self.ds.root_group.AddGroup('new_group1')
+        self.assertEqual(len(self.ds.root_group.groups), 1)
+        self.assertEqual(self.ds.root_group.groups[0].name, 'new_group1')
+        
+        # Ensure more than one group can be created
+        self.ds.root_group.AddGroup('new_group2')
+        self.assertEqual(len(self.ds.root_group.groups), 2)
+        self.assertEqual(self.ds.root_group.groups[1].name, 'new_group2')
+        
+        # @todo: Test creation of preexisting groups (should this fail?)
+#        self.ds.root_group.AddGroup('new_group2')
+        
+    def test_AddAttribute_to_group(self):
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        
+        # Test invalid argument: name
+        string_vals = ['val1', 'val2', 'val3']
+        int_vals    = [123456, 987654, 0]
+        string_type = self.ds.root_group.DataType.STRING
+        int_type    = self.ds.root_group.DataType.INT
+        self.assertRaises(TypeError, self.ds.root_group.AddAttribute, 5, string_type, string_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddAttribute, None, string_type, string_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        self.assertRaises(ValueError, self.ds.root_group.AddAttribute, '', string_type, string_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        
+        # Test invalid argument: values
+        mixed_vals = ['val1', 'val2', None, 25]
+        self.assertRaises(TypeError, self.ds.root_group.AddAttribute, 'atrib1', string_type, 25)
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        # @todo: Ensure entries for "values" of an empty list will fail
+#        self.assertRaises(TypeError, self.ds.root_group.AddAttribute, 'atrib1', string_type, [])
+#        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddAttribute, 'atrib1', string_type, None)
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        self.assertRaises(ValueError, self.ds.root_group.AddAttribute, 'atrib1', string_type, mixed_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        
+        # Test invalid argument: data_types
+        self.assertRaises(TypeError, self.ds.root_group.AddAttribute, 'atrib1', None, string_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddAttribute, 'atrib1', 'not an actual data_type', string_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        self.assertRaises(ValueError, self.ds.root_group.AddAttribute, 'atrib1', int_type, string_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        # @todo: Ensure entries for data_type of the correct type (int) but not listed in the DataType enum will fail
+#        self.assertRaises(TypeError, self.ds.root_group.AddAttribute, 'atrib1', 10000, string_vals)
+#        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        
+        # Test legitimate arguments
+        self.ds.root_group.AddAttribute('atrib1', string_type, string_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 1)
+        self.assertEqual(self.ds.root_group.attributes[0].name, 'atrib1')
+        self.assertEqual(self.ds.root_group.attributes[0].array.value, string_vals)
+        self.assertEqual(self.ds.root_group.attributes[0].data_type, string_type)
+        
+        # Ensure more than one attribute can be created
+        self.ds.root_group.AddAttribute('atrib2', int_type, int_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 2)
+        self.assertEqual(self.ds.root_group.attributes[1].name, 'atrib2')
+        self.assertEqual(self.ds.root_group.attributes[1].array.value, int_vals)
+        self.assertEqual(self.ds.root_group.attributes[1].data_type, int_type)
+
+        # @todo: Test creation of preexisting attributes (should this fail?)
+#        self.ds.root_group.AddAttribute('atrib2', int_type, int_vals)
+
+    def test_AddAttribute_to_variable(self):
+        # Seed the root_group with a variable to attach attributes to...
+        DT = self.ds.root_group.DataType
+        tau  = self.ds.root_group.AddDimension('time', 10, True)
+        lat  = self.ds.root_group.AddDimension('lat', 6, False)
+        lon  = self.ds.root_group.AddDimension('lon', 25, False)
+        variable = self.ds.root_group.AddVariable('var1', DT.FLOAT, [tau, lat, lon])
+    
+        self.assertEqual(len(variable.attributes), 0)
+        
+        # Test invalid argument: name
+        string_vals = ['val1', 'val2', 'val3']
+        int_vals    = [123456, 987654, 0]
+        string_type = variable.DataType.STRING
+        int_type    = variable.DataType.INT
+        self.assertRaises(TypeError, variable.AddAttribute, 5, string_type, string_vals)
+        self.assertEqual(len(variable.attributes), 0)
+        self.assertRaises(TypeError, variable.AddAttribute, None, string_type, string_vals)
+        self.assertEqual(len(variable.attributes), 0)
+        self.assertRaises(ValueError, variable.AddAttribute, '', string_type, string_vals)
+        self.assertEqual(len(variable.attributes), 0)
+        
+        # Test invalid argument: values
+        mixed_vals = ['val1', 'val2', None, 25]
+        self.assertRaises(TypeError, variable.AddAttribute, 'atrib1', string_type, 25)
+        self.assertEqual(len(variable.attributes), 0)
+        # @todo: Ensure entries for "values" of an empty list will fail
+#        self.assertRaises(TypeError, variable.AddAttribute, 'atrib1', string_type, [])
+#        self.assertEqual(len(variable.attributes), 0)
+        self.assertRaises(TypeError, variable.AddAttribute, 'atrib1', string_type, None)
+        self.assertEqual(len(variable.attributes), 0)
+        self.assertRaises(ValueError, variable.AddAttribute, 'atrib1', string_type, mixed_vals)
+        self.assertEqual(len(variable.attributes), 0)
+        
+        # Test invalid argument: data_types
+        self.assertRaises(TypeError, variable.AddAttribute, 'atrib1', None, string_vals)
+        self.assertEqual(len(variable.attributes), 0)
+        self.assertRaises(TypeError, variable.AddAttribute, 'atrib1', 'not an actual data_type', string_vals)
+        self.assertEqual(len(variable.attributes), 0)
+        self.assertRaises(ValueError, variable.AddAttribute, 'atrib1', int_type, string_vals)
+        self.assertEqual(len(variable.attributes), 0)
+        # @todo: Ensure entries for data_type of the correct type (int) but not listed in the DataType enum will fail
+#        self.assertRaises(TypeError, variable.AddAttribute, 'atrib1', 10000, string_vals)
+#        self.assertEqual(len(variable.attributes), 0)
+        
+        # Test legitimate arguments
+        variable.AddAttribute('atrib1', string_type, string_vals)
+        self.assertEqual(len(variable.attributes), 1)
+        self.assertEqual(variable.attributes[0].name, 'atrib1')
+        self.assertEqual(variable.attributes[0].array.value, string_vals)
+        self.assertEqual(variable.attributes[0].data_type, string_type)
+        
+        # Ensure more than one attribute can be created
+        variable.AddAttribute('atrib2', int_type, int_vals)
+        self.assertEqual(len(variable.attributes), 2)
+        self.assertEqual(variable.attributes[1].name, 'atrib2')
+        self.assertEqual(variable.attributes[1].array.value, int_vals)
+        self.assertEqual(variable.attributes[1].data_type, int_type)
+
+        # @todo: Test creation of preexisting attributes (should this fail?)
+#        variable.AddAttribute('atrib2', int_type, int_vals)
+
+    def test_AddDimension(self):
+        self.assertEqual(len(self.ds.root_group.dimensions), 0)
+        
+        # Test invalid argument: name
+        self.assertRaises(TypeError, self.ds.root_group.AddDimension, 5, 1)
+        self.assertEqual(len(self.ds.root_group.dimensions), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddDimension, None, 1)
+        self.assertEqual(len(self.ds.root_group.dimensions), 0)
+        self.assertRaises(ValueError, self.ds.root_group.AddDimension, '', 1)
+        self.assertEqual(len(self.ds.root_group.dimensions), 0)
+        
+        # Test invalid argument: length
+        self.assertRaises(ValueError, self.ds.root_group.AddDimension, 'dim1')
+        self.assertEqual(len(self.ds.root_group.dimensions), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddDimension, 'dim1', None)
+        self.assertEqual(len(self.ds.root_group.dimensions), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddDimension, 'dim1', 'bad length')
+        self.assertEqual(len(self.ds.root_group.dimensions), 0)
+        self.assertRaises(ValueError, self.ds.root_group.AddDimension, 'dim1', -4)
+        self.assertEqual(len(self.ds.root_group.dimensions), 0)
+        
+        # Test invalid argument: variable_length
+        self.assertRaises(TypeError, self.ds.root_group.AddDimension, 'dim1', 1, None)
+        self.assertEqual(len(self.ds.root_group.dimensions), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddDimension, 'dim1', 1, 'not a boolean')
+        self.assertEqual(len(self.ds.root_group.dimensions), 0)
+        
+        
+        # Test legitimate arguments
+        self.ds.root_group.AddDimension('dim1', 20, True)
+        self.assertEqual(len(self.ds.root_group.dimensions), 1)
+        self.assertEqual(self.ds.root_group.dimensions[0].name, 'dim1')
+        self.assertEqual(self.ds.root_group.dimensions[0].length, 20)
+        self.assertEqual(self.ds.root_group.dimensions[0].variable_length, True)
+
+        # Ensure more than one dimension can be created
+        self.ds.root_group.AddDimension('dim2', 12, False)
+        self.assertEqual(len(self.ds.root_group.dimensions), 2)
+        self.assertEqual(self.ds.root_group.dimensions[1].name, 'dim2')
+        self.assertEqual(self.ds.root_group.dimensions[1].length, 12)
+        self.assertEqual(self.ds.root_group.dimensions[1].variable_length, False)
+        
+        # @todo: Test creation of preexisting dimensions (should this fail?)
+#        self.ds.root_group.AddDimension('dim2', 12, False)
+    
+    def test_AddVariable(self):
+        self.assertEqual(len(self.ds.root_group.variables), 0)
+        
+        # Seed the root_group with dimensions to use in creating variables:
+        tau = self.ds.root_group.AddDimension('time', 10, True)
+        lat = self.ds.root_group.AddDimension('lat', 6, False)
+        lon = self.ds.root_group.AddDimension('lon', 25, False)
+
+        shape1 = [tau, lat, lon]
+        shape2 = [lat, lon]
+        float_type = self.ds.root_group.DataType.FLOAT
+        int_type   = self.ds.root_group.DataType.INT
+        
+        # Test invalid argument: name
+        self.assertRaises(TypeError, self.ds.root_group.AddVariable, 5, float_type, shape1)
+        self.assertEqual(len(self.ds.root_group.variables), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddVariable, None, float_type, shape1)
+        self.assertEqual(len(self.ds.root_group.variables), 0)
+        self.assertRaises(ValueError, self.ds.root_group.AddVariable, '', float_type, shape1)
+        self.assertEqual(len(self.ds.root_group.variables), 0)
+
+        # Test invalid argument: data_type
+        self.assertRaises(TypeError, self.ds.root_group.AddVariable, 'var1', None, shape1)
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddVariable, 'var1', 'not an actual data_type', shape1)
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        # @todo: Ensure entries for data_type of the correct type (int) but not listed in the DataType enum will fail
+#        self.assertRaises(TypeError, self.ds.root_group.AddVariable, 'var1', 10000)
+#        self.assertEqual(len(self.ds.root_group.attributes), 0)
+
+        # Test invalid argument: shape1
+        self.assertRaises(TypeError, self.ds.root_group.AddVariable, 'var1', float_type, [None])
+        self.assertEqual(len(self.ds.root_group.variables), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddVariable, 'var1', float_type, [lat, None])
+        self.assertEqual(len(self.ds.root_group.variables), 0)
+        self.assertRaises(AttributeError, self.ds.root_group.AddVariable, 'var1', float_type, [lat, 'not a dim obj'])
+        self.assertEqual(len(self.ds.root_group.variables), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddVariable, 'var1', float_type, [lat, self.ds.root_group])
+        self.assertEqual(len(self.ds.root_group.variables), 0)
+        self.assertRaises(TypeError, self.ds.root_group.AddVariable, 'var1', float_type, 'not a list obj')
+        self.assertEqual(len(self.ds.root_group.variables), 0)
+        
+        # Test legitimate arguments
+        self.ds.root_group.AddVariable('var1', float_type, shape1)
+        self.assertEqual(len(self.ds.root_group.variables), 1)
+        self.assertEqual(self.ds.root_group.variables[0].name, 'var1')
+        self.assertEqual(self.ds.root_group.variables[0].data_type, float_type)
+        self.assertEqual(len(self.ds.root_group.variables[0].shape), len(shape1))
+        for i in range(0, len(shape1)):
+            self.assertEqual(self.ds.root_group.variables[0].shape[i], shape1[i])
+        
+        # Ensure more than one variable can be created
+        self.ds.root_group.AddVariable('var2', int_type, shape2)
+        self.assertEqual(len(self.ds.root_group.variables), 2)
+        self.assertEqual(self.ds.root_group.variables[1].name, 'var2')
+        self.assertEqual(self.ds.root_group.variables[1].data_type, int_type)
+        self.assertEqual(len(self.ds.root_group.variables[1].shape), len(shape2))
+        for i in range(0, len(shape2)):
+            self.assertEqual(self.ds.root_group.variables[1].shape[i], shape2[i])
+        
+        # Ensure variables can be created without shape1 (scalars)
+        self.ds.root_group.AddVariable('var3', int_type, None)
+        self.assertEqual(len(self.ds.root_group.variables), 3)
+        self.assertEqual(self.ds.root_group.variables[2].name, 'var3')
+        self.assertEqual(self.ds.root_group.variables[2].data_type, int_type)
+        self.assertEqual(len(self.ds.root_group.variables[2].shape), 0)
+        
+    def test_FindGroupByName(self):
+        # Test invalid attributes: name
+        self.assertRaises(TypeError,      self.ds.root_group.FindGroupByName, 5)
+        self.assertRaises(TypeError,      self.ds.root_group.FindGroupByName, None)
+        self.assertRaises(ValueError,     self.ds.root_group.FindGroupByName, '')
+        self.assertRaises(OOIObjectError, self.ds.root_group.FindGroupByName, 'non-existant')
+        # @todo: Should we instead simply return None??
+
+        # Seed the root_group with data to query        
+        self.assertEqual(len(self.ds.root_group.groups), 0)
+        grp1 = self.ds.root_group.AddGroup('new_group1')
+        grp2 = self.ds.root_group.AddGroup('new_group2')
+        self.assertEqual(len(self.ds.root_group.groups), 2)
+        
+        # Test legitimate query
+        res_grp1 = self.ds.root_group.FindGroupByName('new_group1')
+        res_grp2 = self.ds.root_group.FindGroupByName('new_group2')
+        
+        self.assertIdentical(grp1, res_grp1)
+        self.assertIdentical(grp2, res_grp2)
+
+    def test_FindAttributeByName_in_group(self):
+        # Test invalid attributes: name
+        self.assertRaises(TypeError,      self.ds.root_group.FindAttributeByName, 5)
+        self.assertRaises(TypeError,      self.ds.root_group.FindAttributeByName, None)
+        self.assertRaises(ValueError,     self.ds.root_group.FindAttributeByName, '')
+        self.assertRaises(OOIObjectError, self.ds.root_group.FindAttributeByName, 'non-existant')
+        # @todo: Should we instead simply return None??
+
+        # Seed the root_group with data to query
+        string_vals = ['val1', 'val2', 'val3']
+        int_vals    = [123456, 987654, 0]
+        string_type = self.ds.root_group.DataType.STRING
+        int_type    = self.ds.root_group.DataType.INT
+        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        obj1 = self.ds.root_group.AddAttribute('atrib1', string_type ,string_vals)
+        obj2 = self.ds.root_group.AddAttribute('atrib2', int_type, int_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 2)
+        
+        # Test legitimate query
+        res1 = self.ds.root_group.FindAttributeByName('atrib1')
+        res2 = self.ds.root_group.FindAttributeByName('atrib2')
+        
+        self.assertIdentical(obj1, res1)
+        self.assertIdentical(obj2, res2)
+
+    def test_FindAttributeByName_in_variable(self):
+        # Seed the root_group with a variable to attach attributes to...
+        DT = self.ds.root_group.DataType
+        tau  = self.ds.root_group.AddDimension('time', 10, True)
+        lat  = self.ds.root_group.AddDimension('lat', 6, False)
+        lon  = self.ds.root_group.AddDimension('lon', 25, False)
+        variable = self.ds.root_group.AddVariable('var1', DT.FLOAT, [tau, lat, lon])
+    
+        self.assertEqual(len(variable.attributes), 0)
+        
+        # Test invalid attributes: name
+        self.assertRaises(TypeError,      variable.FindAttributeByName, 5)
+        self.assertRaises(TypeError,      variable.FindAttributeByName, None)
+        self.assertRaises(ValueError,     variable.FindAttributeByName, '')
+        self.assertRaises(OOIObjectError, variable.FindAttributeByName, 'non-existant')
+        # @todo: Should we instead simply return None??
+
+        # Seed the root_group with data to query
+        string_vals = ['val1', 'val2', 'val3']
+        int_vals    = [123456, 987654, 0]
+        string_type = variable.DataType.STRING
+        int_type    = variable.DataType.INT
+        self.assertEqual(len(variable.attributes), 0)
+        obj1 = variable.AddAttribute('atrib1', string_type ,string_vals)
+        obj2 = variable.AddAttribute('atrib2', int_type, int_vals)
+        self.assertEqual(len(variable.attributes), 2)
+        
+        # Test legitimate query
+        res1 = variable.FindAttributeByName('atrib1')
+        res2 = variable.FindAttributeByName('atrib2')
+        
+        self.assertIdentical(obj1, res1)
+        self.assertIdentical(obj2, res2)
+        
+    def test_FindDimensionByName_in_group(self):
+        # Test invalid attributes: name
+        self.assertRaises(TypeError,      self.ds.root_group.FindDimensionByName, 5)
+        self.assertRaises(TypeError,      self.ds.root_group.FindDimensionByName, None)
+        self.assertRaises(ValueError,     self.ds.root_group.FindDimensionByName, '')
+        self.assertRaises(OOIObjectError, self.ds.root_group.FindDimensionByName, 'non-existant')
+        # @todo: Should we instead simply return None??
+
+        # Seed the root_group with data to query
+        self.assertEqual(len(self.ds.root_group.dimensions), 0)
+        obj1 = self.ds.root_group.AddDimension('dim1', 25, True)
+        obj2 = self.ds.root_group.AddDimension('dim2', 130, False)
+        self.assertEqual(len(self.ds.root_group.dimensions), 2)
+        
+        # Test legitimate query
+        res1 = self.ds.root_group.FindDimensionByName('dim1')
+        res2 = self.ds.root_group.FindDimensionByName('dim2')
+        
+        self.assertIdentical(obj1, res1)
+        self.assertIdentical(obj2, res2)
+    
+    def test_FindDimensionByName_in_variable(self):
+        # Seed the root_group with a variable to attach attributes to...
+        DT = self.ds.root_group.DataType
+        tau  = self.ds.root_group.AddDimension('time', 10, True)
+        lat  = self.ds.root_group.AddDimension('lat', 6, False)
+        lon  = self.ds.root_group.AddDimension('lon', 25, False)
+        variable = self.ds.root_group.AddVariable('var1', DT.FLOAT, [tau, lat, lon])
+    
+        self.assertEqual(len(variable.attributes), 0)
+        
+        # Test invalid attributes: name
+        self.assertRaises(TypeError,      variable.FindDimensionByName, 5)
+        self.assertRaises(TypeError,      variable.FindDimensionByName, None)
+        self.assertRaises(ValueError,     variable.FindDimensionByName, '')
+        self.assertRaises(OOIObjectError, variable.FindDimensionByName, 'non-existant')
+        # @todo: Should we instead simply return None??
+
+        self.assertEqual(len(variable.shape), 3)
+        
+        # Test legitimate query
+        res1 = variable.FindDimensionByName('time')
+        res2 = variable.FindDimensionByName('lat')
+        res3 = variable.FindDimensionByName('lon')
+        
+        self.assertIdentical(res1, tau)
+        self.assertIdentical(res2, lat)
+        self.assertIdentical(res3, lon)
+    
+    def test_FindVariableByName(self):
+        # Test invalid attributes: name
+        self.assertRaises(TypeError,      self.ds.root_group.FindVariableByName, 5)
+        self.assertRaises(TypeError,      self.ds.root_group.FindVariableByName, None)
+        self.assertRaises(ValueError,     self.ds.root_group.FindVariableByName, '')
+        self.assertRaises(OOIObjectError, self.ds.root_group.FindVariableByName, 'non-existant')
+        # @todo: Should we instead simply return None??
+
+        # Seed the root_group with data to query
+        self.assertEqual(len(self.ds.root_group.variables), 0)
+
+        tau = self.ds.root_group.AddDimension('time', 10, True)
+        lat = self.ds.root_group.AddDimension('lat', 6, False)
+        lon = self.ds.root_group.AddDimension('lon', 25, False)
+        shape1 = [tau, lat, lon]
+        shape2 = [lat, lon]
+        float_type = self.ds.root_group.DataType.FLOAT
+        int_type   = self.ds.root_group.DataType.INT
+        
+        obj1 = self.ds.root_group.AddVariable('var1', float_type, shape1)
+        obj2 = self.ds.root_group.AddVariable('var2', int_type, shape2)
+        self.assertEqual(len(self.ds.root_group.variables), 2)
+        
+        # Test legitimate query
+        res1 = self.ds.root_group.FindVariableByName('var1')
+        res2 = self.ds.root_group.FindVariableByName('var2')
+        
+        self.assertIdentical(obj1, res1)
+        self.assertIdentical(obj2, res2)
+    
+    @SkipTest
+    def test_FindVariableIndexByName(self):
+        """
+        """
+
+    @SkipTest
+    def test_FindAttributeIndexByName_for_group(self):
+        """
+        """
+
+    @SkipTest
+    def test_FindAttributeIndexByName_for_variable(self):
+        """
+        """
+    
+    def test_SetAttribute_for_group(self):
+        # Seed the group with an attribute for testing
+        string_vals = ['val1', 'val2', 'val3']
+        int_vals    = [123456, 987654, 0]
+        string_type = self.ds.root_group.DataType.STRING
+        int_type    = self.ds.root_group.DataType.INT
+        
+        atr1 = self.ds.root_group.AddAttribute('atrib1', string_type, string_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 1)
+        self.assertEqual(self.ds.root_group.attributes[0].name, 'atrib1')
+        self.assertEqual(self.ds.root_group.attributes[0].array.value, string_vals)
+        self.assertEqual(self.ds.root_group.attributes[0].data_type, string_type)
+        
+        # Test invalid argument: name
+        self.assertRaises(TypeError, self.ds.root_group.SetAttribute, 5, string_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 1)
+        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+        self.assertRaises(TypeError, self.ds.root_group.SetAttribute, None, string_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 1)
+        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+        self.assertRaises(ValueError, self.ds.root_group.SetAttribute, '', string_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 1)
+        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+        
+        # Test invalid argument: values
+        mixed_vals = ['val1', 'val2', 123, None, 3.2]
+        self.assertRaises(TypeError, self.ds.root_group.SetAttribute, 'atrib1', 25)
+        self.assertEqual(len(self.ds.root_group.attributes), 1)
+        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+        # @todo: Ensure entries for "values" of an empty list will fail
+#        self.assertRaises(TypeError, self.ds.root_group.SetAttribute, 'atrib1', [])
+#        self.assertEqual(len(self.ds.root_group.attributes), 0)
+        self.assertRaises(TypeError, self.ds.root_group.SetAttribute, 'atrib1', None)
+        self.assertEqual(len(self.ds.root_group.attributes), 1)
+        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+        # @warning: Must implement this check
+        #           If set attribute fails mid-swing the method may have removed the old
+        #           attribute with the intent of replacing it in step 2.  Since this it
+        #           not an atomic action, stage-2 failure may result in placing the
+        #           dataset in an invalid state.  This must be prevented before the
+        #           following check will succeed
+#        self.assertRaises(ValueError, self.ds.root_group.SetAttribute, 'atrib1', mixed_vals)
+#        self.assertEqual(len(self.ds.root_group.attributes), 1)
+#        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+        
+        
+#        # Test legitimate arguments
+        string_vals2 = ['new1', 'new2', 'new3']
+        int_vals2    = [434233, 403030, 1]
+#        
+#        
+#        # Ensure DAG integrity (setting one group's attribute to a new set of values
+#        #                       when another group contains a reference to that same
+#        #                       attribute should not effect the second group
+#        atr2 = self.ds.root_group.AddAttribute('atrib2', int_type, int_vals)
+#        self.assertEqual(len(self.ds.root_group.attributes), 2)
+#        self.assertEqual(self.ds.root_group.attributes[1].name, 'atrib1')
+#        self.assertEqual(self.ds.root_group.attributes[1].array.value, int_vals)
+#        self.assertEqual(self.ds.root_group.attributes[1].data_type, int_type)
+        
+    @SkipTest
+    def test_SetDimension_for_group(self):
+        """
+        """
+        
+    def test_GetValues_for_attribute(self):
+        # Seed the root_group with an attribute or two
+        string_vals = ['val1', 'val2', 'val3']
+        int_vals    = [123456, 987654, 0]
+        string_type = self.ds.root_group.DataType.STRING
+        int_type    = self.ds.root_group.DataType.INT
+        self.ds.root_group.AddAttribute('atrib1', string_type, string_vals)
+        self.ds.root_group.AddAttribute('atrib2', int_type, int_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 2)
+        
+        # Test GetValues method:
+        res1 = self.ds.root_group.FindAttributeByName('atrib1').GetValues()
+        res2 = self.ds.root_group.FindAttributeByName('atrib2').GetValues()
+        self.assertNotEqual(res1, res2)
+        self.assertEqual(res1, string_vals)
+        self.assertEqual(res2, int_vals)
+        self.assertNotIdentical(res1, string_vals)
+        self.assertNotIdentical(res2, int_vals)
+        
+    def test_GetValue_for_attribute(self):
+        # Seed the root_group with an attribute or two
+        string_vals = ['val1', 'val2', 'val3']
+        int_vals    = [123456, 987654, 0]
+        string_type = self.ds.root_group.DataType.STRING
+        int_type    = self.ds.root_group.DataType.INT
+        atr1 = self.ds.root_group.AddAttribute('atrib1', string_type, string_vals)
+        atr2 = self.ds.root_group.AddAttribute('atrib2', int_type, int_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 2)
+        
+        # Test GetValue method:
+        for i in range(len(string_vals)):
+            val = atr1.GetValue(i)
+            self.assertEqual(val, string_vals[i])
+        for i in range(len(int_vals)):
+            val = atr2.GetValue(i)
+            self.assertEqual(val, int_vals[i])
+
+    def test_GetLength_for_attribute_values(self):
+        # Seed the root_group with an attribute or two
+        string_vals = ['val1', 'val2', 'val3']
+        int_vals    = [123456, 987654, 0]
+        string_type = self.ds.root_group.DataType.STRING
+        int_type    = self.ds.root_group.DataType.INT
+        atr1 = self.ds.root_group.AddAttribute('atrib1', string_type, string_vals)
+        atr2 = self.ds.root_group.AddAttribute('atrib2', int_type, int_vals)
+        self.assertEqual(len(self.ds.root_group.attributes), 2)
+        
+        # Test GetLength method:
+        self.assertEqual(atr1.GetLength(), len(string_vals))
+        self.assertEqual(atr2.GetLength(), len(int_vals))
+    
+    def test_GetUnits_for_variable(self):
+        # Seed the root_group with a variable and necessary attributes
+        DT = self.ds.root_group.DataType
+        tau  = self.ds.root_group.AddDimension('time', 10, True)
+        lat  = self.ds.root_group.AddDimension('lat', 6, False)
+        lon  = self.ds.root_group.AddDimension('lon', 25, False)
+        var1 = self.ds.root_group.AddVariable('var1', DT.FLOAT, [tau, lat, lon])
+        var2 = self.ds.root_group.AddVariable('var2', DT.INT, [lat, lon])
+        
+        var1.AddAttribute('units',       DT.STRING, ['meters'])
+        var1.AddAttribute('middle_name', DT.STRING, ['bad'])
+        var1.AddAttribute('in-my-car',   DT.STRING, ['stuff'])
+        var2.AddAttribute('units',       DT.STRING, ['pancakes'])
+        var2.AddAttribute('snacks',      DT.STRING, ['ring-dings'])
+        var2.AddAttribute('lunch',       DT.STRING, ['cake'])
+        
+        # Test GetUnits
+        result1 = var1.GetUnits()
+        delicious = var2.GetUnits()
+        self.assertEqual('meters', result1)
+        self.assertEqual('pancakes', delicious)
+    
+    def test_GetStandardName_for_variable(self):
+        # Seed the root_group with a variable and necessary attributes
+        DT = self.ds.root_group.DataType
+        tau  = self.ds.root_group.AddDimension('time', 10, True)
+        lat  = self.ds.root_group.AddDimension('lat', 6, False)
+        lon  = self.ds.root_group.AddDimension('lon', 25, False)
+        var1 = self.ds.root_group.AddVariable('var1', DT.FLOAT, [tau, lat, lon])
+        var2 = self.ds.root_group.AddVariable('var2', DT.INT, [lat, lon])
+        
+        var1.AddAttribute('standard_name', DT.STRING, ['variable_senior'])
+        var1.AddAttribute('units',         DT.STRING, ['meters'])
+        var1.AddAttribute('middle_name',   DT.STRING, ['bad'])
+        var1.AddAttribute('in-my-car',     DT.STRING, ['stuff'])
+        var2.AddAttribute('standard_name', DT.STRING, ['variable_junior'])
+        var2.AddAttribute('units',         DT.STRING, ['pancakes'])
+        var2.AddAttribute('snacks',        DT.STRING, ['ring-dings'])
+        var2.AddAttribute('lunch',         DT.STRING, ['cake'])
+        
+        # Test GetUnits
+        father = var1.GetStandardName()
+        son = var2.GetStandardName()
+        self.assertEqual('variable_senior', father)
+        self.assertEqual('variable_junior', son)
         
         
 class TestWrapperMethodsRequiringRepository(unittest.TestCase):

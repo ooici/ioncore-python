@@ -338,35 +338,60 @@ class WrapperType(type):
     def _add_specializations(cls, obj_type, clsDict):
 
         #-----------------------------------#
+        # Wrapper_Dataset Specialized Methods #
+        #-----------------------------------#
+        def _make_root_group(self, name=''):
+            """
+            Specialized method for CDM (dataset) Objects to append a group object with the given name
+            """
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if self.root_group is not None:
+                raise OOIObjectError('Cannot make the root group when one already exists!')
+            
+            group = self.Repository.create_object(CDM_GROUP_TYPE)
+            group.name = name
+            self.root_group = group
+
+
+        #-----------------------------------#
         # Wrapper_Group Specialized Methods #
         #-----------------------------------#
         def _add_group_to_group(self, name=''):
             """
             Specialized method for CDM (group) Objects to append a group object with the given name
+            @return: The group being created (as a convenience)
             """
-            if not name or not isinstance(name, str):
-                raise OOIObjrectError('Invalid group name: "%s" -- please specify a non-empty string name' % str(name))
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name":  Please specify a non-empty string')
             
             group = self.Repository.create_object(CDM_GROUP_TYPE)
             group.name = name
             group_ref = self.groups.add()
             group_ref.SetLink(group)
+            
+            return group
         
         
-        def _add_attribute(self, name, values, data_type):
+        def _add_attribute(self, name, data_type, values):
             """
             Specialized method for CDM (group) Objects to append a group object with the given name
             @param name: The intented name of the attribute to be appended
             @param values: A List of primitives to be stored as this attributes value.
             @param data_type: A Value from the DataType enum indicating how the 'values' argument should be stored
+            @return: The attribute being created (as a convenience)
             """
             # @attention: Should we allow an empty list of values for an attribute?
-            if not name or not isinstance(name, str):
-                raise OOIObjectError('Invalid attribute name: "%s" -- please specify a non-empty string name' % str(name))
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
             if not values or not isinstance(values, list):
-                raise OOIObjectError('Invalid attribute values: "%s" -- please specify a list for the argument "values"' % str(values))
+                raise TypeError('Type mismatch for argument "values" -- Expected %s; received %s with value: "%s"' % (repr(list), type(values), str(values)))
             if not data_type or not isinstance(data_type, int):
-                raise OOIObjectError('Invalid attribute data_type: "%s" -- data_type must be of type int' % str(data_type))
+                raise TypeError('Type mismatch for argument "data_type" -- Expected %s; received %s with value: "%s"' % (repr(int), type(data_type), str(data_type)))
             
             # @todo: all items must be the same type...  this includes ommiting/casting null values
             #        since they will cause an error when stored in the GPB array representation
@@ -410,22 +435,30 @@ class WrapperType(type):
             try:
                 atrib.array.value.extend(values)
             except TypeError, ex:
-                raise OOIObjectError('Parameter data_type (%s) is incompatible with the given values -- %s' % (str(data_type), str(ex)))
+                raise ValueError('Parameter data_type (%s) is incompatible with the given values -- %s' % (str(data_type), str(ex)))
             
             # Attach the attribute resource instance to its parent resource via CASRef linking 
             atrib_ref = self.attributes.add()
             atrib_ref.SetLink(atrib)
+            
+            return atrib
         
         
-        def _add_dimension(self, name=None, length=-1, variable_length=True):
+        def _add_dimension(self, name, length=-1, variable_length=True):
             """
             Specialized method for CDM Objects to append a dimension object with the given name and length
+            @return: The dimension being created (as a convenience)
             """
-            if not name or not isinstance(name, str):
-                raise OOIObjectError('Invalid dimension name: "%s" -- please specify a non-empty string name' % str(name))
-            
-            if not isinstance(length, int) or length <= 0:
-                raise OOIObjectError('Invalid dimension length: "%s" -- please specify a positive integer for length' % str(length))
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
+            if not isinstance(length, int):
+                raise TypeError('Type mismatch for argument "length" -- Expected %s; received %s with value: "%s"' % (repr(int), type(length), str(length)))
+            if length <= 0:
+                raise ValueError('Invalid argument "dimension": "%s" -- Please specify a positive integer' % str(length))
+            if not isinstance(variable_length, bool):
+                raise TypeError('Type mismatch for argument "variable_length" -- Expected %s; received %s with value: "%s"' % (type(bool), type(variable_length), str(variable_length)))
                 
             
             dim = self.Repository.create_object(CDM_DIMENSION_TYPE)
@@ -434,17 +467,23 @@ class WrapperType(type):
             dim.variable_length = variable_length
             dim_ref = self.dimensions.add()
             dim_ref.SetLink(dim)
+            
+            return dim
 
         
         def _add_variable(self, name, data_type, shape=[]):
             """
             Specialized method for CDM Objects to append a variable object with the given name, data_type, and shape
+            @return: The variable being created (as a convenience)
             """
-            if not name or not isinstance(name, str) or name == '':
-                raise OOIObjectError('Invalid variable name requested: "%s"' % str(data_type))
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
             # @todo: Find a better way to ensure DataType is a valid value in cdmdatatype enum
             if not data_type or not isinstance(data_type, int):
-                raise OOIObjectError('Invalid data_type requested: "%s"' % str(data_type))
+                raise TypeError('Type mismatch for argument "data_type" -- Expected %s; received %s with value: "%s"' % (repr(int), type(data_type), str(data_type)))
+            
             
             var = self.Repository.create_object(CDM_VARIABLE_TYPE)
             var.name = name
@@ -452,11 +491,15 @@ class WrapperType(type):
 
             # @note: shape is allowed to be null for scalar variables
             if shape is not None:
+                if not isinstance(shape, list):
+                    raise TypeError('Type mismatch for argument "shape" -- Expected %s; received %s with value: "%s"' % (repr(list), type(shape), str(shape)))
                 for dim in shape:
                     if dim is None:
-                        raise OOIObjectError('Invalid shape given -- encountered null entries: "%s".  ' % str(shape))
-                    elif not hasattr(dim, 'ObjectType') or dim.ObjectType != CDM_DIMENSION_TYPE:
-                        raise OOIObjectError('Invalid shape given -- shape must provide a list of CDM dimension objects: "%s"' % str(shape))
+                        raise TypeError('Invalid shape given -- encountered null entries: "%s".  ' % str(shape))
+                    elif not hasattr(dim, 'ObjectType'):
+                        raise AttributeError('Type mismatch for value in argument "shape" -- Could not access method ObjectType for object "%s" of type "%s"' % (str(dim), type(dim)))
+                    elif dim.ObjectType != CDM_DIMENSION_TYPE:
+                        raise TypeError('Type mismatch for value in argument "shape" -- Expected %s; received %s with value: "%s"' % (repr(CDM_DIMENSION_TYPE), repr(dim.ObjectType), str(dim)))
                     else:
                         # Add this dimension to the variable's shape!
                         dim_ref = var.shape.add()
@@ -465,14 +508,18 @@ class WrapperType(type):
             var_ref = self.variables.add()
             var_ref.SetLink(var)
             
+            return var
+            
 
         def _find_group_by_name(self, name=''):
             """
             Specialized method for CDM Objects to find the group object by its name
             """
-            if not name or not isinstance(name, str):
-                raise OOIObjectError('Invalid group name requested: "%s"' % str(name))
-
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
+            
             result = None
             for group in self.groups:
                 if group.name == name:
@@ -483,13 +530,16 @@ class WrapperType(type):
             
             return result
 
+
         def _find_attribute_by_name(self, name=''):
             """
             Specialized method for CDM Objects to find the attribute object by its name
             """
             # @attention: Should this find operate on the variable's standard_name attribute when avail?
-            if not name or not isinstance(name, str):
-                raise OOIObjectError('Invalid attribute name requested: "%s"' % str(name))
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
 
             result = None
             for att in self.attributes:
@@ -506,8 +556,10 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find a dimension object by its name
             """
-            if not name or not isinstance(name, str):
-                raise OOIObjectError('Invalid dimension name requested: "%s"' % str(name))
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
 
             result = None
             
@@ -522,19 +574,20 @@ class WrapperType(type):
                         result = dim
                         break
                 
-                
-                
             if None == result:
                 raise OOIObjectError('Requested dimension name not found: "%s"' % str(name))
 
             return result
 
+
         def _find_variable_by_name(self, name=''):
             """
             Specialized method for CDM Objects to find the variable object by its name
             """
-            if not name or not isinstance(name, str):
-                raise OOIObjectError('Invalid variable name requested: "%s"' % str(name))
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
 
             result = None
             for var in self.variables:
@@ -551,8 +604,10 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find the variable object's index by the variable's name
             """
-            if not name or not isinstance(name, str):
-                raise OOIObjectError('Invalid variable name requested: "%s"' % str(name))
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
 
             result = -1
             for i in xrange(0, len(self.variables)):
@@ -571,8 +626,10 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to find the attribute object's index by the attribute's name
             """
-            if not name or not isinstance(name, str):
-                raise OOIObjectError('Invalid attribute name requested: "%s"' % str(name))
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
 
             result = -1
             for i in xrange(0, len(self.attributes)):
@@ -590,9 +647,13 @@ class WrapperType(type):
         def __remove_attribute(self, name):
             """
             Removes an attribute with the given name from this CDM Object (GROUP)
+            @return: The attribute which was removed as a convenience
             """
             idx = _find_attribute_index_by_name(self, name)
+            atr = self.attributes.__getitem__(idx)
             self.attributes.__delitem__(idx)
+            
+            return atr
             
         
         def _set_attribute(self, name, values=[]):
@@ -600,13 +661,17 @@ class WrapperType(type):
             Specialized method for CDM Objects to set values for existing attributes
             """
             # @attention: Should we allow an empty list of values for an attribute?
-            if not name or not isinstance(name, str):
-                raise OOIObjectError('Invalid attribute name: "%s" -- please specify a non-empty string name' % str(name))
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
             if not values or not isinstance(values, list):
-                raise OOIObjectError('Invalid attribute values: "%s" -- please specify a list for the argument "values"' % str(values))
+                raise TypeError('Type mismatch for argument "values" -- Expected %s; received %s with value: "%s"' % (repr(list), type(values), str(values)))
 
-            __remove_attribute(self, name)
-            _add_attribute(self, name, values)
+            
+
+            atr = __remove_attribute(self, name)
+            _add_attribute(self, name, atr.data_type, values)
         
         
         def _set_dimension(self, name, length):
@@ -693,13 +758,11 @@ class WrapperType(type):
         # Additional helper methods for attaching specialized attributes/methods #
         #------------------------------------------------------------------------#
         def __add_data_type_enum(clsDict):
-                print "\n\n\nAdding DataType enun to Group...."
                 # Get a handle to the data_type field from the variable class
                 VAR_CLASS = get_gpb_class_from_type_id(CDM_VARIABLE_TYPE)
                 field_desc = None
                 for name, desc in VAR_CLASS.DESCRIPTOR.fields_by_name.items():
                     if name == "data_type":
-                        print "\n\n\n\nFound data_type descriptor!"
                         field_desc = desc
                 
                 # Add the enum definitions from the data_type field (can only be one - DataType)
@@ -723,6 +786,10 @@ class WrapperType(type):
 
             clsDict['SetLink'] = obj_setlink
         
+        elif obj_type == CDM_DATASET_TYPE:
+            
+            clsDict['MakeRootGroup'] = _make_root_group
+            
         elif obj_type == CDM_GROUP_TYPE:
 
             clsDict['AddGroup'] = _add_group_to_group
