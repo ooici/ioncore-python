@@ -46,7 +46,8 @@ class ExchangeManager(BasicLifecycleObject):
         heartbeat = int(self.config['broker_heartbeat'])
 
         # Is a BrokerConnection instance (no action at this point)
-        self.message_space = MessageSpace(hostname=hostname,
+        self.message_space = MessageSpace(self,
+                                hostname=hostname,
                                 port=port,
                                 virtual_host=virtual_host,
                                 heartbeat=heartbeat)
@@ -132,3 +133,15 @@ class ExchangeManager(BasicLifecycleObject):
         """
         exchange_space = exchange_space or self.container.exchange_manager.exchange_space
         return exchange_space.send(to_name, message_data, **kwargs)
+
+    def connectionLost(self, reason):
+        """
+        Event triggered by the messaging manager when the amqp client goes
+        down.
+        The relationship between the exchange manager and the messaging
+        manager is not well defined, so it is only via 'the force' that the
+        messaging manager will understand that it should notify the
+        exchange manager of things like connectionLost
+        """
+        self.container.exchangeConnectionLost(reason)
+

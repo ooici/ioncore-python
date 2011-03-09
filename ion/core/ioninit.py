@@ -24,6 +24,9 @@ if sys.version_info > (3,0):
     raise RuntimeError("ioncore is not compatible with Python 3.0 or later.")
 del sys
 
+# The following code looking for a ION_ALTERNATE_LOGGING_CONF environment
+# variable can go away with the new ion environment directories 
+
 # Configure logging system (console, logfile, other loggers)
 # NOTE: Console logging is appended to Twisted log output prefix!!
 if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
