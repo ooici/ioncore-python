@@ -133,21 +133,23 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # try to register this user for the first time
         reply = yield self.aisc.registerUser(msg)
         log.debug('registerUser returned:\n'+str(reply))
-        log.debug('registerUser returned:\n'+str(reply.message_parameters_reference))
+        log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
+        log.info("test_registerUser: first time registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
             
         # try to re-register this user for a second time
         reply = yield self.aisc.registerUser(msg)
         log.debug('registerUser returned:\n'+str(reply))
-        log.debug('registerUser returned:\n'+str(reply.message_parameters_reference))
+        log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
         if FirstOoiId != reply.message_parameters_reference[0].ooi_id:
             self.fail("re-registration did not return the same OoiId as registration")
+        log.info("test_registerUser: re-registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
         
