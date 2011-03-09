@@ -192,14 +192,20 @@ class Receiver(BasicLifecycleObject):
             msg = inv1.message
             data = inv1.content
 
-        # Make the calls into the application code (e.g. process receive)
-        try:
-            for handler in self.handlers:
-                yield defer.maybeDeferred(handler, data, msg)
-        finally:
-            if msg._state == "RECEIVED":
-                log.error("Message has not been ACK'ed at the end of processing")
-            del self.rec_messages[id(msg)]
+            # TODO fix this
+            # For now, silently dropping message
+            if inv1.status == Invocation.STATUS_DROP:
+                log.info("Message dropped! to=%s op=%s" % (data.get('receiver',None), data.get('op',None)))
+                del self.rec_messages[id(msg)]
+            else:
+                # Make the calls into the application code (e.g. process receive)
+                try:
+                    for handler in self.handlers:
+                        yield defer.maybeDeferred(handler, data, msg)
+                finally:
+                    if msg._state == "RECEIVED":
+                        log.error("Message has not been ACK'ed at the end of processing")
+                    del self.rec_messages[id(msg)]
 
     @defer.inlineCallbacks
     def send(self, **kwargs):
@@ -227,13 +233,19 @@ class Receiver(BasicLifecycleObject):
                 inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
                 msg = inv1.message
 
-            # call flow: Container.send -> ExchangeManager.send -> ProcessExchangeSpace.send
-            yield ioninit.container_instance.send(msg.get('receiver'), msg, publisher_config=self.publisher_config)
+            # TODO fix this
+            # For now, silently dropping message
+            if inv1.status == Invocation.STATUS_DROP:
+                log.info("Message dropped! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
+            else:
+                # call flow: Container.send -> ExchangeManager.send -> ProcessExchangeSpace.send
+                yield ioninit.container_instance.send(msg.get('receiver'), msg, publisher_config=self.publisher_config)
         except Exception, ex:
             log.exception("Send error")
         else:
-            log.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
-            #log.debug("msg"+str(msg))
+            if inv1.status != Invocation.STATUS_DROP:
+                log.info("Message sent! to=%s op=%s" % (msg.get('receiver',None), msg.get('op',None)))
+                #log.debug("msg"+str(msg))
 
     def __str__(self):
         return "Receiver(label=%s,xname=%s,group=%s)" % (
