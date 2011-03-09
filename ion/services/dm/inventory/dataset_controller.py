@@ -13,14 +13,12 @@ from twisted.internet import defer
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.core.messaging.message_client import MessageClient
 from ion.core.exception import ApplicationError
 
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 
 from ion.core.object import object_utils
 
-# from net.ooici.play instrument_example.proto
 CMD_DATASET_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 """
 message Dataset {
@@ -113,6 +111,32 @@ message IDRef {
 	optional string commit = 4;
 }
 """
+
+FindDatasetRequest_TYPE = object_utils.create_type_identifier(object_id=2401, version=1)
+"""
+message FindDatasetMessage {
+    enum _MessageTypeIdentifier {
+		_ID = 2401;
+		_VERSION = 1;
+	}
+
+    optional bool only_mine = 1 ;
+    optional net.ooici.services.coi.LifeCycleState by_life_cycle_State = 2 [default = ACTIVE];
+    }
+"""
+
+ListFindResults_TYPE = object_utils.create_type_identifier(object_id=22, version=1)
+"""
+message QueryResult{
+    enum _MessageTypeIdentifier {
+      _ID = 22;
+      _VERSION = 1;
+    }
+    repeated net.ooici.core.link.CASRef idref = 1;
+}
+"""
+
+
 
 class DatasetControllerError(ApplicationError):
     """
@@ -308,8 +332,8 @@ class DatasetController(ServiceProcess):
         """
         @Brief set the lifecycle state of the dataset resource
 
-        @param params request GPB, ??, a request to find datasets
-        @retval simple ack message
+        @param params request GPB, 2401/1, a request to find datasets
+        @retval ListFindResults Type, GPB 22/1, A list of Dataset Resource References that match the request
         """
 
         # Request params:
