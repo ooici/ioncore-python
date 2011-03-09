@@ -902,6 +902,15 @@ class ProcessClient(ProcessClientBase):
         """
         Sends an RPC message to the specified target via originator process
         """
+        
+        # Validate expiry value
+        assert type(expiry) is str, 'Expiry must be string representation of int time value'
+
+        try:
+            expiryval = int(expiry)
+        except:
+            assert False, 'Expiry must be string representation of int time value'
+            
         headers = {'user-id':user_id, 'expiry':expiry}
         return self.proc.rpc_send(self.target, operation, content, headers)
 
