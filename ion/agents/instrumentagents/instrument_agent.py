@@ -277,10 +277,12 @@ class InstrumentAgent(ResourceAgent):
 
 
     def start_transaction(timeout):
+        pass
     
     
     
     def end_transaction(tid):
+        pass
     
     
 
