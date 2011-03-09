@@ -52,7 +52,7 @@ class Rot13Service(ServiceProcess):
                                content.ResponseCodes.BAD_REQUEST)
 
         # Check for required field in message
-        if not hasattr(content, 'input_string'):
+        if not content.IsFieldSet('input_string'):
             raise R13Exception('Required field not found in message',
                                content.ResponseCodes.BAD_REQUEST)
 
