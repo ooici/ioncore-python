@@ -25,6 +25,8 @@ import ion.util.procutils as pu
 
 from ion.resources import description_utility
 
+from ion.core.process.process import request
+
 # The following modules must be imported here, because they load config
 # files. If done while in test, it does not work!
 
@@ -184,6 +186,15 @@ class IonTestCase(unittest.TestCase):
         """
         process = ioninit.container_instance.proc_manager.process_registry.kvs.get(pid, None)
         return process
+                
+    def run(self, result):
+        # TODO This is where we can inject user id and expiry into test case
+        # stack to allow running of tests within the policy enforcement environment
+        # as well as force certain policy enforcement failures, etc.
+        #request.user_id = 'MYUSERID'
+        #request.expiry = '999999999'
+        unittest.TestCase.run(self, result)        
+
 
 class ReceiverProcess(Process):
     """

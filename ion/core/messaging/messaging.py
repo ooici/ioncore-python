@@ -10,9 +10,64 @@ from twisted.internet import defer
 
 from carrot import connection
 from carrot import messaging
+from txamqp.client import TwistedDelegate
 
 from ion.core.cc.store import Store
 from ion.util.state_object import BasicLifecycleObject
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
+class AMQPEvents(TwistedDelegate):
+    """
+    This class defines handlers for asynchronous amqp events (events the
+    broker can raise at any time).
+    """
+
+    def __init__(self, manager):
+        TwistedDelegate.__init__(self)
+        self.manager = manager
+
+    def basic_deliver(self, ch, msg):
+        """notify container when an error occurs during message delivery
+
+        ch._deliver comes from carrot.backends.txamqplib. Delivered
+        messages are routed to their endpoint receiver via the amqp channel
+        that the receivers consumer was created with.
+        This delivery plumbing is definitely messy and hacky. We used to
+        use a TwistedDelegate subclass called
+        carrot.backends.txamqplib.InterceptionPoint, where the ch._deliver
+        made slightly more sense. 
+        """
+        d = defer.maybeDeferred(ch._deliver, msg)
+        d.addErrback(self.manager.delivery_error, msg) #XXX
+
+    def basic_return(self, ch, msg):
+        """implement this to handle messages that could not be delivered to
+        a queue or consumer
+        """
+        log.warning("""basic.return event received! This means the broker\
+                could not guarantee reliable delivery for a message sent\
+                from a process in this container.""")
+
+    def channel_flow(self, ch, msg):
+        """implement this to handle a broker flow control request
+        """
+        log.warning('channel.flow event received')
+
+    def channel_alert(self, ch, msg):
+        """implement this to handle a broker channel.alert notification.
+        """
+        log.warning('channel.alert event received')
+        
+    def close(self, reason):
+        """The AMQClient protocol calls this as a result of a
+        connectionLost event. The TwistedDelegate.close method finishes
+        shutting off the client, and we get a chance to react to the event
+        here.
+        """
+        TwistedDelegate.close(self, reason)
+        self.manager.connectionLost(reason) #XXX notify container that we lost the connection
+
 
 class MessageSpace(BasicLifecycleObject):
     """
@@ -20,12 +75,18 @@ class MessageSpace(BasicLifecycleObject):
     Follows a basic life cycle.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, exchange_manager, *args, **kwargs):
+        """
+        @param exchange_manager So we can link our states. If I'm in a bad
+        state, then I need to notify ExchangeManager.
+        """
         BasicLifecycleObject.__init__(self)
         self.connection = None
+        self.exchange_manager = exchange_manager
 
         # Immediately transition to READY state
         self.initialize(*args, **kwargs)
+        self.closing = False # State that determines if we expect a close event
 
     def on_initialize(self, *args, **kwargs):
         """
@@ -33,22 +94,38 @@ class MessageSpace(BasicLifecycleObject):
         instance.
         """
         self.connection = connection.BrokerConnection(*args, **kwargs)
+        self.closing = False # State that determines if we expect a close event
 
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
         assert not self.connection._connection, "Already connected to broker"
-        yield self.connection.connect()
+        amqpEvents = AMQPEvents(self)
+        yield self.connection.connect(amqpEvents)
 
     def on_deactivate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
 
     def on_terminate(self, *args, **kwargs):
-        # @note Carrot has a different close() on the BrokerConnection
-        # @note lostConnection does not return anything
-        return self.connection._connection.transport.loseConnection()
+        self.closing = True
+        return defer.maybeDeferred(self.connection.close)
 
     def on_error(self, *args, **kwargs):
-        raise RuntimeError("Illegal state change for MessageSpace")
+        #raise RuntimeError("Illegal state change for MessageSpace")
+        self.exchange_manager.error(*args, **kwargs)
+
+    def delivery_error(self, msg):
+        """
+        @param msg Message that resulted in a delivery error
+        @notes Is this always a fatal error?
+        """
+
+    def connectionLost(self, reason):
+        """
+        AMQP Client triggers this event when it has a conenctionLost event
+        itself.
+        """
+        if not self.closing: #only notify of unexpected closure
+            self.exchange_manager.connectionLost(reason) # perpetuate the event
 
     def __repr__(self):
         params = ['hostname',
