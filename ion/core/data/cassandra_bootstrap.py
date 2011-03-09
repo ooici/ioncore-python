@@ -50,14 +50,14 @@ log = ion.util.ionlog.getLogger(__name__)
 
 
 
-class CassnadraIndexedStoreBootstrap(CassandraIndexedStore):
+class CassandraIndexedStoreBootstrap(CassandraIndexedStore):
 
     def __init__(self):
         """
         Get init args from the bootstrap
         """
 
-class CassnadraStoreBootstrap(CassandraStore):
+class CassandraStoreBootstrap(CassandraStore):
 
     def __init__(self):
         """
