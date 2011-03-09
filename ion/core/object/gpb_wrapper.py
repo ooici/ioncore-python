@@ -353,34 +353,39 @@ class WrapperType(type):
             group_ref.SetLink(group)
         
         
-        def _add_attribute(self, name=None, values=None):
+        def _add_attribute(self, name, values, data_type):
             """
             Specialized method for CDM (group) Objects to append a group object with the given name
+            @param name: The intented name of the attribute to be appended
+            @param values: A List of primitives to be stored as this attributes value.
+            @param data_type: A Value from the DataType enum indicating how the 'values' argument should be stored
             """
             # @attention: Should we allow an empty list of values for an attribute?
             if not name or not isinstance(name, str):
                 raise OOIObjectError('Invalid attribute name: "%s" -- please specify a non-empty string name' % str(name))
             if not values or not isinstance(values, list):
                 raise OOIObjectError('Invalid attribute values: "%s" -- please specify a list for the argument "values"' % str(values))
+            if not data_type or not isinstance(data_type, int):
+                raise OOIObjectError('Invalid attribute data_type: "%s" -- data_type must be of type int' % str(data_type))
             
             # @todo: all items must be the same type...  this includes ommiting/casting null values
             #        since they will cause an error when stored in the GPB array representation
-            list_type = types.NoneType
-            for item in values:
-                if list_type == types.NoneType:
-                    # Determine the type of values in this list...
-                    list_type = type(item)
-                else:
-                    # ...and ensure all values are the same type or None
-                    next_type = type(item)
-                    if next_type != types.NoneType and next_type != list_type:
-                        raise OOIObjectError('Invalid attribute value list: "%s" -- All items in this list must be of the same type or the value None' % str(values))
-                
-            log.debug('Type of list is "%s" for list: "%s"' % (str(list_type), str(values)))
+#            list_type = types.NoneType
+#            for item in values:
+#                if list_type == types.NoneType:
+#                    # Determine the type of values in this list...
+#                    list_type = type(item)
+#                else:
+#                    # ...and ensure all values are the same type or None
+#                    next_type = type(item)
+#                    if next_type != types.NoneType and next_type != list_type:
+#                        raise OOIObjectError('Invalid attribute value list: "%s" -- All items in this list must be of the same type or the value None' % str(values))
+#            log.debug('Type of list is "%s" for list: "%s"' % (str(list_type), str(values)))
             
             # Create the new attribute
             atrib = self.Repository.create_object(CDM_ATTRIBUTE_TYPE)
             atrib.name = name
+            atrib.data_type = data_type
 
             # Set the datatype based on the type of values being given
             # @todo: add support for remaining array types (currently only string attributes are even used)
@@ -395,15 +400,17 @@ class WrapperType(type):
                 atrib_inst.data_type = atrib_inst.DataType.STRING
                 atrib_inst.array = parent.Repository.create_object(CDM_ARRAY_STRING_TYPE)
             
-            attach_array_definitions = {types.StringType : _attach_string_array,
-                                        types.IntType : _attach_int32_array,
-                                        types.FloatType : _attach_float32_array}
+            attach_array_definitions = {self.DataType.STRING : _attach_string_array,
+                                        self.DataType.INT    : _attach_int32_array,
+                                        self.DataType.FLOAT  : _attach_float32_array}
             
-            attach_array_definitions[list_type](self, atrib)
-#            attach_array_definitions[list_type](self, None)
+            attach_array_definitions[data_type](self, atrib)
             
             # Extend the attribute value array with the given values list
-            atrib.array.value.extend(values)
+            try:
+                atrib.array.value.extend(values)
+            except TypeError, ex:
+                raise OOIObjectError('Parameter data_type (%s) is incompatible with the given values -- %s' % (str(data_type), str(ex)))
             
             # Attach the attribute resource instance to its parent resource via CASRef linking 
             atrib_ref = self.attributes.add()
