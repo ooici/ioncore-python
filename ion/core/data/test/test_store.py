@@ -104,7 +104,7 @@ class CassandraStoreTest(IStoreTest):
 
     @itv(CONF)
     def _setup_backend(self):
-        """
+        
         ### This is a short cut to use resource objects without a process 
         wb = workbench.WorkBench('No Process: Testing only')
         
@@ -134,19 +134,12 @@ class CassandraStoreTest(IStoreTest):
         cache_repository, column_family  = wb.init_repository(column_family_type)
         # only the name of the column family is required
         column_family.name = 'TestCF'
-        """
-        host = "ec2-204-236-159-249.us-west-1.compute.amazonaws.com"
-        port = 9160
-        keyspace = "StoreTestKeyspace"
-        column_family = "TestCF"
-        credentials = {"username":"ooiuser", "password": "oceans11"}
-    
-        connection_string = cassandra.CassandraConnectionString(host, \
-                                                                port, \
-                                                                keyspace, \
-                                                                column_family, \
-                                                                credentials)
-        store = cassandra.CassandraStore(connection_string)
+        
+        
+        store = cassandra.CassandraStore(cassandra_cluster, \
+                                         cassandra_keyspace, \
+                                         simple_password, \
+                                         column_family)
         
         
         store.initialize()
@@ -431,7 +424,7 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
         yield self._stop_container()
 
 
-class CassandraIndexedStoreTest(IndexStoreTest):
+class CassandraIndexStoreTest(IndexStoreTest):
 
     @itv(CONF)
     @defer.inlineCallbacks
@@ -445,75 +438,55 @@ class CassandraIndexedStoreTest(IndexStoreTest):
         @note The column_metadata in the cache is not correct. The column family on the 
         server has a few more indexes.  
         """
-#        
-#        ### This is a short cut to use resource objects without a process 
-#        wb = workbench.WorkBench('No Process: Testing only')
-#        
-#        ### Create a persistence_technology resource - for cassandra a CassandraCluster object
-#        persistence_technology_repository, cassandra_cluster  = wb.init_repository(cassandra_cluster_type)
-#        
-#        # Set only one host and port in the host list for now
-#        cas_host = cassandra_cluster.hosts.add()
-#        #cas_host.host = 'amoeba.ucsd.edu'
-#        #cas_host.host = 'localhost'
-#        cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
-#        cas_host.port = 9160
-#        
-#        ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
-#        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keyspace_type)
-#        # only the name of the keyspace is required
-#        cassandra_keyspace.name = 'StoreTestKeyspace'
-#        #cassandra_keyspace.name = 'Keyspace1'
-#        
-#        ### Create a Credentials resource - for cassandra a SimplePassword object
-#        cache_repository, simple_password  = wb.init_repository(simple_password_type)
-#        # only the name of the column family is required
-#        simple_password.username = 'ooiuser'
-#        simple_password.password = 'oceans11'
-#        
-#        ### Create a Cache resource - for Cassandra a ColumnFamily object
-#
-#        cache_repository, column_family  = wb.init_repository(column_family_type)
-#        # only the name of the column family is required
-#        column_family.name = 'TestCF'
-#        
-#        self.cache = column_family
-#        self.cache_repository = cache_repository
-#        column = cache_repository.create_object(columndef_type)
-#        #column_repository, column  = wb.init_repository(columndef_type) # This is wrong...
-#        column.column_name = "state"
-#        column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
-#        #IndexType.KEYS is 0, and IndexType is an enum
-#        column.index_type = 0
-#        column.index_name = 'stateIndex'
-#        self.cache.column_metadata.add()
-#        self.cache.column_metadata[0] = column
-#        
-#        
-#        store = cassandra.CassandraIndexedStore(cassandra_cluster, \
-#                                                cassandra_keyspace, \
-#                                                simple_password, \
-#                                                column_family)
+        
+        ### This is a short cut to use resource objects without a process 
+        wb = workbench.WorkBench('No Process: Testing only')
+        
+        ### Create a persistence_technology resource - for cassandra a CassandraCluster object
+        persistence_technology_repository, cassandra_cluster  = wb.init_repository(cassandra_cluster_type)
+        
+        # Set only one host and port in the host list for now
+        cas_host = cassandra_cluster.hosts.add()
+        #cas_host.host = 'amoeba.ucsd.edu'
+        #cas_host.host = 'localhost'
+        cas_host.host = 'ec2-204-236-159-249.us-west-1.compute.amazonaws.com'
+        cas_host.port = 9160
+        
+        ### Create a Persistent Archive resource - for cassandra a Cassandra KeySpace object
+        persistent_archive_repository, cassandra_keyspace  = wb.init_repository(cassandra_keyspace_type)
+        # only the name of the keyspace is required
+        cassandra_keyspace.name = 'StoreTestKeyspace'
+        #cassandra_keyspace.name = 'Keyspace1'
+        
+        ### Create a Credentials resource - for cassandra a SimplePassword object
+        cache_repository, simple_password  = wb.init_repository(simple_password_type)
+        # only the name of the column family is required
+        simple_password.username = 'ooiuser'
+        simple_password.password = 'oceans11'
+        
+        ### Create a Cache resource - for Cassandra a ColumnFamily object
 
-        host = "ec2-204-236-159-249.us-west-1.compute.amazonaws.com"
-        port = 9160
-        keyspace = "StoreTestKeyspace"
-        column_family = "TestCF"
-        credentials = {"username":"ooiuser", "password": "oceans11"}
-    
-        connection_string = cassandra.CassandraConnectionString(host, \
-                                                                port, \
-                                                                keyspace, \
-                                                                column_family, \
-                                                                credentials)
-        store = cassandra.CassandraIndexedStore(connection_string)
+        cache_repository, column_family  = wb.init_repository(column_family_type)
+        # only the name of the column family is required
+        column_family.name = 'TestCF'
+        
+        self.cache = column_family
+        self.cache_repository = cache_repository
+        column = cache_repository.create_object(columndef_type)
+        #column_repository, column  = wb.init_repository(columndef_type) # This is wrong...
+        column.column_name = "state"
+        column.validation_class = 'org.apache.cassandra.db.marshal.UTF8Type'
+        #IndexType.KEYS is 0, and IndexType is an enum
+        column.index_type = 0
+        column.index_name = 'stateIndex'
+        self.cache.column_metadata.add()
+        self.cache.column_metadata[0] = column
         
         
-        store.initialize()
-        store.activate()
-        
-        
-        return defer.succeed(store)
+        store = cassandra.CassandraIndexedStore(cassandra_cluster, \
+                                                cassandra_keyspace, \
+                                                simple_password, \
+                                                column_family)
         
         store.initialize()
         store.activate()

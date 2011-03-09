@@ -59,57 +59,43 @@ class CassandraStore(TCPConnection):
     """
 
     implements(store.IStore)
-#    """
-#    def __init__(self, persistent_technology, persistent_archive, credentials, cache):
-#        """
-#        functional wrapper around active client instance
-#        """
-#        #import twisted.internet.base
-#        #twisted.internet.base.DelayedCall.debug = True
-#        ### Get the host and port from the Persistent Technology resource
-#        host = persistent_technology.hosts[0].host
-#        port = persistent_technology.hosts[0].port
-#        
-#        ### Get the Key Space for the connection
-#        self._keyspace = persistent_archive.name
-#        # More robust but obfuscates errors in calling arguments
-#        #self._keyspace = getattr(persistent_archive, 'name', None)
-#        
-#        #Get the credentials for the cassandra connection
-#        log.info("CassandraStore.__init__")
-#        uname = credentials.username
-#        pword = credentials.password
-#        authorization_dictionary = {'username': uname, 'password': pword}
-#        log.info("Connecting to %s on port %s " % (host,port))
-#        log.info("Using keyspace %s" % (self._keyspace,))
-#        log.info("authorization_dictionary; %s" % (str(authorization_dictionary),))
-#        ### Create the twisted factory for the TCP connection  
-#        self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
-#        #self._manager = ManagedCassandraClientFactory(credentials=authorization_dictionary)
-#        
-#        # Call the initialization of the Managed TCP connection base class
-#        TCPConnection.__init__(self,host, port, self._manager)
-#        self.client = CassandraClient(self._manager)    
-#        
-#        self._cache = cache # Cassandra Column Family maps to an ION Cache resource
-#        self._cache_name = cache.name
-#        log.info("leaving __init__")
-#        
-    def __init__(self, connection_string):
+
+    def __init__(self, persistent_technology, persistent_archive, credentials, cache):
         """
         functional wrapper around active client instance
         """
-        host = connection_string.get_host()
-        port = connection_string.get_port()
-        authorization_dictionary = connection_string.get_credentials()
-        self._keyspace = connection_string.get_keyspace()
-        self._cache_name = connection_string.get_column_family()
+        #import twisted.internet.base
+        #twisted.internet.base.DelayedCall.debug = True
+        ### Get the host and port from the Persistent Technology resource
+        host = persistent_technology.hosts[0].host
+        port = persistent_technology.hosts[0].port
         
+        ### Get the Key Space for the connection
+        self._keyspace = persistent_archive.name
+        # More robust but obfuscates errors in calling arguments
+        #self._keyspace = getattr(persistent_archive, 'name', None)
+        
+        #Get the credentials for the cassandra connection
+        log.info("CassandraStore.__init__")
+        uname = credentials.username
+        pword = credentials.password
+        authorization_dictionary = {'username': uname, 'password': pword}
+        log.info("Connecting to %s on port %s " % (host,port))
+        log.info("Using keyspace %s" % (self._keyspace,))
+        log.info("authorization_dictionary; %s" % (str(authorization_dictionary),))
+        ### Create the twisted factory for the TCP connection  
         self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
+        #self._manager = ManagedCassandraClientFactory(credentials=authorization_dictionary)
+        
+        # Call the initialization of the Managed TCP connection base class
         TCPConnection.__init__(self,host, port, self._manager)
-        self.client = CassandraClient(self._manager)
+        self.client = CassandraClient(self._manager)    
+        
+        self._cache = cache # Cassandra Column Family maps to an ION Cache resource
+        self._cache_name = cache.name
         log.info("leaving __init__")
         
+
     @defer.inlineCallbacks
     def get(self, key):
         """
@@ -171,13 +157,13 @@ class CassandraIndexedStore(CassandraStore):
     """
     implements(store.IIndexStore)
     
-    def __init__(self, connection_string):
+    def __init__(self, persistent_technology, persistent_archive, credentials, cache):
         """
         functional wrapper around active client instance
         """
         log.info("CassandraIndexedStore.__init__")       
-        CassandraStore.__init__(self, connection_string)
-        #self._cache = cache
+        CassandraStore.__init__(self, persistent_technology, persistent_archive, credentials, cache)
+        self._cache = cache
         
     @defer.inlineCallbacks
     def put(self, key, value, index_attributes=None):
@@ -274,7 +260,7 @@ class CassandraIndexedStore(CassandraStore):
         """
         keyspace_description = yield self.client.describe_keyspace(self._keyspace)
         log.debug("keyspace desc %s" % (keyspace_description,))
-        get_cfdef = lambda cfdef: cfdef.name == self._cache_name
+        get_cfdef = lambda cfdef: cfdef.name == self._cache.name
         cfdef = filter(get_cfdef, keyspace_description.cf_defs)
         get_names = lambda cdef: cdef.name
         indexes = map(get_names, cfdef[0].column_metadata)
@@ -282,47 +268,14 @@ class CassandraIndexedStore(CassandraStore):
         
         defer.returnValue(indexes)
 
-class CassandraConnectionString:
-    """
-    This class holds the connection information of the
-    persistent_technology, persistent_archive, cache, and 
-    credentials. It does not use the ION resource objects,
-    so it can be used during bootstrapping the system.
-    """
-    def __init__(self, host, port=9160, keyspace=None, column_family=None, credentials=None):
-        """
-        @param host a string of the hostname
-        @poram port an int that should be 9160
-        @param keyspace the keyspace to connect 
-        @param the column family to read and write
-        @param a dictionary {username:username,password:password} 
-        """    
-        self.host = host
-        self.port = port
-        self.keyspace =  keyspace
-        self.column_family = column_family
-        self.credentials = credentials
-        
-    def get_host(self):
-        return self.host
-    
-    def get_port(self):
-        return self.port
-    
-    def get_keyspace(self):
-        return self.keyspace
-    
-    def get_column_family(self):
-        return self.column_family
-    
-    def get_credentials(self):
-        return self.credentials
-    
+
+
+
 class CassandraStorageResource:
     """
     This class holds the connection information in the
     persistent_technology, persistent_archive, cache, and 
-    credentials resource objects
+    credentials
     """
     def __init__(self, persistent_technology, persistent_archive=None, cache=None, credentials=None):
         self.persistent_technology = persistent_technology
