@@ -424,7 +424,7 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
         yield self._stop_container()
 
 
-class CassandraIndexStoreTest(IndexStoreTest):
+class CassandraIndexedStoreTest(IndexStoreTest):
 
     @itv(CONF)
     @defer.inlineCallbacks
