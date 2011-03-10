@@ -24,32 +24,71 @@ from uuid import uuid4
 
 
 """
-Constants/Enumerations for tags in capabilities dict structures
+Constants/Enumerations for tags in capabilities dict structures.
 """
-ci_commands = 'ci_commands'
-ci_parameters = 'ci_parameters'
-instrument_commands = 'instrument_commands'
-instrument_parameters = 'instrument_parameters'
+ci_commands                     = 'ci_commands'
+ci_parameters                   = 'ci_parameters'
+instrument_commands             = 'instrument_commands'
+instrument_parameters           = 'instrument_parameters'
 
-# parameter names for all instrument agents
-ci_param_list = {
-    "DataTopics":"DataTopics",
-    "EventTopics":"EventTopics",
-    "StateTopics":"StateTopics",
-    "DriverAddress":"DriverAddress"
-}
-
-publish_msg_type = {
-    "Error":"Error",
-    "StateChange":"StateChange",
-    "ConfigChange":"ConfigChange",
-    "Data":"Data",
-    "Event":"Event"
-}
-
-
-# CI parameter key constant
+"""
+CI parameter key constant.
+"""
 driver_address = 'DriverAddress'
+
+"""
+Parameter names for all instrument agents.
+"""
+ci_param_list = {
+    'DataTopics'                :'DataTopics',
+    'EventTopics'               :'EventTopics',
+    'StateTopics'               :'StateTopics',
+    'DriverAddress'             :'DriverAddress',
+    'ResourceID'                :'ResourceID',
+    #'DataCorrectionMode'        : 'DataCorrectionMode',
+    'TimeSource'                : 'TimeSource',
+    'ConnectionMethod'          : 'ConnectionMethod',
+    'DefaultTransactionTimeout' : 'DefaultTransactionTimeout',
+    'MaxTransactionTimeout'     : 'MaxTransactionTimeout',
+    'TransactionExpireTimeout'  : 'TransactionExpireTimeout'
+}
+
+"""
+Publish message types.
+"""
+publish_msg_type = {
+    'Error'                     :'Error',
+    'StateChange'               :'StateChange',
+    'ConfigChange'              :'ConfigChange',
+    'Data'                      :'Data',
+    'Event'                     :'Event'
+}
+
+"""
+Agent errors.
+"""
+errors = {
+    'InvalidDestnation'     : ['ERROR','InvalidDestination','Intended destination for a message or operation is not valid.'],
+    'Timeout'	            : ['ERROR','Timeout','The message or operation timed out.'],
+    'NetworkFailure'        : ['ERROR','NetworkFailure','A network failure has been detected.'],
+    'NetworkCorruption'     : ['ERROR','NetworkCorruption','A message passing through the network has been determined to be corrupt.'],
+    'OutofMemory'	    : ['ERROR','OutofMemory','There is no more free memory to complete the operation.'],
+    'LockedResource'	    : ['ERROR','LockedResource','The resource being accessed is in use by another exclusive operation.'],
+    'ResourceUnavailable'   : ['ERROR','ResourceUnavailable','The resource being accessed is unavailable.'],
+    'UnknownError'          : ['ERROR','UnknownError','An unknown error has been encountered.'],
+    'PermissionError'       : ['ERROR','PermissionError','The user does not have the correct permission to access the resource in the desired way.'],
+    'InvalidTransition'     : ['ERROR','InvalidTransition','The transition being requested does not apply for the current state.'],
+    'IncorrectState'        : ['ERROR','IncorrectState','The operation being requested does not apply to the current state.'],
+    'CannotPublish'	    : ['ERROR','CannotPublish','An attempt to publish has failed.'],
+    'InstrumentUnreachable' : ['ERROR','InstrumentUnreachable','The agent cannot communicate with the device.'],
+    'MessagingError'        : ['ERROR','MessagingError','An error has been encountered during a messaging operation.'],
+    'HardwareError'         : ['ERROR','HardwareError','An error has been encountered with a hardware element.'],
+    'PhrasePending'         : ['ERROR','PhrasePending','A phrase is currently pending.'],
+    'WrongType'             : ['ERROR','WrongType','The type of operation is not valid in the current state.'],
+    'InvalidCommand'        : ['ERROR','InvalidCommand','The command is not valid in the given context.'],    
+    'UnknownCommand'        : ['ERROR','UnknownCommand','The command is not recognized.'],
+    'NotImplemented'        : ['ERROR','NotImplemented','The command is not implemented.']
+}
 
 
 class InstrumentDriver(Process):
@@ -246,10 +285,41 @@ class InstrumentAgent(ResourceAgent):
     default_transaction_timeout = 10   
     
     """
-    An integer in seconds for the maximum allowable timeout.
+    An integer in seconds for the maximum allowable timeout to wait for a new transaction.
     """
-    max_timeout = 120
+    max_transaction_timeout = 120
 
+    """
+    An integer in seconds for the maximum time a transaction may be open.
+    """
+    transaction_expire_timeout = 300
+
+    """
+    A finite state machine to track and manage agent state according to the general
+    instrument state model.
+    """
+    agent_fsm = None
+
+    """
+    String indicating the source of time being used for the instrument.
+    'PTPDirect'             - IEEE 1588 PTP connection directly supported by the instrument
+    'NTPUnicast'            - NTP unicast to the instrument
+    'LocalOscillator'       - NTP broadcast to the instrument
+    'LocalOscillator'       - The device has its own clock
+    'DriverSetInterval'     - Driver sets the clock at an interval
+    """
+    TimeSource = None
+
+    """
+    String describing how the device is connected to the observatory.
+    'Offline'               - Device is offline.
+    'CabledObservatory'     - Accessible through cabled, full time observatory.
+    'ShortNetwork'          - Accessible through full time shore connection.
+    'PartTimeScheduled'     - Comes online on scheduled basis. Outages normal.
+    'PartTimeRandom'        - Comes online as needed. Outages normal.
+    """
+    ConnectionMethod = None
+    
     
     def plc_init(self):
         ResourceAgent.plc_init(self)
@@ -309,16 +379,15 @@ class InstrumentAgent(ResourceAgent):
         if timeout < 0:
             timeout = default_transaction_timeout
         
-        if timeout > max_timeout:
-            timeout = max_timeout
+        if timeout > max_transaction_timeout:
+            timeout = max_transaction_timeout
             
         if timeout == 0:
             if transaction_id == '':
                 transaction_id = uuid4()
                 return ['OK',transaction_id]
             else:
-                return ['ERROR','LockedResource',
-                      'The resource being accessed is in use by another exclusive operation']
+                return errors['LockedResource']
         
         #todo add the timeout callback code here
         
@@ -347,8 +416,7 @@ class InstrumentAgent(ResourceAgent):
             transaction_id = None
             self.reply_ok(['OK'])
         else:
-            self.reply_ok(['ERROR','LockedResource',
-                           'The resource being accessed is in use by another exclusive operation'])
+            self.reply_ok(errors['LockedResource'])
             
         
 
@@ -414,15 +482,18 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         # Set up the transaction
-        result = yield self._verify_or_start_transaction(tid,'get')
+        result = yield self._verify_transaction(tid,'get')
         if not result:
-            result = ['ERROR','LockedResource',
-                    'The resource being accessed is in use by another exclusive operation']
+            result = errors['LockedResource']
             yield self.reply_ok(msg,result)
             return
                     
-        # Do the work here.
-        # Set up the result message.
+        if  cmd[0] == 'StateTransition':
+            result = self.agent_fsm.state_transition(cmd[1])
+        elif cmd[0] == 'TransmitData':
+            result = errors['NotImplemented']            
+        else:
+            result = errors['UnknownCommand']
         
         # End implicit transactions.
         if tid == 'create':
@@ -455,10 +526,9 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        result = yield self._verify_or_start_transaction(tid,'get')
+        result = yield self._verify_transaction(tid,'get')
         if not result:
-            result = ['ERROR','LockedResource',
-                    'The resource being accessed is in use by another exclusive operation']
+            result = errors['LockedResource']
             yield self.reply_ok(msg,result)
             return
                     
@@ -513,10 +583,9 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        result = yield self._verify_or_start_transaction(tid,'get')
+        result = yield self._verify_transaction(tid,'get')
         if not result:
-            result = ['ERROR','LockedResource',
-                    'The resource being accessed is in use by another exclusive operation']
+            result = errors['LockedResource']
             yield self.reply_ok(msg,result)
             return
                     
@@ -551,10 +620,9 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        result = yield self._verify_or_start_transaction(tid,'get')
+        result = yield self._verify_transaction(tid,'get')
         if not result:
-            result = ['ERROR','LockedResource',
-                    'The resource being accessed is in use by another exclusive operation']
+            result = errors['LockedResource']
             yield self.reply_ok(msg,result)
             return
                     
@@ -589,10 +657,9 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        result = yield self._verify_or_start_transaction(tid,'get')
+        result = yield self._verify_transaction(tid,'get')
         if not result:
-            result = ['ERROR','LockedResource',
-                    'The resource being accessed is in use by another exclusive operation']
+            result = errors['LockedResource']
             yield self.reply_ok(msg,result)
             return
                     
@@ -631,10 +698,9 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        result = yield self._verify_or_start_transaction(tid,'get')
+        result = yield self._verify_transaction(tid,'get')
         if not result:
-            result = ['ERROR','LockedResource',
-                    'The resource being accessed is in use by another exclusive operation']
+            result = errors['LockedResource']
             yield self.reply_ok(msg,result)
             return
                     
@@ -685,10 +751,9 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        result = yield self._verify_or_start_transaction(tid,'get')
+        result = yield self._verify_transaction(tid,'get')
         if not result:
-            result = ['ERROR','LockedResource',
-                    'The resource being accessed is in use by another exclusive operation']
+            result = errors['LockedResource']
             yield self.reply_ok(msg,result)
             return
                     
@@ -721,10 +786,9 @@ class InstrumentAgent(ResourceAgent):
         
 
         # Set up the transaction
-        result = yield self._verify_or_start_transaction(tid,'get')
+        result = yield self._verify_transaction(tid,'get')
         if not result:
-            result = ['ERROR','LockedResource',
-                    'The resource being accessed is in use by another exclusive operation']
+            result = errors['LockedResource']
             yield self.reply_ok(msg,result)
             return
                     
@@ -757,10 +821,9 @@ class InstrumentAgent(ResourceAgent):
         
 
         # Set up the transaction
-        result = yield self._verify_or_start_transaction(tid,'get')
+        result = yield self._verify_transaction(tid,'get')
         if not result:
-            result = ['ERROR','LockedResource',
-                    'The resource being accessed is in use by another exclusive operation']
+            result = errors['LockedResource']
             yield self.reply_ok(msg,result)
             return
                     
@@ -794,10 +857,9 @@ class InstrumentAgent(ResourceAgent):
         
 
         # Set up the transaction
-        result = yield self._verify_or_start_transaction(tid,'get')
+        result = yield self._verify_transaction(tid,'get')
         if not result:
-            result = ['ERROR','LockedResource',
-                    'The resource being accessed is in use by another exclusive operation']
+            result = errors['LockedResource']
             yield self.reply_ok(msg,result)
             return
                     
@@ -833,10 +895,9 @@ class InstrumentAgent(ResourceAgent):
         
 
         # Set up the transaction
-        result = yield self._verify_or_start_transaction(tid,'get')
+        result = yield self._verify_transaction(tid,'get')
         if not result:
-            result = ['ERROR','LockedResource',
-                    'The resource being accessed is in use by another exclusive operation']
+            result = errors['LockedResource']
             yield self.reply_ok(msg,result)
             return
                     
@@ -869,13 +930,11 @@ class InstrumentAgent(ResourceAgent):
         
         # get agent state
         if state != 'DirectAccessMode':
-            yield self.reply_ok(msg,['ERROR','IncorrectState',
-                                     'The operation being requested does not apply to the current state'])
+            yield self.reply_ok(msg,errors['IncorrectState'])
             return
         
         if tid != _transaction_id:
-            yield self.reply_ok(msg,['ERROR','LockedResource',
-                                     'The resource being accessed is in use by another exclusive operation'])
+            yield self.reply_ok(msg,errors['LockedResource'])
             return
         
         # Everything OK, send the data to the device
