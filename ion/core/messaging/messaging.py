@@ -226,8 +226,7 @@ class Exchange(object):
 
 class Consumer(messaging.Consumer):
     """
-    Dumb Consumer only knows how to consume off an existing queue. It does
-    not attempt to do amqp configuration.
+    Consumer for AMQP.
     """
 
     @classmethod
@@ -271,11 +270,11 @@ class Consumer(messaging.Consumer):
             # remember the queue name the broker made for us
             self.queue = reply.queue
 
-
-        yield self.backend.queue_bind(queue=self.queue,
-                                    exchange=self.exchange,
-                                    routing_key=routing_key,
-                                    arguments=arguments)
+        if routing_key != None:
+            yield self.backend.queue_bind(queue=self.queue,
+                                        exchange=self.exchange,
+                                        routing_key=routing_key,
+                                        arguments=arguments)
 
         yield self.qos(prefetch_count=1)
 
