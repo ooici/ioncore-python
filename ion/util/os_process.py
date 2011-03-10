@@ -187,7 +187,11 @@ class OSProcess(protocol.ProcessProtocol):
         the exit code, the lines produced on stdout, and the lines on stderr.
         If the exit code is non zero, the errback is raised.
         """
-        log.debug("OSProcess: process ended (exitcode: %d)" % reason.value.exitCode)
+        ec = 0
+        if hasattr(reason, 'value') and hasattr(reason.value, 'exitCode') and reason.value.exitCode != None:
+            ec = reason.value.exitCode
+
+        log.debug("OSProcess: process ended (exitcode: %d)" % ec)
 
         # if this was called as a result of a close() call, we need to cancel the timeout so
         # it won't try to kill again
@@ -195,11 +199,11 @@ class OSProcess(protocol.ProcessProtocol):
             self.close_timeout.cancel()
 
         # form a dict of status to be passed as the result
-        cba = { 'exitcode' : reason.value.exitCode,
+        cba = { 'exitcode' : ec,
                 'outlines' : self.outlines,
                 'errlines' : self.errlines }
 
-        if reason.value.exitCode != 0:
+        if ec != 0:
             self.deferred_exited.errback(StandardError(cba))
             return
 
