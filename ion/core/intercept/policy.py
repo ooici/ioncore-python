@@ -26,15 +26,21 @@ def construct_policy_lists(policydb):
     thedict = {}
     try:
         for policy_entry in policydb:
-            role, op, action = policy_entry
-            service, opname = op.split('.', 1)
-            if service in thedict:
-                servicelist = thedict[service]
-                servicelist.append(policy_entry)
+            role, action, resource = policy_entry
+            service, opname = action.split('.', 1)
+            assert role in ('ANONYMOUS', 'AUTHENTICATED', 'OWNER')
+
+            if role == 'OWNER':
+                role_set = set(['OWNER'])
+            elif role == 'AUTHENTICATED':
+                role_set = set(['AUTHENTICATED', 'OWNER'])            
             else:
-                servicelist = [policy_entry]
-                thedict[service] = servicelist
-                
+                role_set = set(['ANONYMOUS', 'AUTHENTICATED', 'OWNER'])
+
+            service_dict = thedict.setdefault(service, {})
+            op_set = service_dict.setdefault(opname, set())
+            op_set.update(role_set)
+
     except Exception, ex:
         log.exception('----- POLICY INIT ERROR -----')
         raise ex
@@ -102,19 +108,17 @@ class PolicyInterceptor(EnvelopeInterceptor):
 
         try:
             expiry = int(expirystr)
-        except:
+        except ValueError, ex:
             log.info("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
             invocation.drop('Error: expiry improperly defined in message header!')
             return invocation
             
         rcvr = msg['receiver']
-        substrs = rcvr.split('.')
-        service = substrs[len(substrs) - 1]
+        service = rcvr.rsplit('.',1)[-1]
 
         operation = msg['op']
-        action = service + '.' + operation
 
-        log.info('Policy Interceptor: Authorization request for service [%s] user_id [%s] action [%s] expiry [%s] resource [%s]' % (service, user_id, action, expiry, '*'))
+        log.info('Policy Interceptor: Authorization request for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s]' % (service, operation, '*', user_id, expiry))
         if service in policy_dictionary:
             role = 'ANONYMOUS'
             # TODO figure out mechanism to map user id to role
@@ -126,16 +130,15 @@ class PolicyInterceptor(EnvelopeInterceptor):
 
             service_list = policy_dictionary[service]
             # TODO figure out how to handle non-wildcard resource ids
-            for entry in service_list:
-                log.info('Policy Interceptor: Policy tuple [%s]' % str(entry))
-                entry_role, entry_action, entry_resource = entry
-                if entry_action == action:
-                    log.info('Policy Interceptor: Action matches tuple [%s]' % str(entry))
-                    # TODO handle OWNER role
-                    if entry_role == 'AUTHENTICATED' and role == 'ANONYMOUS':
-                        log.info('Policy Interceptor: Role [%s] does not satisfy tuple [%s]. Returning Not Authorized.' % (role, str(entry)))
-                        invocation.drop('Not authorized')
-                        return invocation
+            if operation in service_list:
+                operation_entry = service_list[operation]
+                log.info('Policy Interceptor: Policy tuple [%s]' % str(operation_entry))
+                if role in operation_entry:
+                    log.info('Policy Interceptor: Authentication matches')
+                else:
+                    log.info('Policy Interceptor: Authentication failed')
+                    invocation.drop('Not authorized')
+                    return invocation
         else:
             log.info('Policy Interceptor: service not in policy dictionary.')
 
