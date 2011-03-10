@@ -160,11 +160,6 @@ class WrapperMethodsTest(unittest.TestCase):
 class TestSpecializedCdmMethods(unittest.TestCase):
     """
     """
-    # @todo: See the warning at test_SetAttribute_for_group
-    # @todo: Implement test_SetDimension
-    # @todo: Implement test_FindVariableIndexByName_for group
-    # @todo: Implement test_FindVariableIndexByName_for variable
-    # @todo: Implement test_FindAttributeIndexByName_for group
     def setUp(self):
         # Step 1: Perform initial setup
         wb = workbench.WorkBench('No Process Test')
@@ -282,7 +277,7 @@ class TestSpecializedCdmMethods(unittest.TestCase):
         self.assertEqual(self.ds.root_group.attributes[1].array.value, int_vals)
         self.assertEqual(self.ds.root_group.attributes[1].data_type, int_type)
 
-        # @todo: Test creation of preexisting attributes (should this fail?)
+        # @todo: Test creation of preexisting attributes (should this fail or act like SetAttribute?)
 #        self.ds.root_group.AddAttribute('atrib2', int_type, int_vals)
 
     def test_AddAttribute_to_variable(self):
@@ -389,7 +384,7 @@ class TestSpecializedCdmMethods(unittest.TestCase):
         self.assertEqual(self.ds.root_group.dimensions[1].length, 12)
         self.assertEqual(self.ds.root_group.dimensions[1].variable_length, False)
         
-        # @todo: Test creation of preexisting dimensions (should this fail?)
+        # @todo: Test creation of preexisting dimensions (should this fail or act like SetDimension?)
 #        self.ds.root_group.AddDimension('dim2', 12, False)
     
     def test_AddVariable(self):
@@ -458,6 +453,9 @@ class TestSpecializedCdmMethods(unittest.TestCase):
         self.assertEqual(self.ds.root_group.variables[2].name, 'var3')
         self.assertEqual(self.ds.root_group.variables[2].data_type, int_type)
         self.assertEqual(len(self.ds.root_group.variables[2].shape), 0)
+        
+        # @todo: Test creation of preexisting variables
+#        self.ds.root_group.AddDimension('dim2', 12, False)
         
     def test_FindGroupByName(self):
         # Test invalid attributes: name
@@ -588,6 +586,7 @@ class TestSpecializedCdmMethods(unittest.TestCase):
         self.assertIdentical(res2, lat)
         self.assertIdentical(res3, lon)
     
+    
     def test_FindVariableByName(self):
         # Test invalid attributes: name
         self.assertRaises(TypeError,      self.ds.root_group.FindVariableByName, 5)
@@ -617,6 +616,7 @@ class TestSpecializedCdmMethods(unittest.TestCase):
         
         self.assertIdentical(obj1, res1)
         self.assertIdentical(obj2, res2)
+
     
     @SkipTest
     def test_FindVariableIndexByName(self):
@@ -626,11 +626,15 @@ class TestSpecializedCdmMethods(unittest.TestCase):
     @SkipTest
     def test_FindAttributeIndexByName_for_group(self):
         """
+        FindAttributeIndexByName is transitively tested by
+        test_SetAttribute* methods.  This is sufficient testing for now
         """
 
     @SkipTest
     def test_FindAttributeIndexByName_for_variable(self):
         """
+        FindAttributeIndexByName is transitively tested by
+        test_SetAttribute* methods.  This is sufficient testing for now
         """
     
     def test_SetAttribute_for_group(self):
@@ -649,27 +653,27 @@ class TestSpecializedCdmMethods(unittest.TestCase):
         # Test invalid argument: name
         self.assertRaises(TypeError, self.ds.root_group.SetAttribute, 5, string_vals)
         self.assertEqual(len(self.ds.root_group.attributes), 1)
-        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+        self.assertIdentical(self.ds.root_group.attributes[0], atr1)
         self.assertRaises(TypeError, self.ds.root_group.SetAttribute, None, string_vals)
         self.assertEqual(len(self.ds.root_group.attributes), 1)
-        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+        self.assertIdentical(self.ds.root_group.attributes[0], atr1)
         self.assertRaises(ValueError, self.ds.root_group.SetAttribute, '', string_vals)
         self.assertEqual(len(self.ds.root_group.attributes), 1)
-        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+        self.assertIdentical(self.ds.root_group.attributes[0], atr1)
         
         # Test invalid argument: values
         mixed_vals = ['val1', 'val2', 123, None, 3.2]
         self.assertRaises(TypeError, self.ds.root_group.SetAttribute, 'atrib1', 25)
         self.assertEqual(len(self.ds.root_group.attributes), 1)
-        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+        self.assertIdentical(self.ds.root_group.attributes[0], atr1)
         # @todo: Ensure entries for "values" of an empty list will fail
 #        self.assertRaises(TypeError, self.ds.root_group.SetAttribute, 'atrib1', [])
 #        self.assertEqual(len(self.ds.root_group.attributes), 0)
         self.assertRaises(TypeError, self.ds.root_group.SetAttribute, 'atrib1', None)
         self.assertEqual(len(self.ds.root_group.attributes), 1)
-        self.assertEqual(self.ds.root_group.attributes[0], atr1)
-        # @warning: Must implement this check
-        #           If set attribute fails mid-swing the method may have removed the old
+        self.assertIdentical(self.ds.root_group.attributes[0], atr1)
+        # @warning: Must Implement...
+        #           If SetAttribute() fails mid-swing the method may have removed the old
         #           attribute with the intent of replacing it in step 2.  Since this it
         #           not an atomic action, stage-2 failure may result in placing the
         #           dataset in an invalid state.  This must be prevented before the
@@ -678,25 +682,138 @@ class TestSpecializedCdmMethods(unittest.TestCase):
 #        self.assertEqual(len(self.ds.root_group.attributes), 1)
 #        self.assertEqual(self.ds.root_group.attributes[0], atr1)
         
-        
 #        # Test legitimate arguments
         string_vals2 = ['new1', 'new2', 'new3']
-        int_vals2    = [434233, 403030, 1]
-#        
-#        
-#        # Ensure DAG integrity (setting one group's attribute to a new set of values
-#        #                       when another group contains a reference to that same
-#        #                       attribute should not effect the second group
-#        atr2 = self.ds.root_group.AddAttribute('atrib2', int_type, int_vals)
-#        self.assertEqual(len(self.ds.root_group.attributes), 2)
-#        self.assertEqual(self.ds.root_group.attributes[1].name, 'atrib1')
-#        self.assertEqual(self.ds.root_group.attributes[1].array.value, int_vals)
-#        self.assertEqual(self.ds.root_group.attributes[1].data_type, int_type)
+        self.assertEqual(len(self.ds.root_group.attributes), 1)
+        self.assertEqual(self.ds.root_group.attributes[0], atr1)
+
+        self.ds.root_group.SetAttribute(atr1.name, string_vals2)
+        self.assertEqual(len(self.ds.root_group.attributes), 1)
+        self.assertNotIdentical(self.ds.root_group.attributes[0], atr1)
+        self.assertEqual(self.ds.root_group.attributes[0].array.value, string_vals2)
+        
+        # Ensure DAG integrity (setting one group's attribute to a new set of values
+        #                       when another group contains a reference to that same
+        #                       attribute should not effect the second group
+        #------------------------------------------------------------------------------
+        # Step 1: Create two groups each with identical attributes (by memory reference)
+        int_vals2 = [434233, 403030, 1]
+        grp1 = self.ds.root_group.AddGroup('group1')
+        grp2 = self.ds.root_group.AddGroup('group2')
+        self.assertEqual(len(self.ds.root_group.groups), 2)
+        self.assertNotIdentical(grp1, grp2)
+        
+        shared_atrib = grp1.AddAttribute('dag1', int_type, int_vals)
+        atr_ref = grp2.attributes.add()
+        atr_ref.SetLink(shared_atrib)
+        self.assertEqual(len(grp1.attributes), 1)
+        self.assertEqual(len(grp2.attributes), 1)
+        self.assertIdentical(grp1.attributes[0], grp2.attributes[0])
+        
+        # Step 2: Use SetAttribute() on one of the groups for the shared attribute
+        grp1.SetAttribute(shared_atrib.name, int_vals2)
+        self.assertEqual(len(grp1.attributes), 1)
+        self.assertEqual(grp1.attributes[0].array.value, int_vals2)
+        
+        # Step 3: Ensure the second group's attribute was untouched and the two groups
+        #         now point to separate attributes
+        self.assertNotIdentical(grp1.attributes[0], shared_atrib)
+        self.assertIdentical(grp2.attributes[0], shared_atrib)
+        # thus we can infer grp1.atr[0] != grp2.atr[0]
         
     @SkipTest
     def test_SetDimension_for_group(self):
         """
         """
+        # Seed the root_group with dimension objects
+        tau  = self.ds.root_group.AddDimension('time', 10, True)
+        lat  = self.ds.root_group.AddDimension('lat', 6, False)
+        lon  = self.ds.root_group.AddDimension('lon', 25, False)
+        
+        # Test invalid argument: name
+        self.assertRaises(TypeError, self.ds.root_group.SetDimension, 5, length=1)
+        self.assertEqual(len(self.ds.root_group.dimensions), 3)
+        self.assertIdentical(self.ds.root_group.dimensions[0], tau)
+        self.assertIdentical(self.ds.root_group.dimensions[1], lat)
+        self.assertIdentical(self.ds.root_group.dimensions[2], lon)
+        self.assertRaises(TypeError, self.ds.root_group.SetDimension, None, length=1)
+        self.assertEqual(len(self.ds.root_group.dimensions), 3)
+        self.assertIdentical(self.ds.root_group.dimensions[0], tau)
+        self.assertIdentical(self.ds.root_group.dimensions[1], lat)
+        self.assertIdentical(self.ds.root_group.dimensions[2], lon)
+        self.assertRaises(ValueError, self.ds.root_group.SetDimension, '', length=1)
+        self.assertEqual(len(self.ds.root_group.dimensions), 3)
+        self.assertIdentical(self.ds.root_group.dimensions[0], tau)
+        self.assertIdentical(self.ds.root_group.dimensions[1], lat)
+        self.assertIdentical(self.ds.root_group.dimensions[2], lon)
+        
+        # Test invalid argument: length
+        self.assertRaises(ValueError, self.ds.root_group.SetDimension, tau.name)
+        self.assertEqual(len(self.ds.root_group.dimensions), 3)
+        self.assertIdentical(self.ds.root_group.dimensions[0], tau)
+        self.assertIdentical(self.ds.root_group.dimensions[1], lat)
+        self.assertIdentical(self.ds.root_group.dimensions[2], lon)
+        self.assertRaises(TypeError, self.ds.root_group.SetDimension, tau.name, None)
+        self.assertEqual(len(self.ds.root_group.dimensions), 3)
+        self.assertIdentical(self.ds.root_group.dimensions[0], tau)
+        self.assertIdentical(self.ds.root_group.dimensions[1], lat)
+        self.assertIdentical(self.ds.root_group.dimensions[2], lon)
+        self.assertRaises(TypeError, self.ds.root_group.SetDimension, tau.name, 'bad length')
+        self.assertEqual(len(self.ds.root_group.dimensions), 3)
+        self.assertIdentical(self.ds.root_group.dimensions[0], tau)
+        self.assertIdentical(self.ds.root_group.dimensions[1], lat)
+        self.assertIdentical(self.ds.root_group.dimensions[2], lon)
+        self.assertRaises(ValueError, self.ds.root_group.SetDimension, tau.name, -4)
+        self.assertEqual(len(self.ds.root_group.dimensions), 3)
+        self.assertIdentical(self.ds.root_group.dimensions[0], tau)
+        self.assertIdentical(self.ds.root_group.dimensions[1], lat)
+        self.assertIdentical(self.ds.root_group.dimensions[2], lon)
+        
+        # Test changing a dimension where variable_length == false
+        self.assertRaises(ValueError, self.ds.root_group.SetDimension, lat.name, int(lat.length + 1))
+        self.assertEqual(len(self.ds.root_group.dimensions), 3)
+        self.assertIdentical(self.ds.root_group.dimensions[0], tau)
+        self.assertIdentical(self.ds.root_group.dimensions[1], lat)
+        self.assertIdentical(self.ds.root_group.dimensions[2], lon)
+        
+        # Test Legitimate arguments:
+        new_length = int(tau.length + 5)
+        self.assertRaises(ValueError, self.ds.root_group.SetDimension, tau.name, new_length)
+        self.assertEqual(len(self.ds.root_group.dimensions), 3)
+        self.assertIdentical(self.ds.root_group.dimensions[0], tau)
+        self.assertIdentical(self.ds.root_group.dimensions[1], lat)
+        self.assertIdentical(self.ds.root_group.dimensions[2], lon)
+        self.assertEqual(self.ds_root_group.dimensions[0].length, new_length)
+        
+        # Ensure DAG integrity (Changing one group's dimension when another group
+        #                       contains a reference to that same dimension should
+        #                       not effect the second group
+        #------------------------------------------------------------------------------
+        # Step 1: Create two groups each with identical dimensions (by memory reference)
+        grp1 = self.ds.root_group.AddGroup('group1')
+        grp2 = self.ds.root_group.AddGroup('group2')
+        self.assertEqual(len(self.ds.root_group.groups), 2)
+        self.assertNotIdentical(grp1, grp2)
+        
+        shared_dim = grp1.AddDimension('shared', 8, True)
+        dim_ref = grp2.dimensions.add()
+        dim_ref.SetLink(shared_dim)
+        
+        self.assertEqual(len(grp1.dimensions), 1)
+        self.assertEqual(len(grp2.dimensions), 1)
+        self.assertIdentical(grp1.dimensions[0], grp2.dimensions[0])
+        
+        # Step 2: Use SetDimension() on one of the groups for the shared dimension
+        new_length = shared_dim.length = 20
+        grp1.SetDimension(shared_dim.name, new_length)
+        self.assertEqual(len(grp1.dimensions), 1)
+        self.assertEqual(grp1.dimensions[0].length, new_length)
+        
+        # Step 3: Ensure the second group's dimension not only was updated with the
+        #         new value but that both dimensions hold the same memory reference
+        self.assertEqual(len(grp2.dimensions), 1)
+        self.assertEqual(grp2.dimensions[0].length, new_length)
+        self.assertIdentical(grp1.dimensions[0], grp2.dimensions[0])
         
     def test_GetValues_for_attribute(self):
         # Seed the root_group with an attribute or two

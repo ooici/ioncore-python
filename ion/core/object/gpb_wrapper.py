@@ -448,6 +448,12 @@ class WrapperType(type):
             """
             Specialized method for CDM Objects to append a dimension object with the given name and length
             @return: The dimension being created (as a convenience)
+            
+            @warning: If some component of a dataset contains a dimension: say 'tau', and a dimension is
+                      later created anew for a differnt component which does not already contain it, we
+                      would effectively have two instances of the same dimension 'tau', which point to
+                      different in-memory objects.  This is illegal in this datastructure for dimension objects
+                      and should be prevented in further iterations.
             """
             if not isinstance(name, str):
                 raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
@@ -531,7 +537,7 @@ class WrapperType(type):
             return result
 
 
-        def _find_attribute_by_name(self, name=''):
+        def _find_attribute_by_name(self, name):
             """
             Specialized method for CDM Objects to find the attribute object by its name
             """
@@ -552,7 +558,7 @@ class WrapperType(type):
             return result
 
         
-        def _find_dimension_by_name(self, name=''):
+        def _find_dimension_by_name(self, name):
             """
             Specialized method for CDM Objects to find a dimension object by its name
             """
@@ -580,7 +586,7 @@ class WrapperType(type):
             return result
 
 
-        def _find_variable_by_name(self, name=''):
+        def _find_variable_by_name(self, name):
             """
             Specialized method for CDM Objects to find the variable object by its name
             """
@@ -600,7 +606,7 @@ class WrapperType(type):
             return result
 
         
-        def _find_variable_index_by_name(self, name=''):
+        def _find_variable_index_by_name(self, name):
             """
             Specialized method for CDM Objects to find the variable object's index by the variable's name
             """
@@ -622,7 +628,7 @@ class WrapperType(type):
             return result
 
         
-        def _find_attribute_index_by_name(self, name=''):
+        def _find_attribute_index_by_name(self, name):
             """
             Specialized method for CDM Objects to find the attribute object's index by the attribute's name
             """
@@ -656,7 +662,7 @@ class WrapperType(type):
             return atr
             
         
-        def _set_attribute(self, name, values=[]):
+        def _set_attribute(self, name, values):
             """
             Specialized method for CDM Objects to set values for existing attributes
             """
@@ -668,21 +674,27 @@ class WrapperType(type):
             if not values or not isinstance(values, list):
                 raise TypeError('Type mismatch for argument "values" -- Expected %s; received %s with value: "%s"' % (repr(list), type(values), str(values)))
 
-            
-
             atr = __remove_attribute(self, name)
-            _add_attribute(self, name, atr.data_type, values)
+            try:
+                _add_attribute(self, name, int(atr.data_type), values)
+            except Exception, ex:
+                log.warn('WARNING! Exception may have left this resource in an invalid state')
+                raise ex
         
         
         def _set_dimension(self, name, length):
             """
             Specialized method for CDM Objects to set fields for existing dimensions
             """
-            if not name or not isinstance(name, str):
-                raise OOIObjectError('Invalid dimension name: "%s" -- please specify a non-empty string name' % str(name))
+            if not isinstance(name, str):
+                raise TypeError('Type mismatch for argument "name" -- Expected %s; received %s with value: "%s"' % (repr(str), type(name), str(name)))
+            if not name:
+                raise ValueError('Invalid argument "name" -- Please specify a non-empty string')
+            if not isinstance(length, int):
+                raise TypeError('Type mismatch for argument "length" -- Expected %s; received %s with value: "%s"' % (repr(int), type(length), str(length)))
             # @attention: Can a dimension have a length of zero??
-            if not isinstance(length, int) or length <= 0:
-                raise OOIObjectError('Invalid dimension length: "%s" -- please specify a positive integer for length' % str(length))
+            if length <= 0:
+                raise ValueError('Invalid argument "dimension": "%s" -- Please specify a positive integer' % str(length))
 
             dim = _find_dimension_by_name(self, name)
             if dim.variable_length and length != dim.length:
