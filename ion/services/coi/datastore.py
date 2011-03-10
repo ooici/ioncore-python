@@ -24,7 +24,7 @@ from ion.core.data.store import Query
 
 
 from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
-from ion.core.data.storage_configuration_utility import COMMIT_COLUMN_NAMES
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
 from ion.core.data.storage_configuration_utility import REPOSITORY_KEY, BRANCH_NAME
 
 from ion.core.data.storage_configuration_utility import SUBJECT_KEY, SUBJECT_BRANCH, SUBJECT_COMMIT
@@ -108,7 +108,7 @@ class DataStoreService(ServiceProcess):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
         else:
 
-            self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE], self, **{'indices':COMMIT_COLUMN_NAMES})
+            self.c_store = yield defer.maybeDeferred(self._backend_classes[COMMIT_CACHE], self, **{'indices':COMMIT_INDEXED_COLUMNS})
 
         if issubclass(self._backend_classes[BLOB_CACHE], cassandra.CassandraStore):
             raise NotImplementedError('Startup for cassandra store is not yet complete')

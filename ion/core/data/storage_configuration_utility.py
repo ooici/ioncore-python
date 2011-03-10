@@ -61,10 +61,10 @@ PERSISTENT_ARCHIVE:{'name':'sysname',
                       },
 ### Column Families
 CACHE_CONFIGURATION: {BLOB_CACHE:{
-    					'indexed columns':BLOB_COLUMN_NAMES},
+    					'indexed columns':BLOB_INDEXED_COLUMNS},
 
      					COMMIT_CACHE:{
-        					'indexed columns':COMMIT_COLUMN_NAMES}
+        					'indexed columns':COMMIT_INDEXED_COLUMNS}
         				},
 }
 
