@@ -15,6 +15,7 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory, Process, ProcessClient
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
+#from ion.integration.ais.findDataResources.resourceStubs import ResourceClient, ResourceInstance
 
 from ion.core.object import object_utils
 
@@ -24,7 +25,11 @@ class FindDataResources(object):
         self.rc = ResourceClient()
         log.info('FindDataResources.__init__()')
         
-    #@defer.inlineCallbacks
     def findDataResources(self, msg):
-        log.debug("findDataResources Worker Class!")        
+        log.debug("findDataResources Worker Class!")
+
+        # DHE TEST!!!
+        #log.debug("build objects!")
+        #yield self.rc.build_objects()
+        
         return 'something useful'        

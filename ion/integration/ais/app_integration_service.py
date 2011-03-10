@@ -61,6 +61,18 @@ class AppIntegrationService(ServiceProcess):
         """
         log.info('op_findDataResources: '+str(content))
         try:
+
+            rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
+            rspMsg.message_parameters_reference.add()
+            rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_MSG_TYPE)
+
+            """
+            Now in the case of a good response, this code will attach the
+            data to the response.  Actually, it would probably be good
+            to have the worker class do that.
+            """
+            
+            # Instantiate the worker class
             worker = FindDataResources()
             # THIS WILL DO A YIELD IN NEAR FUTURE
             """
@@ -151,7 +163,7 @@ class AppIntegrationServiceClient(ServiceClient):
     #def findDataResources(self, userId, published, spacial, temporal):
     def findDataResources(self, msg):
         yield self._check_init()
-        log.debug("findDataResources: sending %s message to findDataResources" % str(msg))
+        log.debug("findDataResources: sending message to findDataResources")
         (content, headers, payload) = yield self.rpc_send('findDataResources', msg)
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)
