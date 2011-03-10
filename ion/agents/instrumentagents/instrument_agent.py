@@ -20,6 +20,8 @@ from ion.data.dataobject import ResourceReference, DataObject
 from ion.core.process.process import Process, ProcessClient
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 from ion.resources.dm_resource_descriptions import PublisherResource
+from uuid import uuid4
+
 
 """
 Constants/Enumerations for tags in capabilities dict structures
@@ -44,6 +46,7 @@ publish_msg_type = {
     "Data":"Data",
     "Event":"Event"
 }
+
 
 # CI parameter key constant
 driver_address = 'DriverAddress'
@@ -232,16 +235,21 @@ class InstrumentAgent(ResourceAgent):
     state_topics = None
 
     """
-    A hexidecimal UUID string specifying the current transaction. An empty
-    string indicates no current transaction.
+    A UUID specifying the current transaction. None
+    indicates no current transaction.
     """
-    _transaction_id = ''
+    transaction_id = None
     
     """
     An integer in seconds for how long to wait to acquire a new transaction.
     """
     default_transaction_timeout = 10   
     
+    """
+    An integer in seconds for the maximum allowable timeout.
+    """
+    max_timeout = 120
+
     
     def plc_init(self):
         ResourceAgent.plc_init(self)
@@ -276,40 +284,107 @@ class InstrumentAgent(ResourceAgent):
     ############################################################################
 
 
-    def start_transaction(timeout):
-        pass
+    @defer.inlineCallbacks
+    def op_start_transaction(self,content,headers,msg):
+        """
+        Begin an exclusive transaction with the agent.
+        @param content An integer specifying the time to wait in seconds for the
+            transaction.
+        @retval Transaction ID UUID string.
+        """
+        
+        result = yield self._start_transaction(timeout)                
+        yield self.reply_ok(msg,result)
+        
     
+    @defer.inlineCallbacks
+    def _start_transaction(timeout):
+        """
+        Begin an exclusive transaction with the agent.
+        @param timeout An integer specifying time to wait in seconds for the transaction.
+        @retval Transaction ID UUID string.
+        """
+        
+        assert(isinstance(timeout,int)), 'Expected an integer timeout.'
+        
+        if timeout < 0:
+            timeout = default_transaction_timeout
+        
+        if timeout > max_timeout:
+            timeout = max_timeout
+            
+        if timeout == 0:
+            if transaction_id == '':
+                transaction_id = uuid4()
+                return ['OK',transaction_id]
+            else:
+                return ['ERROR','LockedResource',
+                      'The resource being accessed is in use by another exclusive operation']
+        
+        #todo add the timeout callback code here
+        
+        
     
+    @defer.inlineCallbacks
+    def op_end_transaction(tid):
+        """
+        End the current transaction.
+        @param tid A uuid specifying the current transaction to end.
+        """        
+        
+        result = _end_transaction(tid)
+        yield self.reply_ok(result)
+                
     
-    def end_transaction(tid):
-        pass
-    
-    
-
 
     @defer.inlineCallbacks
-    def _verify_or_start_transaction(tid,optype):
+    def _end_transaction(tid):
         """
-        """
-
-        if tid=='create' and _transaction_id == '':
-            (success,_tid) = start_transaction(default_transaction_timeout)
-            return success
-        elif tid == 'none' and _transaction_id == '':
-            if optype == 'get':
-                return ['OK']
-            elif optype == 'set':
-                return ['ERROR',9999,'Invalid transaction ID.']
-            elif optype == 'execute':
-                return ['ERROR',9999,'Invalid transaction ID.']
-            else:
-                return ['ERROR',9999,'Invalid transaction ID.']            
-        elif tid != _transaction_id:
-            return ['ERROR',9999,'Invalid transaction ID.']
+        End the current transaction.
+        @param tid A uuid specifying the current transaction to end.
+        """        
+        
+        if tid == transaction_id:
+            transaction_id = None
+            yield self.reply_ok(['OK'])
         else:
-            return ['OK']
-    
+            yield self.reply_ok(['ERROR','LockedResource',
+                                 'The resource being accessed is in use by another exclusive operation'])
+            
+        
 
+    
+    def _verify_transaction(tid,optype):
+        """
+        Verify the passed transaction ID is currently open, or open an implicit transaction.
+        @param tid 'create' to create an implicit transaction, 'none' to perform the operation without
+            a transaction, or a UUID to test against the current transaction ID.
+        @param optype 'get' 'set' or 'execute'
+        @retval True if the transaction is valid or if one was successfully created, False otherwise.
+        """
+
+        assert(isinstance(tid,(str,uuid4))), 'Expected uuid4 or str transaction ID.'
+        assert(isinstance(optype,str,uuid4)), 'Expected str optype.'
+
+
+        # Try to start an implicit transaction if tid is 'create'
+        if tid == 'create':
+            result = self._start_transaction(default_transaction_timeout)
+            if result[0]=='OK':
+                return True
+            else:
+                return False
+        
+        # Allow only gets without a current or created transaction.
+        if tid == 'none' and transaction_id == None and optype == 'get':
+            return true
+        
+        # Otherwise, the given ID must match the outstanding one
+        if tid == transaction_id:
+            return True
+        
+        return False
+    
     
     ############################################################################
     #   Observatory Facing Interface
@@ -334,30 +409,26 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(content,tuple)), 'Expected a content tuple.'
         assert(len(content)==2), 'Expected a 2 element content.'
 
-
         (cmd,tid) = content        
 
         assert(isinstance(cmd,list)), 'Expected a command list.'
         assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         # Set up the transaction
-        success = _verify_or_start_transaction(tid,'get')
-        if success[0] != 'OK':
-            yield self.reply_err(msg,success[1:])
-            return
-
+        result = yield self._verify_or_start_transaction(tid,'get')
+        if not result:
+            result = ['ERROR','LockedResource',
+                    'The resource being accessed is in use by another exclusive operation']
+            yield self.reply_ok(msg,result)
+                    
         # Do the work here.
-        # (success,result,_tid) = yield do_something()
+        # Set up the result message.
         
         # End implicit transactions.
         if tid == 'create':
-            end_transaction(tid)
-        
-        if success[0] == 'OK':
-            yield self.reply_ok(msg, (result,_tid))
-        else:
-            yield self.reply_err(msg,success[1:])
-            
+            end_transaction(transaction_id)
+                    
+        yield self.reply_ok(msg,result)
             
         
     @defer.inlineCallbacks
@@ -384,11 +455,14 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        success = _verify_or_start_transaction(tid,'get')
-        if success[0] != 'OK':
-            yield self.reply_err(msg,success[1:])
-            return
-
+        result = yield self._verify_or_start_transaction(tid,'get')
+        if not result:
+            result = ['ERROR','LockedResource',
+                    'The resource being accessed is in use by another exclusive operation']
+            yield self.reply_ok(msg,result)
+                    
+        # Do the work here.
+        # Set up the result message.
 
         # Do the work.
         #response = {}
@@ -409,15 +483,12 @@ class InstrumentAgent(ResourceAgent):
         #    for i in self.event_topics.keys():
         #        response[ci_param_list['EventTopics']][i] = self.event_topics[i].encode()
 
-
+        
         # End implicit transactions.
         if tid == 'create':
-            end_transaction(tid)
-
-        if errors == 0:
-            yield self.reply_ok(msg, response)
-        else:
-            yield self.reply_err(msg, response)        
+            end_transaction(transaction_id)
+                    
+        yield self.reply_ok(msg,result)
         
 
     @defer.inlineCallbacks
@@ -440,22 +511,20 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        success = _verify_or_start_transaction(tid,'set')
-        if success[0] != 'OK':
-            yield self.reply_err(msg,success[1:])
-            return
-
+        result = yield self._verify_or_start_transaction(tid,'get')
+        if not result:
+            result = ['ERROR','LockedResource',
+                    'The resource being accessed is in use by another exclusive operation']
+            yield self.reply_ok(msg,result)
+                    
         # Do the work here.
-
-
+        # Set up the result message.
+        
         # End implicit transactions.
         if tid == 'create':
-            end_transaction(tid)
-
-        if errors == 0:
-            yield self.reply_ok(msg, response)
-        else:
-            yield self.reply_err(msg, response)        
+            end_transaction(transaction_id)
+                    
+        yield self.reply_ok(msg,result)
  
  
     @defer.inlineCallbacks
@@ -479,22 +548,20 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        success = _verify_or_start_transaction(tid,'get')
-        if success[0] != 'OK':
-            yield self.reply_err(msg,success[1:])
-            return
-
+        result = yield self._verify_or_start_transaction(tid,'get')
+        if not result:
+            result = ['ERROR','LockedResource',
+                    'The resource being accessed is in use by another exclusive operation']
+            yield self.reply_ok(msg,result)
+                    
         # Do the work here.
-
-
+        # Set up the result message.
+        
         # End implicit transactions.
         if tid == 'create':
-            end_transaction(tid)
-
-        if errors == 0:
-            yield self.reply_ok(msg, response)
-        else:
-            yield self.reply_err(msg, response)        
+            end_transaction(transaction_id)
+                    
+        yield self.reply_ok(msg,result)
 
 
     @defer.inlineCallbacks
@@ -518,22 +585,20 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        success = _verify_or_start_transaction(tid,'get')
-        if success[0] != 'OK':
-            yield self.reply_err(msg,success[1:])
-            return
-
+        result = yield self._verify_or_start_transaction(tid,'get')
+        if not result:
+            result = ['ERROR','LockedResource',
+                    'The resource being accessed is in use by another exclusive operation']
+            yield self.reply_ok(msg,result)
+                    
         # Do the work here.
-
-
+        # Set up the result message.
+        
         # End implicit transactions.
         if tid == 'create':
-            end_transaction(tid)
-
-        if errors == 0:
-            yield self.reply_ok(msg, response)
-        else:
-            yield self.reply_err(msg, response)        
+            end_transaction(transaction_id)
+                    
+        yield self.reply_ok(msg,result)
         
 
 
@@ -561,22 +626,20 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        success = _verify_or_start_transaction(tid,'get')
-        if success[0] != 'OK':
-            yield self.reply_err(msg,success[1:])
-            return
-
+        result = yield self._verify_or_start_transaction(tid,'get')
+        if not result:
+            result = ['ERROR','LockedResource',
+                    'The resource being accessed is in use by another exclusive operation']
+            yield self.reply_ok(msg,result)
+                    
         # Do the work here.
-
-
+        # Set up the result message.
+        
         # End implicit transactions.
         if tid == 'create':
-            end_transaction(tid)
-
-        if errors == 0:
-            yield self.reply_ok(msg, response)
-        else:
-            yield self.reply_err(msg, response)        
+            end_transaction(transaction_id)
+                    
+        yield self.reply_ok(msg,result)
         
 
 
@@ -616,22 +679,20 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction ID string.'
 
         # Set up the transaction
-        success = _verify_or_start_transaction(tid,'execute')
-        if success[0] != 'OK':
-            yield self.reply_err(msg,success[1:])
-            return
-
+        result = yield self._verify_or_start_transaction(tid,'get')
+        if not result:
+            result = ['ERROR','LockedResource',
+                    'The resource being accessed is in use by another exclusive operation']
+            yield self.reply_ok(msg,result)
+                    
         # Do the work here.
-        # (success,result) = yield self.driver_client.execute_device()
-
+        # Set up the result message.
+        
         # End implicit transactions.
         if tid == 'create':
-            end_transaction(tid)
-
-        if success[0] == 'OK':
-            yield self.reply_ok(msg, result)
-        else:
-            yield self.reply_err(msg, result)        
+            end_transaction(transaction_id)
+                    
+        yield self.reply_ok(msg,result)
 
 
     @defer.inlineCallbacks
@@ -653,22 +714,20 @@ class InstrumentAgent(ResourceAgent):
         
 
         # Set up the transaction
-        success = _verify_or_start_transaction(tid,'get')
-        if success[0] != 'OK':
-            yield self.reply_err(msg,success[1:])
-            return
-
+        result = yield self._verify_or_start_transaction(tid,'get')
+        if not result:
+            result = ['ERROR','LockedResource',
+                    'The resource being accessed is in use by another exclusive operation']
+            yield self.reply_ok(msg,result)
+                    
         # Do the work here.
-
-
+        # Set up the result message.
+        
         # End implicit transactions.
         if tid == 'create':
-            end_transaction(tid)
-
-        if errors == 0:
-            yield self.reply_ok(msg, result)
-        else:
-            yield self.reply_err(msg, result)        
+            end_transaction(transaction_id)
+                    
+        yield self.reply_ok(msg,result)
 
 
 
@@ -690,22 +749,20 @@ class InstrumentAgent(ResourceAgent):
         
 
         # Set up the transaction
-        success = _verify_or_start_transaction(tid,'set')
-        if success[0] != 'OK':
-            yield self.reply_err(msg,success[1:])
-            return
-
+        result = yield self._verify_or_start_transaction(tid,'get')
+        if not result:
+            result = ['ERROR','LockedResource',
+                    'The resource being accessed is in use by another exclusive operation']
+            yield self.reply_ok(msg,result)
+                    
         # Do the work here.
-
-
+        # Set up the result message.
+        
         # End implicit transactions.
         if tid == 'create':
-            end_transaction(tid)
-
-        if errors == 0:
-            yield self.reply_ok(msg, result)
-        else:
-            yield self.reply_err(msg, result)        
+            end_transaction(transaction_id)
+                    
+        yield self.reply_ok(msg,result)
 
 
 
@@ -728,22 +785,20 @@ class InstrumentAgent(ResourceAgent):
         
 
         # Set up the transaction
-        success = _verify_or_start_transaction(tid,'get')
-        if success[0] != 'OK':
-            yield self.reply_err(msg,success[1:])
-            return
-
+        result = yield self._verify_or_start_transaction(tid,'get')
+        if not result:
+            result = ['ERROR','LockedResource',
+                    'The resource being accessed is in use by another exclusive operation']
+            yield self.reply_ok(msg,result)
+                    
         # Do the work here.
-
-
+        # Set up the result message.
+        
         # End implicit transactions.
         if tid == 'create':
-            end_transaction(tid)
-
-        if errors == 0:
-            yield self.reply_ok(msg, result)
-        else:
-            yield self.reply_err(msg, result)        
+            end_transaction(transaction_id)
+                    
+        yield self.reply_ok(msg,result)
 
 
 
@@ -768,22 +823,20 @@ class InstrumentAgent(ResourceAgent):
         
 
         # Set up the transaction
-        success = _verify_or_start_transaction(tid,'get')
-        if success[0] != 'OK':
-            yield self.reply_err(msg,success[1:])
-            return
-
+        result = yield self._verify_or_start_transaction(tid,'get')
+        if not result:
+            result = ['ERROR','LockedResource',
+                    'The resource being accessed is in use by another exclusive operation']
+            yield self.reply_ok(msg,result)
+                    
         # Do the work here.
-
-
+        # Set up the result message.
+        
         # End implicit transactions.
         if tid == 'create':
-            end_transaction(tid)
-
-        if errors == 0:
-            yield self.reply_ok(msg, result)
-        else:
-            yield self.reply_err(msg, result)        
+            end_transaction(transaction_id)
+                    
+        yield self.reply_ok(msg,result)
 
 
     @defer.inlineCallbacks
@@ -805,20 +858,20 @@ class InstrumentAgent(ResourceAgent):
         
         # get agent state
         if state != 'DirectAccessMode':
-            yield self.reply_err(msg,[9999,'Agent not in direct access mode.'])
+            yield self.reply_ok(msg,['ERROR','IncorrectState',
+                                     'The operation being requested does not apply to the current state'])
             return
         
         if tid != _transaction_id:
-            yield self.reply_err(msg,[9999,'Invalid direct access transaction ID'])
+            yield self.reply_ok(msg,['ERROR','LockedResource',
+                                     'The resource being accessed is in use by another exclusive operation'])
             return
         
         # Everything OK, send the data to the device
         # success = yield driver_client.execute_direct(command)
+        # Results are published rather than replied?
 
-        if success[0] == 'OK':
-            yield self.reply_err(msg,success[0])
-        else:
-            yield self.reply_err(msg,success[1:])
+        yield self.reply_ok(msg,['OK'])
             
 
 
