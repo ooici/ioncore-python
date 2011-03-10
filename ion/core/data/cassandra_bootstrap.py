@@ -15,7 +15,8 @@ from ion.util.config import Config
 from ion.util.tcp_connections import TCPConnection
 
 from ion.core.data.cassandra import CassandraStore, CassandraIndexedStore
-
+from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
+from ion.core.data import storage_configuration_utility
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -25,10 +26,11 @@ class CassandraBootStrap:
         """
         Get init args from the bootstrap
         """
-        storage_conf = Config("res/config/storage.cfg")
+        storage_conf = storage_configuration_utility.storage_conf
+        #storage_conf = Config("res/config/storage.cfg")
         host = storage_conf["storage provider"]["host"]
         port = storage_conf["storage provider"]["port"]
-        self._keyspace = storage_conf["persistent_archive"]["name"]
+        self._keyspace = storage_conf["persistent archive"]["name"]
         authorization_dictionary = {"username":username, "password":password}    
         self._manager = ManagedCassandraClientFactory(keyspace=self._keyspace, credentials=authorization_dictionary)
         TCPConnection.__init__(self,host, port, self._manager)
@@ -38,9 +40,11 @@ class CassandraBootStrap:
 class CassandraIndexedStoreBootstrap(CassandraBootStrap, CassandraIndexedStore):
     
     def __init__(self, username, password):
-            CassandraBootStrap.__init__(self, username, password) 
+        CassandraBootStrap.__init__(self, username, password)
+        self._cache_name = COMMIT_CACHE
 
 class CassandraStoreBootstrap(CassandraBootStrap, CassandraStore):
 
     def __init__(self, username, password):
         CassandraBootStrap.__init__(self, username, password)
+        self._cache_name = BLOB_CACHE
