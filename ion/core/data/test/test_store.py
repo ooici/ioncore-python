@@ -36,12 +36,16 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 from ion.util.itv_decorator import itv
 
+from ion.core.data.cassandra_bootstrap import CassandraStoreBootstrap
 
 simple_password_type = object_utils.create_type_identifier(object_id=2502, version=1)
 columndef_type = object_utils.create_type_identifier(object_id=2508, version=1)
 column_family_type = object_utils.create_type_identifier(object_id=2507, version=1)
 cassandra_cluster_type = object_utils.create_type_identifier(object_id=2504, version=1)
 cassandra_keyspace_type = object_utils.create_type_identifier(object_id=2506, version=1)
+
+
+        
 
 class IStoreTest(unittest.TestCase):
 
@@ -98,6 +102,21 @@ class IStoreTest(unittest.TestCase):
         self.failUnlessEqual(self.value, b)
         yield self.ds.remove(self.key)
         defer.returnValue(None)
+
+class BootstrapStoreTest(IStoreTest):
+    
+    def _setup_backend(self):
+        store = CassandraStoreBootstrap("ooiuser", "oceans11")
+        store.initialize()
+        store.activate()
+        return defer.succeed(store)
+        
+    @defer.inlineCallbacks
+    def tearDown(self):
+        try:
+            yield self.ds.terminate()
+        except Exception, ex:
+            log.info("Exception raised in tearDown %s" % (ex,))    
 
 class CassandraStoreTest(IStoreTest):
     

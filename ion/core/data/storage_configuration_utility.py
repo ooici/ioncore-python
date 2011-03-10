@@ -5,6 +5,7 @@
 @author David Stuebe
 @TODO
 """
+import os
 
 from ion.core.exception import IonError
 from ion.util.config import Config
@@ -44,7 +45,8 @@ class StorageConfigurationError(IonError):
     An exception to raise if the Storage configuration is incorrect or can not be read
     """
 
-
+#TODO, do some checking to verify the Cassandra schema is configured correctly
+"""
 # Set some constants based on the config file:
 cache_list = storage_conf.getValue(CACHE_CONFIGURATION,[])
 for cache in cache_list:
@@ -87,5 +89,5 @@ log.info('CACHE_CONFIGURATION: %s' % CACHE_CONFIGURATION)
 log.info('COMMIT_CACHE: %s' % COMMIT_CACHE)
 log.info('COMMIT_COLUMN_NAMES: %s' % COMMIT_COLUMN_NAMES)
 
-
+"""
 
