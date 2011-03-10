@@ -190,9 +190,33 @@ class ExchangeManagementService(ServiceProcess):
         qname = q.configuration.name
         xn = q.configuration.exchangename
         xs = q.configuration.exchangespace
-        topic = q.configuration.topic
         
         self.controller.create_queue(xs + "." + xn)
+        
+        log.debug('op_create_queue()')
+        
+        # Object creation
+        yield self.reply_ok(msg, None)
+
+
+    @defer.inlineCallbacks
+    def op_create_binding(self, binding, headers, msg):
+        """
+        Creates a queue and binds it to the appropriate namespace and exchange.
+        """
+        b = binding.MessageObject
+        desc = b.configuration.description
+        bname = b.configuration.name
+        xn = b.configuration.exchangename
+        xs = b.configuration.exchangespace
+        topic = b.configuration.topic
+        q = b.configuration.queuename
+        
+        self.controller.bind(
+                name = xs + "." + xn + "." + q,
+                exchange = xs + "." + xn,
+                routing_key = topic
+        )
         
         log.debug('op_create_queue()')
         
@@ -354,11 +378,51 @@ class ExchangeManagementClient(ServiceClient):
             msg.configuration.description = description
             msg.configuration.exchangespace = exchangespace
             msg.configuration.exchangename = exchangename
-            msg.configuration.topic = topic
     
             (content, headers, msg) = yield self.rpc_send('create_queue', msg)
             defer.returnValue(content)
 
+
+    @defer.inlineCallbacks
+    def create_binding(
+            self,
+            name,
+            description,
+            exchangespace,
+            exchangename,
+            queuename,
+            topic
+        ):
+            """
+            Creates a Binding.
+            @param name 
+                    a string uniquely identifying the Queue 
+                    in the scope of the ExchangeSpace and 
+                    ExchangeName.
+            @param description 
+                    a free text string containing a description of 
+                    the ExchangeName.
+            @param exchangespace
+                    a string uniquely identifying the ExchangeSpace
+                    to which ExchangeName belongs.  This must be 
+                    previously defined with a call to create_exchangespace()
+            @param exchangename
+                    a string uniquely identifying the ExchangeName
+                    to which this queue will be bound.  This must be 
+                    previously defined with a call to create_exchangename()
+            """        
+            yield self._check_init()
+    
+            msg = yield self.helper.create_object(res_wrapper.binding_type)
+            msg.configuration.name = name
+            msg.configuration.description = description
+            msg.configuration.exchangespace = exchangespace
+            msg.configuration.exchangename = exchangename
+            msg.configuration.queuename = queuename
+            msg.configuration.topic = topic
+    
+            (content, headers, msg) = yield self.rpc_send('create_queue', msg)
+            defer.returnValue(content)
 
            
 
