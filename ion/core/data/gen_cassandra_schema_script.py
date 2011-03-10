@@ -5,7 +5,7 @@
 """
 
 from optparse import OptionParser
-import copy,sys
+import sys
 import os.path
 from ion.util.config import Config
 

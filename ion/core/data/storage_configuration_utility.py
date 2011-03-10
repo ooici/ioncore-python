@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-@file ion/services/dm/preservation/storage_configuration_utility.py
+@file ion/core/data/storage_configuration_utility.py
 @author David Stuebe
 @TODO
 """
@@ -39,7 +39,7 @@ KEYWORD = 'keyword'
 # Load the Config File!
 storage_conf = Config('../res/config/storage.cfg')
 
-class StorateConfigurationError(IonError):
+class StorageConfigurationError(IonError):
     """
     An exception to raise if the Storage configuration is incorrect or can not be read
     """
@@ -52,7 +52,7 @@ blob_cache = caches.get(BLOB_CACHE,None)
 if blob_cache:
     pass
 else:
-    raise StorateConfigurationError('The storage configuration file does not have a cache for blobs!')
+    raise StorageConfigurationError('The storage configuration file does not have a cache for blobs!')
 
 
 
@@ -75,7 +75,7 @@ if commit_cache:
     assert KEYWORD in COMMIT_COLUMN_NAMES, 'Keyword column name not found in config file!'
 
 else:
-    raise StorateConfigurationError('The storage configuration file does not have a cache for commits!')
+    raise StorageConfigurationError('The storage configuration file does not have a cache for commits!')
 
 
 

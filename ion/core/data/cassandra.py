@@ -163,7 +163,6 @@ class CassandraIndexedStore(CassandraStore):
         """
         log.info("CassandraIndexedStore.__init__")       
         CassandraStore.__init__(self, persistent_technology, persistent_archive, credentials, cache)
-        self._cache = cache
         
     @defer.inlineCallbacks
     def put(self, key, value, index_attributes=None):
@@ -260,7 +259,7 @@ class CassandraIndexedStore(CassandraStore):
         """
         keyspace_description = yield self.client.describe_keyspace(self._keyspace)
         log.debug("keyspace desc %s" % (keyspace_description,))
-        get_cfdef = lambda cfdef: cfdef.name == self._cache.name
+        get_cfdef = lambda cfdef: cfdef.name == self._cache_name
         cfdef = filter(get_cfdef, keyspace_description.cf_defs)
         get_names = lambda cdef: cdef.name
         indexes = map(get_names, cfdef[0].column_metadata)
