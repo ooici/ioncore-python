@@ -908,7 +908,7 @@ class ProcessClient(ProcessClientBase):
 
         try:
             expiryval = int(expiry)
-        except:
+        except ValueError, ex:
             assert False, 'Expiry must be string representation of int time value'
             
         headers = {'user-id':user_id, 'expiry':expiry}
