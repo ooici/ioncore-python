@@ -297,7 +297,6 @@ class InstrumentAgent(ResourceAgent):
         yield self.reply_ok(msg,result)
         
     
-    @defer.inlineCallbacks
     def _start_transaction(timeout):
         """
         Begin an exclusive transaction with the agent.
@@ -346,10 +345,10 @@ class InstrumentAgent(ResourceAgent):
         
         if tid == transaction_id:
             transaction_id = None
-            yield self.reply_ok(['OK'])
+            self.reply_ok(['OK'])
         else:
-            yield self.reply_ok(['ERROR','LockedResource',
-                                 'The resource being accessed is in use by another exclusive operation'])
+            self.reply_ok(['ERROR','LockedResource',
+                           'The resource being accessed is in use by another exclusive operation'])
             
         
 
@@ -420,6 +419,7 @@ class InstrumentAgent(ResourceAgent):
             result = ['ERROR','LockedResource',
                     'The resource being accessed is in use by another exclusive operation']
             yield self.reply_ok(msg,result)
+            return
                     
         # Do the work here.
         # Set up the result message.
@@ -460,6 +460,7 @@ class InstrumentAgent(ResourceAgent):
             result = ['ERROR','LockedResource',
                     'The resource being accessed is in use by another exclusive operation']
             yield self.reply_ok(msg,result)
+            return
                     
         # Do the work here.
         # Set up the result message.
@@ -491,6 +492,7 @@ class InstrumentAgent(ResourceAgent):
         yield self.reply_ok(msg,result)
         
 
+
     @defer.inlineCallbacks
     def op_set_observatory(self, content, headers, msg):
         """
@@ -516,6 +518,7 @@ class InstrumentAgent(ResourceAgent):
             result = ['ERROR','LockedResource',
                     'The resource being accessed is in use by another exclusive operation']
             yield self.reply_ok(msg,result)
+            return
                     
         # Do the work here.
         # Set up the result message.
@@ -553,6 +556,7 @@ class InstrumentAgent(ResourceAgent):
             result = ['ERROR','LockedResource',
                     'The resource being accessed is in use by another exclusive operation']
             yield self.reply_ok(msg,result)
+            return
                     
         # Do the work here.
         # Set up the result message.
@@ -590,6 +594,7 @@ class InstrumentAgent(ResourceAgent):
             result = ['ERROR','LockedResource',
                     'The resource being accessed is in use by another exclusive operation']
             yield self.reply_ok(msg,result)
+            return
                     
         # Do the work here.
         # Set up the result message.
@@ -631,6 +636,7 @@ class InstrumentAgent(ResourceAgent):
             result = ['ERROR','LockedResource',
                     'The resource being accessed is in use by another exclusive operation']
             yield self.reply_ok(msg,result)
+            return
                     
         # Do the work here.
         # Set up the result message.
@@ -684,6 +690,7 @@ class InstrumentAgent(ResourceAgent):
             result = ['ERROR','LockedResource',
                     'The resource being accessed is in use by another exclusive operation']
             yield self.reply_ok(msg,result)
+            return
                     
         # Do the work here.
         # Set up the result message.
@@ -719,6 +726,7 @@ class InstrumentAgent(ResourceAgent):
             result = ['ERROR','LockedResource',
                     'The resource being accessed is in use by another exclusive operation']
             yield self.reply_ok(msg,result)
+            return
                     
         # Do the work here.
         # Set up the result message.
@@ -754,6 +762,7 @@ class InstrumentAgent(ResourceAgent):
             result = ['ERROR','LockedResource',
                     'The resource being accessed is in use by another exclusive operation']
             yield self.reply_ok(msg,result)
+            return
                     
         # Do the work here.
         # Set up the result message.
@@ -790,6 +799,7 @@ class InstrumentAgent(ResourceAgent):
             result = ['ERROR','LockedResource',
                     'The resource being accessed is in use by another exclusive operation']
             yield self.reply_ok(msg,result)
+            return
                     
         # Do the work here.
         # Set up the result message.
@@ -828,6 +838,7 @@ class InstrumentAgent(ResourceAgent):
             result = ['ERROR','LockedResource',
                     'The resource being accessed is in use by another exclusive operation']
             yield self.reply_ok(msg,result)
+            return
                     
         # Do the work here.
         # Set up the result message.
