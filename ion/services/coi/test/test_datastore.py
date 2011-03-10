@@ -241,7 +241,7 @@ class DataStoreTest(IonTestCase):
         ab2 = yield repo2.checkout('master')
         
         # The state is repaired here too
-        self.assertEqual(ab2.owner.email, 'process1@gmail.com')
+        self.assertEqual(str(ab2.owner.email), 'process1@gmail.com')
         self.assertEqual(repo2._dotgit, repo1._dotgit)
         
         

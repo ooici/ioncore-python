@@ -155,12 +155,11 @@ class DataStoreService(ServiceProcess):
                 # Load these commits into the workbench
                 self.workbench._hashed_elements.update(store_commits)
 
-                repo = self.workbench._load_repo_from_mutable(store_head)
-                    
+
                 # Check to make sure the mutable is upto date with the commits...
-                for commit_key in store_commits.keys():
-                    if not commit_key in repo._commit_index:
-                        raise DataStoreError('Can not handle divergence yet...')
+                #for commit_key in store_commits.keys():
+                #    if not commit_key in repo._commit_index:
+                #        raise DataStoreError('Can not handle divergence yet...')
             
             
         yield self.workbench.op_push(heads, headers, msg)
@@ -189,20 +188,20 @@ class DataStoreService(ServiceProcess):
                             attributes[BRANCH_NAME] = branch.branchkey
                                         
                     if cref.objectroot.ObjectType == ASSOCIATION_TYPE:
-                        attributes['subject_repository'] = cref.objectroot.subject.key
-                        attributes['subject_branch'] = cref.objectroot.subject.branch
-                        attributes['subject_commit'] = cref.objectroot.subject.commit
+                        attributes[SUBJECT_KEY] = cref.objectroot.subject.key
+                        attributes[SUBJECT_BRANCH] = cref.objectroot.subject.branch
+                        attributes[SUBJECT_COMMIT] = cref.objectroot.subject.commit
                         
-                        attributes['predicate_repository'] = cref.objectroot.predicate.key
-                        attributes['predicate_branch'] = cref.objectroot.predicate.branch
-                        attributes['predicate_commit'] = cref.objectroot.predicate.commit
+                        attributes[PREDICATE_KEY] = cref.objectroot.predicate.key
+                        attributes[PREDICATE_BRANCH] = cref.objectroot.predicate.branch
+                        attributes[PREDICATE_COMMIT] = cref.objectroot.predicate.commit
 
-                        attributes['object_repository'] = cref.objectroot.object.key
-                        attributes['object_branch'] = cref.objectroot.object.branch
-                        attributes['object_commit'] = cref.objectroot.object.commit
+                        attributes[OBJECT_KEY] = cref.objectroot.object.key
+                        attributes[OBJECT_BRANCH] = cref.objectroot.object.branch
+                        attributes[OBJECT_COMMIT] = cref.objectroot.object.commit
                         
                     elif  cref.objectroot.ObjectType == TERMINOLOGY_TYPE:
-                        attributes['word'] = cref.objectroot.word
+                        attributes[KEYWORD] = cref.objectroot.word
                     
                     # get the wrapped structure element to put in...
                     wse = self.workbench._hashed_elements.get(key)
@@ -220,17 +219,6 @@ class DataStoreService(ServiceProcess):
         
         #print 'Index: \n', self.c_store.indices, '\n\n'
             
-            
-        def_list = []
-        # Now put the mutable heads
-        for repo_key in pushed_repos.keys():
-            repo = self.workbench.get_repository(repo_key)
-            wse = self.workbench.serialize_mutable(repo._dotgit)
-            defd = self.m_store.put(repo_key, wse.serialize())
-            
-            def_list.append(defd)
-            
-        yield defer.DeferredList(def_list)
         
             
                 
@@ -244,33 +232,29 @@ class DataStoreService(ServiceProcess):
         
         store_commits ={}
         
-        blob = yield self.m_store.get(repo_key)
-        # if the store has a version of the repo - then load it
-        if blob:
-            store_head = gpb_wrapper.StructureElement.parse_structure_element(blob)
-            self.workbench._hashed_elements[store_head.key]=store_head
-                
-            # Get the commits using the query interface
-            q = Query()
-            q.add_predicate_eq(REPOSITORY_KEY, repo_key)
-            rows = yield self.c_store.query(q)
-                
-            for key, columns in rows.items():
-                blob = columns["value"]
-                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-                assert key == wse.key, 'Calculated key does not match the stored key!'
-                store_commits[wse.key] = wse
+
+
+        q = Query()
+        q.add_predicate_eq(REPOSITORY_KEY, repo_key)
+        q.add_predicate_gt(BRANCH_NAME, '')
+
+        rows = yield self.c_store.query(q)
+
+        for key, columns in rows.items():
+            blob = columns["value"]
+            wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+            assert key == wse.key, 'Calculated key does not match the stored key!'
+            store_commits[wse.key] = wse
                     
                     
-                # Load these commits into the workbench
-                self.workbench._hashed_elements.update(store_commits)
-                    
-                repo = self.workbench._load_repo_from_mutable(store_head)
-                    
-                # Check to make sure the mutable is upto date with the commits...
-                for commit_key in store_commits.keys():
-                    if not commit_key in repo._commit_index:
-                        raise DataStoreError('Can not handle divergence yet...')
+            # Load these commits into the workbench
+            self.workbench._hashed_elements.update(store_commits)
+
+
+            # Check to make sure the mutable is upto date with the commits...
+            for commit_key in store_commits.keys():
+                if not commit_key in repo._commit_index:
+                    raise DataStoreError('Can not handle divergence yet...')
         
         yield self.workbench.op_pull(content, headers, msg)
         
@@ -301,7 +285,7 @@ class DataStoreService(ServiceProcess):
         # Load this list of objects from the store into memory for use in the datastores workbench
         for result, blob in obj_list:
             wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-            self._hashed_elements[wse.key]=wse
+            self.workbench._hashed_elements[wse.key]=wse
             
         yield self.workbench.op_fetch_linked_objects(elements, headers, message)
         

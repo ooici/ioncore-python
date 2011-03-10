@@ -37,7 +37,7 @@ KEYWORD = 'keyword'
 
 
 # Load the Config File!
-storage_conf = Config('res/config/storage.cfg')
+storage_conf = Config('../res/config/storage.cfg')
 
 class StorateConfigurationError(IonError):
     """
@@ -46,35 +46,34 @@ class StorateConfigurationError(IonError):
 
 
 # Set some constants based on the config file:
-cache_list = storage_conf.getValue(CACHE_CONFIGURATION,[])
-for cache in cache_list:
-    blob_cache = cache.get(BLOB_CACHE,None)
-    if blob_cache:
-        break
+caches = storage_conf.getValue(CACHE_CONFIGURATION,[])
+
+blob_cache = caches.get(BLOB_CACHE,None)
+if blob_cache:
+    pass
 else:
     raise StorateConfigurationError('The storage configuration file does not have a cache for blobs!')
 
 
-for cache in cache_list:
-    commit_cache = cache.get(COMMIT_CACHE,None)
-    if commit_cache:
 
-        COMMIT_COLUMN_NAMES = commit_cache.get('indexed columns')
+commit_cache = caches.get(COMMIT_CACHE,None)
+if commit_cache:
 
-        assert REPOSITORY_KEY in COMMIT_COLUMN_NAMES, 'Repository key column name not found in config file!'
-        assert BRANCH_NAME in COMMIT_COLUMN_NAMES, 'Branch Name column name not found in config file!'
+    COMMIT_COLUMN_NAMES = commit_cache.get('indexed columns')
 
-        assert SUBJECT_KEY in COMMIT_COLUMN_NAMES, 'Subject key column name not found in config file!'
-        assert SUBJECT_BRANCH in COMMIT_COLUMN_NAMES, 'Subject Branch column name not found in config file!'
-        assert SUBJECT_COMMIT in COMMIT_COLUMN_NAMES, 'Subject Commit column name not found in config file!'
+    assert REPOSITORY_KEY in COMMIT_COLUMN_NAMES, 'Repository key column name not found in config file!'
+    assert BRANCH_NAME in COMMIT_COLUMN_NAMES, 'Branch Name column name not found in config file!'
 
-        assert PREDICATE_KEY in COMMIT_COLUMN_NAMES, 'Predicate Key column name not found in config file!'
-        assert PREDICATE_BRANCH in COMMIT_COLUMN_NAMES, 'Predicate Branch column name not found in config file!'
-        assert PREDICATE_COMMIT in COMMIT_COLUMN_NAMES, 'Predicate commit column name not found in config file!'
+    assert SUBJECT_KEY in COMMIT_COLUMN_NAMES, 'Subject key column name not found in config file!'
+    assert SUBJECT_BRANCH in COMMIT_COLUMN_NAMES, 'Subject Branch column name not found in config file!'
+    assert SUBJECT_COMMIT in COMMIT_COLUMN_NAMES, 'Subject Commit column name not found in config file!'
 
-        assert KEYWORD in COMMIT_COLUMN_NAMES, 'Keyword column name not found in config file!'
+    assert PREDICATE_KEY in COMMIT_COLUMN_NAMES, 'Predicate Key column name not found in config file!'
+    assert PREDICATE_BRANCH in COMMIT_COLUMN_NAMES, 'Predicate Branch column name not found in config file!'
+    assert PREDICATE_COMMIT in COMMIT_COLUMN_NAMES, 'Predicate commit column name not found in config file!'
 
-        break
+    assert KEYWORD in COMMIT_COLUMN_NAMES, 'Keyword column name not found in config file!'
+
 else:
     raise StorateConfigurationError('The storage configuration file does not have a cache for commits!')
 
