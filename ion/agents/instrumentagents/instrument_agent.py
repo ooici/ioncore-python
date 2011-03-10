@@ -517,7 +517,7 @@ class InstrumentAgent(ResourceAgent):
         """
         
         assert(isinstance(content,tuple)), 'Expected a content tuple.'
-        assert(len(content)), 'Expected a 2 element content.'
+        assert(len(content)==2), 'Expected a 2 element content.'
 
 
         (params,tid) = content
@@ -575,7 +575,7 @@ class InstrumentAgent(ResourceAgent):
         @todo Write this or pass through to a subclass
         """
         assert(isinstance(content,tuple)), 'Expected a content tuple.'
-        assert(len(content)), 'Expected a 2 element content.'
+        assert(len(content)==2), 'Expected a 2 element content.'
 
         (params,tid) = content
         
@@ -612,7 +612,7 @@ class InstrumentAgent(ResourceAgent):
         """
         
         assert(isinstance(content,tuple)), 'Expected a content tuple.'
-        assert(len(content)), 'Expected a 2 element content.'
+        assert(len(content)==2), 'Expected a 2 element content.'
 
         (params,tid) = content
         
@@ -649,7 +649,7 @@ class InstrumentAgent(ResourceAgent):
         """
         
         assert(isinstance(content,tuple)), 'Expected a content tuple.'
-        assert(len(content)), 'Expected a 2 element content.'
+        assert(len(content)==2), 'Expected a 2 element content.'
 
         (params,tid) = content
         
@@ -690,7 +690,7 @@ class InstrumentAgent(ResourceAgent):
         """
         
         assert(isinstance(content,tuple)), 'Expected a content tuple.'
-        assert(len(content)), 'Expected a 2 element content.'
+        assert(len(content)==2), 'Expected a 2 element content.'
 
         (params,tid) = content
         
@@ -737,7 +737,7 @@ class InstrumentAgent(ResourceAgent):
         
 
         assert(isinstance(content,tuple)), 'Expected a content tuple.'
-        assert(len(content)), 'Expected a 2 element content.'
+        assert(len(content)==2), 'Expected a 2 element content.'
 
         (content,tid) = content
         
@@ -778,7 +778,7 @@ class InstrumentAgent(ResourceAgent):
             containing a dictionary of parameter values and a transaction ID.
         """
         assert(isinstance(content,tuple)), 'Expected a content tuple.'
-        assert(len(content)), 'Expected a 2 element content.'
+        assert(len(content)==2), 'Expected a 2 element content.'
 
         (params,tid) = content
         
@@ -813,7 +813,7 @@ class InstrumentAgent(ResourceAgent):
             giving a dictionary of successes for each channel-parameter pair, and a transaction ID.
         """
         assert(isinstance(content,tuple)), 'Expected a content tuple.'
-        assert(len(content)), 'Expected a 2 element content.'
+        assert(len(content)==2), 'Expected a 2 element content.'
 
         (params,tid) = content
         
@@ -849,7 +849,7 @@ class InstrumentAgent(ResourceAgent):
             giving a dictionary of success-values for each channel-parameter-metadata triple, and a transaction ID.
         """
         assert(isinstance(content,tuple)), 'Expected a content tuple.'
-        assert(len(content)), 'Expected a 2 element content.'
+        assert(len(content)==2), 'Expected a 2 element content.'
 
         (params,tid) = content
         
@@ -887,7 +887,7 @@ class InstrumentAgent(ResourceAgent):
         """
         
         assert(isinstance(content,tuple)), 'Expected a content tuple.'
-        assert(len(content)), 'Expected a 2 element content.'
+        assert(len(content)==2), 'Expected a 2 element content.'
 
         (statuses,tid) = content
         
