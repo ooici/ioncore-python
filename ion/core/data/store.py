@@ -80,6 +80,16 @@ class Store(object):
         if self.kvs.has_key(key):
             del self.kvs[key]
         return defer.succeed(None)
+    
+       
+    def has_key(self, key):
+        """
+        Checks to see if the key exists in the column family
+        @param key is the key to check in the column family
+        @retVal Returns a bool in a deferred
+        """ 
+        return defer.maybeDeferred(self.kvs.has_key, key )
+
 
 class IIndexStore(IStore):
     """
@@ -103,13 +113,7 @@ class IIndexStore(IStore):
         @param index_attributes a dictionary of attributes by which to index this value of this key
         @retval Deferred, for success of this operation
         """
-
-    def update_index(key, index_attributes):
-        """
-        @param key  an immutable key associated with a value
-        @param index_attributes an update to the dictionary of attributes by which to index this value of this key
-        """
-
+    
     def remove(key):
         """
         @param key  an immutable key associated with a value
@@ -117,18 +121,27 @@ class IIndexStore(IStore):
      
         """
         
-    def query(self, indexed_attributes_eq={}, indexed_attributes_gt={}):
+    def query(query_predicates):
         """
         Search for rows in the Cassandra instance.
-    
-        @param indexed_attributes is a dictionary with column:value mappings.
-        Rows are returned that have columns set to the value specified in 
-        the dictionary
-        
+        @param query_predicates is a store.Query object
         @retVal a thrift representation of the rows returned by the query.
         """
         
-    def get_query_attributes(self):
+    def update_index(key, index_attributes):
+        """
+        @param key  an immutable key associated with a value
+        @param index_attributes an update to the dictionary of attributes by which to index this value of this key
+        """        
+    
+    def has_key(self, key):
+        """
+        Checks to see if the key exists in the column family
+        @param key is the key to check in the column family
+        @retVal Returns a bool in a deferred
+        """ 
+    
+    def get_query_attributes():
         """
         Return the column names that are indexed.
         """
@@ -176,27 +189,6 @@ class IndexStore(object):
         else:
             return defer.maybeDeferred(row.get, "value")
 
-
-    def _update_index(self, key, index_attributes):
-        log.debug("In _update_index")
-        log.debug("key %s index_attributes %s" % (key,index_attributes))
-        #Ensure that we are updating attributes that are indexed.
-        query_attribute_names = set(self.indices.keys())
-        index_attribute_names = set(index_attributes.keys())
-        
-        if not index_attribute_names.issubset(query_attribute_names):
-            bad_attrs = index_attribute_names.difference(query_attribute_names)
-            raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
-        
-        for k, v in index_attributes.items():
-            kindex = self.indices.get(k, None)
-            if not kindex:
-                kindex = {}
-                self.indices[k] = kindex
-            # Create a set of keys if it does not already exist
-            kindex[v] = kindex.get(v, set())
-            kindex[v].add(key)
-
     def put(self, key, value, index_attributes={}):
         """
         @see IStore.put
@@ -205,23 +197,7 @@ class IndexStore(object):
         """
         self._update_index(key, index_attributes)
                         
-        return defer.maybeDeferred(self.kvs.update, {key: dict({"value":value},**index_attributes)})
-    
-    
-    def update_index(self, key, index_attributes):
-        """
-        @brief Update the index attributes, but keep the value the same. 
-        @param key The key to the row.
-        @param index_attributes A dictionary of column names and values. These attributes
-        can be used to query the store to return rows based on the value of the attributes.
-        
-        Raises an IndexStoreException if you try to update an attribute that is not indexed.
-        """
-        log.debug("In update_index")
-        self._update_index(key, index_attributes)
-        self.kvs[key].update(index_attributes)
-        return defer.succeed(None)
-        
+        return defer.maybeDeferred(self.kvs.update, {key: dict({"value":value},**index_attributes)})        
     
     def remove(self, key):
         """
@@ -278,7 +254,50 @@ class IndexStore(object):
                 result[k] = self.kvs.get(k)
                 
         return defer.succeed(result)                
+    
+    def _update_index(self, key, index_attributes):
+        log.debug("In _update_index")
+        log.debug("key %s index_attributes %s" % (key,index_attributes))
+        #Ensure that we are updating attributes that are indexed.
+        query_attribute_names = set(self.indices.keys())
+        index_attribute_names = set(index_attributes.keys())
+        
+        if not index_attribute_names.issubset(query_attribute_names):
+            bad_attrs = index_attribute_names.difference(query_attribute_names)
+            raise IndexStoreError("These attributes: %s %s %s"  % (",".join(bad_attrs),os.linesep,"are not indexed."))
+        
+        for k, v in index_attributes.items():
+            kindex = self.indices.get(k, None)
+            if not kindex:
+                kindex = {}
+                self.indices[k] = kindex
+            # Create a set of keys if it does not already exist
+            kindex[v] = kindex.get(v, set())
+            kindex[v].add(key)
+    
 
+    def update_index(self, key, index_attributes):
+        """
+        @brief Update the index attributes, but keep the value the same. 
+        @param key The key to the row.
+        @param index_attributes A dictionary of column names and values. These attributes
+        can be used to query the store to return rows based on the value of the attributes.
+        
+        Raises an IndexStoreException if you try to update an attribute that is not indexed.
+        """
+        log.debug("In update_index")
+        self._update_index(key, index_attributes)
+        self.kvs[key].update(index_attributes)
+        return defer.succeed(None)
+    
+    def has_key(self, key):
+        """
+        Checks to see if the key exists in the column family
+        @param key is the key to check in the column family
+        @retVal Returns a bool in a deferred
+        """
+        return defer.maybeDeferred(self.kvs.has_key, key)
+    
     def get_query_attributes(self):
         """
         Return the column names that are indexed.
@@ -312,7 +331,7 @@ class IDataManager(Interface):
     @note Proposed class to fulfill preservation service management?
     @brief Administrative functionality for backend store configuration. 
     """
-    def create_persistent_archive(self, persistent_archive):
+    def create_persistent_archive(persistent_archive):
         """
         @brief Create a separate organizational instance in the backend
         @param persistent_archive is the name of the organization
@@ -320,33 +339,33 @@ class IDataManager(Interface):
         """
         
         
-    def remove_persistent_archive(self, persistent_archive):
+    def remove_persistent_archive(persistent_archive):
         """
         @brief Remove an organizational instance in the backend
         @param persistent_archive is the name of the organization
         """
         
-    def update_persistent_archive(self, persistent_archive):
+    def update_persistent_archive(persistent_archive):
         """
         @brief changes the configuration of the persistent archive
         @param persistent_archive the name and configuration of the persistent archive.
         This is represented as an OOI resource.
         """
         
-    def create_cache(self, persistent_archive, cache):
+    def create_cache(persistent_archive, cache):
         """
         @brief creates a new cache in Cassandra this creates a new column family
         @param persistent_archive the archive in which the cache resides
         @param cache a resource representation of the cache, this includes its name and configuration
         """
     
-    def update_cache(self, cache):
+    def update_cache(cache):
         """
         @brief changes the configuration of the current cache
         @param a resource representation of the cache
         """
         
-    def remove_cache(self, cache):
+    def remove_cache(cache):
         """
         @brief remove the current cache
         @param a resource representation of the cache
