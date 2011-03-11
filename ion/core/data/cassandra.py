@@ -64,12 +64,16 @@ class CassandraStore(TCPConnection):
         """
         functional wrapper around active client instance
         """
+        #import twisted.internet.base
+        #twisted.internet.base.DelayedCall.debug = True
         ### Get the host and port from the Persistent Technology resource
         host = persistent_technology.hosts[0].host
         port = persistent_technology.hosts[0].port
         
         ### Get the Key Space for the connection
         self._keyspace = persistent_archive.name
+        # More robust but obfuscates errors in calling arguments
+        #self._keyspace = getattr(persistent_archive, 'name', None)
         
         #Get the credentials for the cassandra connection
         log.info("CassandraStore.__init__")
@@ -120,8 +124,7 @@ class CassandraStore(TCPConnection):
         """
         log.debug("CassandraStore: Calling put on key: %s  value: %s " % (key, value))
         # @todo what exceptions need to be handled for an insert?
-        cols = {"value": value, "has_key":"1"}
-        yield self.client.batch_insert(key, self._cache_name, cols)
+        yield self.client.insert(key, self._cache_name, value, column='value')
 
     @defer.inlineCallbacks
     def remove(self, key):
@@ -132,20 +135,6 @@ class CassandraStore(TCPConnection):
         @note Deletes are lazy, so key may still be visible for some time.
         """
         yield self.client.remove(key, self._cache_name)
-        
-    @defer.inlineCallbacks
-    def has_key(self, key):
-        """
-        Checks to see if the key exists in the column family
-        @param key is the key to check in the column family
-        @retVal Returns a bool in a deferred
-        """    
-        try:
-            result = yield self.client.get(key, self._cache_name, column="has_key")
-            ret = True
-        except NotFoundException:
-            ret = False
-        defer.returnValue(ret)    
     
     def on_deactivate(self, *args, **kwargs):
         #self._connector.disconnect()
@@ -189,7 +178,6 @@ class CassandraIndexedStore(CassandraStore):
         log.info("key: %s value: %s index_attributes %s" % (key,value,index_attributes))
         yield self._check_index(index_attributes)
         index_attributes['value'] = value
-        index_attributes['has_key'] = "1"
         log.info("Adding value to the row")
         yield self.client.batch_insert(key, self._cache_name, index_attributes)
 

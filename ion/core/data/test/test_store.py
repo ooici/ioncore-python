@@ -102,18 +102,7 @@ class IStoreTest(unittest.TestCase):
         self.failUnlessEqual(self.value, b)
         yield self.ds.remove(self.key)
         defer.returnValue(None)
-        
-    @defer.inlineCallbacks
-    def test_has_key(self):
-        yield self.ds.put(self.key, self.value)   
-        has_key = yield self.ds.has_key(self.key)
-        self.failUnlessEqual(has_key, True)
-        
-    @defer.inlineCallbacks
-    def test_does_not_have_key(self):
-        yield self.ds.put(self.key, self.value)   
-        has_key = yield self.ds.has_key("I don't exist")
-        self.failUnlessEqual(has_key, False)
+
 class BootstrapStoreTest(IStoreTest):
     
     @itv(CONF)
