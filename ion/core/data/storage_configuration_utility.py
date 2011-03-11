@@ -5,20 +5,25 @@
 @author David Stuebe
 @TODO
 """
-import os
 
-from ion.core.exception import IonError
-from ion.util.config import Config
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 # Defined Terms:
-BLOB_CACHE = 'blobs'
-COMMIT_CACHE = 'commits'
-CACHE_CONFIGURATION = 'cache configuration'
-COMMIT_COLUMN_NAMES=[]
 
-# This list must match what is in the storage.cfg file. I can't think of a better way to do this?
+### PRESERVATION SERVICE TERMS
+STORAGE_PROVIDER = 'storage provider'
+PERSISTENT_ARCHIVE = 'persistent archive'
+CACHE_CONFIGURATION = 'cache configuration'
+
+### BLOB CACHE SETUP
+BLOB_CACHE = 'blobs'
+BLOB_INDEXED_COLUMNS=[]
+
+
+### COMMIT CACHE SETUP
+COMMIT_CACHE = 'commits'
+
 REPOSITORY_KEY = 'repository_key'
 BRANCH_NAME = 'branch_name'
 
@@ -36,58 +41,37 @@ OBJECT_COMMIT = 'object_commit'
 
 KEYWORD = 'keyword'
 
+COMMIT_INDEXED_COLUMNS=[REPOSITORY_KEY, BRANCH_NAME, SUBJECT_KEY, SUBJECT_BRANCH, SUBJECT_COMMIT, PREDICATE_KEY,
+                     PREDICATE_BRANCH, PREDICATE_COMMIT, OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT, KEYWORD]
 
-# Load the Config File!
-storage_conf = Config('res/config/storage.cfg')
+###
 
-class StorageConfigurationError(IonError):
-    """
-    An exception to raise if the Storage configuration is incorrect or can not be read
-    """
+# CREATE A SINGLE EXPORTABLE DATA STRUCTURE
 
-#TODO, do some checking to verify the Cassandra schema is configured correctly
-"""
-# Set some constants based on the config file:
-cache_list = storage_conf.getValue(CACHE_CONFIGURATION,[])
-for cache in cache_list:
-    blob_cache = cache.get(BLOB_CACHE,None)
-    if blob_cache:
-        break
-else:
-    raise StorageConfigurationError('The storage configuration file does not have a cache for blobs!')
+STORAGE_CONF_DICTIONARY = {
 
+### This is the cassandra cluster details - do not put credentials in a config file!
+STORAGE_PROVIDER:{'host':'ec2-184-72-14-57.us-west-1.compute.amazonaws.com',
+                    'port':9160
+                    },
+### Storage Keyspace is provided by the sysname!!!
+PERSISTENT_ARCHIVE:{'name':'sysname',
+                      'replication_factor':2,
+                      'placement_strategy':'NetworkTopologyStrategy',
+                      },
+### Column Families
+CACHE_CONFIGURATION: {BLOB_CACHE:{
+    					'indexed columns':BLOB_INDEXED_COLUMNS},
 
-for cache in cache_list:
-    commit_cache = cache.get(COMMIT_CACHE,None)
-    if commit_cache:
+     					COMMIT_CACHE:{
+        					'indexed columns':COMMIT_INDEXED_COLUMNS}
+        				},
+}
 
-        COMMIT_COLUMN_NAMES = commit_cache.get('indexed columns')
+### LOG SOME DEBUG
+# @TODO Adde some more debug here!
+log.info('BLOB CACHE NAME: %s' % BLOB_CACHE)
+log.info('BLOB INDEXED COLUMNS: %s' % BLOB_INDEXED_COLUMNS)
 
-        assert REPOSITORY_KEY in COMMIT_COLUMN_NAMES, 'Repository key column name not found in config file!'
-        assert BRANCH_NAME in COMMIT_COLUMN_NAMES, 'Branch Name column name not found in config file!'
-
-        assert SUBJECT_KEY in COMMIT_COLUMN_NAMES, 'Subject key column name not found in config file!'
-        assert SUBJECT_BRANCH in COMMIT_COLUMN_NAMES, 'Subject Branch column name not found in config file!'
-        assert SUBJECT_COMMIT in COMMIT_COLUMN_NAMES, 'Subject Commit column name not found in config file!'
-
-        assert PREDICATE_KEY in COMMIT_COLUMN_NAMES, 'Predicate Key column name not found in config file!'
-        assert PREDICATE_BRANCH in COMMIT_COLUMN_NAMES, 'Predicate Branch column name not found in config file!'
-        assert PREDICATE_COMMIT in COMMIT_COLUMN_NAMES, 'Predicate commit column name not found in config file!'
-
-        assert KEYWORD in COMMIT_COLUMN_NAMES, 'Keyword column name not found in config file!'
-
-        break
-else:
-    raise StorageConfigurationError('The storage configuration file does not have a cache for commits!')
-
-
-
-log.info('BLOB_CACHE: %s' % BLOB_CACHE)
-log.info('COMMIT_CACHE: %s' % COMMIT_CACHE)
-log.info('CACHE_CONFIGURATION: %s' % CACHE_CONFIGURATION)
-
-log.info('COMMIT_CACHE: %s' % COMMIT_CACHE)
-log.info('COMMIT_COLUMN_NAMES: %s' % COMMIT_COLUMN_NAMES)
-
-"""
-
+log.info('COMMIT CACHE NAME: %s' % COMMIT_CACHE)
+log.info('COMMIT INDEXED COLUMNS: %s' % COMMIT_INDEXED_COLUMNS)

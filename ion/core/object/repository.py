@@ -44,7 +44,7 @@ class Repository(object):
     MODIFIED='modified'
     NOTINITIALIZED = 'This repository is not initialized yet (No commit checked out)'
 
-    def __init__(self, head=None, repository_key=None):
+    def __init__(self, head=None, repository_key=None, persistent=False):
         
         
         #self.status  is a property determined by the workspace root object status
@@ -121,7 +121,9 @@ class Repository(object):
         """
         The upstream source of this repository. 
         """
-        
+
+        self._persistent = persistent
+
         if head:
             self._dotgit = self._load_element(head)
             # Set it to modified and give it a new ID as soon as we get it!
@@ -165,7 +167,17 @@ class Repository(object):
         return self._upstream
     
     upstream = property(_get_upstream, _set_upstream)
-    
+
+    def _set_persistent(self, value):
+        if not isinstance(value, bool):
+            raise RepositoryError('Invalid argument type to set the persistent property of a repository')
+        self._persistent = value
+
+    def _get_persistent(self):
+        return self._persistent
+
+    persistent = property(_get_persistent, _set_persistent )
+
     def _get_root_object(self):
         return self._workspace_root
         
@@ -989,7 +1001,7 @@ class Repository(object):
         
         obj = self.get_linked_object(link)
         
-        # Get rid of the temporary link
+        # Get rid of the parent ref to the temporary link
         obj.ParentLinks.discard(link)
         
         return obj

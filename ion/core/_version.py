@@ -137,13 +137,18 @@ class Version(object):
             headFile = os.path.join(git, 'HEAD')
             if os.path.exists(headFile):
                 head = file(headFile).read().strip()
-                headRef = head.split(':')[1].strip()
-                refFile = os.path.join(git, headRef)
-                if os.path.exists(refFile):
-                    commit = file(refFile).read().strip()
-                    return commit
+                versplit = head.split(':')
+                if len(versplit) == 2:
+                    headRef = versplit[1].strip()
+                    refFile = os.path.join(git, headRef)
+                    if os.path.exists(refFile):
+                        commit = file(refFile).read().strip()
+                        return commit
+                    else:
+                        return 'Unknown'
                 else:
-                    return 'Unknown'
+                    # this indicates a non named ref is checked out
+                    return versplit[0]
             else:
                 return 'Unknown'
 

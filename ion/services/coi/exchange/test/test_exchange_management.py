@@ -215,9 +215,6 @@ class ExchangeManagementTest(IonTestCase):
         A test that ensures we can define an exchangename.  Tests 
         for:
             1) successful creation 
-            2) failure on duplicate name
-            3) failure on no name
-            4) failure on no exchangespace
         """
 
         # We need an exchangespace and an exchangename
@@ -231,4 +228,51 @@ class ExchangeManagementTest(IonTestCase):
                             exchangespace="TestExchangeSpace", 
                             exchangename="TestExchangeName",
                             topic="alt.humar.best-of-usenet"
+                    )
+
+
+
+    @defer.inlineCallbacks
+    def test_create_binding(self):
+        """
+        A test that ensures we can define a binding.  Tests 
+        for:
+            1) successful creation 
+        """
+
+        # We need an exchangespace and an exchangename
+        id = yield self.emc.create_exchangespace("TestExchangeSpace", "This is a test!")
+        id = yield self.emc.create_exchangename("TestExchangeName", "This is a test!", "TestExchangeSpace")
+
+        # Case 1:  Expect success
+        id = yield self.emc.create_binding(
+                            name="TestBinding", 
+                            description="This is a test!", 
+                            exchangespace="TestExchangeSpace", 
+                            exchangename="TestExchangeName",
+                            queuename="TestQueue",
+                            topic="alt.humar.best-of-usenet"
+                    )
+
+    @defer.inlineCallbacks
+    def test_create_queue(self):
+        """
+        A test that ensures we can define an exchangename.  Tests 
+        for:
+            1) successful creation 
+            2) failure on duplicate name
+            3) failure on no name
+            4) failure on no exchangespace
+        """
+
+        # We need an exchangespace and an exchangename
+        id = yield self.emc.create_exchangespace("TestExchangeSpace", "This is a test!")
+        id = yield self.emc.create_exchangename("TestExchangeName", "This is a test!", "TestExchangeSpace")
+        id = yield self.emc.create_queue(
+                            name="TestQueue", 
+                            description="This is a test!", 
+                            exchangespace="TestExchangeSpace", 
+                            exchangename="TestExchangeName",
+                            topic="alt.humar.best-of-usenet"
+
                     )

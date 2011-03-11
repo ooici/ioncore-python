@@ -22,6 +22,7 @@ from ion.core.object import gpb_wrapper
 from ion.core.exception import ReceivedError
 from ion.core.object.gpb_wrapper import OOIObjectError
 
+import weakref
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -57,20 +58,20 @@ class WorkBench(object):
         """
         A dictionary - shared between repositories for hashed objects
         """  
-        self._hashed_elements={}
-
+        #self._hashed_elements={}
+        self._hashed_elements = weakref.WeakValueDictionary()
 
         #@TODO Consider using an index store in the Workbench to keep a cache of associations and keep track of objects
 
       
-    def create_repository(self, root_type=None, nickname=None, repository_key=None):
+    def create_repository(self, root_type=None, nickname=None, repository_key=None, persistent=False):
         """
         New better method to initialize a repository.
         The init_repository method returns both the repo and the root object.
         This is awkward. Now that the repository has a root_object property, it
         is better to just return the repository.
         """
-        repo = repository.Repository(repository_key=repository_key)
+        repo = repository.Repository(repository_key=repository_key, persistent=persistent)
         repo._workbench = self
             
         repo._hashed_elements = self._hashed_elements
