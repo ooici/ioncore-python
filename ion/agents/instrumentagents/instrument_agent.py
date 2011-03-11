@@ -232,10 +232,16 @@ class InstrumentAgent(ResourceAgent):
     state_topics = None
 
     """
-    A phrase to keep track of pending action lists. Should be some subclass of
-    Phrase (GetPhrase, SetPhrase, ExecutePhrase)
+    A hexidecimal UUID string specifying the current transaction. An empty
+    string indicates no current transaction.
     """
-    pending_phrase = None
+    _transaction_id = ''
+    
+    """
+    An integer in seconds for how long to wait to acquire a new transaction.
+    """
+    default_transaction_timeout = 10   
+    
     
     def plc_init(self):
         ResourceAgent.plc_init(self)
@@ -248,117 +254,68 @@ class InstrumentAgent(ResourceAgent):
             'DataObject')
         publisher = yield self.pubsub_client.define_publisher(publisher)
 
-    @defer.inlineCallbacks
-    def op_get_from_instrument(self, content, headers, msg):
+    def _is_child_process(self, name):
         """
-        Get configuration parameters from the instrument side of the agent.
-        This is stuff that would generally be handled by the instrument driver.
-        @retval A reply message containing a dictionary of name/value pairs
+        Determine if a process with the given name is a child process
+        @param name The name to test for subprocess-ness
+        @retval True if the name matches a child process name, False otherwise
         """
-        assert(isinstance(content, (list, tuple)))
-        assert(self.driver_client != None)
-        response = {}
-        for key in content:
-            response = yield self.driver_client.fetch_params(content)
-        if response != {}:
-            yield self.reply_ok(msg, response)
-        else:
-            yield self.reply_err(msg, 'No values found')
+        log.debug("__is_child_process looking for process '%s' in %s",
+                  name, self.child_procs)
+        found = False
+        for proc in self.child_procs:
+            if proc.proc_name == name:
+                found = True
+                break
+        return found
 
-    @defer.inlineCallbacks
-    def _action_get_from_device(self, action):
-        """
-        Execute an action associated with getting a value from an instrument.
-        @param action A GetAction object with a destination of device
-        @retval Tuple of success/fail boolean and the get_from_device return
-            result or error message.
-        """
-        assert(isinstance(action, GetAction)), "Expected a GetAction object"
-        assert(action.destination == Phrase.device), "Expected device destination"
-        response = yield self.driver_client.fetch_params(action.struct)
-        if response != {}:
-            yield (True, "Success")
-        else:
-            yield (False, "ERROR: No item found")
 
-    @defer.inlineCallbacks
-    def op_get_observatory(self, content, headers, msg):
-        """
-        Get data from the cyberinfrastructure side of the agent (registry info,
-        topic locations, messaging parameters, process parameters, etc.)
-        @retval A reply message containing a dictionary of name/value pairs
-        @todo Write this or push to subclass
-        """
-        #assert(isinstance(content, (list, tuple)))
-        #assert(self.driver_client != None)
-        response = {}
-        # get data somewhere, or just punt this lower in the class hierarchy
-        if (ci_param_list[driver_address] in content):
-            response[ci_param_list[driver_address]] = str(self.driver_client.target)
-        
-        if (ci_param_list['DataTopics'] in content):
-            response[ci_param_list['DataTopics']] = {}
-            for i in self.output_topics.keys():
-                response[ci_param_list['DataTopics']][i] = self.output_topics[i].encode()
-        if (ci_param_list['StateTopics'] in content):
-            response[ci_param_list['StateTopics']] = {}
-            for i in self.state_topics.keys():
-                response[ci_param_list['StateTopics']][i] = self.state_topics[i].encode()
-        if (ci_param_list['EventTopics'] in content):
-            response[ci_param_list['EventTopics']] = {}
-            for i in self.event_topics.keys():
-                response[ci_param_list['EventTopics']][i] = self.event_topics[i].encode()
 
-        if response != {}:
-            yield self.reply_ok(msg, response)
-        else:
-            yield self.reply_err(msg, 'No values found')
+    ############################################################################
+    #   Transaction Management
+    ############################################################################
 
-    @defer.inlineCallbacks
-    def op_set(self, content, headers, msg):
-        """
-        Set parameters to the infrastructure side of the agent. For
-        instrument-specific values, use op_setToInstrument().
-        @see op_setToInstrument
-        @see op_setToCI
-        @retval Message with a list of settings
-            that were changed and what their new values are upon success.
-            On failure, return the bad key, but previous keys were already set
-        """
-        yield self.op_set_to_CI(content, headers, msg)
 
-    @defer.inlineCallbacks
-    def op_set_to_instrument(self, content, headers, msg):
-        """
-        Set parameters to the instrument side of of the agent. These are
-        generally values that will be handled by the instrument driver.
-        @param content A dict that contains the key:value pair to set
-        @retval Message with a list of settings
-            that were changed and what their new values are upon success.
-            On failure, return the bad key, but previous keys were already set
-        """
-        assert(isinstance(content, dict))
-        response = {}
-        result = yield self.driver_client.set_params(content)
-        if result == {}:
-            yield self.reply_err(msg, "Could not set %s" % content)
-            return
-        else:
-            response.update(result)
-        assert(response != {})
-        yield self.reply_ok(msg, response)
-
-    @defer.inlineCallbacks
-    def op_set_to_CI(self, content, headers, msg):
-        """
-        Set parameters related to the infrastructure side of the agent
-        (registration information, location, network addresses, etc.)
-        @retval Message with a list of settings that were changed and what
-           their new values are upon success. On failure, return the bad key,
-           but previous keys were already set
-        @todo Write this or pass through to a subclass
-        """
+    def start_transaction(timeout):
         pass
+    
+    
+    
+    def end_transaction(tid):
+        pass
+    
+    
+
+
+    @defer.inlineCallbacks
+    def _verify_or_start_transaction(tid,optype):
+        """
+        """
+
+        if tid=='create' and _transaction_id == '':
+            (success,_tid) = start_transaction(default_transaction_timeout)
+            return success
+        elif tid == 'none' and _transaction_id == '':
+            if optype == 'get':
+                return ['OK']
+            elif optype == 'set':
+                return ['ERROR',9999,'Invalid transaction ID.']
+            elif optype == 'execute':
+                return ['ERROR',9999,'Invalid transaction ID.']
+            else:
+                return ['ERROR',9999,'Invalid transaction ID.']            
+        elif tid != _transaction_id:
+            return ['ERROR',9999,'Invalid transaction ID.']
+        else:
+            return ['OK']
+    
+
+    
+    ############################################################################
+    #   Observatory Facing Interface
+    ############################################################################
+    
+
 
     @defer.inlineCallbacks
     def op_execute_observatory(self, content, headers, msg):
@@ -366,214 +323,513 @@ class InstrumentAgent(ResourceAgent):
         Execute infrastructure commands related to the Instrument Agent
         instance. This includes commands for messaging, resource management
         processes, etc.
-        @param command A list where the command name is the
-            first item in the sub-list, and the arguments are the rest of
-            the items in the sublists. For example:
-            ['command1', 'arg1', 'arg2']
-        @retval ACK message with response on success, ERR message with string
-            indicating code and response message on fail
+        @param content A tuple ([command,arg, ,arg],transaction_id)
+            where the first element is a command list
+            second element is a transaction_id.
+        @retval ACK message containing a tuple (command_specific, transaction_id)
+            with response and transaction ID on success, ERR message with string
+            indicating code and response message on fail.
         """
-        if (self.pending_phrase != None):
-            self.pending_phrase.add(ExecuteAction(Phrase.observatory, content))
-            yield self.reply_ok(msg, "STUB of execute_observatory with phrase")
+        
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)==2), 'Expected a 2 element content.'
+
+
+        (cmd,tid) = content        
+
+        assert(isinstance(cmd,list)), 'Expected a command list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+
+        # Set up the transaction
+        success = _verify_or_start_transaction(tid,'get')
+        if success[0] != 'OK':
+            yield self.reply_err(msg,success[1:])
+            return
+
+        # Do the work here.
+        # (success,result,_tid) = yield do_something()
+        
+        # End implicit transactions.
+        if tid == 'create':
+            end_transaction(tid)
+        
+        if success[0] == 'OK':
+            yield self.reply_ok(msg, (result,_tid))
         else:
-            yield self.reply_ok(msg, "STUB...execute observatory with no phrase")
+            yield self.reply_err(msg,success[1:])
             
+            
+        
     @defer.inlineCallbacks
-    def op_disconnect(self, content, headers, msg):
+    def op_get_observatory(self, content, headers, msg):
         """
-        Disconnect from the instrument.
-        @param none
-        @return ACK message with response on success, ERR message with string
-            indicating code and response message on fail
+        Get data from the cyberinfrastructure side of the agent (registry info,
+        topic locations, messaging parameters, process parameters, etc.)
+        @param content A tuple ([param_arg, ,param_arg],transaction_id)
+            where the first argument is a list of observatory
+            parameters to retrieve and the second argument is a transaction ID.
+        @retval A reply message containing a tuple ({param_arg:(success,val),...,
+            param_arg:(success,val)}, transaction_id) with param-val dict and
+            transaction_id on success.
+        @todo Write this or push to subclass
         """
-        log.debug("DHE: IA in op_disconnect!")
-        assert(isinstance(content, list))
-        assert(self.driver != None)
-        execResult = self.driver.disconnect(content)
-        assert(len(execResult) == 2)
-        (errorCode, response) = execResult
-        assert(isinstance(errorCode, int))
-        if errorCode == 1:
-            log.debug("DHE: errorCode is 1")
+        
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)), 'Expected a 2 element content.'
+
+
+        (params,tid) = content
+        
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction ID string.'
+
+        # Set up the transaction
+        success = _verify_or_start_transaction(tid,'get')
+        if success[0] != 'OK':
+            yield self.reply_err(msg,success[1:])
+            return
+
+
+        # Do the work.
+        #response = {}
+        ## get data somewhere, or just punt this lower in the class hierarchy
+        #if (ci_param_list[driver_address] in content):
+        #    response[ci_param_list[driver_address]] = str(self.driver_client.target)
+        #
+        #if (ci_param_list['DataTopics'] in content):
+        #    response[ci_param_list['DataTopics']] = {}
+        #    for i in self.output_topics.keys():
+        #        response[ci_param_list['DataTopics']][i] = self.output_topics[i].encode()
+        #if (ci_param_list['StateTopics'] in content):
+        #    response[ci_param_list['StateTopics']] = {}
+        #    for i in self.state_topics.keys():
+        #        response[ci_param_list['StateTopics']][i] = self.state_topics[i].encode()
+        #if (ci_param_list['EventTopics'] in content):
+        #    response[ci_param_list['EventTopics']] = {}
+        #    for i in self.event_topics.keys():
+        #        response[ci_param_list['EventTopics']][i] = self.event_topics[i].encode()
+
+
+        # End implicit transactions.
+        if tid == 'create':
+            end_transaction(tid)
+
+        if errors == 0:
             yield self.reply_ok(msg, response)
         else:
-            log.debug("DHE: errorCode is NOT 1")
-            yield self.reply_err(msg,
-                                 "Error code %s, response: %s" % (errorCode,
-                                                                  response))
+            yield self.reply_err(msg, response)        
+        
+
+    @defer.inlineCallbacks
+    def op_set_observatory(self, content, headers, msg):
+        """
+        Set parameters related to the infrastructure side of the agent
+        (registration information, location, network addresses, etc.)
+        @param content A tuple ({param_arg:val,..., param_arg:val},transaction_id)
+            where the first element is a param-val dict and the second is the
+            transaction ID.
+        @retval Reply message with tuple ({param_arg:success,...,param_arg:success},transaction_id).
+        @todo Write this or pass through to a subclass
+        """
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)), 'Expected a 2 element content.'
+
+        (params,tid) = content
+        
+        assert(isinstance(params,dict)), 'Expected a param-val dict.'
+        assert(isinstance(tid,str)), 'Expected a transaction ID string.'
+
+        # Set up the transaction
+        success = _verify_or_start_transaction(tid,'set')
+        if success[0] != 'OK':
+            yield self.reply_err(msg,success[1:])
+            return
+
+        # Do the work here.
+
+
+        # End implicit transactions.
+        if tid == 'create':
+            end_transaction(tid)
+
+        if errors == 0:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg, response)        
+ 
+ 
+    @defer.inlineCallbacks
+    def op_get_observatory_metadata(self,content,headers,msg):
+        """
+        Retrieve metadata about the observatory configuration parameters.
+        @param content A tuple ([(param_arg,meta_arg),...,param_arg,meta_arg)],transaction_id)
+        where the first element is a list of parameter-metadata pairs, and the second
+        element is a transaction id.
+        @retval A reply message with a tuple {(param_arg,meta_arg):(success,val),...,
+            param_arg,meta_arg):(success,val)}, transaction_id) with a dict of metadata values
+            indexed by parameter-metadata pairs and a transaction ID.
+        """
+        
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)), 'Expected a 2 element content.'
+
+        (params,tid) = content
+        
+        assert(isinstance(params,dict)), 'Expected a param-metadata list.'
+        assert(isinstance(tid,str)), 'Expected a transaction ID string.'
+
+        # Set up the transaction
+        success = _verify_or_start_transaction(tid,'get')
+        if success[0] != 'OK':
+            yield self.reply_err(msg,success[1:])
+            return
+
+        # Do the work here.
+
+
+        # End implicit transactions.
+        if tid == 'create':
+            end_transaction(tid)
+
+        if errors == 0:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg, response)        
+
+
+    @defer.inlineCallbacks
+    def op_get_observatory_status(self,content,headers,msg):
+        """
+        Retrieve the observatory status values, including lifecycle state and other
+        dynamic observatory status values indexed by status keys.
+        @param content A tuple ([status_arg,...,status_arg],transaction_id) where
+            the first value is a list of status keys and the second element is
+            a transaction ID.
+        @retval Reply message with a tuple {status_arg:(success,val),..., status_arg:(success,val)}, transaction_id)
+            with status:arg dict and transaciton ID.
+        """
+        
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)), 'Expected a 2 element content.'
+
+        (params,tid) = content
+        
+        assert(isinstance(params,dict)), 'Expected a status key list.'
+        assert(isinstance(tid,str)), 'Expected a transaction ID string.'
+
+        # Set up the transaction
+        success = _verify_or_start_transaction(tid,'get')
+        if success[0] != 'OK':
+            yield self.reply_err(msg,success[1:])
+            return
+
+        # Do the work here.
+
+
+        # End implicit transactions.
+        if tid == 'create':
+            end_transaction(tid)
+
+        if errors == 0:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg, response)        
+        
+
+
+    @defer.inlineCallbacks
+    def op_get_capabilities(self,content,headers,msg):
+        """
+        Retrieve the agent capabilities, including observatory and device values,
+        both common and specific to the agent / device.
+        @param content A Tuple ([cap_arg,...,cap_arg],transaction_id) where the first
+            element is a capabilties argument list and the second element is a transaction ID.
+            Valid capabilities arguments are: 'all','ObservatoryCommands,' 'ObservatoryParameters,'
+            'ObservatoryStatuses,' 'ObservatoryMetadata,' 'DeviceCommands,', DeviceParameters,'
+            'DeviceStatuses,' 'DeviceMetadata'
+        @retval Reply message with a tuple {cap_arg:(success,[cap_val,...,cap_val]),...,
+            cap_arg:(success,[cap_val,...,cap_val])}, transaction_id)
+            containing a capabilities dictionary and transaction ID.      
+        """
+        
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)), 'Expected a 2 element content.'
+
+        (params,tid) = content
+        
+        assert(isinstance(params,list)), 'Expected a capabilities list.'
+        assert(isinstance(tid,str)), 'Expected a transaction ID string.'
+
+        # Set up the transaction
+        success = _verify_or_start_transaction(tid,'get')
+        if success[0] != 'OK':
+            yield self.reply_err(msg,success[1:])
+            return
+
+        # Do the work here.
+
+
+        # End implicit transactions.
+        if tid == 'create':
+            end_transaction(tid)
+
+        if errors == 0:
+            yield self.reply_ok(msg, response)
+        else:
+            yield self.reply_err(msg, response)        
+        
+
+
+    ############################################################################
+    #   Instrument Facing Interface
+    ############################################################################
+
 
     @defer.inlineCallbacks
     def op_execute_device(self, content, headers, msg):
         """
-        Execute instrument commands relate to the instrument fronted by this
-        Instrument Agent. These commands will likely be handled by the
-        underlying driver.
-        @param command An ordered list of lists where the command name is the
-            first item in the sub-list, and the arguments are the rest of
-            the items in the sublists. For example:
-            ['command1', 'arg1', 'arg2']
-        @retval ACK message with response on success, ERR message with string
-            indicating code and response message on fail
-        @todo fix the return value hack
+        Execute a command on the device fronted by the agent. Commands may be
+        common or specific to the device, with specific commands known through
+        knowledge of the device or a previous get_capabilities query.
+        @param content A tuple (([chan_arg,...,chan_arg],[command,arg,...,argN]),transaction_id)
+            containing a channel list and command list pair, and a transaction ID.
+        @retval A reply message with a tuple
+            ({chan_arg:(success,command_specific_values),...,chan_arg:(success,command_specific_values)},
+            transaction_id) containing a dictionary of command results indexed by channel argument, and
+            a transaction ID on success.
         """
-        assert(isinstance(content, (tuple, list))), "Bad IA op_execute_device type"
-        try:
-            response = {}
-            result = yield self.driver_client.execute(content)
-            if result == {}:
-                yield self.reply_err(msg, "Could not execute %s" % content)
-                return
-            else:
-                response.update(result)
+        
+        
 
-            assert(response != {})
-            yield self.reply_ok(msg, response)
-        except ReceivedError, re:
-            yield self.reply_err(msg, "Failure, response is: %s" % re[1])
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)), 'Expected a 2 element content.'
+
+        (content,tid) = content
+        
+        assert(isinstance(content,tuple)), 'Expected a channels-command  pair.'
+        assert(isinstance(len(content)==2)), 'Expected a channels-command pair.'
+        
+        (chans,command) = content
+        
+        assert(isinstance(chans,dict)), 'Expected a channel list.'
+        assert(isinstance(command,dict)), 'Expected a command list.'
+        assert(isinstance(tid,str)), 'Expected a transaction ID string.'
+
+        # Set up the transaction
+        success = _verify_or_start_transaction(tid,'execute')
+        if success[0] != 'OK':
+            yield self.reply_err(msg,success[1:])
+            return
+
+        # Do the work here.
+        # (success,result) = yield self.driver_client.execute_device()
+
+        # End implicit transactions.
+        if tid == 'create':
+            end_transaction(tid)
+
+        if success[0] == 'OK':
+            yield self.reply_ok(msg, result)
+        else:
+            yield self.reply_err(msg, result)        
+
 
     @defer.inlineCallbacks
-    def op_get_status(self, content, headers, msg):
+    def op_get_device(self, content, headers, msg):
+        """
+        Get configuration parameters from the instrument. 
+        @param content A tuple ([(chan_arg,param_arg),...,(chan_arg,param_arg)],transaction_id)
+            with a list of channel arg, param arg pairs and a transaction ID.
+        @retval A reply message with a tuple
+            ({(chan_arg,param_arg):(success,val),...,(chan_arg,param_arg):(success,val)}, transaction_id)
+            containing a dictionary of parameter values and a transaction ID.
+        """
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)), 'Expected a 2 element content.'
+
+        (params,tid) = content
+        
+        assert(isinstance(params,list)), 'Expected a channel-parameter list.'
+        
+
+        # Set up the transaction
+        success = _verify_or_start_transaction(tid,'get')
+        if success[0] != 'OK':
+            yield self.reply_err(msg,success[1:])
+            return
+
+        # Do the work here.
+
+
+        # End implicit transactions.
+        if tid == 'create':
+            end_transaction(tid)
+
+        if errors == 0:
+            yield self.reply_ok(msg, result)
+        else:
+            yield self.reply_err(msg, result)        
+
+
+
+    @defer.inlineCallbacks
+    def op_set_device(self, content, headers, msg):
+        """
+        Set parameters to the instrument side of of the agent. 
+        @param content A tuple ({(chan_arg,param_arg):val,...,(chan_arg,param_arg):val},transaction_id)
+            containing a dict of values indexed by channel-parameter pairs, and a transaction ID.
+        @retval Reply message with a tuple ({(chan_arg,param_arg):success,...,chan_arg,param_arg):success}, transaction_id)
+            giving a dictionary of successes for each channel-parameter pair, and a transaction ID.
+        """
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)), 'Expected a 2 element content.'
+
+        (params,tid) = content
+        
+        assert(isinstance(params,dict)), 'Expected a channel-parameter-value dict.'
+        
+
+        # Set up the transaction
+        success = _verify_or_start_transaction(tid,'set')
+        if success[0] != 'OK':
+            yield self.reply_err(msg,success[1:])
+            return
+
+        # Do the work here.
+
+
+        # End implicit transactions.
+        if tid == 'create':
+            end_transaction(tid)
+
+        if errors == 0:
+            yield self.reply_ok(msg, result)
+        else:
+            yield self.reply_err(msg, result)        
+
+
+
+    @defer.inlineCallbacks
+    def op_get_device_metadata(self, content, headers, msg):
+        """
+        Retrieve metadata for the device, its transducers and parameters.
+        @param content A tuple ([(chan_arg,param_arg,meta_arg),...,(chan_arg,param_arg,meta_arg)],transaction_id)
+            containing a list of triples (channel, parameter, metadata) to query for, and a transaction ID.
+        @retval Reply message with a tuple
+            {(chan_arg,param_arg,meta_arg):(success,val),...,chan_arg,param_arg,meta_arg):(success,val)}, transaction_id)
+            giving a dictionary of success-values for each channel-parameter-metadata triple, and a transaction ID.
+        """
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)), 'Expected a 2 element content.'
+
+        (params,tid) = content
+        
+        assert(isinstance(params,list)), 'Expected a channel-parameter-metadata list.'
+        
+
+        # Set up the transaction
+        success = _verify_or_start_transaction(tid,'get')
+        if success[0] != 'OK':
+            yield self.reply_err(msg,success[1:])
+            return
+
+        # Do the work here.
+
+
+        # End implicit transactions.
+        if tid == 'create':
+            end_transaction(tid)
+
+        if errors == 0:
+            yield self.reply_ok(msg, result)
+        else:
+            yield self.reply_err(msg, result)        
+
+
+
+    @defer.inlineCallbacks
+    def op_get_device_status(self, content, headers, msg):
         """
         Obtain the status of an instrument. This includes non-parameter
         and non-lifecycle state of the instrument.
-        @param content A list of arguments to make up the status request
-        @retval ACK message with response on success, ERR message on failure
+        @param content A tuple ([(chan_arg,status_arg),...,chan_arg,status_arg)],transaction_id)
+            with a list of channel name - status argument pairs, and a transaction ID.
+        @retval A reply message with a tuple
+            ({(chan_arg,status_arg):(success,val),...,chan_arg,status_arg):(success,val)}, transaction_id)
+            containing a dict of success-value pairs indexed by channel-status key pairs, and a transaction ID.
         """
-        assert(isinstance(content, (list, tuple)))
-        try:
-            response = yield self.driver_client.get_status(content)
-            yield self.reply_ok(msg, response)
-        except ReceivedError, re:
-            yield self.reply_err(msg, re[1])
+        
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)), 'Expected a 2 element content.'
 
-    @defer.inlineCallbacks
-    def op_start_phrase(self, content, headers, msg):
-        """
-        Start a phrase. Must not already have a phrase started or ended
-            pending application.
-        @param timeout Duration of time before the phrase times out
-        @retval Success with a phrase ID or failure with an explanation
-        @todo Add check of end time to see old phrase self expired
-        @todo Add timeouts argument
-        """
-        if (self.pending_phrase != None):
-            yield self.reply_err(msg, "Phrase already started")
-            return
+        (statuses,tid) = content
         
-        # Must be okay to start a phrase then. Add a placeholder with an
-        # untyped phrase
-            # *** Gotta figure out current time/time duration structures
-            # Think something like:
-            #self.pending_phrase = Phrase(current_time + timeout)
-        self.pending_phrase = Phrase()
-        yield self.reply_ok(msg, "Phrase created")
+        assert(isinstance(statuses,list)), 'Expected a channel-status list.'
         
-    @defer.inlineCallbacks
-    def op_end_phrase(self, content, headers, msg):
-        """
-        End a phrase. Must have a phrase started and not ended
-            pending application.
-        @retval Success or failure with an explanation
-        @todo Sort out observatory fetch
-        @todo Implement locking/exclusion for fetch
-        """
-        if (self.pending_phrase == None):
-            yield self.reply_err(msg, "No phrase started")
-            return
-        
-        if (self.pending_phrase.is_complete()):
-            yield self.reply_err(msg,
-                            "Phrase already ended. Apply or cancel first.")
-            return
-        
-        if (self.pending_phrase.is_expired()):
-            self.pending_phrase = None
-            yield self.reply_err(msg, "Phrase is expired")
+
+        # Set up the transaction
+        success = _verify_or_start_transaction(tid,'get')
+        if success[0] != 'OK':
+            yield self.reply_err(msg,success[1:])
             return
 
-        # Get phrases get an immediate response
-        # TODO Currently only for get_instrument calls
-        if (isinstance(self.pending_phrase, GetPhrase)):
-            phrase = self.pending_phrase.contents()
-            assert(self.driver_client != None)
-            response = {}
-            for action in phrase:
-                assert(action != None)
-                if action.destination == self.pending_phrase.device:
-                    response = yield self.driver_client.fetch_params(action.struct)
-                    if response != {}:
-                        yield self.reply_ok(msg, response)
-                    else:
-                        yield self.reply_err(msg, 'No values found')
-                elif action.destination == self.pending_phrase.observatory:
-                    #TODO: Get observatory values
-                    pass
-                else:
-                    assert(False), "Really unknown action type"
-            return
-        
-        # Must not be a get, so just mark the end
-        self.pending_phrase.end()
-        yield self.reply_ok(msg, "Phrase ended")        
-           
-    @defer.inlineCallbacks
-    def op_cancel_phrase(self, content, headers, msg):
-        """
-        Cancel a phrase. Must have a phrase started.
-        @retval Success or failure with an explanation
-        """
-        if (self.pending_phrase == None):
-            yield self.reply_err(msg, 'No phrase active')
+        # Do the work here.
+
+
+        # End implicit transactions.
+        if tid == 'create':
+            end_transaction(tid)
+
+        if errors == 0:
+            yield self.reply_ok(msg, result)
         else:
-            self.pending_phrase = None
-            yield self.reply_ok(msg, "Cancelled phrase")
+            yield self.reply_err(msg, result)        
+
 
     @defer.inlineCallbacks
-    def op_apply_phrase(self, content, headers, msg):
+    def op_execute_direct(self,content,headers,msg):
         """
-        Apply a phrase. Must have a phrase started.
-        @retval Success or failure with an explanation
-        @todo Figure out observatory sets
-        @todo handle returns for each action
+        Execute untranslated byte data commands on the device.
+        Must be in direct access mode and possess the correct transaction_id key
+        for the direct access session.
+        @param content A tuple (block_of_data,transaction_id) containing a block of
+            binary data to be executed on the device as is, untranslated, and a
+            transaction ID for the current direct access mode session.
+        @retval Success or fail with error code and string.
         """
-        if (self.pending_phrase == None):
-            yield self.reply_err(msg, "No phrase to apply")
-            return    
-
-        if (self.pending_phrase.is_expired()):
-            self.pending_phrase = None
-            yield self.reply_err(msg, "Phrase is expired")
+        
+        assert(isinstance(content,tuple)), 'Expected a content tuple.'
+        assert(len(content)==2), 'Expected a 2-element content'
+        
+        (command,tid) = content
+        
+        # get agent state
+        if state != 'DirectAccessMode':
+            yield self.reply_err(msg,[9999,'Agent not in direct access mode.'])
             return
         
-        phrase = self.pending_phrase.contents()
+        if tid != _transaction_id:
+            yield self.reply_err(msg,[9999,'Invalid direct access transaction ID'])
+            return
         
-        # Dispatch phrase actions
-        result = {}
-        for action in phrase:
-            if (isinstance(action, GetAction)):
-                if (action.destination == Phrase.device):
-                    result.append({action.struct:
-                                   self._action_get_device(action)})
-                if (action.destination == Phrase.observatory):
-                    result.append({action.struct:
-                                   self._action_get_observatory(action)})
-            if (isinstance(action, SetAction)):
-                if (action.destination == Phrase.device):
-                    result.append({action.struct:
-                                   self._action_set_device(action)})
-                if (action.destination == Phrase.observatory):
-                    result.append({action.struct:
-                                   self._action_set_observatory(action)})
-            if (isinstance(action, ExecuteAction)):
-                if (action.destination == Phrase.device):
-                    result.append({action.struct:
-                                   self._action_execute_device(action)})
-                if (action.destination == Phrase.observatory):
-                    result.append({action.struct:
-                                   self._action_execute_observatory(action)})
-        
-        yield self.reply_ok(msg, result)
+        # Everything OK, send the data to the device
+        # success = yield driver_client.execute_direct(command)
+
+        if success[0] == 'OK':
+            yield self.reply_err(msg,success[0])
+        else:
+            yield self.reply_err(msg,success[1:])
+            
+
+
+
+
+    ############################################################################
+    #   Publishing Methods
+    ############################################################################
+
+
+
                 
     @defer.inlineCallbacks
     def op_publish(self, content, headers, msg):
@@ -632,26 +888,8 @@ class InstrumentAgent(ResourceAgent):
                 yield self.pubsub_client.publish(self.sup,
                             self.state_topics["Agent"].reference(),value)
     
-    def _is_child_process(self, name):
-        """
-        Determine if a process with the given name is a child process
-        @param name The name to test for subprocess-ness
-        @retval True if the name matches a child process name, False otherwise
-        """
-        log.debug("__is_child_process looking for process '%s' in %s",
-                  name, self.child_procs)
-        found = False
-        for proc in self.child_procs:
-            if proc.proc_name == name:
-                found = True
-                break
-        return found
+
         
-    def _add_to_phrase(self, action):
-        """
-        Add the following action to a currently running phrase.
-        @param action The valid structure for an action
-        """
 class InstrumentAgentClient(ResourceAgentClient):
     """
     The base class for an Instrument Agent Client. It is a service

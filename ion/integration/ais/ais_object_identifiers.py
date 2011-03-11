@@ -47,9 +47,9 @@ message ApplicationIntegrationServiceError{
 """
 
 # FindDataResources GPBs from ion-object-definitions/net/ooici/integration/ais/findDataResources/find_data_resources.proto
-FIND_DATA_RESOURCES_MSG_TYPE = object_utils.create_type_identifier(object_id=9031, version=1)
+FIND_DATA_RESOURCES_REQ_MSG_TYPE = object_utils.create_type_identifier(object_id=9031, version=1)
 """
-message FindDataResourcesMsg {
+message FindDataResourcesReqMsg {
    enum _MessageTypeIdentifier {
        _ID = 9031;
        _VERSION = 1;	
@@ -57,6 +57,19 @@ message FindDataResourcesMsg {
 
    required Spatial  spatial  = 1;
    required Temporal temporal = 2;
+}
+"""
+
+# FindDataResources GPBs from ion-object-definitions/net/ooici/integration/ais/findDataResources/find_data_resources.proto
+FIND_DATA_RESOURCES_RSP_MSG_TYPE = object_utils.create_type_identifier(object_id=9032, version=1)
+"""
+message FindDataResourcesRspMsg {
+   enum _MessageTypeIdentifier {
+       _ID = 9032;
+       _VERSION = 1;	
+   }
+
+   //repeated <put payload here>
 }
 """
 

@@ -74,7 +74,6 @@ class IStoreTest(unittest.TestCase):
         # Make sure we can't read the not-written
         rc = yield self.ds.get(self.key)
         self.assertEqual(rc, None)
-        print 'PASSED!'
 
     @defer.inlineCallbacks
     def test_write_and_delete(self):
@@ -427,6 +426,7 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
 
 class CassandraIndexStoreTest(IndexStoreTest):
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def setUp(self):
         yield IStoreTest.setUp(self)

@@ -9,21 +9,16 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-import time
-
 from twisted.internet import defer
 from twisted.internet.task import LoopingCall
 from twisted.internet import reactor
 from ion.core.process.process import ProcessFactory
 
-from ion.core.process.process import Process, ProcessDesc
-import ion.util.procutils as pu
+from ion.core.process.process import Process
 
-from ion.data import dataobject
 from ion.resources import dm_resource_descriptions
 
 
-#import numpy
 import random
 
 
