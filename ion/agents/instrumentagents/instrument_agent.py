@@ -31,10 +31,7 @@ ci_parameters                   = 'ci_parameters'
 instrument_commands             = 'instrument_commands'
 instrument_parameters           = 'instrument_parameters'
 
-"""
-CI parameter key constant.
-"""
-driver_address = 'DriverAddress'
+
 
 """
 Parameter names for all instrument agents.
@@ -309,7 +306,7 @@ class InstrumentAgent(ResourceAgent):
     'LocalOscillator'       - The device has its own clock
     'DriverSetInterval'     - Driver sets the clock at an interval
     """
-    TimeSource = None
+    time_source = None
 
     """
     String describing how the device is connected to the observatory.
@@ -319,7 +316,7 @@ class InstrumentAgent(ResourceAgent):
     'PartTimeScheduled'     - Comes online on scheduled basis. Outages normal.
     'PartTimeRandom'        - Comes online as needed. Outages normal.
     """
-    ConnectionMethod = None
+    connection_method = None
     
     
     def plc_init(self):
@@ -535,7 +532,6 @@ class InstrumentAgent(ResourceAgent):
                 yield self.reply_ok(errors['InvalidTransactionID'])
                 return
 
-
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
@@ -543,9 +539,45 @@ class InstrumentAgent(ResourceAgent):
             yield self.reply_ok(msg,result)
             return
                     
-        # Do the work here.
-        # Set up the result message.
+        output = {}                    
+                    
+        # Add each observatory parameter given in params list.
+        if (ci_param_list['DataTopics'] in params):
+            # Does this depend on new pubsub? See below for old way.
+            pass
+        
+        if (ci_param_list['EventTopics'] in params):
+            # Does this depend on new pubsub? See below for old way.
+            pass
+        
+        if (ci_param_list['StateTopics'] in params):
+            # Does this depend on new pubsub? See below for old way.
+            pass
 
+        if (ci_param_list['DriverAddress'] in params):
+            output['DriverAddress'] = str(self.driver_client.target)
+
+        if (ci_param_list['ResourceID'] in params):
+            # How do we get this?
+            pass
+
+        if (ci_param_list['TimeSource'] in params):
+            output['TimeSource'] = time_source
+
+        if (ci_param_list['ConnectionMethod'] in params):
+            output['ConnectionMethod'] = connection_method
+
+        if (ci_param_list['DefaultTransactionTimeout'] in params):
+            output['DefaultTransactionTimeout'] = default_transaction_timeout
+
+        if (ci_param_list['MaxTransactionTimeout'] in params):
+            output['MaxTransactionTimeout'] = max_transaction_timeout
+
+        if (ci_param_list['TransactionExpireTimeout'] in params):
+            output['TransactionExpireTimeout'] = transaction_expire_timeout
+
+        result = {'params':output,'transaction_id':transaction_id}
+        
         # Do the work.
         #response = {}
         ## get data somewhere, or just punt this lower in the class hierarchy
