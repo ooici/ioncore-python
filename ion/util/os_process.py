@@ -44,8 +44,13 @@ class OSProcess(protocol.ProcessProtocol):
       for graceful shutdown.
 
     """
-    def __init__(self, binary=None, spawnargs=[], **kwargs):
+    def __init__(self, binary=None, spawnargs=[], startdir=None, **kwargs):
         """
+        @param  binary      The binary to run.
+        @param  spawnargs   Arguments to give the binary. Does not need to have the binary as the first argument,
+                            as some other mechanisms may require.
+        @param  startdir    The directory to run the binary from. If left unset, the process will run from the
+                            current directory.
         """
         self.errlines           = []
         self.outlines           = []
@@ -55,6 +60,7 @@ class OSProcess(protocol.ProcessProtocol):
         self.deferred_exited    = defer.Deferred(self._cancel)  # is called back on process end
         self.used               = False             # do not allow anyone to use again
         self.close_timeout      = None
+        self.startdir           = startdir
 
     def spawn(self, binary=None, args=[]):
         """
@@ -84,7 +90,7 @@ class OSProcess(protocol.ProcessProtocol):
             theargs.extend(args)
 
         log.debug("OSProcess::spawn %s %s" % (str(binary), " ".join(theargs)))
-        reactor.spawnProcess(self, binary, theargs, env=None)
+        reactor.spawnProcess(self, binary, theargs, path=self.startdir, env=None)
         self.used = True
 
         return self.deferred_exited
@@ -181,7 +187,11 @@ class OSProcess(protocol.ProcessProtocol):
         the exit code, the lines produced on stdout, and the lines on stderr.
         If the exit code is non zero, the errback is raised.
         """
-        log.debug("OSProcess: process ended (exitcode: %d)" % reason.value.exitCode)
+        ec = 0
+        if hasattr(reason, 'value') and hasattr(reason.value, 'exitCode') and reason.value.exitCode != None:
+            ec = reason.value.exitCode
+
+        log.debug("OSProcess: process ended (exitcode: %d)" % ec)
 
         # if this was called as a result of a close() call, we need to cancel the timeout so
         # it won't try to kill again
@@ -189,11 +199,11 @@ class OSProcess(protocol.ProcessProtocol):
             self.close_timeout.cancel()
 
         # form a dict of status to be passed as the result
-        cba = { 'exitcode' : reason.value.exitCode,
+        cba = { 'exitcode' : ec,
                 'outlines' : self.outlines,
                 'errlines' : self.errlines }
 
-        if reason.value.exitCode != 0:
+        if ec != 0:
             self.deferred_exited.errback(StandardError(cba))
             return
 

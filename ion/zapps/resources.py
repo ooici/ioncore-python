@@ -66,7 +66,7 @@ def stop(container, state):
     supdesc = state[0]
     log.info("Terminating CC agent")
     yield supdesc.terminate()
-    gi
+
     
 # Create CDM Type Objects
 dataset_type = object_utils.create_type_identifier(object_id=10001, version=1)
