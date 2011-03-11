@@ -323,21 +323,13 @@ class InstrumentAgent(ResourceAgent):
 
     """
     String indicating the source of time being used for the instrument.
-    'PTPDirect'             - IEEE 1588 PTP connection directly supported by the instrument
-    'NTPUnicast'            - NTP unicast to the instrument
-    'LocalOscillator'       - NTP broadcast to the instrument
-    'LocalOscillator'       - The device has its own clock
-    'DriverSetInterval'     - Driver sets the clock at an interval
+    See time_sources list for available values.
     """
     time_source = None
 
     """
     String describing how the device is connected to the observatory.
-    'Offline'               - Device is offline.
-    'CabledObservatory'     - Accessible through cabled, full time observatory.
-    'ShortNetwork'          - Accessible through full time shore connection.
-    'PartTimeScheduled'     - Comes online on scheduled basis. Outages normal.
-    'PartTimeRandom'        - Comes online as needed. Outages normal.
+    See connection_methods list for available values.
     """
     connection_method = None
     
