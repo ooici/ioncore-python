@@ -85,7 +85,11 @@ errors = {
     'InvalidCommand'        : ['ERROR','InvalidCommand','The command is not valid in the given context.'],    
     'UnknownCommand'        : ['ERROR','UnknownCommand','The command is not recognized.'],
     'NotImplemented'        : ['ERROR','NotImplemented','The command is not implemented.'],
-    'InvalidTransactionID'  : ['ERROR','InvalidTransactionID','The transaction ID is not a valid value.']
+    'InvalidTransactionID'  : ['ERROR','InvalidTransactionID','The transaction ID is not a valid value.'],
+    'InvalidDriver'         : ['ERROR','InvalidDriver','Driver or driver client invalid.'],
+    'GetObservatoryErr'     : ['ERROR','GetObservatoryErr','Could not retrieve all parameters.'],
+    'ExeObservatoryErr'     : ['ERROR','ExeObservatoryErr','Could not execute observatory command.'],
+    'SetObservatoryErr'     : ['ERROR','SetObservatoryErr','Could not set all parameters.']
 }
 
 
@@ -493,7 +497,9 @@ class InstrumentAgent(ResourceAgent):
                     
         if  cmd[0] == 'StateTransition':
             result = self.agent_fsm.state_transition(cmd[1])
-            result = (result,transaction_id)
+            # check here result is successful and define success
+            success = ['OK']
+            result = {'success':success,'result':result,'transaction_id':transaction_id}
         elif cmd[0] == 'TransmitData':
             result = errors['NotImplemented']            
         else:
@@ -540,7 +546,7 @@ class InstrumentAgent(ResourceAgent):
             return
                     
         output = {}                    
-                    
+        get_errors = False
         # Add each observatory parameter given in params list.
         if (ci_param_list['DataTopics'] in params):
             # Does this depend on new pubsub? See below for old way.
@@ -555,28 +561,37 @@ class InstrumentAgent(ResourceAgent):
             pass
 
         if (ci_param_list['DriverAddress'] in params):
-            output['DriverAddress'] = str(self.driver_client.target)
+            if driver_client and driver_client.target:
+                output['DriverAddress'] = (['OK'],str(self.driver_client.target))
+            else:
+                get_errors = True
+                output['DriverAddress'] = (errors['InvalidDriver'],None)
 
         if (ci_param_list['ResourceID'] in params):
             # How do we get this?
             pass
 
         if (ci_param_list['TimeSource'] in params):
-            output['TimeSource'] = time_source
+            output['TimeSource'] = (['OK'],time_source)
 
         if (ci_param_list['ConnectionMethod'] in params):
-            output['ConnectionMethod'] = connection_method
+            output['ConnectionMethod'] = (['OK'],connection_method)
 
         if (ci_param_list['DefaultTransactionTimeout'] in params):
-            output['DefaultTransactionTimeout'] = default_transaction_timeout
+            output['DefaultTransactionTimeout'] = (['OK'],default_transaction_timeout)
 
         if (ci_param_list['MaxTransactionTimeout'] in params):
-            output['MaxTransactionTimeout'] = max_transaction_timeout
+            output['MaxTransactionTimeout'] = (['OK'],max_transaction_timeout)
 
         if (ci_param_list['TransactionExpireTimeout'] in params):
-            output['TransactionExpireTimeout'] = transaction_expire_timeout
+            output['TransactionExpireTimeout'] = (['OK'],transaction_expire_timeout)
 
-        result = {'params':output,'transaction_id':transaction_id}
+        if get_errors:
+            success = errors['GetObservatoryErr']
+        else:
+            success = ['OK']
+            
+        result = {'success':success,'params':output,'transaction_id':transaction_id}
         
         # Do the work.
         #response = {}
@@ -640,8 +655,21 @@ class InstrumentAgent(ResourceAgent):
             yield self.reply_ok(msg,result)
             return
                     
+        
+        output = {}
+        set_errors = False
+        
         # Do the work here.
         # Set up the result message.
+
+        if set_errors:
+            success = errors['SetObservatoryErr']
+        else:
+            success = ['OK']
+            
+        result = {'success':success,'params':output,'transaction_id':transaction_id}
+
+        
         
         # End implicit transactions.
         if tid == 'create':
@@ -683,8 +711,19 @@ class InstrumentAgent(ResourceAgent):
             yield self.reply_ok(msg,result)
             return
                     
+        get_errors = False
+        output = {}
+        
         # Do the work here.
         # Set up the result message.
+        
+        if get_errors:
+            success = errors['GetObservatoryErr']
+        else:
+            success = ['OK']
+            
+        result = {'success':success,'params':output,'transaction_id':transaction_id}
+        
         
         # End implicit transactions.
         if tid == 'create':
@@ -727,8 +766,18 @@ class InstrumentAgent(ResourceAgent):
             yield self.reply_ok(msg,result)
             return
                     
+        get_errors = False
+        output = {}
+        
         # Do the work here.
         # Set up the result message.
+        
+        if get_errors:
+            success = errors['GetObservatoryErr']
+        else:
+            success = ['OK']
+            
+        result = {'success':success,'params':output,'transaction_id':transaction_id}
         
         # End implicit transactions.
         if tid == 'create':
