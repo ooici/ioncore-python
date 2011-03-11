@@ -49,6 +49,18 @@ ci_param_list = [
     'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT'
 ]
 
+"""
+Used by the existing drivers...need to fix.
+"""
+publish_msg_type = {
+    'Error'                     :'Error',
+    'StateChange'               :'StateChange',
+    'ConfigChange'              :'ConfigChange',
+    'Data'                      :'Data',
+    'Event'                     :'Event'
+}
+
+
 
 """
 Publish message types.
