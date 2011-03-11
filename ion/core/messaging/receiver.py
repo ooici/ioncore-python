@@ -49,7 +49,7 @@ class Receiver(BasicLifecycleObject):
     rec_messages = {}
     rec_shutoff = False
 
-    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, raw=False, publisher_config={}):
+    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, raw=False, consumer_config={}, publisher_config={}):
         """
         @param label descriptive label for the receiver
         @param name the actual exchange name. Used for routing
@@ -59,6 +59,8 @@ class Receiver(BasicLifecycleObject):
         @param group a string grouping multiple receivers
         @param handler a callable for the message handler, shorthand for add_handler
         @param raw if True do not put through receive Interceptors
+        @param consumer_config  Additional Consumer configuration params. Used by _init_receiver, these params take precedence over any
+                                other config.
         @param publisher_config Additional Publisher configuration params, used by send()
         """
         BasicLifecycleObject.__init__(self)
@@ -71,6 +73,7 @@ class Receiver(BasicLifecycleObject):
         self.process = process
         self.group = group
         self.raw = raw
+        self.consumer_config  = consumer_config
         self.publisher_config = publisher_config
 
         self.handlers = []
@@ -109,6 +112,11 @@ class Receiver(BasicLifecycleObject):
     @defer.inlineCallbacks
     def _init_receiver(self, receiver_config, store_config=False):
         container = ioninit.container_instance
+
+        # copy and update receiver_config with the stored consumer_config
+        receiver_config = receiver_config.copy()
+        receiver_config.update(self.consumer_config)
+
         if store_config:
             xnamestore = container.exchange_manager.exchange_space.store
             yield xnamestore.put(self.xname, receiver_config)

@@ -12,7 +12,7 @@ and defining subscriptions.
 """
 
 import time
-
+import re
 from twisted.internet import defer
 
 from ion.core.exception import ApplicationError
@@ -22,7 +22,7 @@ from ion.core import ioninit
 import ion.util.ionlog
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceClientError
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 from ion.services.coi.exchange.exchange_management import ExchangeManagementClient
 
 # Global objects
@@ -31,6 +31,10 @@ log = ion.util.ionlog.getLogger(__name__)
 
 # References to protobuf message/object definitions
 TOPIC_TYPE = object_utils.create_type_identifier(object_id=2307, version=1)
+PUBLISHER_TYPE = object_utils.create_type_identifier(object_id=2310, version=1)
+SUBSCRIBER_TYPE = object_utils.create_type_identifier(object_id=2311, version=1)
+QUEUE_TYPE = object_utils.create_type_identifier(object_id=2308, version=1)
+BINDING_TYPE = object_utils.create_type_identifier(object_id=2314, version=1)
 
 # Generic request and response wrapper message types
 REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
@@ -41,6 +45,15 @@ REGEX_TYPE = object_utils.create_type_identifier(object_id=2306, version=1)
 IDLIST_TYPE = object_utils.create_type_identifier(object_id=2312, version=1)
 XS_TYPE = object_utils.create_type_identifier(object_id=2313, version=1)
 XP_TYPE = object_utils.create_type_identifier(object_id=2309, version=1)
+
+# Resource GPB objects
+XS_RES_TYPE = object_utils.create_type_identifier(object_id=2315, version=1)
+XP_RES_TYPE = object_utils.create_type_identifier(object_id=2316, version=1)
+TOPIC_RES_TYPE = object_utils.create_type_identifier(object_id=2317, version=1)
+PUBLISHER_RES_TYPE = object_utils.create_type_identifier(object_id=2318, version=1)
+SUBSCRIBER_RES_TYPE = object_utils.create_type_identifier(object_id=2319, version=1)
+QUEUE_RES_TYPE = object_utils.create_type_identifier(object_id=2321, version=1)
+BINDING_RES_TYPE = object_utils.create_type_identifier(object_id=2320, version=1)
 
 class PSSException(ApplicationError):
     """
@@ -80,11 +93,12 @@ class PubSubService(ServiceProcess):
         self.topic_list = dict()
         self.pub_list = dict()
         self.sub_list = dict()
+        self.q_list = dict()
+        self.binding_list = dict()
 
-    # Protocol entry points. Responsible for parsing and unpacking arguments
     @defer.inlineCallbacks
     def op_declare_exchange_space(self, request, headers, msg):
-        log.debug('Here we go')
+        log.debug('DXS starting')
         if request.MessageType != XS_TYPE:
             raise PSSException('Bad message, expected a request type, got %s' % str(request),
                                request.ResponseCodes.BAD_REQUEST)
@@ -95,39 +109,43 @@ class PubSubService(ServiceProcess):
         description = str(time.time())
         xsid = yield self.ems.create_exchangespace(request.exchange_space_name, description)
 
-        log.debug('EMS returns ID %s' % xsid.resource_reference)
+        log.debug('EMS returns ID %s for name %s' %
+                  (xsid.resource_reference.key, request.exchange_space_name))
 
         # Write ID into registry
-        log.debug('Creating RC instance')
-        xs = yield self.rclient.create_instance(XS_TYPE, ResourceName=request.exchange_space_name,
-                                                ResourceDescription=description)
-        log.debug('Writing RC record')
-        yield self.rclient.put_instance(xs)
+        log.debug('Creating resource instance')
+        registry_entry = yield self.rclient.create_instance(XS_RES_TYPE, 'Niemand')
+
+        # Populate registry entry message
+        log.debug('Populating resource instance')
+        registry_entry.exchange_space_name = request.exchange_space_name
+        registry_entry.exchange_space_id = xsid.resource_reference
+
+        log.debug('Writing resource record')
+        yield self.rclient.put_instance(registry_entry)
+        log.debug('Getting resource ID')
+        xs_resource_id = self.rclient.reference_instance(registry_entry)
 
         log.debug('Operation completed, creating response message')
 
-        response = yield self.mc.create_instance(IDLIST_TYPE, MessageName='declare_xs response')
-
-        log.debug('Response message created')
-
+        response = yield self.mc.create_instance(IDLIST_TYPE)
+        log.debug('Populating return message')
         response.id_list.add()
-        response.id_list[0]=xsid.resource_reference
-
+        response.id_list[0] = xs_resource_id
         response.MessageResponseCode = response.ResponseCodes.OK
 
         # save to list
         log.debug('Saving to internal list...')
-        self.xs_list[xsid.resource_reference] = request.exchange_space_name
+        self.xs_list[xs_resource_id.key] = request.exchange_space_name
 
         log.debug('Responding...')
-
         yield self.reply_ok(msg, response)
-        log.debug('DXS completed')
+        log.debug('DXS completed OK')
 
 
     @defer.inlineCallbacks
     def op_undeclare_exchange_space(self, request, headers, msg):
-
+        log.debug('UDXP starting')
         # Typecheck the message
         if request.MessageType != REQUEST_TYPE:
             raise PSSException('Bad message type received', request.ResponseCodes.BAD_REQUEST)
@@ -140,81 +158,365 @@ class PubSubService(ServiceProcess):
             response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
             yield self.reply_ok(msg, response)
 
+        # @todo Call EMS to remove the XS
+        # @todo Remove resource record too
         log.warn('Here is where we ask EMS to remove the XS')
         response = yield self.mc.create_instance(RESPONSE_TYPE)
         response.MessageResponseCode = response.ResponseCodes.OK
 
         yield self.reply_ok(msg, response)
 
-
-
-    ##############################################################    
-    # API-style entry points. Akin to the twisted protocol/factory
     @defer.inlineCallbacks
-    def declare_topic_tree(self, exchange_space_name, topic_tree_name):
-        """
-        @brief Create a topic tree
-        @param exchange_space_name Exchange space where the tree will live
-        @param topic_tree_name Name of the tree to create
-        @retval Topic tree ID on success, None if failure
-        """
-        log.debug('Creating exchange space "%s"' % exchange_space_name)
-        yield self.ems.create_exchangespace(exchange_space_name, 'Default exchange space')
+    def op_query_exchange_spaces(self, request, headers, msg):
+        # Typecheck the message
+        if request.MessageType != REGEX_TYPE:
+            raise PSSException('Bad message type received', request.ResponseCodes.BAD_REQUEST)
 
-        log.debug('Calling EMS to create topic tree "%s/%s"' % (exchange_space_name, topic_tree_name))
-        rc = yield self.ems.create_exchangename(topic_tree_name, 'New topic tree', exchange_space_name)
-        if rc == None:
-            log.error('Error in creating exchange name (topic tree')
-            defer.returnValue(None)
-        log.debug('EMS returned "%s"' % str(rc))
-
-        log.debug('Writing topic tree into registry')
-        # Now need to write new topic tree into registry
-        ttree = yield self.rclient.create_instance(TT_TYPE, name=topic_tree_name, description='New topic tree')
-
-        ttree.exchange_space_name = exchange_space_name
-        ttree.topic_tree_name = topic_tree_name
-
-        log.debug('About to push topic tree into registry')
-        yield self.rclient.put_instance(ttree, 'declare_topic_tree')
-        log.debug('Wrote TT, id is %s' % ttree.ResourceIdentity)
-        log.debug("Attach a topic with:  client.define_topic('%s', 'topic_name')" % (ttree.ResourceIdentity))
-        
-        defer.returnValue(ttree.ResourceIdentity)
-
+        log.debug('Looking for XS entries...')
+        yield self._do_query(request, self.xs_list)
 
     @defer.inlineCallbacks
-    def define_topic(self, topic_tree_id, topic_name):
-        """
-        @brief Within a topic tree, define a topic. Usually a dataset name by convention.
-        @param topic_tree_id ID, as returned from op_declare_topic_tree
-        @param topic_name Name to declare
-        @retval Topic ID, or None if error
-        """
-        log.debug('Creating and populating dataset message/object')
+    def _do_query(self, request, res_list):
+        # This is probably better written as a list comprehension. Or something.
+        rc = []
+        p = re.compile(request.regex)
+        for cur_key, cur_entry in res_list.iteritems():
+            if p.match(cur_entry):
+                rc.append(cur_key)
 
-        # Step 1: Get a handle to the topic's prospective tree
+        log.debug('Matches to "%s" are: "%s"' % (request.regex, str(rc)))
+        response = yield self.mc.create_instance(IDLIST_TYPE)
+        response.MessageResponseCode = response.ResponseCodes.OK
+
+        idx = 0
+        for x in rc:
+            response.id_list.add()
+            response.id_list[idx] = x
+            idx += 1
+
+        log.debug('Query complete')
+        yield self.reply_ok(msg, response)
+
+    @defer.inlineCallbacks
+    def op_declare_exchange_point(self, request, headers, msg):
+        log.debug('Starting DXP')
+
+        if request.MessageType != XP_TYPE:
+            raise PSSException('Bad message, expected a request type, got %s' % str(request),
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # Lookup the XS ID in the dictionary
         try:
-            ttree = yield self.rclient.get_instance(topic_tree_id)
-        except ResourceClientError, ex:
-            log.warn('Could not retreive topic tree instance for given topic_tree_id:  %s' % (ex))
-            
-        # Step 2: Create the topic resource
-        cstr = "%s/%s" % (topic_tree_id, topic_name)
+            xs_name = self.xs_list[request.exchange_space_id.key]
+            log.debug('Found XS %s/%s' % (request.exchange_space_id.key, xs_name))
+        except KeyError:
+            raise PSSException('Unable to locate XS ID %s' % request.exchange_space_id.key,
+                               request.ResponseCodes.BAD_REQUEST)
 
-        topic = yield self.rclient.create_instance(TOPIC_TYPE, ResourceName=topic_name, ResourceDescription=cstr)
-        topic.topic_name = topic_name
-        topic.routing_key = cstr
-        
-        # Step 3: @todo: Create an association between the given topic_tree and the topic being created here
-        
-        # Step 4: Store changes to the topic
-        # @todo: Store changes to whichever resource represents the association between tree and topic
-        log.debug('Topic object created, pushing/committing "%s"' % cstr)
+        # Found XS ID, now call EMS
+        description = str(time.time())
+        xpid = yield self.ems.create_exchangename(request.exchange_point_name, description, xs_name)
 
-        yield self.rclient.put_instance(topic, 'Adding dataset/topic %s' % cstr)
-        log.debug('Commit completed, %s' % topic.ResourceIdentity)
-        defer.returnValue(topic.ResourceIdentity)
+        log.debug('EMS completed, returned XP ID "%s"' % str(xpid))
+
+        xp_resource = yield self.rclient.create_instance(XP_RES_TYPE, 'Niemand')
+
+        log.debug('creating xp resource and populating')
+
+        xp_resource.exchange_space_name = xs_name
+        xp_resource.exchange_space_id = request.exchange_space_id
+        xp_resource.exchange_point_id = xpid
+        xp_resource.exchange_point_name = request.exchange_point_name
+
+        log.debug('Saving XP to registry')
+        yield self.rclient.put_instance(xp_resource)
+        xp_resource_id = self.rclient.reference_instance(xp_resource)
+
+        log.debug('Creating reply')
+        reply = yield self.mc.create_instance(IDLIST_TYPE)
+        reply.id_list.add()
+        reply.id_list[0] = xp_resource_id
+
+        log.debug('Saving XPID to internal list')
+        self.xp_list[xp_resource_id.key] = request.exchange_point_name
+
+        log.debug('DXP responding')
+        yield self.reply_ok(msg, reply)
+        log.debug('DXP completed OK')
+
+    @defer.inlineCallbacks
+    def op_undeclare_exchange_point(self, request, headers, msg):
+        log.debug('UDXP starting')
+
+        if request.MessageType != REQUEST_TYPE:
+            raise PSSException('Bad message type',
+                               request.ResponseCodes.BAD_REQUEST)
+
+
+        # Try to lookup the XP in the dictionary
+        log.debug('Looking for XP ID %s' % request.resource_reference.key)
+        try:
+            xp_name = self.xp_list[request.resource_reference.key]
+            log.debug('XP found, %s/%s' % (request.resource_reference.key, xp_name))
+        except KeyError:
+            raise PSSException('Unable to locate XP ID',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # @todo Look up XS via XPID, call EMS to remove same...
+        log.warn('This is where the Actual Work Goes...')
+        yield self.reply_err(msg)
+
+    @defer.inlineCallbacks
+    def op_query_exchange_points(self, request, headers, msg):
+        log.debug('Starting XP query')
+        # Validate the input
+        if request.MessageType != REGEX_TYPE:
+            raise PSSException('Bad message type, expected regex query',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        if not request.IsFieldSet('regex'):
+            raise PSSException('Bad message, regex missing',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
+        yield self._do_query(request, self.xp_list)
+
+    @defer.inlineCallbacks
+    def op_declare_topic(self, request, headers, msg):
+        log.debug('Declare topic starting')
+        if request.MessageType != TOPIC_TYPE:
+            raise PSSException('Bad message type, expected a topic',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        try:
+            xs_name = self.xs_list[request.exchange_space_id.key]
+            xp_name = self.xp_list[request.exchange_point_id.key]
+        except KeyError:
+            log.exception('Error looking up exchange space or point')
+            raise PSSException('Unable to look up exchange space or point',
+                               request.ResponseCodes.BAD_REQUEST)
+        description = str(time.time())
+        tid = yield self.ems.create_topic(xs_name, xp_name, request.topic_name, description)
+
+        log.debug('creating and populating the resource')
+        topic_resource = yield self.rclient.create_instance(TOPIC_RES_TYPE, 'Niemand')
+        topic_resource.exchange_space_name = xs_name
+        topic_resource.exchange_point_name = xp_name
+        topic_resource.topic_name = request.topic_name
+        topic_resource.topic_id = tid
+        topic_resource.exchange_space_id = request.exchange_space_id
+        topic_resource.exchange_point_id = request.exchange_point_id
+
+        log.debug('Saving resource...')
+        res_id = yield self.rclient.put_instance(topic_resource)
+
+        log.debug('Creating reply')
+        reply = yield self.mc.create_instance(IDLIST_TYPE)
+        reply.id_list.add()
+        reply.id_list[0] = res_id.resource_reference
+
+        log.debug('Saving topic to internal list...')
+        self.topic_list[res_id.resource_reference.key] = request.topic_name
+
+        yield self.reply_ok(msg, reply)
+
+    @defer.inlineCallbacks
+    def op_query_topics(self, request, headers, msg):
+        log.debug('topic query starting')
+        # Input validation... GIGO, after all. Or should we rename that 'Gigli'?
+        if request.MessageType != REGEX_TYPE:
+            raise PSSException('Bad message type, expected regex query',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        if not request.IsFieldSet('regex'):
+            raise PSSException('Bad message, regex missing',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        yield self._do_query(request, self.topic_list)
+
+    @defer.inlineCallbacks
+    def op_declare_publisher(self, request, headers, msg):
+        log.debug('Starting DP')
+        if request.MessageType != PUBLISHER_TYPE:
+            raise PSSException('Bad message type, expected PublisherMsg',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # Verify that IDs exist - not sure if this is the correct order or not...
+        try:
+            xs_name = self.xs_list[request.exchange_space_id.key]
+            xp_name = self.xp_list[request.exchange_point_id.key]
+            topic_name = self.topic_list[request.topic_id]
+        except KeyError:
+            log.exception('Error looking up publisher context!')
+            raise PSSException('Bad publisher request, cannot locate context',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        log.debug('Publisher context is %s/%s/%s' % (xs_name, xp_name, topic_name))
+        description = str(time.time())
+        publ_id = yield self.ems.create_publisher(xs_name, xp_name, topic_name,
+                                                  request.publisher_name,
+                                                  request.credentials, description)
+        log.debug('pub id is ' + publ_id.resource_reference.key)
+
+        log.debug('creating and populating the publ resource')
+        publ_resource = yield self.rclient.create_instance(PUBLISHER_RES_TYPE, 'Niemand')
+        publ_resource.exchange_space_id = request.exchange_space_id
+        publ_resource.exchange_point_id = request.exchange_point_id
+        publ_resource.topic_id = request.topic_id
+        publ_resource.publisher_name = request.publisher_name
+        publ_resource.credentials = request.credentials
+        publ_resource.publisher_id = publ_id
+
+        log.debug('Saving publ resource....')
+        publ_res_id = yield self.rclient.put_instance(publ_resource)
+        log.debug('Creating reply')
+        reply = self.mc.create_instance(IDLIST_TYPE)
+        reply.id_list.add()
+        reply.id_list[0] = publ_res_id.resource_reference
+
+        log.debug('Saving publisher to internal list...')
+        self.pub_list[publ_res_id.resource_reference.key] = request.publisher_name
+
+        yield self.reply_ok(msg, reply)
+
+    @defer.inlineCallbacks
+    def op_undeclare_publisher(self, request, headers, msg):
+        log.debug('UDP starting')
+
+        if request.MessageType != REQUEST_TYPE:
+            raise PSSException('Bad message type',
+                               request.ResponseCodes.BAD_REQUEST)
+
+
+        # Try to lookup in the dictionary
+        log.debug('Looking for publ ID %s' % request.resource_reference.key)
+        try:
+            pub_name = self.pub_list[request.resource_reference.key]
+            log.debug('Publisher found, %s/%s' % (request.resource_reference.key, pub_name))
+        except KeyError:
+            raise PSSException('Unable to locate publisher ID %s' % request.resource_reference.key,
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # @todo Using publisher ID, lookup exchange space and point and topic from registry
+        log.warn('This is where the Actual Work Goes...')
+
+        yield self.reply_err(msg)
+
+
+    @defer.inlineCallbacks
+    def op_subscribe(self, request, headers, msg):
+        log.debug('PSC subscribe starting')
+        if request.MessageType != SUBSCRIBER_TYPE:
+            raise PSSException('Bad message type, expected SubscriberMsg',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        try:
+            xs_name = self.xs_list[request.exchange_space_id.key]
+            xp_name = self.xp_list[request.exchange_point_id.key]
+            topic_name = self.topic_list[request.topic_id.key]
+        except KeyError:
+            log.exception('Error looking up subscription context!')
+            raise PSSException('Bad subscription request, cannot locate context',
+                               request.ResponseCodes.BAD_REQUEST)
+
+
+        # Hmm, is EMS gonna return a string queue name/address or what?
+        # Assume a string for now.
+        # We return a resource ref, which then must be looked up. Hmm. Change
+        # to string return?
+        q_name = yield self.ems.subscribe(xs_name, xp_name, topic_name)
+
+        # Save into registry
+        log.debug('Saving subscription into registry')
+        sub_resource = yield self.rclient.create_instance(SUBSCRIBER_RES_TYPE, 'Niemand')
+        sub_resource.exchange_space_id = request.exchange_space_id
+        sub_resource.exchange_point_id = request.exchange_point_id
+        sub_resource.topic_id = request.topic_id
+        sub_resource.queue_name = q_name
+
+        sub_res_id = yield self.rclient.put_instance(sub_resource)
+
+        reply = yield self.mc.create_instance(IDLIST_TYPE)
+        reply.id_list.add()
+        reply.id_list[0] = sub_res_id.resource_reference
+
+        log.debug('Saving to internal list')
+        self.sub_list[sub_res_id.resource_reference.key] = request.subscriber_name
+        yield self.reply_ok(msg, reply)
+
+
+    @defer.inlineCallbacks
+    def op_unsubscribe(self, request, headers, msg):
+        log.debug('Starting unsub')
+        if request.MessageType != REQUEST_TYPE:
+            raise PSSException('Bad message type, expected request type',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        try:
+            sub_name = self.sub_list[request.resource_reference.key]
+        except KeyError:
+            log.exception('Unable to locate subscription!')
+            raise PSSException('Could not locate subscription ID',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # @todo Call EMS, delete from registry
+        log.warn('Theres a wee bit of code left to do here....')
+        yield self.reply_err(msg)
+
+    @defer.inlineCallbacks
+    def op_declare_queue(self, request, headers, msg):
+        log.debug('DQ starting')
+        if request.MessageType != QUEUE_TYPE:
+            raise PSSException('Bad message type, expected QueueMsg',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        try:
+            xs_name = self.xs_list[request.exchange_space_id.key]
+            xp_name = self.xp_list[request.exchange_point_id.key]
+            topic_name = self.topic_list[request.topic_id]
+            sub_name = self.sub_list[request.subscriber_id]
+        except KeyError:
+            log.exception('Error looking up queue context!')
+            raise PSSException('Bad queue request, cannot locate context',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        log.debug('Queue context is %s/%s/%s/%s' %
+                  (xs_name, xp_name, topic_name, sub_name))
+
+        description = str(time.time())
+        q_name = yield self.ems.declare_queue(xs_name, xp_name, topic_name,
+                                     request.queue_name, description)
+
+        q_resource = yield self.mc.create_instance(QUEUE_RES_TYPE)
+        q_resource.exchange_space_id = request.exchange_space_id
+        q_resource.exchange_point_id = request.exchange_point_id
+        q_resource.topic_id = request.topic_id
+        q_resource.subscriber_id = request.subscriber_id
+        q_resource.queue_name = q_name
+
+        q_id = yield self.rclient.put_instance(q_resource)
+        log.debug('Saving q into dictionary')
+        self.q_list[q_resource.resource_reference.key] = q_name
+
+        reply = yield self.mc.create_instance(IDLIST_TYPE)
+        reply.id_list.add()
+        reply.id_list[0] = q_id.resource_reference
+
+        yield self.reply_ok(msg, reply)
+
+
+    @defer.inlineCallbacks
+    def op_add_binding(self, request, headers, msg):
+        log.debug('PSC AB starting')
+        if request.MessageType != QUEUE_TYPE:
+            raise PSSException('Bad message type, expected BindingMsg',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # Hmm, what's required to add a binding?? Something like this?
+        rc = yield self.ems.add_binding(request.queue_name, request.binding)
+
+        # If so, do we need registries for this at all?
+        yield self.reply_ok(msg)
 
 
 class PubSubClient(ServiceClient):
@@ -413,7 +715,7 @@ class PubSubClient(ServiceClient):
         defer.returnValue(content)
 
     @defer.inlineCallbacks
-    def create_queue(self, params):
+    def declare_queue(self, params):
         """
         @brief Create a listener queue for a subscription
         @param GPB 2308/1
@@ -421,7 +723,7 @@ class PubSubClient(ServiceClient):
         """
         yield self._check_init()
 
-        (content, headers, msg) = yield self.rpc_send('create_queue', params)
+        (content, headers, msg) = yield self.rpc_send('declare_queue', params)
         defer.returnValue(content)
 
     @defer.inlineCallbacks
