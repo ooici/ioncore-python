@@ -39,12 +39,14 @@ class FindDataResources(object):
         """
         Need to build up a GPB Message;
          - get request message object from message client
-         - build up request message to resource client based on incoming
+         - build up request message to dataset_controller based on incoming
            request message
-         - send to worker resource client to get list of resource ids
+         - send to dataset_controller client to get list of resource ids
          - get results
-         - for each resource id, determine if in bounds
-         - get response message object from messagse client
+         - for each resource id: determine if in bounds
+         - use cdm dataset helper methods (resource_client) to get pertinent
+           metadata; determine if in bounds of spatial/temporal parms.
+         - get response message object from message client
          - build up response message
          - get response message payload
          - build up response message payload
