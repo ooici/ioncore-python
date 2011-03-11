@@ -63,7 +63,7 @@ message FindDataResourcesMsg {
 # RegisterUser GPBs from ion-object-definitions/net/ooici/integration/ais/registerUser/register_user.proto
 REGISTER_USER_TYPE = object_utils.create_type_identifier(object_id=9101, version=1)
 """
-message RegisterUser {
+message RegisterIonUser {
    enum _MessageTypeIdentifier {
        _ID = 9101;
        _VERSION = 1;
