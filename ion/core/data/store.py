@@ -80,6 +80,14 @@ class Store(object):
         if self.kvs.has_key(key):
             del self.kvs[key]
         return defer.succeed(None)
+    
+    def has_key(self, key):
+        """
+        Checks to see if the key exists in the column family
+        @param key is the key to check in the column family
+        @retVal Returns a bool in a deferred
+        """  
+        return defer.maybeDeferred(self.kvs.has_key, key )
 
 class IIndexStore(IStore):
     """
@@ -284,6 +292,14 @@ class IndexStore(object):
         Return the column names that are indexed.
         """
         return defer.maybeDeferred(self.indices.keys)
+    
+    def has_key(self, key):
+        """
+        Checks to see if the key exists in the column family
+        @param key is the key to check in the column family
+        @retVal Returns a bool in a deferred
+        """  
+        return defer.maybeDeferred(self.kvs.has_key, key)
 
 class Query:
     """
