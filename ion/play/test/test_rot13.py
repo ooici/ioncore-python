@@ -9,7 +9,7 @@
 
 from twisted.internet import defer
 
-from ion.play.rot13_service import Rot13Service, Rot13Client, REQUEST_TYPE, RESPONSE_TYPE
+from ion.play.rot13_service import Rot13Service, Rot13Client, REQUEST_TYPE, RESPONSE_TYPE, R13Exception
 
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
@@ -46,6 +46,20 @@ class RUnit(IonTestCase):
         rc = yield dut.rot13(msg)
 
         self.failUnlessEqual('nopfqfq', rc.output_string)
+
+    @defer.inlineCallbacks
+    def test_bad_gpb(self):
+        """
+        Unit test of service logic when fed bad GPB
+        """
+        dut = Rot13Service()
+        msg = yield self.create_message(BAD_MSG)
+        try:
+            yield dut.rot13(msg)
+        except AttributeError:
+            pass
+        else:
+            self.fail('Did not catch expected exception')
 
 class R13Test(IonTestCase):
     #######################################################

@@ -39,6 +39,7 @@ broker_type                = object_utils.create_type_identifier(object_id=1001,
 exchangespace_type         = object_utils.create_type_identifier(object_id=1002, version=1)
 exchangename_type          = object_utils.create_type_identifier(object_id=1003, version=1)
 queue_type                 = object_utils.create_type_identifier(object_id=1004, version=1)
+binding_type               = object_utils.create_type_identifier(object_id=1005, version=1)
 
 amqpexchangemapping_type   = object_utils.create_type_identifier(object_id=1006, version=1)
 amqpqueuemapping_type      = object_utils.create_type_identifier(object_id=1007, version=1)

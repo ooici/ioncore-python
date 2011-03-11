@@ -24,7 +24,7 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_TYPE, \
                                                        UPDATE_USER_EMAIL_TYPE,   \
                                                        UPDATE_USER_DISPATCH_QUEUE_TYPE, \
                                                        OOI_ID_TYPE, \
-                                                       FIND_DATA_RESOURCES_MSG_TYPE
+                                                       FIND_DATA_RESOURCES_REQ_MSG_TYPE
 
 
 class AppIntegrationTest(IonTestCase):
@@ -64,7 +64,7 @@ class AppIntegrationTest(IonTestCase):
         # Use the message client to create a message object
         log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
-        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         reqMsg.message_parameters_reference.spatial.minLatitude = 32.87521
         reqMsg.message_parameters_reference.spatial.maxLatitude = 32.97521
         reqMsg.message_parameters_reference.spatial.minLongitude = -117.274609
