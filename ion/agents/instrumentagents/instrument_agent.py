@@ -34,81 +34,86 @@ instrument_parameters           = 'instrument_parameters'
 
 
 """
-Parameter names for all instrument agents.
+Parameter names for instrument agents.
 """
-ci_param_list = {
-    'DataTopics'                :'DataTopics',
-    'EventTopics'               :'EventTopics',
-    'StateTopics'               :'StateTopics',
-    'DriverAddress'             :'DriverAddress',
-    'ResourceID'                :'ResourceID',
-    #'DataCorrectionMode'        : 'DataCorrectionMode',
-    'TimeSource'                : 'TimeSource',
-    'ConnectionMethod'          : 'ConnectionMethod',
-    'DefaultTransactionTimeout' : 'DefaultTransactionTimeout',
-    'MaxTransactionTimeout'     : 'MaxTransactionTimeout',
-    'TransactionExpireTimeout'  : 'TransactionExpireTimeout'
-}
+ci_param_list = [
+    'CI_PARAM_DATA_TOPICS',
+    'CI_PARAM_EVENT_TOPICS',
+    'CI_PARAM_STATE_TOPICS',
+    'CI_PARAMS_DRIVER_ADDRESS',
+    'CI_PARAM_RESOURCE_ID',
+    'CI_PARAM_TIME_SOURCE',
+    'CI_PARAM_CONNECTION_METHOD',
+    'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT',
+    'CI_PARAM_MAX_TRANSACTION_TIMEOUT',
+    'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT'
+]
+
 
 """
 Publish message types.
 """
-publish_msg_type = {
-    'Error'                     :'Error',
-    'StateChange'               :'StateChange',
-    'ConfigChange'              :'ConfigChange',
-    'Data'                      :'Data',
-    'Event'                     :'Event'
-}
-
-time_sources = [
-    'PTPDirect',                # IEEE 1588 PTP connection directly supported.
-    'NTPUnicast',               # NTP unicast to the instrument.
-    'NTPBroadcast',             # NTP broadcast to the instrument.
-    'LocalOscillator',          # Device has own clock.
-    'DriverSetInterval'         # Driver sets clock at interval.
+publish_msg_types = [
+    'PUBLISH_ERROR',                        
+    'PUBLISH_STATE_CHANGE',
+    'PUBLISH_CONIFG_CHANGE',
+    'PUBLISH_DATA',
+    'PUBLISH_EVENT'    
 ]
 
+"""
+Time source of device fronted by agent.
+"""
+time_sources = [
+    'TIME_PTP_DIRECT',                          # IEEE 1588 PTP connection directly supported.
+    'TIME_NTP_UNICAST',                         # NTP unicast to the instrument.
+    'TIME_NTP_BROADCAST',                       # NTP broadcast to the instrument.
+    'TIME_LOCAL_OSCILLATOR',                    # Device has own clock.
+    'TIME_DRIVER_SET_INTERVAL'                  # Driver sets clock at interval.
+]
+
+"""
+Connection method to agent and device.
+"""
 connection_methods = [
-    'Offline',                  # Device offline.
-    'CabledObservatory',        # Accessible through cabled observatory, available full time.
-    'ShoreNetwork',             # Connected through full time shore connection.
-    'PartTimeScheduled',        # Comes online on scheduled basis. Outages normal.
-    'PartTimeRandom'            # Comes online as needed. Outages normal.
+    'CONNECTION_OFFLINE',                      # Device offline.
+    'CONNECTION_CABLED_OBSERVATORY',           # Accessible through cabled observatory, available full time.
+    'CONNECTION_SHORE_NETWORK',                # Connected through full time shore connection.
+    'CONNECTION_PART_TIME_SCHEDULED',          # Comes online on scheduled basis. Outages normal.
+    'CONNECTION_PART_TIME_RANDOM'              # Comes online as needed. Outages normal.
 ]
 
 """
 Agent errors.
 """
 errors = {
-    'InvalidDestnation'     : ['ERROR','InvalidDestination','Intended destination for a message or operation is not valid.'],
-    'Timeout'	            : ['ERROR','Timeout','The message or operation timed out.'],
-    'NetworkFailure'        : ['ERROR','NetworkFailure','A network failure has been detected.'],
-    'NetworkCorruption'     : ['ERROR','NetworkCorruption','A message passing through the network has been determined to be corrupt.'],
-    'OutofMemory'	    : ['ERROR','OutofMemory','There is no more free memory to complete the operation.'],
-    'LockedResource'	    : ['ERROR','LockedResource','The resource being accessed is in use by another exclusive operation.'],
-    'ResourceUnavailable'   : ['ERROR','ResourceUnavailable','The resource being accessed is unavailable.'],
-    'UnknownError'          : ['ERROR','UnknownError','An unknown error has been encountered.'],
-    'PermissionError'       : ['ERROR','PermissionError','The user does not have the correct permission to access the resource in the desired way.'],
-    'InvalidTransition'     : ['ERROR','InvalidTransition','The transition being requested does not apply for the current state.'],
-    'IncorrectState'        : ['ERROR','IncorrectState','The operation being requested does not apply to the current state.'],
-    'CannotPublish'	    : ['ERROR','CannotPublish','An attempt to publish has failed.'],
-    'InstrumentUnreachable' : ['ERROR','InstrumentUnreachable','The agent cannot communicate with the device.'],
-    'MessagingError'        : ['ERROR','MessagingError','An error has been encountered during a messaging operation.'],
-    'HardwareError'         : ['ERROR','HardwareError','An error has been encountered with a hardware element.'],
-    'PhrasePending'         : ['ERROR','PhrasePending','A phrase is currently pending.'],
-    'WrongType'             : ['ERROR','WrongType','The type of operation is not valid in the current state.'],
-    'InvalidCommand'        : ['ERROR','InvalidCommand','The command is not valid in the given context.'],    
-    'UnknownCommand'        : ['ERROR','UnknownCommand','The command is not recognized.'],
-    'NotImplemented'        : ['ERROR','NotImplemented','The command is not implemented.'],
-    'InvalidTransactionID'  : ['ERROR','InvalidTransactionID','The transaction ID is not a valid value.'],
-    'InvalidDriver'         : ['ERROR','InvalidDriver','Driver or driver client invalid.'],
-    'GetObservatoryErr'     : ['ERROR','GetObservatoryErr','Could not retrieve all parameters.'],
-    'ExeObservatoryErr'     : ['ERROR','ExeObservatoryErr','Could not execute observatory command.'],
-    'SetObservatoryErr'     : ['ERROR','SetObservatoryErr','Could not set all parameters.'],
-    'ParameterReadOnly'     : ['ERROR','ParameterReadOnly','Parameter is read only.'],
-    'InvalidParameter'      : ['ERROR','InvalidParameter','The parameter is not available.'],
-    'InvalidParamValue'     : ['ERROR','InvalidParamValue','The parameter value is out of range.']
+    'INVALID_DESTINATION'       : ['ERROR','INVALID_DESTINATION','Intended destination for a message or operation is not valid.'],
+    'TIMEOUT'	                : ['ERROR','TIMEOUT','The message or operation timed out.'],
+    'NETWORK_FAILURE'           : ['ERROR','NETWORK_FAILURE','A network failure has been detected.'],
+    'NETWORK_CORRUPTION'        : ['ERROR','NETWORK_CORRUPTION','A message passing through the network has been determined to be corrupt.'],
+    'OUT_OF_MEMORY'	        : ['ERROR','OUT_OF_MEMORY','There is no more free memory to complete the operation.'],
+    'LOCKED_RESOURCE'	        : ['ERROR','LOCKED_RESOURCE','The resource being accessed is in use by another exclusive operation.'],
+    'RESOURCE_UNAVAILABLE'      : ['ERROR','RESOURCE_UNAVAILABLE','The resource being accessed is unavailable.'],
+    'UNKNOWN_ERROR'             : ['ERROR','UNKNOWN_ERROR','An unknown error has been encountered.'],
+    'PERMISSION_ERROR'          : ['ERROR','PERMISSION_ERROR','The user does not have the correct permission to access the resource in the desired way.'],
+    'INVALID_TRANSITION'        : ['ERROR','INVALID_TRANSITION','The transition being requested does not apply for the current state.'],
+    'INCORRECT_STATE'           : ['ERROR','INCORRECT_STATE','The operation being requested does not apply to the current state.'],
+    'CANNOT_PUBLISH'	        : ['ERROR','CANNOT_PUBLISH','An attempt to publish has failed.'],
+    'INSTRUMENT_UNREACHABLE'    : ['ERROR','INSTRUMENT_UNREACHABLE','The agent cannot communicate with the device.'],
+    'MESSAGING_ERROR'           : ['ERROR','MESSAGING_ERROR','An error has been encountered during a messaging operation.'],
+    'HARDWARE_ERROR'            : ['ERROR','HARDWARE_ERROR','An error has been encountered with a hardware element.'],
+    'WRONG_TYPE'                : ['ERROR','WRONG_TYPE','The type of operation is not valid in the current state.'],
+    'INVALID_COMMAND'           : ['ERROR','INVALID_COMMAND','The command is not valid in the given context.'],    
+    'UNKNOWN_COMMAND'           : ['ERROR','UNKNOWN_COMMAND','The command is not recognized.'],
+    'NOT_IMPLEMENTED'           : ['ERROR','NOT_IMPLEMENTED','The command is not implemented.'],
+    'INVALID_TRANSACTION_ID'    : ['ERROR','INVALID_TRANSACTION_ID','The transaction ID is not a valid value.'],
+    'INVALID_DRIVER'            : ['ERROR','INVALID_DRIVER','Driver or driver client invalid.'],
+    'GET_OBSERVATORY_ERR'       : ['ERROR','GET_OBSERVATORY_ERR','Could not retrieve all parameters.'],
+    'EXE_OBSERVATORY_ERR'       : ['ERROR','EXE_OBSERVATORY_ERR','Could not execute observatory command.'],
+    'SET_OBSERVATORY_ERR'       : ['ERROR','SET_OBSERVATORY_ERR','Could not set all parameters.'],
+    'PARAMETER_READ_ONLY'       : ['ERROR','PARAMETER_READ_ONLY','Parameter is read only.'],
+    'INVALID_PARAMETER'         : ['ERROR','INVALID_PARAMETER','The parameter is not available.'],
+    'INVALID_PARAM_VALUE'       : ['ERROR','INVALID_PARAM_VALUE','The parameter value is out of range.']
 }
 
 
@@ -301,7 +306,8 @@ class InstrumentAgent(ResourceAgent):
     transaction_id = None
     
     """
-    An integer in seconds for how long to wait to acquire a new transaction.
+    An integer in seconds for how long to wait to acquire a new transaction if
+    a value is not explicitly given.
     """
     default_transaction_timeout = 10   
     
@@ -376,7 +382,9 @@ class InstrumentAgent(ResourceAgent):
         @retval Transaction ID UUID string.
         """
         
-        result = yield self._start_transaction(timeout)                
+        # Do we need to explicitly convert the content from dict to timeout int?
+        
+        result = yield self._start_transaction(content)                
         yield self.reply_ok(msg,result)
         
     
@@ -400,20 +408,21 @@ class InstrumentAgent(ResourceAgent):
                 transaction_id = uuid4()
                 return ['OK',transaction_id]
             else:
-                return errors['LockedResource']
+                return errors['LOCKED_RESOURCE']
         
         #todo add the timeout callback code here
         
         
     
     @defer.inlineCallbacks
-    def op_end_transaction(tid):
+    def op_end_transaction(self,content,headers,msg):
         """
         End the current transaction.
         @param tid A uuid specifying the current transaction to end.
         """        
+        # Do we need to explicitly convert content from dict to uuid4?
         
-        result = _end_transaction(tid)
+        result = self._end_transaction(content)
         yield self.reply_ok(result)
                 
     
@@ -425,11 +434,13 @@ class InstrumentAgent(ResourceAgent):
         @param tid A uuid specifying the current transaction to end.
         """        
         
+        assert(isinstance(tid,uuid4)), 'Expected a uuid4 transaction ID.'
+        
         if tid == transaction_id:
             transaction_id = None
-            self.reply_ok(['OK'])
+            return ['OK']
         else:
-            self.reply_ok(errors['LockedResource'])
+            return errors['LOCKED_RESOURCE']
             
         
 
@@ -497,7 +508,7 @@ class InstrumentAgent(ResourceAgent):
     
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -505,7 +516,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
             
@@ -516,9 +527,9 @@ class InstrumentAgent(ResourceAgent):
             reply['result'] = output['result']
             reply['success'] = output['success']
         elif cmd[0] == 'TransmitData':
-            reply['success'] = errors['NotImplemented']
+            reply['success'] = errors['NOT_IMPLEMENTED']
         else:
-            reply['success'] = errors['UnknownCommand']
+            reply['success'] = errors['UNKNOWN_COMMAND']
 
         
         # End implicit transactions.
@@ -554,14 +565,14 @@ class InstrumentAgent(ResourceAgent):
 
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
 
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
 
@@ -570,42 +581,46 @@ class InstrumentAgent(ResourceAgent):
         result = {}                    
         get_errors = False
         
+        if 'all' in params:
+            params = ci_param_list.values()
+        
+        
         # Add each observatory parameter given in params list.
         for arg in params:                
-            if arg == ci_param_list['DataTopics']:
+            if arg == 'CI_PARAM_DATA_TOPICS':
                 # Does this depend on new pubsub? See below for old way.
                 pass    
-            elif arg == ci_param_list['EventTopics']:
+            elif arg == 'CI_PARAM_EVENT_TOPICS':
                 # Does this depend on new pubsub? See below for old way.
                 pass
-            elif arg == ci_param_list['StateTopics']:
+            elif arg == 'CI_PARAM_STATE_TOPICS':
                 # Does this depend on new pubsub? See below for old way.
                 pass
-            elif arg == ci_param_list['DriverAddress']:
+            elif arg == 'CI_PARAM_DRIVER_ADDRESS':
                 if driver_client.target:
-                    result['DriverAddress'] = (['OK'],str(self.driver_client.target))
+                    result['CI_PARAM_DRIVER_ADDRESS'] = (['OK'],str(self.driver_client.target))
                 else:
                     get_errors = True
-                    result['DriverAddress'] = (errors['InvalidDriver'],None)
-            elif arg == ci_param_list['ResourceID']:
+                    result['CI_PARAM_DRIVER_ADDRESS'] = (errors['INVALID_DRIVER'],None)
+            elif arg == 'CI_PARAM_RESOURCE_ID':
                 # How do we get this?
                 pass
-            elif arg == ci_param_list['TimeSource']:
-                result['TimeSource'] = (['OK'],time_source)
-            elif arg == ci_param_list['ConnectionMethod']:
-                result['ConnectionMethod'] = (['OK'],connection_method)
-            elif arg == ci_param_list['DefaultTransactionTimeout']:
-                result['DefaultTransactionTimeout'] = (['OK'],default_transaction_timeout)
-            elif arg == ci_param_list['MaxTransactionTimeout']:
-                result['MaxTransactionTimeout'] = (['OK'],max_transaction_timeout)
-            elif arg == ci_param_list['TransactionExpireTimeout']:
-                result['TransactionExpireTimeout'] = (['OK'],transaction_expire_timeout)
+            elif arg == 'CI_PARAM_TIME_SOURCE':
+                result['CI_PARAM_TIME_SOURCE'] = (['OK'],time_source)
+            elif arg == 'CI_PARAM_CONNECTION_METHOD':
+                result['CI_PARAM_CONNECTION_METHOD'] = (['OK'],connection_method)
+            elif arg == 'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT':
+                result['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'] = (['OK'],default_transaction_timeout)
+            elif arg == 'CI_PARAM_MAX_TRANSACTION_TIMEOUT':
+                result['CI_PARAM_MAX_TRANSACTION_TIMEOUT'] = (['OK'],max_transaction_timeout)
+            elif arg == 'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT':
+                result['CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT'] = (['OK'],transaction_expire_timeout)
             else:
                 get_errors = True
                 result[arg] = (error[ParameterNotAvailable],None)
                 
         if get_errors:
-            success = errors['GetObservatoryErr']
+            success = errors['GET_OBSERVATORY_ERR']
         else:
             success = ['OK']
             
@@ -666,7 +681,7 @@ class InstrumentAgent(ResourceAgent):
         
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
         
@@ -674,7 +689,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
                     
@@ -692,23 +707,23 @@ class InstrumentAgent(ResourceAgent):
         # general agent users. 
         for arg in params.keys():
             val = params[arg]
-            if arg == ci_param_list['DataTopics']:
+            if arg == 'CI_PARAM_DATA_TOPICS':
                 pass
             
-            elif arg == ci_param_list['EventTopics']:
+            elif arg == 'CI_PARAM_EVENT_TOPICS':
                 pass
             
-            elif arg == ci_param_list['StateTopics']:
+            elif arg == 'CI_PARAM_STATE_TOPICS':
                 pass
             
-            elif arg == ci_param_list['DriverAddress']:
+            elif arg == 'CI_PARAM_DRIVER_ADDRESS':
                 # Is this read only?
                 pass
             
-            elif arg == ci_param_list['ResourceID']:
+            elif arg == 'CI_PARAM_RESOURCE_ID':
                 pass
             
-            elif arg == ci_param_list['TimeSource']:
+            elif arg == 'CI_PARAM_TIME_SOURCE':
                 if val in time_sources:
                     if val != time_source:
                         time_source = val
@@ -719,10 +734,10 @@ class InstrumentAgent(ResourceAgent):
                         success = ['OK']
                 else:
                     set_errors = True
-                    success = error['InvalidParamValue']
+                    success = error['INVALID_PARAM_VALUE']
                 result[arg] = success
                 
-            elif arg == ci_param_list['ConnectionMethod']:
+            elif arg == 'CI_PARAM_CONNECTION_METHOD':
                 if val in connecction_methods:
                     if val != connection_method:
                         connection_method = val
@@ -733,48 +748,48 @@ class InstrumentAgent(ResourceAgent):
                         success = ['OK']
                 else:
                     set_errors = True
-                    success = errors['InvalidParamValue']
+                    success = errors['INVALID_PARAM_VALUE']
                 result[arg] = success
                 
-            elif arg == ci_param_list['DefaultTransactionTimeout']:
+            elif arg == 'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT':
                 if isinstance(val,int) and val >= 0:
                     default_transaction_timeout = val
                     success = ['OK']
                     if max_transaction_timeout < val:
                         max_transaction_timeout = val
-                        result['MaxTransactionTimeout'] = ['OK']
+                        result['CI_PARAM_MAX_TRANSACTION_TIMEOUT'] = ['OK']
                 else:
                     set_errors = True
-                    success = errors['InvalidParamValue']
+                    success = errors['INVALID_PARAM_VALUE']
                 result[arg] = success
                 
-            elif arg == ci_param_list['MaxTransactionTimeout']:
+            elif arg == 'CI_PARAM_MAX_TRANSACTION_TIMEOUT':
                 if isinstance(val,int) and val >= 0:
                     max_transaction_timeout = val
                     success = ['OK']
                     if default_transaction_timeout > val:
                         default_transaction_timeout = val
-                        result['DefaultTransactionTimeout'] = ['OK']
+                        result['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'] = ['OK']
                 else:
                     set_errors = True
-                    success = errors['InvalidParamValue']
+                    success = errors['INVALID_PARAM_VALUE']
                 result[arg] = success
 
-            elif arg == ci_param_list['TransactionExpireTimeout']:
+            elif arg == 'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT':
                 if isinstance(val,int) and val > min_transaction_expire_timeout:
                     transaction_expire_timeout = val
                     success = ['OK']
                 else:
                     set_errors = True
-                    success = errors['InvalidParamValue']
+                    success = errors['INVALID_PARAM_VALUE']
                 result[arg] = success
             else:
                 set_errors = True
-                result[arg] = error['InvalidParameter']
+                result[arg] = error['INVALID_PARAMETER']
 
 
         if set_errors:
-            success = errors['SetObservatoryErr']
+            success = errors['SET_OBSERVATORY_ERR']
         else:
             success = ['OK']
             
@@ -815,7 +830,7 @@ class InstrumentAgent(ResourceAgent):
 
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -823,7 +838,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
 
@@ -878,7 +893,7 @@ class InstrumentAgent(ResourceAgent):
 
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -886,7 +901,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
 
@@ -900,7 +915,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the result message.
         
         if get_errors:
-            success = errors['GetObservatoryErr']
+            success = errors['GET_OBSERVATORY_ERR']
         else:
             success = ['OK']
             
@@ -944,7 +959,7 @@ class InstrumentAgent(ResourceAgent):
 
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -952,7 +967,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
 
@@ -966,7 +981,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the result message.
         
         if get_errors:
-            success = errors['GetObservatoryErr']
+            success = errors['GET_OBSERVATORY_ERR']
         else:
             success = ['OK']
             
@@ -1020,7 +1035,7 @@ class InstrumentAgent(ResourceAgent):
 
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -1028,7 +1043,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
 
@@ -1065,7 +1080,7 @@ class InstrumentAgent(ResourceAgent):
 
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -1073,7 +1088,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
 
@@ -1118,7 +1133,7 @@ class InstrumentAgent(ResourceAgent):
 
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -1126,7 +1141,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
 
@@ -1171,7 +1186,7 @@ class InstrumentAgent(ResourceAgent):
 
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -1179,7 +1194,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
 
@@ -1226,7 +1241,7 @@ class InstrumentAgent(ResourceAgent):
 
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -1234,7 +1249,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
 
@@ -1278,7 +1293,7 @@ class InstrumentAgent(ResourceAgent):
 
         if isinstance(tid,str):
             if tid != 'create' and tid != 'none':
-                reply['success'] = errors['InvalidTransactionID']
+                reply['success'] = errors['INVALID_TRANSACTION_ID']
                 yield self.reply_ok(msg,reply)
                 return
 
@@ -1286,7 +1301,7 @@ class InstrumentAgent(ResourceAgent):
         # Set up the transaction
         result = yield self._verify_transaction(tid,'get')
         if not result:
-            reply['success'] = errors['LockedResource']
+            reply['success'] = errors['LOCKED_RESOURCE']
             yield self.reply_ok(msg,reply)
             return
 
