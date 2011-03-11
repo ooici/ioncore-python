@@ -19,7 +19,6 @@ from ion.core import ioninit
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.core.process.process import Process
-import itertools
 from ion.core.messaging.receiver import Receiver
 from ion.core.messaging import messaging
 import ion.util.procutils as pu
@@ -61,11 +60,13 @@ class TestPublisher(IonTestCase):
                 ('routing_key', 'arf.test'),
                 ('process', proc)]
 
-        for i in itertools.combinations(args, 1):
-            self.failUnlessRaises(AssertionError, Publisher, **dict(i))     # dict(i): {'xp_name': 'magnet.topic'}
+        self.failUnlessRaises(AssertionError, Publisher, **dict([args[0]])) # xp_name
+        self.failUnlessRaises(AssertionError, Publisher, **dict([args[1]])) # routing_key
+        self.failUnlessRaises(AssertionError, Publisher, **dict([args[2]])) # process
 
-        for i in itertools.combinations(args, 2):
-            self.failUnlessRaises(AssertionError, Publisher, **dict(i))     # dict(i): {'xp_name': 'magnet.topic', 'routing_key': 'arf.test'}
+        self.failUnlessRaises(AssertionError, Publisher, **dict([args[0]] + [args[1]])) # xp_name + routing_key
+        self.failUnlessRaises(AssertionError, Publisher, **dict([args[0]] + [args[2]])) # xp_name + proc
+        self.failUnlessRaises(AssertionError, Publisher, **dict([args[1]] + [args[2]])) # routing_key + proc
 
         # now construct one with everything correct
         pub1 = Publisher(**dict(args))      # all requirements satisfied
@@ -200,8 +201,8 @@ class TestSubscriber(IonTestCase):
         args = [('xp_name','magnet.topic'),
                 ('process',proc)]
 
-        for i in itertools.combinations(args, 1):
-            self.failUnlessRaises(AssertionError, Subscriber, **dict(i))    # dict(i): {'xp_name':'magnet.topic'}
+        self.failUnlessRaises(AssertionError, Subscriber, **dict([args[0]]))    # xp_name
+        self.failUnlessRaises(AssertionError, Subscriber, **dict([args[1]]))    # process
 
         # all required arguments
         sub = Subscriber(**dict(args))
@@ -224,8 +225,8 @@ class TestSubscriber(IonTestCase):
         args = [('xp_name','magnet.topic'),
                 ('process',proc)]
 
-        for i in itertools.combinations(args, 1):
-            self.failUnlessFailure(sf.build(**dict(i)), AssertionError)    # dict(i): {'xp_name':'magnet.topic'}
+        self.failUnlessFailure(sf.build(**dict([args[0]])), AssertionError)    # xp_name
+        self.failUnlessFailure(sf.build(**dict([args[1]])), AssertionError)    # process
 
         sub = yield sf.build(**dict(args))
         self.failUnlessIsInstance(sub, Subscriber)
