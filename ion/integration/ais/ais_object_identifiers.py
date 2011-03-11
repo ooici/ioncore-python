@@ -122,3 +122,15 @@ message OoiId {
 }
 """
 
+SUBSCRIPTION_INFO_TYPE = object_utils.create_type_identifier(object_id=9201, version=1)
+"""
+message SubscriptionInfo {
+   enum _MessageTypeIdentifier {
+       _ID = 9201;
+       _VERSION = 1;
+   }
+
+   optional string user_ooi_id=1;
+   optional string queue_id=1;
+}
+"""
