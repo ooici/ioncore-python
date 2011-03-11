@@ -15,9 +15,7 @@ Refactor Merge to use a proxy repository for the readonly objects - they must li
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-import sys
-
-import time
+import weakref
 from twisted.internet import threads, reactor, defer
 
 from ion.core.object import gpb_wrapper
@@ -37,6 +35,121 @@ class RepositoryError(Exception):
     """
     An exception class for errors in the object management repository 
     """
+
+class IndexHash(dict):
+    """
+    A dictionary class to contain the objects owned by a repository. All repository objects are accessible by other
+    repositories via the workbench which maintains a cache of all the local objects. Clean up is the responsibility of
+    each repository.
+    """
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+
+        self._workbench_cache = None
+
+
+    def _set_cache(self,cache):
+        assert isinstance(cache, weakref.WeakValueDictionary), 'Invalid object passed as the cache for a repository.'
+        self._workbench_cache = cache
+        self.has_cache = True
+
+    def _get_cache(self):
+        return self._workbench_cache
+
+    cache = property(_get_cache, _set_cache)
+
+    def __getitem__(self, key):
+
+        if self.has_key(key):
+            return dict.__getitem__(self, key)
+        elif self.has_cache:
+            # You get it - you own it!
+            val = self.cache[key]
+            dict.__setitem__(self, key, val)
+            return val
+
+
+    def __setitem__(self, key, val):
+        dict.__setitem__(self, key, val)
+        if self.has_cache:
+            self.cache[key]=val
+
+    def clear(self):
+        """ D.clear() -> None.  Remove all items from the Repository Index Hash. """
+        dict.clear(self)
+
+    def get(self, key, d=None):
+        """ Get Item from the Index Hash"""
+        if dict.has_key(self, key):
+            return dict.__getitem__(self, key)
+        elif self.has_cache:
+            # You get it - you own it!
+            val = self.cache.get(key,None)
+            if val is None:
+                return d
+            else:
+                dict.__setitem__(self, key, val)
+                return val
+
+            
+
+    def has_key(self, k):
+        """ Check to see if the Key exists """
+        if self.has_cache:
+            return dict.has_key(self, key) or self.cache.has_key(key)
+        else:
+            return dict.has_key(self, key)
+
+
+    def items(self):
+        """ Get the items of the repository """
+        return dict.items(self)
+
+    def iteritems(self):
+        """ iter the items of the repository """
+        return dict.iteritems(self)
+
+    def iterkeys(self):
+        """ iter the keys of the repository """
+        return dict.iteritems(self)
+
+    def itervalues(self): # real signature unknown; restored from __doc__
+        """ D.itervalues() -> an iterator over the values of D """
+        pass
+
+    def keys(self): # real signature unknown; restored from __doc__
+        """ D.keys() -> list of D's keys """
+        return []
+
+    def pop(self, k, d=None): # real signature unknown; restored from __doc__
+        """
+        D.pop(k[,d]) -> v, remove specified key and return the corresponding value
+        If key is not found, d is returned if given, otherwise KeyError is raised
+        """
+        pass
+
+    def popitem(self): # real signature unknown; restored from __doc__
+        """
+        D.popitem() -> (k, v), remove and return some (key, value) pair as a
+        2-tuple; but raise KeyError if D is empty
+        """
+        pass
+
+    def setdefault(self, k, d=None): # real signature unknown; restored from __doc__
+        """ D.setdefault(k[,d]) -> D.get(k,d), also set D[k]=d if k not in D """
+        pass
+
+    def update(self, E=None, **F): # known special case of dict.update
+        """
+        D.update(E, **F) -> None.  Update D from E and F: for k in E: D[k] = E[k]
+        (if E has keys else: for (k, v) in E: D[k] = v) then: for k in F: D[k] = F[k]
+        """
+        pass
+
+    def values(self): # real signature unknown; restored from __doc__
+        """ D.values() -> list of D's values """
+        return []
+
 
 class Repository(object):
     
@@ -935,7 +1048,7 @@ class Repository(object):
         
         #log.debug('_load_element' + str(element))
         
-        # check that the caluclated value in element.sha1 matches the stored value
+        # check that the calculated value in element.sha1 matches the stored value
         if not element.key == element.sha1:
             raise RepositoryError('The sha1 key does not match the value. The data is corrupted! \n' +\
             'Element key %s, Calculated key %s' % (object_utils.sha1_to_hex(element.key), object_utils.sha1_to_hex(element.sha1)))
