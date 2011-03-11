@@ -36,8 +36,9 @@ class TestInstrumentAgent(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        
         yield self._start_container()
-
+        """
         # Start an instrument agent
         processes = [
             {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
@@ -59,17 +60,24 @@ class TestInstrumentAgent(IonTestCase):
         # Start an Agent Registry to test against
         self.reg_client = AgentRegistryClient(proc=self.sup)
         yield self.reg_client.clear_registry()
+        """
+
 
     @defer.inlineCallbacks
     def tearDown(self):
-        yield self._stop_container()
 
+        yield self._stop_container()
+        
+        
     @defer.inlineCallbacks
     def test_get_WHSentinelADCP_capabilities(self):
         """
         Test the ability to gather capabilities from the SBE49 instrument
         capabilities
         """
+        raise unittest.SkipTest('InstrumentAgent rewrite in progress.')
+        
+        
         result = yield self.IAClient.get_capabilities()
         #log.info("getCapabilities result: "+ str(result))
         self.assert_(set(IACIParameters).issubset(set(result[IA.ci_parameters])))
@@ -83,6 +91,9 @@ class TestInstrumentAgent(IonTestCase):
 
     @defer.inlineCallbacks
     def test_get_set_WHSentinelADCP_params(self):
+        
+        raise unittest.SkipTest('InstrumentAgent rewrite in progress.')
+        
         raise unittest.SkipTest('Needs failfast set to false')
         """
         Test the ability of the SBE49 driver to send and receive get, set,
@@ -128,6 +139,9 @@ class TestInstrumentAgent(IonTestCase):
         Tests the ability of an instrument agent to successfully register
         ifself with the resource registry.
         """
+        raise unittest.SkipTest('InstrumentAgent rewrite in progress.')
+        
+        
         reg_ref = yield self.IAClient.register_resource("123")
 
         result = yield self.IAClient.get_resource_instance()
@@ -151,6 +165,9 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test the resource lifecycle management
         """
+        raise unittest.SkipTest('InstrumentAgent rewrite in progress.')
+        
+        
         yield self.IAClient.register_resource("123")
 
         response = yield self.IAClient.set_lifecycle_state(LCS.inactive)
@@ -173,6 +190,9 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability of the SBE49 driver to execute commands through the
         InstrumentAgentClient class
         """
+        
+        raise unittest.SkipTest('InstrumentAgent rewrite in progress.')
+        
         self.simulator = Simulator("123", 9000)
         self.simulator.start()
 
@@ -206,6 +226,9 @@ class TestInstrumentAgent(IonTestCase):
         Test the methods for retreiving the driver process directly from
         the instrument agent.
         """
+        
+        raise unittest.SkipTest('InstrumentAgent rewrite in progress.')
+        
         response = yield self.IAClient.get_observatory([IA.driver_address])
         self.assertNotEqual(response, None)
         """
@@ -222,6 +245,9 @@ class TestInstrumentAgent(IonTestCase):
         Test to see if the status response is correct
         @todo Do we even need this function?
         """
+        
+        raise unittest.SkipTest('InstrumentAgent rewrite in progress.')
+        
         response = yield self.IAClient.get_status(['some_arg'])
         self.assert_(isinstance(response, dict))
         self.assertEqual(response['InstrumentState'], 'a-ok')
