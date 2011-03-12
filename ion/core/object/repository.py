@@ -74,9 +74,18 @@ class IndexHash(dict):
         if self.has_cache:
             self.cache[key]=val
 
-    def clear(self):
-        """ D.clear() -> None.  Remove all items from the Repository Index Hash. """
-        dict.clear(self)
+
+    def copy(self):
+        """ D.copy() -> a shallow copy of D """
+        raise NotImplementedError('IndexHash does not support copy')
+
+    @staticmethod # known case
+    def fromkeys(S, v=None):
+        """
+        dict.fromkeys(S[,v]) -> New dict with keys from S and values equal to v.
+        v defaults to None.
+        """
+        raise NotImplementedError('IndexHash does not support fromkeys')
 
     def get(self, key, d=None):
         """ Get Item from the Index Hash"""
@@ -91,15 +100,26 @@ class IndexHash(dict):
                 dict.__setitem__(self, key, val)
                 return val
 
-            
-
-    def has_key(self, k):
+    def has_key(self, key):
         """ Check to see if the Key exists """
         if self.has_cache:
             return dict.has_key(self, key) or self.cache.has_key(key)
         else:
             return dict.has_key(self, key)
 
+    def update(self, *args, **kwargs):
+        """
+        D.update(E, **F) -> None.  Update D from E and F: for k in E: D[k] = E[k]
+        (if E has keys else: for (k, v) in E: D[k] = v) then: for k in F: D[k] = F[k]
+        """
+        dict.update(self, *args, **kwargs)
+        if self.has_cache:
+            self.cache.update(*args, **kwargs)
+
+    '''
+    def clear(self):
+        """ D.clear() -> None.  Remove all items from the Repository Index Hash. """
+        dict.clear(self)
 
     def items(self):
         """ Get the items of the repository """
@@ -115,40 +135,91 @@ class IndexHash(dict):
 
     def itervalues(self): # real signature unknown; restored from __doc__
         """ D.itervalues() -> an iterator over the values of D """
-        pass
+        return dict.itervalues(self)
 
     def keys(self): # real signature unknown; restored from __doc__
         """ D.keys() -> list of D's keys """
-        return []
+        return dict.keys(self)
 
     def pop(self, k, d=None): # real signature unknown; restored from __doc__
         """
         D.pop(k[,d]) -> v, remove specified key and return the corresponding value
         If key is not found, d is returned if given, otherwise KeyError is raised
         """
-        pass
+        return dict.pop(self,k,d)
 
     def popitem(self): # real signature unknown; restored from __doc__
         """
         D.popitem() -> (k, v), remove and return some (key, value) pair as a
         2-tuple; but raise KeyError if D is empty
         """
-        pass
+        return dict.popitem(self)
 
     def setdefault(self, k, d=None): # real signature unknown; restored from __doc__
         """ D.setdefault(k[,d]) -> D.get(k,d), also set D[k]=d if k not in D """
         pass
 
-    def update(self, E=None, **F): # known special case of dict.update
-        """
-        D.update(E, **F) -> None.  Update D from E and F: for k in E: D[k] = E[k]
-        (if E has keys else: for (k, v) in E: D[k] = v) then: for k in F: D[k] = F[k]
-        """
-        pass
 
     def values(self): # real signature unknown; restored from __doc__
         """ D.values() -> list of D's values """
-        return []
+        return dict.values(self)
+
+    def __cmp__(self, y): # real signature unknown; restored from __doc__
+        """ x.__cmp__(y) <==> cmp(x,y) """
+        return dict.__cmp__(self,y)
+
+    def __contains__(self, k): # real signature unknown; restored from __doc__
+        """ D.__contains__(k) -> True if D has a key k, else False """
+
+
+    def __delitem__(self, y):
+        """ x.__delitem__(y) <==> del x[y]. Delete the Repositories item """
+        return dict.__delitem__(self,y)
+
+    def __eq__(self, y): # real signature unknown; restored from __doc__
+        """ x.__eq__(y) <==> x==y """
+        return dict.__eq__(self,y)
+
+    def __getattribute__(self, name): # real signature unknown; restored from __doc__
+        """ x.__getattribute__('name') <==> x.name """
+        return dict.__getattribute__(self,y)
+
+    def __ge__(self, y): # real signature unknown; restored from __doc__
+        """ x.__ge__(y) <==> x>=y """
+        return dict.__ge__(self,y)
+
+    def __gt__(self, y): # real signature unknown; restored from __doc__
+        """ x.__gt__(y) <==> x>y """
+        return dict.__gt__(self,y)
+
+    def __hash__(self): # real signature unknown; restored from __doc__
+        """ x.__hash__() <==> hash(x) """
+        return dict.__hash__(self,y)
+
+    def __iter__(self): # real signature unknown; restored from __doc__
+        """ x.__iter__() <==> iter(x) """
+        pass
+
+    def __len__(self): # real signature unknown; restored from __doc__
+        """ x.__len__() <==> len(x) """
+        pass
+
+    def __le__(self, y): # real signature unknown; restored from __doc__
+        """ x.__le__(y) <==> x<=y """
+        pass
+
+    def __lt__(self, y): # real signature unknown; restored from __doc__
+        """ x.__lt__(y) <==> x<y """
+        pass
+
+    def __ne__(self, y): # real signature unknown; restored from __doc__
+        """ x.__ne__(y) <==> x!=y """
+        pass
+
+    def __repr__(self): # real signature unknown; restored from __doc__
+        """ x.__repr__() <==> repr(x) """
+        pass
+    '''
 
 
 class Repository(object):
@@ -185,7 +256,7 @@ class Repository(object):
         A dictionary containing the commit objects - all immutable content hashed
         """
         
-        self._hashed_elements = None
+        self.index_hash = IndexHash()
         """
         All content elements are stored here - from incoming messages and
         new commits - everything goes here. Now it can be decoded for a checkout
@@ -225,17 +296,19 @@ class Repository(object):
         A place to stash the work space under a saved name.
         """
         
-        self._workbench=None
-        """
-        The work bench which this repository belongs to...
-        """
-        
         self._upstream={}
         """
         The upstream source of this repository. 
         """
 
+
+        if not isinstance(persistent, bool):
+            raise RepositoryError('Invalid argument type to set the persistent property of a repository')
         self._persistent = persistent
+        """
+        Set the persistence of this repository. Any repository which is declared persistent will not be GC'd until
+        the persistent setting is changed to false
+        """
 
         if head:
             self._dotgit = self._load_element(head)
@@ -309,12 +382,35 @@ class Repository(object):
         
     root_object = property(_get_root_object, _set_root_object)
     
-    
+
+    def clear(self):
+        """
+        Clear the repository in preparation for python garbage collection
+        """
+
+         # Do some clean up!
+        for item in self._workspace.itervalues():
+            #print 'ITEM',item
+            item.Invalidate()
+        self._workspace = None
+        self._workspace = None
+        self.index_hash = None
+        self._commit_index = None
+        self._current_branch = None
+        self.branchnicknames = None
+        self._merge_from = None
+        self._stash = None
+        self._upstream = None
+
+
+
+
+
     def set_repository_reference(self, id_ref, current_state=False):
         """
         Fill in a IDREF Object using the current state of the repository
         """
-        # Don't worry about type checking here....        
+        # Don't worry about type checking here.... will cause an attribute error if incorrect
         id_ref.key = self.repository_key
         id_ref.branch = self._current_branch.branchkey
         
@@ -629,7 +725,7 @@ class Repository(object):
         self._commit_index[cref.MyId] = cref
 
         # update the hashed elements
-        self._hashed_elements.update(structure)
+        self.index_hash.update(structure)
         
         del branch.commitrefs[:]
         bref = branch.commitrefs.add()
@@ -686,7 +782,7 @@ class Repository(object):
             self._commit_index[cref.MyId] = cref
 
             # update the hashed elements
-            self._hashed_elements.update(structure)
+            self.index_hash.update(structure)
             log.info('Commited repository - Comment: cref.comment')
                             
         else:
@@ -937,9 +1033,9 @@ class Repository(object):
             obj.AddParentLink(link)
             return obj
 
-        elif self._hashed_elements.has_key(link.key):
-            
-            element = self._hashed_elements.get(link.key)
+        elif self.index_hash.has_key(link.key):
+            # @TODO - is this safe? Can the k/v be GC'd in the weakref dict inbetween haskey and get?
+            element = self.index_hash.get(link.key)
             
         else:
             
@@ -1102,7 +1198,7 @@ class Repository(object):
             
         structure={}
         value.RecurseCommit(structure)
-        self._hashed_elements.update(structure)
+        self.index_hash.update(structure)
         
         # Get the element by creating a temporary link and loading links...
         link_cls = object_utils.get_gpb_class_from_type_id(LINK_TYPE)

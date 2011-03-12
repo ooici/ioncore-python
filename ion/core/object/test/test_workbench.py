@@ -75,18 +75,19 @@ class WorkBenchTest(unittest.TestCase):
         cref = self.repo.commit(comment='testing commit')
         self.assertEqual(cref, self.repo._current_branch.commitrefs[0].MyId)
         
-        self.assertIn(self.ab.MyId, self.wb._hashed_elements.keys())
-        self.assertIn(self.ab.person[0].MyId, self.wb._hashed_elements.keys())
-        self.assertIn(self.ab.person[1].MyId, self.wb._hashed_elements.keys())
-        self.assertIn(self.ab.owner.MyId, self.wb._hashed_elements.keys())
+        self.assertIn(self.ab.MyId, self.repo.index_hash.keys())
+        self.assertIn(self.ab.person[0].MyId, self.repo.index_hash.keys())
+        self.assertIn(self.ab.person[1].MyId, self.repo.index_hash.keys())
+        self.assertIn(self.ab.owner.MyId, self.repo.index_hash.keys())
         
-        self.assertIn(cref, self.wb._hashed_elements.keys())
+        self.assertIn(cref, self.repo.index_hash.keys())
         
-        cref_se = self.wb._hashed_elements.get(cref)
+        cref_se = self.repo.index_hash.get(cref)
         self.assertEqual(len(cref_se.ChildLinks),1)
         self.assertIn(self.ab.MyId, cref_se.ChildLinks)
         
-    
+    '''
+    Move to CODEC TEST!
     def test_pack_mutable(self):
         serialized = self.wb.pack_structure(self.repo._dotgit)
         
@@ -144,7 +145,7 @@ class WorkBenchTest(unittest.TestCase):
         
         #Check that the commit came through in the current branch
         self.assertEqual(commit, self.repo._current_branch.commitrefs[0])
-        
+        '''
         
     def test_create_repo(self):
             
@@ -200,7 +201,8 @@ class WorkBenchTest(unittest.TestCase):
         
 class WorkBenchMergeTest(unittest.TestCase):
         
-        
+    '''
+    REfactoring push and pull!
     def test_fastforward_merge(self):
         wb1 = workbench.WorkBench('No Process Test')
         
@@ -326,7 +328,7 @@ class WorkBenchMergeTest(unittest.TestCase):
         
         # Show that the state of the heads is the same
         self.assertEqual(repo2._dotgit, repo1._dotgit)
-        
+        '''
         
         
                         

@@ -1233,9 +1233,8 @@ class Wrapper(object):
         for link in  self.ChildLinks:
                         
             # Test to see if it is already serialized!
-            
-            if  repo._hashed_elements.has_key(link.key):
-                child_se = repo._hashed_elements.get(link.key)
+            child_se = repo.index_hash.get(link.key, None)
+            if  child_se is not None:
 
                 # Set the links is leaf property
                 link.isleaf = child_se.isleaf

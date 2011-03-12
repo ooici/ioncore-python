@@ -56,10 +56,10 @@ class WorkBench(object):
         self._repository_nicknames = {}
         
         """
-        A dictionary - shared between repositories for hashed objects
+        A cache - shared between repositories for hashed objects
         """  
         #self._hashed_elements={}
-        self._hashed_elements = weakref.WeakValueDictionary()
+        self._workbench_cache = weakref.WeakValueDictionary()
 
         #@TODO Consider using an index store in the Workbench to keep a cache of associations and keep track of objects
 
@@ -72,9 +72,8 @@ class WorkBench(object):
         is better to just return the repository.
         """
         repo = repository.Repository(repository_key=repository_key, persistent=persistent)
-        repo._workbench = self
             
-        repo._hashed_elements = self._hashed_elements
+        repo.index_hash.cache = self._workbench_cache
             
         # Set the default branch
         repo.branch(nickname='master')
@@ -176,7 +175,18 @@ class WorkBench(object):
         Simple list tool for repository names - not sure this will exist?
         """
         return self._repos.keys()
-        
+
+    def clear_non_persistent(self):
+
+        for key, repo in self._repos.items():
+
+            if repo.persistent is False:
+                repo.clear()
+
+                del self._repos[key]
+
+                
+
     def put_repository(self,repo):
         
         self._repos[repo.repository_key] = repo
@@ -355,7 +365,7 @@ class WorkBench(object):
                 cref= repo.get_linked_object(ref_link)
                     
                 obj_link = cref.GetLink('objectroot')
-                obj = self._hashed_elements.get(obj_link.key,None)
+                obj = repo.index_hash.get(obj_link.key,None)
                 
                 if not obj:
                     objs_to_get.add(obj_link)
@@ -389,7 +399,8 @@ class WorkBench(object):
                 if not link.isleaf:
                     obj = repo.get_linked_object(link)
                     for child_link in obj.ChildLinks:
-                        if not self._hashed_elements.has_key(child_link.key):
+                        if repo.index_hash.get(child_link.key, None) is None:
+                            # Use get not has key - make sure that it is added to the repository index
                             new_links.add(child_link)
             
             objs_to_get = new_links
@@ -398,7 +409,9 @@ class WorkBench(object):
     def fetch_linked_objects(self, address, links):
         """
         Fetch the linked objects from the data store service
-        """     
+
+        @TODO Update to new message pattern!
+        """
             
         cs = object_utils.get_gpb_class_from_type_id(structure_type)()
             
@@ -419,7 +432,7 @@ class WorkBench(object):
             
         objs, headers, msg = yield self._process.rpc_send(address,'fetch_linked_objects', cs)
         
-        # put the dictionary of new objects into the hased elements list
+        # put the dictionary of new objects into the hahsed elements list
         self._hashed_elements.update(objs)
             
         defer.returnValue(objs)
@@ -430,6 +443,9 @@ class WorkBench(object):
     def op_fetch_linked_objects(self, elements, headers, message):
         """
         Send a linked object back to a requestor if you have it!
+
+        @TODO Update to new message pattern!
+        
         """
         log.info('op_fetch_linked_objects: received content type, %s; \n Elements: %s' % (type(elements), str(elements)))
         cs = object_utils.get_gpb_class_from_type_id(structure_type)()

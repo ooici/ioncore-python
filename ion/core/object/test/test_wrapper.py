@@ -1136,7 +1136,7 @@ class RecurseCommitTest(unittest.TestCase):
         self.assertEqual(p1.Invalid, True)
         
         # manually update the hashed elements...
-        wb._hashed_elements.update(strct)
+        repo.index_hash.update(strct)
         
         self.assertIn(repo.root_object.MyId, strct)
         self.assertIn(repo.root_object.person[0].MyId, strct)
