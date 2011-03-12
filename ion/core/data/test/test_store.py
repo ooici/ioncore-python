@@ -116,6 +116,22 @@ class IStoreTest(unittest.TestCase):
         has_key = yield self.ds.has_key("I don't exist")
         self.failUnlessEqual(has_key, False)
 
+
+    @defer.inlineCallbacks
+    def test_has_deleted_key(self):
+        # Write, then read to verify same
+        yield self.ds.put(self.key, self.value)
+        b = yield self.ds.get(self.key)
+        self.failUnlessEqual(self.value, b)
+        yield self.ds.remove(self.key)
+
+        # Try to get the key we just deleted!
+        has_key = yield self.ds.has_key(self.key)
+        self.failUnlessEqual(has_key, False)
+
+
+
+
 class BootstrapStoreTest(IStoreTest):
     
     @itv(CONF)
