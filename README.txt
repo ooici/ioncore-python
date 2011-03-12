@@ -66,7 +66,6 @@ cd ioncore-python
 cd ../ion-object-definitions
 (Refer to ion-object-definitions README.txt for build instructions)
 cd ../ioncore-python
-ln -s ../ion-object-definitions/net .
 python bootstrap.py
 ant clean
 bin/buildout -c dev-integration.cfg

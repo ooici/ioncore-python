@@ -90,15 +90,6 @@ class IndexStoreService(ServiceProcess):
         @retval return a cassandra_rows type. The key attribute will be set and each row will contain one column 
         with the name value.
         """
-        """
-        index_attrs_eq = {}
-        for attr in request.attrs_eq:
-            index_attrs_eq[attr.attribute_name] = attr.attribute_value
-
-        index_attrs_gt = {}
-        for attr in request.attrs_gt:
-            index_attrs_gt[attr.attribute_name] = attr.attribute_value
-        """
         query_predicates = Query()    
         for attr in request.attrs:
             if attr.predicate_type == Query.EQ:
@@ -163,14 +154,14 @@ class IndexStoreService(ServiceProcess):
         """
         @note Gets a row from the Cassandra cluster
         If the row does not exist then leave the value field in the CassandraIndexedRow empty.
-        @request is a CassandraRow message object
+        @param request is a CassandraRow message object
         @retval Returns a CassandraRow message in the response   
         """
 
         value = yield self._indexed_store.get(request.key)
         response = yield self.message_client.create_instance(ROW_TYPE)
         response.key = request.key
-
+        
         if value is not None:
             response.value = value
 
@@ -181,14 +172,26 @@ class IndexStoreService(ServiceProcess):
     def op_remove(self, request, headers, msg): 
         """
         @note removes a row
-        @request is a CassandraRow message object
+        @param request is a CassandraRow message object
         @retval does not return anything
         """     
 
         yield self._indexed_store.remove(request.key)
         yield self.reply_ok(msg)
         
-     
+    @defer.inlineCallbacks
+    def op_has_key(self, request, headers, msg):
+        """
+        @note sees if key exists in the cluster
+        @request is a CassandraRow message object
+        @retval return a string that is "True" or "False" in a CassandraRow message
+        """
+        key_exists = yield self._indexed_store.has_key(request.key)
+        log.info("key_exists: " + str(key_exists))
+        response = yield self.message_client.create_instance(ROW_TYPE)
+        response.value = str(int(key_exists))
+        yield self.reply_ok(msg, response)
+        
     @defer.inlineCallbacks
     def op_get_query_attributes(self, request, headers, msg):
         """
@@ -202,6 +205,7 @@ class IndexStoreService(ServiceProcess):
 
         log.info("replying for get_query_attributes")         
         yield self.reply_ok(msg, response)
+        
 # Spawn of the process using the module name
 factory = ProcessFactory(IndexStoreService)
 
@@ -315,6 +319,16 @@ class IndexStoreServiceClient(ServiceClient):
           
         (content, headers, msg) = yield self.rpc_send('remove', row)
         defer.returnValue(content)
+        
+    @defer.inlineCallbacks
+    def has_key(self, key):
+        log.info("Called Index Store Service client: has_key")    
+        row = yield self.mc.create_instance(ROW_TYPE)
+        row.key = key
+        (result, headers, msg) = yield self.rpc_send('has_key', row)
+        ret = bool(int(result.value))
+        log.info("%s" % (ret,))
+        defer.returnValue(ret)
         
     @defer.inlineCallbacks
     def get_query_attributes(self):
