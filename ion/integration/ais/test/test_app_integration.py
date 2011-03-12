@@ -14,6 +14,8 @@ from twisted.internet import defer
 #from ion.integration.r1integration_service import R1IntegrationServiceClient
 from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
 from ion.core.messaging.message_client import MessageClient
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
+from ion.services.coi.resource_registry_beta.resource_client import ResourceInstance
 from ion.test.iontest import IonTestCase
 
 from ion.core.object import object_utils
@@ -25,6 +27,17 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_TYPE, \
                                                        UPDATE_USER_DISPATCH_QUEUE_TYPE, \
                                                        OOI_ID_TYPE, \
                                                        FIND_DATA_RESOURCES_REQ_MSG_TYPE
+
+
+CDM_DATASET_TYPE = object_utils.create_type_identifier(object_id = 10001, version = 1)
+GROUP_TYPE = object_utils.create_type_identifier(object_id=10020, version=1)
+dimension_type = object_utils.create_type_identifier(object_id=10018, version=1)
+variable_type = object_utils.create_type_identifier(object_id=10024, version=1)
+attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
+stringArray_type = object_utils.create_type_identifier(object_id=10015, version=1)
+boundedArray_type = object_utils.create_type_identifier(object_id=10021, version=1)
+float32Array_type = object_utils.create_type_identifier(object_id=10013, version=1)
+int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
 
 
 class AppIntegrationTest(IonTestCase):
@@ -60,7 +73,17 @@ class AppIntegrationTest(IonTestCase):
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
+        rc = ResourceClient(proc=self.test_sup)
+        
+        log.debug('DHE: calling createDataset')
+        dsID = yield self.createDataset(rc)
 
+        print '================================================================='
+        print 'Added Dataset:'
+        print dsID
+        print '================================================================='
+        #log.debug('DHE: createDataset returned: ' + dsID))
+        
         # Use the message client to create a message object
         log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
@@ -69,10 +92,216 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference.spatial.maxLatitude = 32.97521
         reqMsg.message_parameters_reference.spatial.minLongitude = -117.274609
         reqMsg.message_parameters_reference.spatial.maxLongitude = -117.174609
+        
+        """
+        DHE: temporarily passing the identity of the dummied dataset just
+        created into the client so that it can access because currently there
+        is now way to search.
+        """
+        reqMsg.message_parameters_reference.spatial.identity = dsID
 
         log.debug('DHE: Calling findDateResource!!...')
         outcome1 = yield self.aisc.findDataResources(reqMsg)
         log.debug('DHE: findDataResources returned:\n'+str(outcome1))
+
+    @defer.inlineCallbacks
+    def createDataset(self, rc):
+        log.debug('DHE: creating test dataset!')
+        dataset = yield rc.create_instance(CDM_DATASET_TYPE, ResourceName='AIS Test CDM Dataset Resource', ResourceDescription='A test resource')
+        log.debug('DHE: created test dataset!')
+        
+        # Attach the root group
+        group = dataset.CreateObject(GROUP_TYPE)
+        group.name = 'ais test data'
+        dataset.root_group = group
+
+        dimension_t = dataset.CreateObject(dimension_type)       # dimension object for time
+        dimension_z = dataset.CreateObject(dimension_type)       # dimension object for depth
+        variable_t = dataset.CreateObject(variable_type)         # coordinate variable for time
+        variable_z = dataset.CreateObject(variable_type)         # coordinate variable for depth
+        scalar_lat = dataset.CreateObject(variable_type)         # scalar variable for latitude
+        scalar_lon = dataset.CreateObject(variable_type)         # scalar variable for longitude
+        scalar_sid = dataset.CreateObject(variable_type)         # scalar variable for station ID
+        variable_salinity = dataset.CreateObject(variable_type)  # Data variable for salinity
+        
+    
+        # Assign required field values (name, length, datatype, etc)
+        #-----------------------------------------------------------
+        dimension_t.name = 'time'
+        dimension_z.name = 'z'
+        dimension_t.length = 2
+        dimension_z.length = 3
+        
+        variable_t.name = 'time'
+        variable_z.name = 'depth'
+        scalar_lat.name = 'lat'
+        scalar_lon.name = 'lon'
+        scalar_sid.name = 'stnId'
+        
+        variable_salinity.name = 'salinity'
+        variable_t.data_type = variable_t.DataType.INT
+        variable_z.data_type = variable_z.DataType.FLOAT
+        scalar_lat.data_type = scalar_lat.DataType.FLOAT
+        scalar_lon.data_type = scalar_lon.DataType.FLOAT
+        scalar_sid.data_type = scalar_sid.DataType.INT
+        variable_salinity.data_type = variable_salinity.DataType.FLOAT
+        
+        
+        # Construct the Coordinate Variables: time and depth
+        #------------------------------------------------------
+        # Add dimensionality (shape)
+        variable_t.shape.add()
+        variable_t.shape[0] = dimension_t
+        variable_z.shape.add()
+        variable_z.shape[0] = dimension_z
+        # Add attributes (CDM conventions require certain attributes!)
+        _add_string_attribute(dataset, variable_t, 'units', ['seconds since 1970-01-01 00:00::00'])
+        _add_string_attribute(dataset, variable_t, 'long_name', ['time'])
+        _add_string_attribute(dataset, variable_t, 'standard_name', ['time'])
+        _add_string_attribute(dataset, variable_t, '_CoordinateAxisType', ['Time'])
+        _add_string_attribute(dataset, variable_z, 'units', ['m'])
+        _add_string_attribute(dataset, variable_z, 'positive', ['down'])
+        _add_string_attribute(dataset, variable_z, 'long_name', ['depth below mean sea level'])
+        _add_string_attribute(dataset, variable_z, 'standard_name', ['depth'])
+        _add_string_attribute(dataset, variable_z, '_CoordinateAxisType', ['Height'])
+        _add_string_attribute(dataset, variable_z, '_CoordinateZisPositive', ['down'])
+        # Add data values
+        variable_t.content.add()
+        variable_t.content[0] = dataset.CreateObject(boundedArray_type)
+        variable_t.content[0].bounds.add()
+        variable_t.content[0].bounds[0].origin = 0
+        variable_t.content[0].bounds[0].size = 2
+        variable_t.content[0].ndarray = dataset.CreateObject(int32Array_type) 
+        variable_t.content[0].ndarray.value.extend([1280102520, 1280106120])
+        variable_z.content.add()
+        variable_z.content[0] = dataset.CreateObject(boundedArray_type)
+        variable_z.content[0].bounds.add()
+        variable_z.content[0].bounds[0].origin = 0
+        variable_z.content[0].bounds[0].size = 3
+        variable_z.content[0].ndarray = dataset.CreateObject(float32Array_type) 
+        variable_z.content[0].ndarray.value.extend([0.0, 0.1, 0.2])
+        
+        
+        # Construct the Scalar Variables: lat, lon and station id
+        #------------------------------------------------------------
+        # Add dimensionality (shape)
+        # !! scalars DO NOT specify dimensions !!
+        # Add attributes (CDM conventions require certain attributes!)
+        _add_string_attribute(dataset, scalar_lat, 'units', ['degree_north'])
+        _add_string_attribute(dataset, scalar_lat, 'long_name', ['northward positive degrees latitude'])
+        _add_string_attribute(dataset, scalar_lat, 'standard_name', ['latitude'])
+        _add_string_attribute(dataset, scalar_lon, 'units', ['degree_east'])
+        _add_string_attribute(dataset, scalar_lon, 'long_name', ['eastward positive degrees longitude'])
+        _add_string_attribute(dataset, scalar_lon, 'standard_name', ['longitude'])
+        _add_string_attribute(dataset, scalar_sid, 'long_name', ['integer station identifier'])
+        _add_string_attribute(dataset, scalar_sid, 'standard_name', ['station_id'])
+        # Add data values
+        scalar_lat.content.add()
+        scalar_lat.content[0] = dataset.CreateObject(boundedArray_type)
+        scalar_lat.content[0].bounds.add()
+        scalar_lat.content[0].bounds[0].origin = 0
+        scalar_lat.content[0].bounds[0].size = 1
+        scalar_lat.content[0].ndarray = dataset.CreateObject(float32Array_type) 
+        scalar_lat.content[0].ndarray.value.extend([-45.431])
+        scalar_lon.content.add()
+        scalar_lon.content[0] = dataset.CreateObject(boundedArray_type)
+        scalar_lon.content[0].bounds.add()
+        scalar_lon.content[0].bounds[0].origin = 0
+        scalar_lon.content[0].bounds[0].size = 1
+        scalar_lon.content[0].ndarray = dataset.CreateObject(float32Array_type) 
+        scalar_lon.content[0].ndarray.value.extend([25.909])
+        scalar_sid.content.add()
+        scalar_sid.content[0] = dataset.CreateObject(boundedArray_type)
+        scalar_sid.content[0].bounds.add()
+        scalar_sid.content[0].bounds[0].origin = 0
+        scalar_sid.content[0].bounds[0].size = 1
+        scalar_sid.content[0].ndarray = dataset.CreateObject(int32Array_type) 
+        scalar_sid.content[0].ndarray.value.extend([10059])
+        
+        
+        # Construct the Data Variable: salinity
+        #-----------------------------------------------------------
+        # Add dimensionality (shape)
+        variable_salinity.shape.add()
+        variable_salinity.shape.add()
+        variable_salinity.shape[0] = dimension_t
+        variable_salinity.shape[1] = dimension_z
+        # Add attributes (CDM conventions require certain attributes!)
+        _add_string_attribute(dataset, variable_salinity, 'units', ['psu'])
+        _add_string_attribute(dataset, variable_salinity, 'long_name', ['water salinity at location'])
+        _add_string_attribute(dataset, variable_salinity, 'coordinates', ['time lon lat z'])
+        _add_string_attribute(dataset, variable_salinity, 'standard_name', ['sea_water_salinity'])
+        # Add data values
+        variable_salinity.content.add()
+        variable_salinity.content[0] = dataset.CreateObject(boundedArray_type)
+        variable_salinity.content[0].bounds.add()
+        variable_salinity.content[0].bounds[0].origin = 0
+        variable_salinity.content[0].bounds[0].size = 2 # time dimension
+        variable_salinity.content[0].bounds.add()
+        variable_salinity.content[0].bounds[1].origin = 0
+        variable_salinity.content[0].bounds[1].size = 3 # depth dimension
+        variable_salinity.content[0].ndarray = dataset.CreateObject(float32Array_type) 
+        variable_salinity.content[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
+        
+        
+        # Attach variable and dimension objects to the root group
+        #--------------------------------------------------------
+        group.dimensions.add()
+        group.dimensions.add()
+        group.dimensions[0] = dimension_z
+        group.dimensions[1] = dimension_t
+        
+        group.variables.add()
+        group.variables.add()
+        group.variables.add()
+        group.variables.add()
+        group.variables.add()
+        group.variables.add()
+        group.variables[0] = scalar_lat
+        group.variables[1] = scalar_lon
+        group.variables[2] = scalar_sid
+        group.variables[3] = variable_salinity
+        group.variables[4] = variable_t
+        group.variables[5] = variable_z
+        
+        
+        # Create and Attach global attributes to the root group
+        #--------------------------------------------------------
+        attrib_feature_type =   _create_string_attribute(dataset, 'CF:featureType', ['stationProfile'])
+        attrib_conventions =    _create_string_attribute(dataset, 'Conventions',    ['CF-1.5'])
+        attrib_history =        _create_string_attribute(dataset, 'history',        ['Converted from CSV to OOI CDM compliant NC by net.ooici.agent.abstraction.impl.SosAgent', 'Reconstructed manually as a GPB composite for the resource registry tutorial'])
+        attrib_references =     _create_string_attribute(dataset, 'references',     ['http://sdf.ndbc.noaa.gov/sos/', 'http://www.ndbc.noaa.gov/', 'http://www.noaa.gov/'])
+        attrib_title =          _create_string_attribute(dataset, 'title',          ['NDBC Sensor Observation Service data from "http://sdf.ndbc.noaa.gov/sos/"'])
+        attrib_utc_begin_time = _create_string_attribute(dataset, 'utc_begin_time', ['2008-08-01T00:50:00Z'])
+        attrib_source =         _create_string_attribute(dataset, 'source',         ['NDBC SOS'])
+        attrib_utc_end_time =   _create_string_attribute(dataset, 'utc_end_time',   ['2008-08-01T23:50:00Z'])
+        attrib_institution =    _create_string_attribute(dataset, 'institution',    ["NOAA's National Data Buoy Center (http://www.ndbc.noaa.gov/)"])
+        
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
+        
+        group.attributes[0] = attrib_feature_type
+        group.attributes[1] = attrib_conventions
+        group.attributes[2] = attrib_history
+        group.attributes[3] = attrib_references
+        group.attributes[4] = attrib_title
+        group.attributes[5] = attrib_utc_begin_time
+        group.attributes[6] = attrib_source
+        group.attributes[7] = attrib_utc_end_time
+        group.attributes[8] = attrib_institution
+        
+        # 'put' the resource into the Resource Registry
+        yield rc.put_instance(dataset, 'Testing put...')
+        log.debug('DHE: createDataset supposedly put dataset with identity: ' + str(dataset.ResourceIdentity))
+        
+        defer.returnValue(dataset.ResourceIdentity)
 
     @defer.inlineCallbacks
     def test_registerUser(self):
@@ -153,3 +382,23 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail("re-registration did not return the same OoiId as registration")
         log.info("test_registerUser: re-registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
         
+        
+def _create_string_attribute(dataset, name, values):
+    '''
+    Helper method to create string attributes for variables and dataset groups
+    '''
+    atrib = dataset.CreateObject(attribute_type)
+    atrib.name = name
+    atrib.data_type= atrib.DataType.STRING
+    atrib.array = dataset.CreateObject(stringArray_type)
+    atrib.array.value.extend(values)
+    return atrib
+
+def _add_string_attribute(dataset, variable, name, values):
+    '''
+    Helper method to add string attributes to variable instances
+    '''
+    atrib = _create_string_attribute(dataset, name, values)
+    
+    atrib_ref = variable.attributes.add()
+    atrib_ref.SetLink(atrib)        

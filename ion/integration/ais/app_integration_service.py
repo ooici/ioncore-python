@@ -59,7 +59,7 @@ class AppIntegrationService(ServiceProcess):
         @param reference to instrument protocol object.
         @retval none
         """
-        log.info('op_findDataResources: \n' + str(content))
+        log.debug('op_findDataResources service method.')
         try:
 
             #rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
@@ -75,7 +75,7 @@ class AppIntegrationService(ServiceProcess):
             # Instantiate the worker class
             worker = FindDataResources(self)
 
-            returnValue = yield worker.findDataResources(msg)
+            returnValue = yield worker.findDataResources(content)
             log.debug('worker returned: ' + returnValue)
             yield self.reply_ok(msg, {'value' : 'list of resource ids'})
         except KeyError:
@@ -146,10 +146,9 @@ class AppIntegrationServiceClient(ServiceClient):
         ServiceClient.__init__(self, proc, **kwargs)
         
     @defer.inlineCallbacks
-    #def findDataResources(self, userId, published, spacial, temporal):
     def findDataResources(self, msg):
         yield self._check_init()
-        log.debug("findDataResources: sending to findDataResources:" + str(msg))
+        log.debug("AppIntegrationServiceClient: findDataResources(): sending msg to AppIntegrationService.")
         (content, headers, payload) = yield self.rpc_send('findDataResources', msg)
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)

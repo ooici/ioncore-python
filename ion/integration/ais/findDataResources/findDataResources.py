@@ -11,11 +11,10 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-import ion.util.procutils as pu
-from ion.core.process.process import ProcessFactory, Process, ProcessClient
-from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
-#from ion.integration.ais.findDataResources.resourceStubs import ResourceClient, ResourceInstance
+#from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
+# DHE Temporarily pulling DatasetControllerClient from scaffolding
+from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
@@ -30,11 +29,12 @@ class FindDataResources(object):
         log.info('FindDataResources.__init__()')
         self.rc = ResourceClient()
         self.mc = ais.mc
+        self.dscc = DatasetControllerClient()
 
         
     @defer.inlineCallbacks
     def findDataResources(self, msg):
-        log.debug("findDataResources Worker Class!")
+        log.debug('findDataResources Worker Class got GPB: \n' + str(msg))
 
         """
         Need to build up a GPB Message;
@@ -52,11 +52,15 @@ class FindDataResources(object):
          - build up response message payload
          - return response message to ais service
         """
+
+        log.debug('DHE: !!!!!! Got resource identity: ' + str(msg.message_parameters_reference.spatial.identity))
+        
+        self.dscc.find_dataset_resources(msg)
         
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
-        
+
         defer.returnValue('something useful')
 
         # DHE TEST!!!
