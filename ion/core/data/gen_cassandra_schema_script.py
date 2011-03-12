@@ -4,19 +4,16 @@
 @brief Generates cassandra-cli commands given the storage.cfg file as input.
 """
 
-from optparse import OptionParser
-import sys
-import os.path
-from ion.util.config import Config
+
+from ion.core.data import storage_configuration_utility as scu
 
 
 def create_keyspace(pa_dict):
     """
     Create the keyspace definition
     """
-    if pa_dict["name"] == "": 
-        name = "sysname"
-    del pa_dict["name"]
+    print pa_dict
+    name = pa_dict["name"]
     f = lambda x: "".join((x[0],"=",str(x[1])))
     attrs = " and ".join(map(f, pa_dict.items()))
     command = " ".join(("create keyspace", name , "with", attrs, ";")) 
@@ -43,21 +40,7 @@ def create_column_families(cache_dict):
         print command
  
 if __name__ == "__main__":
-    parser = OptionParser() 
-    parser.add_option("-f", "--file", dest="filename", help="configuration file for the Cassandra Cluster")
-    options, args = parser.parse_args() 
-    error_message = "Problem with configuration file. You probably forget to pass the name in with -f"
-    try: 
-        ok = os.path.isfile(options.filename)
-    except TypeError, ex:
-        print error_message
-        print ex.args
-        sys.exit(-1)
-    if not ok:    
-        print error_message
-        sys.exit(-1)    
-        
-
-    config = Config(options.filename) 
-    create_keyspace(config["persistent archive"])
-    create_column_families(config["cache configuration"]) 
+    scu_dict = scu.STORAGE_CONF_DICTIONARY
+    print scu_dict
+    create_keyspace(scu_dict[scu.PERSISTENT_ARCHIVE])
+    create_column_families(scu_dict[scu.CACHE_CONFIGURATION]) 
