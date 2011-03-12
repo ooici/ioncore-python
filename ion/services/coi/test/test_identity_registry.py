@@ -42,6 +42,13 @@ class UserRegistrationClientTest(IonTestCase):
         yield self._stop_container()
 
 
+"""
+        identity = yield self.rc.create_instance(IDENTITY_TYPE, ResourceName='Identity Registry', ResourceDescription='A place to store identitys')
+        identity.certificate = request['user_cert']
+        identity.rsa_private_key = request['user_private_key']
+
+"""
+
     @defer.inlineCallbacks
     def narf_test_register_user_new(self):
         log.info('in test_register_user_new')
