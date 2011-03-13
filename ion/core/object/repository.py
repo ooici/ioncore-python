@@ -46,7 +46,7 @@ class IndexHash(dict):
         dict.__init__(self, *args, **kwargs)
 
         self._workbench_cache = None
-
+        self.has_cache = False
 
     def _set_cache(self,cache):
         assert isinstance(cache, weakref.WeakValueDictionary), 'Invalid object passed as the cache for a repository.'
@@ -315,6 +315,8 @@ class Repository(object):
             # Set it to modified and give it a new ID as soon as we get it!
             self._dotgit.Modified = True
             self._dotgit.MyId = self.new_id()
+            if repository_key:
+                raise RepositoryError('Can not pass both a serialized head and a repository key')
         else:
            
             mutable_cls = object_utils.get_gpb_class_from_type_id(mutable_type)

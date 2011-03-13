@@ -2,9 +2,9 @@
 """
 @brief Test implementation of the workbench class
 
-@file ion/core/object
+@file ion/core/object/test/test_workbench
 @author David Stuebe
-@test The object managment WorkBench class
+@test The object management WorkBench test class
 """
 
 import ion.util.ionlog
@@ -14,7 +14,9 @@ from uuid import uuid4
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from ion.test.iontest import IonTestCase
+import weakref
+import gc
+
 
 from net.ooici.play import addressbook_pb2
 
@@ -85,67 +87,7 @@ class WorkBenchTest(unittest.TestCase):
         cref_se = self.repo.index_hash.get(cref)
         self.assertEqual(len(cref_se.ChildLinks),1)
         self.assertIn(self.ab.MyId, cref_se.ChildLinks)
-        
-    '''
-    Move to CODEC TEST!
-    def test_pack_mutable(self):
-        serialized = self.wb.pack_structure(self.repo._dotgit)
-        
-        
-    def test_pack_root_eq_unpack(self):
-        
-        serialized = self.wb.pack_structure(self.ab)
-            
-        res = self.wb.unpack_structure(serialized)
-        
-        self.assertEqual(res,self.ab)
-        
-    @defer.inlineCallbacks
-    def test_pack_mutable_eq_unpack(self):
-        """
-        This method packs everything in a repository!
-        """
-            
-        serialized = self.wb.pack_structure(self.repo._dotgit)
-            
-        heads = self.wb.unpack_structure(serialized)
-    
-        self.assertEqual(len(heads), 1)
-        
-        repo = self.wb._load_repo_from_mutable(heads[0])
-        
-        self.assertEqual(repo._dotgit, self.repo._dotgit)
-        
-        ab= yield repo.checkout(branchname='master')
-        
-        self.assertEqual(ab.person[0].name, 'David')
-            
-            
-    def test_unpack_error(self):
-        
-        self.assertRaises(workbench.WorkBenchError,self.wb.unpack_structure,'junk that is not a serialized container!')
-        
-    def test_pack_repository_commits(self):
-        """
-        This method packs only the mutable and the commits
-        """
-        self.repo.commit('testing repository packing')
-        
-        serialized = self.wb.pack_repository(self.repo)
-        
-        heads = self.wb.unpack_structure(serialized)
-    
-        self.assertEqual(len(heads), 1)
-        
-        repo = self.wb._load_repo_from_mutable(heads[0])
-        
-        self.assertEqual(repo._dotgit, self.repo._dotgit)
-        
-        commit = repo.branches[0].commitrefs[0]
-        
-        #Check that the commit came through in the current branch
-        self.assertEqual(commit, self.repo._current_branch.commitrefs[0])
-        '''
+
         
     def test_create_repo(self):
             
@@ -197,6 +139,40 @@ class WorkBenchTest(unittest.TestCase):
         self.assertEqual(association.root_object.subject.key, subject.repository_key)
         self.assertEqual(association.root_object.predicate.key, predicate.repository_key)
         self.assertEqual(association.root_object.object.key, obj.repository_key)
+
+
+    def test_clear_non_persistent(self):
+        """
+        Call clear on a non persistent repository and make sure it is gone from the workbench
+        """
+        key = self.repo.repository_key
+
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+
+        self.wb.clear_non_persistent()
+
+        # make sure it is gone!
+        self.assertEqual(self.wb.get_repository(key), None)
+
+
+    def test_clear_persistent(self):
+        """
+        Call clear on a persistent repository and make sure it stays
+        """
+
+        key = self.repo.repository_key
+
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+        self.repo.persistent = True
+
+        self.wb.clear_non_persistent()
+
+
+        self.assertEqual(self.wb.get_repository(key), self.repo)
+
+
 
         
 class WorkBenchMergeTest(unittest.TestCase):

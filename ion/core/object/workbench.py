@@ -28,8 +28,8 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from net.ooici.core.container import container_pb2
 
-structure_element_type = object_utils.create_type_identifier(object_id=1, version=1)
-structure_type = object_utils.create_type_identifier(object_id=2, version=1)
+STRUCTURE_ELEMENT_TYPE = object_utils.create_type_identifier(object_id=1, version=1)
+STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=2, version=1)
 
 idref_type = object_utils.create_type_identifier(object_id=4, version=1)
 gpbtype_type = object_utils.create_type_identifier(object_id=9, version=1)
@@ -185,7 +185,14 @@ class WorkBench(object):
 
                 del self._repos[key]
 
-                
+
+                # Remove the nickname too - this is dumb - nicknames may be removed anyway. Don't worry about it.
+                for k,v in self._repository_nicknames.items():
+
+                    if v == key:
+                        del self._repository_nicknames[k]
+
+
 
     def put_repository(self,repo):
         
@@ -413,7 +420,7 @@ class WorkBench(object):
         @TODO Update to new message pattern!
         """
             
-        cs = object_utils.get_gpb_class_from_type_id(structure_type)()
+        cs = object_utils.get_gpb_class_from_type_id(STRUCTURE_TYPE)()
             
         for link in links:
             se_raw = cs.items.add()
@@ -448,7 +455,7 @@ class WorkBench(object):
         
         """
         log.info('op_fetch_linked_objects: received content type, %s; \n Elements: %s' % (type(elements), str(elements)))
-        cs = object_utils.get_gpb_class_from_type_id(structure_type)()
+        cs = object_utils.get_gpb_class_from_type_id(STRUCTURE_TYPE)()
         
         # Elements is a dictionary of wrapped structure elements
         for se in elements.values():
@@ -481,7 +488,7 @@ class WorkBench(object):
         
     def pack_repositories(self, repos):
         
-        container_structure = object_utils.get_gpb_class_from_type_id(structure_type)()
+        container_structure = object_utils.get_gpb_class_from_type_id(STRUCTURE_TYPE)()
         for repo in repos:
             log.debug('pack_repositories: Packing repository:\n'+str(repo))
             container_structure.MergeFrom(self._repo_to_structure(repo))
@@ -717,7 +724,7 @@ class WorkBench(object):
         """
         log.debug('_pack_container: Packing container head and object_keys!')
         # An unwrapped GPB Structure message to put stuff into!
-        cs = object_utils.get_gpb_class_from_type_id(structure_type)()
+        cs = object_utils.get_gpb_class_from_type_id(STRUCTURE_TYPE)()
         
         cs.heads.add()
         cs.heads[0].key = head._element.key
@@ -812,7 +819,7 @@ class WorkBench(object):
             
         log.debug('_unpack_container: Unpacking Container')
         # An unwrapped GPB Structure message to put stuff into!
-        cs = object_utils.get_gpb_class_from_type_id(structure_type)()
+        cs = object_utils.get_gpb_class_from_type_id(STRUCTURE_TYPE)()
             
         try:
             cs.ParseFromString(serialized_container)

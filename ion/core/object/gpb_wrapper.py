@@ -9,8 +9,7 @@ TODO:
 Finish test of new Invalid methods using weakrefs - make sure it is deleted!
 """
 
-from ion.util import procutils as pu
-from ion.util.cache import memoize
+
 from ion.core.object.object_utils import get_type_from_obj, sha1bin, sha1hex, \
     sha1_to_hex, ObjectUtilException, create_type_identifier, get_gpb_class_from_type_id
 
@@ -21,10 +20,7 @@ from google.protobuf import message
 from google.protobuf.internal import containers
 from google.protobuf import descriptor
     
-from ion.util.cache import memoize
 
-import hashlib
-import types
 
 STRUCTURE_ELEMENT_TYPE = create_type_identifier(object_id=1, version=1)
 LINK_TYPE = create_type_identifier(object_id=3, version=1)
