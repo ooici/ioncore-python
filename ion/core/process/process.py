@@ -32,6 +32,7 @@ from ion.util.context import StackLocal
 from ion.util.state_object import BasicLifecycleObject, BasicStates
 
 from ion.core.object import workbench
+from ion.core.object.codec import ION_R1_GPB
 
 CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
@@ -428,6 +429,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
                     log.info('>>> [%s] receive(): Set stashed user_id to ANONYMOUS' % (self.proc_name))
                 else:
                     log.info('>>> [%s] receive(): Kept stashed user_id the same: [%s]' % (self.proc_name, request.get('user_id')))
+
             if 'expiry' in payload:
                 request.expiry = payload.get('expiry')
                 log.info('>>> [%s] receive(): Set/updated stashed expiry: [%s]' % (self.proc_name, request.get('expiry')))
@@ -437,6 +439,13 @@ class Process(BasicLifecycleObject,ResponseCodes):
                     log.info('>>> [%s] receive(): Set stashed expiry to 0' % (self.proc_name))
                 else:
                     log.info('>>> [%s] receive(): Kept stashed expiry the same: [%s]' % (self.proc_name, request.get('expiry')))
+
+
+            if 'encoding' in payload and payload['encoding'] == ION_R1_GPB:
+                # The Codec does not attach the repository to the process. That is done here.
+                content = payload.get('content', None)
+                self.workbench.put_repository(content.Repository)
+
             # Check if this response is in reply to an outstanding RPC call
             if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
                 yield self._receive_rpc(payload, msg)

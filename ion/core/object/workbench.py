@@ -31,9 +31,13 @@ from net.ooici.core.container import container_pb2
 STRUCTURE_ELEMENT_TYPE = object_utils.create_type_identifier(object_id=1, version=1)
 STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=2, version=1)
 
-idref_type = object_utils.create_type_identifier(object_id=4, version=1)
-gpbtype_type = object_utils.create_type_identifier(object_id=9, version=1)
+IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
+GPBTYPE_TYPE = object_utils.create_type_identifier(object_id=9, version=1)
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
+
+MUTABLECLASSTYPE = object_utils.create_type_identifier(object_id=6, version=1)
+LINKCLASSTYPE = object_utils.create_type_identifier(object_id=3, version=1)
+COMMITCLASSTYPE = object_utils.create_type_identifier(object_id=8, version=1)
 
 class WorkBenchError(Exception):
     """
@@ -41,11 +45,6 @@ class WorkBenchError(Exception):
     """
 
 class WorkBench(object):
- 
-    MutableClassType = object_utils.create_type_identifier(object_id=6, version=1)
-    LinkClassType = object_utils.create_type_identifier(object_id=3, version=1)
-    CommitClassType = object_utils.create_type_identifier(object_id=8, version=1)
-    
     
     def __init__(self, myprocess):   
     
@@ -72,14 +71,15 @@ class WorkBench(object):
         is better to just return the repository.
         """
         repo = repository.Repository(repository_key=repository_key, persistent=persistent)
-            
-        repo.index_hash.cache = self._workbench_cache
+
+        self.put_repository(repo)
+
             
         # Set the default branch
         repo.branch(nickname='master')
            
         # Handle options in the root class argument
-        if isinstance(root_type, object_utils.get_gpb_class_from_type_id(gpbtype_type)):
+        if isinstance(root_type, object_utils.get_gpb_class_from_type_id(GPBTYPE_TYPE)):
             
             try:
                 rootobj = repo.create_object(root_type)
@@ -147,7 +147,7 @@ class WorkBench(object):
             raise WorkBenchError('Invalid object passed to Create Association. Only Resource Instances or Object Repositories can be passed as subject, predicate or object')
 
 
-        id_ref = association_repo.create_object(idref_type)
+        id_ref = association_repo.create_object(IDREF_TYPE)
         thing.set_repository_reference(id_ref, current_state=True)
 
         association_repo.root_object.SetLinkByName(partname,id_ref)
@@ -197,6 +197,7 @@ class WorkBench(object):
     def put_repository(self,repo):
         
         self._repos[repo.repository_key] = repo
+        repo.index_hash.cache = self._workbench_cache
        
     def reference_repository(self, repo_key, current_state=False):
 
@@ -207,7 +208,7 @@ class WorkBench(object):
                 raise WorkBenchError('Can not reference the current state of a repository which has been modified but not committed')
 
         # Create a new repository to hold this data object
-        repository = self.create_repository(idref_type)
+        repository = self.create_repository(IDREF_TYPE)
         id_ref = repository.root_object
         
         # Use the method of the repository we are tagging to set the reference
@@ -460,9 +461,9 @@ class WorkBench(object):
         # Elements is a dictionary of wrapped structure elements
         for se in elements.values():
             
-            assert se.type == self.LinkClassType, 'This is not a link element!'
+            assert se.type == LINKCLASSTYPE, 'This is not a link element!'
     
-            link = object_utils.get_gpb_class_from_type_id(self.LinkClassType)()
+            link = object_utils.get_gpb_class_from_type_id(LINKCLASSTYPE)()
             link.ParseFromString(se.value)
 
             se = cs.items.add()
@@ -774,9 +775,9 @@ class WorkBench(object):
         self._hashed_elements.update(obj_dict)
         
         
-        if heads[0].type == self.MutableClassType:
+        if heads[0].type == MUTABLECLASSTYPE:
             for head in heads:
-                assert head.type == self.MutableClassType, 'Invalid mixed head type!'
+                assert head.type == MUTABLECLASSTYPE, 'Invalid mixed head type!'
             return heads
         
         # This is a list of root objects - 
@@ -903,7 +904,7 @@ class WorkBench(object):
             raise WorkBenchError('Commit id not found while loding commits: \n %s' % link.key)
             # This commit ref was not actually sent!
             
-        if cref.ObjectType != self.CommitClassType:
+        if cref.ObjectType != COMMITCLASSTYPE:
             raise WorkBenchError('This method should only load commits!')
             
         for parent in cref.parentrefs:

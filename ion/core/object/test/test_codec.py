@@ -23,7 +23,6 @@ from ion.core.object import object_utils
 PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
 ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
 ADDRESSBOOK_TYPE = object_utils.create_type_identifier(object_id=20002, version=1)
-INVALID_TYPE = object_utils.create_type_identifier(object_id=-1, version=1)
 
 
 class WorkBenchTest(unittest.TestCase):

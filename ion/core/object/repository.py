@@ -52,6 +52,8 @@ class IndexHash(dict):
         assert isinstance(cache, weakref.WeakValueDictionary), 'Invalid object passed as the cache for a repository.'
         self._workbench_cache = cache
         self.has_cache = True
+        # add everything currently in self to the cahce!
+        cache.update(self)
 
     def _get_cache(self):
         return self._workbench_cache

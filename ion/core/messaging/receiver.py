@@ -189,13 +189,10 @@ class Receiver(BasicLifecycleObject):
 
         data = msg.payload
         if not self.raw:
-            wb = None
-            if hasattr(self.process, 'workbench'):
-                wb = self.process.workbench
             inv = Invocation(path=Invocation.PATH_IN,
                              message=msg,
                              content=data,
-                             workbench=wb)
+                             )
             inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
             msg = inv1.message
             data = inv1.content
@@ -225,13 +222,10 @@ class Receiver(BasicLifecycleObject):
         #log.debug("Send message op="+operation+" to="+str(recv))
         try:
             if not self.raw:
-                wb = None
-                if hasattr(self.process, 'workbench'):
-                    wb = self.process.workbench
                 inv = Invocation(path=Invocation.PATH_OUT,
                                  message=msg,
                                  content=msg['content'],
-                                 workbench=wb)
+                                 )
                 inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
                 msg = inv1.message
 

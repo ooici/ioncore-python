@@ -18,11 +18,11 @@ from ion.core.object import repository
 from net.ooici.core.container import container_pb2
 from ion.core.object import object_utils
 from ion.core.messaging import message_client
+
 ION_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=11, version=1)
 
 STRUCTURE_ELEMENT_TYPE = object_utils.create_type_identifier(object_id=1, version=1)
 STRUCTURE_TYPE = object_utils.create_type_identifier(object_id=2, version=1)
-
 
 ION_R1_GPB = 'ION R1 GPB'
 
@@ -34,17 +34,18 @@ class CodecError(Exception):
 
 class ObjectCodecInterceptor(EnvelopeInterceptor):
     """
-    Interceptor that assembles the headers in the ION message format.
+    Interceptor that decodes the serialized content in a message.
+    The object returned is the root of a repository structure. It is not yet added to the workbench and completely
+    separate from the process until it finishes the interceptor stack!
     """
     def before(self, invocation):
 
         # Only mess with ION_R1_GPB encoded objects...
         if isinstance(invocation.content, dict) and ION_R1_GPB == invocation.content['encoding']:
             raw_content = invocation.content['content']
-            unpacked_content = self.unpack_structure(raw_content)
+            unpacked_content = unpack_structure(raw_content)
                 
-            if hasattr(unpacked_content, 'ObjectType') and \
-                unpacked_content.ObjectType == ION_MESSAGE_TYPE:
+            if hasattr(unpacked_content, 'ObjectType') and unpacked_content.ObjectType == ION_MESSAGE_TYPE:
                 # If this content should be returned in a Message Instance
                 unpacked_content = message_client.MessageInstance(unpacked_content.Repository)
 
@@ -54,15 +55,16 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
         return invocation
 
     def after(self, invocation):
+        """
+        Encode a Message Instance to a serialized form.
+        Also possible to encode a gpb_wrapper for backward compatibility.
+        """
 
         content = invocation.message['content']
           
-        if isinstance(content, message_client.MessageInstance):
-            invocation.message['content'] = self.pack_structure(content.Message)
-            invocation.message['encoding'] = ION_R1_GPB
-            
-        elif isinstance(content, gpb_wrapper.Wrapper):
-            invocation.message['content'] = self.pack_structure(content)
+        if isinstance(content, message_client.MessageInstance) or isinstance(content, gpb_wrapper.Wrapper):
+
+            invocation.message['content'] = pack_structure(content)
         
             invocation.message['encoding'] = ION_R1_GPB
         
@@ -176,6 +178,8 @@ def unpack_structure(serialized_container):
     # Load the object and set it as the workspace root
     root_obj = repo._load_element(head)
     repo.root_object = root_obj
+
+    repo.branch(nickname='master')
 
     # Create a commit to record the state when the message arrived
     cref = repo.commit(comment='Message for you Sir!')
