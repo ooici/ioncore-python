@@ -291,8 +291,19 @@ class RepositoryTest(unittest.TestCase):
         ph1.number = '123 456 7890'
  
         ab1.owner = p1
+
+        ab1.person.add()
+
+        # Test the copy
+        ab1.person[0] = repo1.copy_object(p1)
+        self.assertNotIdentical(ab1.person[0],ab1.owner)
+
+
+        ab1.person[0].name = 'John'
+
         cref = repo1.commit(comment='testing commit')
- 
+
+
         # Create a second repository and copy p1 from repo1 to repo2
         repo2, ab2 = self.wb.init_repository(addresslink_type)
             
