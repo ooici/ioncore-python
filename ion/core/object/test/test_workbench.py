@@ -9,7 +9,6 @@
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from uuid import uuid4
 
 from twisted.trial import unittest
 from twisted.internet import defer
@@ -24,6 +23,12 @@ from ion.core.object import gpb_wrapper
 from ion.core.object import repository
 from ion.core.object import workbench
 from ion.core.object import object_utils
+
+# For testing the message based ops of the workbench
+from ion.core.process.process import ProcessFactory, Process
+from ion.test.iontest import IonTestCase
+
+
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -173,6 +178,73 @@ class WorkBenchTest(unittest.TestCase):
         self.assertEqual(self.wb.get_repository(key), self.repo)
 
 
+class WorkBenchProcess(Process):
+    """
+    A test process which has the ops of the workbench
+    """
+
+
+    def __init__(self, *args, **kwargs):
+        # Service class initializer. Basic config, but no yields allowed.
+
+        Process.__init__(self, *args, **kwargs)
+
+        self.op_pull = self.workbench.op_pull
+
+
+
+factory = ProcessFactory(WorkBenchProcess)
+
+
+
+class WorkBenchService(IonTestCase):
+
+
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
+
+
+    @defer.inlineCallbacks
+    def test_pull(self):
+
+        processes = [
+            {'name':'workbench_test','module':'ion.core.object.test.test_workbench','class':'WorkBenchProcess'},
+        ]
+
+        sup = yield self._spawn_processes(processes)
+
+        child_proc = yield sup.get_child_id('workbench_test')
+        log.debug('Process ID:' + str(child_proc))
+        workbench_process = self._get_procinstance(child_proc)
+
+
+        repo = workbench_process.workbench.create_repository(addresslink_type)
+
+        ab = repo.root_object
+
+        p = repo.create_object(person_type)
+        p.name='David'
+        p.id = 5
+        p.email = 'd@s.com'
+        ph = p.phone.add()
+        ph.type = p.PhoneType.WORK
+        ph.number = '123 456 7890'
+
+        ab.owner = p
+
+        repo.commit('Made it - few!')
+
+
+        yield self.test_sup.workbench.pull('workbench_test', repo.repository_key)
+
+        myrepo = self.test_sup.workbench.get_repository(repo.repository_key)
+        print myrepo
 
         
 class WorkBenchMergeTest(unittest.TestCase):

@@ -362,7 +362,7 @@ class Repository(object):
         if self._current_branch != None and len(self._current_branch.commitrefs)==0:
             # Unless this is an uninitialized repository it is an error to create
             # a new branch from one which has no commits yet...
-            raise RepositoryError('The current branch is empty - a new one can not be created untill there is a commit!')
+            raise RepositoryError('The current branch is empty - a new one can not be created until there is a commit!')
         
         
         brnch = self.branches.add()    
@@ -406,6 +406,13 @@ class Repository(object):
                 break
         else:
             log.info('Branch %s not found!' % name)
+            return
+
+        # Clean up the branch nickname if any...
+        for k,v in self.branchnicknames.items():
+            if v == name:
+                del self.branchnicknames[k]
+
         
     def get_branch(self, name):
         

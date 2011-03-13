@@ -74,4 +74,4 @@ class WorkBenchTest(unittest.TestCase):
 
     def test_unpack_error(self):
 
-        self.assertRaises(workbench.WorkBenchError,self.wb.unpack_structure,'junk that is not a serialized container!')
+        self.assertRaises(codec.CodecError,codec.unpack_structure,'junk that is not a serialized container!')

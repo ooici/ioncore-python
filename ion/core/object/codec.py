@@ -12,6 +12,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.intercept.interceptor import EnvelopeInterceptor
+from google.protobuf.internal import decoder
 
 from ion.core.object import gpb_wrapper
 from ion.core.object import repository

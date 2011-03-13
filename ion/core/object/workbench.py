@@ -13,7 +13,6 @@ from twisted.internet import defer
 
 from google.protobuf import message
 
-from google.protobuf.internal import decoder
 
 from ion.core.object import object_utils
 from ion.core.object import repository
@@ -21,6 +20,8 @@ from ion.core.object import gpb_wrapper
 
 from ion.core.exception import ReceivedError
 from ion.core.object.gpb_wrapper import OOIObjectError
+
+from ion.core.exception import ReceivedApplicationError, ReceivedContainerError, ApplicationError
 
 import weakref
 import ion.util.ionlog
@@ -35,11 +36,16 @@ IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 GPBTYPE_TYPE = object_utils.create_type_identifier(object_id=9, version=1)
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 
-MUTABLECLASSTYPE = object_utils.create_type_identifier(object_id=6, version=1)
-LINKCLASSTYPE = object_utils.create_type_identifier(object_id=3, version=1)
-COMMITCLASSTYPE = object_utils.create_type_identifier(object_id=8, version=1)
+MUTABLE_TYPE = object_utils.create_type_identifier(object_id=6, version=1)
+LINK_TYPE = object_utils.create_type_identifier(object_id=3, version=1)
+COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
 
-class WorkBenchError(Exception):
+
+
+PULL_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=46, version=1)
+PULL_RESPONSE_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=47, version=1)
+
+class WorkBenchError(ApplicationError):
     """
     An exception class for errors that occur in the Object WorkBench class
     """
@@ -57,7 +63,6 @@ class WorkBench(object):
         """
         A cache - shared between repositories for hashed objects
         """  
-        #self._hashed_elements={}
         self._workbench_cache = weakref.WeakValueDictionary()
 
         #@TODO Consider using an index store in the Workbench to keep a cache of associations and keep track of objects
@@ -91,9 +96,7 @@ class WorkBench(object):
         elif root_type is not None:
             raise WorkBenchError('Invalid root type argument passed in create_repository')
         
-        
-        self.put_repository(repo)
-        
+
         if nickname:
             self.set_repository_nickname(repo.repository_key, nickname)
         
@@ -225,69 +228,168 @@ class WorkBench(object):
         """
          
     @defer.inlineCallbacks
-    def pull(self, origin, repo_name):
+    def pull(self, origin, repo_name, get_head_content=True):
         """
         Pull the current state of the repository
         """
+
+        # Get the scoped name for the process to pull from
         targetname = self._process.get_scoped_name('system', origin)
+
+
+        repo = self.get_repository(repo_name)
         
-        #print 'PULL Targetname: ', targetname
-        #print 'PULL RepoName: ', repo_name
-        
+        commit_list = []
+        if repo is None:
+            #if it does not exist make a new one
+            repo = repository.Repository(repository_key=repo_name)
+            self.put_repository(repo)
+        else: 
+            # If we have a current version - get the list of commits
+            commit_list = self.list_repository_commits(repo)
+
+        # Create pull message
+        pullmsg = yield self._process.message_client.create_instance(PULL_MESSAGE_TYPE)
+        pullmsg.repository_key = repo.repository_key
+        pullmsg.get_head_content = get_head_content
+        pullmsg.commit_keys.extend(commit_list)
+
         try:
-            content, headers, msg = yield self._process.rpc_send(targetname,'pull', repo_name)
-        except ReceivedError, re:
-            
-            log.debug('ReceivedError', str(re))
-            #content = re[1]        
-            raise WorkBenchError('Pull Operation faild with an exception: "%s"' % str(re))
-            
-            
-        # it is a message instance...
-        if hasattr(content, 'MessageResponseCode'):
-            if content.MessageResponseCode == content.ResponseCodes.NOT_FOUND:
-                defer.returnValue(content)
-        else:
-            # assume that we got a list of heads to load as repositories...
-            heads = content
+            result, headers, msg = yield self._process.rpc_send(targetname,'pull', pullmsg)
+        except ReceivedApplicationError, re:
+
+            log.info('ReceivedApplicationError', str(re))
+
+            ex_msg = re.msg_content
+            msg_headers = re.msg_headers
+
+            if ex_msg.MessageResponseCode == ex_msg.ResponseCodes.NOT_FOUND:
+
+                raise WorkBenchError('Pull Operation failed: Repository Key Not Found! "%s"' % str(re))
+            else:
+                raise WorkBenchError('Pull Operation failed for unknown reason "%s"' % str(re))
+
+        if not hasattr(result, 'MessageType') or result.MessageType != PULL_RESPONSE_MESSAGE_TYPE:
+            raise WorkBenchError('Invalid response to pull request. Bad Message Type!')
         
-        
-        for head in heads:
-            repo = self._load_repo_from_mutable(head)
-            
-            # Where to get objects not yet transfered.
-            repo.upstream['service'] = origin
-            repo.upstream['process'] = headers.get('reply-to')
-            
-        # Later there will aways be a message instance, for now fake out the interface 
-        response = yield self._process.message_client.create_instance(MessageContentTypeID=None)
-        response.MessageResponseCode = response.ResponseCodes.OK
-        defer.returnValue(response)
+
+        if result.IsFieldSet('blobs') and not get_head_content:
+            raise WorkBenchError('Unexpected response to pull request: included blobs but I did not ask for them.')
+
+
+        if len(result.commits) == 0:
+            # We are upto date!
+            return
+
+        # Add any new content to the repository:
+
+        for commit in result.commits:
+            repo.index_hash[commit.MyId] = result.Repository.index_hash[commit.MyId]
+
+        for blob in result.blobs:
+            repo.index_hash[blob.MyId] = result.Repository.index_hash[blob.MyId]
+
+
+        # Get the wrapped structure element to meet the old interface to merge...
+        head = result.Repository.index_hash[result.repo_head.MyId]
+        repo = self._load_repo_from_mutable(head)
+
+        # Where to get objects not yet transfered.
+        repo.upstream['service'] = origin
+        repo.upstream['process'] = headers.get('reply-to')
+
+
+
+
         
     @defer.inlineCallbacks
-    def op_pull(self,content, headers, msg):
+    def op_pull(self,request, headers, msg):
         """
         The operation which responds to a pull request
         If a process exposes this operation it must provide persistent storage
         for the objects it provides - the data store! When the op is complete
-        only the repository and its commits have been transfered. The content
+        only the repository and its commits have been transferred. The content
         will be lazy fetched as needed!
         """
         
-        #print 'Received pull request, id:', content
-        
-        repo = self.get_repository(content)
-        
-        if repo:
-            yield self._process.reply(msg,content=repo)
-        else:
-            
-            response = yield self._process.message_client.create_instance(MessageContentTypeID=None)
-            response.MessageResponseCode = response.ResponseCodes.NOT_FOUND
-            
-            yield self._process.reply_ok(msg, content=response)
-        
-        
+
+        if not hasattr(request, 'MessageType') or request.MessageType != PULL_RESPONSE_MESSAGE:
+            raise WorkBenchError('Invalid pull request. Bad Message Type!', request.BAD_REQUEST)
+
+
+        repo = self.get_repository(request.repo_head.repositorykey)
+        if not repo:
+            raise WorkBenchError('Repository Key "%s" not found' % request.repo_head.repositorykey, request.NOT_FOUND)
+
+        my_commits = self.list_repository_commits(repo)
+
+        puller_has = request.commits
+
+        puller_needs = set(my_commits).difference(puller_has)
+
+        response = yield self._process.message_client.create_instance(PULL_RESPONSE_MESSAGE_TYPE)
+
+        for commit_key in puller_needs:
+            link = response.commits.add()
+            link.SetLink(repo._commit_index[commit_key])
+
+
+        if request.get_head_content:
+            for commit in repo.current_heads():
+
+                root_object_link = commit.GetLink('objectroot')
+
+                element = repo.index_hash.get(root_object_link.key, None)
+                if element is None:
+                    raise WorkBenchError('Repository root object not found in op_pull', request.NOT_FOUND)
+
+                elements = [element,]
+
+                while len(elements) > 0:
+                    children = []
+                    for element in elements:
+                        link = response.blobs.add()
+                        self._link_to_structure_element(link, element)
+
+                        for child_key in element.ChildLinks:
+                            child = repo.index_hash.get(child_key,None)
+                            if child is None:
+                                raise WorkBenchError('Repository object not found in op_pull', request.NOT_FOUND)
+                            children.append(child)
+                    elemets = children
+
+
+
+        yield self._process.reply_ok(msg, content=response)
+
+
+
+    def _link_to_structure_element(self, link, element):
+        """
+        Utility method for use in push / pull methods to pass content without decoding it.
+        """
+
+        if link.key:
+            raise WorkBenchError('Unexpected condition - link already set in link_to_structure_element.')
+
+        # Set the id of the linked wrapper
+        link.key = element.key
+
+        # Set the type
+        link.type.GPBMessage.CopyFrom(element.type)
+
+        link.isleaf = element.isleaf
+
+        # Add this link to the list of childlinks in the root of the object
+        link.ChildLinks.add(link)
+
+        # Add this structure element to the objects owned by the message
+        link.Repository.index_hash[element.key] = element
+
+
+    
+
+
     @defer.inlineCallbacks
     def push(self, origin, name_or_names):
         """
@@ -461,9 +563,9 @@ class WorkBench(object):
         # Elements is a dictionary of wrapped structure elements
         for se in elements.values():
             
-            assert se.type == LINKCLASSTYPE, 'This is not a link element!'
+            assert se.type == LINK_TYPE, 'This is not a link element!'
     
-            link = object_utils.get_gpb_class_from_type_id(LINKCLASSTYPE)()
+            link = object_utils.get_gpb_class_from_type_id(LINK_TYPE)()
             link.ParseFromString(se.value)
 
             se = cs.items.add()
@@ -487,155 +589,9 @@ class WorkBench(object):
         yield self._process.reply(message,content=cs)
         log.info('op_fetch_linked_objects: Complete!')
         
-    def pack_repositories(self, repos):
-        
-        container_structure = object_utils.get_gpb_class_from_type_id(STRUCTURE_TYPE)()
-        for repo in repos:
-            log.debug('pack_repositories: Packing repository:\n'+str(repo))
-            container_structure.MergeFrom(self._repo_to_structure(repo))
-
-        #print 'CONTAINER',container_structure
-        log.debug('pack_repositories: Packing Complete!')         
-        serialized = container_structure.SerializeToString()
-        
-        return serialized
-        
-        
-        
-    def pack_repository(self,repo):
-        
-        log.debug('pack_repository: Packing repository:\n'+str(repo))
-        container_structure = self._repo_to_structure(repo)
-        
-        log.debug('pack_repository: Packing Complete!')         
-        serialized = container_structure.SerializeToString()
-        return serialized
-        
-        
-    def _repo_to_structure(self,repo):
-        """
-        pack just the mutable head and the commits!
-        By default send all commits in the history. Too damn complex on the other
-        side to deal with merge otherwise.
-        """
-        
-        mutable = repo._dotgit
-        
-        root_obj = self.serialize_mutable(mutable)
-        #print 'ROOT Obj', root_obj
-            
-        cref_set = set()
-        for branch in mutable.branches:
-            
-            for cref in branch.commitrefs:
-                cref_set.add(cref)
-            
-        obj_set = set()
-            
-        while len(cref_set)>0:                
-            new_set = set()
-                        
-            for cref in cref_set:
-                obj_set.add(cref.MyId)
-                    
-                for prefs in cref.parentrefs:
-                    new_set.add(prefs.commitref)
-            
-            # Now recurse on the ancestors    
-            cref_set = new_set
-            
-            
-        # Now make a list of just the keys that we want to send!
-        obj_list = []
-        for key in obj_set:
-            obj_list.append(key)
-                
-        
-        container_structure = self._pack_container(root_obj, obj_list)
-        
-        return container_structure
-        
-    def pack_structure(self, wrapper, include_leaf=True):
-        """
-        Pack all children of the wrapper stucture into a message. Stop at the leaf
-        links if include_leaf=False.
-        Return the content as a container object.
-        """
-        log.debug('pack_structure: Packing wrapper:\n'+str(wrapper))
-        
-        if not isinstance(wrapper, gpb_wrapper.Wrapper):
-            raise WorkBenchError('Pack Structure received a wrapper argument which is not a wrapper?')
-        
-        repo = wrapper.Repository
-        
-        
-        if not repo.status == repo.UPTODATE:
-            comment='Commiting to send message with wrapper object'
-            repo.commit(comment=comment)
-            
-        obj_set=set()
-        root_obj = None
-        obj_list = []
-        
-        # If we are sending the mutable head object
-        if wrapper is repo._dotgit:
-            root_obj = self.serialize_mutable(wrapper)
-            
-            items = set()
-            for branch in wrapper.branches:
-                
-                for cref in branch.commitrefs:
-                    obj = self._hashed_elements.get(cref.MyId,None)
-                    if not obj:
-                        # Debugging exception - remove later
-                        raise WorkBenchError('Hashed CREF not found! Please call David')
-                    items.add(obj)
-            
-        else:
-            # Else we are sending just the commited root object
-            root_obj = self._hashed_elements.get(wrapper.MyId,None)
-            items = set([root_obj])
 
         
-        # Recurse through the DAG and add the keys to a set - obj_set.
-        while len(items) > 0:
-            child_items = set()
-            for item in items:
-                
-                if len(item.ChildLinks) >0:
-                    
-                    obj_set.add(item.key)    
-                    
-                    for key in item.ChildLinks:
-                    
-                        obj = self._hashed_elements.get(key,None)
-                        if not obj:
-                            # Debugging exception - remove later
-                            raise WorkBenchError('Hashed CREF not found! Please call David')
-                    
-                        child_items.add(obj)
-                        
-                elif include_leaf:
-                    obj_set.add(item.key)
-                    
-            items = child_items
-
-        if root_obj.key in obj_set:
-            #Make a list in the right order        
-            obj_set.discard(root_obj.key)
-
-        for key in obj_set:
-            obj_list.append(key)
         
-        #print 'OBJLIST',obj_list
-        
-        container_structure = self._pack_container(root_obj, obj_list)
-        log.debug('pack_structure: Packing Complete!')
-        
-        serialized = container_structure.SerializeToString()
-        return serialized
-
-
     def list_repository_commits(self, repo):
 
 
@@ -649,209 +605,30 @@ class WorkBench(object):
             for cref in branch.commitrefs:
                 cref_set.add(cref)
 
-        obj_set = set()
+        key_set = set()
 
         while len(cref_set)>0:
             new_set = set()
 
             for cref in cref_set:
-                obj_set.add(cref.MyId)
 
-                for prefs in cref.parentrefs:
-                    new_set.add(prefs.commitref)
+                if cref.MyId not in key_set:
+                    key_set.add(cref.MyId)
 
-                    ### HOW CAN WE CHECK IF IT IS ALREADY THERE?
+                    for prefs in cref.parentrefs:
+                        new_set.add(prefs.commitref)
+
 
             # Now recurse on the ancestors
             cref_set = new_set
 
 
-        # Now make a list of just the keys that we want to send!
-        obj_list = []
-        for key in obj_set:
-            obj_list.append(key)
-
-        return items
+        key_list = []
+        key_list.extend(key_set)
+        return key_list
 
 
 
-    def serialize_mutable(self, mutable):
-        """
-        
-        """
-        if mutable._invalid:
-            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-            
-        
-        # Create the Structure Element in which the binary blob will be stored
-        se = gpb_wrapper.StructureElement()        
-        repo = mutable.Repository
-        for link in  mutable.ChildLinks:
-                                    
-            if  repo._hashed_elements.has_key(link.key):
-                child_se = repo._hashed_elements.get(link.key)
-
-                # Set the links is leaf property
-                link.isleaf = child_se.isleaf
-                
-            
-            # Save the link info as a convience for sending!
-            se.ChildLinks.add(link.key)
-                    
-        se.value = mutable.SerializeToString()
-        #se.key = sha1hex(se.value)
-
-        # Structure element wrapper provides for setting type!
-        se.type = mutable.ObjectType
-        
-        # Calculate the sha1 from the serialized value and type!
-        # Sha1 is a property - not a method...
-        se.key = se.sha1
-    
-        # Mutable is never a leaf!    
-        se.isleaf = False
-            
-        # Done setting up the Sturcture Element
-        return se
-            
-        
-        
-    
-    def _pack_container(self, head, object_keys):
-        """
-        Helper for the sender to pack message content into a container in order
-        Awkward interface. Head is wrapper object, object_keys is a list of keys.
-        Should be all objects or all keys...
-        """
-        log.debug('_pack_container: Packing container head and object_keys!')
-        # An unwrapped GPB Structure message to put stuff into!
-        cs = object_utils.get_gpb_class_from_type_id(STRUCTURE_TYPE)()
-        
-        cs.heads.add()
-        cs.heads[0].key = head._element.key
-        cs.heads[0].type.CopyFrom(head._element.type)
-        cs.heads[0].isleaf = head._element.isleaf
-        cs.heads[0].value = head._element.value
-                        
-        for key in object_keys:
-            hashed_obj = self._hashed_elements.get(key)         
-            gpb_obj = hashed_obj._element
-                        
-            se = cs.items.add()
-        
-            # Can not set the pointer directly... must set the components
-            se.key = gpb_obj.key
-            se.isleaf = gpb_obj.isleaf
-            se.type.CopyFrom(gpb_obj.type) # Copy is okay - this is small
-            se.value = gpb_obj.value # Let python's object manager keep track of the pointer to the big things!
-        
-        
-        log.debug('_pack_container: Packed container!')
-        return cs
-        
-    def unpack_structure(self, serialized_container):
-        """
-        Take a container object and load a repository with its contents
-        May want to provide more arguments to give this new repository a special
-        name based on the 
-        """
-        log.debug('unpack_structure: Unpacking Structure!')
-        heads, obj_dict = self._unpack_container(serialized_container)
-        
-        assert len(obj_dict) > 0, 'There should be objects in the container!'
-
-        
-        if not heads:
-            # Only fetch links should hit this!
-            # There is not data structure or repository in this container,
-            # just a bunch of blobs to work with in the op.
-            log.debug('unpack_structure: returning dictionary of objects:'+str(obj_dict))
-            return obj_dict
-        
-        
-
-        # If it is not a fetch         
-        # put the content into the hashed elements list
-        self._hashed_elements.update(obj_dict)
-        
-        
-        if heads[0].type == MUTABLECLASSTYPE:
-            for head in heads:
-                assert head.type == MUTABLECLASSTYPE, 'Invalid mixed head type!'
-            return heads
-        
-        # This is a list of root objects - 
-        results=[]
-        for head in heads:
-            # This is what generally happens when a message is recieved!
-                            
-            
-            # Create a new repository for the structure in the container
-            repo = self.create_repository()
-                
-            
-            # Load the object and set it as the workspace root
-            root_obj = repo._load_element(head)
-            repo.root_object = root_obj
-                
-            # Create a commit to record the state when the message arrived
-            cref = repo.commit(comment='Message for you Sir!')
-
-            # Now load the rest of the linked objects - down to the leaf nodes.
-            repo._load_links(root_obj)
-            
-            log.debug('unpack_structure: returning root_obj:'+str(root_obj))
-            #repos.append(repo)
-            results.append(root_obj)
-        
-        if len(results) == 1:
-            return results[0]
-        else:
-            return results
-        
-        
-        
-    def _unpack_container(self,serialized_container):
-        """
-        Helper for the receiver for unpacking message content
-        Returns the content as a list of ids in order now in the workbench
-        hashed elements dictionary
-        """
-            
-        log.debug('_unpack_container: Unpacking Container')
-        # An unwrapped GPB Structure message to put stuff into!
-        cs = object_utils.get_gpb_class_from_type_id(STRUCTURE_TYPE)()
-            
-        try:
-            cs.ParseFromString(serialized_container)
-        except decoder._DecodeError, de:
-            log.debug('Received invalid content: "%s"' % str(serialized_container))
-            raise WorkBenchError('Could not decode message content as a GPB container structure!')
-                
-        # Return arguments
-        heads = []
-        obj_dict={}
-        
-        if cs.heads:
-            # The head field is optional - if not included this is a fetch links op            
-            
-            for raw_head in cs.heads:
-                
-                wrapped_head = gpb_wrapper.StructureElement(raw_head)
-                #self._hashed_elements[head.key]=head
-                obj_dict[wrapped_head.key] = wrapped_head
-                heads.append(wrapped_head)
-            
-        for se in cs.items:
-            wse = gpb_wrapper.StructureElement(se)
-            
-            obj_dict[wse.key] = wse
-        
-        log.debug('_unpack_container: returning head:\n'+str(heads))
-        log.debug('_unpack_container: returning dictionary of objects:\n'+str(obj_dict))
-        
-        return heads, obj_dict
-        
     def _load_repo_from_mutable(self,head):
         """
         Load a repository from a mutable - helper for push and pull - methods
@@ -859,7 +636,7 @@ class WorkBench(object):
         head is a raw (unwrapped) gpb message
         """
         log.debug('_load_repo_from_mutable: Loading a repository!')
-        new_repo = repository.Repository(head)
+        new_repo = repository.Repository(head=head)
                 
         new_repo._workbench = self
             
@@ -904,7 +681,7 @@ class WorkBench(object):
             raise WorkBenchError('Commit id not found while loding commits: \n %s' % link.key)
             # This commit ref was not actually sent!
             
-        if cref.ObjectType != COMMITCLASSTYPE:
+        if cref.ObjectType != COMMIT_TYPE:
             raise WorkBenchError('This method should only load commits!')
             
         for parent in cref.parentrefs:
