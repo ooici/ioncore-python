@@ -294,10 +294,11 @@ class RepositoryTest(unittest.TestCase):
 
         ab1.person.add()
 
-        # Test the copy
+        # Test copy to self = can't be done by assignment
         ab1.person[0] = repo1.copy_object(p1)
         self.assertNotIdentical(ab1.person[0],ab1.owner)
-
+        self.assertNotEqual(ab1.person[0].MyId, ab1.owner.MyId)
+        self.assertEqual(ab1.person[0], ab1.owner)
 
         ab1.person[0].name = 'John'
 
@@ -309,11 +310,9 @@ class RepositoryTest(unittest.TestCase):
             
         ab2.person.add()
         
-        # move to a repeated link
+        # move to a repeated link by assignment
         ab2.person[0] = ab1.owner
-        
-        
-            
+
         # Test the person
         self.assertEqual(ab2.person[0].name, 'David')
             
@@ -324,7 +323,7 @@ class RepositoryTest(unittest.TestCase):
         
         self.assertIdentical(ab2.person[0].Repository, ab2.Repository)
         
-        # move to a link
+        # move to a link by assignment - uses copy_object!
         ab2.owner = ab1.owner
         
         # Test the owner

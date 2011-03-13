@@ -1516,7 +1516,14 @@ class Wrapper(object):
         """
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self.GPBMessage.SerializeToString()
+
+        try:
+            serialized = self.GPBMessage.SerializeToString()
+        except message.EncodeError, ex:
+            log.info(ex)
+            raise OOIObjectError('Could not serialize object - likely due to unset required field in a core object: %s' % str(self))
+
+        return serialized
     
     def ParseFromString(self, serialized):
         """Clear the message and read from serialized."""
