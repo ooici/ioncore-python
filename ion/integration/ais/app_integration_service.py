@@ -62,16 +62,6 @@ class AppIntegrationService(ServiceProcess):
         log.debug('op_findDataResources service method.')
         try:
 
-            #rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
-            #rspMsg.message_parameters_reference.add()
-            #rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_MSG_TYPE)
-
-            """
-            Now in the case of a good response, this code will attach the
-            data to the response.  Actually, it would probably be good
-            to have the worker class do that.
-            """
-            
             # Instantiate the worker class
             worker = FindDataResources(self)
 
