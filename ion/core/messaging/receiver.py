@@ -22,6 +22,7 @@ from ion.core.intercept.interceptor import Invocation
 from ion.core.messaging import messaging
 from ion.util.state_object import BasicLifecycleObject
 import ion.util.procutils as pu
+from ion.core.object.codec import ION_R1_GPB
 
 class IReceiver(Interface):
     """
@@ -196,6 +197,11 @@ class Receiver(BasicLifecycleObject):
             inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
             msg = inv1.message
             data = inv1.content
+
+        if 'encoding' in data and data['encoding'] == ION_R1_GPB:
+                # The Codec does not attach the repository to the process. That is done here.
+                content = data.get('content')
+                self.process.workbench.put_repository(content.Repository)
 
         # Make the calls into the application code (e.g. process receive)
         try:

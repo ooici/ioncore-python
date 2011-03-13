@@ -52,7 +52,7 @@ class IndexHash(dict):
         assert isinstance(cache, weakref.WeakValueDictionary), 'Invalid object passed as the cache for a repository.'
         self._workbench_cache = cache
         self.has_cache = True
-        # add everything currently in self to the cahce!
+        # add everything currently in self to the cache!
         cache.update(self)
 
     def _get_cache(self):
@@ -118,110 +118,7 @@ class IndexHash(dict):
         if self.has_cache:
             self.cache.update(*args, **kwargs)
 
-    '''
-    def clear(self):
-        """ D.clear() -> None.  Remove all items from the Repository Index Hash. """
-        dict.clear(self)
 
-    def items(self):
-        """ Get the items of the repository """
-        return dict.items(self)
-
-    def iteritems(self):
-        """ iter the items of the repository """
-        return dict.iteritems(self)
-
-    def iterkeys(self):
-        """ iter the keys of the repository """
-        return dict.iteritems(self)
-
-    def itervalues(self): # real signature unknown; restored from __doc__
-        """ D.itervalues() -> an iterator over the values of D """
-        return dict.itervalues(self)
-
-    def keys(self): # real signature unknown; restored from __doc__
-        """ D.keys() -> list of D's keys """
-        return dict.keys(self)
-
-    def pop(self, k, d=None): # real signature unknown; restored from __doc__
-        """
-        D.pop(k[,d]) -> v, remove specified key and return the corresponding value
-        If key is not found, d is returned if given, otherwise KeyError is raised
-        """
-        return dict.pop(self,k,d)
-
-    def popitem(self): # real signature unknown; restored from __doc__
-        """
-        D.popitem() -> (k, v), remove and return some (key, value) pair as a
-        2-tuple; but raise KeyError if D is empty
-        """
-        return dict.popitem(self)
-
-    def setdefault(self, k, d=None): # real signature unknown; restored from __doc__
-        """ D.setdefault(k[,d]) -> D.get(k,d), also set D[k]=d if k not in D """
-        pass
-
-
-    def values(self): # real signature unknown; restored from __doc__
-        """ D.values() -> list of D's values """
-        return dict.values(self)
-
-    def __cmp__(self, y): # real signature unknown; restored from __doc__
-        """ x.__cmp__(y) <==> cmp(x,y) """
-        return dict.__cmp__(self,y)
-
-    def __contains__(self, k): # real signature unknown; restored from __doc__
-        """ D.__contains__(k) -> True if D has a key k, else False """
-
-
-    def __delitem__(self, y):
-        """ x.__delitem__(y) <==> del x[y]. Delete the Repositories item """
-        return dict.__delitem__(self,y)
-
-    def __eq__(self, y): # real signature unknown; restored from __doc__
-        """ x.__eq__(y) <==> x==y """
-        return dict.__eq__(self,y)
-
-    def __getattribute__(self, name): # real signature unknown; restored from __doc__
-        """ x.__getattribute__('name') <==> x.name """
-        return dict.__getattribute__(self,y)
-
-    def __ge__(self, y): # real signature unknown; restored from __doc__
-        """ x.__ge__(y) <==> x>=y """
-        return dict.__ge__(self,y)
-
-    def __gt__(self, y): # real signature unknown; restored from __doc__
-        """ x.__gt__(y) <==> x>y """
-        return dict.__gt__(self,y)
-
-    def __hash__(self): # real signature unknown; restored from __doc__
-        """ x.__hash__() <==> hash(x) """
-        return dict.__hash__(self,y)
-
-    def __iter__(self): # real signature unknown; restored from __doc__
-        """ x.__iter__() <==> iter(x) """
-        pass
-
-    def __len__(self): # real signature unknown; restored from __doc__
-        """ x.__len__() <==> len(x) """
-        pass
-
-    def __le__(self, y): # real signature unknown; restored from __doc__
-        """ x.__le__(y) <==> x<=y """
-        pass
-
-    def __lt__(self, y): # real signature unknown; restored from __doc__
-        """ x.__lt__(y) <==> x<y """
-        pass
-
-    def __ne__(self, y): # real signature unknown; restored from __doc__
-        """ x.__ne__(y) <==> x!=y """
-        pass
-
-    def __repr__(self): # real signature unknown; restored from __doc__
-        """ x.__repr__() <==> repr(x) """
-        pass
-    '''
 
 
 class Repository(object):
@@ -376,7 +273,7 @@ class Repository(object):
             raise RepositoryError('Can not set the root object of the repository to a value which is not an instance of Wrapper')
     
         if not value.Repository is self:
-            value = self._copy_from_other(value)
+            value = self.copy_object(value)
         
         if not value.MyId in self._workspace:
             self._workspace[value.MyId] = value
@@ -391,7 +288,6 @@ class Repository(object):
         """
         Clear the repository in preparation for python garbage collection
         """
-
          # Do some clean up!
         for item in self._workspace.itervalues():
             #print 'ITEM',item
@@ -405,8 +301,6 @@ class Repository(object):
         self._merge_from = None
         self._stash = None
         self._upstream = None
-
-
 
 
 
@@ -1178,12 +1072,12 @@ class Repository(object):
         return obj
         
         
-    def _copy_from_other(self, value):
+    def copy_object(self, value, deep_copy=True):
         """
-        Copy an object from another repository. This method will serialize any
-        content which is not already in the hashed objects. Then read it back in
-        as new objects in this repository. The objects must not already exist in
-        the current repository or it will return an error
+        Copy an object. This method will serialize the current state of the value.
+        Then read it back in as new objects in the repository. The copies will all be
+        created in a modified state. Copy can move from one repository to another.
+        The deep_copy parameter determines whether all child objects are also copied.
         """
         if not isinstance(value, gpb_wrapper.Wrapper):
             raise RepositoryError('Can not copy an object which is not an instance of Wrapper')    
@@ -1191,33 +1085,31 @@ class Repository(object):
         if not value.IsRoot:
             # @TODO provide for transfer by serialization and re instantiation
             raise RepositoryError('You can not copy only part of a gpb composite, only the root!')
-        
-        if value.Repository is self:
-            raise RepositoryError('Can not copy an object from the same repository')
             
         if value.ObjectType.object_id <= 1000 and value.ObjectType.object_id != 4:
             # This is a core object other than an IDRef to another repository.
             # Generally this should not happen...
-            log.warn('Copying core objects is not an error but unexpected results may occur.')
-            
-        structure={}
-        value.RecurseCommit(structure)
-        self.index_hash.update(structure)
+            log.warn('Copying core objects is not an error but unexpected results may occur. Use with caution')
+
+        if value.Modified:
+            structure={}
+            value.RecurseCommit(structure)
+            self.index_hash.update(structure)
+
+        element = self.index_hash.get(value.MyId)
+        new_obj = self._load_element(element)
+
+        new_obj._set_parents_modified()
+
+        if deep_copy:
+            # Deep copy from the original!
+            for link in new_obj.ChildLinks:
+                # Use the copies link to get the child - possibly from a different repo!
+                child = value.Repository.get_linked_object(link)
+                new_child = self.copy_object(child, True)
+                link.SetLink(new_child)
         
-        # Get the element by creating a temporary link and loading links...
-        link_cls = object_utils.get_gpb_class_from_type_id(LINK_TYPE)
-        link = self._create_wrapped_object(link_cls, addtoworkspace=False)
-        link.key = value.MyId
-        object_utils.set_type_from_obj(value, link.type)
-        
-        self._load_links(link)
-        
-        obj = self.get_linked_object(link)
-        
-        # Get rid of the parent ref to the temporary link
-        obj.ParentLinks.discard(link)
-        
-        return obj
+        return new_obj
     
     
         
@@ -1237,7 +1129,7 @@ class Repository(object):
         # if this value is from another repository... you need to load it from the hashed objects into this repository
         if not value.Repository is self:
             
-            value = self._copy_from_other(value)
+            value = self.copy_object(value)
         
         
         if link.key == value.MyId:

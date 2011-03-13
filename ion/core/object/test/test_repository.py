@@ -306,7 +306,7 @@ class RepositoryTest(unittest.TestCase):
         # Test the person
         self.assertEqual(ab2.person[0].name, 'David')
             
-        self.assertEqual(ab2.person[0].MyId, ab1.owner.MyId)
+        self.assertNotEqual(ab2.person[0].MyId, ab1.owner.MyId)
         self.assertEqual(ab2.person[0], ab1.owner)
         self.assertNotIdentical(ab2.person[0], ab1.owner)
         self.assertNotIdentical(ab2.person[0].Repository, ab1.owner.Repository)
@@ -318,7 +318,7 @@ class RepositoryTest(unittest.TestCase):
         
         # Test the owner
         self.assertEqual(ab2.owner.name, 'David')
-        self.assertEqual(ab2.owner.MyId, ab1.owner.MyId)
+        self.assertNotEqual(ab2.owner.MyId, ab1.owner.MyId)
         self.assertEqual(ab2.owner, ab1.owner)
         self.assertNotIdentical(ab2.owner, ab1.owner)
         self.assertNotIdentical(ab2.owner.Repository, ab1.owner.Repository)

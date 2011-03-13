@@ -62,12 +62,19 @@ class ObjectCodecInterceptor(EnvelopeInterceptor):
 
         content = invocation.message['content']
           
-        if isinstance(content, message_client.MessageInstance) or isinstance(content, gpb_wrapper.Wrapper):
+        if isinstance(content, (message_client.MessageInstance, gpb_wrapper.Wrapper)):
+
+            # Turn of access to shared process object Cache
+            content.Repository.index_hash.has_cache = False
 
             invocation.message['content'] = pack_structure(content)
         
             invocation.message['encoding'] = ION_R1_GPB
-        
+
+            # Turn it back on.
+            content.Repository.index_hash.has_cache = True
+
+
         return invocation
 
 
