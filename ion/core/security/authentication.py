@@ -145,6 +145,7 @@ class Authentication(object):
         Return a Dict of all known attributes for the certificate
         """
         log.info("decode_certificate:\n"+str(certificate))
+        print certificate
         attributes = {}
         x509 = X509.load_cert_string(certificate, format=1)
         
