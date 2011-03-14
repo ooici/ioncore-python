@@ -92,20 +92,18 @@ class RegisterUser(object):
    @defer.inlineCallbacks
    def registerUser (self, msg):
       log.debug('RegisterUser.registerUser()\n'+str(msg))
-      """
       result = yield self.irc.authenticate_user(msg.message_parameters_reference.certificate,
                                                 msg.message_parameters_reference.rsa_private_key)
       if type(result) == str:   
          log.info('RegisterUser.registerUser(): user exists in IR with ooi_id = '+str(result))
       else:
-      """
-      Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
-      Request.configuration = Request.CreateObject(IDENTITY_TYPE)
-      Request.configuration.certificate = msg.message_parameters_reference.certificate
-      Request.configuration.rsa_private_key = msg.message_parameters_reference.rsa_private_key
-      log.info("RegisterUser.registerUser(): calling irc with\n"+str(Request.configuration))
-      result = yield self.irc.register_user(Request)
-      log.info('RegisterUser.registerUser(): added new user in IR with ooi_id = '+str(result))
+         Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
+         Request.configuration = Request.CreateObject(IDENTITY_TYPE)
+         Request.configuration.certificate = msg.message_parameters_reference.certificate
+         Request.configuration.rsa_private_key = msg.message_parameters_reference.rsa_private_key
+         log.info("RegisterUser.registerUser(): calling irc with\n"+str(Request.configuration))
+         result = yield self.irc.register_user(Request)
+         log.info('RegisterUser.registerUser(): added new user in IR with ooi_id = '+str(result))
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS RegisterUser response')
       Response.message_parameters_reference.add()
       Response.message_parameters_reference[0] = Response.CreateObject(OOI_ID_TYPE)
