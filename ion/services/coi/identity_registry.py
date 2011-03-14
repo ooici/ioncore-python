@@ -97,15 +97,6 @@ class IdentityRegistryClient(ServiceClient):
         """
         yield self._check_init()
         
-        """
-        params = [Identity, certificate]
-        params = {
-            'identity': Identity,
-            'certificate': certificate
-        }
-        """
-
-        #(content, headers, msg) = yield self.rpc_send('register_user_credentials', params)
         (content, headers, msg) = yield self.rpc_send('register_user_credentials', Identity)
         defer.returnValue(str(content))
 
@@ -387,12 +378,6 @@ class IdentityRegistryService(ServiceProcess):
         log.debug('in op_register_user_credentials:\n'+str(request))
         log.debug('in op_register_user_credentials: request.configuration\n'+str(request.configuration))
 
-        #log.info("calling decode_certificate() with\n"+str(request['certificate']))
-        #cert_info = authentication.decode_certificate(request[certificate])
-
-        #log.info("calling decode_certificate() with\n"+str(request['identity'].configuration.certificate))
-        #cert_info = authentication.decode_certificate(request['identirty'].configuration.certificate)
-
         identity = yield self.rc.create_instance(IDENTITY_TYPE, ResourceName='Identity Registry', ResourceDescription='A place to store identitys')
         identity.certificate = request.configuration.certificate
         identity.rsa_private_key = request.configuration.rsa_private_key
@@ -401,7 +386,7 @@ class IdentityRegistryService(ServiceProcess):
         authentication = Authentication()
 
         log.info("calling decode_certificate() with\n"+str(request.configuration.certificate))
-        cert_info = authentication.decode_certificate(request.configuration.certificate)
+        cert_info = authentication.decode_certificate(str(request.configuration.certificate))
 
         identity.subject = cert_info['subject']
        
