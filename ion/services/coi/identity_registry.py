@@ -378,7 +378,9 @@ class IdentityRegistryService(ServiceProcess):
 
         identity = msg.configuration
         authentication = Authentication()
+
         cert_info = authentication.decode_certificate(identity.certificate)
+
         identity.subject = cert_info['subject']
        
         yield self.rc.put_instance(identity, 'Adding identity %s' % identity.subject)
