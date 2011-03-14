@@ -14,13 +14,45 @@ from ion.test.iontest import IonTestCase, ReceiverProcess
 
 from ion.core.process.process import Process, ProcessClient, ProcessDesc
 from ion.core import bootstrap
+from twisted.trial import unittest
 
 from ion.core.object import object_utils
 from ion.core.object import workbench
 from ion.core.messaging import message_client
 
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
+ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
+PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
+ION_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=11, version=1)
+
+
+class MessageInstanceTest(unittest.TestCase):
+
+    
+    def setUp(self):
+        
+        # Fake what the message client does to create a message
+        self.wb = workbench.WorkBench('No Process')
+        
+        msg_repo = self.wb.create_repository(ION_MESSAGE_TYPE)
+        msg_object = msg_repo.root_object
+        msg_object.identity = msg_repo.repository_key
+        
+        self.msg = message_client.MessageInstance()
+    
+        
+        msg_object.message_object = msg_repo.create_object(ADDRESSLINK_TYPE)
+
+        msg_repo.commit('Message object instantiated')
+
+        self.msg = message_client.MessageInstance(msg_repo)
+
+
+    def test_listsetfields(self):
+
+        self.msg.title = 'foobar'
+
+        self.assertEqual(self.msg.ListSetFields(),['title'])
+
 
 
 class MessageClientTest(IonTestCase):
@@ -46,7 +78,7 @@ class MessageClientTest(IonTestCase):
         # Create a mesasge client
         mc = message_client.MessageClient(proc=self.test_sup)
         
-        message = yield mc.create_instance(person_type, MessageName='person message')
+        message = yield mc.create_instance(PERSON_TYPE, MessageName='person message')
         
         # test the name property        
         self.assertEqual(message.MessageName, 'person message')
@@ -57,7 +89,7 @@ class MessageClientTest(IonTestCase):
         self.assertEqual(message.MessageIdentity, message.Repository.repository_key)
         
         # Test the type property
-        self.assertEqual(message.MessageType, person_type)
+        self.assertEqual(message.MessageType, PERSON_TYPE)
         
         # Test setting a field
         message.name = 'David'
@@ -75,7 +107,7 @@ class MessageClientTest(IonTestCase):
             
         mc = message_client.MessageClient(proc=self.test_sup)
             
-        message = yield mc.create_instance(person_type, MessageName='person message')
+        message = yield mc.create_instance(PERSON_TYPE, MessageName='person message')
         message.name ='David'
         
         (response, headers, msg) = yield self.test_sup.rpc_send(pid, 'echo', message)
@@ -126,6 +158,6 @@ class IonTestMessageClientTest(IonTestCase):
     def test_convience_methods(self):
         
         
-        msg_instance = yield self.create_message(person_type, MessageName='David', name='david', id=6)
+        msg_instance = yield self.create_message(PERSON_TYPE, MessageName='David', name='david', id=6)
         
         

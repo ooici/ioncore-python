@@ -155,7 +155,18 @@ class WrapperMethodsTest(unittest.TestCase):
         mylist = p.ListSetFields()
         # returned list is in order of field identifier
         self.assertEqual(['name', 'id'], mylist)
-        
+
+
+    def test_isfieldset(self):
+
+        p = gpb_wrapper.Wrapper._create_object(person_type)
+
+        p.name = 'David'
+
+        self.assertEqual(p.IsFieldSet('name'), True)
+        self.assertRaises(gpb_wrapper.OOIObjectError, p.IsFieldSet, 'foobar')
+
+
 
 class TestSpecializedCdmMethods(unittest.TestCase):
     """

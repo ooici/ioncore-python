@@ -63,8 +63,8 @@ class WorkBench(object):
         """
         A cache - shared between repositories for hashed objects
         """  
-        #self._workbench_cache = weakref.WeakValueDictionary()
-        self._workbench_cache = {}
+        self._workbench_cache = weakref.WeakValueDictionary()
+        #self._workbench_cache = {}
 
         #@TODO Consider using an index store in the Workbench to keep a cache of associations and keep track of objects
 
