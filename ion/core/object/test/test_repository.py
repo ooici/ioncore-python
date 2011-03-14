@@ -29,8 +29,230 @@ addresslink_type = object_utils.create_type_identifier(object_id=20003, version=
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
 
 
+class DummyClass(object):
+
+        def __init__(self, *args, **kwargs):
+
+            self.args = args
+            self.kwargs = kwargs
+
+class IndexHashTest(unittest.TestCase):
+
+    def setUp(self):
+
+        #self.cache = dict()
+        self.cache = weakref.WeakValueDictionary()
+
+
+
+    def test_bad_cache(self):
+
+        ih = repository.IndexHash()
+        # Must be a weak value Dictionary
+        self.assertRaises(AssertionError, ih._set_cache, dict())
+
+
+    def test_setitem_getitem(self):
+
+
+        ih = repository.IndexHash()
+        ih.cache = self.cache
+
+
+        ih['a']=DummyClass(5,3,david='abc')
+
+
+        # Get from the indexes objects
+        self.assertIsInstance(dict.__getitem__(ih,'a'), DummyClass)
+        self.assertRaises(KeyError, dict.__getitem__, ih,'v' )
+
+        # Get from the cache
+        self.assertIsInstance(self.cache['a'], DummyClass)
+        self.assertRaises(KeyError, self.cache.__getitem__, 'v')
+
+
+        # Get from the index hash
+        self.assertIsInstance(ih['a'], DummyClass)
+        self.assertRaises(KeyError, ih.__getitem__, 'v')
+
+
+    def test_putitem_1_getitem_2(self):
+
+
+        ih1 = repository.IndexHash()
+        ih1.cache = self.cache
+
+
+        ih1['a']=DummyClass(5,3,david='abc')
+
+
+        # Get from the indexes objects
+        self.assertIsInstance(dict.__getitem__(ih1,'a'), DummyClass)
+
+        # Get from the cache
+        self.assertIsInstance(self.cache['a'], DummyClass)
+
+        # Get from the index hash
+        self.assertIsInstance(ih1['a'], DummyClass)
+
+
+        # Create a second IndexHash and test the objects...
+        ih2 = repository.IndexHash()
+        ih2.cache = self.cache
+
+        # Get from the indexes objects - it does not have it yet...
+        self.assertRaises(KeyError, dict.__getitem__, ih2,'a' )
+
+        # Get from the cache
+        self.assertEqual(ih2['a'].args, (5,3))
+
+        # Now it has it!
+        self.assertIsInstance(dict.__getitem__(ih2,'a'), DummyClass)
+
+
+    def test_update_1_get_2(self):
+
+
+        ih1 = repository.IndexHash()
+        ih1.cache = self.cache
+
+        ih1.update({'a':DummyClass(5,3,david='abc'),'b':DummyClass(55,33,david='def')})
+
+
+        # Get from the indexes objects - test this first
+        self.assertEqual(dict.__getitem__(ih1,'a').args, (5,3))
+        self.assertEqual(dict.__getitem__(ih1,'b').args, (55,33))
+        self.assertEqual(dict.__len__(ih1),2)
+
+
+        # Get from the cache - make sure it got added
+        self.assertIsInstance(self.cache['a'], DummyClass)
+        self.assertIsInstance(self.cache['b'], DummyClass)
+        self.assertEqual(len(self.cache),2)
+
+        # Get from the index hash
+        self.assertIsInstance(ih1.get('a'), DummyClass)
+        self.assertEqual(ih1.get('b').args, (55,33))
+        self.assertEqual(ih1.get('c'), None)
+
+        # Make sure nothing got added...
+        self.assertEqual(len(self.cache),2)
+        self.assertEqual(len(ih1),2)
+        self.assertEqual(dict.__len__(ih1),2)
+
+
+        # Create a second IndexHash and test the objects...
+        ih2 = repository.IndexHash()
+        ih2.cache = self.cache
+
+        # Get from the indexes objects - it does not have it yet...
+        self.assertEqual(dict.get(ih2,'a'), None )
+        self.assertEqual(dict.get(ih2,'b'), None )
+        self.assertEqual(dict.get(ih2,'c'), None )
+
+        # Get from the cache
+        self.assertIsInstance(ih2.get('a'), DummyClass)
+        self.assertIsInstance(ih2.get('b'), DummyClass)
+        self.assertEqual(dict.get(ih2,'c'), None ) # Still None
+
+        # Now it has it!
+        self.assertEqual(dict.get(ih2,'a').args, (5,3) )
+        self.assertEqual(dict.get(ih2,'b').args, (55,33) )
+        self.assertEqual(dict.get(ih2,'c'), None ) # Still None
+
+        # Make sure nothing got added...
+        self.assertEqual(len(self.cache),2)
+        self.assertEqual(len(ih2),2)
+        self.assertEqual(dict.__len__(ih2),2)
+
+
+    def test_add_cache_later(self):
+
+        ih1 = repository.IndexHash()
+
+        ih1.update({'a':DummyClass(5,3,david='abc'),'b':DummyClass(55,33,david='def')})
+
+        # Get from the indexes objects - test this first
+        self.assertEqual(dict.__getitem__(ih1,'a').args, (5,3))
+        self.assertEqual(dict.__getitem__(ih1,'b').args, (55,33))
+        self.assertEqual(dict.__len__(ih1),2)
+
+
+        # Get from the cache - make sure it got added
+        self.assertEqual(self.cache.get('a'), None)
+        self.assertEqual(self.cache.get('b'), None)
+        self.assertEqual(len(self.cache),0)
+
+        # Get from the index hash
+        self.assertIsInstance(ih1.get('a'), DummyClass)
+        self.assertEqual(ih1.get('b').args, (55,33))
+        self.assertEqual(ih1.get('c'), None)
+
+        # Make sure nothing got added...
+        self.assertEqual(len(self.cache),0)
+        self.assertEqual(len(ih1),2)
+        self.assertEqual(dict.__len__(ih1),2)
+
+        # Now add the cache
+        ih1.cache = self.cache
+
+        # Get from the indexes objects - test this first
+        self.assertEqual(dict.__getitem__(ih1,'a').args, (5,3))
+        self.assertEqual(dict.__getitem__(ih1,'b').args, (55,33))
+        self.assertEqual(dict.__len__(ih1),2)
+
+
+        # Get from the cache - make sure it got added
+        self.assertIsInstance(self.cache['a'], DummyClass)
+        self.assertIsInstance(self.cache['b'], DummyClass)
+        self.assertEqual(len(self.cache),2)
+
+        # Get from the index hash
+        self.assertIsInstance(ih1.get('a'), DummyClass)
+        self.assertEqual(ih1.get('b').args, (55,33))
+        self.assertEqual(ih1.get('c'), None)
+
+        # Make sure nothing got added...
+        self.assertEqual(len(self.cache),2)
+        self.assertEqual(len(ih1),2)
+        self.assertEqual(dict.__len__(ih1),2)
+
+
+    def test_weakvalues(self):
+
+        ih1 = repository.IndexHash()
+        ih1.cache = self.cache
+
+        ih1.update({'a':DummyClass(5,3,david='abc'),'b':DummyClass(55,33,david='def')})
+
+
+        self.assertEqual(len(gc.get_referrers(self.cache['a'])),1)
+
+        del ih1['a']
+
+        self.assertEqual(self.cache.has_key('a'),False)
+
+
+        ih2 = repository.IndexHash()
+        ih2.cache = self.cache
+
+        # Bring the k,v into ih2
+        ih2.get('b')
+        self.assertEqual(len(gc.get_referrers(self.cache['b'])),2)
+
+        # Delete it from ih1
+        del ih1['b']
+
+        # Still in the cache!
+        self.assertEqual(self.cache.has_key('b'),True)
+        self.assertEqual(len(gc.get_referrers(self.cache['b'])),1)
+
+
+
+
+
 class RepositoryTest(unittest.TestCase):
-        
+
     def setUp(self):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb

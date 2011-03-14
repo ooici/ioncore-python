@@ -189,6 +189,8 @@ class WorkBenchProcess(Process):
 
         Process.__init__(self, *args, **kwargs)
 
+
+
         self.op_pull = self.workbench.op_pull
 
 
@@ -214,17 +216,25 @@ class WorkBenchService(IonTestCase):
     def test_pull(self):
 
         processes = [
-            {'name':'workbench_test','module':'ion.core.object.test.test_workbench','class':'WorkBenchProcess'},
+            {'name':'workbench_test1',
+             'module':'ion.core.object.test.test_workbench',
+             'class':'WorkBenchProcess',
+             'spawnargs':{'proc-name':'wb1'}},
+
+            {'name':'workbench_test2',
+             'module':'ion.core.object.test.test_workbench',
+             'class':'WorkBenchProcess',
+             'spawnargs':{'proc-name':'wb2'}},
         ]
 
         sup = yield self._spawn_processes(processes)
 
-        child_proc = yield sup.get_child_id('workbench_test')
-        log.debug('Process ID:' + str(child_proc))
-        workbench_process = self._get_procinstance(child_proc)
+        child_proc1 = yield sup.get_child_id('workbench_test1')
+        log.info('Process ID:' + str(child_proc1))
+        workbench_process1 = self._get_procinstance(child_proc1)
 
 
-        repo = workbench_process.workbench.create_repository(addresslink_type)
+        repo = workbench_process1.workbench.create_repository(addresslink_type)
 
         ab = repo.root_object
 
@@ -241,9 +251,15 @@ class WorkBenchService(IonTestCase):
         repo.commit('Made it - few!')
 
 
-        yield self.test_sup.workbench.pull('workbench_test', repo.repository_key)
+        child_proc2 = yield sup.get_child_id('workbench_test2')
+        log.info('Process ID:' + str(child_proc2))
+        workbench_process2 = self._get_procinstance(child_proc2)
 
-        myrepo = self.test_sup.workbench.get_repository(repo.repository_key)
+
+        log.info('Sending to: %s' % str(workbench_process1.id.full))
+        yield workbench_process2.workbench.pull(workbench_process1.id.full, repo.repository_key)
+
+        myrepo = workbench_process2.workbench.get_repository(repo.repository_key)
         print myrepo
 
         

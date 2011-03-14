@@ -62,13 +62,17 @@ class IndexHash(dict):
 
     def __getitem__(self, key):
 
-        if self.has_key(key):
+        if dict.has_key(self, key):
             return dict.__getitem__(self, key)
+
         elif self.has_cache:
             # You get it - you own it!
             val = self.cache[key]
+            # If it does not raise a KeyError - add it
             dict.__setitem__(self, key, val)
             return val
+        else:
+            raise KeyError('Key not found in index hash!')
 
 
     def __setitem__(self, key, val):
@@ -93,14 +97,18 @@ class IndexHash(dict):
         """ Get Item from the Index Hash"""
         if dict.has_key(self, key):
             return dict.__getitem__(self, key)
+
         elif self.has_cache:
             # You get it - you own it!
-            val = self.cache.get(key,None)
-            if val is None:
-                return d
-            else:
+            val = self.cache.get(key,d)
+
+            if val != d:
                 dict.__setitem__(self, key, val)
-                return val
+
+            return val
+        else:
+            return d
+
 
     def has_key(self, key):
         """ Check to see if the Key exists """
@@ -1098,12 +1106,37 @@ class Repository(object):
             # Generally this should not happen...
             log.warn('Copying core objects is not an error but unexpected results may occur. Use with caution')
 
+        log.info('Copying Value: %s' % str(value))
+
+        log.info(value.Debug())
+
         if value.Modified:
             structure={}
             value.RecurseCommit(structure)
-            self.index_hash.update(structure)
+            value.Repository.index_hash.update(structure)
+
+
+        log.info(value.Debug())
+        
+
+        oe = value.Repository.index_hash.get(value.MyId)
+        log.info('PRINT OE: %s' % oe)
+
+        log.info('Len value Cache %s' % str(value.Repository.index_hash.cache.items()))
+        log.info('Len self Cache %s' % str(self.index_hash.cache.items()))
+
+
+        log.info('Same Cache %s' % str(self.index_hash.cache is value.Repository.index_hash.cache) )
+
+        log.info('Get Directly self: %s' % self.index_hash.cache.get(value.MyId))
+        log.info('Get Directly value: %s' % value.Repository.index_hash.cache.get(value.MyId))
 
         element = self.index_hash.get(value.MyId)
+
+        log.info('Index hash has_cache: %s' % self.index_hash.has_cache)
+
+        if element is None:
+            raise RepositoryError('Could not get element from the index hash during copy.')
         new_obj = self._load_element(element)
 
         new_obj._set_parents_modified()

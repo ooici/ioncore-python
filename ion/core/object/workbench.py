@@ -63,7 +63,8 @@ class WorkBench(object):
         """
         A cache - shared between repositories for hashed objects
         """  
-        self._workbench_cache = weakref.WeakValueDictionary()
+        #self._workbench_cache = weakref.WeakValueDictionary()
+        self._workbench_cache = {}
 
         #@TODO Consider using an index store in the Workbench to keep a cache of associations and keep track of objects
 
@@ -236,7 +237,7 @@ class WorkBench(object):
         # Get the scoped name for the process to pull from
         targetname = self._process.get_scoped_name('system', origin)
 
-
+        log.info('Target Name "%s"' % str(targetname))
         repo = self.get_repository(repo_name)
         
         commit_list = []
@@ -273,6 +274,7 @@ class WorkBench(object):
             raise WorkBenchError('Invalid response to pull request. Bad Message Type!')
         
 
+        log.info('FIELDS: %s' % str(result.ListSetFields()))
         if result.IsFieldSet('blobs') and not get_head_content:
             raise WorkBenchError('Unexpected response to pull request: included blobs but I did not ask for them.')
 
@@ -313,27 +315,34 @@ class WorkBench(object):
         """
         
 
-        if not hasattr(request, 'MessageType') or request.MessageType != PULL_RESPONSE_MESSAGE:
+        if not hasattr(request, 'MessageType') or request.MessageType != PULL_MESSAGE_TYPE:
             raise WorkBenchError('Invalid pull request. Bad Message Type!', request.BAD_REQUEST)
 
 
-        repo = self.get_repository(request.repo_head.repositorykey)
+        repo = self.get_repository(request.repository_key)
         if not repo:
             raise WorkBenchError('Repository Key "%s" not found' % request.repo_head.repositorykey, request.NOT_FOUND)
 
         my_commits = self.list_repository_commits(repo)
 
-        puller_has = request.commits
+        puller_has = request.commit_keys
 
         puller_needs = set(my_commits).difference(puller_has)
 
         response = yield self._process.message_client.create_instance(PULL_RESPONSE_MESSAGE_TYPE)
 
+        print 'KENEENE<NE'
+        response.repo_head = response.Repository.copy_object(repo._dotgit, deep_copy=False)
+
+        print 'KENEENsssssssssE<NE'
+
         for commit_key in puller_needs:
             link = response.commits.add()
             link.SetLink(repo._commit_index[commit_key])
 
+        print 'LPLPLPLPLPLPLPLPLP', headers
 
+        """
         if request.get_head_content:
             for commit in repo.current_heads():
 
@@ -357,8 +366,8 @@ class WorkBench(object):
                                 raise WorkBenchError('Repository object not found in op_pull', request.NOT_FOUND)
                             children.append(child)
                     elemets = children
-
-
+        """
+        print 'JKJKJKJKJKJKJKJKJKJ'
 
         yield self._process.reply_ok(msg, content=response)
 

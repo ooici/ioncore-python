@@ -652,8 +652,11 @@ class Process(BasicLifecycleObject,ResponseCodes):
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders)
         if reply:
+            log.info('Process Reply: %s' % str(msgheaders))
             d = self.receiver.send(**message)
         else:
+            log.info('Process Send: %s' % str(msgheaders))
+
             d = self.backend_receiver.send(**message)
         return d
 
