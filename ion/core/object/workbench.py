@@ -180,21 +180,26 @@ class WorkBench(object):
         """
         return self._repos.keys()
 
+    def clear_repository(self, repo):
+
+        key = repo.repository_key
+        repo.clear()
+
+        del self._repos[key]
+
+        # Remove the nickname too - this is dumb - nicknames may be removed anyway. Don't worry about it.
+        for k,v in self._repository_nicknames.items():
+
+            if v == key:
+                del self._repository_nicknames[k]
+
+
     def clear_non_persistent(self):
 
-        for key, repo in self._repos.items():
+        for repo in self._repos.values():
 
             if repo.persistent is False:
-                repo.clear()
-
-                del self._repos[key]
-
-
-                # Remove the nickname too - this is dumb - nicknames may be removed anyway. Don't worry about it.
-                for k,v in self._repository_nicknames.items():
-
-                    if v == key:
-                        del self._repository_nicknames[k]
+                self.clear_repository(repo)
 
 
 

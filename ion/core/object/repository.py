@@ -300,6 +300,12 @@ class Repository(object):
         for item in self._workspace.itervalues():
             #print 'ITEM',item
             item.Invalidate()
+        for item in self._commit_index.itervalues():
+            #print 'ITEM',item
+            item.Invalidate()
+
+        self._dotgit.Invalidate()
+
         self._workspace = None
         self._workspace = None
         self.index_hash = None

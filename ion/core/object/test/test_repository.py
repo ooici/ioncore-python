@@ -627,51 +627,108 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(branch.commitrefs[0].parentrefs[0].commitref.MyId, cref1)
         self.assertEqual(branch.commitrefs[0].parentrefs[1].commitref.MyId, cref2)
         
-        
 
 
-    def test_clear(self):
-
-        repo = self.wb.create_repository(addresslink_type)
-
-        # Create a resource object
-        p1 = repo.create_object(person_type)
-        p1.name='David'
-        p1.id = 5
-        p1.email = 'd@s.com'
-        ph1 = p1.phone.add()
-        ph1.type = p1.PhoneType.WORK
-        ph1.number = '123 456 7890'
-        repo.root_object.owner = p1
-        repo.root_object.person.add()
-        repo.root_object.person[0] = p1
-
-        repo.root_object.title = 'Junk'
-
-        cref1 = repo.commit(comment='testing commit')
-        
-
-        person_ref = weakref.proxy(repo.root_object.person[0])
-        addressbook_ref = weakref.proxy(repo.root_object)
-
-        self.assertEqual(addressbook_ref.title, 'Junk')
-        self.assertEqual(person_ref.name, 'David')
+    def test_clear_repo(self):
 
 
-        repo.clear()
+
+
+        def closure(workbench):
+            repo = workbench.create_repository(addresslink_type)
+
+            #repo = repository.Repository()
+
+            repo_ref = weakref.proxy(repo)
+
+
+            workbench.clear_repository(repo)
+
+            return repo_ref
+
+        repo_ref = closure(self.wb)
+
 
         gc.collect()
 
-        referrers = gc.get_referrers(person_ref, addressbook_ref)
+        referrers = gc.get_referrers(repo_ref)
 
-        print 'Referrers', referrers
 
+        print 'Referrers:', referrers
+
+
+
+        self.assertRaises(ReferenceError, getattr, repo_ref, 'persistent')
+
+    
+
+    '''
+    def test_clear(self):
+
+
+
+
+        def closure(workbench):
+            repo = workbench.create_repository(addresslink_type)
+
+            # Create a resource object
+            """
+            p1 = repo.create_object(person_type)
+            p1.name='David'
+            p1.id = 5
+            p1.email = 'd@s.com'
+            ph1 = p1.phone.add()
+            ph1.type = p1.PhoneType.WORK
+            ph1.number = '123 456 7890'
+            repo.root_object.owner = p1
+            repo.root_object.person.add()
+            repo.root_object.person[0] = p1
+
+            repo.root_object.title = 'Junk'
+
+            cref1 = repo.commit(comment='testing commit')
+
+            """
+            repo_ref = weakref.proxy(repo)
+            person_ref =5
+            addressbook_ref =6
+            """
+            person_ref = weakref.proxy(repo.root_object.person[0])
+            addressbook_ref = weakref.proxy(repo.root_object)
+
+            self.assertEqual(addressbook_ref.title, 'Junk')
+            self.assertEqual(person_ref.name, 'David')
+            """
+
+            repo.clear()
+
+            return (repo_ref, person_ref, addressbook_ref)
+
+
+        repo_ref, person_ref, addressbook_ref = closure(self.wb)
+
+
+        gc.collect()
+
+        referrers = gc.get_referrers(repo_ref, person_ref, addressbook_ref)
+
+        myframe = referrers[0]
+
+
+        print 'Referrers:', referrers
+        print 'myframe:', dir(myframe)
+        print 'myframe:', str(myframe.f_globals.keys())
+        print 'myframe:', str(myframe.f_locals.keys())
+
+
+
+        self.assertRaises(ReferenceError, getattr, repo_ref, 'repository_key')
 
         self.assertRaises(ReferenceError, getattr, addressbook_ref, 'title')
 
         self.assertRaises(ReferenceError, getattr, person_ref, 'name')
 
-
+        '''
 
 
  
