@@ -42,6 +42,13 @@ class UserRegistrationClientTest(IonTestCase):
         yield self._stop_container()
 
 
+    """
+    identity = yield self.rc.create_instance(IDENTITY_TYPE, ResourceName='Identity Registry', ResourceDescription='A place to store identitys')
+    identity.certificate = request['user_cert']
+    identity.rsa_private_key = request['user_private_key']
+
+    """
+
     @defer.inlineCallbacks
     def narf_test_register_user_new(self):
         log.info('in test_register_user_new')
@@ -201,6 +208,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Test for user not found handled properly.
         bogus_ooi_id = "bogus-ooi_id"
         result = yield self.identity_registry_client.get_user(bogus_ooi_id)
+        print "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  get_user() result:"
+        print result
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.NOT_FOUND)
 
         # Test if we can find the user we have stuffed in.
