@@ -385,12 +385,10 @@ class IdentityRegistryService(ServiceProcess):
         log.info("calling Authentication()")
         authentication = Authentication()
 
-        log.info("calling decode_certificate() with\n"+str(request.configuration.certificate))
         cert_info = authentication.decode_certificate(str(request.configuration.certificate))
 
         identity.subject = cert_info['subject']
        
-        log.info("calling put_instance()")
         yield self.rc.put_instance(identity, 'Adding identity %s' % identity.subject)
         log.debug('Commit completed, %s' % identity.ResourceIdentity)
         yield self.reply_ok(msg, identity.ResourceIdentity)
