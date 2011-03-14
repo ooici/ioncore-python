@@ -53,10 +53,49 @@ class FindDataResources(object):
          - return response message to ais service
         """
 
-        log.debug('DHE: !!!!!! Got resource identity: ' + str(msg.message_parameters_reference.spatial.identity))
         
-        self.dscc.find_dataset_resources(msg)
+        """
+        This is currently a call to a stub; the msg contains the actual resource
+        id.
+        """
         
+        resID = self.dscc.find_dataset_resources(msg)
+        log.debug('DHE: Stub find_data_resources returned identity: ' + str(resID))
+        
+        log.debug('DHE: findDataResources getting resource instance')
+        ds = yield self.rc.get_instance(resID)
+        log.debug('DHE: get_instance returned ' + str(ds))
+
+        """
+        """
+        for var in ds.root_group.variables:
+            #print 'Root Variable: %s' % str(var.GetStandardName())
+            print 'Root Variable: %s' % str(var.name)
+            for atrib in var.attributes:
+                print "Attribute: %s = %s" % (str(atrib.name), str(atrib.GetValue()))
+            print "....Dimensions:"
+            for dim in var.shape:
+                print "    ....%s (%s)" % (str(dim.name), str(dim.length))
+
+
+        lat = ds.root_group.FindVariableByName('lat')
+        unicode_name  = lat.GetStandardName()
+        unicode_units = lat.GetUnits()
+        
+        #dimensions    =  [str(dim.name) for dim in lat.shape]
+        print 'YO! %s units are %s' % (str(unicode_name), str(unicode_units))
+        print 'YO YO! lat has %s contents' % (len(lat.content))
+        #testvalue = lat.GetValue()
+        #print 'YO YO YO! lat has value %s' % (str(testvalue))
+
+
+        """
+        lat = ds.root_group.FindAttributeByName('latitude')
+        log.debug("Here are the latitude values")
+        for value in lat.GetValues():
+            log.debug(str(value))
+        """
+
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)

@@ -27,6 +27,7 @@ from ion.core.object import repository
 from ion.core.object.repository import RepositoryError
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 from ion.core.exception import ReceivedError
 
 
@@ -72,10 +73,15 @@ class DatasetControllerClient(object):
         #yield self._check_init()
 
         #(content, headers, msg) = yield self.rpc_send('create_dataset_resource', msg)
+        rc = ResourceClient()
 
         #defer.returnValue(content)
-        log.debug('DHE: DatasetControllerClient.find_data_resources got msg: \n' + str(msg))
-        return 'return from find_data_resources'
+        log.debug('DHE: Stub DatasetControllerClient.find_data_resources getting resource ID : \n' + \
+                  str(msg.message_parameters_reference.spatial.identity))
+        
+        #log.debug('DHE: !!!!!! Got resource identity: ' + str(msg.message_parameters_reference.spatial.identity))
+
+        return msg.message_parameters_reference.spatial.identity
 
 class ResourceClientError(Exception):
     """
