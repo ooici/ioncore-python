@@ -87,7 +87,7 @@ class PubSubService(ServiceProcess):
         self.rclient = ResourceClient(proc=self)
         self.mc = MessageClient(proc=self)
 
-        # @todo Lists to replace find/query in registry
+        # @bug Dictionaries to cover for lack of find/query in registry
         self.xs_list = dict()
         self.xp_list = dict()
         self.topic_list = dict()
@@ -197,6 +197,21 @@ class PubSubService(ServiceProcess):
         log.debug('Query complete')
         yield self.reply_ok(msg, response)
 
+    def _reverse_find(self, data, search_value):
+        """
+        Look for a given value in a provided dictionary, return key that corresponds.
+        """
+        rc = None
+        if not search_value in data.values():
+            log.debug('Value not found!')
+            return None
+
+        for key, value in data.iteritems():
+            if value == search_value:
+                rc = key
+
+        return rc
+
     @defer.inlineCallbacks
     def op_declare_exchange_point(self, request, headers, msg):
         log.debug('Starting DXP')
@@ -217,7 +232,7 @@ class PubSubService(ServiceProcess):
         description = str(time.time())
         xpid = yield self.ems.create_exchangename(request.exchange_point_name, description, xs_name)
 
-        log.debug('EMS completed, returned XP ID "%s"' % str(xpid))
+        log.debug('EMS completed, returned XP ID "%s"' % xpid.resource_reference.key)
 
         xp_resource = yield self.rclient.create_instance(XP_RES_TYPE, 'Niemand')
 
@@ -225,7 +240,7 @@ class PubSubService(ServiceProcess):
 
         xp_resource.exchange_space_name = xs_name
         xp_resource.exchange_space_id = request.exchange_space_id
-        xp_resource.exchange_point_id = xpid
+        xp_resource.exchange_point_id = xpid.resource_reference
         xp_resource.exchange_point_name = request.exchange_point_name
 
         log.debug('Saving XP to registry')
@@ -264,7 +279,7 @@ class PubSubService(ServiceProcess):
 
         # @todo Look up XS via XPID, call EMS to remove same...
         log.warn('This is where the Actual Work Goes...')
-        yield self.reply_err(msg)
+        yield self.reply_ok(msg)
 
     @defer.inlineCallbacks
     def op_query_exchange_points(self, request, headers, msg):
@@ -296,6 +311,7 @@ class PubSubService(ServiceProcess):
             raise PSSException('Unable to look up exchange space or point',
                                request.ResponseCodes.BAD_REQUEST)
         description = str(time.time())
+        log.debug('Creating topic in EMS...')
         tid = yield self.ems.create_topic(xs_name, xp_name, request.topic_name, description)
 
         log.debug('creating and populating the resource')
@@ -484,9 +500,12 @@ class PubSubService(ServiceProcess):
                   (xs_name, xp_name, topic_name, sub_name))
 
         description = str(time.time())
-        q_name = yield self.ems.declare_queue(xs_name, xp_name, topic_name,
-                                     request.queue_name, description)
 
+        log.debug('Calling EMS to make the q')
+        q_name = yield self.ems.create_queue(request.queue_name, description,
+                                             xs_name, xp_name, topic_name)
+
+        log.debug('Creating registry object')
         q_resource = yield self.mc.create_instance(QUEUE_RES_TYPE)
         q_resource.exchange_space_id = request.exchange_space_id
         q_resource.exchange_point_id = request.exchange_point_id
@@ -512,8 +531,25 @@ class PubSubService(ServiceProcess):
             raise PSSException('Bad message type, expected BindingMsg',
                                request.ResponseCodes.BAD_REQUEST)
 
+        log.debug('Looking up queue for binding....')
+        try:
+            q_id = self._reverse_find(self.q_list, request.queue_name)
+        except KeyError:
+            log.exception('Unable to locate queue for binding!')
+            raise PSSException('AB error in lookup',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        log.debug('q id is %s' % q_id)
+
+        log.debug('Looking up queue entry in registry...')
+        q_entry = yield self.rclient.get_instance(q_id)
+        log.debug('Resource client completed!')
+
+        description = str(time.time())
+
         # Hmm, what's required to add a binding?? Something like this?
-        rc = yield self.ems.add_binding(request.queue_name, request.binding)
+        rc = yield self.ems.create_binding('NoName', description,
+                                           xs_name, xp_name, q_name, topic_name)
 
         # If so, do we need registries for this at all?
         yield self.reply_ok(msg)

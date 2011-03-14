@@ -10,7 +10,8 @@ import ion.util.ionlog
 from twisted.internet import defer
 
 from ion.services.dm.distribution.pubsub_service import PubSubClient, \
-    REQUEST_TYPE, REGEX_TYPE, XP_TYPE, XS_TYPE, PUBLISHER_TYPE, SUBSCRIBER_TYPE
+    REQUEST_TYPE, REGEX_TYPE, XP_TYPE, XS_TYPE, PUBLISHER_TYPE, SUBSCRIBER_TYPE, \
+    QUEUE_TYPE, TOPIC_TYPE
 
 from ion.test.iontest import IonTestCase
 from twisted.trial import unittest
@@ -34,7 +35,7 @@ class PST(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
-        self.timeout = 5
+        self.timeout = 10
         services = [
             {
                 'name':'pubsub_service',
@@ -69,6 +70,7 @@ class PST(IonTestCase):
         self.topic_name = 'http://ooici.net:8001/coads.nc'
         self.publisher_name = 'Otto Niemand' # Hey, it's thematically correct.
         self.credentials = 'Little to none'
+        self.queue_name = 'waiting'
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -160,7 +162,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_xp_creation(self):
-        raise unittest.SkipTest('Blocked on EMS, returning something weird')
 
         xs_id = yield self._create_xs()
         xp_id = yield self._create_xp(xs_id)
@@ -169,42 +170,39 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_undeclare_xp(self):
-        raise unittest.SkipTest('Blocked on EMS, returning something weird')
 
         xs_id = yield self._create_xs()
         xp_id = yield self._create_xp(xs_id)
 
-        msg = self.create_message(REQUEST_TYPE)
-        msg.resource_reference = xp_id
+        msg = yield self.create_message(REQUEST_TYPE)
+        msg.resource_reference = xp_id.id_list[0]
 
         # Should throw an error if problem, trial will catch same as failure
         yield self.psc.undeclare_exchange_point(msg)
 
     @defer.inlineCallbacks
-    def _declare_topic(self, xs=None, xp=None):
-        if not xs:
-            xs = yield self._create_xs()
-        if not xp:
-            xp = yield self._create_xp(xs_id)
+    def _declare_topic(self):
+        xs = yield self._create_xs()
+        xp = yield self._create_xp(xs)
 
         msg = yield self.create_message(TOPIC_TYPE)
-        msg.exchange_space_id = xs
-        msg.exchange_point_id = xp
+        msg.exchange_space_id = xs.id_list[0]
+        msg.exchange_point_id = xp.id_list[0]
         msg.topic_name = self.topic_name
 
         topic_id = yield self.psc.declare_topic(msg)
-        defer.returnValue(topic_id)
+        rc = tuple(xs, xp, topic_id)
+        defer.returnValue(rc)
 
     @defer.inlineCallbacks
     def test_declare_topic(self):
-        raise unittest.SkipTest('Blocked on EMS')
-        topic_id = yield self._declare_topic()
+        xs, xp, topic_id = yield self._declare_topic()
         self.failUnless(len(topic_id.id_list) > 0)
 
     @defer.inlineCallbacks
     def test_undeclare_topic(self):
         raise unittest.SkipTest('Blocked on EMS')
-        topic_id = yield self._declare_topic()
+        xs, xp, topic_id = yield self._declare_topic()
         self.failUnless(len(topic_id.id_list) > 0)
         msg = self.create_message(REQUEST_TYPE)
         msg.resource_reference = topic_id
@@ -218,7 +216,7 @@ class PST(IonTestCase):
         raise unittest.SkipTest('Blocked on EMS')
         yield self._declare_topic()
 
-        msg = self.create_message(REGEX_TYPE)
+        msg = yield self.create_message(REGEX_TYPE)
         msg.regex = '.+'
 
         topic_list = self.psc.query_topics(msg)
@@ -227,11 +225,9 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def _declare_publisher(self):
-        xs_id = yield self._create_xs()
-        xp_id = yield self._create_xp(xs_id)
-        topic_id = yield self._declare_topic(xs=xsid, xp=xp_id)
+        xs_id, xp_id, topic_id = yield self._declare_topic()
 
-        msg = self.create_message(PUBLISHER_TYPE)
+        msg = yield self.create_message(PUBLISHER_TYPE)
         msg.exchange_space_id = xs_id
         msg.exchange_point_id = xp_id
         msg.topic_id = topic_id
@@ -250,11 +246,9 @@ class PST(IonTestCase):
     @defer.inlineCallbacks
     def test_subscribe(self):
         raise unittest.SkipTest('Blocked on EMS')
-        xs_id = yield self._create_xs()
-        xp_id = yield self._create_xp(xs_id)
-        topic_id = yield self._declare_topic(xs=xsid, xp=xp_id)
+        xs_id, xp_id, topic_id = yield self._declare_topic()
 
-        msg = self.create_message(SUBSCRIBER_TYPE)
+        msg = yield self.create_message(SUBSCRIBER_TYPE)
 
         msg.exchange_space_id = xs_id
         msg.exchange_point_id = xp_id
@@ -263,8 +257,17 @@ class PST(IonTestCase):
         rc = yield self.psc.subscribe(msg)
         self.failUnless(len(rc.id_list) > 0)
 
+    @defer.inlineCallbacks
     def test_declare_queue(self):
-        pass
+        xs_id, xp_id, topic_id = yield self._declare_topic()
+        msg = yield self.create_message(QUEUE_TYPE)
+        msg.exchange_space_id = xs_id.resource_reference
+        msg.exchange_point_id = xp_id.resource_reference
+        msg.topic_id = topic_id.resource_reference
+        msg.queue_name = self.queue_name
+
+        q_id = yield self.psc.declare_queue(msg)
+        self.failUnless(len(q_id.id_list) > 0)
 
     def test_add_binding(self):
         pass    

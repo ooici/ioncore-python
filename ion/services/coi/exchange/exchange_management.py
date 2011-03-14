@@ -119,7 +119,7 @@ class ExchangeManagementService(ServiceProcess):
         # Response
         response = yield self.helper.push_object(object)
         self.xs[name] = response.configuration.MyId;
-        log.debug('Created exchangespace.  id: %s', response.resource_reference)
+        log.debug('Created exchangespace.  id: %s', response.resource_reference.key)
         yield self.reply_ok(msg, response)
 
 
@@ -176,8 +176,8 @@ class ExchangeManagementService(ServiceProcess):
         # Response
         response = yield self.helper.push_object(object)
         self.xn[name] = response.configuration.MyId;
-        log.debug('Created exchangename.  id: %s', response.configuration.MyId)
-        yield self.reply_ok(msg, response.configuration.MyId)
+        log.debug('Created exchangename.  id: %s', response.resource_reference.key)
+        yield self.reply_ok(msg, response)
 
 
     @defer.inlineCallbacks
