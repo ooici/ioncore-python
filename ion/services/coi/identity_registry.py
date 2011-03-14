@@ -88,6 +88,7 @@ class IdentityRegistryClient(ServiceClient):
 
 
     @defer.inlineCallbacks
+    #def register_user(self, Identity, certificate):
     def register_user(self, Identity):
         """
         This registers a user by storing the user certificate, user private key,
@@ -95,7 +96,16 @@ class IdentityRegistryClient(ServiceClient):
         an ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
         yield self._check_init()
+        
+        """
+        params = [Identity, certificate]
+        params = {
+            'identity': Identity,
+            'certificate': certificate
+        }
+        """
 
+        #(content, headers, msg) = yield self.rpc_send('register_user_credentials', params)
         (content, headers, msg) = yield self.rpc_send('register_user_credentials', Identity)
         defer.returnValue(str(content))
 
@@ -376,6 +386,12 @@ class IdentityRegistryService(ServiceProcess):
         """
         log.debug('in op_register_user_credentials:\n'+str(request))
         log.debug('in op_register_user_credentials: request.configuration\n'+str(request.configuration))
+
+        #log.info("calling decode_certificate() with\n"+str(request['certificate']))
+        #cert_info = authentication.decode_certificate(request[certificate])
+
+        #log.info("calling decode_certificate() with\n"+str(request['identity'].configuration.certificate))
+        #cert_info = authentication.decode_certificate(request['identirty'].configuration.certificate)
 
         identity = yield self.rc.create_instance(IDENTITY_TYPE, ResourceName='Identity Registry', ResourceDescription='A place to store identitys')
         identity.certificate = request.configuration.certificate
