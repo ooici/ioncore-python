@@ -20,12 +20,8 @@ from ion.core.object import object_utils
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
-from ion.integration.ais.ais_object_identifiers import REGISTER_USER_TYPE, \
-                                                       OOI_ID_TYPE, \
-                                                       FIND_DATA_RESOURCES_MSG_TYPE, \
-                                                       SUBSCRIPTION_INFO_TYPE
+from ion.integration.ais.ais_object_identifiers import SUBSCRIPTION_INFO_TYPE
                                                        
-
 
 class NotificationAlertTest(IonTestCase):
     """
