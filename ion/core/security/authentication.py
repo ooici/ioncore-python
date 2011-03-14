@@ -147,6 +147,9 @@ class Authentication(object):
         log.info("decode_certificate:\n"+str(certificate))
         print certificate
         attributes = {}
+        from IPython.Shell import IPShellEmbed
+        ipshell = IPShellEmbed()
+        ipshell()
         x509 = X509.load_cert_string(certificate, format=1)
         
         attributes['subject_items'] = {}
