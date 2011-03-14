@@ -20,7 +20,7 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 
 from ion.core.object import object_utils
 
-IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
+IDENT_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 """
 from ion-object-definitions/net/ooici/services/coi/identity/identity_management.proto
 message UserIdentity {
@@ -88,15 +88,19 @@ class IdentityRegistryClient(ServiceClient):
 
 
     @defer.inlineCallbacks
-    def register_user(self, Identity):
+    def register_user(self, user_cert, user_private_key):
         """
-        This registers a user by storing the user certificate, user private key,
-        and certificate subject line (derived from the certificate).  It returns
-        an ooi_id which is the uuid of the record and can be used to uniquely identify a user.
+        This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
+        It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
         yield self._check_init()
 
-        (content, headers, msg) = yield self.rpc_send('register_user_credentials', Identity)
+        cont = {
+            'user_cert': user_cert,
+            'user_private_key': user_private_key
+        }
+
+        (content, headers, msg) = yield self.rpc_send('register_user_credentials', cont)
         defer.returnValue(str(content))
 
         
@@ -374,11 +378,15 @@ class IdentityRegistryService(ServiceProcess):
         This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
         It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
-        log.debug('in op_register_user_credentials'+str(msg))
+        log.debug('in op_register_user_credentials')
 
+        identity = yield self.rc.create_instance(IDENT_TYPE, ResourceName='Identity Registry', ResourceDescription='A place to store identitys')
+        identity.certificate = request['user_cert']
+        identity.rsa_private_key = request['user_private_key']
 
         authentication = Authentication()
-        cert_info = authentication.decode_certificate(msg.configuration.certificate)
+        log.debug('in op_register_user_credentials: decoding certificate:\n'+str(request['user_cert']))
+        cert_info = authentication.decode_certificate(request['user_cert'])
         identity.subject = cert_info['subject']
        
         yield self.rc.put_instance(identity, 'Adding identity %s' % identity.subject)
@@ -386,8 +394,9 @@ class IdentityRegistryService(ServiceProcess):
         yield self.reply_ok(msg, identity.ResourceIdentity)
 
         # Now we store the subject/ResourceIdentity pair so we can get around not having find.
+        self._user_dict['testing'] = 'TESTING'
         self._user_dict[cert_info['subject']] = identity.ResourceIdentity
-        # TODO: Above line needs to be altered when FIND is implemented
+        # Above line needs to be altered when FIND is implemented
         
         
     @defer.inlineCallbacks

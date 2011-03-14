@@ -37,6 +37,7 @@ class RegisterUser(object):
    @defer.inlineCallbacks
    def registerUser (self, msg):
       log.debug('RegisterUser.registerUser()\n'+str(msg))
+      log.debug('RegisterUser.registerUser() params\n'+str(msg.message_parameters_reference))
       result = yield self.irc.authenticate_user(msg.message_parameters_reference.certificate,
                                                 msg.message_parameters_reference.rsa_private_key)
       if type(result) == str:   
