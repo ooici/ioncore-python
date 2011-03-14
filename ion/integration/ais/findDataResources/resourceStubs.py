@@ -52,6 +52,30 @@ idref_Type = object_utils.create_type_identifier(object_id=4, version=1)
 
 CONF = ioninit.config(__name__)
 
+"""
+A very simple little scaffolding to simulate DatasetControllerClient
+"""
+class DatasetControllerClient(object):
+    """
+    Dataset Controller Svc Client
+    """
+
+    """
+    def __init__(self, proc=None, **kwargs):
+        if not 'targetname' in kwargs:
+            kwargs['targetname'] = "dataset_controller"
+        ServiceClient.__init__(self, proc, **kwargs)
+    """
+
+    #@defer.inlineCallbacks
+    def find_dataset_resources(self, msg):
+        #yield self._check_init()
+
+        #(content, headers, msg) = yield self.rpc_send('create_dataset_resource', msg)
+
+        #defer.returnValue(content)
+        log.debug('DHE: DatasetControllerClient.find_data_resources got msg: \n' + str(msg))
+        return 'return from find_data_resources'
 
 class ResourceClientError(Exception):
     """
@@ -102,15 +126,6 @@ class ResourceClient(object):
         assert isinstance(self.workbench, workbench.WorkBench), \
         'Process workbench is not initialized'
 
-    @defer.inlineCallbacks
-    def build_objects(self):
-        """
-        DHE: TESTTESTTEST
-        """
-        # DHE TEST!!!
-        #data_resources = yield self._bootstrap_objects(self.proc)
-        data_resources = yield self._bootstrap_objects()
-        
     @defer.inlineCallbacks
     def create_instance(self, type_id, ResourceName, ResourceDescription=''):
         """
@@ -256,266 +271,6 @@ class ResourceClient(object):
         
         return self.workbench.reference_repository(instance.ResourceIdentity, current_state)
         
-    # DHE NEW CODE FOR TESTING!!! These go to bottom of the class
-
-    @defer.inlineCallbacks
-    def _bootstrap_objects(self):
-            
-        # We need to cheat - get the supervisor process from the container
-        # This is only for bootstrap in a demo application - do no do this in operational code!
-        #sup = ioninit.container_instance.proc_manager.process_registry.kvs.get(supid, None)    
-        
-        # Instantiate the Resource Client using the supervisor
-        #rc = ResourceClient(proc=sup)
-        
-        # Create the dataset resource
-        dataset = yield self.create_instance(dataset_type, ResourceName='Test CDM Resource dataset',
-                                           ResourceDescription='A test resource')
-        
-        # Attach the root group
-        group = dataset.CreateObject(group_type)
-        group.name = 'junk data'
-        dataset.root_group = group
-        
-        # Create all dimension and variable objects
-        # Note: CDM variables such as scalars, coordinate variables and data are all represented by
-        #       the variable object type.  Signifying the difference between these types is done
-        #       simply by the conventions used in implementing variable objects.  Some noteable
-        #       fields of the variable object are the 'shape' field and the 'content' field.  The
-        #       'shape field is used for defining the dimensionality of the variable and is defined
-        #       as a repeated field so that it can support multi-dimensional variables.  The 'content'
-        #       field can be filled with a Bounded Array, a Structure or a Sequence with the same rank
-        #       and length as the dimension objects stored in the variables shape field.
-        #
-        #       See: http://oceanobservatories.org/spaces/display/CIDev/DM+CDM
-        #       
-        #       Scalars:
-        #       Scalar variables such as 'station ID' in the example below, are not associated with a
-        #       dimension and therefore do NOT contain an entry for their shape field.  Also, the
-        #       BoundedArray which contains the station ID's content contains only a single value.
-        #       
-        #       Coordinate Variables:
-        #       Coordinate variables are those which contain an array of values upon which other variables
-        #       are dependent on.  An example of this is the 'time' variable.  Data variables such as
-        #       salinity are dependent on the dimension of time.  Coordinate variables are represented
-        #       by constructing a dimension object for that coordinate and also creating a variable object
-        #       to store the values of that dimension.  Once this is done, dependet data variables can
-        #       define their shape with the aforementioned dimension object as well.
-        #       
-        #       Data Variables:
-        #       Data variables are the most straight-forward types to implement.  The following example
-        #       should explain all that is needed to use these types.
-        dimension_t = dataset.CreateObject(dimension_type)       # dimension object for time
-        dimension_z = dataset.CreateObject(dimension_type)       # dimension object for depth
-        variable_t = dataset.CreateObject(variable_type)         # coordinate variable for time
-        variable_z = dataset.CreateObject(variable_type)         # coordinate variable for depth
-        scalar_lat = dataset.CreateObject(variable_type)         # scalar variable for latitude
-        scalar_lon = dataset.CreateObject(variable_type)         # scalar variable for longitude
-        scalar_sid = dataset.CreateObject(variable_type)         # scalar variable for station ID
-        variable_salinity = dataset.CreateObject(variable_type)  # Data variable for salinity
-        
-    
-        # Assign required field values (name, length, datatype, etc)
-        #-----------------------------------------------------------
-        dimension_t.name = 'time'
-        dimension_z.name = 'z'
-        dimension_t.length = 2
-        dimension_z.length = 3
-        
-        variable_t.name = 'time'
-        variable_z.name = 'depth'
-        scalar_lat.name = 'lat'
-        scalar_lon.name = 'lon'
-        scalar_sid.name = 'stnId'
-        
-        variable_salinity.name = 'salinity'
-        variable_t.data_type = variable_t.DataType.INT
-        variable_z.data_type = variable_z.DataType.FLOAT
-        scalar_lat.data_type = scalar_lat.DataType.FLOAT
-        scalar_lon.data_type = scalar_lon.DataType.FLOAT
-        scalar_sid.data_type = scalar_sid.DataType.INT
-        variable_salinity.data_type = variable_salinity.DataType.FLOAT
-        
-        
-        # Construct the Coordinate Variables: time and depth
-        #------------------------------------------------------
-        # Add dimensionality (shape)
-        variable_t.shape.add()
-        variable_t.shape[0] = dimension_t
-        variable_z.shape.add()
-        variable_z.shape[0] = dimension_z
-        # Add attributes (CDM conventions require certain attributes!)
-        _add_string_attribute(dataset, variable_t, 'units', ['seconds since 1970-01-01 00:00::00'])
-        _add_string_attribute(dataset, variable_t, 'long_name', ['time'])
-        _add_string_attribute(dataset, variable_t, 'standard_name', ['time'])
-        _add_string_attribute(dataset, variable_t, '_CoordinateAxisType', ['Time'])
-        _add_string_attribute(dataset, variable_z, 'units', ['m'])
-        _add_string_attribute(dataset, variable_z, 'positive', ['down'])
-        _add_string_attribute(dataset, variable_z, 'long_name', ['depth below mean sea level'])
-        _add_string_attribute(dataset, variable_z, 'standard_name', ['depth'])
-        _add_string_attribute(dataset, variable_z, '_CoordinateAxisType', ['Height'])
-        _add_string_attribute(dataset, variable_z, '_CoordinateZisPositive', ['down'])
-        # Add data values
-        variable_t.content.add()
-        variable_t.content[0] = dataset.CreateObject(boundedArray_type)
-        variable_t.content[0].bounds.add()
-        variable_t.content[0].bounds[0].origin = 0
-        variable_t.content[0].bounds[0].size = 2
-        variable_t.content[0].ndarray = dataset.CreateObject(int32Array_type) 
-        variable_t.content[0].ndarray.value.extend([1280102520, 1280106120])
-        variable_z.content.add()
-        variable_z.content[0] = dataset.CreateObject(boundedArray_type)
-        variable_z.content[0].bounds.add()
-        variable_z.content[0].bounds[0].origin = 0
-        variable_z.content[0].bounds[0].size = 3
-        variable_z.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-        variable_z.content[0].ndarray.value.extend([0.0, 0.1, 0.2])
-        
-        
-        # Construct the Scalar Variables: lat, lon and station id
-        #------------------------------------------------------------
-        # Add dimensionality (shape)
-        # !! scalars DO NOT specify dimensions !!
-        # Add attributes (CDM conventions require certain attributes!)
-        _add_string_attribute(dataset, scalar_lat, 'units', ['degree_north'])
-        _add_string_attribute(dataset, scalar_lat, 'long_name', ['northward positive degrees latitude'])
-        _add_string_attribute(dataset, scalar_lat, 'standard_name', ['latitude'])
-        _add_string_attribute(dataset, scalar_lon, 'units', ['degree_east'])
-        _add_string_attribute(dataset, scalar_lon, 'long_name', ['eastward positive degrees longitude'])
-        _add_string_attribute(dataset, scalar_lon, 'standard_name', ['longitude'])
-        _add_string_attribute(dataset, scalar_sid, 'long_name', ['integer station identifier'])
-        _add_string_attribute(dataset, scalar_sid, 'standard_name', ['station_id'])
-        # Add data values
-        scalar_lat.content.add()
-        scalar_lat.content[0] = dataset.CreateObject(boundedArray_type)
-        scalar_lat.content[0].bounds.add()
-        scalar_lat.content[0].bounds[0].origin = 0
-        scalar_lat.content[0].bounds[0].size = 1
-        scalar_lat.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-        scalar_lat.content[0].ndarray.value.extend([-45.431])
-        scalar_lon.content.add()
-        scalar_lon.content[0] = dataset.CreateObject(boundedArray_type)
-        scalar_lon.content[0].bounds.add()
-        scalar_lon.content[0].bounds[0].origin = 0
-        scalar_lon.content[0].bounds[0].size = 1
-        scalar_lon.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-        scalar_lon.content[0].ndarray.value.extend([25.909])
-        scalar_sid.content.add()
-        scalar_sid.content[0] = dataset.CreateObject(boundedArray_type)
-        scalar_sid.content[0].bounds.add()
-        scalar_sid.content[0].bounds[0].origin = 0
-        scalar_sid.content[0].bounds[0].size = 1
-        scalar_sid.content[0].ndarray = dataset.CreateObject(int32Array_type) 
-        scalar_sid.content[0].ndarray.value.extend([10059])
-        
-        
-        # Construct the Data Variable: salinity
-        #-----------------------------------------------------------
-        # Add dimensionality (shape)
-        variable_salinity.shape.add()
-        variable_salinity.shape.add()
-        variable_salinity.shape[0] = dimension_t
-        variable_salinity.shape[1] = dimension_z
-        # Add attributes (CDM conventions require certain attributes!)
-        _add_string_attribute(dataset, variable_salinity, 'units', ['psu'])
-        _add_string_attribute(dataset, variable_salinity, 'long_name', ['water salinity at location'])
-        _add_string_attribute(dataset, variable_salinity, 'coordinates', ['time lon lat z'])
-        _add_string_attribute(dataset, variable_salinity, 'standard_name', ['sea_water_salinity'])
-        # Add data values
-        variable_salinity.content.add()
-        variable_salinity.content[0] = dataset.CreateObject(boundedArray_type)
-        variable_salinity.content[0].bounds.add()
-        variable_salinity.content[0].bounds[0].origin = 0
-        variable_salinity.content[0].bounds[0].size = 2 # time dimension
-        variable_salinity.content[0].bounds.add()
-        variable_salinity.content[0].bounds[1].origin = 0
-        variable_salinity.content[0].bounds[1].size = 3 # depth dimension
-        variable_salinity.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-        variable_salinity.content[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
-        
-        
-        # Attach variable and dimension objects to the root group
-        #--------------------------------------------------------
-        group.dimensions.add()
-        group.dimensions.add()
-        group.dimensions[0] = dimension_z
-        group.dimensions[1] = dimension_t
-        
-        group.variables.add()
-        group.variables.add()
-        group.variables.add()
-        group.variables.add()
-        group.variables.add()
-        group.variables.add()
-        group.variables[0] = scalar_lat
-        group.variables[1] = scalar_lon
-        group.variables[2] = scalar_sid
-        group.variables[3] = variable_salinity
-        group.variables[4] = variable_t
-        group.variables[5] = variable_z
-        
-        
-        # Create and Attach global attributes to the root group
-        #--------------------------------------------------------
-        attrib_feature_type =   _create_string_attribute(dataset, 'CF:featureType', ['stationProfile'])
-        attrib_conventions =    _create_string_attribute(dataset, 'Conventions',    ['CF-1.5'])
-        attrib_history =        _create_string_attribute(dataset, 'history',        ['Converted from CSV to OOI CDM compliant NC by net.ooici.agent.abstraction.impl.SosAgent', 'Reconstructed manually as a GPB composite for the resource registry tutorial'])
-        attrib_references =     _create_string_attribute(dataset, 'references',     ['http://sdf.ndbc.noaa.gov/sos/', 'http://www.ndbc.noaa.gov/', 'http://www.noaa.gov/'])
-        attrib_title =          _create_string_attribute(dataset, 'title',          ['NDBC Sensor Observation Service data from "http://sdf.ndbc.noaa.gov/sos/"'])
-        attrib_utc_begin_time = _create_string_attribute(dataset, 'utc_begin_time', ['2008-08-01T00:50:00Z'])
-        attrib_source =         _create_string_attribute(dataset, 'source',         ['NDBC SOS'])
-        attrib_utc_end_time =   _create_string_attribute(dataset, 'utc_end_time',   ['2008-08-01T23:50:00Z'])
-        attrib_institution =    _create_string_attribute(dataset, 'institution',    ["NOAA's National Data Buoy Center (http://www.ndbc.noaa.gov/)"])
-        
-        group.attributes.add()
-        group.attributes.add()
-        group.attributes.add()
-        group.attributes.add()
-        group.attributes.add()
-        group.attributes.add()
-        group.attributes.add()
-        group.attributes.add()
-        group.attributes.add()
-        
-        group.attributes[0] = attrib_feature_type
-        group.attributes[1] = attrib_conventions
-        group.attributes[2] = attrib_history
-        group.attributes[3] = attrib_references
-        group.attributes[4] = attrib_title
-        group.attributes[5] = attrib_utc_begin_time
-        group.attributes[6] = attrib_source
-        group.attributes[7] = attrib_utc_end_time
-        group.attributes[8] = attrib_institution
-        
-        
-        # 'put' the resource into the Resource Registry
-        rc.put_instance(dataset, 'Testing put...')
-        
-        
-        data_resources ={'dataset1':dataset.ResourceIdentity}
-        defer.returnValue(data_resources)
-        
-    def _create_string_attribute(dataset, name, values):
-        '''
-        Helper method to create string attributes for variables and dataset groups
-        '''
-        atrib = dataset.CreateObject(attribute_type)
-        atrib.name = name
-        atrib.data_type= atrib.DataType.STRING
-        atrib.array = dataset.CreateObject(stringArray_type)
-        atrib.array.value.extend(values)
-        return atrib
-    
-    def _add_string_attribute(dataset, variable, name, values):
-        '''
-        Helper method to add string attributes to variable instances
-        '''
-        atrib = _create_string_attribute(dataset, name, values)
-        
-        atrib_ref = variable.attributes.add()
-        atrib_ref.SetLink(atrib)
-
-    
 class ResourceInstanceError(Exception):
     """
     Exception class for Resource Instance Object
