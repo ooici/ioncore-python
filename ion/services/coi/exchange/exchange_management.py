@@ -350,9 +350,8 @@ class ExchangeManagementClient(ServiceClient):
             name,
             description,
             exchangespace,
-            exchangename,
-            topic
-        ):
+            exchangename
+            ):
             """
             Creates a Queue.
             @param name 
