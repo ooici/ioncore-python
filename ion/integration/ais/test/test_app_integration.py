@@ -33,6 +33,7 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_TYPE, \
 
 CDM_DATASET_TYPE = object_utils.create_type_identifier(object_id = 10001, version = 1)
 GROUP_TYPE = object_utils.create_type_identifier(object_id=10020, version=1)
+datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
 dimension_type = object_utils.create_type_identifier(object_id=10018, version=1)
 variable_type = object_utils.create_type_identifier(object_id=10024, version=1)
 attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
@@ -109,6 +110,7 @@ class AppIntegrationTest(IonTestCase):
     @defer.inlineCallbacks
     def createDataset(self, rc):
         log.debug('DHE: creating test dataset!')
+
         dataset = yield rc.create_instance(CDM_DATASET_TYPE, ResourceName='AIS Test CDM Dataset Resource', ResourceDescription='A test resource')
         log.debug('DHE: created test dataset!')
         
@@ -116,7 +118,35 @@ class AppIntegrationTest(IonTestCase):
         group = dataset.CreateObject(GROUP_TYPE)
         group.name = 'ais test data'
         dataset.root_group = group
-
+    
+        # Create all dimension and variable objects
+        # Note: CDM variables such as scalars, coordinate variables and data are all represented by
+        #       the variable object type.  Signifying the difference between these types is done
+        #       simply by the conventions used in implementing variable objects.  Some noteable
+        #       fields of the variable object are the 'shape' field and the 'content' field.  The
+        #       'shape field is used for defining the dimensionality of the variable and is defined
+        #       as a repeated field so that it can support multi-dimensional variables.  The 'content'
+        #       field can be filled with a Bounded Array, a Structure or a Sequence with the same rank
+        #       and length as the dimension objects stored in the variables shape field.
+        #
+        #       See: http://oceanobservatories.org/spaces/display/CIDev/DM+CDM
+        #       
+        #       Scalars:
+        #       Scalar variables such as 'station ID' in the example below, are not associated with a
+        #       dimension and therefore do NOT contain an entry for their shape field.  Also, the
+        #       BoundedArray which contains the station ID's content contains only a single value.
+        #       
+        #       Coordinate Variables:
+        #       Coordinate variables are those which contain an array of values upon which other variables
+        #       are dependent on.  An example of this is the 'time' variable.  Data variables such as
+        #       salinity are dependent on the dimension of time.  Coordinate variables are represented
+        #       by constructing a dimension object for that coordinate and also creating a variable object
+        #       to store the values of that dimension.  Once this is done, dependet data variables can
+        #       define their shape with the aforementioned dimension object as well.
+        #       
+        #       Data Variables:
+        #       Data variables are the most straight-forward types to implement.  The following example
+        #       should explain all that is needed to use these types.
         dimension_t = dataset.CreateObject(dimension_type)       # dimension object for time
         dimension_z = dataset.CreateObject(dimension_type)       # dimension object for depth
         variable_t = dataset.CreateObject(variable_type)         # coordinate variable for time
@@ -269,16 +299,30 @@ class AppIntegrationTest(IonTestCase):
         
         # Create and Attach global attributes to the root group
         #--------------------------------------------------------
-        attrib_feature_type =   _create_string_attribute(dataset, 'CF:featureType', ['stationProfile'])
-        attrib_conventions =    _create_string_attribute(dataset, 'Conventions',    ['CF-1.5'])
-        attrib_history =        _create_string_attribute(dataset, 'history',        ['Converted from CSV to OOI CDM compliant NC by net.ooici.agent.abstraction.impl.SosAgent', 'Reconstructed manually as a GPB composite for the resource registry tutorial'])
-        attrib_references =     _create_string_attribute(dataset, 'references',     ['http://sdf.ndbc.noaa.gov/sos/', 'http://www.ndbc.noaa.gov/', 'http://www.noaa.gov/'])
-        attrib_title =          _create_string_attribute(dataset, 'title',          ['NDBC Sensor Observation Service data from "http://sdf.ndbc.noaa.gov/sos/"'])
-        attrib_utc_begin_time = _create_string_attribute(dataset, 'utc_begin_time', ['2008-08-01T00:50:00Z'])
-        attrib_source =         _create_string_attribute(dataset, 'source',         ['NDBC SOS'])
-        attrib_utc_end_time =   _create_string_attribute(dataset, 'utc_end_time',   ['2008-08-01T23:50:00Z'])
-        attrib_institution =    _create_string_attribute(dataset, 'institution',    ["NOAA's National Data Buoy Center (http://www.ndbc.noaa.gov/)"])
+        attrib_feature_type = _create_string_attribute(dataset, 'CF:featureType', ['stationProfile'])
+        attrib_title = _create_string_attribute(dataset, 'title', ['NDBC Sensor Observation Service data from "http://sdf.ndbc.noaa.gov/sos/"'])
+        attrib_institution = _create_string_attribute(dataset, 'institution', ["NOAA's National Data Buoy Center (http://www.ndbc.noaa.gov/)"])
+        attrib_source = _create_string_attribute(dataset, 'source', ['NDBC SOS'])
+        attrib_history = _create_string_attribute(dataset, 'history', ['Converted from CSV to OOI CDM compliant NC by net.ooici.agent.abstraction.impl.SosAgent', 'Reconstructed manually as a GPB composite for the resource registry tutorial'])
+        attrib_references = _create_string_attribute(dataset, 'references', ['http://sdf.ndbc.noaa.gov/sos/', 'http://www.ndbc.noaa.gov/', 'http://www.noaa.gov/'])
+        attrib_conventions = _create_string_attribute(dataset, 'Conventions', ['CF-1.5'])
+        attrib_time_start = _create_string_attribute(dataset, 'ion_time_coverage_start', ['2008-08-01T00:50:00Z'])
+        attrib_time_end = _create_string_attribute(dataset, 'ion_time_coverage_end', ['2008-08-01T23:50:00Z'])
+        attrib_lat_max = _create_string_attribute(dataset, 'ion_geospatial_lat_max', ['-45.431'])
+        attrib_lat_min = _create_string_attribute(dataset, 'ion_geospatial_lat_min', ['-45.431'])
+        attrib_lon_max = _create_string_attribute(dataset, 'ion_geospatial_lon_max', ['25.909'])
+        attrib_lon_min = _create_string_attribute(dataset, 'ion_geospatial_lon_min', ['25.909'])
+        attrib_vert_max = _create_string_attribute(dataset, 'ion_geospatial_vertical_max', ['0.0'])
+        attrib_vert_min = _create_string_attribute(dataset, 'ion_geospatial_vertical_min', ['0.2'])
+        attrib_vert_pos = _create_string_attribute(dataset, 'ion_geospatial_vertical_positive', ['down'])
         
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
+        group.attributes.add()
         group.attributes.add()
         group.attributes.add()
         group.attributes.add()
@@ -290,15 +334,45 @@ class AppIntegrationTest(IonTestCase):
         group.attributes.add()
         
         group.attributes[0] = attrib_feature_type
-        group.attributes[1] = attrib_conventions
-        group.attributes[2] = attrib_history
-        group.attributes[3] = attrib_references
-        group.attributes[4] = attrib_title
-        group.attributes[5] = attrib_utc_begin_time
-        group.attributes[6] = attrib_source
-        group.attributes[7] = attrib_utc_end_time
-        group.attributes[8] = attrib_institution
+        group.attributes[1] = attrib_title
+        group.attributes[2] = attrib_institution
+        group.attributes[3] = attrib_source
+        group.attributes[4] = attrib_history
+        group.attributes[5] = attrib_references
+        group.attributes[6] = attrib_conventions
+        group.attributes[7] = attrib_time_start
+        group.attributes[8] = attrib_time_end
+        group.attributes[9] = attrib_lat_max
+        group.attributes[10] = attrib_lat_min
+        group.attributes[11] = attrib_lon_max
+        group.attributes[12] = attrib_lon_min
+        group.attributes[13] = attrib_vert_max
+        group.attributes[14] = attrib_vert_min
+        group.attributes[15] = attrib_vert_pos
         
+        
+        # 'put' the resource into the Resource Registry
+        rc.put_instance(dataset, 'Testing put...')
+        
+        
+        #-------------------------------------------#
+        # Create the coresponding datasource object #
+        #-------------------------------------------#
+        datasource = yield rc.create_instance(datasource_type, ResourceName='Test CDM Resource datasource',
+                                           ResourceDescription='A test resource for retrieving dataset context (datasource)')
+        datasource.source_type = datasource.SourceType.SOS
+        datasource.property.append('sea_water_temperature')
+        datasource.station_id.append('41012')
+        datasource.request_type = datasource.RequestType.NONE
+        # datasource.top = *not used*
+        # datasource.bottom = *not used*
+        # datasource.left = *not used*
+        # datasource.right = *not used*
+        # datasource.base_url = 'http://sdf.ndbc.noaa.gov/sos/server.php?request=GetObservation&service=SOS&responseformat=text/csv&'
+        datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
+        # datasource.dataset_url = *not used*
+        # datasource.ncml_mask = *not used*
+
         # 'put' the resource into the Resource Registry
         yield rc.put_instance(dataset, 'Testing put...')
         log.debug('DHE: createDataset supposedly put dataset with identity: ' + str(dataset.ResourceIdentity))

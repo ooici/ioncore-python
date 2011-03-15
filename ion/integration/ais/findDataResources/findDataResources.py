@@ -68,6 +68,10 @@ class FindDataResources(object):
 
         """
         """
+
+        for atrib in ds.root_group.attributes:
+            print 'Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue()))
+
         for var in ds.root_group.variables:
             #print 'Root Variable: %s' % str(var.GetStandardName())
             print 'Root Variable: %s' % str(var.name)
