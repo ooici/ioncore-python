@@ -1162,10 +1162,14 @@ class Repository(object):
     def set_linked_object(self,link, value):        
         # If it is a link - set a link to the value in the wrapper
         if link.ObjectType != LINK_TYPE:
+            # Should never happen - checked in the caller...
             raise RepositoryError('Can not set a composite field unless it is of type Link')
 
         if not isinstance(value, gpb_wrapper.Wrapper):
-            raise RepositoryError('You can not assign an object link equal to a none GPB Wrapper value. Value type %s' % type(value))
+            log.debug('Error Setting Link in Object - Root Object Containing the Link: \n %s' % link.Root.Debug())
+            log.error('Error Setting Link in Object - Attempting to set the link equal to a non GPBWrapper Value: "%s"' % str(value))
+
+            raise RepositoryError('You can not assign an object link equal to a none GPB Wrapper value. Value type "%s", see log errors and log debug for more details' % type(value))
 
         if not value.IsRoot == True:
             # @TODO provide for transfer by serialization and re instantiation
