@@ -12,8 +12,12 @@ from twisted.internet import defer
 
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
+from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 
-from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, AIS_REQUEST_MSG_TYPE, OOI_ID_TYPE
+from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
+                                                       AIS_REQUEST_MSG_TYPE, \
+                                                       AIS_RESPONSE_ERROR_TYPE, \
+                                                       OOI_ID_TYPE
 from ion.core.object import object_utils
 
 IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
@@ -92,18 +96,23 @@ class RegisterUser(object):
    @defer.inlineCallbacks
    def registerUser (self, msg):
       log.debug('RegisterUser.registerUser()\n'+str(msg))
-      result = yield self.irc.authenticate_user(msg.message_parameters_reference.certificate,
-                                                msg.message_parameters_reference.rsa_private_key)
-      if type(result) == str:   
-         log.info('RegisterUser.registerUser(): user exists in IR with ooi_id = '+str(result))
-      else:
-         Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
-         Request.configuration = Request.CreateObject(IDENTITY_TYPE)
-         Request.configuration.certificate = msg.message_parameters_reference.certificate
-         Request.configuration.rsa_private_key = msg.message_parameters_reference.rsa_private_key
-         log.info("RegisterUser.registerUser(): calling irc with\n"+str(Request.configuration))
-         result = yield self.irc.register_user(Request)
-         log.info('RegisterUser.registerUser(): added new user in IR with ooi_id = '+str(result))
+      try:
+         result = yield self.irc.authenticate_user(msg.message_parameters_reference.certificate,
+                                                   msg.message_parameters_reference.rsa_private_key)
+         if type(result) == str:   
+            log.info('RegisterUser.registerUser(): user exists in IR with ooi_id = '+str(result))
+         else:
+            Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
+            #Request.configuration = Request.CreateObject(IDENTITY_TYPE)
+            #Request.configuration.certificate = msg.message_parameters_reference.certificate
+            #Request.configuration.rsa_private_key = msg.message_parameters_reference.rsa_private_key
+            log.info("RegisterUser.registerUser(): calling irc with\n"+str(Request.configuration))
+            result = yield self.irc.register_user(Request)
+            log.info('RegisterUser.registerUser(): added new user in IR with ooi_id = '+str(result))
+      except ReceivedApplicationError, ex:
+         log.info('RegisterUser.registerUser(): Error invoking Identity Registry Service: %s' %ex)
+         Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS RegisterUser error response')
+         defer.returnValue(Response)
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS RegisterUser response')
       Response.message_parameters_reference.add()
       Response.message_parameters_reference[0] = Response.CreateObject(OOI_ID_TYPE)

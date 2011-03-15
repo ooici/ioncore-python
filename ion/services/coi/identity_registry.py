@@ -17,6 +17,7 @@ from ion.core.process.process import Process, ProcessClient, ProcessDesc, Proces
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.security.authentication import Authentication
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance, ResourceClientError, ResourceInstanceError
+from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils
 
@@ -286,6 +287,11 @@ class IdentityRegistryClient(ServiceClient):
         defer.returnValue( content )
 
 
+class IdentityRegistryException(ApplicationError):
+    """
+    IdentityRegistryService exception class
+    """
+
 class IdentityRegistryService(ServiceProcess):
 
     # Declaration of service
@@ -378,6 +384,24 @@ class IdentityRegistryService(ServiceProcess):
         log.debug('in op_register_user_credentials:\n'+str(request))
         log.debug('in op_register_user_credentials: request.configuration\n'+str(request.configuration))
 
+        # Check for correct protocol buffer type
+        if request.MessageType != RESOURCE_CFG_REQUEST_TYPE:
+            raise IdentityRegistryException('Bad message type receieved, ignoring',
+                                            request.ResponseCodes.BAD_REQUEST)
+
+        # Check for required field in message
+        if not request.IsFieldSet('configuration'):
+            raise IdentityRegistryException("Required field 'configuration' not found in message",
+                                            request.ResponseCodes.BAD_REQUEST)
+        
+        identity = yield self.register_user_credentials(request)
+
+        yield self.reply_ok(msg, identity)
+
+        
+    @defer.inlineCallbacks
+    def register_user_credentials(self, request):
+        log.debug('in register_user_credentials:\n'+str(request))
         identity = yield self.rc.create_instance(IDENTITY_TYPE, ResourceName='Identity Registry', ResourceDescription='A place to store identitys')
         identity.certificate = request.configuration.certificate
         identity.rsa_private_key = request.configuration.rsa_private_key
@@ -391,13 +415,14 @@ class IdentityRegistryService(ServiceProcess):
        
         yield self.rc.put_instance(identity, 'Adding identity %s' % identity.subject)
         log.debug('Commit completed, %s' % identity.ResourceIdentity)
-        yield self.reply_ok(msg, identity.ResourceIdentity)
-
+        
         # Now we store the subject/ResourceIdentity pair so we can get around not having find.
         self._user_dict[cert_info['subject']] = identity.ResourceIdentity
         # TODO: Above line needs to be altered when FIND is implemented
         
-        
+        defer.returnValue(identity.ResourceIdentity)
+ 
+
     @defer.inlineCallbacks
     def op_verify_registration(self, request, headers, msg):
         """
