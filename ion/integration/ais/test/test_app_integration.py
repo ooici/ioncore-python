@@ -90,17 +90,17 @@ class AppIntegrationTest(IonTestCase):
         log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
-        reqMsg.message_parameters_reference.spatial.minLatitude = 32.87521
-        reqMsg.message_parameters_reference.spatial.maxLatitude = 32.97521
-        reqMsg.message_parameters_reference.spatial.minLongitude = -117.274609
-        reqMsg.message_parameters_reference.spatial.maxLongitude = -117.174609
+        reqMsg.message_parameters_reference.minLatitude = 32.87521
+        reqMsg.message_parameters_reference.maxLatitude = 32.97521
+        reqMsg.message_parameters_reference.minLongitude = -117.274609
+        reqMsg.message_parameters_reference.maxLongitude = -117.174609
         
         """
         DHE: temporarily passing the identity of the dummied dataset just
         created into the client so that it can access because currently there
         is now way to search.
         """
-        reqMsg.message_parameters_reference.spatial.identity = dsID
+        reqMsg.message_parameters_reference.identity = dsID
 
         log.debug('DHE: Calling findDateResource!!...')
         outcome1 = yield self.aisc.findDataResources(reqMsg)
