@@ -255,13 +255,18 @@ class WorkBenchProcessTest(IonTestCase):
         log.info('Process ID:' + str(child_proc2))
         workbench_process2 = self._get_procinstance(child_proc2)
 
-
         log.info('Sending to: %s' % str(workbench_process1.id.full))
         yield workbench_process2.workbench.pull(workbench_process1.id.full, repo.repository_key)
 
         myrepo = workbench_process2.workbench.get_repository(repo.repository_key)
-        print myrepo
 
+        
+        #print 'REPO  Cache:',repo.index_hash
+        #print 'OTHER Cache:',myrepo.index_hash
+
+        ab = yield myrepo.checkout('master')
+
+        print ab
         
 class WorkBenchMergeTest(unittest.TestCase):
         

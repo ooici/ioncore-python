@@ -24,8 +24,8 @@ from ion.core.object import object_utils
 from ion.util import procutils as pu
 
 COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
-mutable_type = object_utils.create_type_identifier(object_id=6, version=1)
-branch_type = object_utils.create_type_identifier(object_id=5, version=1)
+MUTABLE_TYPE = object_utils.create_type_identifier(object_id=6, version=1)
+BRANCH_TYPE = object_utils.create_type_identifier(object_id=5, version=1)
 LINK_TYPE = object_utils.create_type_identifier(object_id=3, version=1)
 
 
@@ -239,7 +239,7 @@ class Repository(object):
                 raise RepositoryError('Can not pass both a serialized head and a repository key')
         else:
            
-            mutable_cls = object_utils.get_gpb_class_from_type_id(mutable_type)
+            mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
             self._dotgit = self._create_wrapped_object(mutable_cls, addtoworkspace = False)
 
             if repository_key:
@@ -593,6 +593,9 @@ class Repository(object):
         self._workspace_root = None
             
         # Automatically fetch the object from the hashed dictionary
+
+        print cref
+
         rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
         self._workspace_root = rootobj
         
@@ -602,7 +605,7 @@ class Repository(object):
         self._detached_head = detached
         
         if detached:
-            branch_cls = object_utils.get_gpb_class_from_type_id(branch_type)
+            branch_cls = object_utils.get_gpb_class_from_type_id(BRANCH_TYPE)
             self._current_branch = self._create_wrapped_object(branch_cls, addtoworkspace=False)
             bref = self._current_branch.commitrefs.add()
             bref.SetLink(cref)
@@ -1125,9 +1128,6 @@ class Repository(object):
             # Generally this should not happen...
             log.warn('Copying core objects is not an error but unexpected results may occur. Use with caution')
 
-        log.info('Copying Value: %s' % str(value))
-
-        log.info(value.Debug())
 
         if value.Modified:
             structure={}
@@ -1135,28 +1135,7 @@ class Repository(object):
             value.Repository.index_hash.update(structure)
 
 
-        log.info(value.Debug())
-        
-
-        oe = value.Repository.index_hash.get(value.MyId)
-        log.info('PRINT OE: %s' % oe)
-        log.info('HAS CACHE: %s' % value.Repository.index_hash.has_cache)
-        log.info('HAS CACHE: %s' % self.index_hash.has_cache)
-
-        log.info('Len value Cache %s' % str(value.Repository.index_hash.cache.items()))
-        log.info('Len self Cache %s' % str(self.index_hash.cache.items()))
-
-
-        log.info('Value Repo Has it!: %s ' % value.Repository.index_hash.cache.get(value.MyId))
-
-        log.info('Same Cache %s' % str(self.index_hash.cache is value.Repository.index_hash.cache) )
-
-        log.info('Get Directly self: %s' % self.index_hash.cache.get(value.MyId))
-        log.info('Get Directly value: %s' % value.Repository.index_hash.cache.get(value.MyId))
-
         element = self.index_hash.get(value.MyId)
-
-        log.info('Index hash has_cache: %s' % self.index_hash.has_cache)
 
         if element is None:
             raise RepositoryError('Could not get element from the index hash during copy.')

@@ -284,7 +284,6 @@ class WorkBench(object):
             raise WorkBenchError('Invalid response to pull request. Bad Message Type!')
         
 
-        log.info('FIELDS: %s' % str(result.ListSetFields()))
         if result.IsFieldSet('blobs') and not get_head_content:
             raise WorkBenchError('Unexpected response to pull request: included blobs but I did not ask for them.')
 
@@ -296,16 +295,26 @@ class WorkBench(object):
         # Add any new content to the repository:
 
         for commit in result.commits:
+            print 'COMMIT', commit
             repo.index_hash[commit.MyId] = result.Repository.index_hash[commit.MyId]
 
         for blob in result.blobs:
+            print 'BLOB', blob
             repo.index_hash[blob.MyId] = result.Repository.index_hash[blob.MyId]
 
 
         # Get the wrapped structure element to meet the old interface to merge...
-        head = result.Repository.index_hash[result.repo_head.MyId]
-        repo = self._load_repo_from_mutable(head)
 
+        print 'REPO WORKSPACE', repo._workspace
+
+        #head = result.Repository.index_hash[result.repo_head.MyId]
+        #repo = self._load_repo_from_mutable(head)
+        self._update_repo_to_head(repo,result.repo_head)
+
+
+        print 'REPO WORKSPACE', repo._workspace
+
+        
         # Where to get objects not yet transfered.
         repo.upstream['service'] = origin
         repo.upstream['process'] = headers.get('reply-to')
@@ -341,19 +350,16 @@ class WorkBench(object):
 
         response = yield self._process.message_client.create_instance(PULL_RESPONSE_MESSAGE_TYPE)
 
-        print 'KENEENE<NE'
         response.repo_head = response.Repository.copy_object(repo._dotgit, deep_copy=False)
 
-        print 'KENEENsssssssssE<NE'
 
         for commit_key in puller_needs:
             link = response.commits.add()
             link.SetLink(repo._commit_index[commit_key])
 
-        print 'LPLPLPLPLPLPLPLPLP', headers
 
-        """
         if request.get_head_content:
+            blobs=set()
             for commit in repo.current_heads():
 
                 root_object_link = commit.GetLink('objectroot')
@@ -362,22 +368,24 @@ class WorkBench(object):
                 if element is None:
                     raise WorkBenchError('Repository root object not found in op_pull', request.NOT_FOUND)
 
-                elements = [element,]
+                new_elements = set([element,])
 
-                while len(elements) > 0:
-                    children = []
-                    for element in elements:
-                        link = response.blobs.add()
-                        self._link_to_structure_element(link, element)
-
+                while len(new_elements) > 0:
+                    children = set()
+                    for element in new_elements:
+                        blobs.add(element)
                         for child_key in element.ChildLinks:
                             child = repo.index_hash.get(child_key,None)
                             if child is None:
                                 raise WorkBenchError('Repository object not found in op_pull', request.NOT_FOUND)
-                            children.append(child)
-                    elemets = children
-        """
-        print 'JKJKJKJKJKJKJKJKJKJ'
+                            elif child not in blobs:
+                                children.add(child)
+                    new_elements = children
+
+            for element in blobs:
+                link = response.blobs.add()
+                self._link_to_structure_element(link, element)
+
 
         yield self._process.reply_ok(msg, content=response)
 
@@ -646,6 +654,17 @@ class WorkBench(object):
         key_list.extend(key_set)
         return key_list
 
+
+    def _update_repo_to_head(self, repo, head):
+        log.debug('_update_repo_to_head: Loading a repository!')
+
+        if repo._dotgit == head:
+            return
+
+        if len(repo.branches) == 0:
+            # if we are doing a clone - pulling a new repository
+            repo._dotgit = head
+            repo.branchnicknames['master']=repo.branches[0].branchkey
 
 
     def _load_repo_from_mutable(self,head):
