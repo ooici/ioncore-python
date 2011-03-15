@@ -21,7 +21,7 @@ from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils
 
-IDENT_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
+IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 """
 from ion-object-definitions/net/ooici/services/coi/identity/identity_management.proto
 message UserIdentity {
@@ -89,29 +89,14 @@ class IdentityRegistryClient(ServiceClient):
 
 
     @defer.inlineCallbacks
-<<<<<<< HEAD
-    def register_user(self, user_cert, user_private_key):
-=======
-    #def register_user(self, Identity, certificate):
     def register_user(self, Identity):
->>>>>>> working
         """
         This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
         It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
         yield self._check_init()
-<<<<<<< HEAD
-
-        cont = {
-            'user_cert': user_cert,
-            'user_private_key': user_private_key
-        }
-
-        (content, headers, msg) = yield self.rpc_send('register_user_credentials', cont)
-=======
         
         (content, headers, msg) = yield self.rpc_send('register_user_credentials', Identity)
->>>>>>> working
         defer.returnValue(str(content))
 
         
