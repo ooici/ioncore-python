@@ -108,7 +108,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
 
 
     @defer.inlineCallbacks
-    def test_register_user(self):
+    def Xtest_register_user(self):
         """
         """
     
