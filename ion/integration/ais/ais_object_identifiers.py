@@ -134,3 +134,65 @@ message SubscriptionInfo {
    optional string queue_id=1;
 }
 """
+
+CREATE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9211, version=1)
+UPDATE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9211, version=1)
+"""
+message DataResourceCreateUpdateRequest {
+    enum _MessageTypeIdentifier {
+        _ID = 9211;
+        _VERSION = 1;
+    }
+    optional string data_resource_id       = 1;
+    optional string provider               = 2;
+    optional string format                 = 3;
+    optional string protocol               = 4;
+    optional string type                   = 5;
+    optional string title                  = 6;
+    optional string data_format            = 7;
+    optional string data_type              = 8;
+    optional string naming_authority       = 9;
+    optional string summary                = 10;
+    optional string creator_user_id        = 11;
+    optional string publisher_id           = 12;
+
+}
+"""
+
+CREATE_DATA_RESOURCE_RSP_TYPE = object_utils.create_type_identifier(object_id=9212, version=1)
+UPDATE_DATA_RESOURCE_RSP_TYPE = object_utils.create_type_identifier(object_id=9212, version=1)
+"""
+message DataResourceCreateUpdateResponse {
+    enum _MessageTypeIdentifier {
+        _ID = 9212;
+        _VERSION = 1;
+    }
+
+    optional string data_resource_id  = 1;
+}
+"""
+
+DELETE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9213, version=1)
+"""
+message DataResourceDeleteRequest {
+    enum _MessageTypeIdentifier {
+        _ID = 9213;
+        _VERSION = 1;
+    }
+
+    optional string data_resource_id  = 1;
+}
+"""
+
+DELETE_DATA_RESOURCE_RSP_TYPE = object_utils.create_type_identifier(object_id=9214, version=1)
+"""
+message DataResourceDeleteResponse {
+    enum _MessageTypeIdentifier {
+        _ID = 9214;
+        _VERSION = 1;
+    }
+
+    optional bool success  = 1;
+}
+"""
+
