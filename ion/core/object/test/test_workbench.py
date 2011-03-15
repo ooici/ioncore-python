@@ -199,7 +199,7 @@ factory = ProcessFactory(WorkBenchProcess)
 
 
 
-class WorkBenchService(IonTestCase):
+class WorkBenchProcessTest(IonTestCase):
 
 
 
