@@ -66,7 +66,7 @@ class AppIntegrationService(ServiceProcess):
             worker = FindDataResources(self)
 
             returnValue = yield worker.findDataResources(content)
-            log.debug('worker returned: ' + returnValue)
+            #log.debug('worker returned: ' + returnValue)
             yield self.reply_ok(msg, {'value' : 'list of resource ids'})
         except KeyError:
             estr = 'Missing information in message!'
