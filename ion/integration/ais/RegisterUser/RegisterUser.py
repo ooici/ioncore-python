@@ -112,6 +112,8 @@ class RegisterUser(object):
       except ReceivedApplicationError, ex:
          log.info('RegisterUser.registerUser(): Error invoking Identity Registry Service: %s' %ex)
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS RegisterUser error response')
+         Response.error_num =  ex.msg_content.MessageResponseCode
+         Response.error_str =  ex.msg_content.MessageResponseBody
          defer.returnValue(Response)
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS RegisterUser response')
       Response.message_parameters_reference.add()
