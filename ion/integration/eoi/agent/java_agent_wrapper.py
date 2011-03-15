@@ -7,7 +7,7 @@
 @brief:  EOI JavaAgentAgent and JavaAgentWrapperClient class definitions
 """
 
-# Imports: Logging
+# Imports:
 from ion.core.messaging.message_client import MessageClient
 from ion.core.object import object_utils
 from ion.core.process.process import Process, ProcessFactory
@@ -22,6 +22,7 @@ import ion.util.procutils as pu
 log = ion.util.ionlog.getLogger(__name__)
 
 # Imports: General
+import time
 
 # Imports: Message object creation
 DATA_CONTEXT_TYPE = object_utils.create_type_identifier(object_id=4501, version=1)
@@ -426,8 +427,7 @@ class JavaAgentWrapper(ServiceProcess):
 #            msg.ncml_mask = ''
             msg.source_type = datasource.source_type
             msg.start_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
-            # @todo: make end time NOW time
-            msg.end_time = '2011-03-14T00:00:00Z'
+            msg.end_time = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
             msg.property.extend(datasource.property)
             msg.station_id.extend(datasource.station_id)
@@ -621,13 +621,21 @@ factory = ProcessFactory(JavaAgentWrapper)
 # Application Startup
 #----------------------------#
 :: bash ::
-scripts/start-cc -h amoeba.ucsd.edu -a sysname=eoitest res/apps/eoiagent.app
+bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=eoitest,register=demodata res/apps/resource.app
 
 
 #----------------------------#
 # Update Testing
 #----------------------------#
 :: py ::
+from ion.integration.eoi.agent.java_agent_wrapper import JavaAgentWrapperClient as jawc
+client = jawc()
+spawn("ion.integration.eoi.agent.java_agent_wrapper")
+
+client.rpc_request_update(dataset1, datasource1)
+
+
+
 from ion.integration.eoi.agent.java_agent_wrapper import JavaAgentWrapperClient as jawc
 aclient = jawc()
 aclient.rpc_request_update('sos_station_st')
