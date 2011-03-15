@@ -103,9 +103,9 @@ class RegisterUser(object):
             log.info('RegisterUser.registerUser(): user exists in IR with ooi_id = '+str(result))
          else:
             Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
-            #Request.configuration = Request.CreateObject(IDENTITY_TYPE)
-            #Request.configuration.certificate = msg.message_parameters_reference.certificate
-            #Request.configuration.rsa_private_key = msg.message_parameters_reference.rsa_private_key
+            Request.configuration = Request.CreateObject(IDENTITY_TYPE)
+            Request.configuration.certificate = msg.message_parameters_reference.certificate
+            Request.configuration.rsa_private_key = msg.message_parameters_reference.rsa_private_key
             log.info("RegisterUser.registerUser(): calling irc with\n"+str(Request.configuration))
             result = yield self.irc.register_user(Request)
             log.info('RegisterUser.registerUser(): added new user in IR with ooi_id = '+str(result))

@@ -381,19 +381,26 @@ class IdentityRegistryService(ServiceProcess):
         This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
         It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
-        log.debug('in op_register_user_credentials:\n'+str(request))
-        log.debug('in op_register_user_credentials: request.configuration\n'+str(request.configuration))
 
         # Check for correct protocol buffer type
         if request.MessageType != RESOURCE_CFG_REQUEST_TYPE:
             raise IdentityRegistryException('Bad message type receieved, ignoring',
                                             request.ResponseCodes.BAD_REQUEST)
 
-        # Check for required field in message
+        # Check for required fields in message
         if not request.IsFieldSet('configuration'):
-            raise IdentityRegistryException("Required field 'configuration' not found in message",
+            raise IdentityRegistryException("Required field [configuration] not found in message",
+                                            request.ResponseCodes.BAD_REQUEST)
+        if not request.configuration.IsFieldSet('certificate'):
+            raise IdentityRegistryException("Required field [certificate] not found in message",
+                                            request.ResponseCodes.BAD_REQUEST)
+        if not request.configuration.IsFieldSet('rsa_private_key'):
+            raise IdentityRegistryException("Required field [rsa_private_key] not found in message",
                                             request.ResponseCodes.BAD_REQUEST)
         
+        log.debug('in op_register_user_credentials:\n'+str(request))
+        log.debug('in op_register_user_credentials: request.configuration\n'+str(request.configuration))
+
         identity = yield self.register_user_credentials(request)
 
         yield self.reply_ok(msg, identity)
@@ -402,11 +409,10 @@ class IdentityRegistryService(ServiceProcess):
     @defer.inlineCallbacks
     def register_user_credentials(self, request):
         log.debug('in register_user_credentials:\n'+str(request))
-        identity = yield self.rc.create_instance(IDENTITY_TYPE, ResourceName='Identity Registry', ResourceDescription='A place to store identitys')
+        identity = yield self.rc.create_instance(IDENTITY_TYPE, ResourceName='Identity Registry', ResourceDescription='User identity information')
         identity.certificate = request.configuration.certificate
         identity.rsa_private_key = request.configuration.rsa_private_key
         
-        log.info("calling Authentication()")
         authentication = Authentication()
 
         cert_info = authentication.decode_certificate(str(request.configuration.certificate))

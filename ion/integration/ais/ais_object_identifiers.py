@@ -40,7 +40,7 @@ message ApplicationIntegrationServiceError{
       _VERSION = 1;
     }
     
-    optional string error_num = 1;
+    optional int32 error_num = 1;
     
     optional string error_str = 2;
 }
