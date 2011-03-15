@@ -311,15 +311,13 @@ class PubSubService(ServiceProcess):
             raise PSSException('Unable to look up exchange space or point',
                                request.ResponseCodes.BAD_REQUEST)
         description = str(time.time())
-        log.debug('Creating topic in EMS...')
-        tid = yield self.ems.create_topic(xs_name, xp_name, request.topic_name, description)
 
         log.debug('creating and populating the resource')
         topic_resource = yield self.rclient.create_instance(TOPIC_RES_TYPE, 'Niemand')
         topic_resource.exchange_space_name = xs_name
         topic_resource.exchange_point_name = xp_name
         topic_resource.topic_name = request.topic_name
-        topic_resource.topic_id = tid
+        # topic_resource.topic_id = tid
         topic_resource.exchange_space_id = request.exchange_space_id
         topic_resource.exchange_point_id = request.exchange_point_id
 

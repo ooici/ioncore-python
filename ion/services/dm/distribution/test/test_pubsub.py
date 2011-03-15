@@ -15,11 +15,9 @@ from ion.services.dm.distribution.pubsub_service import PubSubClient, \
 
 from ion.test.iontest import IonTestCase
 from twisted.trial import unittest
-from ion.util.procutils import asleep
 from ion.core import ioninit
 
 from ion.core.object import object_utils
-from ion.core.messaging.message_client import MessageClient
 
 from ion.core.exception import ReceivedApplicationError
 
