@@ -77,11 +77,11 @@ class DatasetControllerClient(object):
 
         #defer.returnValue(content)
         log.debug('DHE: Stub DatasetControllerClient.find_data_resources getting resource ID : \n' + \
-                  str(msg.message_parameters_reference.spatial.identity))
+                  str(msg.message_parameters_reference.identity))
         
         #log.debug('DHE: !!!!!! Got resource identity: ' + str(msg.message_parameters_reference.spatial.identity))
 
-        return msg.message_parameters_reference.spatial.identity
+        return msg.message_parameters_reference.identity
 
 class ResourceClientError(Exception):
     """
