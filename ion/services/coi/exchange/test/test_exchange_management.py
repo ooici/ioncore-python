@@ -273,6 +273,6 @@ class ExchangeManagementTest(IonTestCase):
                             description="This is a test!", 
                             exchangespace="TestExchangeSpace", 
                             exchangename="TestExchangeName",
-                            topic="alt.humar.best-of-usenet"
+                            # topic="alt.humar.best-of-usenet"
 
                     )

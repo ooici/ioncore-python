@@ -147,6 +147,8 @@ def build_gpb_lookup(rootpath):
                         if enum_type.name == ENUM_NAME:
                             for val in enum_type.values:
                                 if val.name == ENUM_ID_NAME:
+                                    if gpb_id_to_class.has_key(val.number):
+                                        raise ObjectUtilException('Duplicate _MessageTypeIdentifier for ID# %s' % str(val.number))
                                     gpb_id_to_class[val.number] = msg_class
                                 elif val.name == ENUM_VERSION_NAME:
                                     # Eventually this will implement versioning...
