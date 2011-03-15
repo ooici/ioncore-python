@@ -1552,14 +1552,29 @@ class Wrapper(object):
         #if self.Invalid:
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-            
+
+        GPBMessage = self.GPBMessage
+        # Get the raw GPB field
         try:
-            result = self.GPBMessage.HasField(field_name)
-        except ValueError, ex:
+            GPBField = getattr(GPBMessage, field_name)
+        except AttributeError, ex:
             raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
                     (str(self.ObjectClass), field_name))
-            
-        return result
+
+        if isinstance(GPBField, containers.RepeatedScalarFieldContainer):
+            return len(GPBField) > 0
+
+        elif isinstance(GPBField, containers.RepeatedCompositeFieldContainer):
+            if len(GPBField) == 0:
+                return False
+            for item in GPBField:
+                if len(item.ListFields())>0:
+                    return True
+            else:
+                return False
+
+        else:
+            return GPBMessage.HasField(field_name)
 
     def HasField(self, field_name):
         log.warn('HasField is depricated because the name is confusing. Use IsFieldSet')
@@ -1576,12 +1591,12 @@ class Wrapper(object):
         #    return
             
         # Get the raw GPB field
-        try: 
+        try:
             GPBField = getattr(GPBMessage, field_name)
         except AttributeError, ex:
             raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
                     (str(self.ObjectClass), field_name))
-            
+
         if isinstance(GPBField, containers.RepeatedScalarFieldContainer):
             objhash = GPBField.__hash__()
             del self.DerivedWrappers[objhash]
@@ -1604,7 +1619,9 @@ class Wrapper(object):
             
             objhash = GPBField.__hash__()
             del self.DerivedWrappers[objhash]
-        
+
+        # Nothing to be done for scalar fields - just clear it.
+
         #Now clear the field
         self.GPBMessage.ClearField(field_name)
         # Set this object and it parents to be modified

@@ -36,10 +36,9 @@ class MessageInstanceTest(unittest.TestCase):
         msg_repo = self.wb.create_repository(ION_MESSAGE_TYPE)
         msg_object = msg_repo.root_object
         msg_object.identity = msg_repo.repository_key
-        
-        self.msg = message_client.MessageInstance()
-    
-        
+
+        print dir(msg_object.message_object)
+
         msg_object.message_object = msg_repo.create_object(ADDRESSLINK_TYPE)
 
         msg_repo.commit('Message object instantiated')
@@ -48,10 +47,49 @@ class MessageInstanceTest(unittest.TestCase):
 
 
     def test_listsetfields(self):
+        """ Testing for this Method is more through in the wrapper test
+        """
+
 
         self.msg.title = 'foobar'
 
-        self.assertEqual(self.msg.ListSetFields(),['title'])
+        flist = self.msg.ListSetFields()
+        self.assertIn('title',flist)
+
+        self.msg.owner = self.msg.CreateObject(PERSON_TYPE)
+
+        flist = self.msg.ListSetFields()
+        self.assertIn('title',flist)
+        self.assertIn('owner',flist)
+
+        self.msg.person.add()
+        self.msg.person[0] = self.msg.CreateObject(PERSON_TYPE)
+
+        flist = self.msg.ListSetFields()
+        self.assertIn('title',flist)
+        self.assertIn('owner',flist)
+        self.assertIn('person',flist)
+
+        self.assertEqual(len(flist),3)
+
+    def test_isfieldset(self):
+        """ Testing for this Method is more through in the wrapper test
+        """
+        self.assertEqual(self.msg.IsFieldSet('title'),False)
+        self.msg.title = 'foobar'
+        self.assertEqual(self.msg.IsFieldSet('title'),True)
+
+        self.assertEqual(self.msg.IsFieldSet('owner'),False)
+        self.msg.owner = self.msg.CreateObject(PERSON_TYPE)
+        self.assertEqual(self.msg.IsFieldSet('owner'),True)
+
+
+        self.assertEqual(self.msg.IsFieldSet('person'),False)
+        self.msg.person.add()
+        self.assertEqual(self.msg.IsFieldSet('person'),False)
+        self.msg.person[0] = self.msg.CreateObject(PERSON_TYPE)
+        self.assertEqual(self.msg.IsFieldSet('person'),True)
+
 
 
 
