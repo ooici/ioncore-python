@@ -17,6 +17,7 @@ from ion.core.process.process import Process, ProcessClient, ProcessDesc, Proces
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.security.authentication import Authentication
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance, ResourceClientError, ResourceInstanceError
+from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils
 
@@ -88,12 +89,18 @@ class IdentityRegistryClient(ServiceClient):
 
 
     @defer.inlineCallbacks
+<<<<<<< HEAD
     def register_user(self, user_cert, user_private_key):
+=======
+    #def register_user(self, Identity, certificate):
+    def register_user(self, Identity):
+>>>>>>> working
         """
         This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
         It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
         yield self._check_init()
+<<<<<<< HEAD
 
         cont = {
             'user_cert': user_cert,
@@ -101,6 +108,10 @@ class IdentityRegistryClient(ServiceClient):
         }
 
         (content, headers, msg) = yield self.rpc_send('register_user_credentials', cont)
+=======
+        
+        (content, headers, msg) = yield self.rpc_send('register_user_credentials', Identity)
+>>>>>>> working
         defer.returnValue(str(content))
 
         
@@ -289,6 +300,11 @@ class IdentityRegistryClient(ServiceClient):
         defer.returnValue( content )
 
 
+class IdentityRegistryException(ApplicationError):
+    """
+    IdentityRegistryService exception class
+    """
+
 class IdentityRegistryService(ServiceProcess):
 
     # Declaration of service
@@ -378,27 +394,54 @@ class IdentityRegistryService(ServiceProcess):
         This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
         It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
-        log.debug('in op_register_user_credentials')
+        # Check for correct protocol buffer type
+        if request.MessageType != RESOURCE_CFG_REQUEST_TYPE:
+            raise IdentityRegistryException('Bad message type receieved, ignoring',
+                                            request.ResponseCodes.BAD_REQUEST)
 
-        identity = yield self.rc.create_instance(IDENT_TYPE, ResourceName='Identity Registry', ResourceDescription='A place to store identitys')
-        identity.certificate = request['user_cert']
-        identity.rsa_private_key = request['user_private_key']
+        # Check for required fields in message
+        if not request.IsFieldSet('configuration'):
+            raise IdentityRegistryException("Required field [configuration] not found in message",
+                                            request.ResponseCodes.BAD_REQUEST)
+        if not request.configuration.IsFieldSet('certificate'):
+            raise IdentityRegistryException("Required field [certificate] not found in message",
+                                            request.ResponseCodes.BAD_REQUEST)
+        if not request.configuration.IsFieldSet('rsa_private_key'):
+            raise IdentityRegistryException("Required field [rsa_private_key] not found in message",
+                                            request.ResponseCodes.BAD_REQUEST)
+        
+        log.debug('in op_register_user_credentials:\n'+str(request))
+        log.debug('in op_register_user_credentials: request.configuration\n'+str(request.configuration))
 
+        identity = yield self.register_user_credentials(request)
+
+        yield self.reply_ok(msg, identity)
+
+        
+    @defer.inlineCallbacks
+    def register_user_credentials(self, request):
+        log.debug('in register_user_credentials:\n'+str(request))
+        identity = yield self.rc.create_instance(IDENTITY_TYPE, ResourceName='Identity Registry', ResourceDescription='User identity information')
+        identity.certificate = request.configuration.certificate
+        identity.rsa_private_key = request.configuration.rsa_private_key
+        
         authentication = Authentication()
-        log.debug('in op_register_user_credentials: decoding certificate:\n'+str(request['user_cert']))
-        cert_info = authentication.decode_certificate(request['user_cert'])
+
+        cert_info = authentication.decode_certificate(str(request.configuration.certificate))
+
         identity.subject = cert_info['subject']
        
         yield self.rc.put_instance(identity, 'Adding identity %s' % identity.subject)
         log.debug('Commit completed, %s' % identity.ResourceIdentity)
-        yield self.reply_ok(msg, identity.ResourceIdentity)
-
+        
         # Now we store the subject/ResourceIdentity pair so we can get around not having find.
         self._user_dict['testing'] = 'TESTING'
         self._user_dict[cert_info['subject']] = identity.ResourceIdentity
         # Above line needs to be altered when FIND is implemented
         
-        
+        defer.returnValue(identity.ResourceIdentity)
+ 
+
     @defer.inlineCallbacks
     def op_verify_registration(self, request, headers, msg):
         """

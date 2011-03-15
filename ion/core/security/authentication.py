@@ -145,7 +145,6 @@ class Authentication(object):
         Return a Dict of all known attributes for the certificate
         """
         log.info("decode_certificate:\n"+str(certificate))
-        print certificate
         attributes = {}
         from IPython.Shell import IPShellEmbed
         ipshell = IPShellEmbed()
