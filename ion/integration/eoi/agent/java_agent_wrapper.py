@@ -8,22 +8,24 @@
 """
 
 # Imports: Logging
+from ion.core.messaging.message_client import MessageClient
+from ion.core.object import object_utils
+from ion.core.process.process import Process, ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
+from ion.services.coi.resource_registry_beta.resource_client import \
+    ResourceClient
+from ion.util.os_process import OSProcess
+from ion.util.state_object import BasicStates
+from twisted.internet import defer, reactor
 import ion.util.ionlog
+import ion.util.procutils as pu
 log = ion.util.ionlog.getLogger(__name__)
 
 # Imports: General
-import ion.util.procutils as pu
-from twisted.internet import defer, reactor
-from ion.core.process.process import Process, ProcessFactory
-from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.util.state_object import BasicStates
-from ion.util.os_process import OSProcess
 
 # Imports: Message object creation
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
-from ion.core.object import object_utils
-from ion.core.messaging.message_client import MessageClient
-context_message_type = object_utils.create_type_identifier(object_id=4501, version=1)
+DATA_CONTEXT_TYPE = object_utils.create_type_identifier(object_id=4501, version=1)
+CHANGE_EVENT_TYPE = object_utils.create_type_identifier(object_id=7001, version=1)
 
 
 class JavaAgentWrapper(ServiceProcess):
@@ -340,9 +342,13 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         log.info("<<<---@@@ Recieved operation 'update_request'.  Delegating to underlying dataset agent...")
         
+        if not hasattr(content, 'MessageType') or content.MessageType != CHANGE_EVENT_TYPE:
+            raise TypeError('The given content must be an instance of or a wrapped instance of %s.  Given: %s' % (repr(CHANGE_EVENT_TYPE), type(content)))
+        
+        
         # Step 1: Grab the context for the given dataset ID
         try:
-            context = yield self._get_dataset_context(content[0], content[1])
+            context = yield self._get_dataset_context(content.dataset_id, content.data_source_id)
         except KeyError, ex:
             yield self.reply_err(msg, "Could not grab the current context for the dataset with id: " + str(content))
         
@@ -350,7 +356,7 @@ class JavaAgentWrapper(ServiceProcess):
         # @todo: this should ultimately be an RPC send which replies when the update is complete, just before data is pushed back
         log.info("@@@--->>> Sending update request to Dataset Agent with context...")
         log.info("..." + str(context))
-#        (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=30)
+        (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=30)
         
         # @todo: change reply based on response of the RPC send
         # yield self.reply_ok(msg, {"value":"Successfully dispatched update request"}, {})
@@ -386,7 +392,7 @@ class JavaAgentWrapper(ServiceProcess):
         been keyed to the given datasetID; communication with the Resource Registry does NOT occur)
         '''
         # @todo: this method will be reimplemented so that dataset contexts can be retrieved dynamically
-        log.debug(" -[]- Entered _get_dataset_context(datasetID=%s); state=%s" % (datasetID, str(self._get_state())))
+        log.debug(" -[]- Entered _get_dataset_context(datasetID=%s, dataSourceID=%s); state=%s" % (datasetID, dataSourceID, str(self._get_state())))
         
         
         dataset = yield self.rc.get_instance(datasetID)
@@ -400,7 +406,7 @@ class JavaAgentWrapper(ServiceProcess):
             # @SEE use msg_instance.MessageObject.SOS (example of accessing GPB enum fields)
             
             # Create an instance of the EoiDataContext message
-            msg = yield self.mc.create_instance(context_message_type)
+            msg = yield self.mc.create_instance(DATA_CONTEXT_TYPE)
             
             # Fill in values
 #            msg.source_type = msg.SourceType.SOS
@@ -533,8 +539,13 @@ class JavaAgentWrapperClient(ServiceClient):
     """
     
     def __init__(self, *args, **kwargs):
+        # Step 1: Delegate initialization to parent "ServiceClient"
         kwargs['targetname'] = 'java_agent_wrapper'
         ServiceClient.__init__(self, *args, **kwargs)
+        
+        # Step 2: Perform Initialization
+        self.mc = MessageClient(proc=self.proc)
+        self.rc = ResourceClient(proc=self.proc)
         
     
     @defer.inlineCallbacks
@@ -586,9 +597,14 @@ class JavaAgentWrapperClient(ServiceClient):
         #   ...if not, this will spawn a new default instance.
         yield self._check_init()
         
+        # Create the Change event (just as the scheduler would)
+        change_event = yield self.mc.create_instance(CHANGE_EVENT_TYPE)
+        change_event.data_source_id = datasourceID
+        change_event.dataset_id = datasetID
+        
         # Invoke [op_]update_request() on the target service 'dispatcher_svc' via RPC
         log.info("@@@--->>> Sending 'update_request' RPC message to java_agent_wrapper service")
-        (content, headers, msg) = yield self.rpc_send('update_request', (datasetID, datasourceID))
+        (content, headers, msg) = yield self.rpc_send('update_request', (change_event))
         
         defer.returnValue(str(content))
         
