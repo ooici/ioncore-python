@@ -15,10 +15,11 @@ from ion.agents.resource_agent import ResourceAgentClient
 from ion.core.exception import ReceivedError
 from ion.services.dm.distribution.pubsub_service import PubSubClient
 from ion.data.dataobject import ResourceReference, DataObject
-from ion.core.process.process import Process, ProcessClient
+from ion.core.process.process import Process, ProcessClient, ProcessFactory, ProcessDesc
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 from ion.resources.dm_resource_descriptions import PublisherResource
 from uuid import uuid4
+import ion.util.procutils as pu
 
 
 """
@@ -239,6 +240,7 @@ errors = {
     'NETWORK_CORRUPTION'        : ['ERROR','NETWORK_CORRUPTION','A message passing through the network has been determined to be corrupt.'],
     'OUT_OF_MEMORY'	        : ['ERROR','OUT_OF_MEMORY','There is no more free memory to complete the operation.'],
     'LOCKED_RESOURCE'	        : ['ERROR','LOCKED_RESOURCE','The resource being accessed is in use by another exclusive operation.'],
+    'RESOURCE_NOT_LOCKED'       : ['ERROR','RESOURCE_NOT_LOCKED','Attempted to unlock a free resource.'],
     'RESOURCE_UNAVAILABLE'      : ['ERROR','RESOURCE_UNAVAILABLE','The resource being accessed is unavailable.'],
     'UNKNOWN_ERROR'             : ['ERROR','UNKNOWN_ERROR','An unknown error has been encountered.'],
     'PERMISSION_ERROR'          : ['ERROR','PERMISSION_ERROR','The user does not have the correct permission to access the resource in the desired way.'],
@@ -327,11 +329,13 @@ class InstrumentDriverClient(ProcessClient):
         @retval A dictionary with the parameter and value of the requested
             parameter
         """
+                
         assert(isinstance(param_list, (list, tuple)))
         (content, headers, message) = yield self.rpc_send('fetch_params',
                                                           param_list)
         assert(isinstance(content, dict))
         defer.returnValue(content)
+
 
     @defer.inlineCallbacks
     def set_params(self, param_dict):
@@ -341,11 +345,14 @@ class InstrumentDriverClient(ProcessClient):
         @retval A small dict of parameter and value on success, empty dict on
             failure
         """
+        
         assert(isinstance(param_dict, dict))
         (content, headers, message) = yield self.rpc_send('set_params',
                                                           param_dict)
         assert(isinstance(content, dict))
         defer.returnValue(content)
+
+
 
     @defer.inlineCallbacks
     def execute(self, command):
@@ -554,13 +561,11 @@ class InstrumentAgent(ResourceAgent):
         @retval Transaction ID UUID string.
         """
         
-        # Do we need to explicitly convert the content from dict to timeout int?
-        
         result = yield self._start_transaction(content)                
         yield self.reply_ok(msg,result)
         
     
-    def _start_transaction(timeout):
+    def _start_transaction(self,timeout):
         """
         Begin an exclusive transaction with the agent.
         @param timeout An integer specifying time to wait in seconds for the transaction.
@@ -569,20 +574,33 @@ class InstrumentAgent(ResourceAgent):
         
         assert(isinstance(timeout,int)), 'Expected an integer timeout.'
         
-        if timeout < 0:
-            timeout = default_transaction_timeout
+        result = {'success':None,'transaction_id':None}
         
-        if timeout > max_transaction_timeout:
-            timeout = max_transaction_timeout
+        if timeout < 0:
+            timeout = self.default_transaction_timeout
+        
+        if timeout > self.max_transaction_timeout:
+            timeout = self.max_transaction_timeout
             
         if timeout == 0:
-            if transaction_id == '':
-                transaction_id = uuid4()
-                return ['OK',transaction_id]
+            if self.transaction_id == None:
+                self.transaction_id = str(uuid4())
+                result['success'] = ['OK']
+                result['transaction_id']=self.transaction_id
             else:
-                return errors['LOCKED_RESOURCE']
+                result['success'] = errors['LOCKED_RESOURCE']
+                
+        else:
+            #TODO replay this with callback/timeout logic as necessary
+            if self.transaction_id == None:
+                self.transaction_id = str(uuid4())
+                result['success'] = ['OK']
+                result['transaction_id']=self.transaction_id
+            else:
+                result['success'] = errors['LOCKED_RESOURCE']
         
-        #todo add the timeout callback code here
+        return result
+        
         
         
     
@@ -592,32 +610,36 @@ class InstrumentAgent(ResourceAgent):
         End the current transaction.
         @param tid A uuid specifying the current transaction to end.
         """        
-        # Do we need to explicitly convert content from dict to uuid4?
-        
+
         result = self._end_transaction(content)
-        yield self.reply_ok(result)
+        yield self.reply_ok(msg,result)
                 
     
 
-    @defer.inlineCallbacks
-    def _end_transaction(tid):
+    def _end_transaction(self,tid):
         """
         End the current transaction.
         @param tid A uuid specifying the current transaction to end.
         """        
         
-        assert(isinstance(tid,uuid4)), 'Expected a uuid4 transaction ID.'
-        
-        if tid == transaction_id:
-            transaction_id = None
-            return ['OK']
+        assert(isinstance(tid,str)), 'Expected a str transaction ID.'
+
+        result = {'success':None}
+
+        if tid == self.transaction_id:
+            self.transaction_id = None
+            result['success'] = ['OK']
+        elif self.transaction_id == None:
+            result['success'] = errors['RESOURCE_NOT_LOCKED']
         else:
-            return errors['LOCKED_RESOURCE']
+            result['success'] = errors['LOCKED_RESOURCE']
+
             
+        return result
         
 
     
-    def _verify_transaction(tid,optype):
+    def _verify_transaction(self,tid,optype):
         """
         Verify the passed transaction ID is currently open, or open an implicit transaction.
         @param tid 'create' to create an implicit transaction, 'none' to perform the operation without
@@ -626,24 +648,24 @@ class InstrumentAgent(ResourceAgent):
         @retval True if the transaction is valid or if one was successfully created, False otherwise.
         """
 
-        assert(isinstance(tid,(str,uuid4))), 'Expected uuid4 or str transaction ID.'
-        assert(isinstance(optype,str,uuid4)), 'Expected str optype.'
+        assert(isinstance(tid,str)), 'Expected transaction ID str.'
+        assert(isinstance(optype,str)), 'Expected str optype.'
 
 
         # Try to start an implicit transaction if tid is 'create'
         if tid == 'create':
-            result = self._start_transaction(default_transaction_timeout)
+            result = self._start_transaction(self.default_transaction_timeout)
             if result[0]=='OK':
                 return True
             else:
                 return False
         
         # Allow only gets without a current or created transaction.
-        if tid == 'none' and transaction_id == None and optype == 'get':
+        if tid == 'none' and self.transaction_id == None and optype == 'get':
             return true
         
         # Otherwise, the given ID must match the outstanding one
-        if tid == transaction_id:
+        if tid == self.transaction_id:
             return True
         
         return False
@@ -674,7 +696,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
 
         assert(isinstance(cmd,list)), 'Expected a command list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
     
         reply = {'success':None,'result':None,'transaction_id':None}
     
@@ -730,7 +752,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -844,7 +866,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,dict)), 'Expected a parameter dict.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
         
         reply = {'success':None,'result':None,'transaction_id':None}
         
@@ -994,7 +1016,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -1092,7 +1114,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -1190,7 +1212,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -1307,7 +1329,7 @@ class InstrumentAgent(ResourceAgent):
         
         assert(isinstance(channels,list)), 'Expected a channels list.'
         assert(isinstance(command,list)), 'Expected a command list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -1409,7 +1431,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,dict)), 'Expected a parameter dict.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -1464,7 +1486,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -1521,7 +1543,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -1574,7 +1596,7 @@ class InstrumentAgent(ResourceAgent):
         bytes = content['bytes']
         tid = content['transaction_id']
 
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         
         reply = {'success':None,'result':None,'transaction_id':None}
@@ -1677,202 +1699,309 @@ class InstrumentAgent(ResourceAgent):
         if (type == publish_msg_type["StateChange"]):
                 yield self.pubsub_client.publish(self.sup,
                             self.state_topics["Agent"].reference(),value)
-    
-
         
 class InstrumentAgentClient(ResourceAgentClient):
     """
     The base class for an Instrument Agent Client. It is a service
     that allows for RPC messaging
     """
+    
+    ############################################################################
+    #   Transaction Management.
+    ############################################################################
 
     @defer.inlineCallbacks
-    def get_from_instrument(self, paramList):
+    def start_transaction(self,timeout):
         """
-        Obtain a list of parameter names from the instrument
-        @param paramList A list of the values to fetch
-        @retval A dict of the names and values requested
+        Begin an exclusive transaction with the agent.
+        @param timeout An integer specifying the time to wait in seconds for the
+            transaction.
+        @retval Transaction ID UUID string.
         """
-        assert(isinstance(paramList, list))
-        (content, headers, message) = yield self.rpc_send('get_from_instrument',
-                                                          paramList)
-        assert(isinstance(content, dict))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def get_observatory(self, paramList):
-        """
-        Obtain a list of parameter names from the instrument, decode some
-        values as needed.
-        @param paramList A list of the values to fetch
-        @retval A dict of the names and values requested
-        """
-        assert(isinstance(paramList, list))
-        (content, headers, message) = yield self.rpc_send('get_observatory',
-                                                          paramList)
-        assert(isinstance(content, dict))
-        for key in content.keys():
-            if (key == ci_param_list['DataTopics']) or \
-                (key == ci_param_list['EventTopics']) or \
-                       (key == ci_param_list['StateTopics']):
-                for entry in content[key].keys():
-                    content[key][entry] = DataObject.decode(content[key][entry])
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def set_to_instrument(self, paramDict):
-        """
-        Set a collection of values on an instrument
-        @param paramDict A dict of parameter names and the values they are
-            being set to
-        @retval A dict of the successful set operations that were performed
-        @todo Add exceptions for error conditions
-        """
-        assert(isinstance(paramDict, dict))
-        (content, headers, message) = yield self.rpc_send('set_to_instrument',
-                                                          paramDict)
-        assert(isinstance(content, dict))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def set_to_CI(self, paramDict):
-        """
-        Set a collection of values on an instrument
-        @param paramDict A dict of parameter names and the values they are
-            being set to
-        @retval A dict of the successful set operations that were performed
-        @todo Add exceptions for error conditions
-        """
-        assert(isinstance(paramDict, dict))
-        (content, headers, message) = yield self.rpc_send('set_to_CI',
-                                                          paramDict)
-        assert(isinstance(content, dict))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def disconnect(self, argList):
-        """
-        Disconnect from the instrument
-        """
-        log.debug("DHE: IAC in op_disconnect!")
-        assert(isinstance(argList, list))
-        (content, headers, message) = yield self.rpc_send('disconnect',
-                                                              argList)
-        assert(isinstance(content, dict))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def execute_device(self, command):
-        """
-        Execute the instrument commands in the order of the list.
-        Processing will cease when a command fails, but will not roll back.
-        For instrument calls, use executeInstrument()
-        @see executeInstrument()
-        @param command A list where the command name is the
-            first item in the sub-list, and the arguments are the rest of
-            the items in the sublists. For example:
-            ['command1', 'arg1', 'arg2']
-        @retval Dictionary of responses to each execute command
-        @todo Alter semantics of this call as needed...maybe a list?
-        @todo Add exceptions as needed
-        """
-        assert(isinstance(command, list))
-        (content, headers, message) = yield self.rpc_send('execute_device',
-                                                          command)
-        log.debug("message = " + str(message))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def execute_observatory(self, command):
-        """
-        Execute the instrument commands in the order of the list.
-        Processing will cease when a command fails, but will not roll back.
-        For instrument calls, use execute_device()
-        @see execute_device()
-        @param command A list where the command name is the
-            first item in the sub-list, and the arguments are the rest of
-            the items in the sublists. For example:
-            ['command1', 'arg1', 'arg2']
-        @retval Dictionary of responses to each execute command
-        @todo Alter semantics of this call as needed...maybe a command list?
-        @todo Add exceptions as needed
-        """
-        assert(isinstance(command, list))
-        (content, headers, message) = yield self.rpc_send('execute_observatory',
-                                                          command)
-        assert(isinstance(content, dict))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def get_status(self, argList):
-        """
-        Obtain the non-parameter and non-lifecycle status of the instrument
-        @param argList A list of arguments to pass for status
-        """
-        assert(isinstance(argList, list))
-        (content, headers, message) = yield self.rpc_send('get_status',
-                                                              argList)
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def start_phrase(self, timeout=0):
-        """
-        Start a phrase. Must not already have a phrase started or ended
-            pending application.
-        @param timeout An optional timeout in time duration format
-        @retval Success with a phrase ID or failure with an explanation
-        """
-        (content, headers, message) = yield self.rpc_send('start_phrase',
-                                                          timeout)
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def end_phrase(self):
-        """
-        End a phrase. Must have a phrase started and not ended
-            pending application.
-        @retval Success or failure with an explanation
-        """
-        (content, headers, message) = yield self.rpc_send('end_phrase', None)
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def cancel_phrase(self):
-        """
-        Cancel a phrase. Must have a phrase started.
-        @retval Success or failure with an explanation
-        """
-        (content, headers, message) = yield self.rpc_send('cancel_phrase', None)
+        
+        
+        assert(timeout==None or isinstance(timeout,int)), 'Expected int or None timeout.'
+        (content,headers,message) = yield self.rpc_send('start_transaction',timeout)    
+        assert(isinstance(content,dict))
+        
         defer.returnValue(content)
         
+    
     @defer.inlineCallbacks
-    def get_capabilities(self):
+    def end_transaction(self,tid):
         """
-        Obtain a list of capabilities from the instrument
-        @retval A dict with commands and
-        parameter lists that are supported
-            such as {'commands':(), 'parameters':()}
+        End the current transaction.
+        @param tid A uuid string specifying the current transaction to end.        
         """
-        (content, headers, message) = yield self.rpc_send('get_capabilities',
-                                                          ())
-        assert(isinstance(content, dict))
-        assert(ci_commands in content.keys())
-        assert(ci_parameters in content.keys())
-        assert(isinstance(content[ci_commands], (tuple, list)))
-        assert(isinstance(content[ci_parameters], (tuple, list)))
-        assert(instrument_commands in content.keys())
-        assert(instrument_parameters in content.keys())
-        assert(isinstance(content[instrument_commands], (tuple, list)))
-        assert(isinstance(content[instrument_parameters], (tuple, list)))
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        (content,headers,message) = yield self.rpc_send('end_transaction',tid)
+        #yield pu.asleep(1)
+        #content = {'success':['OK']}
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
 
-        listified = {}
-        for listing in content.keys():
-            listified[listing] = list(content[listing])
+    ############################################################################
+    #   Observatory Facing Interface.
+    ############################################################################
 
-        # Add in the special stuff that all instruments know
-        listified[ci_parameters].append(driver_address)
+    @defer.inlineCallbacks
+    def execute_observatory(self,command,transaction_id):
+        """
+        Execute infrastructure commands related to the Instrument Agent
+        instance. This includes commands for messaging, resource management
+        processes, etc.
+        @param command A command list [command,arg, ,arg].
+        @param transaction_id A transaction_id uuid4 or string 'create,' 'none.'
+        @retval Reply dict {'success':success,'result':command-specific,'transaction_id':transaction_id}.
+        """
+        
+        assert(isinstance(command,list)), 'Expected a command list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'command':command,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('execute_observatory',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+        
 
-        defer.returnValue(listified)
+    @defer.inlineCallbacks
+    def get_observatory(self,params,transaction_id):
+        """
+        Get data from the cyberinfrastructure side of the agent (registry info,
+        topic locations, messaging parameters, process parameters, etc.)
+        @param params A paramter list [param_arg, ,param_arg].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'
+        @retval A reply dict {'success':success,'params':{param_arg:(success,val),...,param_arg:(success,val)},
+            'transaction_id':transaction_id)        
+        """
+        
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_observatory',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+        
+        
+
+    @defer.inlineCallbacks
+    def set_observatory(self,params,transaction_id):
+        """
+        Set parameters related to the infrastructure side of the agent
+        (registration information, location, network addresses, etc.)
+        @param params A parameter-value dict {'params':{param_arg:val,..., param_arg:val}.
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'        
+        @retval Reply dict
+            {'success':success,'params':{param_arg:success,...,param_arg:success},'transaction_id':transaction_id}.        
+        """
+        assert(isinstance(params,dict)), 'Expected a parameter-value dict.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('set_observatory',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_observatory_metadata(self,params,transaction_id):
+        """
+        Retrieve metadata about the observatory configuration parameters.
+        @param params A metadata parameter list [(param_arg,meta_arg),...,(param_arg,meta_arg)].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                
+        @retval A reply dict {'success':success,'params':{(param_arg,meta_arg):(success,val),...,
+            param_arg,meta_arg):(success,val)},'transaction_id':transaction_id}.        
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_observatory_metadata',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_observatory_status(self,params,transaction_id):
+        """
+        Retrieve the observatory status values, including lifecycle state and other
+        dynamic observatory status values indexed by status keys.
+        @param params A parameter list [status_arg,...,status_arg].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                        
+        @retval Reply dict
+            {'success':success,'params':{status_arg:(success,val),..., status_arg:(success,val)},
+            'transaction_id':transaction_id}        
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_observatory_status',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_capabilities(self,params,transaction_id):
+        """
+        Retrieve the agent capabilities, including observatory and device values,
+        both common and specific to the agent / device.
+        @param params A parameter list [cap_arg,...,cap_arg].        
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                        
+        @retval Reply dict {'success':success,'params':{cap_arg:(success,[cap_val,...,cap_val]),...,
+            cap_arg:(success,[cap_val,...,cap_val])}, 'transaction_id':transaction_id}
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_capabilities',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+
+    ############################################################################
+    #   Instrument Facing Interface.
+    ############################################################################
+
+    @defer.inlineCallbacks
+    def execute_device(self,channels,command,transaction_id):
+        """
+        Execute a command on the device fronted by the agent. Commands may be
+        common or specific to the device, with specific commands known through
+        knowledge of the device or a previous get_capabilities query.
+        @param channels A channels list [chan_arg,...,chan_arg].
+        @param command A command list [command,arg,...,argN]).
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                                
+        @retval A reply dict
+            {'success':success,'result':{chan_arg:(success,command_specific_values),...,chan_arg:(success,command_specific_values)},
+            'transaction_id':transaction_id}. 
+        """
+        assert(isinstance(channels,list)), 'Expected a channels list.'
+        assert(isinstance(command,list)), 'Expected a command list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'channels':params,'command':command,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('execute_device',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_device(self,params,transaction_id):
+        """
+        Get configuration parameters from the instrument. 
+        @param params A parameters list [(chan_arg,param_arg),...,(chan_arg,param_arg)].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                                        
+        @retval A reply dict
+            {'success':success,'params':{(chan_arg,param_arg):(success,val),...,(chan_arg,param_arg):(success,val)},
+            'transaction_id':transaction_id}
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_device',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def set_device(self,params,transaction_id):
+        """
+        Set parameters to the instrument side of of the agent. 
+        @param params A parameter-value dict {(chan_arg,param_arg):val,...,(chan_arg,param_arg):val}.
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                                
+        @retval Reply dict
+            {'success':success,'params':{(chan_arg,param_arg):success,...,chan_arg,param_arg):success},
+            'transaction_id':transaction_id}.
+        """
+        assert(isinstance(params,dict)), 'Expected a parameter-value dict.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('set_device',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_device_metadata(self,params,transaction_id):
+        """
+        Retrieve metadata for the device, its transducers and parameters.
+        @param params A metadata parameter list [(chan_arg,param_arg,meta_arg),...,(chan_arg,param_arg,meta_arg)].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                                        
+        @retval Reply dict
+            {'success':success,'params':{(chan_arg,param_arg,meta_arg):(success,val),...,
+            chan_arg,param_arg,meta_arg):(success,val)}, 'transaction_id':transaction_id}.
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_device_metadata',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_device_status(self,params,transaction_id):
+        """
+        Obtain the status of an instrument. This includes non-parameter
+        and non-lifecycle state of the instrument.
+        @param params A parameter list [(chan_arg,status_arg),...,chan_arg,status_arg)].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                                        
+        @retval A reply dict
+            {'success':success,'params':{(chan_arg,status_arg):(success,val),...,
+            chan_arg,status_arg):(success,val)}, 'transaction_id':transaction_id}.
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_device_status',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def execute_device_direct(self,bytes,transaction_id):
+        """
+        Execute untranslated byte data commands on the device.
+        Must be in direct access mode and possess the correct transaction_id key
+        for the direct access session.
+        @param bytes An untranslated block of data to send to the device.
+        @param transaction_id A transaction ID uuid4 specifying the direct access session.                                               
+        @retval A reply dict {'success':success,'result':bytes}.
+        """
+        assert(bytes), 'Expected command bytes.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'bytes':bytes,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('execute_device_direct',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    ############################################################################
+    #   Publishing interface.
+    ############################################################################
+
+
+    @defer.inlineCallbacks
+    def publish(self):
+        """
+        """
+        pass
+
+    ############################################################################
+    #   Registration interface.
+    ############################################################################
+
 
     @defer.inlineCallbacks
     def register_resource(self, instrument_id):
@@ -1880,6 +2009,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         Register the resource. Since this is a subclass, make the appropriate
         resource description for the registry and pass that into the
         registration call.
+        """
+        
         """
         ia_instance = InstrumentAgentResourceInstance()
         ci_params = yield self.get_observatory([driver_address])
@@ -1889,3 +2020,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         result = yield ResourceAgentClient.register_resource(self,
                                                              ia_instance)
         defer.returnValue(result)
+        """
+        pass
+
+# Spawn of the process using the module name
+factory = ProcessFactory(InstrumentAgent)
