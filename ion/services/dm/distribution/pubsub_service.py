@@ -39,6 +39,7 @@ BINDING_TYPE = object_utils.create_type_identifier(object_id=2314, version=1)
 # Generic request and response wrapper message types
 REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
 RESPONSE_TYPE = object_utils.create_type_identifier(object_id=12, version=1)
+IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 # Query and response types
 REGEX_TYPE = object_utils.create_type_identifier(object_id=2306, version=1)
@@ -166,7 +167,7 @@ class PubSubService(ServiceProcess):
         self._check_msg_type(request, REGEX_TYPE)
 
         log.debug('Looking for XS entries...')
-        yield self._do_query(request, self.xs_list)
+        yield self._do_query(request, self.xs_list, msg)
 
     def _check_msg_type(self, request, expected_type):
         """
@@ -178,16 +179,14 @@ class PubSubService(ServiceProcess):
             raise PSSException('Bad message type!',
                                request.ResponseCodes.BAD_REQUEST)
 
-
     def _make_ref(self, key_string, object):
         """
         From a CASref key, create a full-on casref.
         @param key_string String, from casref key
         @param object Reply object we are modifying (in-place)
         @retval None
-        @bug This does not yet work. Need Stuebination(TM) here.
         """
-        my_ref = object.CreateObject(RESPONSE_TYPE)
+        my_ref = object.CreateObject(IDREF_TYPE)
         my_ref.key = key_string
         idx = len(object.id_list)
         object.id_list.add()
@@ -196,7 +195,7 @@ class PubSubService(ServiceProcess):
         
 
     @defer.inlineCallbacks
-    def _do_query(self, request, res_list):
+    def _do_query(self, request, res_list, msg):
         # This is probably better written as a list comprehension. Or something.
         rc = []
         p = re.compile(request.regex)
@@ -300,7 +299,7 @@ class PubSubService(ServiceProcess):
                                request.ResponseCodes.BAD_REQUEST)
 
         # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
-        yield self._do_query(request, self.xp_list)
+        yield self._do_query(request, self.xp_list, msg)
 
     @defer.inlineCallbacks
     def op_declare_topic(self, request, headers, msg):
@@ -369,7 +368,7 @@ class PubSubService(ServiceProcess):
             raise PSSException('Bad message, regex missing',
                                request.ResponseCodes.BAD_REQUEST)
 
-        yield self._do_query(request, self.topic_list)
+        yield self._do_query(request, self.topic_list, msg)
 
     @defer.inlineCallbacks
     def op_declare_publisher(self, request, headers, msg):
@@ -451,7 +450,6 @@ class PubSubService(ServiceProcess):
         # Assume a string for now.
         # We return a resource ref, which then must be looked up. Hmm. Change
         # to string return?
-        #q_name = yield self.ems.subscribe(xs_name, xp_name, topic_name)
         # @todo Declare queue and binding??!
 
         # Save into registry
@@ -565,34 +563,32 @@ class PubSubService(ServiceProcess):
         log.debug('Looking up queue for binding....')
         try:
             q_id = self._reverse_find(self.q_list, request.queue_name)
+            q_entry = yield self.rclient.get_instance(q_id)
+
+            xs_name = self.xs_list[q_entry.exchange_space_id.key]
+            xp_name = self.xp_list[q_entry.exchange_point_id.key]
+            topic_name = self.topic_list[q_entry.topic_id.key]
         except KeyError:
             log.exception('Unable to locate queue for binding!')
             raise PSSException('AB error in lookup',
                                request.ResponseCodes.BAD_REQUEST)
 
-        log.debug('q id is %s' % q_id)
-
-        log.debug('Looking up queue entry in registry...')
-        q_entry = yield self.rclient.get_instance(q_id)
-
+        log.debug('Ready for EMS with %s/%s/%s and %s' % \
+                  (xs_name, xp_name, topic_name, request.queue_name))
         
-        log.debug('Resource client completed, calling EMS')
-
         description = str(time.time())
-        from IPython.Shell import IPShellEmbed
-
-        ipshell = IPShellEmbed()
-        ipshell()
-
-
-
-        # Hmm, what's required to add a binding?? Something like this?
         rc = yield self.ems.create_binding('NoName', description,
                                            xs_name, xp_name, request.queue_name, topic_name)
 
-        # If so, do we need registries for this at all?
-        yield self.reply_ok(msg)
+        b_resource = yield self.rclient.create_instance(BINDING_RES_TYPE, 'Niemand')
+        b_resource.queue_name = request.queue_name
+        b_resource.binding = request.binding
+        b_resource.queue_id = self.rclient.reference_instance(q_entry)
 
+        yield self.rclient.put_instance(b_resource)
+
+        log.debug('Binding added')
+        yield self.reply_ok(msg)
 
 class PubSubClient(ServiceClient):
     """

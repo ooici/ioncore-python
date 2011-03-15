@@ -136,7 +136,7 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_xs_query(self):
-        raise unittest.SkipTest('Query is broken')
+        #raise unittest.SkipTest('Query is broken')
 
         xs_id = yield self._create_xs()
 
@@ -211,7 +211,7 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_query_topics(self):
-        raise unittest.SkipTest('Buggy, _make_ref borked still')
+        #raise unittest.SkipTest('Buggy, _make_ref borked still')
         yield self._declare_topic()
 
         msg = yield self.create_message(REGEX_TYPE)

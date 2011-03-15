@@ -413,6 +413,7 @@ class ExchangeManagementClient(ServiceClient):
             yield self._check_init()
     
             msg = yield self.helper.create_object(res_wrapper.binding_type)
+    
             msg.configuration.name = name
             msg.configuration.description = description
             msg.configuration.exchangespace = exchangespace
