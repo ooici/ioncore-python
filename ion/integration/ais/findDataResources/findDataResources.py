@@ -104,9 +104,6 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
 
-        defer.returnValue('something useful')
+        defer.returnValue(rspMsg)
 
-        # DHE TEST!!!
-        #log.debug("build objects!")
-        #yield self.rc.build_objects()
 
