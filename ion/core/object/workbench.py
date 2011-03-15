@@ -180,6 +180,11 @@ class WorkBench(object):
         """
         return self._repos.keys()
 
+    def clear_repository_key(self, repo_key):
+
+        repo = self.get_repository(repo_key)
+        self.clear_repository(repo)
+
     def clear_repository(self, repo):
 
         key = repo.repository_key

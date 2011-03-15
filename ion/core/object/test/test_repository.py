@@ -641,48 +641,56 @@ class RepositoryTest(unittest.TestCase):
 
     def test_clear_repo(self):
 
-
-
-
         def closure(workbench):
-            repo = workbench.create_repository(addresslink_type)
 
-            #repo = repository.Repository()
-
+            repo = self.wb.create_repository(addresslink_type)
+            # Create a weakref proxy to the repository
             repo_ref = weakref.proxy(repo)
-
-
-            workbench.clear_repository(repo)
 
             return repo_ref
 
-        repo_ref = closure(self.wb)
+        repo1_ref = closure(self.wb)
+        repo2_ref = closure(self.wb)
 
+        # Check to make sure we can get to properties of both repositories
+        self.assertEqual(repo1_ref.persistent, False)
+        self.assertEqual(repo2_ref.persistent, False)
+        # Neither one has been GCd because it is in the workbench.
 
+        # Clear destroys the references too it.
+        self.wb.clear_repository_key(repo1_ref.repository_key)
+
+        # Make sure the test is deterministic - call garbage collection!
         gc.collect()
 
-        referrers = gc.get_referrers(repo_ref)
+        # After clear the object is gone!
+        self.assertRaises(ReferenceError, getattr, repo1_ref, 'persistent')
+        self.assertEqual(repo2_ref.persistent, False)
 
 
-        print 'Referrers:', referrers
+        # Clear the second one
+        self.wb.clear_repository_key(repo2_ref.repository_key)
+
+        # Make sure the test is deterministic - call garbage collection!
+        gc.collect()
+
+        # After clear the object is gone!
+        self.assertRaises(ReferenceError, getattr, repo2_ref, 'persistent')
+        
 
 
 
-        self.assertRaises(ReferenceError, getattr, repo_ref, 'persistent')
 
-    
-
-    '''
     def test_clear(self):
+        """
+        In this test make weakrefs to a number of different objects in the repository and make sure all are GCd
 
-
-
-
+        @TODO add a test to make sure that 
+        """
         def closure(workbench):
             repo = workbench.create_repository(addresslink_type)
 
             # Create a resource object
-            """
             p1 = repo.create_object(person_type)
             p1.name='David'
             p1.id = 5
@@ -698,49 +706,34 @@ class RepositoryTest(unittest.TestCase):
 
             cref1 = repo.commit(comment='testing commit')
 
-            """
-            repo_ref = weakref.proxy(repo)
-            person_ref =5
-            addressbook_ref =6
-            """
-            person_ref = weakref.proxy(repo.root_object.person[0])
-            addressbook_ref = weakref.proxy(repo.root_object)
+            repo_refs=[]
+            repo_refs.append(weakref.ref(repo))
+            repo_refs.append(weakref.ref(repo.root_object.person[0]))
+            repo_refs.append(weakref.ref(repo.root_object.owner))
+            repo_refs.append(weakref.ref(repo.root_object.owner.GPBMessage))
+            repo_refs.append(weakref.ref(repo.root_object.owner.phone[0].GPBMessage))
+            repo_refs.append(weakref.ref(repo.root_object))
+            repo_refs.append(weakref.ref(repo._current_branch))
+            repo_refs.append(weakref.ref(repo._dotgit))
 
-            self.assertEqual(addressbook_ref.title, 'Junk')
-            self.assertEqual(person_ref.name, 'David')
-            """
+            for value in repo._commit_index.values():
+                repo_refs.append(weakref.ref(value))
 
-            repo.clear()
-
-            return (repo_ref, person_ref, addressbook_ref)
+            for value in repo.index_hash.values():
+                repo_refs.append(weakref.ref(value))
 
 
-        repo_ref, person_ref, addressbook_ref = closure(self.wb)
+            return repo_refs
 
+
+        repo_refs = closure(self.wb)
+
+        for item in repo_refs:
+            self.assertNotEqual(item(),None)
+
+        self.wb.clear_non_persistent()
 
         gc.collect()
 
-        referrers = gc.get_referrers(repo_ref, person_ref, addressbook_ref)
-
-        myframe = referrers[0]
-
-
-        print 'Referrers:', referrers
-        print 'myframe:', dir(myframe)
-        print 'myframe:', str(myframe.f_globals.keys())
-        print 'myframe:', str(myframe.f_locals.keys())
-
-
-
-        self.assertRaises(ReferenceError, getattr, repo_ref, 'repository_key')
-
-        self.assertRaises(ReferenceError, getattr, addressbook_ref, 'title')
-
-        self.assertRaises(ReferenceError, getattr, person_ref, 'name')
-
-        '''
-
-
- 
- 
- 
+        for item in repo_refs:
+            self.assertEqual(item(),None)
