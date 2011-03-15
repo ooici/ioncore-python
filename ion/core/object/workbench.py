@@ -659,7 +659,7 @@ class WorkBench(object):
                 
         new_repo._workbench = self
             
-        new_repo._hashed_elements = self._hashed_elements
+        new_repo.index_hash.cache = self._workbench_cache
         
         
         # Load all of the commit refs that came with this head.

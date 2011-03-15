@@ -46,19 +46,32 @@ class IndexHash(dict):
         dict.__init__(self, *args, **kwargs)
 
         self._workbench_cache = None
-        self.has_cache = False
+        self._has_cache = False
 
     def _set_cache(self,cache):
         assert isinstance(cache, weakref.WeakValueDictionary), 'Invalid object passed as the cache for a repository.'
         self._workbench_cache = cache
         self.has_cache = True
-        # add everything currently in self to the cache!
-        cache.update(self)
+
 
     def _get_cache(self):
         return self._workbench_cache
 
     cache = property(_get_cache, _set_cache)
+
+    def _set_has_cache(self, val):
+
+        assert isinstance(val, bool), 'Invalid or non boolen value passed to set has_cache property!'
+        self._has_cache = val
+        # add everything currently in self to the cache!
+        if val:
+            self._workbench_cache.update(self)
+
+    def _get_has_cache(self):
+          return self._has_cache
+
+    has_cache = property(_get_has_cache, _set_has_cache)
+
 
     def __getitem__(self, key):
 
@@ -1127,10 +1140,14 @@ class Repository(object):
 
         oe = value.Repository.index_hash.get(value.MyId)
         log.info('PRINT OE: %s' % oe)
+        log.info('HAS CACHE: %s' % value.Repository.index_hash.has_cache)
+        log.info('HAS CACHE: %s' % self.index_hash.has_cache)
 
         log.info('Len value Cache %s' % str(value.Repository.index_hash.cache.items()))
         log.info('Len self Cache %s' % str(self.index_hash.cache.items()))
 
+
+        log.info('Value Repo Has it!: %s ' % value.Repository.index_hash.cache.get(value.MyId))
 
         log.info('Same Cache %s' % str(self.index_hash.cache is value.Repository.index_hash.cache) )
 
