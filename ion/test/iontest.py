@@ -22,6 +22,7 @@ from ion.core.process import process
 from ion.core.process.process import IProcess, Process
 from ion.data.store import Store
 import ion.util.procutils as pu
+import os
 
 from ion.resources import description_utility
 
@@ -48,7 +49,7 @@ class IonTestCase(unittest.TestCase):
     twisted_container_service = None #hack
 
     @defer.inlineCallbacks
-    def _start_container(self):
+    def _start_container(self, sysname=None):
         """
         Starting and initialzing the container with a connection to a broker.
         """
@@ -74,7 +75,23 @@ class IonTestCase(unittest.TestCase):
         self.twisted_container_service = twisted_container_service
 
         # Manually perform some ioncore initializations
-        yield bootstrap.init_ioncore()
+        if sysname == None and os.environ.has_key("ION_TEST_CASE_SYSNAME"):
+            sysname = os.environ["ION_TEST_CASE_SYSNAME"]
+
+        # save off the old container args
+        self._old_container_args = None
+        self._reset_container_args = False
+        if sysname != None:
+            log.info("Setting _start_container sysname to %s" % sysname)
+            self._old_container_args = Container.args
+            self._reset_container_args = True
+            curargs = ''
+            if Container.args:
+                curargs = Container.args + ' '
+
+            Container.args = curargs + "sysname=%s" % sysname       # making this last will override sysname if it's set twice due to parsing
+
+        yield bootstrap.init_ioncore()      # calls set_container_args
 
         self.procRegistry = process.procRegistry
         self.test_sup = yield bootstrap.create_supervisor()
@@ -144,6 +161,13 @@ class IonTestCase(unittest.TestCase):
         #    yield self.container.terminate()
         #elif ioninit.container_instance:
         #    yield ioninit.container_instance.terminate()
+
+        # fix Container args if we messed with them
+        if self._reset_container_args:
+            Container.args = self._old_container_args
+            self._old_container_args = None
+            self._reset_container_args = False
+            # bootstrap.reset_container() will kill the stuff that bootstrap._set_container_args (called by bootstrap.init_ioncore) will set
 
         # Reset static module values back to initial state for next test case
         bootstrap.reset_container()
