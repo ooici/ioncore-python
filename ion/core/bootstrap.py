@@ -150,3 +150,7 @@ def reset_container():
     Receiver.rec_shutoff = False
     from ion.core.cc.cc_agent import CCAgent
     CCAgent.instance = None
+
+    # reset things set by _set_container_args
+    #ioninit.cont_args.pop('contid', None)
+    ioninit.cont_args.pop('sysname', None)

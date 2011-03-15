@@ -78,6 +78,10 @@ class CapabilityContainer(service.Service):
         self.container = None
         ioninit.testing = False
 
+        # calls back when the CC service starts up - anyone may attach to this callback and
+        # use it for whatever is needed.
+        self.defer_started = defer.Deferred()
+
     @defer.inlineCallbacks
     def startService(self):
         """
@@ -101,7 +105,8 @@ class CapabilityContainer(service.Service):
 
         log.info("All startup actions completed.")
 
-        # @todo At this point, can signal successful container start
+        # signal successful container start
+        self.defer_started.callback(True)
 
     @defer.inlineCallbacks
     def stopService(self):
