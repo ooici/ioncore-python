@@ -22,6 +22,7 @@ from ion.core.process import process
 from ion.core.process.process import IProcess, Process
 from ion.data.store import Store
 import ion.util.procutils as pu
+import os
 
 from ion.resources import description_utility
 
@@ -48,7 +49,7 @@ class IonTestCase(unittest.TestCase):
     twisted_container_service = None #hack
 
     @defer.inlineCallbacks
-    def _start_container(self):
+    def _start_container(self, sysname=None):
         """
         Starting and initialzing the container with a connection to a broker.
         """
@@ -74,7 +75,23 @@ class IonTestCase(unittest.TestCase):
         self.twisted_container_service = twisted_container_service
 
         # Manually perform some ioncore initializations
-        yield bootstrap.init_ioncore()
+        if sysname == None and os.environ.has_key("ION_TEST_CASE_SYSNAME"):
+            sysname = os.environ["ION_TEST_CASE_SYSNAME"]
+
+        # save off the old container args
+        self._old_container_args = None
+        self._reset_container_args = False
+        if sysname != None:
+            log.info("Setting _start_container sysname to %s" % sysname)
+            self._old_container_args = Container.args
+            self._reset_container_args = True
+            curargs = ''
+            if Container.args:
+                curargs = Container.args + ' '
+
+            Container.args = curargs + "sysname=%s" % sysname       # making this last will override sysname if it's set twice due to parsing
+
+        yield bootstrap.init_ioncore()      # calls set_container_args
 
         self.procRegistry = process.procRegistry
         self.test_sup = yield bootstrap.create_supervisor()
@@ -144,6 +161,13 @@ class IonTestCase(unittest.TestCase):
         #    yield self.container.terminate()
         #elif ioninit.container_instance:
         #    yield ioninit.container_instance.terminate()
+
+        # fix Container args if we messed with them
+        if self._reset_container_args:
+            Container.args = self._old_container_args
+            self._old_container_args = None
+            self._reset_container_args = False
+            # bootstrap.reset_container() will kill the stuff that bootstrap._set_container_args (called by bootstrap.init_ioncore) will set
 
         # Reset static module values back to initial state for next test case
         bootstrap.reset_container()
@@ -263,3 +287,55 @@ class FakeReceiver(object):
         self.sendmsg = msg
         # Need to be a generator
         yield fakeStore.put('fake','fake')
+
+class ItvTestCase(IonTestCase):
+    """
+    Integration testing base class for use with trial/itv_trial.
+
+    Tests a fully spawned system, either via CEI bootstrapping, or a locally spawned system via itv_trial.
+
+    Read more at:
+        https://confluence.oceanobservatories.org/display/CIDev/ITV+R1C3+Integration+Test+Framework
+
+    To use, derive your test from ion.test.ItvTestCase and fill in the services class
+    attribute with a list of apps your test needs. Apps are relative to the current working
+    directory and typically reside in the res/apps subdir of ioncore-python.
+
+    Example:
+
+        class AttributeStoreTest(ItvTestCase):
+            services = ["res/apps/attributestore.app"]  # start these apps prior to testing.
+
+            @defer.inlineCallbacks
+            def setUp(self):
+                yield self._start_container()
+
+            @defer.inlineCallbacks
+            def tearDown(self):
+                yield self._stop_container()
+
+            @defer.inlineCallbacks
+            def test_set_attr(self):
+                asc = AttributeStoreClient()
+                yield asc.put("hi", "hellothere")
+
+                res = yield asc.get("hi")
+                self.failUnless(res == "hellothere")
+
+            @defer.inlineCallbacks
+            def test_set_attr2(self):
+                # "hi" is still set here, but only if test_set_attr is run first, be careful
+                asc = AttributeStoreClient()
+                res = yield asc.get("hi")
+                self.failUnless(res == "hellothere")
+
+    Important points:
+    - The sysname parameter is required to get all the services and tests running on the same
+      system. itv_trial takes care of this for you, but if you want to deploy these tests vs 
+      a CEI spawned environment, you must set the environment variable ION_TEST_CASE_SYSNAME
+      to be the same as the sysname the CEI environment was spawned with.
+
+    """
+    services = []
+
+
