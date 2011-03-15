@@ -26,6 +26,11 @@ from ion.core.process.process import ProcessFactory, Process
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
+from ion.core.messaging.message_client import MessageClient
+from ion.services.coi.resource_registry_beta.resource_client import \
+    ResourceClient
+
+
 # For testing - used in the client
 from net.ooici.play import addressbook_pb2
 
@@ -38,6 +43,8 @@ from ion.core.object import object_utils
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
+
+BEGIN_INGEST_TYPE = object_utils.create_type_identifier(object_id=2002, version=1)
 
 
 class EOIIngestionService(ServiceProcess):
@@ -99,6 +106,23 @@ class EOIIngestionService(ServiceProcess):
         
         yield self.reply(msg, content=head)
         
+        
+        
+    @defer.inlineCallbacks
+    def op_begin_ingest(self, content, headers, msg):
+        """
+        Start the ingestion process by setting up neccessary
+        """
+        log.info('<<<---@@@ Incoming begin_ingest request with "Begin Ingest" message')
+        log.debug("...Content:\t" + str(content))
+        
+        
+        log.info('Setting up ingest topic for communication with a Dataset Agent: "%s"' % content.ds_ingest_topic)
+        log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
+        log.info('Notifying caller that ingest is ready by invoking RPC op_ingest_ready() using routing key: "%s"' % content.ready_routing_key)
+        
+        
+        yield self.reply(msg, content={'topic':content.ds_ingest_topic})
 
 
     
@@ -107,9 +131,14 @@ class EOIIngestionClient(ServiceClient):
     Class for the client accessing the resource registry.
     """
     def __init__(self, proc=None, **kwargs):
+        # Step 1: Delegate initialization to parent "ServiceClient"
         if not 'targetname' in kwargs:
             kwargs['targetname'] = "eoi_ingest"
         ServiceClient.__init__(self, proc, **kwargs)
+        
+        # Step 2: Perform Initialization
+        self.mc = MessageClient(proc=self.proc)
+#        self.rc = ResourceClient(proc=self.proc)
 
     @defer.inlineCallbacks
     def ingest(self):
@@ -132,7 +161,6 @@ class EOIIngestionClient(ServiceClient):
         
         (content, headers, msg) = yield self.rpc_send('ingest', ab)
         
-
         defer.returnValue(content)
         
         
@@ -153,8 +181,55 @@ class EOIIngestionClient(ServiceClient):
         # Return value should be a resource identity
         defer.returnValue(content)
         
+        
+        
+    @defer.inlineCallbacks
+    def begin_ingest(self, ds_ingest_topic, ready_routing_key, ingest_service_timeout):
+        """
+        Start the ingest process by passing the Service a topic to communicate on, a
+        routing key for intermediate replies (signaling that the ingest is ready), and
+        a custom timeout for the ingest service (since it may take much longer than the
+        default timeout to complete an ingest)
+        """
+        # Ensure a Process instance exists to send messages FROM...
+        #   ...if not, this will spawn a new default instance.
+        yield self._check_init()
+        
+        # Create the BeginIngestMessage
+        begin_msg = yield self.mc.create_instance(BEGIN_INGEST_TYPE)
+        begin_msg.ds_ingest_topic        = ds_ingest_topic
+        begin_msg.ready_routing_key       = ready_routing_key
+        begin_msg.ingest_service_timeout = ingest_service_timeout
+
+        # Invoke [op_]update_request() on the target service 'dispatcher_svc' via RPC
+        log.info("@@@--->>> Sending 'begin_ingest' RPC message to eoi_ingest service")
+        (content, headers, msg) = yield self.rpc_send('begin_ingest', begin_msg)
+        
+
+        defer.returnValue(content)
+        
+        
 
 # Spawn of the process using the module name
 factory = ProcessFactory(EOIIngestionService)
 
 
+
+'''
+
+#----------------------------#
+# Application Startup
+#----------------------------#
+:: bash ::
+bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=eoitest res/apps/resource.app
+
+
+#----------------------------#
+# Begin_Ingest Testing
+#----------------------------#
+from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
+client = EOIIngestionClient()
+spawn('eoi_ingest')
+client.begin_ingest('ingest.topic.123iu2yr82', 'ready_routing_key', 1234)
+
+'''
