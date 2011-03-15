@@ -177,7 +177,7 @@ class ExchangeManagementService(ServiceProcess):
         response = yield self.helper.push_object(object)
         self.xn[name] = response.configuration.MyId;
         log.debug('Created exchangename.  id: %s', response.configuration.MyId)
-        yield self.reply_ok(msg, response.configuration.MyId)
+        yield self.reply_ok(msg, response)
 
 
     @defer.inlineCallbacks
@@ -350,9 +350,8 @@ class ExchangeManagementClient(ServiceClient):
             name,
             description,
             exchangespace,
-            exchangename,
-            topic
-        ):
+            exchangename
+            ):
             """
             Creates a Queue.
             @param name 

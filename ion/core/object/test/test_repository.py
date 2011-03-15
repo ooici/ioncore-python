@@ -187,7 +187,17 @@ class RepositoryTest(unittest.TestCase):
         ab = yield repo.checkout(branchname='master', commit_id=commit_ref3)
         self.assertEqual(ab.person[0].id,1)
         self.assertEqual(ab.person[0].name,'alpha')
-        
+
+
+    def test_error_on_set_linked_object(self):
+
+        repo, ab = self.wb.init_repository(addresslink_type)
+
+        self.assertRaises(repository.RepositoryError, setattr, ab , 'owner', 'anything but a gpbwrapper')
+
+
+
+
         
     def test_log(self):
         wb1 = workbench.WorkBench('No Process Test')
@@ -250,7 +260,7 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(ab.owner.name, 'Michael')
         
         self.assertEqual(ab.person[0].name, 'Michael')
- 
+
     @defer.inlineCallbacks
     def test_lost_objects(self):
         repo, ab = self.wb.init_repository(addresslink_type)

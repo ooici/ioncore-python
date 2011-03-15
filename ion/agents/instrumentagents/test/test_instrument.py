@@ -35,8 +35,14 @@ class TestInstrumentAgent(IonTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
+        
+        
         yield self._start_container()
 
+
+
+
+        """
         # startup a simulator
         self.simulator = Simulator("123", 9000)
         self.SimulatorPort = self.simulator.start()
@@ -63,19 +69,22 @@ class TestInstrumentAgent(IonTestCase):
         # Start an Agent Registry to test against
         self.reg_client = AgentRegistryClient(proc=self.sup)
         yield self.reg_client.clear_registry()
-
+        """
     @defer.inlineCallbacks
     def tearDown(self):
+        
+        """
         yield self.simulator.stop()
-        """
-        child_id = yield self.sup.get_child_id('pubsub_service')
-        pubsub = self._get_procinstance(child_id)
-        pubsub.reg.clear_registry()
-        """
+        
+        #child_id = yield self.sup.get_child_id('pubsub_service')
+        #pubsub = self._get_procinstance(child_id)
+        #pubsub.reg.clear_registry()
+        
         
         yield pu.asleep(1)
-        
+        """
         yield self._stop_container()
+        
 
     @defer.inlineCallbacks
     def test_get_SBE49_capabilities(self):
@@ -83,6 +92,8 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability to gather capabilities from the SBE49 instrument
         capabilities
         """
+        raise unittest.SkipTest("InstrumentAgent rewrite in progress.")
+        
         result = yield self.IAClient.get_capabilities()
         #log.info("getCapabilities result: "+ str(result))
         self.assert_(set(IACIParameters).issubset(set(result[IA.ci_parameters])))
@@ -100,6 +111,8 @@ class TestInstrumentAgent(IonTestCase):
         Test the ability of the SBE49 driver to send and receive get, set,
         and other messages. Best called as RPC message pairs.
         """
+        raise unittest.SkipTest("InstrumentAgent rewrite in progress.")
+        
         response = yield self.IAClient.get_from_instrument(['baudrate',
                                                                 'outputformat'])
         self.assertEqual(response['baudrate'], 9600)
@@ -126,12 +139,15 @@ class TestInstrumentAgent(IonTestCase):
         except ReceivedError:
             log.debug("Correctly caught a ReceivedError")
 
+        
     @defer.inlineCallbacks
     def test_registration(self):
         """
         Tests the ability of an instrument agent to successfully register
         ifself with the resource registry.
         """
+        raise unittest.SkipTest("InstrumentAgent rewrite in progress.")
+        
         reg_ref = yield self.IAClient.register_resource("123")
 
         result = yield self.IAClient.get_resource_instance()
@@ -155,6 +171,8 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test the resource lifecycle management
         """
+        raise unittest.SkipTest("InstrumentAgent rewrite in progress.")
+        
         yield self.IAClient.register_resource("123")
 
         response = yield self.IAClient.set_lifecycle_state(LCS.inactive)
@@ -170,13 +188,15 @@ class TestInstrumentAgent(IonTestCase):
         response = yield self.IAClient.get_lifecycle_state()
         self.assertEqual(response, LCS.active)
 
+        
     @defer.inlineCallbacks
     def test_execute_device(self):
-        raise unittest.SkipTest('Needs failfast set to false')
         """
         Test the ability of the SBE49 driver to execute commands through the
         InstrumentAgentClient class
         """
+        raise unittest.SkipTest('InstrumentAgent rewrite in progress.')
+
         response = yield self.IAClient.execute_device(['start', 'now', 1])
         log.debug("response: %s " % response)
         self.assert_(isinstance(response, dict))
@@ -203,6 +223,9 @@ class TestInstrumentAgent(IonTestCase):
         Test the methods for retreiving the driver process directly from
         the instrument agent.
         """
+        raise unittest.SkipTest('InstrumentAgent rewrite in progress.')
+        
+        
         response = yield self.IAClient.get_observatory([IA.driver_address])
         self.assertNotEqual(response, None)
         """
@@ -219,6 +242,9 @@ class TestInstrumentAgent(IonTestCase):
         Test to see if the status response is correct
         @todo Do we even need this function?
         """
+        raise unittest.SkipTest('InstrumentAgent rewrite in progress.')
+        
+        
         response = yield self.IAClient.get_status(['some_arg'])
         self.assert_(isinstance(response, dict))
         self.assertEqual(response['InstrumentState'], 'a-ok')
@@ -229,6 +255,10 @@ class TestInstrumentAgent(IonTestCase):
         """
         Test the ability to manipulate phrases in an instrument agent
         """
+        
+        raise unittest.SkipTest('InstrumentAgent rewrite in progress.')
+        
+        
         try:
             response = yield self.IAClient.end_phrase()
             self.fail("ReceivedError expected")
