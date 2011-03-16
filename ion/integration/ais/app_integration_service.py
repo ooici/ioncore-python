@@ -26,6 +26,7 @@ from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_REQ_M
 
 # import working classes for AIS
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources
+from ion.integration.ais.getDataResourceDetail.getDataResourceDetail import GetDataResourceDetail
 from ion.integration.ais.RegisterUser.RegisterUser import RegisterUser
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -56,8 +57,8 @@ class AppIntegrationService(ServiceProcess):
     def op_findDataResources(self, content, headers, msg):
         """
         @brief Find data resources associated with given userID
-        @param reference to instrument protocol object.
-        @retval none
+        @param GPB containing OOID user ID, spatial, and temporal bounds.
+        @retval GPB with list of resource IDs.
         """
         log.debug('op_findDataResources service method.')
         try:
@@ -77,8 +78,16 @@ class AppIntegrationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_getDataResourceDetail(self, content, headers, msg):
+        """
+        @brief Get detailed metadata for a given resource ID.
+        @param GPB containing resource ID.
+        @retval GPB containing detailed metadata.
+        """
         log.info('op_getDataResourceDetail: '+str(content))
         try:
+            
+            worker = GetDataResourceDetail(self)
+            
             yield self.reply_ok(msg, {'value' : 'value'})
         except KeyError:
             estr = 'Missing information in message!'
@@ -144,21 +153,16 @@ class AppIntegrationServiceClient(ServiceClient):
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def getDataResourceDetail(self, userId, dataResourceId, detailType):
+    def getDataResourceDetail(self, msg):
         yield self._check_init()
-        payload = {'userId' : userId,
-                   'dataResourceId' : dataResourceId,
-                   'detailType' : detailType}
-        (content, headers, payload) = yield self.rpc_send('getDataResourceDetail', payload)
+        (content, headers, payload) = yield self.rpc_send('getDataResourceDetail', msg)
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def createDownloadURL(self, userId, dataResourceId):
+    def createDownloadURL(self, msg):
         yield self._check_init()
-        payload = {'userId' : userId,
-                   'dataResourceId' : dataResourceId}
-        (content, headers, payload) = yield self.rpc_send('createDownloadURL', payload)
+        (content, headers, payload) = yield self.rpc_send('createDownloadURL', msg)
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)
  

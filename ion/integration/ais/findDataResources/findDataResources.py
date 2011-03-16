@@ -102,7 +102,7 @@ class FindDataResources(object):
 
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
-        rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
+        #rspMsg.message_parameters_reference[0].data_resource_id.add()
 
         defer.returnValue(rspMsg)
 
