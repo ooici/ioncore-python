@@ -31,17 +31,19 @@ from ion.integration.ais.ais_object_identifiers import REGISTER_USER_TYPE, \
                                                        FIND_DATA_RESOURCES_REQ_MSG_TYPE
 
 
-CDM_DATASET_TYPE = object_utils.create_type_identifier(object_id = 10001, version = 1)
-GROUP_TYPE = object_utils.create_type_identifier(object_id=10020, version=1)
+# Create CDM Type Objects
 datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
+dataset_type = object_utils.create_type_identifier(object_id=10001, version=1)
+group_type = object_utils.create_type_identifier(object_id=10020, version=1)
 dimension_type = object_utils.create_type_identifier(object_id=10018, version=1)
 variable_type = object_utils.create_type_identifier(object_id=10024, version=1)
+bounded_array_type = object_utils.create_type_identifier(object_id=10021, version=1)
+array_structure_type = object_utils.create_type_identifier(object_id=10025, version=1)
+
 attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
 stringArray_type = object_utils.create_type_identifier(object_id=10015, version=1)
-boundedArray_type = object_utils.create_type_identifier(object_id=10021, version=1)
 float32Array_type = object_utils.create_type_identifier(object_id=10013, version=1)
 int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
-
 
 class AppIntegrationTest(IonTestCase):
     """
@@ -228,18 +230,22 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail("re-registration did not return the same OoiId as registration")
         log.info("test_registerUser: re-registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
 
+
+
     @defer.inlineCallbacks
     def createDataset(self, rc):
+
         log.debug('DHE: creating test dataset!')
 
-        dataset = yield rc.create_instance(CDM_DATASET_TYPE, ResourceName='AIS Test CDM Dataset Resource', ResourceDescription='A test resource')
+        dataset = yield rc.create_instance(dataset_type, ResourceName='AIS Test CDM Dataset Resource', ResourceDescription='A test resource')
         log.debug('DHE: created test dataset!')
         
         # Attach the root group
-        group = dataset.CreateObject(GROUP_TYPE)
+        group = dataset.CreateObject(group_type)
         group.name = 'ais test data'
         dataset.root_group = group
     
+
         # Create all dimension and variable objects
         # Note: CDM variables such as scalars, coordinate variables and data are all represented by
         #       the variable object type.  Signifying the difference between these types is done
@@ -319,20 +325,25 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         _add_string_attribute(dataset, variable_z, '_CoordinateAxisType', ['Height'])
         _add_string_attribute(dataset, variable_z, '_CoordinateZisPositive', ['down'])
         # Add data values
-        variable_t.content.add()
-        variable_t.content[0] = dataset.CreateObject(boundedArray_type)
-        variable_t.content[0].bounds.add()
-        variable_t.content[0].bounds[0].origin = 0
-        variable_t.content[0].bounds[0].size = 2
-        variable_t.content[0].ndarray = dataset.CreateObject(int32Array_type) 
-        variable_t.content[0].ndarray.value.extend([1280102520, 1280106120])
-        variable_z.content.add()
-        variable_z.content[0] = dataset.CreateObject(boundedArray_type)
-        variable_z.content[0].bounds.add()
-        variable_z.content[0].bounds[0].origin = 0
-        variable_z.content[0].bounds[0].size = 3
-        variable_z.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-        variable_z.content[0].ndarray.value.extend([0.0, 0.1, 0.2])
+        variable_t.content = dataset.CreateObject(array_structure_type)
+        variable_t.content.bounded_arrays.add()
+        variable_t.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    
+        variable_t.content.bounded_arrays[0].bounds.add()
+        variable_t.content.bounded_arrays[0].bounds[0].origin = 0
+        variable_t.content.bounded_arrays[0].bounds[0].size = 2
+        variable_t.content.bounded_arrays[0].ndarray = dataset.CreateObject(int32Array_type)
+        variable_t.content.bounded_arrays[0].ndarray.value.extend([1280102520, 1280106120])
+    
+        variable_z.content = dataset.CreateObject(array_structure_type)
+        variable_z.content.bounded_arrays.add()
+        variable_z.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    
+        variable_z.content.bounded_arrays[0].bounds.add()
+        variable_z.content.bounded_arrays[0].bounds[0].origin = 0
+        variable_z.content.bounded_arrays[0].bounds[0].size = 3
+        variable_z.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+        variable_z.content.bounded_arrays[0].ndarray.value.extend([0.0, 0.1, 0.2])
         
         
         # Construct the Scalar Variables: lat, lon and station id
@@ -349,27 +360,37 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         _add_string_attribute(dataset, scalar_sid, 'long_name', ['integer station identifier'])
         _add_string_attribute(dataset, scalar_sid, 'standard_name', ['station_id'])
         # Add data values
-        scalar_lat.content.add()
-        scalar_lat.content[0] = dataset.CreateObject(boundedArray_type)
-        scalar_lat.content[0].bounds.add()
-        scalar_lat.content[0].bounds[0].origin = 0
-        scalar_lat.content[0].bounds[0].size = 1
-        scalar_lat.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-        scalar_lat.content[0].ndarray.value.extend([-45.431])
-        scalar_lon.content.add()
-        scalar_lon.content[0] = dataset.CreateObject(boundedArray_type)
-        scalar_lon.content[0].bounds.add()
-        scalar_lon.content[0].bounds[0].origin = 0
-        scalar_lon.content[0].bounds[0].size = 1
-        scalar_lon.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-        scalar_lon.content[0].ndarray.value.extend([25.909])
-        scalar_sid.content.add()
-        scalar_sid.content[0] = dataset.CreateObject(boundedArray_type)
-        scalar_sid.content[0].bounds.add()
-        scalar_sid.content[0].bounds[0].origin = 0
-        scalar_sid.content[0].bounds[0].size = 1
-        scalar_sid.content[0].ndarray = dataset.CreateObject(int32Array_type) 
-        scalar_sid.content[0].ndarray.value.extend([10059])
+        scalar_lat.content= dataset.CreateObject(array_structure_type)
+        scalar_lat.content.bounded_arrays.add()
+        scalar_lat.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    
+        scalar_lat.content.bounded_arrays[0].bounds.add()
+        scalar_lat.content.bounded_arrays[0].bounds[0].origin = 0
+        scalar_lat.content.bounded_arrays[0].bounds[0].size = 1
+        scalar_lat.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+        scalar_lat.content.bounded_arrays[0].ndarray.value.extend([-45.431])
+    
+    
+        scalar_lon.content= dataset.CreateObject(array_structure_type)
+        scalar_lon.content.bounded_arrays.add()
+        scalar_lon.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    
+        scalar_lon.content.bounded_arrays[0].bounds.add()
+        scalar_lon.content.bounded_arrays[0].bounds[0].origin = 0
+        scalar_lon.content.bounded_arrays[0].bounds[0].size = 1
+        scalar_lon.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+        scalar_lon.content.bounded_arrays[0].ndarray.value.extend([25.909])
+    
+    
+        scalar_sid.content= dataset.CreateObject(array_structure_type)
+        scalar_sid.content.bounded_arrays.add()
+        scalar_sid.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    
+        scalar_sid.content.bounded_arrays[0].bounds.add()
+        scalar_sid.content.bounded_arrays[0].bounds[0].origin = 0
+        scalar_sid.content.bounded_arrays[0].bounds[0].size = 1
+        scalar_sid.content.bounded_arrays[0].ndarray = dataset.CreateObject(int32Array_type)
+        scalar_sid.content.bounded_arrays[0].ndarray.value.extend([10059])
         
         
         # Construct the Data Variable: salinity
@@ -385,16 +406,18 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         _add_string_attribute(dataset, variable_salinity, 'coordinates', ['time lon lat z'])
         _add_string_attribute(dataset, variable_salinity, 'standard_name', ['sea_water_salinity'])
         # Add data values
-        variable_salinity.content.add()
-        variable_salinity.content[0] = dataset.CreateObject(boundedArray_type)
-        variable_salinity.content[0].bounds.add()
-        variable_salinity.content[0].bounds[0].origin = 0
-        variable_salinity.content[0].bounds[0].size = 2 # time dimension
-        variable_salinity.content[0].bounds.add()
-        variable_salinity.content[0].bounds[1].origin = 0
-        variable_salinity.content[0].bounds[1].size = 3 # depth dimension
-        variable_salinity.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-        variable_salinity.content[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
+        variable_salinity.content= dataset.CreateObject(array_structure_type)
+        variable_salinity.content.bounded_arrays.add()
+        variable_salinity.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+    
+        variable_salinity.content.bounded_arrays[0].bounds.add()
+        variable_salinity.content.bounded_arrays[0].bounds[0].origin = 0
+        variable_salinity.content.bounded_arrays[0].bounds[0].size = 2 # time dimension
+        variable_salinity.content.bounded_arrays[0].bounds.add()
+        variable_salinity.content.bounded_arrays[0].bounds[1].origin = 0
+        variable_salinity.content.bounded_arrays[0].bounds[1].size = 3 # depth dimension
+        variable_salinity.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+        variable_salinity.content.bounded_arrays[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
         
         
         # Attach variable and dimension objects to the root group
@@ -471,10 +494,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         group.attributes[14] = attrib_vert_min
         group.attributes[15] = attrib_vert_pos
         
-        
         # 'put' the resource into the Resource Registry
         rc.put_instance(dataset, 'Testing put...')
-        
         
         #-------------------------------------------#
         # Create the coresponding datasource object #
@@ -489,16 +510,17 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # datasource.bottom = *not used*
         # datasource.left = *not used*
         # datasource.right = *not used*
-        # datasource.base_url = 'http://sdf.ndbc.noaa.gov/sos/server.php?request=GetObservation&service=SOS&responseformat=text/csv&'
+        #    datasource.base_url = 'http://sdf.ndbc.noaa.gov/sos/server.php?request=GetObservation&service=SOS&responseformat=text/csv&'
         datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
         # datasource.dataset_url = *not used*
         # datasource.ncml_mask = *not used*
-
+        
         # 'put' the resource into the Resource Registry
         yield rc.put_instance(dataset, 'Testing put...')
         log.debug('DHE: createDataset supposedly put dataset with identity: ' + str(dataset.ResourceIdentity))
         
         defer.returnValue(dataset.ResourceIdentity)
+
 
 def _create_string_attribute(dataset, name, values):
     '''

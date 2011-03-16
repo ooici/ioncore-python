@@ -88,7 +88,7 @@ class FindDataResources(object):
         
         #dimensions    =  [str(dim.name) for dim in lat.shape]
         print 'YO! %s units are %s' % (str(unicode_name), str(unicode_units))
-        print 'YO YO! lat has %s contents' % (len(lat.content))
+        #print 'YO YO! lat has %s contents' % (len(lat.content))
         #testvalue = lat.GetValue()
         #print 'YO YO YO! lat has value %s' % (str(testvalue))
 
