@@ -4,6 +4,8 @@
 @file ion/services/coi/resource_registry/resource_registry.py
 @author Michael Meisinger
 @author David Stuebe
+@author Dave Foster <dfoster@asascience.com>
+@author Timothy LaRocque
 @brief service for registering resources
 
 To test this with the Java CC!
@@ -12,7 +14,7 @@ To test this with the Java CC!
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from twisted.python import reflect
 
 from ion.services.coi import datastore
@@ -29,6 +31,7 @@ import ion.util.procutils as pu
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry_beta.resource_client import \
     ResourceClient
+from ion.services.dm.distribution.publisher_subscriber import Subscriber
 
 
 # For testing - used in the client
@@ -70,6 +73,8 @@ class EOIIngestionService(ServiceProcess):
         self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
         self.fetch_linked_objects = self.workbench.fetch_linked_objects
 
+        self._defer_ingest = defer.Deferred()       # waited on by op_ingest to signal end of ingestion
+
         log.info('ResourceRegistryService.__init__()')
 
     @defer.inlineCallbacks
@@ -78,7 +83,8 @@ class EOIIngestionService(ServiceProcess):
         Push this dataset to the datastore
         """
         log.debug('op_ingest recieved content:'+ str(content))
-        
+
+       
         msg_repo = content.Repository
         
         result = yield self.push('datastore', msg_repo.repository_key)
@@ -107,7 +113,15 @@ class EOIIngestionService(ServiceProcess):
         yield self.reply(msg, content=head)
         
         
-        
+    class IngestSubscriber(Subscriber):
+        """
+        Specially derived Subscriber that routes received messages into the ingest service's
+        standard receive method, as if it is one of the process receivers.
+        """
+        @defer.inlineCallbacks
+        def _receive_msg(self, content, msg):
+            yield self._process.receive(content, msg)
+
     @defer.inlineCallbacks
     def op_begin_ingest(self, content, headers, msg):
         """
@@ -115,17 +129,66 @@ class EOIIngestionService(ServiceProcess):
         """
         log.info('<<<---@@@ Incoming begin_ingest request with "Begin Ingest" message')
         log.debug("...Content:\t" + str(content))
-        
-        
+
+
         log.info('Setting up ingest topic for communication with a Dataset Agent: "%s"' % content.ds_ingest_topic)
+        self._subscriber = self.IngestSubscriber(xp_name="magnet.topic",
+                                                 binding_key=content.ds_ingest_topic,
+                                                 process=self)
+        yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
+
+        def _timeout():
+            # trigger execution to continue below with a False result
+            self._defer_ingest.callback(False)
+
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
+        timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
+
         log.info('Notifying caller that ingest is ready by invoking RPC op_ingest_ready() using routing key: "%s"' % content.ready_routing_key)
-        
-        
-        yield self.reply(msg, content={'topic':content.ds_ingest_topic})
+        yield self.rpc_send(content.ready_routing_key, operation='ingest_ready', content=True)
 
+        ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
 
-    
+        if ingest_res:
+            # we succeeded, cancel the timeout
+            timeoutcb.cancel()
+
+            # now reply ok to the original message
+            yield self.reply_ok(msg) #, content={'topic':content.ds_ingest_topic})
+        else:
+            yield self.reply_err(msg)
+
+        # common cleanup
+
+        # reset ingestion deferred so we can use it again
+        self._defer_ingest = defer.Deferred()
+
+        # remove subscriber, deactivate it
+        self._registered_life_cycle_objects.remove(self._susbcriber)
+        yield self._subscriber.terminate()
+        self._subscriber = None
+
+    @defer.inlineCallbacks
+    def op_recv_shell(self, content, headers, msg):
+        log.info("op_recv_shell")
+        # this is NOT rpc
+        yield self.reply_ok(msg)
+
+    @defer.inlineCallbacks
+    def op_recv_chunk(self, content, headers, msg):
+        log.info("op_recv_chunk")
+        # this is NOT rpc
+        yield self.reply_ok(msg)
+
+    @defer.inlineCallbacks
+    def op_recv_done(self, content, headers, msg):
+        log.info("op_recv_done")
+        # this is NOT rpc
+        yield self.reply_ok(msg)
+
+        # trigger the op_begin_ingest to complete!
+        self._defer_ingest.callback(True)
+
 class EOIIngestionClient(ServiceClient):
     """
     Class for the client accessing the resource registry.
