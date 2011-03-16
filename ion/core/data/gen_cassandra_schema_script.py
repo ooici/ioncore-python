@@ -12,7 +12,6 @@ def create_keyspace(pa_dict):
     """
     Create the keyspace definition
     """
-    print pa_dict
     name = pa_dict["name"]
     f = lambda x: "".join((x[0],"=",str(x[1])))
     attrs = " and ".join(map(f, pa_dict.items()))
@@ -41,6 +40,5 @@ def create_column_families(cache_dict):
  
 if __name__ == "__main__":
     scu_dict = scu.STORAGE_CONF_DICTIONARY
-    print scu_dict
     create_keyspace(scu_dict[scu.PERSISTENT_ARCHIVE])
     create_column_families(scu_dict[scu.CACHE_CONFIGURATION]) 
