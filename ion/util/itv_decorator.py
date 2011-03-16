@@ -20,6 +20,10 @@ of your file. Here's the config for the unit tests:
 
 In this case, test_that_skips is not run - anything marked False
 is skipped.
+
+@TODO:
+    Using techniques from http://stackoverflow.com/questions/218616/getting-method-parameter-names-in-python
+    redo this cleaner.
 """
 
 from twisted.trial import unittest
