@@ -465,39 +465,73 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(len(transaction_id_15),36)
         self.assertEqual(transaction_id_15,transaction_id_8)
         
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-        """
-        reply_ = yield self.ia_client.get_observatory(instrument_agent.ci_param_list,'none')
-        success_ = reply_['success']
-        result_ = reply_['result']
-        transaction_id_ = reply_['transaction_id']
-
-        self.assertEqual(success_[0],'OK')
-        self.assertEqual(type(transaction_id_),str)
-        self.assertEqual(len(transaction_id_),36)
-
-        self.assertEqual(success_[0],'ERROR') 
-        self.assertEqual(result_,None)
-        self.assertEqual(transaction_id_,None)
         
-        print success_
-        print result_
-        print transaction_id_
+    @defer.inlineCallbacks
+    def test_get_obsevatory_metadata(self):
+        raise unittest.SkipTest("To be done.")
         
-        """
+    """        
+    @defer.inlineCallbacks
+    def test_get_obsevatory_status(self):
+        raise unittest.SkipTest("To be done.")
+
+
+    @defer.inlineCallbacks
+    def test_get_capabilities(self):
+        raise unittest.SkipTest("To be done.")
+                
+                
+    @defer.inlineCallbacks
+    def test_execute_device(self):
+        raise unittest.SkipTest("To be done.")
+    
+
+    @defer.inlineCallbacks
+    def test_get_device(self):
+        raise unittest.SkipTest("To be done.")
+
+
+    @defer.inlineCallbacks
+    def test_set_device(self):
+        raise unittest.SkipTest("To be done.")
+            
+            
+    @defer.inlineCallbacks
+    def test_get_device_metadata(self):
+        raise unittest.SkipTest("To be done.")
+
+
+    @defer.inlineCallbacks
+    def test_get_device_status(self):
+        raise unittest.SkipTest("To be done.")
+
+
+    @defer.inlineCallbacks
+    def test_execute_device_direct(self):
+        raise unittest.SkipTest("To be done.")        
+    """    
+ 
+ 
+    """
+    reply_ = yield self.ia_client.get_observatory(instrument_agent.ci_param_list,'none')
+    success_ = reply_['success']
+    result_ = reply_['result']
+    transaction_id_ = reply_['transaction_id']
+
+    self.assertEqual(success_[0],'OK')
+    self.assertEqual(type(transaction_id_),str)
+    self.assertEqual(len(transaction_id_),36)
+
+    self.assertEqual(success_[0],'ERROR') 
+    self.assertEqual(result_,None)
+    self.assertEqual(transaction_id_,None)
+    
+    print success_
+    print result_
+    print transaction_id_
+    
+    """
+ 
  
     """
     @defer.inlineCallbacks

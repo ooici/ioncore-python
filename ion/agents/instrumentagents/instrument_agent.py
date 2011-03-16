@@ -1702,7 +1702,7 @@ class InstrumentAgent(ResourceAgent):
 
 
     @defer.inlineCallbacks
-    def op_execute_direct(self,content,headers,msg):
+    def op_execute_device_direct(self,content,headers,msg):
         """
         Execute untranslated byte data commands on the device.
         Must be in direct access mode and possess the correct transaction_id key
