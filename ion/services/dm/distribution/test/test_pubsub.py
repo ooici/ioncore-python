@@ -16,9 +16,7 @@ from ion.services.dm.distribution.pubsub_service import PubSubClient, \
 from ion.test.iontest import IonTestCase
 from twisted.trial import unittest
 from ion.core import ioninit
-
 from ion.core.object import object_utils
-
 from ion.core.exception import ReceivedApplicationError
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -78,8 +76,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def _create_xs(self):
-        # Try and create the 'swapmeet' exchange space
-
         msg = yield self.create_message(XS_TYPE)
         msg.exchange_space_name = self.xs_name
 
@@ -111,7 +107,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_undeclare_xs(self):
-        #raise unittest.SkipTest('Blocked on EMS')
 
         xs_id = yield self._create_xs()
 
@@ -133,7 +128,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_xs_query(self):
-        #raise unittest.SkipTest('Query is broken')
 
         xs_id = yield self._create_xs()
 
@@ -208,7 +202,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_query_topics(self):
-        #raise unittest.SkipTest('Buggy, _make_ref borked still')
         yield self._declare_topic()
 
         msg = yield self.create_message(REGEX_TYPE)
@@ -234,7 +227,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_declare_publisher(self):
-        #raise unittest.SkipTest('Blocked on EMS')
         pid = yield self._declare_publisher()
         self.failUnless(len(pid.id_list) > 0)
 

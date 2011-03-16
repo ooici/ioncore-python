@@ -8,7 +8,7 @@
 @author David Stuebe
 @brief service for publishing on data streams, and for subscribing to streams.
 The service includes methods for defining topics, defining publishers, publishing,
-and defining subscriptions.
+and defining subscriptions. See the PubSubClient for API documentation.
 """
 
 import time
@@ -77,7 +77,10 @@ class PubSubService(ServiceProcess):
     e.g.
     swapmeet / science_data / test.pydap.org:coads.nc
 
-    that last field is subject to argument.
+    that last field is subject to argument/debate/refactoring.
+
+    @note PSC uses 'Niemand' here and there as a placeholder name
+    @note PSC uses the current timestamp, string format, as a placeholder description
     """
     declare = ServiceProcess.service_declare(name='pubsub',
                                           version='0.1.2',
@@ -97,8 +100,86 @@ class PubSubService(ServiceProcess):
         self.q_list = dict()
         self.binding_list = dict()
 
+    def _check_msg_type(self, request, expected_type):
+        """
+        @brief Simple helper routine to validate the GPB that arrives against what's expected.
+        Raising the exception will filter all the way back to the service client.
+        @param request Incoming message, GPB assumed
+        @param expected_type Typedef from object utils
+        """
+        if request.MessageType != expected_type:
+            log.error('Bad message type, throwing exception')
+            raise PSSException('Bad message type!',
+                               request.ResponseCodes.BAD_REQUEST)
+
+    def _key_to_idref(self, key_string, object):
+        """
+        From a CASref key, create a full-on casref.
+        @param key_string String, from casref key
+        @param object Reply object we are modifying (in-place)
+        @retval None
+        """
+        my_ref = object.CreateObject(IDREF_TYPE)
+        my_ref.key = key_string
+        idx = len(object.id_list)
+        object.id_list.add()
+        log.debug('Adding to index %d' % idx)
+        object.id_list[idx] = my_ref
+
+    def _obj_to_ref(self, object):
+        """
+        @brief Generate a casref/idref from an object, so that proto bufs requiring
+        CASrefs will work. It's a one-liner, but worth calling out.
+        @param object Yep, object to reference
+        @retval Reference to object
+        """
+        return self.rclient.reference_instance(object)
+
+    @defer.inlineCallbacks
+    def _do_query(self, request, res_list, msg):
+        """
+        @brief Query internal dictionaries, create reply message, send same. Helper for the
+        various queries.
+        """
+        # This is probably better written as a list comprehension. Or something.
+        idlist = []
+        p = re.compile(request.regex)
+        for cur_key, cur_entry in res_list.iteritems():
+            if p.match(cur_entry):
+                idlist.append(cur_key)
+
+        log.debug('Matches to "%s" are: "%s"' % (request.regex, str(idlist)))
+        response = yield self.mc.create_instance(IDLIST_TYPE)
+        response.MessageResponseCode = response.ResponseCodes.OK
+
+        # For each string in the dictionary, inflate into a casref/idref and add to message
+        for key in idlist:
+            self._key_to_idref(key, response)
+
+        log.debug('Query complete')
+        yield self.reply_ok(msg, response)
+
+    def _reverse_find(self, data, search_value):
+        """
+        @brief Look for a given value in a provided dictionary, return key that corresponds.
+        @note Probably a better way to solve this.
+        @note To emulate the python list, it raises KeyError if not found.
+        """
+        rc = None
+        if not search_value in data.values():
+            raise KeyError('%s not in data', search_value)
+
+        for key, value in data.iteritems():
+            if value == search_value:
+                rc = key
+
+        return rc
+
     @defer.inlineCallbacks
     def op_declare_exchange_space(self, request, headers, msg):
+        """
+        @see PubSubClient.declare_exchange_space
+        """
         log.debug('DXS starting')
         self._check_msg_type(request, XS_TYPE)
 
@@ -122,7 +203,7 @@ class PubSubService(ServiceProcess):
         log.debug('Writing resource record')
         yield self.rclient.put_instance(registry_entry)
         log.debug('Getting resource ID')
-        xs_resource_id = self.rclient.reference_instance(registry_entry)
+        xs_resource_id = self._obj_to_ref(registry_entry)
 
         log.debug('Operation completed, creating response message')
 
@@ -142,6 +223,9 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_undeclare_exchange_space(self, request, headers, msg):
+        """
+        @see PubSubClient.undeclare_exchange_space
+        """
         log.debug('UDXS starting')
         self._check_msg_type(request, REQUEST_TYPE)
 
@@ -163,72 +247,21 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_query_exchange_spaces(self, request, headers, msg):
+        """
+        @see PubSubClient.query_exchange_spaces
+        """
         log.debug('qxs starting')
         self._check_msg_type(request, REGEX_TYPE)
 
         log.debug('Looking for XS entries...')
         yield self._do_query(request, self.xs_list, msg)
 
-    def _check_msg_type(self, request, expected_type):
-        """
-        Simple helper routine to validate the GPB that arrives against what's expected.
-        Raising the exception will filter all the way back to the service client.
-        """
-        if request.MessageType != expected_type:
-            log.error('Bad message type, throwing exception')
-            raise PSSException('Bad message type!',
-                               request.ResponseCodes.BAD_REQUEST)
-
-    def _make_ref(self, key_string, object):
-        """
-        From a CASref key, create a full-on casref.
-        @param key_string String, from casref key
-        @param object Reply object we are modifying (in-place)
-        @retval None
-        """
-        my_ref = object.CreateObject(IDREF_TYPE)
-        my_ref.key = key_string
-        idx = len(object.id_list)
-        object.id_list.add()
-        log.debug('Adding to index %d' % idx)
-        object.id_list[idx] = my_ref
-        
-
-    @defer.inlineCallbacks
-    def _do_query(self, request, res_list, msg):
-        # This is probably better written as a list comprehension. Or something.
-        rc = []
-        p = re.compile(request.regex)
-        for cur_key, cur_entry in res_list.iteritems():
-            if p.match(cur_entry):
-                rc.append(cur_key)
-
-        log.debug('Matches to "%s" are: "%s"' % (request.regex, str(rc)))
-        response = yield self.mc.create_instance(IDLIST_TYPE)
-        response.MessageResponseCode = response.ResponseCodes.OK
-
-        for x in rc:
-            self._make_ref(x, response)
-
-        log.debug('Query complete')
-        yield self.reply_ok(msg, response)
-
-    def _reverse_find(self, data, search_value):
-        """
-        Look for a given value in a provided dictionary, return key that corresponds.
-        """
-        rc = None
-        if not search_value in data.values():
-            raise KeyError('%s not in data', search_value)
-
-        for key, value in data.iteritems():
-            if value == search_value:
-                rc = key
-
-        return rc
-
     @defer.inlineCallbacks
     def op_declare_exchange_point(self, request, headers, msg):
+        """
+        @see PubSubClient.declare_exchange_point
+        """
+
         log.debug('Starting DXP')
         self._check_msg_type(request, XP_TYPE)
 
@@ -257,7 +290,7 @@ class PubSubService(ServiceProcess):
 
         log.debug('Saving XP to registry')
         yield self.rclient.put_instance(xp_resource)
-        xp_resource_id = self.rclient.reference_instance(xp_resource)
+        xp_resource_id = self._obj_to_ref(xp_resource)
 
         log.debug('Creating reply')
         reply = yield self.mc.create_instance(IDLIST_TYPE)
@@ -273,6 +306,9 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_undeclare_exchange_point(self, request, headers, msg):
+        """
+        @see PubSubClient.declare_exchange_point
+        """
         log.debug('UDXP starting')
         self._check_msg_type(request, REQUEST_TYPE)
 
@@ -291,6 +327,10 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_query_exchange_points(self, request, headers, msg):
+        """
+        @see PubSubClient.query_exchange_points
+        """
+
         log.debug('Starting XP query')
         self._check_msg_type(request, REGEX_TYPE)
 
@@ -303,6 +343,9 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_declare_topic(self, request, headers, msg):
+        """
+        @see PubSubClient.declare_exchange_topic
+        """
         log.debug('Declare topic starting')
         self._check_msg_type(request, TOPIC_TYPE)
 
@@ -330,7 +373,7 @@ class PubSubService(ServiceProcess):
 
         log.debug('Creating reference to resource for return value')
         # We return by reference, so create same
-        topic_ref = self.rclient.reference_instance(topic_resource)
+        topic_ref = self._obj_to_ref(topic_resource)
 
         reply.id_list.add()
         reply.id_list[0] = topic_ref
@@ -342,6 +385,10 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_undeclare_topic(self, request, headers, msg):
+        """
+        @see PubSubClient.undeclare_topic
+        """
+
         log.debug('UDT starting')
         self._check_msg_type(request, REQUEST_TYPE)
 
@@ -361,6 +408,10 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_query_topics(self, request, headers, msg):
+        """
+        @see PubSubClient.query_topics
+        """
+
         log.debug('topic query starting')
         # Input validation... GIGO, after all. Or should we rename that 'Gigli'?
         self._check_msg_type(request, REGEX_TYPE)
@@ -372,6 +423,10 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_declare_publisher(self, request, headers, msg):
+        """
+        @see PubSubClient.declare_exchange_publisher
+        """
+
         log.debug('Starting DP')
         self._check_msg_type(request, PUBLISHER_TYPE)
 
@@ -399,7 +454,7 @@ class PubSubService(ServiceProcess):
         yield self.rclient.put_instance(publ_resource)
 
         # Need a reference return value
-        pub_ref = self.rclient.reference_instance(publ_resource)
+        pub_ref = self._obj_to_ref(publ_resource)
 
         log.debug('Creating reply')
         reply = yield self.mc.create_instance(IDLIST_TYPE)
@@ -413,6 +468,9 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_undeclare_publisher(self, request, headers, msg):
+        """
+        @see PubSubClient.undeclare_publisher
+        """
         log.debug('UDP starting')
         self._check_msg_type(request, REQUEST_TYPE)
 
@@ -433,6 +491,10 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_subscribe(self, request, headers, msg):
+        """
+        @see PubSubClient.subscribe
+        """
+
         log.debug('PSC subscribe starting')
         self._check_msg_type(request, SUBSCRIBER_TYPE)
 
@@ -461,7 +523,8 @@ class PubSubService(ServiceProcess):
         sub_resource.queue_name = str(time.time()) # Hack!
 
         yield self.rclient.put_instance(sub_resource)
-        sub_ref = self.rclient.reference_instance(sub_resource)
+
+        sub_ref = self._obj_to_ref(sub_resource)
 
         reply = yield self.mc.create_instance(IDLIST_TYPE)
         reply.id_list.add()
@@ -473,6 +536,10 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_unsubscribe(self, request, headers, msg):
+        """
+        @see PubSubClient.unsubscribe
+        """
+
         log.debug('Starting unsub')
         self._check_msg_type(request, REQUEST_TYPE)
 
@@ -492,6 +559,9 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_declare_queue(self, request, headers, msg):
+        """
+        @see PubSubClient.declare_queue
+        """
         log.debug('DQ starting')
         self._check_msg_type(request, QUEUE_TYPE)
 
@@ -523,7 +593,7 @@ class PubSubService(ServiceProcess):
         log.debug('Saving q into registry')
         yield self.rclient.put_instance(q_resource)
         log.debug('Creating reference')
-        q_ref = self.rclient.reference_instance(q_resource)
+        q_ref = self._obj_to_ref(q_resource)
 
         log.debug('Saving q into dictionary')
         self.q_list[q_ref.key] = request.queue_name
@@ -537,6 +607,9 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_undeclare_queue(self, request, headers, msg):
+        """
+        @see PubSubClient.undeclare_queue
+        """
         log.debug('Undeclare_q starting')
         self._check_msg_type(request, REQUEST_TYPE)
 
@@ -557,6 +630,9 @@ class PubSubService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_add_binding(self, request, headers, msg):
+        """
+        @see PubSubClient.add_binding
+        """
         log.debug('PSC AB starting')
         self._check_msg_type(request, BINDING_TYPE)
 
@@ -583,7 +659,7 @@ class PubSubService(ServiceProcess):
         b_resource = yield self.rclient.create_instance(BINDING_RES_TYPE, 'Niemand')
         b_resource.queue_name = request.queue_name
         b_resource.binding = request.binding
-        b_resource.queue_id = self.rclient.reference_instance(q_entry)
+        b_resource.queue_id = self._obj_to_ref(q_entry)
 
         yield self.rclient.put_instance(b_resource)
 
