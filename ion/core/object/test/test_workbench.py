@@ -207,14 +207,6 @@ class WorkBenchProcessTest(IonTestCase):
     def setUp(self):
         yield self._start_container()
 
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield self._stop_container()
-
-
-    @defer.inlineCallbacks
-    def test_pull(self):
-
         processes = [
             {'name':'workbench_test1',
              'module':'ion.core.object.test.test_workbench',
@@ -233,6 +225,10 @@ class WorkBenchProcessTest(IonTestCase):
         log.info('Process ID:' + str(child_proc1))
         workbench_process1 = self._get_procinstance(child_proc1)
 
+        child_proc2 = yield sup.get_child_id('workbench_test2')
+        log.info('Process ID:' + str(child_proc2))
+        workbench_process2 = self._get_procinstance(child_proc2)
+
 
         repo = workbench_process1.workbench.create_repository(addresslink_type)
 
@@ -248,26 +244,35 @@ class WorkBenchProcessTest(IonTestCase):
 
         ab.owner = p
 
+        ab.title = 'an addressbook'
+
         repo.commit('Made it - few!')
 
+        self.proc1 = workbench_process1
+        self.proc2 = workbench_process2
+        self.repo1 = repo
 
-        child_proc2 = yield sup.get_child_id('workbench_test2')
-        log.info('Process ID:' + str(child_proc2))
-        workbench_process2 = self._get_procinstance(child_proc2)
 
-        log.info('Sending to: %s' % str(workbench_process1.id.full))
-        yield workbench_process2.workbench.pull(workbench_process1.id.full, repo.repository_key)
 
-        myrepo = workbench_process2.workbench.get_repository(repo.repository_key)
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield self._stop_container()
 
-        
-        #print 'REPO  Cache:',repo.index_hash
-        #print 'OTHER Cache:',myrepo.index_hash
 
-        ab = yield myrepo.checkout('master')
+    @defer.inlineCallbacks
+    def test_pull(self):
 
-        print ab
-        
+
+        log.info('Sending to: %s' % str(self.proc1.id.full))
+        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+
+        repo2 = self.proc2.workbench.get_repository(repo.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(ab.title, 'an addressbook')
+
+
 class WorkBenchMergeTest(unittest.TestCase):
         
     '''
