@@ -45,7 +45,7 @@ class CmdPort(protocol.Protocol):
             for i in range(len(data)):
                 if len(DataAsHex) > 0:
                     DataAsHex += ","
-                DataAsHex += "{0:X}".format(ord(data[i]))
+                DataAsHex += "{0:%X}"%ord(data[i])
             log.debug("CmdPort dataReceived [%s] [%s]" % (data, DataAsHex))
         else:
             log.info("CmdPort dataReceived [%s]" % data)
@@ -159,7 +159,7 @@ class Instrument(protocol.Protocol):
         for i in range(len(data)):
             if len(DataAsHex) > 0:
                 DataAsHex += ","
-            DataAsHex += "{0:X}".format(ord(data[i]))
+            DataAsHex += "{0:%X}"%ord(data[i])
         log.info("dataReceived() [%s] [%s]" % (data, DataAsHex))
         
         """
