@@ -145,7 +145,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         self.manager.terminate()
          
     
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_update_persistent_archive(self):
         yield self.manager.create_persistent_archive(self.keyspace)
@@ -158,7 +158,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         log.info("Replication factor %s" % (desc.replication_factor,))    
         self.failUnlessEqual(desc.replication_factor, 2)
         
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_update_cache(self):
         self.cache.column_type= 'Standard'
@@ -171,7 +171,7 @@ class CassandraDataManagerTest(IDataManagerTest):
         log.info("column_metadata index_name %s " % (desc.cf_defs[0].column_metadata[0].index_name,))
         self.failUnlessEqual(desc.cf_defs[0].column_metadata[0].index_name, "stateIndex")
         
-    #@itv(CONF)
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_update_cache_two_indexes(self):
         """

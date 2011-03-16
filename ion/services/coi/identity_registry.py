@@ -2,18 +2,10 @@
 
 """
 @file ion/services/coi/identity_registry.py
-@author Roger Unwin
-@brief service for storing identities
+@authors Roger Unwin, Bill Bollenbacher
+@brief service for storing user identities
 """
-
-
-
-
-
-
-
 import ion.util.ionlog
-
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
@@ -25,10 +17,63 @@ from ion.core.process.process import Process, ProcessClient, ProcessDesc, Proces
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.security.authentication import Authentication
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance, ResourceClientError, ResourceInstanceError
+from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils
 
-IDENT_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
+IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
+"""
+from ion-object-definitions/net/ooici/services/coi/identity/identity_management.proto
+message UserIdentity {
+   enum _MessageTypeIdentifier {
+       _ID = 1401;
+       _VERSION = 1;
+   }
+
+   // objects in a protofile are called messages
+
+   optional string subject=1;
+   optional string certificate=2;
+   optional string rsa_private_key=3;
+   optional string dispatcher_queue=4
+   optional string email=5
+}
+"""""
+
+RESOURCE_CFG_REQUEST_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
+"""
+from ion-object-definitions/net/ooici/core/message/resource_request.proto
+message ResourceConfigurationRequest{
+    enum _MessageTypeIdentifier {
+      _ID = 10;
+      _VERSION = 1;
+    }
+    
+    // The identifier for the resource to configure
+    optional net.ooici.core.link.CASRef resource_reference = 1;
+
+    // The desired configuration object
+    optional net.ooici.core.link.CASRef configuration = 2;
+"""
+
+RESOURCE_CFG_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=12, version=1)
+"""
+from ion-object-definitions/net/ooici/core/message/resource_request.proto
+message ResourceConfigurationResponse{
+    enum _MessageTypeIdentifier {
+      _ID = 12;
+      _VERSION = 1;
+    }
+    
+    // The identifier for the resource to configure
+    optional net.ooici.core.link.CASRef resource_reference = 1;
+
+    // The desired configuration object
+    optional net.ooici.core.link.CASRef configuration = 2;
+    
+    optional string result = 3;
+}
+"""
 
 
 class IdentityRegistryClient(ServiceClient):
@@ -44,36 +89,14 @@ class IdentityRegistryClient(ServiceClient):
 
 
     @defer.inlineCallbacks
-    def register_user(self, user_cert, user_private_key):
+    def register_user(self, Identity):
         """
         This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
         It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
         yield self._check_init()
-
-        cont = {
-            'user_cert': user_cert,
-            'user_private_key': user_private_key
-        }
-
-        (content, headers, msg) = yield self.rpc_send('register_user_credentials', cont)
-        defer.returnValue(str(content))
-
-
-    @defer.inlineCallbacks
-    def register_user_credentials(self, user_cert, user_private_key):
-        """
-        This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
-        It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
-        """
-        yield self._check_init()
-
-        cont = {
-            'user_cert': user_cert,
-            'user_private_key': user_private_key
-        }
-
-        (content, headers, msg) = yield self.rpc_send('register_user_credentials', cont)
+        
+        (content, headers, msg) = yield self.rpc_send('register_user_credentials', Identity)
         defer.returnValue(str(content))
 
         
@@ -110,8 +133,6 @@ class IdentityRegistryClient(ServiceClient):
         #--#return self.base_find_resource('find_users',user_description,regex,ignore_defaults,attnames)
 
 
-
-
     @defer.inlineCallbacks
     def set_identity_lcstate(self, ooi_id, lcstate):
         """
@@ -125,6 +146,7 @@ class IdentityRegistryClient(ServiceClient):
 
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
+
 
     @defer.inlineCallbacks
     def set_identity_lcstate_new(self, ooi_id):
@@ -140,6 +162,7 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
 
+
     @defer.inlineCallbacks
     def set_identity_lcstate_active(self, ooi_id):
         """
@@ -154,6 +177,7 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
         
+
     @defer.inlineCallbacks
     def set_identity_lcstate_inactive(self, ooi_id):
         """
@@ -167,6 +191,7 @@ class IdentityRegistryClient(ServiceClient):
 
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
+
 
     @defer.inlineCallbacks
     def set_identity_lcstate_decommissioned(self, ooi_id):
@@ -182,6 +207,7 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
 
+
     @defer.inlineCallbacks
     def set_identity_lcstate_retired(self, ooi_id):
         """
@@ -195,6 +221,7 @@ class IdentityRegistryClient(ServiceClient):
 
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
+
 
     @defer.inlineCallbacks
     def set_identity_lcstate_developed(self, ooi_id):
@@ -210,6 +237,7 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
 
+
     @defer.inlineCallbacks
     def set_identity_lcstate_commissioned(self, ooi_id):
         """
@@ -224,6 +252,7 @@ class IdentityRegistryClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_lcstate', cont)
         defer.returnValue( content )
     
+
     @defer.inlineCallbacks
     def is_user_registered(self, user_cert, user_private_key):
         """
@@ -239,6 +268,7 @@ class IdentityRegistryClient(ServiceClient):
         log.debug("in is_user_registered " + str(content))
         defer.returnValue( content )
         
+
     @defer.inlineCallbacks
     def authenticate_user(self, user_cert, user_private_key):
         """
@@ -254,6 +284,11 @@ class IdentityRegistryClient(ServiceClient):
         
         defer.returnValue( content )
 
+
+class IdentityRegistryException(ApplicationError):
+    """
+    IdentityRegistryService exception class
+    """
 
 class IdentityRegistryService(ServiceProcess):
 
@@ -316,7 +351,6 @@ class IdentityRegistryService(ServiceProcess):
           yield self.reply_ok(msg, False)
 
 
-
     @defer.inlineCallbacks
     def op_get_user(self, request, headers, msg):
         """
@@ -345,26 +379,53 @@ class IdentityRegistryService(ServiceProcess):
         This registers a user by storing the user certificate, user private key, and certificate subject line(derived from the certificate)
         It returns a ooi_id which is the uuid of the record and can be used to uniquely identify a user.
         """
-        log.debug('in op_register_user_credentials')
+        # Check for correct protocol buffer type
+        if request.MessageType != RESOURCE_CFG_REQUEST_TYPE:
+            raise IdentityRegistryException('Bad message type receieved, ignoring',
+                                            request.ResponseCodes.BAD_REQUEST)
 
-        identity = yield self.rc.create_instance(IDENT_TYPE, ResourceName='Identity Registry', ResourceDescription='A place to store identitys')
-        identity.certificate = request['user_cert']
-        identity.rsa_private_key = request['user_private_key']
+        # Check for required fields in message
+        if not request.IsFieldSet('configuration'):
+            raise IdentityRegistryException("Required field [configuration] not found in message",
+                                            request.ResponseCodes.BAD_REQUEST)
+        if not request.configuration.IsFieldSet('certificate'):
+            raise IdentityRegistryException("Required field [certificate] not found in message",
+                                            request.ResponseCodes.BAD_REQUEST)
+        if not request.configuration.IsFieldSet('rsa_private_key'):
+            raise IdentityRegistryException("Required field [rsa_private_key] not found in message",
+                                            request.ResponseCodes.BAD_REQUEST)
+        
+        log.debug('in op_register_user_credentials:\n'+str(request))
+        log.debug('in op_register_user_credentials: request.configuration\n'+str(request.configuration))
 
+        identity = yield self.register_user_credentials(request)
+
+        yield self.reply_ok(msg, identity)
+
+        
+    @defer.inlineCallbacks
+    def register_user_credentials(self, request):
+        log.debug('in register_user_credentials:\n'+str(request))
+        identity = yield self.rc.create_instance(IDENTITY_TYPE, ResourceName='Identity Registry', ResourceDescription='User identity information')
+        identity.certificate = request.configuration.certificate
+        identity.rsa_private_key = request.configuration.rsa_private_key
+        
         authentication = Authentication()
-        cert_info = authentication.decode_certificate(request['user_cert'])
+
+        cert_info = authentication.decode_certificate(str(request.configuration.certificate))
+
         identity.subject = cert_info['subject']
        
         yield self.rc.put_instance(identity, 'Adding identity %s' % identity.subject)
         log.debug('Commit completed, %s' % identity.ResourceIdentity)
-        yield self.reply_ok(msg, identity.ResourceIdentity)
-
+        
         # Now we store the subject/ResourceIdentity pair so we can get around not having find.
         self._user_dict['testing'] = 'TESTING'
         self._user_dict[cert_info['subject']] = identity.ResourceIdentity
         # Above line needs to be altered when FIND is implemented
         
-        
+        defer.returnValue(identity.ResourceIdentity)
+ 
 
     @defer.inlineCallbacks
     def op_verify_registration(self, request, headers, msg):
@@ -384,6 +445,7 @@ class IdentityRegistryService(ServiceProcess):
         else:
            yield self.reply_ok(msg, False)
            log.info('op_verify_registration: Registration NOT PRESENT')
+
 
     @defer.inlineCallbacks
     def op_authenticate_user_credentials(self, request, headers, msg):
@@ -405,8 +467,14 @@ class IdentityRegistryService(ServiceProcess):
            log.debug(str(identity.ResourceIdentity))
            yield self.reply_ok(msg, identity.ResourceIdentity)
         else:
-           log.debug('returning None')
+           log.debug('op_authenticate_user_credentials: no match')
            yield self.reply_ok(msg, None)  # Should this be none? or False or something else
+           """
+           log.debug('returning NOT_FOUND')
+           response = yield self.message_client.create_instance(MessageContentTypeID=None)
+           response.MessageResponseCode = response.ResponseCodes.NOT_FOUND          
+           yield self.reply_ok(msg, response)
+           """
 
     @defer.inlineCallbacks
     def op_update_user(self, request, headers, msg):
@@ -429,8 +497,5 @@ class IdentityRegistryService(ServiceProcess):
            log.debug('op_update_user: no match')
            yield self.reply_ok(msg, None)  # Should this be none? or False or something else
         
-
-
-
 # Spawn of the process using the module name
 factory = ProcessFactory(IdentityRegistryService)

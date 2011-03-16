@@ -74,9 +74,11 @@ dataset_type = object_utils.create_type_identifier(object_id=10001, version=1)
 group_type = object_utils.create_type_identifier(object_id=10020, version=1)
 dimension_type = object_utils.create_type_identifier(object_id=10018, version=1)
 variable_type = object_utils.create_type_identifier(object_id=10024, version=1)
+bounded_array_type = object_utils.create_type_identifier(object_id=10021, version=1)
+array_structure_type = object_utils.create_type_identifier(object_id=10025, version=1)
+
 attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
 stringArray_type = object_utils.create_type_identifier(object_id=10015, version=1)
-boundedArray_type = object_utils.create_type_identifier(object_id=10021, version=1)
 float32Array_type = object_utils.create_type_identifier(object_id=10013, version=1)
 int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
 
@@ -179,20 +181,25 @@ def _bootstrap_objects(supid):
     _add_string_attribute(dataset, variable_z, '_CoordinateAxisType', ['Height'])
     _add_string_attribute(dataset, variable_z, '_CoordinateZisPositive', ['down'])
     # Add data values
-    variable_t.content.add()
-    variable_t.content[0] = dataset.CreateObject(boundedArray_type)
-    variable_t.content[0].bounds.add()
-    variable_t.content[0].bounds[0].origin = 0
-    variable_t.content[0].bounds[0].size = 2
-    variable_t.content[0].ndarray = dataset.CreateObject(int32Array_type) 
-    variable_t.content[0].ndarray.value.extend([1280102520, 1280106120])
-    variable_z.content.add()
-    variable_z.content[0] = dataset.CreateObject(boundedArray_type)
-    variable_z.content[0].bounds.add()
-    variable_z.content[0].bounds[0].origin = 0
-    variable_z.content[0].bounds[0].size = 3
-    variable_z.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-    variable_z.content[0].ndarray.value.extend([0.0, 0.1, 0.2])
+    variable_t.content = dataset.CreateObject(array_structure_type)
+    variable_t.content.bounded_arrays.add()
+    variable_t.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    variable_t.content.bounded_arrays[0].bounds.add()
+    variable_t.content.bounded_arrays[0].bounds[0].origin = 0
+    variable_t.content.bounded_arrays[0].bounds[0].size = 2
+    variable_t.content.bounded_arrays[0].ndarray = dataset.CreateObject(int32Array_type)
+    variable_t.content.bounded_arrays[0].ndarray.value.extend([1280102520, 1280106120])
+
+    variable_z.content = dataset.CreateObject(array_structure_type)
+    variable_z.content.bounded_arrays.add()
+    variable_z.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    variable_z.content.bounded_arrays[0].bounds.add()
+    variable_z.content.bounded_arrays[0].bounds[0].origin = 0
+    variable_z.content.bounded_arrays[0].bounds[0].size = 3
+    variable_z.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    variable_z.content.bounded_arrays[0].ndarray.value.extend([0.0, 0.1, 0.2])
     
     
     # Construct the Scalar Variables: lat, lon and station id
@@ -209,27 +216,37 @@ def _bootstrap_objects(supid):
     _add_string_attribute(dataset, scalar_sid, 'long_name', ['integer station identifier'])
     _add_string_attribute(dataset, scalar_sid, 'standard_name', ['station_id'])
     # Add data values
-    scalar_lat.content.add()
-    scalar_lat.content[0] = dataset.CreateObject(boundedArray_type)
-    scalar_lat.content[0].bounds.add()
-    scalar_lat.content[0].bounds[0].origin = 0
-    scalar_lat.content[0].bounds[0].size = 1
-    scalar_lat.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-    scalar_lat.content[0].ndarray.value.extend([-45.431])
-    scalar_lon.content.add()
-    scalar_lon.content[0] = dataset.CreateObject(boundedArray_type)
-    scalar_lon.content[0].bounds.add()
-    scalar_lon.content[0].bounds[0].origin = 0
-    scalar_lon.content[0].bounds[0].size = 1
-    scalar_lon.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-    scalar_lon.content[0].ndarray.value.extend([25.909])
-    scalar_sid.content.add()
-    scalar_sid.content[0] = dataset.CreateObject(boundedArray_type)
-    scalar_sid.content[0].bounds.add()
-    scalar_sid.content[0].bounds[0].origin = 0
-    scalar_sid.content[0].bounds[0].size = 1
-    scalar_sid.content[0].ndarray = dataset.CreateObject(int32Array_type) 
-    scalar_sid.content[0].ndarray.value.extend([10059])
+    scalar_lat.content= dataset.CreateObject(array_structure_type)
+    scalar_lat.content.bounded_arrays.add()
+    scalar_lat.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    scalar_lat.content.bounded_arrays[0].bounds.add()
+    scalar_lat.content.bounded_arrays[0].bounds[0].origin = 0
+    scalar_lat.content.bounded_arrays[0].bounds[0].size = 1
+    scalar_lat.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    scalar_lat.content.bounded_arrays[0].ndarray.value.extend([-45.431])
+
+
+    scalar_lon.content= dataset.CreateObject(array_structure_type)
+    scalar_lon.content.bounded_arrays.add()
+    scalar_lon.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    scalar_lon.content.bounded_arrays[0].bounds.add()
+    scalar_lon.content.bounded_arrays[0].bounds[0].origin = 0
+    scalar_lon.content.bounded_arrays[0].bounds[0].size = 1
+    scalar_lon.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    scalar_lon.content.bounded_arrays[0].ndarray.value.extend([25.909])
+
+
+    scalar_sid.content= dataset.CreateObject(array_structure_type)
+    scalar_sid.content.bounded_arrays.add()
+    scalar_sid.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    scalar_sid.content.bounded_arrays[0].bounds.add()
+    scalar_sid.content.bounded_arrays[0].bounds[0].origin = 0
+    scalar_sid.content.bounded_arrays[0].bounds[0].size = 1
+    scalar_sid.content.bounded_arrays[0].ndarray = dataset.CreateObject(int32Array_type)
+    scalar_sid.content.bounded_arrays[0].ndarray.value.extend([10059])
     
     
     # Construct the Data Variable: salinity
@@ -245,16 +262,18 @@ def _bootstrap_objects(supid):
     _add_string_attribute(dataset, variable_salinity, 'coordinates', ['time lon lat z'])
     _add_string_attribute(dataset, variable_salinity, 'standard_name', ['sea_water_salinity'])
     # Add data values
-    variable_salinity.content.add()
-    variable_salinity.content[0] = dataset.CreateObject(boundedArray_type)
-    variable_salinity.content[0].bounds.add()
-    variable_salinity.content[0].bounds[0].origin = 0
-    variable_salinity.content[0].bounds[0].size = 2 # time dimension
-    variable_salinity.content[0].bounds.add()
-    variable_salinity.content[0].bounds[1].origin = 0
-    variable_salinity.content[0].bounds[1].size = 3 # depth dimension
-    variable_salinity.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-    variable_salinity.content[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
+    variable_salinity.content= dataset.CreateObject(array_structure_type)
+    variable_salinity.content.bounded_arrays.add()
+    variable_salinity.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    variable_salinity.content.bounded_arrays[0].bounds.add()
+    variable_salinity.content.bounded_arrays[0].bounds[0].origin = 0
+    variable_salinity.content.bounded_arrays[0].bounds[0].size = 2 # time dimension
+    variable_salinity.content.bounded_arrays[0].bounds.add()
+    variable_salinity.content.bounded_arrays[0].bounds[1].origin = 0
+    variable_salinity.content.bounded_arrays[0].bounds[1].size = 3 # depth dimension
+    variable_salinity.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    variable_salinity.content.bounded_arrays[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
     
     
     # Attach variable and dimension objects to the root group

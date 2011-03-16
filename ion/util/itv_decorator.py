@@ -20,11 +20,27 @@ of your file. Here's the config for the unit tests:
 
 In this case, test_that_skips is not run - anything marked False
 is skipped.
+
+@TODO:
+    Using techniques from http://stackoverflow.com/questions/218616/getting-method-parameter-names-in-python
+    redo this cleaner.
 """
 
 from twisted.trial import unittest
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
+
+skipped = set()
+
+# Monkey-patch the TestCase class so ITV-decorated functions get skipped properly without setUp/tearDown
+oldGetSkip = unittest.TestCase.getSkip
+def patchedGetSkip(self, *args, **kwargs):
+    method = getattr(self, self._testMethodName)
+    name = method.__name__
+    if name in skipped:
+        return 'Skipping the %s integration test.' % (name)
+    return oldGetSkip(self, *args, **kwargs)
+setattr(unittest.TestCase, 'getSkip', patchedGetSkip)
 
 class itv(object):
 
@@ -46,10 +62,12 @@ class itv(object):
             my_func = func
             
         else:
+            skipped.add(func.__name__)
+
             def my_func(*args, **kwargs):
                 strng = 'Skipping the %s integration test.' % func.__name__
                 raise unittest.SkipTest(strng)
-                
+
         return my_func
 
 
