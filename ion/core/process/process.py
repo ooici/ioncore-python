@@ -892,11 +892,11 @@ class ProcessClient(ProcessClientBase):
         if not self.target:
             self.target = self.proc.get_scoped_name('system', targetname)
 
-    def rpc_send(self, *args):
+    def rpc_send(self, *args, **kwargs):
         """
         Sends an RPC message to the specified target via originator process
         """
-        return self.proc.rpc_send(self.target, *args)
+        return self.proc.rpc_send(self.target, *args, **kwargs)
     
     def rpc_send_protected(self, operation, content, user_id='ANONYMOUS', expiry='0'):
         """
