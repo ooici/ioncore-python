@@ -96,11 +96,12 @@ class MessageSpace(BasicLifecycleObject):
         self.connection = connection.BrokerConnection(*args, **kwargs)
         self.closing = False # State that determines if we expect a close event
 
-    @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
         assert not self.connection._connection, "Already connected to broker"
         amqpEvents = AMQPEvents(self)
-        yield self.connection.connect(amqpEvents)
+        d = self.connection.connect(amqpEvents)
+        d.addErrback(self.connectionLost)
+        return d
 
     def on_deactivate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
