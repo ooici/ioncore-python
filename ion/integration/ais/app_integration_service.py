@@ -27,6 +27,7 @@ from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_REQ_M
 # import working classes for AIS
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources
 from ion.integration.ais.getDataResourceDetail.getDataResourceDetail import GetDataResourceDetail
+from ion.integration.ais.createDownloadURL.createDownloadURL import CreateDownloadURL
 from ion.integration.ais.RegisterUser.RegisterUser import RegisterUser
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -98,17 +99,22 @@ class AppIntegrationService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_createDownloadURL(self, content, headers, msg):
+        """
+        @brief Create download URL for given resource ID.
+        @param GPB containing resource ID.
+        @retval GPB containing download URL.
+        """
         log.info('op_createDownloadURL: '+str(content))
         try:
-            userId = content['userId']
-            dataResourceId = content['dataResourceId']
+            worker = CreateDownloadURL(self)
+            yield self.reply_ok(msg, {'value' : 'http://a.download.url.edu'})   
         except KeyError:
             estr = 'Missing information in message!'
             log.exception(estr)
             yield self.reply_err(msg, estr)
             return
         
-        yield self.reply_ok(msg, {'value' : 'http://a.download.url.edu'})
+        return
 
     @defer.inlineCallbacks
     def op_registerUser(self, content, headers, msg):

@@ -103,7 +103,7 @@ class AppIntegrationTest(IonTestCase):
         """
         reqMsg.message_parameters_reference.identity = dsID
 
-        log.debug('DHE: Calling findDateResource!!...')
+        log.debug('DHE: Calling findDataResources!!...')
         outcome1 = yield self.aisc.findDataResources(reqMsg)
         log.debug('DHE: findDataResources returned:\n'+str(outcome1))
 
@@ -124,9 +124,30 @@ class AppIntegrationTest(IonTestCase):
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
         #reqMsg.message_parameters_reference.minLatitude = 32.87521
 
-        log.debug('DHE: Calling findDateResource!!...')
+        log.debug('DHE: Calling getDataResourceDetail!!...')
         outcome1 = yield self.aisc.getDataResourceDetail(reqMsg)
-        log.debug('DHE: findDataResources returned:\n'+str(outcome1))
+        log.debug('DHE: getDataResourceDetail returned:\n'+str(outcome1))
+
+    @defer.inlineCallbacks
+    def test_createDownloadURL(self):
+
+        # Create a message client
+        mc = MessageClient(proc=self.test_sup)
+        rc = ResourceClient(proc=self.test_sup)
+        
+        log.debug('DHE: testing createDownloadURL')
+
+        # Use the message client to create a message object
+        log.debug('DHE: AppIntegrationService! instantiating CreateDownloadURLMSG.\n')
+        
+        # CHANGE THIS TO CREATE_DOWNLOAD_URL_REQ_MSG_TYPE
+        reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
+        reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        #reqMsg.message_parameters_reference.minLatitude = 32.87521
+
+        log.debug('DHE: Calling createDownloadURL!!...')
+        outcome1 = yield self.aisc.createDownloadURL(reqMsg)
+        log.debug('DHE: createDownloadURL returned:\n'+str(outcome1))
 
     @defer.inlineCallbacks
     def test_registerUser(self):
