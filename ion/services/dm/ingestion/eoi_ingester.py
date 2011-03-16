@@ -33,6 +33,7 @@ from ion.services.coi.resource_registry_beta.resource_client import \
     ResourceClient
 from ion.services.dm.distribution.publisher_subscriber import Subscriber
 
+from ion.core.exception import ApplicationError
 
 # For testing - used in the client
 from net.ooici.play import addressbook_pb2
@@ -49,6 +50,11 @@ addressbook_type = object_utils.create_type_identifier(object_id=20002, version=
 
 BEGIN_INGEST_TYPE = object_utils.create_type_identifier(object_id=2002, version=1)
 
+class EOIIngestionError(ApplicationError):
+    """
+    An error occured during the begin_ingest op of EOIIngestionService.
+    """
+    pass
 
 class EOIIngestionService(ServiceProcess):
     """
@@ -119,7 +125,7 @@ class EOIIngestionService(ServiceProcess):
         standard receive method, as if it is one of the process receivers.
         """
         @defer.inlineCallbacks
-        def _receive_msg(self, content, msg):
+        def _receive_handler(self, content, msg):
             yield self._process.receive(content, msg)
 
     @defer.inlineCallbacks
@@ -139,24 +145,18 @@ class EOIIngestionService(ServiceProcess):
 
         def _timeout():
             # trigger execution to continue below with a False result
+            log.info("Timed out in op_begin_ingest")
             self._defer_ingest.callback(False)
 
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
         timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
 
         log.info('Notifying caller that ingest is ready by invoking RPC op_ingest_ready() using routing key: "%s"' % content.ready_routing_key)
-        yield self.rpc_send(content.ready_routing_key, operation='ingest_ready', content=True)
+        self.send(content.ready_routing_key, operation='ingest_ready', content=True)
+        #yield self.rpc_send(content.ready_routing_key, operation='ingest_ready', content=True)
 
+        log.info("Yielding in op_begin_ingest for receive loop to complete")
         ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
-
-        if ingest_res:
-            # we succeeded, cancel the timeout
-            timeoutcb.cancel()
-
-            # now reply ok to the original message
-            yield self.reply_ok(msg) #, content={'topic':content.ds_ingest_topic})
-        else:
-            yield self.reply_err(msg)
 
         # common cleanup
 
@@ -164,27 +164,40 @@ class EOIIngestionService(ServiceProcess):
         self._defer_ingest = defer.Deferred()
 
         # remove subscriber, deactivate it
-        self._registered_life_cycle_objects.remove(self._susbcriber)
+        self._registered_life_cycle_objects.remove(self._subscriber)
         yield self._subscriber.terminate()
         self._subscriber = None
+
+        if ingest_res:
+            log.debug("Ingest succeeded, respond to original request")
+
+            # we succeeded, cancel the timeout
+            timeoutcb.cancel()
+
+            # now reply ok to the original message
+            yield self.reply_ok(msg, content={'topic':content.ds_ingest_topic})
+        else:
+            log.debug("Ingest failed, error back to original request")
+            raise EOIIngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
+            #yield self.reply_err(msg, content="dyde")
 
     @defer.inlineCallbacks
     def op_recv_shell(self, content, headers, msg):
         log.info("op_recv_shell")
         # this is NOT rpc
-        yield self.reply_ok(msg)
+        yield msg.ack()
 
     @defer.inlineCallbacks
     def op_recv_chunk(self, content, headers, msg):
         log.info("op_recv_chunk")
         # this is NOT rpc
-        yield self.reply_ok(msg)
+        yield msg.ack()
 
     @defer.inlineCallbacks
     def op_recv_done(self, content, headers, msg):
         log.info("op_recv_done")
         # this is NOT rpc
-        yield self.reply_ok(msg)
+        yield msg.ack()
 
         # trigger the op_begin_ingest to complete!
         self._defer_ingest.callback(True)
