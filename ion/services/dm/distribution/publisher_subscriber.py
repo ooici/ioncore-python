@@ -165,6 +165,10 @@ class Subscriber(BasicLifecycleObject):
        yield self.subscribe()
 
     @defer.inlineCallbacks
+    def on_terminate(self, *args, **kwargs):
+        yield self._recv.terminate()
+
+    @defer.inlineCallbacks
     def subscribe(self):
         """
         """
