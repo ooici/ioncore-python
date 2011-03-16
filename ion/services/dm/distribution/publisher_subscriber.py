@@ -57,7 +57,7 @@ class Publisher(BasicLifecycleObject):
         pass
 
     def on_activate(self, *args, **kwargs):
-        self._recv.attach() # calls initialize/activate, gets receiver in correct state for publishing
+        return self._recv.attach() # calls initialize/activate, gets receiver in correct state for publishing
 
     def publish(self, data):
         """
