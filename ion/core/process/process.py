@@ -898,24 +898,24 @@ class ProcessClient(ProcessClientBase):
         """
         return self.proc.rpc_send(self.target, *args, **kwargs)
     
-    def rpc_send_protected(self, operation, content, user_id='ANONYMOUS', expiry='0'):
+    def rpc_send_protected(self, operation, content, user_id='ANONYMOUS', expiry='0', **kwargs):
         """
         Sends an RPC message to the specified target via originator process
         """
         headers = {'user-id':user_id, 'expiry':expiry}
-        return self.proc.rpc_send(self.target, operation, content, headers)
+        return self.proc.rpc_send(self.target, operation, content, headers, **kwargs)
 
-    def send(self, *args):
+    def send(self, *args, **kwargs):
         """
         Sends a message to the specified target via originator process
         """
-        return self.proc.send(self.target, *args)
+        return self.proc.send(self.target, *args, **kwargs)
 
-    def reply(self, *args):
+    def reply(self, *args, **kwargs):
         """
         Replies to a message via the originator process
         """
-        return self.proc.reply(*args)
+        return self.proc.reply(*args, **kwargs)
 
 # ============================================================================
 
