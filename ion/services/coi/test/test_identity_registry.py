@@ -89,7 +89,7 @@ class IdentityRegistryClientTest(IonTestCase):
 
         sup = yield self._spawn_processes(services)
 
-        self.identity_registry_client = IdentityRegistryClient(proc=sup)
+        self.irc = IdentityRegistryClient(proc=sup)
         self.mc = MessageClient(proc=self.test_sup)
         
         # initialize the user
@@ -151,7 +151,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     def test_register_user(self):
 
         # test that user is not yet registered
-        found = yield self.identity_registry_client.is_user_registered(self.user_certificate, self.user_rsa_private_key)
+        found = yield self.irc.is_user_registered(self.user_certificate, self.user_rsa_private_key)
         self.assertEqual(found, False)
         
         # Register a user
@@ -159,31 +159,31 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         Request.configuration = Request.CreateObject(IDENTITY_TYPE)
         Request.configuration.certificate = self.user_certificate
         Request.configuration.rsa_private_key = self.user_rsa_private_key
-        ooi_id1 = yield self.identity_registry_client.register_user(Request)
+        ooi_id1 = yield self.irc.register_user(Request)
         log.debug('OOI_ID1 = ' + ooi_id1)
         
         # Verify we can find it.
-        found = yield self.identity_registry_client.is_user_registered(self.user_certificate, self.user_rsa_private_key)
+        found = yield self.irc.is_user_registered(self.user_certificate, self.user_rsa_private_key)
         self.assertEqual(found, True)
         
 
     @defer.inlineCallbacks
-    def test_update_user(self):
+    def test_authenticate_user(self):
         
         # Register a user
         Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
         Request.configuration = Request.CreateObject(IDENTITY_TYPE)
         Request.configuration.certificate = self.user_certificate
         Request.configuration.rsa_private_key = self.user_rsa_private_key
-        ooi_id1 = yield self.identity_registry_client.register_user(Request)
+        ooi_id1 = yield self.irc.register_user(Request)
         log.debug('OOI_ID1 = ' + ooi_id1)
         
         # Verify we can find it.
-        found = yield self.identity_registry_client.is_user_registered(self.user_certificate, self.user_rsa_private_key)
+        found = yield self.irc.is_user_registered(self.user_certificate, self.user_rsa_private_key)
         self.assertEqual(found, True)
         
-        # swap them just to test update
-        ooi_id2 = yield self.identity_registry_client.authenticate_user(self.user_certificate, self.user_rsa_private_key)
+        # reset them to test authenticate
+        ooi_id2 = yield self.irc.authenticate_user(self.user_certificate, self.user_rsa_private_key)
         log.debug('OOI_ID2 = ' + ooi_id2)
         self.assertEqual(ooi_id1, ooi_id2)
         
@@ -196,15 +196,15 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         Request.configuration = Request.CreateObject(IDENTITY_TYPE)
         Request.configuration.certificate = self.user_certificate
         Request.configuration.rsa_private_key = self.user_rsa_private_key
-        ooi_id1 = yield self.identity_registry_client.register_user(Request)
+        ooi_id1 = yield self.irc.register_user(Request)
         log.debug('OOI_ID1 = ' + ooi_id1)
         
         # Verify we can find it.
-        found = yield self.identity_registry_client.is_user_registered(self.user_certificate, self.user_rsa_private_key)
+        found = yield self.irc.is_user_registered(self.user_certificate, self.user_rsa_private_key)
         self.assertEqual(found, True)
         
         # load the user back
-        user1 = yield self.identity_registry_client.get_user(ooi_id1)
+        user1 = yield self.irc.get_user(ooi_id1)
               
         # Test that we got a Person back
         self.assertNotEqual(user1, None)
@@ -212,33 +212,87 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         self.assertEqual(user1['subject'], "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254")
 
         # Test the ooi_id was properly set within the Person object
-        self.assertEqual(user1['ooi_id'], ooi_id)
-
-        # Test that updates work
-        user1['user_cert'] = user_certificate + "\nA Small Change"
-        ooi_id2 = yield self.identity_registry_client.update_user(user1)
-        user2 = yield self.identity_registry_client.get_user(ooi_id2)
-        self.assertEqual(user2['user_cert'], user_certificate + "\nA Small Change")
-
+        self.assertEqual(user1['ooi_id'], ooi_id1)
+        
         # Test for user not found handled properly.
         bogus_ooi_id = "bogus-ooi_id"
-        result = yield self.identity_registry_client.get_user(bogus_ooi_id)
+        result = yield self.irc.get_user(bogus_ooi_id)
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.NOT_FOUND)
 
+    
+    @defer.inlineCallbacks
+    def test_update_user(self):
+        
+        # Register a user
+        Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
+        Request.configuration = Request.CreateObject(IDENTITY_TYPE)
+        Request.configuration.certificate = self.user_certificate
+        Request.configuration.rsa_private_key = self.user_rsa_private_key
+        ooi_id1 = yield self.irc.register_user(Request)
+        log.debug('OOI_ID1 = ' + ooi_id1)
+        
+        # Verify we can find it.
+        found = yield self.irc.is_user_registered(self.user_certificate, self.user_rsa_private_key)
+        self.assertEqual(found, True)
+        
+        # load the user back
+        user1 = yield self.irc.get_user(ooi_id1)
+              
+        # Test that updates work
+        user1['user_cert'] = self.user_certificate + "\nA Small Change"
+        ooi_id2 = yield self.irc.update_user(user1)
+        user2 = yield self.irc.get_user(ooi_id2)
+        self.assertEqual(user2['user_cert'], self.user_certificate + "\nA Small Change")
+
+
+    @defer.inlineCallbacks
+    def test_finding_user(self):
+        
+        # Register a user
+        Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
+        Request.configuration = Request.CreateObject(IDENTITY_TYPE)
+        Request.configuration.certificate = self.user_certificate
+        Request.configuration.rsa_private_key = self.user_rsa_private_key
+        ooi_id1 = yield self.irc.register_user(Request)
+        log.debug('OOI_ID1 = ' + ooi_id1)
+        
+        # Verify we can find it.
+        found = yield self.irc.is_user_registered(self.user_certificate, self.user_rsa_private_key)
+        self.assertEqual(found, True)
+        
         # Test if we can find the user we have stuffed in.
         user_description = coi_resource_descriptions.IdentityResource()
-        user_description.subject = 'oger'
+        user_description.subject = 'Roger'
 
         # Disabled until find is properly implemented
-        #users1 = yield self.identity_registry_client.find_users(user_description,regex=True)
+        #users1 = yield self.irc.find_users(user_description,regex=True)
         #self.assertEqual(len(users1), 1) # should only return 1 match
         #self.assertEqual("/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254 CHANGED", users1[0].subject)
 
+    
+    @defer.inlineCallbacks
+    def test_lifecycle(self):
+        
+        # Register a user
+        Request = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
+        Request.configuration = Request.CreateObject(IDENTITY_TYPE)
+        Request.configuration.certificate = self.user_certificate
+        Request.configuration.rsa_private_key = self.user_rsa_private_key
+        ooi_id1 = yield self.irc.register_user(Request)
+        log.debug('OOI_ID1 = ' + ooi_id1)
+        
+        # Verify we can find it.
+        found = yield self.irc.is_user_registered(self.user_certificate, self.user_rsa_private_key)
+        self.assertEqual(found, True)
+        
+        # load the user back
+        user1 = yield self.irc.get_user(ooi_id1)
+              
         # Test if we can set the life cycle state
         self.assertEqual(str(user1['lifecycle']), 'New') # Should start as new
 
-        ooi_id = user0['ooi_id']
+        ooi_id = user1['ooi_id']
 
-        result = yield self.identity_registry_client.set_identity_lcstate_retired(ooi_id) # Wishful thinking Roger!
-        user2 = yield self.identity_registry_client.get_user(ooi_id)
+        result = yield self.irc.set_identity_lcstate_retired(ooi_id) # Wishful thinking Roger!
+        user2 = yield self.irc.get_user(ooi_id)
         self.assertEqual(str(user2['lifecycle']), 'Retired') # Should be retired now
