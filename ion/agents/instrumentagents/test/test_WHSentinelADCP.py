@@ -97,6 +97,7 @@ class TestWHSentinelADCP(IonTestCase):
     def test_fetch_set(self):
         params = {'baudrate':'19200'}
         yield self.driver_client.set_params(params)
+        yield pu.asleep(2)
 
         """
         params = {'outputformat':'2'}

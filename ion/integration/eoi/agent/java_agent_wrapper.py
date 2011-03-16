@@ -7,22 +7,26 @@
 @brief:  EOI JavaAgentAgent and JavaAgentWrapperClient class definitions
 """
 
-# Imports: Logging
+# Imports:
+from ion.core.messaging.message_client import MessageClient
+from ion.core.object import object_utils
+from ion.core.process.process import Process, ProcessFactory
+from ion.core.process.service_process import ServiceProcess, ServiceClient
+from ion.services.coi.resource_registry_beta.resource_client import \
+    ResourceClient
+from ion.util.os_process import OSProcess
+from ion.util.state_object import BasicStates
+from twisted.internet import defer, reactor
 import ion.util.ionlog
+import ion.util.procutils as pu
 log = ion.util.ionlog.getLogger(__name__)
 
 # Imports: General
-import ion.util.procutils as pu
-from twisted.internet import defer, reactor
-from ion.core.process.process import Process, ProcessFactory
-from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.util.state_object import BasicStates
-from ion.util.os_process import OSProcess
+import time
 
 # Imports: Message object creation
-from ion.core.object import object_utils
-from ion.core.messaging.message_client import MessageClient
-context_message_type = object_utils.create_type_identifier(object_id=4501, version=1)
+DATA_CONTEXT_TYPE = object_utils.create_type_identifier(object_id=4501, version=1)
+CHANGE_EVENT_TYPE = object_utils.create_type_identifier(object_id=7001, version=1)
 
 
 class JavaAgentWrapper(ServiceProcess):
@@ -150,6 +154,7 @@ class JavaAgentWrapper(ServiceProcess):
         
         # Step 2: Perform Initialization
         self.mc = MessageClient(proc=self)
+        self.rc = ResourceClient(proc=self)
         
         # Step 2: Spawn the associated external child process (if not already done)
         res = yield defer.maybeDeferred(self._spawn_dataset_agent)
@@ -338,9 +343,13 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         log.info("<<<---@@@ Recieved operation 'update_request'.  Delegating to underlying dataset agent...")
         
+        if not hasattr(content, 'MessageType') or content.MessageType != CHANGE_EVENT_TYPE:
+            raise TypeError('The given content must be an instance of or a wrapped instance of %s.  Given: %s' % (repr(CHANGE_EVENT_TYPE), type(content)))
+        
+        
         # Step 1: Grab the context for the given dataset ID
         try:
-            context = yield self._get_dataset_context(str(content))
+            context = yield self._get_dataset_context(content.dataset_id, content.data_source_id)
         except KeyError, ex:
             yield self.reply_err(msg, "Could not grab the current context for the dataset with id: " + str(content))
         
@@ -375,7 +384,7 @@ class JavaAgentWrapper(ServiceProcess):
         return True
     
     @defer.inlineCallbacks
-    def _get_dataset_context(self, datasetID):
+    def _get_dataset_context(self, datasetID, dataSourceID):
         '''
         Requests the current state of the given datasetID from the Resource Registry and returns that state as
         "context" for future update procedures.
@@ -384,33 +393,53 @@ class JavaAgentWrapper(ServiceProcess):
         been keyed to the given datasetID; communication with the Resource Registry does NOT occur)
         '''
         # @todo: this method will be reimplemented so that dataset contexts can be retrieved dynamically
-        log.debug(" -[]- Entered _get_dataset_context(datasetID=%s); state=%s" % (datasetID, str(self._get_state())))
-        if (datasetID in self.__dataset_context_dict):
-            context_args = self.__dataset_context_dict[datasetID]
-            # @todo HACK: this implementation will always return the same context (an SOS station request)
+        log.debug(" -[]- Entered _get_dataset_context(datasetID=%s, dataSourceID=%s); state=%s" % (datasetID, dataSourceID, str(self._get_state())))
+        
+        
+        dataset = yield self.rc.get_instance(datasetID)
+        datasource = yield self.rc.get_instance(dataSourceID)
+        
+
+        if (True):
+#        if (datasetID in self.__dataset_context_dict):
+#            context_args = self.__dataset_context_dict[datasetID]
             # @SEE ion.play.hello_message.py for create message object instances
             # @SEE use msg_instance.MessageObject.SOS (example of accessing GPB enum fields)
             
             # Create an instance of the EoiDataContext message
-            msg = yield self.mc.create_instance(context_message_type, name="data_context")
+            msg = yield self.mc.create_instance(DATA_CONTEXT_TYPE)
             
             # Fill in values
-            msg.source_type = msg.SourceType.SOS
-            msg.start_time = '2008-08-01T00:00:00Z'
-            msg.end_time = '2008-08-02T00:00:00Z'
+#            msg.source_type = msg.SourceType.SOS
+#            msg.start_time = '2008-08-01T00:00:00Z'
+#            msg.end_time = '2008-08-02T00:00:00Z'
+#
+#            msg.property.append('sea_water_temperature')
+#            msg.station_id.append('41012')
+#            
+#            msg.request_type = msg.RequestType.CTD
+#            msg.top = 0.0
+#            msg.bottom = 0.0
+#            msg.left = 0.0
+#            msg.right = 0.0
+#            msg.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
+#            msg.dataset_url = ''
+#            msg.ncml_mask = ''
+            msg.source_type = datasource.source_type
+            msg.start_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
+            msg.end_time = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
-            msg.property.append('sea_water_temperature')
-            msg.station_id.append('41012')
-            
-            msg.request_type = msg.RequestType.CTD
-            msg.top = 0.0
-            msg.bottom = 0.0
-            msg.left = 0.0
-            msg.right = 0.0
-            msg.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
-            msg.dataset_url = ''
-            msg.ncml_mask = ''
-            
+            msg.property.extend(datasource.property)
+            msg.station_id.extend(datasource.station_id)
+
+            msg.request_type = datasource.request_type
+            msg.top = datasource.top
+            msg.bottom = datasource.bottom
+            msg.left = datasource.left
+            msg.right = datasource.right
+            msg.base_url = datasource.base_url
+            msg.dataset_url = datasource.dataset_url
+            msg.ncml_mask = datasource.ncml_mask
             
             defer.returnValue(msg)
         else:
@@ -510,8 +539,14 @@ class JavaAgentWrapperClient(ServiceClient):
     """
     
     def __init__(self, *args, **kwargs):
+        # Step 1: Delegate initialization to parent "ServiceClient"
         kwargs['targetname'] = 'java_agent_wrapper'
         ServiceClient.__init__(self, *args, **kwargs)
+        
+        # Step 2: Perform Initialization
+        self.mc = MessageClient(proc=self.proc)
+        self.rc = ResourceClient(proc=self.proc)
+        
     
     @defer.inlineCallbacks
     def rpc_pretty_print(self):
@@ -554,7 +589,7 @@ class JavaAgentWrapperClient(ServiceClient):
         defer.returnValue(str(content))
     
     @defer.inlineCallbacks
-    def rpc_request_update(self, datasetId):
+    def rpc_request_update(self, datasetID, datasourceID):
         '''
         Simulates an update request to the JavaAgentWrapper as if from the Scheduler Service
         '''
@@ -562,9 +597,14 @@ class JavaAgentWrapperClient(ServiceClient):
         #   ...if not, this will spawn a new default instance.
         yield self._check_init()
         
+        # Create the Change event (just as the scheduler would)
+        change_event = yield self.mc.create_instance(CHANGE_EVENT_TYPE)
+        change_event.data_source_id = datasourceID
+        change_event.dataset_id = datasetID
+        
         # Invoke [op_]update_request() on the target service 'dispatcher_svc' via RPC
         log.info("@@@--->>> Sending 'update_request' RPC message to java_agent_wrapper service")
-        (content, headers, msg) = yield self.rpc_send('update_request', datasetId)
+        (content, headers, msg) = yield self.rpc_send('update_request', (change_event))
         
         defer.returnValue(str(content))
         
@@ -581,13 +621,21 @@ factory = ProcessFactory(JavaAgentWrapper)
 # Application Startup
 #----------------------------#
 :: bash ::
-scripts/start-cc -h amoeba.ucsd.edu -a sysname=eoitest res/apps/eoiagent.app
+bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=eoitest,register=demodata res/apps/resource.app
 
 
 #----------------------------#
 # Update Testing
 #----------------------------#
 :: py ::
+from ion.integration.eoi.agent.java_agent_wrapper import JavaAgentWrapperClient as jawc
+client = jawc()
+spawn("ion.integration.eoi.agent.java_agent_wrapper")
+
+client.rpc_request_update(dataset1, datasource1)
+
+
+
 from ion.integration.eoi.agent.java_agent_wrapper import JavaAgentWrapperClient as jawc
 aclient = jawc()
 aclient.rpc_request_update('sos_station_st')

@@ -39,6 +39,9 @@ class TestInstrumentAgent(IonTestCase):
         
         yield self._start_container()
 
+
+
+
         """
         # startup a simulator
         self.simulator = Simulator("123", 9000)

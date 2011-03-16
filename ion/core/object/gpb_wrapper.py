@@ -694,8 +694,10 @@ class WrapperType(type):
                 raise ValueError('Invalid argument "dimension": "%s" -- Please specify a positive integer' % str(length))
 
             dim = _find_dimension_by_name(self, name)
-            if dim.variable_length and length != dim.length:
-                raise OOIObjectError('Cannot change the length of a dimension when dimension.variable_length is set to False.  Old length: %s.  New length: %s.' % (str(dim.length), str(length)))
+
+            ### Variable Length is a NETCDF 4 feature which describes a ragged array.
+            #if dim.variable_length and length != dim.length:
+            #    raise OOIObjectError('Cannot change the length of a dimension when dimension.variable_length is set to False.  Old length: %s.  New length: %s.' % (str(dim.length), str(length)))
             
             dim.length = length
 
@@ -835,8 +837,8 @@ class WrapperType(type):
             clsDict['FindAttributeByName'] = _find_attribute_by_name
             clsDict['FindDimensionByName'] = _find_dimension_by_name
             clsDict['FindAttributeIndexByName'] = _find_attribute_index_by_name
-            # ?? clsDict['SetAttribute'] = _set_attribute
-            # ?? clsDict['SetDimension'] = _set_dimension
+            clsDict['SetAttribute'] = _set_attribute
+            clsDict['SetDimension'] = _set_dimension
             
             # @attention: Value adds are currently manual
 
