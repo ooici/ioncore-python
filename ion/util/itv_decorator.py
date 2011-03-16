@@ -36,7 +36,7 @@ skipped = set()
 oldGetSkip = unittest.TestCase.getSkip
 def patchedGetSkip(self, *args, **kwargs):
     method = getattr(self, self._testMethodName)
-    name = method.__func__.__name__
+    name = method.__name__
     if name in skipped:
         return 'Skipping the %s integration test.' % (name)
     return oldGetSkip(self, *args, **kwargs)
