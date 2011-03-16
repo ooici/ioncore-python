@@ -14,19 +14,33 @@ import random
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+MB = 1024 * 1024
+
 class CassandraPerformanceTester:
     
-    def __init__(self, index=False, num_rows = 100):
+    def __init__(self, index=False, num_rows = 100, blob_size=MB):
         self.index = index
         if self.index:
             self.store = CassandraIndexedStoreBootstrap("ooiuser", "oceans11")
         else:
             self.store = CassandraStoreBootstrap("ooiuser", "oceans11")
         
-        self.store.initialize()
-        self.store.activate()
         self.num_rows = num_rows
         self.blobs = {}
+        
+        f = open("/dev/urandom")  
+        t1 = time.time()
+        for i in range(self.num_rows):
+            blob = f.read(blob_size)
+            key = sha.sha(blob).digest()
+            self.blobs.update({key:blob})
+        t2 = time.time()
+        diff = t2 - t1
+        print "Time creating blobs %s " % (diff,)
+        
+        #Have the store connect to the Cassandra cluster
+        self.store.initialize()
+        self.store.activate()
         self.indexes = []
         self.index_values_dict = {}
         
@@ -44,21 +58,15 @@ class CassandraPerformanceTester:
     
     @defer.inlineCallbacks
     def setUp(self):
-        print "in setUp"
-        size = 1024 * 1024 #1MB
-        f = open("/dev/urandom")
-        num_puts = self.num_rows
-        for i in range(num_puts):
-            blob = f.read(size)
-            key = sha.sha(blob).digest()
-            self.blobs.update({key:blob})
-            
+        """
+        This puts the blobs into the Cassandra cluster
+        """
         t1 = time.time()
         for k,v in self.blobs.items():
             yield self.store.put(k,v)
         t2 = time.time()
         diff =  t2 - t1
-        print "Time to do %s puts %s " % (num_puts,diff)
+        print "Time to do %s puts %s " % (len(self.blobs),diff)
         
     
     @defer.inlineCallbacks
@@ -75,6 +83,7 @@ class CassandraPerformanceTester:
         
         @defer.inlineCallbacks
         def run_query(query):
+            num_preds = len(query.get_predicates())
             t1 = time.time()
             num_queries = 10
             for i in range(num_queries):
@@ -82,7 +91,7 @@ class CassandraPerformanceTester:
             t2 = time.time()
             diff = t2 - t1
             print "%s rows returned." % (len(rows))
-            print "Time to do %s queries with 1 predicate that returns %s rows: %s" % (num_queries,len(rows), diff)
+            print "Time to do %s queries with %s predicate that returns %s rows: %s" % (num_queries,num_preds,len(rows), diff)
         
         q1 = Query()
         q1.add_predicate_eq("subject_key", self.index_values_dict[0])
@@ -90,7 +99,9 @@ class CassandraPerformanceTester:
         
         q2 = Query()
         q2.add_predicate_eq("branch_name", self.index_values_dict[0])
-        yield run_query(q2)
+        #This query returns all of the rows and is really slow.
+        #yield run_query(q2)
+        
         q3 = Query()
         q3.add_predicate_eq("branch_name", self.index_values_dict[1])
         yield run_query(q3)
@@ -172,6 +183,7 @@ class CassandraPerformanceTester:
         for k in no_keys:
             yield self.store.has_key(k)  
         t2 = time.time()
+        diff = t2 - t1
         print "Time to do %s has_keys with negatives: %s " % (num_has_keys, diff)      
             
     @defer.inlineCallbacks
@@ -189,7 +201,7 @@ class CassandraPerformanceTester:
     
     
 def main(): 
-    tester = CassandraPerformanceTester(index=True,num_rows=24)
+    tester = CassandraPerformanceTester(index=True,num_rows=1000)
     tester.runTests()
     reactor.run() 
     
