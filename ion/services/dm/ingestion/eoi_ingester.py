@@ -279,12 +279,21 @@ class EOIIngestionClient(ServiceClient):
 
         # Invoke [op_]update_request() on the target service 'dispatcher_svc' via RPC
         log.info("@@@--->>> Sending 'begin_ingest' RPC message to eoi_ingest service")
-        (content, headers, msg) = yield self.rpc_send('begin_ingest', begin_msg)
+        content = "bhuahj"
+        (content, headers, msg) = yield self.rpc_send('begin_ingest', begin_msg, timeout=ingest_service_timeout+30)
         
 
         defer.returnValue(content)
         
         
+    @defer.inlineCallbacks
+    def demo(self, ds_ingest_topic):
+        yield self.proc.send(ds_ingest_topic, operation='recv_shell', content='butts')
+
+        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='butts')
+        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='butts')
+
+        yield self.proc.send(ds_ingest_topic, operation='recv_done', content='butts')
 
 # Spawn of the process using the module name
 factory = ProcessFactory(EOIIngestionService)
