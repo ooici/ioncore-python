@@ -13,6 +13,7 @@ from ion.services.dm.distribution.pubsub_service import PubSubClient, \
     REQUEST_TYPE, REGEX_TYPE, XP_TYPE, XS_TYPE, PUBLISHER_TYPE, SUBSCRIBER_TYPE, \
     QUEUE_TYPE, TOPIC_TYPE, BINDING_TYPE
 
+from uuid import uuid4
 from ion.test.iontest import IonTestCase
 from twisted.trial import unittest
 from ion.core import ioninit
@@ -58,7 +59,7 @@ class PST(IonTestCase):
         self.psc = PubSubClient(self.sup)
 
         # Fixed parameters for these tests
-        self.xs_name = 'swapmeet'
+        self.xs_name = str(uuid4())
         self.xp_name = 'science_data'
         self.topic_name = 'http://ooici.net:8001/coads.nc'
         self.publisher_name = 'Otto Niemand' # Hey, it's thematically correct.
