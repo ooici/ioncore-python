@@ -13,12 +13,11 @@ from ion.services.dm.distribution.pubsub_service import PubSubClient, \
     REQUEST_TYPE, REGEX_TYPE, XP_TYPE, XS_TYPE, PUBLISHER_TYPE, SUBSCRIBER_TYPE, \
     QUEUE_TYPE, TOPIC_TYPE, BINDING_TYPE
 
+from uuid import uuid4
 from ion.test.iontest import IonTestCase
 from twisted.trial import unittest
 from ion.core import ioninit
-
 from ion.core.object import object_utils
-
 from ion.core.exception import ReceivedApplicationError
 
 log = ion.util.ionlog.getLogger(__name__)
@@ -60,7 +59,7 @@ class PST(IonTestCase):
         self.psc = PubSubClient(self.sup)
 
         # Fixed parameters for these tests
-        self.xs_name = 'swapmeet'
+        self.xs_name = str(uuid4())
         self.xp_name = 'science_data'
         self.topic_name = 'http://ooici.net:8001/coads.nc'
         self.publisher_name = 'Otto Niemand' # Hey, it's thematically correct.
@@ -78,8 +77,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def _create_xs(self):
-        # Try and create the 'swapmeet' exchange space
-
         msg = yield self.create_message(XS_TYPE)
         msg.exchange_space_name = self.xs_name
 
@@ -111,7 +108,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_undeclare_xs(self):
-        #raise unittest.SkipTest('Blocked on EMS')
 
         xs_id = yield self._create_xs()
 
@@ -133,7 +129,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_xs_query(self):
-        #raise unittest.SkipTest('Query is broken')
 
         xs_id = yield self._create_xs()
 
@@ -208,7 +203,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_query_topics(self):
-        #raise unittest.SkipTest('Buggy, _make_ref borked still')
         yield self._declare_topic()
 
         msg = yield self.create_message(REGEX_TYPE)
@@ -234,7 +228,6 @@ class PST(IonTestCase):
 
     @defer.inlineCallbacks
     def test_declare_publisher(self):
-        #raise unittest.SkipTest('Blocked on EMS')
         pid = yield self._declare_publisher()
         self.failUnless(len(pid.id_list) > 0)
 
