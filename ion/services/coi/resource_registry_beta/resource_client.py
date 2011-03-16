@@ -193,6 +193,7 @@ class ResourceClient(object):
         yield repo.checkout(branch)
         
         # Create a resource instance to return
+        # @TODO - Check and see if there is already one - what to do?
         resource = ResourceInstance(repo)
             
         self.workbench.set_repository_nickname(reference, resource.ResourceName)

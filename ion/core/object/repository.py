@@ -230,6 +230,8 @@ class Repository(object):
         the persistent setting is changed to false
         """
 
+        '''
+        Old method - where it was possible to load a repository from a serialized mutable head
         if head:
             self._dotgit = self._load_element(head)
             # Set it to modified and give it a new ID as soon as we get it!
@@ -246,9 +248,21 @@ class Repository(object):
                 self._dotgit.repositorykey = repository_key
             else:
                 self._dotgit.repositorykey = pu.create_guid()
+        '''
+
+
+        # New method to setup the mutable head of the repository
+        mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
+        self._dotgit = self._create_wrapped_object(mutable_cls, addtoworkspace = False)
+
+        if repository_key:
+            self._dotgit.repositorykey = repository_key
+        else:
+            self._dotgit.repositorykey = pu.create_guid()
+
         """
         A specially wrapped Mutable GPBObject which tracks branches and commits
-        It is not 'stored' in the index - it lives in the workspace
+        It is not 'stored' in the index - it lives in the repository
         """
     
     def __repr__(self):
@@ -587,14 +601,14 @@ class Repository(object):
                 
         # Do some clean up!
         for item in self._workspace.itervalues():
-            #print 'ITEM',item
+            print 'ITEM',item
             item.Invalidate()
         self._workspace = {}
         self._workspace_root = None
             
         # Automatically fetch the object from the hashed dictionary
 
-        print cref
+        #print cref
 
         rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
         self._workspace_root = rootobj
@@ -703,22 +717,25 @@ class Repository(object):
         # If the repo is in a valid state - make the commit even if it is up to date
         if self.status == self.MODIFIED or self.status == self.UPTODATE:
             structure={}
+
             self._workspace_root.RecurseCommit(structure)
-                                
+
             cref = self._create_commit_ref(comment=comment)
                 
             # Add the CRef to the hashed elements
             cref.RecurseCommit(structure)
-            
+
+
             # set the cref to be readonly
             cref.ReadOnly = True
             
-            # Add the cref to the active commit objects - for convienance
+            # Add the cref to the active commit objects - for convenience
             self._commit_index[cref.MyId] = cref
 
             # update the hashed elements
             self.index_hash.update(structure)
-            log.info('Commited repository - Comment: cref.comment')
+
+            log.debug('Commited repository - Comment: "%s"' % cref.comment)
                             
         else:
             raise RepositoryError('Repository in invalid state to commit')

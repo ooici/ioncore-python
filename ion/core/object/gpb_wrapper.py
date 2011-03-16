@@ -13,6 +13,7 @@ Finish test of new Invalid methods using weakrefs - make sure it is deleted!
 from ion.core.object.object_utils import get_type_from_obj, sha1bin, sha1hex, \
     sha1_to_hex, ObjectUtilException, create_type_identifier, get_gpb_class_from_type_id
 
+import struct
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -1475,7 +1476,12 @@ class Wrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         if self.ObjectType == LINK_TYPE:
-            msg = '\nkey: %s \ntype { %s }' % (sha1_to_hex(self.GPBMessage.key), self.GPBMessage.type)
+            key = self.GPBMessage.key
+            try:
+                key = sha1_to_hex(self.GPBMessage.key)
+            except struct.error, er:
+                pass
+            msg = '\nkey: %s \ntype { %s }' % (key, self.GPBMessage.type)
         else:
             msg = '\n' +self.GPBMessage.__str__()
             

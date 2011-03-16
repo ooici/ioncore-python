@@ -284,45 +284,38 @@ class WorkBench(object):
             raise WorkBenchError('Invalid response to pull request. Bad Message Type!')
         
 
-        if result.IsFieldSet('blobs') and not get_head_content:
+        if result.IsFieldSet('blob_elements') and not get_head_content:
             raise WorkBenchError('Unexpected response to pull request: included blobs but I did not ask for them.')
 
 
-        if len(result.commits) == 0:
-            # We are upto date!
-            return
-
         # Add any new content to the repository:
+        for bytes in result.commit_elements:
+            # Move over new commits
+            element = gpb_wrapper.StructureElement.parse_structure_element(bytes)
 
-        for commit in result.commits:
-            print 'COMMIT', commit
-            repo.index_hash[commit.MyId] = result.Repository.index_hash[commit.MyId]
+            repo.index_hash[element.key] = element
 
-        for blob in result.blobs:
-            print 'BLOB', blob
-            repo.index_hash[blob.MyId] = result.Repository.index_hash[blob.MyId]
+        for bytes in result.blob_elements:
+            # Move over any blobs
+            element = gpb_wrapper.StructureElement.parse_structure_element(bytes)
+            repo.index_hash[element.key] = element
 
-
-        # Get the wrapped structure element to meet the old interface to merge...
-
-        print 'REPO WORKSPACE', repo._workspace
-
-        #head = result.Repository.index_hash[result.repo_head.MyId]
-        #repo = self._load_repo_from_mutable(head)
-        self._update_repo_to_head(repo,result.repo_head)
-
-
-        print 'REPO WORKSPACE', repo._workspace
-
+        # Move over the new head object
+        bytes = result.repo_head_element
+        head_element = gpb_wrapper.StructureElement.parse_structure_element(bytes)
+        new_head = repo._load_element(head_element)
+        new_head.Modified = True
+        new_head.MyId = repo.new_id()
         
+        # Now merge the state!
+        self._update_repo_to_head(repo,new_head)
+
+
         # Where to get objects not yet transfered.
         repo.upstream['service'] = origin
         repo.upstream['process'] = headers.get('reply-to')
 
 
-
-
-        
     @defer.inlineCallbacks
     def op_pull(self,request, headers, msg):
         """
@@ -335,12 +328,15 @@ class WorkBench(object):
         
 
         if not hasattr(request, 'MessageType') or request.MessageType != PULL_MESSAGE_TYPE:
-            raise WorkBenchError('Invalid pull request. Bad Message Type!', request.BAD_REQUEST)
+            raise WorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
 
         repo = self.get_repository(request.repository_key)
         if not repo:
-            raise WorkBenchError('Repository Key "%s" not found' % request.repo_head.repositorykey, request.NOT_FOUND)
+            raise WorkBenchError('Repository Key "%s" not found' % request.repo_head.repositorykey, request.ResponseCodes.NOT_FOUND)
+
+        if repo.status != repo.UPTODATE:
+            raise WorkBenchError('Invalid pull request. Requested Repository is in an invalid state.', request.ResponseCodes.BAD_REQUEST)
 
         my_commits = self.list_repository_commits(repo)
 
@@ -350,12 +346,18 @@ class WorkBench(object):
 
         response = yield self._process.message_client.create_instance(PULL_RESPONSE_MESSAGE_TYPE)
 
-        response.repo_head = response.Repository.copy_object(repo._dotgit, deep_copy=False)
+        # Create a structure element and put the serialized content in the response
+
+
+        head_element = self.serialize_mutable(repo._dotgit)
+        response.repo_head_element = head_element.serialize()
 
 
         for commit_key in puller_needs:
-            link = response.commits.add()
-            link.SetLink(repo._commit_index[commit_key])
+            commit_element = repo.index_hash.get(commit_key)
+            if commit_element is None:
+                raise WorkBenchError('Repository commit object not found in op_pull', request.ResponseCodes.NOT_FOUND)
+            response.commit_elements.append(commit_element.serialize())
 
 
         if request.get_head_content:
@@ -366,7 +368,7 @@ class WorkBench(object):
 
                 element = repo.index_hash.get(root_object_link.key, None)
                 if element is None:
-                    raise WorkBenchError('Repository root object not found in op_pull', request.NOT_FOUND)
+                    raise WorkBenchError('Repository root object not found in op_pull', request.ResponseCodes.NOT_FOUND)
 
                 new_elements = set([element,])
 
@@ -377,20 +379,21 @@ class WorkBench(object):
                         for child_key in element.ChildLinks:
                             child = repo.index_hash.get(child_key,None)
                             if child is None:
-                                raise WorkBenchError('Repository object not found in op_pull', request.NOT_FOUND)
+                                raise WorkBenchError('Repository object not found in op_pull', request.ResponseCodes.NOT_FOUND)
                             elif child not in blobs:
                                 children.add(child)
                     new_elements = children
 
             for element in blobs:
-                link = response.blobs.add()
-                self._link_to_structure_element(link, element)
-
+                response.blob_elements.append(element.serialize())
 
         yield self._process.reply_ok(msg, content=response)
 
 
 
+
+
+    '''
     def _link_to_structure_element(self, link, element):
         """
         Utility method for use in push / pull methods to pass content without decoding it.
@@ -412,9 +415,49 @@ class WorkBench(object):
 
         # Add this structure element to the objects owned by the message
         link.Repository.index_hash[element.key] = element
+    '''
 
 
-    
+    def serialize_mutable(self, mutable):
+        """
+
+        """
+        if mutable._invalid:
+            raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
+
+
+        # Create the Structure Element in which the binary blob will be stored
+        se = gpb_wrapper.StructureElement()
+        repo = mutable.Repository
+        for link in  mutable.ChildLinks:
+
+            if  repo.index_hash.has_key(link.key):
+                child_se = repo.index_hash.get(link.key)
+
+                # Set the links is leaf property
+                link.isleaf = child_se.isleaf
+
+
+            # Save the link info as a convience for sending!
+            se.ChildLinks.add(link.key)
+
+        se.value = mutable.SerializeToString()
+        #se.key = sha1hex(se.value)
+
+        # Structure element wrapper provides for setting type!
+        se.type = mutable.ObjectType
+
+        # Calculate the sha1 from the serialized value and type!
+        # Sha1 is a property - not a method...
+        se.key = se.sha1
+
+        # Mutable is never a leaf!
+        se.isleaf = False
+
+        # Done setting up the Sturcture Element
+        return se
+
+
 
 
     @defer.inlineCallbacks
@@ -620,7 +663,10 @@ class WorkBench(object):
         
         
     def list_repository_commits(self, repo):
-
+        """
+        This method creates a list of the commits that exist in a repository
+        The return value is a list of binary SHA1 keys
+        """
 
         if not repo.status == repo.UPTODATE:
             comment='Commiting to send message with wrapper object'
@@ -649,7 +695,6 @@ class WorkBench(object):
             # Now recurse on the ancestors
             cref_set = new_set
 
-
         key_list = []
         key_list.extend(key_set)
         return key_list
@@ -658,6 +703,10 @@ class WorkBench(object):
     def _update_repo_to_head(self, repo, head):
         log.debug('_update_repo_to_head: Loading a repository!')
 
+        print 'Repo head', repo._dotgit
+
+        print 'new_head', head
+
         if repo._dotgit == head:
             return
 
@@ -665,8 +714,53 @@ class WorkBench(object):
             # if we are doing a clone - pulling a new repository
             repo._dotgit = head
             repo.branchnicknames['master']=repo.branches[0].branchkey
+            return
+        
+        # The current repository state must be merged with the new head.
+        self._merge_repo_heads(repo._dotgit, head)
 
 
+
+    def _merge_repo_heads(self, existing_head, new_head):
+
+        log.debug('_merge_repo_heads: merging the state of repository heads!')
+        log.debug('existing repository head:\n'+str(existing_head))
+        log.debug('new head:\n'+str(new_head))
+
+        # examine all the branches in new and merge them into existing
+        for new_branch in new_head.branches:
+
+            new_branchkey = new_branch.branchkey
+
+            for existing_branch in existing_head.branches:
+
+                if new_branchkey == existing_branch.branchkey:
+                    # We need to merge the state of these branches
+
+                    self._resolve_branch_state(existing_branch, new_branch)
+
+                    # We found the new branch in existing - exit the outter for loop
+                    break
+
+            else:
+
+                # the branch in new is not in existing - add its head and move on
+                branch = existing_head.branches.add()
+
+                branch.branchkey = new_branchkey
+                # Get the cref and then link it in the existing repository
+                for cref in new_branch.commitrefs:
+                    bref = branch.commitrefs.add()
+                    bref.SetLink(cref)
+
+        log.debug('_merge_repo_heads: returning merged repository:\n'+str(existing_repo))
+        return existing_repo
+
+
+
+
+
+    '''
     def _load_repo_from_mutable(self,head):
         """
         Load a repository from a mutable - helper for push and pull - methods
@@ -705,9 +799,10 @@ class WorkBench(object):
         
         self.put_repository(repo)
         log.debug('_load_repo_from_mutable: returning repo:\n'+str(repo))
-        return repo 
+        return repo
+    '''
             
-    
+    """
     def _load_commits(self, repo, link):
                 
         log.debug('_load_commits: Loading all commits in the repository')
@@ -728,7 +823,10 @@ class WorkBench(object):
             self._load_commits(repo, link)
         
         log.debug('_load_commits: Loaded all commits!')
-    
+    """
+
+
+    """
     def _merge_repo_heads(self, existing_repo, new_repo):
         
         log.debug('_merge_repo_heads: merging the state of repository heads!')
@@ -762,8 +860,9 @@ class WorkBench(object):
                 
         log.debug('_merge_repo_heads: returning merged repository:\n'+str(existing_repo))
         return existing_repo
-    
-    
+    """
+
+    '''
     def _resolve_branch_state(self, existing_branch, new_branch):
         """
         Move everything in new into an updated existing!
@@ -831,3 +930,4 @@ class WorkBench(object):
         # Note this in the branches merge on read field and punt this to some
         # other part of the process.
         return
+    '''
