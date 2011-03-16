@@ -52,7 +52,7 @@ class CmdPort(Protocol):
             for i in range(len(data)):
                 if len(DataAsHex) > 0:
                     DataAsHex += ","
-                DataAsHex += "{0:X}".format(ord(data[i]))
+                DataAsHex += "{0:%X}"%ord(data[i])
             log.debug("CmdPort dataReceived [%s] [%s]" % (data, DataAsHex))
         else:
             log.info("CmdPort dataReceived [%s]" % data)
@@ -411,7 +411,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         if len(self.cmdQueue) > 0:     
             log.error("No response from instrument for cammand \'%s\'" % self.cmdQueue[0])
             self.publish(publish_msg_type["Error"], "Device",
-                         "No response from instrument for cammand \'%s\'".format(self.cmdQueue[0]))
+                         "No response from instrument for cammand \'%s\'"%self.cmdQueue[0])
             self.cmdQueue = []
         else:
             log.error("No cammand in command queue after command-response-timeout")
@@ -437,6 +437,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         
     @defer.inlineCallbacks
     def sendBreak(self):
+        self.CmdInstrument = None
         if self.SendingBreak == True:
             log.debug("already sending break")
             return
@@ -462,7 +463,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             #if self.CmdData != '\x22OK':
             #    raise RuntimeError('OK response not received')
             #log.debug("Rcvd OK response for 'stop break' cmd")
-        except:
+        except RuntimeError:
             log.error("Send break failed: %s" % sys.exc_info()[1])
             self.Cmdproto.transport.loseConnection()
             return
@@ -519,7 +520,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             for i in range(len(data)):
                 if len(DataAsHex) > 0:
                     DataAsHex += ","
-                DataAsHex += "{0:X}".format(ord(data[i]))
+                DataAsHex += "{0:%X}"%ord(data[i])
             log.debug("gotCmdData() [%s] [%s]" % (data, DataAsHex))
         self.CmdData = data
 
@@ -586,7 +587,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
             for i in range(len(data)):
                 if len(DataAsHex) > 0:
                     DataAsHex += ","
-                DataAsHex += "{0:X}".format(ord(data[i]))
+                DataAsHex += "{0:%X}"%ord(data[i])
             log.debug("gotData() [%s] [%s]" % (data, DataAsHex))
         self.dataQueue += data
         if instrument_prompts.INST_PROMPT in self.dataQueue:
@@ -595,7 +596,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         self.hsm.sendEvent('eventDataReceived')
         
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def publish(self, topic, transducer, data):
         """
         Collect some publishable information to hand back to the agent for
@@ -607,7 +608,7 @@ class WHSentinelADCPInstrumentDriver(InstrumentDriver):
         """
         log.debug("WHSentinelADCPDriver is publishing to the agent value: %s", data)
         # send it to our supervisor
-        yield self.send(self.proc_supid, "publish", {"Type":topic, "Transducer":transducer, "Value":data})
+        #yield self.send(self.proc_supid, "publish", {"Type":topic, "Transducer":transducer, "Value":data})
 
 
     @defer.inlineCallbacks

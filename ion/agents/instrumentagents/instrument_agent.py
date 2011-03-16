@@ -12,26 +12,31 @@ from twisted.internet import defer
 
 from ion.agents.resource_agent import ResourceAgent
 from ion.agents.resource_agent import ResourceAgentClient
-from ion.agents.instrumentagents.phrase import Phrase, GetPhrase, SetPhrase, ExecutePhrase
-from ion.agents.instrumentagents.phrase import GetAction, SetAction, ExecuteAction
 from ion.core.exception import ReceivedError
 from ion.services.dm.distribution.pubsub_service import PubSubClient
 from ion.data.dataobject import ResourceReference, DataObject
-from ion.core.process.process import Process, ProcessClient
+from ion.core.process.process import Process, ProcessClient, ProcessFactory, ProcessDesc
 from ion.resources.ipaa_resource_descriptions import InstrumentAgentResourceInstance
 from ion.resources.dm_resource_descriptions import PublisherResource
 from uuid import uuid4
+import ion.util.procutils as pu
 
 
 """
 Constants/Enumerations for tags in capabilities dict structures.
 """
-ci_commands                     = 'ci_commands'
-ci_parameters                   = 'ci_parameters'
-instrument_commands             = 'instrument_commands'
-instrument_parameters           = 'instrument_parameters'
+ci_commands             = 'ci_commands'
+ci_parameters           = 'ci_parameters'
+instrument_commands     = 'instrument_commands'
+instrument_parameters   = 'instrument_parameters'
 
 
+"""
+"""
+ci_command_list = [
+    'CI_CMD_STATE_TRANSITION',
+    'CI_CMD_TRANSMIT_DATA'
+]
 
 """
 Parameter names for instrument agents.
@@ -50,27 +55,59 @@ ci_param_list = [
 ]
 
 """
+List of observatory status names.
+"""
+ci_status_list = [
+    'CI_STATUS_AGENT_STATE',
+    'CI_STATUS_CHANNEL_NAMES',
+    'CI_STATUS_INSTRUMENT_CONNECTION_STATE',
+    'CI_STATUS_ALARMS',
+    'CI_STATUS_TIME_STATUS',
+    'CI_STATUS_BUFFER_SIZE',
+    'CI_STATUS_AGENT_VERSION',
+    'CI_STATUS_DRIVER_VERSION'    
+]
+
+"""
+Agent parameter and metadata types.
+"""
+ci_param_types = [
+    'CI_TYPE_DATATYPE',             # This type.
+    'CI_TYPE_INT',                  # int.
+    'CI_TYPE_FLOAT',                # float.
+    'CI_TYPE_BOOL',                 # bool.
+    'CI_TYPE_STRING',               # str.
+    'CI_TYPE_INT_RANGE',            # (int,int).
+    'CI_TYPE_FLOAT_RANGE',          # (float,float).
+    'CI_TYPE_TIMESTAMP',            # (int seconds,int nanoseconds).
+    'CI_TYPE_TIME_DURATION',        # TBD.
+    'CI_TYPE_PUBSUB_TOPIC_DICT',    # dict of topic strings.
+    'CI_TYPE_RESOURCE_ID',          # str (possible validation).
+    'CI_TYPE_ADDRESS',              # str (possible validation).
+    'CI_TYPE_ENUM'                  # str with valid values.
+]
+
+
+"""
 Used by the existing drivers...need to fix.
 """
 publish_msg_type = {
-    'Error'                     :'Error',
-    'StateChange'               :'StateChange',
-    'ConfigChange'              :'ConfigChange',
-    'Data'                      :'Data',
-    'Event'                     :'Event'
+    'Error':'Error',
+    'StateChange':'StateChange',
+    'ConfigChange':'ConfigChange',
+    'Data':'Data',
+    'Event':'Event'
 }
-
-
 
 """
 Publish message types.
 """
 publish_msg_types = [
-    'PUBLISH_ERROR',                        
-    'PUBLISH_STATE_CHANGE',
-    'PUBLISH_CONIFG_CHANGE',
-    'PUBLISH_DATA',
-    'PUBLISH_EVENT'    
+    'PUBLISH_MSG_ERROR',                        
+    'PUBLISH_MSG_STATE_CHANGE',
+    'PUBLISH_MSG_CONIFG_CHANGE',
+    'PUBLISH_MSG_DATA',
+    'PUBLISH_MSG_EVENT'    
 ]
 
 """
@@ -96,15 +133,114 @@ connection_methods = [
 ]
 
 """
+Observatory alarm conditions.
+"""
+status_alarms = {
+    'ALARM_CANNOT_PUBLISH'              : ('ALARM_CANNOT_PUBLISH','Attempted to publish but cannot.'),
+    'ALARM_INSTRUMENT_UNREACHABLE'      : ('ALARM_INSTRUMENT_UNREACHABLE','Instrument cannot be contacted when it should be.'),
+    'ALARM_MESSAGING_ERROR'             : ('ALARM_MESSAGING_ERROR','Error when sending messages.'),
+    'ALARM_HARDWARE_ERROR'              : ('ALARM_HARDWARE_ERROR','Hardware problem detected.'),
+    'ALARM_UNKNOWN_ERROR'               : ('ALARM_UNKNOWN_ERROR','An unknown error has occurred.')   
+}
+    
+"""
+Names of observatory and device capability lists.
+"""
+capabilities_list = [
+    'CAP_OBSERVATORY_COMMANDS',         # Common and specific observatory command names.
+    'CAP_OBSERVATORY_PARAMETERS',       # Common and specific observatory parameter names.
+    'CAP_OBSERVATORY_STATUSES',         # Common and specific observatory status names.
+    'CAP_METADATA',                     # Common and specific metadata names.
+    'CAP_DEVICE_COMMANDS',              # Common and specific device command names.
+    'CAP_DEVICE_PARAMETERS',            # Common and specific device parameter names.
+    'CAP_DEVICE_STATUSES'               # Common and specific device status names.
+]
+
+"""
+Parameter names for agent and device metadata.
+"""
+metadata_list = [
+    'META_DATATYPE',
+    'META_PHYSICAL_PARAMETER_TYPE',
+    'META_MINIMUM_VALUE',
+    'META_MAXIMUM_VALUE',    
+    'META_UNITS',
+    'META_UNCERTAINTY',
+    'META_LAST_CHANGE_TIMESTAMP',
+    'META_WRITABLE',
+    'META_VALID_VALUES',    
+    'META_FRIENDLY_NAME',
+    'META_DESCRIPTION'
+]
+
+"""
+Instrument agent observatory metadata.
+"""
+ci_param_metadata = {
+    
+    'CI_PARAM_DATA_TOPICS' :
+        {'META_DATATYPE':'CI_PUBSUB_TOPIC_DICT',
+         'META_LAST_CHANGE_TIMESTAMP':(0,0),
+         'META_FRIENDLY_NAME':'Data Topics'},
+    'CI_PARAM_EVENT_TOPICS' :
+        {'META_DATATYPE':'CI_PUBSUB_TOPIC_DICT',
+         'META_LAST_CHANGE_TIMESTAMP':(0,0),
+         'META_FRIENDLY_NAME':'Event Topics'},
+    'CI_PARAM_STATE_TOPICS' :
+        {'META_DATATYPE':'CI_PUBSUB_TOPIC_DICT',
+         'META_LAST_CHANGE_TIMESTAMP':(0,0),
+         'META_FRIENDLY_NAME':'State Topics'},
+    'CI_PARAMS_DRIVER_ADDRESS' :
+        {'META_DATATYPE':'CI_TYPE_ADDRESS',
+         'META_LAST_CHANGE_TIMESTAMP':(0,0),
+         'META_FRIENDLY_NAME':'Driver Address'},
+    'CI_PARAM_RESOURCE_ID' :
+        {'META_DATATYPE':'CI_TYPE_RESOURCE_ID',
+         'META_LAST_CHANGE_TIMESTAMP':(0,0),
+         'META_FRIENDLY_NAME':'Resource ID'},
+    'CI_PARAM_TIME_SOURCE' :
+        {'META_DATATYPE':'CI_TYPE_ENUM',
+         'META_LAST_CHANGE_TIMESTAMP':(0,0),
+         'META_VALID_VALUES':time_sources,
+         'META_FRIENDLY_NAME':'Time Source'},
+    'CI_PARAM_CONNECTION_METHOD' :
+        {'META_DATATYPE':'CI_TYPE_ENUM',
+         'META_LAST_CHANGE_TIMESTAMP':(0,0),
+         'META_VALID_VALUES':connection_methods,
+         'META_FRIENDLY_NAME':'Connection Method'},
+    'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT' :
+        {'META_DATATYPE':'CI_TYPE_INT',
+         'META_LAST_CHANGE_TIMESTAMP':(0,0),
+         'META_MINIMUM_VALUE':0,
+         'META_UNITS':'Seconds',
+         'META_FRIENDLY_NAME':'Default Transaction Timeout'},
+    'CI_PARAM_MAX_TRANSACTION_TIMEOUT' :
+        {'META_DATATYPE':'CI_TYPE_INT',
+         'META_LAST_CHANGE_TIMESTAMP':(0,0),
+         'META_MINIMUM_VALUE':0,
+         'META_UNITS':'Seconds',
+         'META_FRIENDLY_NAME':'Max Transaction Timeout'},
+    'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT' :
+        {'META_DATATYPE':'CI_TYPE_INT',
+         'META_LAST_CHANGE_TIMESTAMP':(0,0),
+         'META_MINIMUM_VALUE':0,
+         'META_UNITS':'Seconds',
+         'META_FRIENDLY_NAME':'Transaction Expire Timeout'}    
+}
+
+
+
+"""
 Agent errors.
 """
 errors = {
     'INVALID_DESTINATION'       : ['ERROR','INVALID_DESTINATION','Intended destination for a message or operation is not valid.'],
-    'TIMEOUT'	                : ['ERROR','TIMEOUT','The message or operation timed out.'],
+    'TIMEOUT'                   : ['ERROR','TIMEOUT','The message or operation timed out.'],
     'NETWORK_FAILURE'           : ['ERROR','NETWORK_FAILURE','A network failure has been detected.'],
     'NETWORK_CORRUPTION'        : ['ERROR','NETWORK_CORRUPTION','A message passing through the network has been determined to be corrupt.'],
     'OUT_OF_MEMORY'	        : ['ERROR','OUT_OF_MEMORY','There is no more free memory to complete the operation.'],
     'LOCKED_RESOURCE'	        : ['ERROR','LOCKED_RESOURCE','The resource being accessed is in use by another exclusive operation.'],
+    'RESOURCE_NOT_LOCKED'       : ['ERROR','RESOURCE_NOT_LOCKED','Attempted to unlock a free resource.'],
     'RESOURCE_UNAVAILABLE'      : ['ERROR','RESOURCE_UNAVAILABLE','The resource being accessed is unavailable.'],
     'UNKNOWN_ERROR'             : ['ERROR','UNKNOWN_ERROR','An unknown error has been encountered.'],
     'PERMISSION_ERROR'          : ['ERROR','PERMISSION_ERROR','The user does not have the correct permission to access the resource in the desired way.'],
@@ -125,7 +261,10 @@ errors = {
     'SET_OBSERVATORY_ERR'       : ['ERROR','SET_OBSERVATORY_ERR','Could not set all parameters.'],
     'PARAMETER_READ_ONLY'       : ['ERROR','PARAMETER_READ_ONLY','Parameter is read only.'],
     'INVALID_PARAMETER'         : ['ERROR','INVALID_PARAMETER','The parameter is not available.'],
-    'INVALID_PARAM_VALUE'       : ['ERROR','INVALID_PARAM_VALUE','The parameter value is out of range.']
+    'INVALID_PARAM_VALUE'       : ['ERROR','INVALID_PARAM_VALUE','The parameter value is out of range.'],
+    'INVALID_METADATA'          : ['ERROR','INVALID_METADATA','The metadata parameter is not available.'],
+    'INVALID_STATUS'            : ['ERROR','INVALID_STATUS','The status parameter is not available.'],
+    'INVALID_CAPABILITY'        : ['ERROR','INVALID_CAPABILITY','The capability parameter is not available.']
 }
 
 
@@ -190,11 +329,13 @@ class InstrumentDriverClient(ProcessClient):
         @retval A dictionary with the parameter and value of the requested
             parameter
         """
+                
         assert(isinstance(param_list, (list, tuple)))
         (content, headers, message) = yield self.rpc_send('fetch_params',
                                                           param_list)
         assert(isinstance(content, dict))
         defer.returnValue(content)
+
 
     @defer.inlineCallbacks
     def set_params(self, param_dict):
@@ -204,11 +345,14 @@ class InstrumentDriverClient(ProcessClient):
         @retval A small dict of parameter and value on success, empty dict on
             failure
         """
+        
         assert(isinstance(param_dict, dict))
         (content, headers, message) = yield self.rpc_send('set_params',
                                                           param_dict)
         assert(isinstance(content, dict))
         defer.returnValue(content)
+
+
 
     @defer.inlineCallbacks
     def execute(self, command):
@@ -351,6 +495,29 @@ class InstrumentAgent(ResourceAgent):
     """
     connection_method = None
     
+    """
+    Buffer to hold instrument data for periodic transmission.
+    """
+    data_buffer = []    # Should this be a dict or something else?
+
+    """
+    List of current alarm conditions. Tuple of (ID,description).
+    """
+    alarms = []
+    
+    """
+    Dictionary of time status values.
+    """
+    time_status = {
+        'Uncertainty': None,
+        'Peers' : None
+    }
+    
+    """
+    The software version of the instrument agent.
+    """
+    version = 0.1
+    
     
     def plc_init(self):
         ResourceAgent.plc_init(self)
@@ -394,13 +561,11 @@ class InstrumentAgent(ResourceAgent):
         @retval Transaction ID UUID string.
         """
         
-        # Do we need to explicitly convert the content from dict to timeout int?
-        
         result = yield self._start_transaction(content)                
         yield self.reply_ok(msg,result)
         
     
-    def _start_transaction(timeout):
+    def _start_transaction(self,timeout):
         """
         Begin an exclusive transaction with the agent.
         @param timeout An integer specifying time to wait in seconds for the transaction.
@@ -409,20 +574,33 @@ class InstrumentAgent(ResourceAgent):
         
         assert(isinstance(timeout,int)), 'Expected an integer timeout.'
         
-        if timeout < 0:
-            timeout = default_transaction_timeout
+        result = {'success':None,'transaction_id':None}
         
-        if timeout > max_transaction_timeout:
-            timeout = max_transaction_timeout
+        if timeout < 0:
+            timeout = self.default_transaction_timeout
+        
+        if timeout > self.max_transaction_timeout:
+            timeout = self.max_transaction_timeout
             
         if timeout == 0:
-            if transaction_id == '':
-                transaction_id = uuid4()
-                return ['OK',transaction_id]
+            if self.transaction_id == None:
+                self.transaction_id = str(uuid4())
+                result['success'] = ['OK']
+                result['transaction_id']=self.transaction_id
             else:
-                return errors['LOCKED_RESOURCE']
+                result['success'] = errors['LOCKED_RESOURCE']
+                
+        else:
+            #TODO replay this with callback/timeout logic as necessary
+            if self.transaction_id == None:
+                self.transaction_id = str(uuid4())
+                result['success'] = ['OK']
+                result['transaction_id']=self.transaction_id
+            else:
+                result['success'] = errors['LOCKED_RESOURCE']
         
-        #todo add the timeout callback code here
+        return result
+        
         
         
     
@@ -432,32 +610,36 @@ class InstrumentAgent(ResourceAgent):
         End the current transaction.
         @param tid A uuid specifying the current transaction to end.
         """        
-        # Do we need to explicitly convert content from dict to uuid4?
-        
+
         result = self._end_transaction(content)
-        yield self.reply_ok(result)
+        yield self.reply_ok(msg,result)
                 
     
 
-    @defer.inlineCallbacks
-    def _end_transaction(tid):
+    def _end_transaction(self,tid):
         """
         End the current transaction.
         @param tid A uuid specifying the current transaction to end.
         """        
         
-        assert(isinstance(tid,uuid4)), 'Expected a uuid4 transaction ID.'
-        
-        if tid == transaction_id:
-            transaction_id = None
-            return ['OK']
+        assert(isinstance(tid,str)), 'Expected a str transaction ID.'
+
+        result = {'success':None}
+
+        if tid == self.transaction_id:
+            self.transaction_id = None
+            result['success'] = ['OK']
+        elif self.transaction_id == None:
+            result['success'] = errors['RESOURCE_NOT_LOCKED']
         else:
-            return errors['LOCKED_RESOURCE']
+            result['success'] = errors['LOCKED_RESOURCE']
+
             
+        return result
         
 
     
-    def _verify_transaction(tid,optype):
+    def _verify_transaction(self,tid,optype):
         """
         Verify the passed transaction ID is currently open, or open an implicit transaction.
         @param tid 'create' to create an implicit transaction, 'none' to perform the operation without
@@ -466,24 +648,24 @@ class InstrumentAgent(ResourceAgent):
         @retval True if the transaction is valid or if one was successfully created, False otherwise.
         """
 
-        assert(isinstance(tid,(str,uuid4))), 'Expected uuid4 or str transaction ID.'
-        assert(isinstance(optype,str,uuid4)), 'Expected str optype.'
+        assert(isinstance(tid,str)), 'Expected transaction ID str.'
+        assert(isinstance(optype,str)), 'Expected str optype.'
 
 
         # Try to start an implicit transaction if tid is 'create'
         if tid == 'create':
-            result = self._start_transaction(default_transaction_timeout)
+            result = self._start_transaction(self.default_transaction_timeout)
             if result[0]=='OK':
                 return True
             else:
                 return False
         
         # Allow only gets without a current or created transaction.
-        if tid == 'none' and transaction_id == None and optype == 'get':
+        if tid == 'none' and self.transaction_id == None and optype == 'get':
             return true
         
         # Otherwise, the given ID must match the outstanding one
-        if tid == transaction_id:
+        if tid == self.transaction_id:
             return True
         
         return False
@@ -514,7 +696,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
 
         assert(isinstance(cmd,list)), 'Expected a command list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
     
         reply = {'success':None,'result':None,'transaction_id':None}
     
@@ -570,7 +752,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -593,43 +775,41 @@ class InstrumentAgent(ResourceAgent):
         result = {}                    
         get_errors = False
         
-        if 'all' in params:
-            params = ci_param_list.values()
         
         
         # Add each observatory parameter given in params list.
-        for arg in params:                
-            if arg == 'CI_PARAM_DATA_TOPICS':
+        for arg in params:
+            if arg not in ci_param_list or arg != 'all':
+                result[arg] = errors['INVALID_PARAMETER']
+                get_errors = True
+            elif arg == 'CI_PARAM_DATA_TOPICS' or arg=='all':
                 # Does this depend on new pubsub? See below for old way.
                 pass    
-            elif arg == 'CI_PARAM_EVENT_TOPICS':
+            elif arg == 'CI_PARAM_EVENT_TOPICS' or arg=='all':
                 # Does this depend on new pubsub? See below for old way.
                 pass
-            elif arg == 'CI_PARAM_STATE_TOPICS':
+            elif arg == 'CI_PARAM_STATE_TOPICS' or arg=='all':
                 # Does this depend on new pubsub? See below for old way.
                 pass
-            elif arg == 'CI_PARAM_DRIVER_ADDRESS':
+            elif arg == 'CI_PARAM_DRIVER_ADDRESS' or arg=='all':
                 if driver_client.target:
                     result['CI_PARAM_DRIVER_ADDRESS'] = (['OK'],str(self.driver_client.target))
                 else:
                     get_errors = True
                     result['CI_PARAM_DRIVER_ADDRESS'] = (errors['INVALID_DRIVER'],None)
-            elif arg == 'CI_PARAM_RESOURCE_ID':
+            elif arg == 'CI_PARAM_RESOURCE_ID' or arg=='all':
                 # How do we get this?
                 pass
-            elif arg == 'CI_PARAM_TIME_SOURCE':
+            elif arg == 'CI_PARAM_TIME_SOURCE' or arg=='all':
                 result['CI_PARAM_TIME_SOURCE'] = (['OK'],time_source)
-            elif arg == 'CI_PARAM_CONNECTION_METHOD':
+            elif arg == 'CI_PARAM_CONNECTION_METHOD' or arg=='all':
                 result['CI_PARAM_CONNECTION_METHOD'] = (['OK'],connection_method)
-            elif arg == 'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT':
+            elif arg == 'CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT' or arg=='all':
                 result['CI_PARAM_DEFAULT_TRANSACTION_TIMEOUT'] = (['OK'],default_transaction_timeout)
-            elif arg == 'CI_PARAM_MAX_TRANSACTION_TIMEOUT':
+            elif arg == 'CI_PARAM_MAX_TRANSACTION_TIMEOUT' or arg=='all':
                 result['CI_PARAM_MAX_TRANSACTION_TIMEOUT'] = (['OK'],max_transaction_timeout)
-            elif arg == 'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT':
+            elif arg == 'CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT' or arg=='all':
                 result['CI_PARAM_TRANSACTION_EXPIRE_TIMEOUT'] = (['OK'],transaction_expire_timeout)
-            else:
-                get_errors = True
-                result[arg] = (error[ParameterNotAvailable],None)
                 
         if get_errors:
             success = errors['GET_OBSERVATORY_ERR']
@@ -686,7 +866,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,dict)), 'Expected a parameter dict.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
         
         reply = {'success':None,'result':None,'transaction_id':None}
         
@@ -718,6 +898,10 @@ class InstrumentAgent(ResourceAgent):
         # Note: it seems like all the current params should be read only by
         # general agent users. 
         for arg in params.keys():
+            if arg not in ci_param_list:
+                result[arg] = errors[INVALID_PARAMETER]
+                set_errors = True
+                continue
             val = params[arg]
             if arg == 'CI_PARAM_DATA_TOPICS':
                 pass
@@ -795,9 +979,7 @@ class InstrumentAgent(ResourceAgent):
                     set_errors = True
                     success = errors['INVALID_PARAM_VALUE']
                 result[arg] = success
-            else:
-                set_errors = True
-                result[arg] = error['INVALID_PARAMETER']
+
 
 
         if set_errors:
@@ -808,8 +990,6 @@ class InstrumentAgent(ResourceAgent):
         reply['success'] = success
         reply['result'] = result
             
-
-        
         
         # End implicit transactions.
         if tid == 'create':
@@ -836,7 +1016,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -862,9 +1042,44 @@ class InstrumentAgent(ResourceAgent):
         
         # Do the work here.
         # Set up the result message.
+        for (param_arg,meta_arg) in params:
+            if not param_arg in ci_params_list or param_arg != 'all':
+                get_errors = True
+                result[(param_arg,meta_arg)] = (errors['INVALID_PARAMETER'],None)
+                get_errors = True
+                continue
+            if not meta_arg in metadata_list or meta_arg != 'all':
+                result[(param_arg,meta_arg)] = (errors['INVALID_METADATA'],None)
+                get_errors = True
+                continue
+            
+            if param_arg == 'all' and meta_arg == 'all':
+                for param_key in ci_metadata.keys():
+                    for meta_key in ci_metadata[param_key]:
+                        result[(param_key,meta_key)] = ci_metadata[param_key][meta_key]
+            elif param_arg == 'all' and meta_arg != 'all':
+                for param_key in ci_parameter_list.keys():
+                    try:
+                        val = ci_metadata[param_key][meta_arg]
+                    except:
+                        result[(param_key,meta_arg)] = (errors['INVALID_METADATA'],None)
+                    else:
+                        result[(param_key,meta_arg)] = (['OK'],val)
+                        
+            elif param_arg != 'all' and meta_arg == 'all':
+                for meta_key in ci_metadata[param_arg].keys():
+                    result[(param_arg,meta_arg)] = ci_metadata[param_arg][meta_arg]
+            else:
+                try:
+                    val = ci_metadata[param_arg][meta_arg]
+                except:
+                    result[(param_arg,meta_arg)] = (errors['INVALID_METADATA'],None)
+                else:
+                    result[(param_arg,meta_arg)] = (['OK'],val)
+                        
         
         if get_errors:
-            success = errors['GetObservatoryErr']
+            success = errors['GET_OBSERVATORY_ERR']
         else:
             success = ['OK']
             
@@ -899,7 +1114,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -925,7 +1140,42 @@ class InstrumentAgent(ResourceAgent):
         
         # Do the work here.
         # Set up the result message.
-        
+        for arg in params:
+            if arg not in ci_status_list and arg != 'all':
+                result[arg] = errors['INVALID_STATUS']
+                get_errors = True
+                continue
+            elif arg == 'CI_STATUS_AGENT_STATE' or arg == 'all':
+                result['CI_STATUS_AGENT_STATE'] = (['OK'],self.agent_fsm.get_state())
+            elif arg == 'CI_STATUS_CHANNEL_NAMES' or arg == 'all':
+                dvr_msg_content = {'params':[('instrument','channel_names')]}
+                dvr_result = yield self.driver_client.rpc_send('get',dvr_msg_content)
+                dvr_success = dvr_result['success']
+                dvr_val = dvr_result['params'][('instrument','channel_names')]
+                result['CI_STATUS_CHANNEL_NAMES'] = (dvr_val[0],dvr_val[1])                    
+                if dvr_success[0] != 'OK':
+                    get_errors = True
+            elif arg == 'CI_STATUS_INSTRUMENT_CONNECTION_STATE' or arg == 'all':
+                dvr_msg_content = {'params':[('instrument','connection_status')]}
+                dvr_result = yield self.driver_client.rpc_send('get_status',dvr_msg_content)
+                dvr_success = dvr_result['success']
+                dvr_val = dvr_result['params'][('instrument','connection_status')]
+                result['CI_STATUS_INSTRUMENT_CONNECTION_STATE'] = (dvr_val[0],dvr_val[1])                    
+                if dvr_success[0] != 'OK':
+                    get_errors = True
+            elif arg == 'CI_STATUS_ALARMS' or arg == 'all':
+                result['CI_STATUS_ALARMS'] = (['OK'],self.alarms)
+            elif arg == 'CI_STATUS_TIME_STATUS' or arg == 'all':
+                result['CI_STATUS_TIME_STATUS'] = (['OK'],time_status)
+            elif arg == 'CI_STATUS_BUFFER_SIZE' or arg == 'all':
+                pass    #TBD
+            elif arg == 'CI_STATUS_AGENT_VERSION' or arg == 'all':
+                result['CI_STATUS_AGENT_VERSION'] = (['OK'],self.get_version())
+            elif arg == 'CI_STATUS_DRIVER_VERSION' or arg == 'all':
+                version = yield self.driver_client.get_version()
+                result['CI_STATUS_DRIVER_VERSION'] = (['OK'],version)
+                
+                
         if get_errors:
             success = errors['GET_OBSERVATORY_ERR']
         else:
@@ -950,9 +1200,6 @@ class InstrumentAgent(ResourceAgent):
         Retrieve the agent capabilities, including observatory and device values,
         both common and specific to the agent / device.
         @param content A dict {'params':[cap_arg,...,cap_arg],'transaction_id':transaction_id} 
-            Valid capabilities arguments are: 'all','ObservatoryCommands,' 'ObservatoryParameters,'
-            'ObservatoryStatuses,' 'ObservatoryMetadata,' 'DeviceCommands,', DeviceParameters,'
-            'DeviceStatuses,' 'DeviceMetadata'
         @retval Reply message with a dict {'success':success,'params':{cap_arg:(success,[cap_val,...,cap_val]),...,
             cap_arg:(success,[cap_val,...,cap_val])}, 'transaction_id':transaction_id}
         """
@@ -965,7 +1212,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -991,6 +1238,49 @@ class InstrumentAgent(ResourceAgent):
         
         # Do the work here.
         # Set up the result message.
+        for arg in params:
+            if arg not in capabilities_list or arg != 'all':
+                result[arg] = (errors['INVALID_CAP_PARAM'],None)
+                
+            elif arg == 'CAP_OBSERVATORY_COMMANDS' or arg == 'all':
+                result['CAP_OBSERVATORY_COMMANDS'] = (['OK'],ci_command_list)
+                
+            elif arg == 'CAP_OBSERVATORY_PARAMS' or arg == 'all':
+                result['CAP_OBSERVATORY_PARAMS'] = (['OK'],ci_param_list)
+                
+            elif arg == 'CAP_OBSERVATORY_STATUSES' or arg == 'all':
+                result['CAP_OBSERVATORY_STATUSES'] = (['OK'],ci_status_list)
+                
+            elif arg == 'CAP_METADATA' or arg == 'all':
+                result['CAP_METADATA'] = (['OK'],ci_metadata_list)
+                
+            elif arg == 'CAP_DEVICE_COMMANDS' or arg == 'all':
+                dvr_content = {'params':'CAP_DEVICE_COMMANDS'}
+                dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
+                dvr_success = dvr_result[0]
+                dvr_val = dvr_result[1]['CAP_DEVICE_COMMANDS']
+                result['CAP_DEVICE_COMMANDS'] = (dvr_val[0],dvr_val[1])
+                if dvr_success[0] != 'OK':
+                    get_errors = True
+                
+            elif arg == 'CAP_DEVICE_PARAMS' or arg == 'all':
+                dvr_content = {'params':'CAP_DEVICE_PARAMS'}
+                dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
+                dvr_success = dvr_result[0]
+                dvr_val = dvr_result[1]['CAP_DEVICE_PARAMS']
+                result['CAP_DEVICE_PARAMS'] = (dvr_val[0],dvr_val[1])
+                if dvr_success[0] != 'OK':
+                    get_errors = True
+                
+            elif arg == 'CAP_DEVICE_STATUSES' or arg == 'all':
+                dvr_content = {'params':'CAP_DEVICE_STATUSES'}
+                dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
+                dvr_success = dvr_result[0]
+                dvr_val = dvr_result[1]['CAP_DEVICE_STATUSES']
+                result['CAP_DEVICE_STATUSES'] = (dvr_val[0],dvr_val[1])
+                if dvr_success[0] != 'OK':
+                    get_errors = True
+ 
         
         if get_errors:
             success = errors['GET_OBSERVATORY_ERR']
@@ -1027,8 +1317,6 @@ class InstrumentAgent(ResourceAgent):
             {'success':success,'result':{chan_arg:(success,command_specific_values),...,chan_arg:(success,command_specific_values)},
             'transaction_id':transaction_id}. 
         """
-        
-        
 
         assert(isinstance(content,dict)), 'Expected a dict content.'
         assert(content.has_key('channels')), 'Expected channels.'
@@ -1041,7 +1329,7 @@ class InstrumentAgent(ResourceAgent):
         
         assert(isinstance(channels,list)), 'Expected a channels list.'
         assert(isinstance(command,list)), 'Expected a command list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -1063,9 +1351,11 @@ class InstrumentAgent(ResourceAgent):
                     
         # Do the work here.
         # Set up the result message.
+        dvr_content = {'command':command,'channels':channels}
+        dvr_result = yield self.driver_client.rpc_send('execute',dvr_content)
         
-        reply['success'] = success
-        reply['result'] = result
+        reply['success'] = dvr_result['success']
+        reply['result'] = dvr_result['result']
         
         
         # End implicit transactions.
@@ -1108,9 +1398,11 @@ class InstrumentAgent(ResourceAgent):
                     
         # Do the work here.
         # Set up the result message.
+        dvr_content = {'params':params}
+        dvr_result = yield self.driver_client.rpc_send('get',dvr_content)
         
-        reply['success'] = success
-        reply['result'] = result
+        reply['success'] = dvr_result['success']
+        reply['params'] = dvr_result['params']
         
         
         # End implicit transactions.
@@ -1139,7 +1431,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,dict)), 'Expected a parameter dict.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -1161,9 +1453,11 @@ class InstrumentAgent(ResourceAgent):
                     
         # Do the work here.
         # Set up the result message.
+        dvr_content = {'params':params}
+        dvr_result = yield self.driver_client.rpc_send('set',dvr_content)
         
-        reply['success'] = success
-        reply['result'] = result
+        reply['success'] = dvr_result['success']
+        reply['params'] = dvr_result['params']
         
         
         # End implicit transactions.
@@ -1192,7 +1486,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -1214,9 +1508,11 @@ class InstrumentAgent(ResourceAgent):
                     
         # Do the work here.
         # Set up the result message.
+        dvr_content = {'params':params}
+        dvr_result = yield self.driver_client.rpc_send('get_metadata',dvr_content)
         
-        reply['success'] = success
-        reply['result'] = result
+        reply['success'] = dvr_result['success']
+        reply['params'] = dvr_result['params']
         
         
         # End implicit transactions.
@@ -1247,7 +1543,7 @@ class InstrumentAgent(ResourceAgent):
         tid = content['transaction_id']
         
         assert(isinstance(params,list)), 'Expected a parameter list.'
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
         
         reply = {'success':None,'result':None,'transaction_id':None}
 
@@ -1269,9 +1565,11 @@ class InstrumentAgent(ResourceAgent):
                     
         # Do the work here.
         # Set up the result message.
+        dvr_content = {'params':params}
+        dvr_result = yield self.driver_client.rpc_send('get_status',dvr_content)
         
-        reply['success'] = success
-        reply['result'] = result
+        reply['success'] = dvr_result['success']
+        reply['params'] = dvr_result['params']
         
         
         # End implicit transactions.
@@ -1288,7 +1586,7 @@ class InstrumentAgent(ResourceAgent):
         Must be in direct access mode and possess the correct transaction_id key
         for the direct access session.
         @param content A dict {'bytes':block_of_data,'transaction_id':transaction_id}
-        @retval A dict {'success':success}.
+        @retval A dict {'success':success,'result':block_of_data}.
         """
         
         assert(isinstance(content,dict)), 'Expected a dict content.'
@@ -1298,7 +1596,7 @@ class InstrumentAgent(ResourceAgent):
         bytes = content['bytes']
         tid = content['transaction_id']
 
-        assert(isinstance(tid,(uuid4,str))), 'Expected a transaction_id str or uuid4.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         
         reply = {'success':None,'result':None,'transaction_id':None}
@@ -1321,9 +1619,11 @@ class InstrumentAgent(ResourceAgent):
                     
         # Do the work here.
         # Set up the result message.
+        dvr_content = {'bytes':bytes}
+        dvr_result = yield self.driver_client.rpc_send('execute_direct',dvr_content)
         
-        reply['success'] = success
-        reply['result'] = result
+        reply['success'] = dvr_result['success']
+        reply['result'] = dvr_result['result']
         
         
         # End implicit transactions.
@@ -1399,202 +1699,309 @@ class InstrumentAgent(ResourceAgent):
         if (type == publish_msg_type["StateChange"]):
                 yield self.pubsub_client.publish(self.sup,
                             self.state_topics["Agent"].reference(),value)
-    
-
         
 class InstrumentAgentClient(ResourceAgentClient):
     """
     The base class for an Instrument Agent Client. It is a service
     that allows for RPC messaging
     """
+    
+    ############################################################################
+    #   Transaction Management.
+    ############################################################################
 
     @defer.inlineCallbacks
-    def get_from_instrument(self, paramList):
+    def start_transaction(self,timeout):
         """
-        Obtain a list of parameter names from the instrument
-        @param paramList A list of the values to fetch
-        @retval A dict of the names and values requested
+        Begin an exclusive transaction with the agent.
+        @param timeout An integer specifying the time to wait in seconds for the
+            transaction.
+        @retval Transaction ID UUID string.
         """
-        assert(isinstance(paramList, list))
-        (content, headers, message) = yield self.rpc_send('get_from_instrument',
-                                                          paramList)
-        assert(isinstance(content, dict))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def get_observatory(self, paramList):
-        """
-        Obtain a list of parameter names from the instrument, decode some
-        values as needed.
-        @param paramList A list of the values to fetch
-        @retval A dict of the names and values requested
-        """
-        assert(isinstance(paramList, list))
-        (content, headers, message) = yield self.rpc_send('get_observatory',
-                                                          paramList)
-        assert(isinstance(content, dict))
-        for key in content.keys():
-            if (key == ci_param_list['DataTopics']) or \
-                (key == ci_param_list['EventTopics']) or \
-                       (key == ci_param_list['StateTopics']):
-                for entry in content[key].keys():
-                    content[key][entry] = DataObject.decode(content[key][entry])
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def set_to_instrument(self, paramDict):
-        """
-        Set a collection of values on an instrument
-        @param paramDict A dict of parameter names and the values they are
-            being set to
-        @retval A dict of the successful set operations that were performed
-        @todo Add exceptions for error conditions
-        """
-        assert(isinstance(paramDict, dict))
-        (content, headers, message) = yield self.rpc_send('set_to_instrument',
-                                                          paramDict)
-        assert(isinstance(content, dict))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def set_to_CI(self, paramDict):
-        """
-        Set a collection of values on an instrument
-        @param paramDict A dict of parameter names and the values they are
-            being set to
-        @retval A dict of the successful set operations that were performed
-        @todo Add exceptions for error conditions
-        """
-        assert(isinstance(paramDict, dict))
-        (content, headers, message) = yield self.rpc_send('set_to_CI',
-                                                          paramDict)
-        assert(isinstance(content, dict))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def disconnect(self, argList):
-        """
-        Disconnect from the instrument
-        """
-        log.debug("DHE: IAC in op_disconnect!")
-        assert(isinstance(argList, list))
-        (content, headers, message) = yield self.rpc_send('disconnect',
-                                                              argList)
-        assert(isinstance(content, dict))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def execute_device(self, command):
-        """
-        Execute the instrument commands in the order of the list.
-        Processing will cease when a command fails, but will not roll back.
-        For instrument calls, use executeInstrument()
-        @see executeInstrument()
-        @param command A list where the command name is the
-            first item in the sub-list, and the arguments are the rest of
-            the items in the sublists. For example:
-            ['command1', 'arg1', 'arg2']
-        @retval Dictionary of responses to each execute command
-        @todo Alter semantics of this call as needed...maybe a list?
-        @todo Add exceptions as needed
-        """
-        assert(isinstance(command, list))
-        (content, headers, message) = yield self.rpc_send('execute_device',
-                                                          command)
-        log.debug("message = " + str(message))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def execute_observatory(self, command):
-        """
-        Execute the instrument commands in the order of the list.
-        Processing will cease when a command fails, but will not roll back.
-        For instrument calls, use execute_device()
-        @see execute_device()
-        @param command A list where the command name is the
-            first item in the sub-list, and the arguments are the rest of
-            the items in the sublists. For example:
-            ['command1', 'arg1', 'arg2']
-        @retval Dictionary of responses to each execute command
-        @todo Alter semantics of this call as needed...maybe a command list?
-        @todo Add exceptions as needed
-        """
-        assert(isinstance(command, list))
-        (content, headers, message) = yield self.rpc_send('execute_observatory',
-                                                          command)
-        assert(isinstance(content, dict))
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def get_status(self, argList):
-        """
-        Obtain the non-parameter and non-lifecycle status of the instrument
-        @param argList A list of arguments to pass for status
-        """
-        assert(isinstance(argList, list))
-        (content, headers, message) = yield self.rpc_send('get_status',
-                                                              argList)
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def start_phrase(self, timeout=0):
-        """
-        Start a phrase. Must not already have a phrase started or ended
-            pending application.
-        @param timeout An optional timeout in time duration format
-        @retval Success with a phrase ID or failure with an explanation
-        """
-        (content, headers, message) = yield self.rpc_send('start_phrase',
-                                                          timeout)
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def end_phrase(self):
-        """
-        End a phrase. Must have a phrase started and not ended
-            pending application.
-        @retval Success or failure with an explanation
-        """
-        (content, headers, message) = yield self.rpc_send('end_phrase', None)
-        defer.returnValue(content)
-
-    @defer.inlineCallbacks
-    def cancel_phrase(self):
-        """
-        Cancel a phrase. Must have a phrase started.
-        @retval Success or failure with an explanation
-        """
-        (content, headers, message) = yield self.rpc_send('cancel_phrase', None)
+        
+        
+        assert(timeout==None or isinstance(timeout,int)), 'Expected int or None timeout.'
+        (content,headers,message) = yield self.rpc_send('start_transaction',timeout)    
+        assert(isinstance(content,dict))
+        
         defer.returnValue(content)
         
+    
     @defer.inlineCallbacks
-    def get_capabilities(self):
+    def end_transaction(self,tid):
         """
-        Obtain a list of capabilities from the instrument
-        @retval A dict with commands and
-        parameter lists that are supported
-            such as {'commands':(), 'parameters':()}
+        End the current transaction.
+        @param tid A uuid string specifying the current transaction to end.        
         """
-        (content, headers, message) = yield self.rpc_send('get_capabilities',
-                                                          ())
-        assert(isinstance(content, dict))
-        assert(ci_commands in content.keys())
-        assert(ci_parameters in content.keys())
-        assert(isinstance(content[ci_commands], (tuple, list)))
-        assert(isinstance(content[ci_parameters], (tuple, list)))
-        assert(instrument_commands in content.keys())
-        assert(instrument_parameters in content.keys())
-        assert(isinstance(content[instrument_commands], (tuple, list)))
-        assert(isinstance(content[instrument_parameters], (tuple, list)))
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        (content,headers,message) = yield self.rpc_send('end_transaction',tid)
+        #yield pu.asleep(1)
+        #content = {'success':['OK']}
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
 
-        listified = {}
-        for listing in content.keys():
-            listified[listing] = list(content[listing])
+    ############################################################################
+    #   Observatory Facing Interface.
+    ############################################################################
 
-        # Add in the special stuff that all instruments know
-        listified[ci_parameters].append(driver_address)
+    @defer.inlineCallbacks
+    def execute_observatory(self,command,transaction_id):
+        """
+        Execute infrastructure commands related to the Instrument Agent
+        instance. This includes commands for messaging, resource management
+        processes, etc.
+        @param command A command list [command,arg, ,arg].
+        @param transaction_id A transaction_id uuid4 or string 'create,' 'none.'
+        @retval Reply dict {'success':success,'result':command-specific,'transaction_id':transaction_id}.
+        """
+        
+        assert(isinstance(command,list)), 'Expected a command list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'command':command,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('execute_observatory',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+        
 
-        defer.returnValue(listified)
+    @defer.inlineCallbacks
+    def get_observatory(self,params,transaction_id):
+        """
+        Get data from the cyberinfrastructure side of the agent (registry info,
+        topic locations, messaging parameters, process parameters, etc.)
+        @param params A paramter list [param_arg, ,param_arg].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'
+        @retval A reply dict {'success':success,'params':{param_arg:(success,val),...,param_arg:(success,val)},
+            'transaction_id':transaction_id)        
+        """
+        
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_observatory',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+        
+        
+
+    @defer.inlineCallbacks
+    def set_observatory(self,params,transaction_id):
+        """
+        Set parameters related to the infrastructure side of the agent
+        (registration information, location, network addresses, etc.)
+        @param params A parameter-value dict {'params':{param_arg:val,..., param_arg:val}.
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'        
+        @retval Reply dict
+            {'success':success,'params':{param_arg:success,...,param_arg:success},'transaction_id':transaction_id}.        
+        """
+        assert(isinstance(params,dict)), 'Expected a parameter-value dict.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('set_observatory',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_observatory_metadata(self,params,transaction_id):
+        """
+        Retrieve metadata about the observatory configuration parameters.
+        @param params A metadata parameter list [(param_arg,meta_arg),...,(param_arg,meta_arg)].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                
+        @retval A reply dict {'success':success,'params':{(param_arg,meta_arg):(success,val),...,
+            param_arg,meta_arg):(success,val)},'transaction_id':transaction_id}.        
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_observatory_metadata',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_observatory_status(self,params,transaction_id):
+        """
+        Retrieve the observatory status values, including lifecycle state and other
+        dynamic observatory status values indexed by status keys.
+        @param params A parameter list [status_arg,...,status_arg].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                        
+        @retval Reply dict
+            {'success':success,'params':{status_arg:(success,val),..., status_arg:(success,val)},
+            'transaction_id':transaction_id}        
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_observatory_status',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_capabilities(self,params,transaction_id):
+        """
+        Retrieve the agent capabilities, including observatory and device values,
+        both common and specific to the agent / device.
+        @param params A parameter list [cap_arg,...,cap_arg].        
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                        
+        @retval Reply dict {'success':success,'params':{cap_arg:(success,[cap_val,...,cap_val]),...,
+            cap_arg:(success,[cap_val,...,cap_val])}, 'transaction_id':transaction_id}
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_capabilities',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+
+    ############################################################################
+    #   Instrument Facing Interface.
+    ############################################################################
+
+    @defer.inlineCallbacks
+    def execute_device(self,channels,command,transaction_id):
+        """
+        Execute a command on the device fronted by the agent. Commands may be
+        common or specific to the device, with specific commands known through
+        knowledge of the device or a previous get_capabilities query.
+        @param channels A channels list [chan_arg,...,chan_arg].
+        @param command A command list [command,arg,...,argN]).
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                                
+        @retval A reply dict
+            {'success':success,'result':{chan_arg:(success,command_specific_values),...,chan_arg:(success,command_specific_values)},
+            'transaction_id':transaction_id}. 
+        """
+        assert(isinstance(channels,list)), 'Expected a channels list.'
+        assert(isinstance(command,list)), 'Expected a command list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'channels':params,'command':command,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('execute_device',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_device(self,params,transaction_id):
+        """
+        Get configuration parameters from the instrument. 
+        @param params A parameters list [(chan_arg,param_arg),...,(chan_arg,param_arg)].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                                        
+        @retval A reply dict
+            {'success':success,'params':{(chan_arg,param_arg):(success,val),...,(chan_arg,param_arg):(success,val)},
+            'transaction_id':transaction_id}
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_device',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def set_device(self,params,transaction_id):
+        """
+        Set parameters to the instrument side of of the agent. 
+        @param params A parameter-value dict {(chan_arg,param_arg):val,...,(chan_arg,param_arg):val}.
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                                
+        @retval Reply dict
+            {'success':success,'params':{(chan_arg,param_arg):success,...,chan_arg,param_arg):success},
+            'transaction_id':transaction_id}.
+        """
+        assert(isinstance(params,dict)), 'Expected a parameter-value dict.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('set_device',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_device_metadata(self,params,transaction_id):
+        """
+        Retrieve metadata for the device, its transducers and parameters.
+        @param params A metadata parameter list [(chan_arg,param_arg,meta_arg),...,(chan_arg,param_arg,meta_arg)].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                                        
+        @retval Reply dict
+            {'success':success,'params':{(chan_arg,param_arg,meta_arg):(success,val),...,
+            chan_arg,param_arg,meta_arg):(success,val)}, 'transaction_id':transaction_id}.
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_device_metadata',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def get_device_status(self,params,transaction_id):
+        """
+        Obtain the status of an instrument. This includes non-parameter
+        and non-lifecycle state of the instrument.
+        @param params A parameter list [(chan_arg,status_arg),...,chan_arg,status_arg)].
+        @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                                        
+        @retval A reply dict
+            {'success':success,'params':{(chan_arg,status_arg):(success,val),...,
+            chan_arg,status_arg):(success,val)}, 'transaction_id':transaction_id}.
+        """
+        assert(isinstance(params,list)), 'Expected a parameter list.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'params':params,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('get_device_status',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def execute_device_direct(self,bytes,transaction_id):
+        """
+        Execute untranslated byte data commands on the device.
+        Must be in direct access mode and possess the correct transaction_id key
+        for the direct access session.
+        @param bytes An untranslated block of data to send to the device.
+        @param transaction_id A transaction ID uuid4 specifying the direct access session.                                               
+        @retval A reply dict {'success':success,'result':bytes}.
+        """
+        assert(bytes), 'Expected command bytes.'
+        assert(isinstance(tid,str)), 'Expected a transaction_id str.'
+        
+        content = {'bytes':bytes,'transaction_id':transaction_id}
+        (content,headers,messaage) = yield self.rpc_send('execute_device_direct',content)
+        
+        assert(isinstance(content,dict))
+        defer.returnValue(content)
+
+    ############################################################################
+    #   Publishing interface.
+    ############################################################################
+
+
+    @defer.inlineCallbacks
+    def publish(self):
+        """
+        """
+        pass
+
+    ############################################################################
+    #   Registration interface.
+    ############################################################################
+
 
     @defer.inlineCallbacks
     def register_resource(self, instrument_id):
@@ -1602,6 +2009,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         Register the resource. Since this is a subclass, make the appropriate
         resource description for the registry and pass that into the
         registration call.
+        """
+        
         """
         ia_instance = InstrumentAgentResourceInstance()
         ci_params = yield self.get_observatory([driver_address])
@@ -1611,3 +2020,8 @@ class InstrumentAgentClient(ResourceAgentClient):
         result = yield ResourceAgentClient.register_resource(self,
                                                              ia_instance)
         defer.returnValue(result)
+        """
+        pass
+
+# Spawn of the process using the module name
+factory = ProcessFactory(InstrumentAgent)
