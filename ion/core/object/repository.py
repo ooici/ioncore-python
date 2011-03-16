@@ -601,7 +601,6 @@ class Repository(object):
                 
         # Do some clean up!
         for item in self._workspace.itervalues():
-            print 'ITEM',item
             item.Invalidate()
         self._workspace = {}
         self._workspace_root = None

@@ -703,10 +703,6 @@ class WorkBench(object):
     def _update_repo_to_head(self, repo, head):
         log.debug('_update_repo_to_head: Loading a repository!')
 
-        print 'Repo head', repo._dotgit
-
-        print 'new_head', head
-
         if repo._dotgit == head:
             return
 

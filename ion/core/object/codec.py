@@ -95,13 +95,11 @@ def pack_structure(content):
 
     if not repo.status == repo.UPTODATE:
         comment='Commiting to send message with wrapper object'
-        print 'LKKLKLKLKLLK'
         repo.commit(comment=comment)
 
     obj_set=set()
 
 
-    print 'IOIOIOIOIOIOIOI'
     # Get the serialized root object
     root_obj_key = repo.root_object.MyId
     root_obj = repo.index_hash.get(root_obj_key)
