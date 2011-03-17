@@ -372,6 +372,7 @@ def _bootstrap_objects(supid):
     datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
     # datasource.dataset_url = *not used*
     # datasource.ncml_mask = *not used*
+    datasource.max_ingest_millis = 6000
     
     rc.put_instance(datasource, 'Commiting initial datasource...')
     

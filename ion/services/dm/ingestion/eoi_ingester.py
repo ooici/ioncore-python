@@ -4,12 +4,14 @@
 @file ion/services/coi/resource_registry/resource_registry.py
 @author Michael Meisinger
 @author David Stuebe
+@author Tim LaRocque (client changes only)
 @brief service for registering resources
 
 To test this with the Java CC!
 > scripts/start-cc -h amoeba.ucsd.edu -a sysname=eoitest res/scripts/eoi_demo.py
 """
 
+import time
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -121,6 +123,13 @@ class EOIIngestionService(ServiceProcess):
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
         log.info('Notifying caller that ingest is ready by invoking RPC op_ingest_ready() using routing key: "%s"' % content.ready_routing_key)
         
+        # @todo: call op_ingest_ready() using ready_routing_key
+        yield self.send(content.ready_routing_key, 'ingest_ready', None)
+        
+        log.info('ingest is sleeping...')
+        
+        # @todo: put a timeout here to fake the length of time to perform an ingest
+        time.sleep(int(content.ingest_service_timeout / 1000))
         
         yield self.reply(msg, content={'topic':content.ds_ingest_topic})
 
@@ -230,6 +239,7 @@ bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=eoitest res/apps/resource.app
 from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
 client = EOIIngestionClient()
 spawn('eoi_ingest')
+
 client.begin_ingest('ingest.topic.123iu2yr82', 'ready_routing_key', 1234)
 
 '''
