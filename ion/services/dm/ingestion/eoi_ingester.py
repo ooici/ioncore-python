@@ -130,7 +130,7 @@ class EOIIngestionService(ServiceProcess):
             yield self._process.receive(content, msg)
 
     @defer.inlineCallbacks
-    def op_begin_ingest(self, content, headers, msg):
+    def op_perform_ingest(self, content, headers, msg):
         """
         Start the ingestion process by setting up neccessary
         """
@@ -146,7 +146,7 @@ class EOIIngestionService(ServiceProcess):
 
         def _timeout():
             # trigger execution to continue below with a False result
-            log.info("Timed out in op_begin_ingest")
+            log.info("Timed out in op_perform_ingest")
             self._defer_ingest.callback(False)
 
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
@@ -156,7 +156,7 @@ class EOIIngestionService(ServiceProcess):
         self.send(content.ready_routing_key, operation='ingest_ready', content=True)
         #yield self.rpc_send(content.ready_routing_key, operation='ingest_ready', content=True)
 
-        log.info("Yielding in op_begin_ingest for receive loop to complete")
+        log.info("Yielding in op_perform_ingest for receive loop to complete")
         ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
 
         # common cleanup
@@ -200,7 +200,7 @@ class EOIIngestionService(ServiceProcess):
         # this is NOT rpc
         yield msg.ack()
 
-        # trigger the op_begin_ingest to complete!
+        # trigger the op_perform_ingest to complete!
         self._defer_ingest.callback(True)
 
 class EOIIngestionClient(ServiceClient):
@@ -261,7 +261,7 @@ class EOIIngestionClient(ServiceClient):
         
         
     @defer.inlineCallbacks
-    def begin_ingest(self, ds_ingest_topic, ready_routing_key, ingest_service_timeout):
+    def perform_ingest(self, ds_ingest_topic, ready_routing_key, ingest_service_timeout):
         """
         Start the ingest process by passing the Service a topic to communicate on, a
         routing key for intermediate replies (signaling that the ingest is ready), and
@@ -278,10 +278,10 @@ class EOIIngestionClient(ServiceClient):
         begin_msg.ready_routing_key       = ready_routing_key
         begin_msg.ingest_service_timeout = ingest_service_timeout
 
-        # Invoke [op_]update_request() on the target service 'dispatcher_svc' via RPC
-        log.info("@@@--->>> Sending 'begin_ingest' RPC message to eoi_ingest service")
-        content = "bhuahj"
-        (content, headers, msg) = yield self.rpc_send('begin_ingest', begin_msg, timeout=ingest_service_timeout+30)
+        # Invoke [op_]() on the target service 'dispatcher_svc' via RPC
+        log.info("@@@--->>> Sending 'perform_ingest' RPC message to eoi_ingest service")
+        content = ""
+        (content, headers, msg) = yield self.rpc_send('perform_ingest', begin_msg, timeout=ingest_service_timeout+30)
         
 
         defer.returnValue(content)
@@ -289,12 +289,12 @@ class EOIIngestionClient(ServiceClient):
         
     @defer.inlineCallbacks
     def demo(self, ds_ingest_topic):
-        yield self.proc.send(ds_ingest_topic, operation='recv_shell', content='butts')
+        yield self.proc.send(ds_ingest_topic, operation='recv_shell', content='demo_start')
 
-        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='butts')
-        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='butts')
+        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='demo_data1')
+        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='demo_data1')
 
-        yield self.proc.send(ds_ingest_topic, operation='recv_done', content='butts')
+        yield self.proc.send(ds_ingest_topic, operation='recv_done', content='demo_done')
 
 # Spawn of the process using the module name
 factory = ProcessFactory(EOIIngestionService)

@@ -345,7 +345,7 @@ class JavaAgentWrapper(ServiceProcess):
             3) The Dataset Agent performs the update assimilating data into CDM/CF compliant form,
                pushes that data to the Resource Registry, and returns the new DatasetID. 
         '''
-        log.info("<<<---@@@ Service recieved operation 'update_request'.  Delegating to underlying dataset agent...")
+        log.info("<<<---@@@ Service received operation 'update_request'.  Delegating to underlying dataset agent...")
         if not hasattr(content, 'MessageType') or content.MessageType != CHANGE_EVENT_TYPE:
             raise TypeError('The given content must be an instance of or a wrapped instance of %s.  Given: %s' % (repr(CHANGE_EVENT_TYPE), type(content)))
         
@@ -368,13 +368,14 @@ class JavaAgentWrapper(ServiceProcess):
         
         log.debug('\n\ntopic:\t"%s"\nready_key:\t"%s"\ntimeout:/t%i' % (ingest_topic, ready_routing_key, ingest_timeout))
         
-        self.__ingest_client.begin_ingest(ingest_topic, ready_routing_key, ingest_timeout)
+        perform_ingest_deferred = self.__ingest_client.perform_ingest(ingest_topic, ready_routing_key, ingest_timeout)
         
         # Step 4: When the deferred comes back, tell the Dataset Agent instance to send data messages to the Ingest Service
         # @note: This deferred is called by when the ingest invokes op_ingest_ready()
         yield self.__ingest_ready_deferred
         
         
+        yield  self.__ingest_client.demo(ingest_topic)
 #        log.info("@@@--->>> Sending update request to Dataset Agent with context...")
 #        log.debug("..." + str(context))
 #        (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=30)
@@ -383,9 +384,13 @@ class JavaAgentWrapper(ServiceProcess):
         
         # @todo: change reply based on response of the RPC send
         # yield self.reply_ok(msg, {"value":"Successfully dispatched update request"}, {})
-        res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
+#        res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
         
-        defer.returnValue(res)
+                  
+        yield perform_ingest_deferred
+        yield msg.ack()
+        log.info('**** Ingestion COMPLETE! ****')
+        
 
     @defer.inlineCallbacks
     def op_ingest_ready(self, content, headers, msg):
@@ -624,7 +629,7 @@ class JavaAgentWrapperClient(ServiceClient):
         defer.returnValue(str(content))
     
     @defer.inlineCallbacks
-    def rpc_request_update(self, datasetID, datasourceID):
+    def request_update(self, datasetID, datasourceID):
         '''
         Simulates an update request to the JavaAgentWrapper as if from the Scheduler Service
         '''
@@ -637,9 +642,9 @@ class JavaAgentWrapperClient(ServiceClient):
         change_event.data_source_id = datasourceID
         change_event.dataset_id = datasetID
         
-        # Invoke [op_]update_request() on the target service 'dispatcher_svc' via RPC
-        log.info("@@@--->>> Client sending 'update_request' RPC message to java_agent_wrapper service")
-        (content, headers, msg) = yield self.rpc_send('update_request', (change_event))
+        # Invoke [op_]update_request() on the target service 'java_agent_wrapper' via RPC
+        log.info("@@@--->>> Client sending 'update_request' message to java_agent_wrapper service")
+        (content, headers, msg) = yield self.send('update_request', (change_event))
         
         defer.returnValue(str(content))
         
@@ -675,7 +680,7 @@ from ion.integration.eoi.agent.java_agent_wrapper import JavaAgentWrapperClient 
 client = jawc()
 spawn("ion.integration.eoi.agent.java_agent_wrapper")
 
-client.rpc_request_update(dataset1, datasource1)
+client.request_update(dataset1, datasource1)
 
 
 #----------------------------#
@@ -690,11 +695,11 @@ client.rpc_request_update(dataset1, datasource1)
 #----------------------------#
 from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
 from ion.integration.eoi.agent.java_agent_wrapper import JavaAgentWrapperClient as jawc
-spawn('ion.integration.eoi.agent.java_agent_wrapper')
+spawn('java_agent_wrapper')
 spawn('eoi_ingest')
 client = jawc()
 
-client.rpc_request_update(dataset1, datasource1)
+client.request_update(dataset1, datasource1)
 
 '''
 
