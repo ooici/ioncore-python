@@ -5,13 +5,14 @@
 @author Michael Meisinger
 @author David Stuebe
 @author Dave Foster <dfoster@asascience.com>
-@author Timothy LaRocque
+@author Tim LaRocque (client changes only)
 @brief service for registering resources
 
 To test this with the Java CC!
 > scripts/start-cc -h amoeba.ucsd.edu -a sysname=eoitest res/scripts/eoi_demo.py
 """
 
+import time
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer, reactor
@@ -315,6 +316,7 @@ bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=eoitest res/apps/resource.app
 from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
 client = EOIIngestionClient()
 spawn('eoi_ingest')
+
 client.begin_ingest('ingest.topic.123iu2yr82', 'ready_routing_key', 1234)
 
 '''
