@@ -11,8 +11,8 @@ from twisted.trial import unittest
 from ion.test import iontest
 
 from ion.services.coi import objstore
-from ion.services.dm.preservation import cas
-from ion.services.dm.preservation.test import test_cas
+from ion.data import cas
+from ion.data.test import test_cas
 
 log = ion.util.ionlog.getLogger(__name__)
 

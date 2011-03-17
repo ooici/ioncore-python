@@ -27,7 +27,7 @@ class ScheduledTask(Process):
 
     def op_get_count(self, content, headers, msg):
         log.debug('Got a request for message count (%d)' % self.msg_count)
-        self.reply_ok(msg, self.msg_count)
+        self.reply_ok(msg, {'value': self.msg_count})
 
 class STClient(ProcessClient):
     @defer.inlineCallbacks

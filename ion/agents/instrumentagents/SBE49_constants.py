@@ -7,10 +7,15 @@
 """
 
 class instrument_prompts:
+    LINE_TERM = "\r\n"
     PROMPT_INST = "\r\n"
-    INST_SLEEPY_PROMPT = "\0SBE 37-SM\r\nS>"
-    INST_PROMPT = "\r\nS>"
+    PROMPT_INST_BURST = "\r\n\r\n\r\n\r\n"
+    #INST_SLEEPY_PROMPT = "\0SBE 37-SM\r\nS>"
+    INST_SLEEPY_PROMPT = "\0SBE 37-SM\r\n"
+    #INST_PROMPT = "\r\nS>"
+    INST_PROMPT = "S>"
     INST_CONFUSED = "\r\n?cmd S>"
+    INST_GONE_TO_SLEEP = "\0"
 
 instrument_commands = (
     "setdefaults",
@@ -27,6 +32,10 @@ instrument_commands = (
     "test_conductivity_raw",
     "test_pressure_raw"
 )
+
+command_substitutions = {
+    "StartAcquisition":"start"
+}
 
 ci_commands = (
     "start_direct_access",

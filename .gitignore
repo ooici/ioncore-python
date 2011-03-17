@@ -16,8 +16,18 @@ dist
 .pydevproject
 .project
 /.settings
+/.metadata
 dropin.cache
+eggs/
+parts/
+develop-eggs/
+downloads/
+bin/
+.installed.cfg
+.idea
+buildout.cfg
 
+/net
 ion/agents/instrumentagents copy/NportSendBreak.py
 ion/agents/instrumentagents copy/SBE49_IA.py
 ion/agents/instrumentagents copy/SBE49_constants.py
@@ -42,3 +52,5 @@ ion/agents/instrumentagents copy/test/test_WHSentinelADCP.py
 ion/agents/instrumentagents copy/test/test_instrument.py
 
 .gitignore
+.idea
+ioncore-python

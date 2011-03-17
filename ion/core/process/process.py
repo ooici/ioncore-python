@@ -6,26 +6,39 @@
 @brief base classes for processes within a capability container
 """
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
+from twisted.internet import reactor
 from twisted.python import failure
+
 from zope.interface import implements, Interface
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.exception import ReceivedError
+from ion.core.exception import ReceivedError, ApplicationError, ReceivedApplicationError, ReceivedContainerError
 from ion.core.id import Id
 from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
+from ion.core.messaging.ion_reply_codes import ResponseCodes
+from ion.core.messaging.message_client import MessageClient, MessageInstance
+
 from ion.core.process.cprocess import IContainerProcess, ContainerProcess
+<<<<<<< HEAD
 from ion.services.dm.preservation.store import Store
 from ion.interact.conversation import ProcessConversationManager
+=======
+from ion.data.store import Store
+from ion.interact.conversation import Conversation
+>>>>>>> develop
 from ion.interact.message import Message
 from ion.interact.request import RequestType
 from ion.interact.rpc import RpcType, GenericType
 import ion.util.procutils as pu
-from ion.util.state_object import BasicLifecycleObject
+from ion.util.context import StackLocal
+from ion.util.state_object import BasicLifecycleObject, BasicStates
+
+from ion.core.object import workbench
 
 CONF = ioninit.config(__name__)
 CF_conversation_log = CONF['conversation_log']
@@ -38,12 +51,22 @@ processes = {}
 # @todo CHANGE: Static store (kvs) to register process instances with names
 procRegistry = Store()
 
+# "thread local" context storage for 
+# minimally retaining user-id from request message
+request = StackLocal()
+
+
 class IProcess(Interface):
     """
     Interface for all capability container application processes
     """
 
-class Process(BasicLifecycleObject):
+class ProcessError(Exception):
+    """
+    An exception class for errors that occur in Process
+    """
+
+class Process(BasicLifecycleObject,ResponseCodes):
     """
     This is the base class for all processes. Processes can be spawned and
     have a unique identifier. Each process has one main process receiver and can
@@ -54,6 +77,13 @@ class Process(BasicLifecycleObject):
     """
     implements(IProcess)
 
+<<<<<<< HEAD
+=======
+    # @todo CHANGE: Conversation ID counter
+    convIdCnt = 0
+    
+    
+>>>>>>> develop
     def __init__(self, receiver=None, spawnargs=None, **kwargs):
         """
         Initialize process using an optional receiver and optional spawn args
@@ -113,11 +143,36 @@ class Process(BasicLifecycleObject):
         self.add_receiver(self.receiver)
         self.add_receiver(self.backend_receiver)
 
+<<<<<<< HEAD
         # Delegate class to manage all conversations of this process
         self.conv_manager = ProcessConversationManager(self)
+=======
+        # Dict of publishers and subscribers
+        self.publishers = {}
+        self.subscribers = {}
+
+        # Dict of converations by conv-id
+        self.conversations = {}
+
+        # Conversations by conv-id for currently outstanding RPCs
+        self.rpc_conv = {}
+>>>>>>> develop
 
         # List of ProcessDesc instances of defined and spawned child processes
         self.child_procs = []
+
+        #The Workbench for all object repositories used by this process
+        self.workbench = workbench.WorkBench(self)
+        
+        # Create a message Client
+        self.message_client = MessageClient(proc = self)
+        
+        # A list of other kinds of life cycle objects which are tied to the process 
+        self._registered_life_cycle_objects=[]
+        
+        # TCP Connectors and Listening Ports
+        self.connectors = []
+        self.listeners = []
 
         log.debug("NEW Process instance [%s]: id=%s, sup-id=%s, sys-name=%s" % (
                 self.proc_name, self.id, self.proc_supid, self.sys_name))
@@ -129,6 +184,16 @@ class Process(BasicLifecycleObject):
     # initialize, activate, deactivate, terminate: (Super class) State management API
     # on_XXX: State management API action callbacks
     # plc_XXX: Callback hooks for subclass processes
+
+    def connectTCP(self, host, port, factory, timeout=30, bindAddress=None):
+        connector = reactor.connectTCP(host, port, factory, timeout, bindAddress)
+        self.connectors.append(connector)
+        return connector
+
+    def listenTCP(self, port, factory, backlog=50, interface=''):
+        port = reactor.listenTCP(port, factory, backlog, interface)
+        self.listeners.append(port)
+        return port
 
     @defer.inlineCallbacks
     def spawn(self):
@@ -158,6 +223,10 @@ class Process(BasicLifecycleObject):
         # Create queue and consumer for backend receiver
         yield self.backend_receiver.initialize()
         yield self.backend_receiver.activate()
+        
+        # Move registerd life cycle objects through there life cycle
+        for lco in self._registered_life_cycle_objects:
+            yield defer.maybeDeferred(lco.initialize)
 
         # Callback to subclasses
         try:
@@ -185,7 +254,7 @@ class Process(BasicLifecycleObject):
                 yield self.reply_ok(msg)
         except Exception, ex:
             if msg != None:
-                yield self.reply_err(msg, "Process %s ACTIVATE ERROR" % (self.id), exception=ex)
+                yield self.reply_uncaught_err(msg, content=None, exception=ex, response_code = "Process %s ACTIVATE ERROR" % (self.id))
 
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
@@ -196,6 +265,10 @@ class Process(BasicLifecycleObject):
 
         # Create consumer for process receiver
         yield self.receiver.activate()
+        
+        # Move registerd life cycle objects through there life cycle
+        for lco in self._registered_life_cycle_objects:
+            yield defer.maybeDeferred(lco.activate)
 
         # Callback to subclasses
         try:
@@ -211,6 +284,13 @@ class Process(BasicLifecycleObject):
 
     def shutdown(self):
         return self.terminate()
+        
+    @defer.inlineCallbacks
+    def op_ping(self, content, headers, msg):
+        """
+        Service operation: ping reply
+        """
+        yield self.reply_ok(msg, {'pong':'pong'}, {'quiet':True})
 
     @defer.inlineCallbacks
     def op_terminate(self, content, headers, msg):
@@ -222,8 +302,12 @@ class Process(BasicLifecycleObject):
             if msg != None:
                 yield self.reply_ok(msg)
         except Exception, ex:
-            if msg != None:
-                yield self.reply_err(msg, "Process %s TERMINATE ERROR" % (self.id), exception=ex)
+            
+            log.error('Error during op_terminate: ' + str(ex))
+            raise ProcessError("Process %s TERMINATE ERROR" % (self.id))
+            ### Let the mesg dispatcher catch the error
+            #if msg != None:
+            #    yield self.reply_err(msg, content=None, exception=ex, response_code = "Process %s TERMINATE ERROR" % (self.id))
 
     @defer.inlineCallbacks
     def on_terminate_active(self, *args, **kwargs):
@@ -244,6 +328,17 @@ class Process(BasicLifecycleObject):
         """
         @retval Deferred
         """
+        # Clean up all TCP connections and listening ports
+        for connector in self.connectors:
+            # XXX What is the best way to unit test this?
+            connector.disconnect()
+        for port in self.listeners:
+            yield port.stopListening()
+            
+        # Move registerd life cycle objects through there life cycle
+        for lco in self._registered_life_cycle_objects:
+            yield defer.maybeDeferred(lco.terminate)
+
         if len(self.child_procs) > 0:
             log.info("Shutting down child processes")
         while len(self.child_procs) > 0:
@@ -268,7 +363,7 @@ class Process(BasicLifecycleObject):
         else:
             raise RuntimeError("Illegal process state change")
 
-#    @defer.inlineCallbacks
+    #    @defer.inlineCallbacks
     def op_sys_procexit(self, content, headers, msg):
         """
         Called when a child process has exited without being terminated. A
@@ -276,10 +371,66 @@ class Process(BasicLifecycleObject):
         """
         pass
 
-    # --- Internal helper methods
+    # -- publishers/subscribers
+
+    def add_publisher(self, publisher):
+        """
+        Adds a publisher to this process.
+
+        @param  publisher   A Publisher instance, preferably tied to this process.
+        """
+        self.publishers[publisher.name] = publisher
+
+    def add_subscriber(self, subscriber):
+        """
+        Adds a subscriber to this process, preferably tied to this process.
+        """
+        self.subscribers[subscriber.name] = subscriber
+
+     # --- Internal helper methods
 
     def add_receiver(self, receiver):
         self.receivers[receiver.name] = receiver
+
+    def add_life_cycle_object(self, lco):
+        """
+        Add a life cycle object to the process during init.
+        This method should only be used during init to add lco's which are also
+        in the init state.
+        """
+        assert isinstance(lco, BasicLifecycleObject), \
+        'Can not add an instance that does not inherit from BasicLifecycleObject'
+        
+        if self._get_state() != BasicStates.S_INIT:
+            raise ProcessError, 'Can not use add_life_cycle_objects when the process is past the INIT state.'
+            
+        self._registered_life_cycle_objects.append(lco)
+            
+    
+    @defer.inlineCallbacks
+    def register_life_cycle_object(self, lco):
+        """
+        Register a life cycle object with the process and automatically advance
+        its state to the current state of the process.
+        """
+        assert isinstance(lco, BasicLifecycleObject), \
+        'Can not register an instance that does not inherit from BasicLifecycleObject'
+        
+        if self._get_state() == BasicStates.S_INIT:
+            pass
+        elif self._get_state() == BasicStates.S_READY:
+            yield defer.maybeDeferred(lco.initialize)
+            
+        elif self._get_state() == BasicStates.S_ACTIVE:
+            yield defer.maybeDeferred(lco.initialize)
+            yield defer.maybeDeferred(lco.activate)
+            
+        elif self._get_state() == BasicStates.S_TERMINATED:
+            raise ProcessError, '''Can not register life cycle object in invalid state "TERMINATED"'''
+        elif self._get_state() == BasicStates.S_ERROR:
+            raise ProcessError, '''Can not register life cycle object in invalid state "ERROR"'''
+        
+        self._registered_life_cycle_objects.append(lco)
 
     def is_spawned(self):
         return self.receiver.consumer != None
@@ -294,6 +445,27 @@ class Process(BasicLifecycleObject):
         messages.
         """
         try:
+            # Check if there is a user id in the header, stash if so
+            if 'user-id' in payload:
+                log.info('>>> [%s] receive(): payload user id [%s] <<<' % (self.proc_name, payload['user-id']))
+                request.user_id = payload.get('user-id')
+                log.info('>>> [%s] receive(): Set/updated stashed user_id: [%s]' % (self.proc_name, request.get('user_id')))
+            else:
+                log.info('>>> [%s] receive(): payload anonymous request <<<' % (self.proc_name))
+                if request.get('user_id', 'Not set') == 'Not set':
+                    request.user_id = 'ANONYMOUS'
+                    log.info('>>> [%s] receive(): Set stashed user_id to ANONYMOUS' % (self.proc_name))
+                else:
+                    log.info('>>> [%s] receive(): Kept stashed user_id the same: [%s]' % (self.proc_name, request.get('user_id')))
+            if 'expiry' in payload:
+                request.expiry = payload.get('expiry')
+                log.info('>>> [%s] receive(): Set/updated stashed expiry: [%s]' % (self.proc_name, request.get('expiry')))
+            else:
+                if request.get('expiry', 'Not set') == 'Not set':
+                    request.expiry = '0'
+                    log.info('>>> [%s] receive(): Set stashed expiry to 0' % (self.proc_name))
+                else:
+                    log.info('>>> [%s] receive(): Kept stashed expiry the same: [%s]' % (self.proc_name, request.get('expiry')))
             # Check if this response is in reply to an outstanding RPC call
             if 'conv-id' in payload:
                 conv_id = payload['conv-id']
@@ -307,7 +479,9 @@ class Process(BasicLifecycleObject):
         except Exception, ex:
             log.exception('Error in process %s receive ' % self.proc_name)
             if msg and msg.payload['reply-to']:
-                yield self.reply_err(msg, 'ERROR in process receive()', exception=ex)
+                yield self.reply_err(msg, exception=ex)
+                
+                #@Todo How do we know if the message was ack'ed here?
 
     @defer.inlineCallbacks
     def _receive_rpc(self, payload, msg, conv):
@@ -326,17 +500,36 @@ class Process(BasicLifecycleObject):
             return
         rpc_deferred.rpc_call.cancel()
         res = (content, payload, msg)
-        if not type(content) is dict:
-            log.error('RPC reply is not well formed. Use reply_ok or reply_err')
 
         yield msg.ack()
-        if payload.get('status','OK') == 'ERROR':
-            log.warn('RPC reply is an ERROR: '+str(content.get('value',None)))
-            err = failure.Failure(ReceivedError(payload, content))
+        
+        status = payload.get(self.MSG_STATUS, None)
+        if status == self.ION_OK:
+            #Cannot do the callback right away, because the message is not yet handled
+            reactor.callLater(0, lambda: rpc_deferred.callback(res))
+                
+        elif status == self.ION_ERROR:
+            
+            code = -1
+            if isinstance(content, MessageInstance):
+                code = content.MessageResponseCode
+            
+            if 400 <= code and code < 500:
+                err = failure.Failure(ReceivedApplicationError(payload, content))
+            elif 500 <= code and code < 600:
+                err = failure.Failure(ReceivedContainerError(payload, content))
+            else:
+                # Received Error is still the catch all!
+                err = failure.Failure(ReceivedError(payload, content))
+            
+            #rpc_deferred.errback(err)
             # Cannot do the callback right away, because the message is not yet handled
             reactor.callLater(0, lambda: rpc_deferred.errback(err))
+            
+            
         else:
-            # Cannot do the callback right away, because the message is not yet handled
+            log.error('RPC reply is not well formed. Header "status" must be set!')
+            #Cannot do the callback right away, because the message is not yet handled
             reactor.callLater(0, lambda: rpc_deferred.callback(res))
 
     @defer.inlineCallbacks
@@ -344,7 +537,7 @@ class Process(BasicLifecycleObject):
         """
         Handling of non-RPC messages. Messages are dispatched according to
         message attributes.
-        """
+        """        
         fromname = payload['sender']
         if 'sender-name' in payload:
             fromname = payload['sender-name']
@@ -376,15 +569,28 @@ class Process(BasicLifecycleObject):
 
         # Perform a dispatch of message by performative/operation
         try:
+<<<<<<< HEAD
             res = yield self._handle_performative(payload, msg, conv)
-        except Exception, ex:
-            log.exception("*****Error in message processing*****")
+=======
+            res = yield self._dispatch_message(payload, msg, conv)
+            
+        except ApplicationError, ex:
+            # In case of an application error - do not terminate the process!
+            log.exception("*****Application Error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             if msg and msg.payload['reply-to']:
-                yield self.reply_err(msg, 'ERROR in process receive(): '+str(ex))
+                yield self.reply_err(msg, exception = ex)
+            
+>>>>>>> develop
+        except Exception, ex:
+            log.exception("*****Container Error in message processing*****")
+            # @todo Should we send an err or rather reject the msg?
+            if msg and msg.payload['reply-to']:
+                yield self.reply_err(msg, exception = ex)
 
-            if CF_fail_fast:
-                yield self.terminate()
+            # The supervisor will also call shutdown child procs. This causes a recursive error when using fail fast!
+            #if CF_fail_fast:
+            #    yield self.terminate()
                 # Send exit message to supervisor
         finally:
             # @todo This is late here (potentially after a reply_err before)
@@ -392,18 +598,30 @@ class Process(BasicLifecycleObject):
                 # Only if msg has not been ack/reject/requeued before
                 log.debug("<<< ACK msg")
                 yield msg.ack()
-
+                
     @defer.inlineCallbacks
     def _handle_performative(self, payload, msg, conv, perf=False):
         if not self._get_state() == "ACTIVE":
+
+
+            # Detect and handle request to terminate
+            # This does not yet work properly with fail fast...
+            if 'op'in payload and payload['op'] == 'terminate':
+
+                if self._get_state() != BasicStates.S_TERMINATED:
+                    yield self.terminate()
+                else:
+                    yield self.reply_ok(msg)
+
             text = "Process %s in invalid state %s." % (self.proc_name, self._get_state())
             log.error(text)
 
             # @todo: Requeue would be ok, but does not work (Rabbit limitation)
             #d = msg.requeue()
-            if msg and msg.payload['reply-to']:
-                yield self.reply_err(msg, text)
-            return
+            
+            # Let the error back handle the exception 
+            raise ProcessError(text)
+
 
         # Regular message handling in expected state
         pu.log_message(msg)
@@ -526,12 +744,24 @@ class Process(BasicLifecycleObject):
         @brief Sends a message and waits for conversation message reply.
         @retval a Deferred with the message value on receipt
         """
+<<<<<<< HEAD
         msgheaders = {}
         if headers:
             msgheaders.update(headers)
         assert conv, "Conversation instance must exist for blocking send"
         msgheaders['conv-id'] = conv.conv_id
 
+=======
+        if headers:
+            if 'user-id' in headers:
+                log.info('>>> [%s] rpc_send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
+            else:
+                log.info('>>> [%s] rpc_send(): user-id not specified in headers <<<' % (self.proc_name))
+        else:
+            log.info('>>> [%s] rpc_send(): headers not specified <<<' % (self.proc_name))
+        msgheaders = self._prepare_message(headers)
+        convid = msgheaders['conv-id']
+>>>>>>> develop
         # Create a new deferred that the caller can yield on to wait for RPC
         conv.blocking_deferred = defer.Deferred()
         # Timeout handling
@@ -557,6 +787,7 @@ class Process(BasicLifecycleObject):
             Starts a new conversation.
         @retval Deferred for send of message
         """
+<<<<<<< HEAD
         msgheaders = {}
         msgheaders['sender-name'] = self.proc_name
         if headers:
@@ -572,6 +803,16 @@ class Process(BasicLifecycleObject):
             msgheaders['conv-id'] = conv.conv_id
             msgheaders['protocol'] = GenericType.CONV_TYPE_GENERIC
 
+=======
+        if headers:
+            if 'user-id' in headers:
+                log.info('>>> [%s] send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
+            else:
+                log.info('>>> [%s] send(): user-id not specified in headers <<<' % (self.proc_name))
+        else:
+            log.info('>>> [%s] send(): headers not specified <<<' % (self.proc_name))
+        msgheaders = self._prepare_message(headers)
+>>>>>>> develop
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders,
                        conversation=conv)
@@ -585,19 +826,55 @@ class Process(BasicLifecycleObject):
             d = self.backend_receiver.send(**message)
         return d
 
+<<<<<<< HEAD
     def reply(self, msg, operation, content, headers=None):
+=======
+    def _prepare_message(self, headers):
+        msgheaders = {}
+        msgheaders['sender-name'] = self.proc_name
+        if headers:
+            msgheaders.update(headers)
+        if not 'conv-id' in msgheaders:
+            convid = self._create_convid()
+            msgheaders['conv-id'] = convid
+            msgheaders['conv-seq'] = 1
+            self.conversations[convid] = Conversation()
+        if not 'user-id' in msgheaders:
+            msgheaders['user-id'] = request.get('user_id', 'ANONYMOUS')
+            log.info('>>> [%s] _prepare_message(): set user id in msgheaders from stashed user_id [%s] <<<' % (self.proc_name, msgheaders['user-id']))
+        else:
+            log.info('>>> [%s] _prepare_message(): using user id from msgheaders [%s] <<<' % (self.proc_name, msgheaders['user-id']))
+        if not 'expiry' in msgheaders:
+            msgheaders['expiry'] = request.get('expiry', '0')
+            log.info('>>> [%s] _prepare_message(): set expiry in msgheaders from stashed expiry [%s] <<<' % (self.proc_name, msgheaders['expiry']))
+        else:
+            log.info('>>> [%s] _prepare_message(): using expiry from msgheaders [%s] <<<' % (self.proc_name, msgheaders['expiry']))
+        return msgheaders
+
+    def _create_convid(self):
+        # Returns a new unique conversation id
+        send = self.id.full
+        Process.convIdCnt += 1
+        convid = "#" + str(Process.convIdCnt)
+        #convid = send + "#" + Process.convIdCnt
+        return convid
+
+    def reply(self, msg, operation=None, content=None, headers={}):
+>>>>>>> develop
         """
         @brief Replies to a given message, continuing the ongoing conversation
         @retval Deferred or None
         """
+        if not operation:
+            operation = self.MSG_RESULT
+                
         ionMsg = msg.payload
         recv = ionMsg.get('reply-to', None)
-        if not headers:
-            headers = {}
         if recv == None:
             log.error('No reply-to given for message '+str(msg))
         else:
             headers['conv-id'] = ionMsg.get('conv-id','')
+<<<<<<< HEAD
             return self.send(pu.get_process_id(recv), operation, content, headers, reply=True)
 
     def reply_agree(self, msg, content=None, headers=None, status=None):
@@ -614,6 +891,29 @@ class Process(BasicLifecycleObject):
         return self.reply(msg, 'result', content, msgheaders)
 
     def reply_ok(self, msg, content=None, headers=None, status=None):
+=======
+            headers['conv-seq'] = int(ionMsg.get('conv-seq',0)) + 1
+        if not 'user-id' in headers:
+            headers['user-id'] = request.get('user_id', 'ANONYMOUS')
+            log.info('>>> [%s] _prepare_message(): set user id [%s] <<<' % (self.proc_name, headers['user-id']))
+        if not 'expiry' in headers:
+            headers['expiry'] = request.get('expiry', '0')
+            log.info('>>> [%s] _prepare_message(): set expiry [%s] <<<' % (self.proc_name, headers['expiry']))
+            
+        # Values in the headers KWarg take precidence over the response_code and exception KWargs!
+        reshdrs = dict()
+        
+        
+        # MSG STATUS is set automatically!
+        #reshdrs[self.MSG_STATUS] = self.ION_OK
+                
+        reshdrs.update(headers)
+            
+        return self.send(pu.get_process_id(recv), operation, content, reshdrs, reply=True)
+
+    @defer.inlineCallbacks
+    def reply_ok(self, msg, content=None, headers={}):
+>>>>>>> develop
         """
         @brief Boilerplate method that replies to a given message with a success
         message and a given result value
@@ -627,19 +927,50 @@ class Process(BasicLifecycleObject):
         msgheaders['protocol'] = msg.payload['protocol']
 
         # Note: Header status=OK is automatically set
+<<<<<<< HEAD
         if not type(content) is dict:
             content = dict(value=content, status='OK')
 
         return self.reply(msg, 'result', content, msgheaders)
+=======
+>>>>>>> develop
 
+        #if not type(content) is dict:
+        #    content = dict(value=content, status='OK')
+        
+        # This is basically a pass through for the reply method interface - only
+        # used for backward compatibility!
+        #log.info('''REPLY_OK is depricated - please use "reply"''')
+        
+        if content is None:
+            
+            content = yield self.message_client.create_instance(MessageContentTypeID=None)
+
+        if isinstance(content, MessageInstance):
+                
+            if not content.Message.IsFieldSet('response_code'):
+                content.MessageResponseCode = content.ResponseCodes.OK
+            
+        self.reply(msg, operation=self.MSG_RESULT, content=content, headers=headers)
+
+        
+    @defer.inlineCallbacks
     def reply_err(self, msg, content=None, headers=None, exception=None):
         """
+<<<<<<< HEAD
         @brief Boilerplate method for reply to a message with an error message and
         an indication of the error.
+=======
+        Boilerplate method for reply to a message which lead to an application
+        level error. The result can include content, a caught exception and an
+        application level error_code as an indication of the error.
+>>>>>>> develop
         @content any sendable type to be converted to dict, or dict (untouched)
         @exception an instance of Exception
+        @response_code an ION application level defined error code for a handled exception
         @retval Deferred for send of reply
         """
+<<<<<<< HEAD
         msgheaders = {}
         msgheaders['performative'] = 'failure'
         msgheaders['protocol'] = msg.payload['protocol']
@@ -654,6 +985,30 @@ class Process(BasicLifecycleObject):
                 # @todo Add more info from exception
                 content['errmsg'] = str(exception)
         return self.reply(msg, 'result', content, msgheaders)
+=======
+        if content is None:
+            content = yield self.message_client.create_instance(MessageContentTypeID=None)
+            
+        if isinstance(content, MessageInstance):
+            
+            if not content.Message.IsFieldSet('response_code'):
+                
+                if isinstance(exception, ApplicationError):
+                    content.MessageResponseCode = exception.response_code
+                else:
+                    content.MessageResponseCode = content.ResponseCodes.INTERNAL_SERVER_ERROR
+                
+            if not content.Message.IsFieldSet('response_body'):
+                content.MessageResponseBody = str(exception)
+                        
+        reshdrs = dict()
+        reshdrs[self.MSG_STATUS] = self.ION_ERROR
+        
+        if headers != None:
+            reshdrs.update(headers)
+            
+        self.reply(msg, operation=self.MSG_RESULT, content=content, headers=reshdrs)
+>>>>>>> develop
 
     def get_conversation(self, headers):
         convid = headers.get('conv-id', None)
@@ -662,7 +1017,13 @@ class Process(BasicLifecycleObject):
     # --- Process and child process management
 
     def get_scoped_name(self, scope, name):
-        return pu.get_scoped_name(name, scope)
+        
+        # Proposed modificaiton to get_scoped_name to only add the scope if needed?
+        prefix = pu.get_scoped_name('', scope)
+        if prefix in name:
+            return name
+        else:
+            return pu.get_scoped_name(name, scope)
 
     # OTP style functions for working with processes and modules/apps
 
@@ -717,27 +1078,21 @@ class AppInterceptor(Interceptor):
 
 # ============================================================================
 
-class ProcessClient(object):
+
+class ProcessClientBase(object,ResponseCodes):
     """
     This is the base class for a process client. A process client is code that
     executes in the process space of a calling process. If no calling process
-    is given, a local one is created on the fly. This client adds some
-    glue to interact with a specific targer process
+    is given, a local one is created on the fly. 
     """
-    def __init__(self, proc=None, target=None, targetname=None, **kwargs):
+    def __init__(self, proc=None, **kwargs):
         """
-        Initializes a process client
+        Initializes a process client base
         @param proc a IProcess instance as originator of messages
-        @param target  global scoped (process id or name) to send to
-        @param targetname  system scoped exchange name to send messages to
         """
         if not proc:
             proc = Process()
         self.proc = proc
-        assert target or targetname, "Need either target or targetname"
-        self.target = target
-        if not self.target:
-            self.target = self.proc.get_scoped_name('system', targetname)
 
     @defer.inlineCallbacks
     def _check_init(self):
@@ -752,23 +1107,46 @@ class ProcessClient(object):
     def attach(self):
         yield self._check_init()
 
-    def rpc_send(self, *args):
+class ProcessClient(ProcessClientBase):
+    """
+    This specific derivation adds some glue to interact with a specific targer process.
+    """
+    def __init__(self, proc=None, target=None, targetname=None, **kwargs):
+        """
+        Initializes a process client
+        @param proc a IProcess instance as originator of messages
+        @param target  global scoped (process id or name) to send to
+        @param targetname  system scoped exchange name to send messages to
+        """
+        ProcessClientBase.__init__(self, proc=proc, **kwargs)
+        self.target = target
+        if not self.target:
+            self.target = self.proc.get_scoped_name('system', targetname)
+
+    def rpc_send(self, *args, **kwargs):
         """
         Sends an RPC message to the specified target via originator process
         """
-        return self.proc.rpc_send(self.target, *args)
+        return self.proc.rpc_send(self.target, *args, **kwargs)
+    
+    def rpc_send_protected(self, operation, content, user_id='ANONYMOUS', expiry='0', **kwargs):
+        """
+        Sends an RPC message to the specified target via originator process
+        """
+        headers = {'user-id':user_id, 'expiry':expiry}
+        return self.proc.rpc_send(self.target, operation, content, headers, **kwargs)
 
-    def send(self, *args):
+    def send(self, *args, **kwargs):
         """
         Sends a message to the specified target via originator process
         """
-        return self.proc.send(self.target, *args)
+        return self.proc.send(self.target, *args, **kwargs)
 
-    def reply(self, *args):
+    def reply(self, *args, **kwargs):
         """
         Replies to a message via the originator process
         """
-        return self.proc.reply(*args)
+        return self.proc.reply(*args, **kwargs)
 
 # ============================================================================
 

@@ -9,27 +9,17 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-import time
-
 from twisted.internet import defer
 from twisted.internet.task import LoopingCall
 from twisted.internet import reactor
 from ion.core.process.process import ProcessFactory
 
-from ion.core.process.process import Process, ProcessDesc
-import ion.util.procutils as pu
+from ion.core.process.process import Process
 
-from ion.data import dataobject
-from ion.resources.dm_resource_descriptions import \
-    DAPMessageObject, DataMessageObject
+from ion.resources import dm_resource_descriptions
 
-from ion.services.dm.util import dap_tools
 
-from pydap.model import DatasetType
-
-#import numpy
 import random
-from ion.services.dm.util import dap_tools
 
 
 class DataStreamProducer(Process):
@@ -78,12 +68,13 @@ class DataStreamProducer(Process):
             z.append(random.randint(-3, 120))
 
         data = {'time':t, 'height':z}
+        do = dm_resource_descriptions.DictionaryMessageObject()
+        do.data=data
         #print 'data',data
 
-        msg = dap_tools.simple_datamessage(metadata, data)
-
-        yield self.send(self.deliver,'data',msg.encode())
-
+        #msg = dap_tools.simple_datamessage(metadata, data)
+        #yield self.send(self.deliver,'data',msg.encode())
+        yield self.send(self.deliver,'data',do.encode())
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DataStreamProducer)

@@ -49,7 +49,7 @@ class Receiver(BasicLifecycleObject):
     rec_messages = {}
     rec_shutoff = False
 
-    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, raw=False):
+    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, raw=False, consumer_config={}, publisher_config={}):
         """
         @param label descriptive label for the receiver
         @param name the actual exchange name. Used for routing
@@ -59,6 +59,9 @@ class Receiver(BasicLifecycleObject):
         @param group a string grouping multiple receivers
         @param handler a callable for the message handler, shorthand for add_handler
         @param raw if True do not put through receive Interceptors
+        @param consumer_config  Additional Consumer configuration params. Used by _init_receiver, these params take precedence over any
+                                other config.
+        @param publisher_config Additional Publisher configuration params, used by send()
         """
         BasicLifecycleObject.__init__(self)
 
@@ -70,6 +73,8 @@ class Receiver(BasicLifecycleObject):
         self.process = process
         self.group = group
         self.raw = raw
+        self.consumer_config  = consumer_config
+        self.publisher_config = publisher_config
 
         self.handlers = []
         self.consumer = None
@@ -112,6 +117,11 @@ class Receiver(BasicLifecycleObject):
     @defer.inlineCallbacks
     def _init_receiver(self, receiver_config, store_config=False):
         container = ioninit.container_instance
+
+        # copy and update receiver_config with the stored consumer_config
+        receiver_config = receiver_config.copy()
+        receiver_config.update(self.consumer_config)
+
         if store_config:
             xnamestore = container.exchange_manager.exchange_space.store
             yield xnamestore.put(self.xname, receiver_config)
@@ -194,9 +204,13 @@ class Receiver(BasicLifecycleObject):
         org_msg = msg
         data = msg.payload
         if not self.raw:
+            wb = None
+            if hasattr(self.process, 'workbench'):
+                wb = self.process.workbench
             inv = Invocation(path=Invocation.PATH_IN,
                              message=msg,
-                             content=data)
+                             content=data,
+                             workbench=wb)
             inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
             msg = inv1.message
             data = inv1.content
@@ -220,7 +234,7 @@ class Receiver(BasicLifecycleObject):
         Constructs a standard message with standard headers and sends on given
         receiver.
         @param sender sender name of the message
-        @param recipient recipient name of the message
+        @param recipient recipient name of the message NOTE: this gets translated to "receiver" in the message in IONMessageInterceptor
         @param operation the operation (performative) of the message
         @param content the black-box content of the message
         @param headers dict with headers that may override standard headers
@@ -230,12 +244,18 @@ class Receiver(BasicLifecycleObject):
         #log.debug("Send message op="+operation+" to="+str(recv))
         try:
             if not self.raw:
+                wb = None
+                if hasattr(self.process, 'workbench'):
+                    wb = self.process.workbench
                 inv = Invocation(path=Invocation.PATH_OUT,
                                  message=msg,
-                                 content=msg['content'])
+                                 content=msg['content'],
+                                 workbench=wb)
                 inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
                 msg = inv1.message
-            yield ioninit.container_instance.send(msg.get('receiver'), msg)
+
+            # call flow: Container.send -> ExchangeManager.send -> ProcessExchangeSpace.send
+            yield ioninit.container_instance.send(msg.get('receiver'), msg, publisher_config=self.publisher_config)
         except Exception, ex:
             log.exception("Send error")
         else:
@@ -302,3 +322,4 @@ class NameReceiver(Receiver):
 
 class ServiceWorkerReceiver(WorkerReceiver):
     pass
+

@@ -34,10 +34,12 @@ class LoadTest(object):
     def __init__(self, *args):
         self.load_options = LoadTestOptions()
         self._shutdown = False
+        self.start_state = {}
         self.base_state = {}
         self.cur_state = {}
         self.base_state['_time'] = 0.0
         self.cur_state['_time'] = time.time()
+        self.start_state['_time'] = time.time()
 
     def setUp(self):
         """
@@ -77,7 +79,9 @@ class LoadTest(object):
         cur_value = self.cur_state[key]
         base_value = self.base_state[key]
         interval = interval or self._get_interval()
-        rate = (cur_value - base_value) / interval
+        rate = 0
+        if interval != 0:
+            rate = (cur_value - base_value) / interval
         return rate
 
     def _get_state_rate(self):
@@ -98,11 +102,11 @@ class LoadTest(object):
         self._update_time()
         self._copy_state()
 
-    def _call_monitor(self):
+    def _call_monitor(self, output=True):
         self.monitor_call = reactor.callLater(self.monitor_delay, self._call_monitor)
         self._update_time()
         try:
-            self.monitor()
+            self.monitor(output)
         except Exception, ex:
             print "Exception in load process monitor", ex
 

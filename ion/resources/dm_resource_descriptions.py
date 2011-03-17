@@ -3,11 +3,12 @@
 """
 @file ion/resources/dm_resource_descriptions.py
 @author David Stuebe
+@author Matt Rodriguez
 @brief Resource descriptions for DM services and resources. Includes some
 container objects used in messaging.
 """
 
-from ion.data.dataobject import DataObject, Resource, TypedAttribute, LCState, LCStates, ResourceReference, InformationResource, StatefulResource, create_unique_identity
+from ion.data.dataobject import DataObject, TypedAttribute, ResourceReference, InformationResource, StatefulResource
 
 """
 DM Pub Sub Registry Resource Descriptions
@@ -49,13 +50,6 @@ class DataMessageObject(DataObject):
     """
     notification = TypedAttribute(str)
     timestamp = TypedAttribute(float)
-
-
-class DAPMessageObject(DataMessageObject):
-    """Container object for messaging DAP data"""
-    das = TypedAttribute(str)
-    dds = TypedAttribute(str)
-    dods = TypedAttribute(str)
 
 class StringMessageObject(DataMessageObject):
     """Container object for messaging STRING data"""
@@ -159,8 +153,56 @@ class ArchiveResource(StatefulResource): # Is it stateful or information?
     #locations = TypedAttribute(list,[]) # List of Archive Location objects
     dmdataresource = TypedAttribute(ResourceReference)
 
+"""
+DM Preservation Management Resources
+"""
+class Cache(StatefulResource):
+    """
+    persistentarchive: The name of the Persistent Archive
+    partition: The name of the partition, this could be a Column Family
+    in Cassandra or a collection in IRODS.
+    PartitionType: The kind of partition, such as Column Family or Collection. 
+    """
+    persistentarchive = TypedAttribute(str)
+    partition = TypedAttribute(str)
+    partitiontype = TypedAttribute(str)
 
+class PersistentArchive(StatefulResource):
+    """
+    This resource holds common attributes for all of the Persistent Archives.
+    
+    datatype: The kind of persistent archive, for example Cassandra or IRODS.
+    
+    """
+    datatype = TypedAttribute(str)
 
+class CassandraPersistentArchive(StatefulResource):
+    """
+    hosts: The hosts in the Cassandra cluster. A list of strings.
+    keyspace: The name of the Keyspace
+    columnfamily: The name of the Column Family
+    """
+    hosts = TypedAttribute(list)
+    keyspace = TypedAttribute(str)
+    columnfamily = TypedAttribute(str)
+    
+
+class IRODSPersistentArchive(StatefulResource):
+    """
+    host: A host of the IRODS instance.
+    ICAT: The name of the ICAT database. Information needed to 
+    zone: Information about the IRODS zone.
+    auth: Authentication information to log into the IRODS instance.
+    """
+    host = TypedAttribute(str)
+    port = TypedAttribute(int)
+    resource = TypedAttribute(str)
+    collection = TypedAttribute(str)
+    username = TypedAttribute(str)
+    password = TypedAttribute(str)
+    ICAT = TypedAttribute(str)
+    zone = TypedAttribute(str)
+    auth = TypedAttribute(str)
 """
 DM Data Registry Resources
 Preliminary!

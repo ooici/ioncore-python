@@ -14,7 +14,7 @@ import time
 
 from twisted.internet import defer, reactor
 
-from ion.services.dm.preservation.store import Store
+from ion.data.store import Store
 import ion.util.procutils as pu
 
 # In a DS such as Cassandra, nodes and number of replicas are different. Load

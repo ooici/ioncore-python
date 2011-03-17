@@ -44,9 +44,13 @@ class Options(usage.Options):
                 ["no_history", "i", "Do not read/write history file"],
                     ]
 
+    def __init__(self):
+        usage.Options.__init__(self)
+        self['script'] = None
+
     def opt_version(self):
-        from ion.core.ionconst import VERSION
-        log.info("ION Capability Container version: "+ VERSION)
+        from ion import version
+        print "ION Capability Container version:", version.short()
         sys.exit(0)
 
     def parseArgs(self, script=None):
@@ -74,6 +78,10 @@ class CapabilityContainer(service.Service):
         self.container = None
         ioninit.testing = False
 
+        # calls back when the CC service starts up - anyone may attach to this callback and
+        # use it for whatever is needed.
+        self.defer_started = defer.Deferred()
+
     @defer.inlineCallbacks
     def startService(self):
         """
@@ -97,12 +105,13 @@ class CapabilityContainer(service.Service):
 
         log.info("All startup actions completed.")
 
-        # @todo At this point, can signal successful container start
+        # signal successful container start
+        self.defer_started.callback(True)
 
     @defer.inlineCallbacks
     def stopService(self):
         yield self.container.terminate()
-        yield service.Service.stopService(self)
+        service.Service.stopService(self)
         log.info("Container stopped.")
 
     @defer.inlineCallbacks
@@ -130,8 +139,14 @@ class CapabilityContainer(service.Service):
         given the path to a file, open that file and exec the code.
         Assume the file contains Python source code.
         """
+        
+        # Try two script locations, one for IDEs and another for shell. 
         script = os.path.abspath(self.config['script'])
-        if os.path.isfile(script):
+        if not os.path.isfile(script):
+            script = os.path.join(os.path.dirname(ion.__file__), self.config['script'])
+        if not os.path.isfile(script):
+            log.error('Bad startup script path: %s' % self.config['script'])
+        else:
             if script.endswith('.app'):
                 yield self.container.start_app(script)
             elif script.endswith('.rel'):
@@ -139,8 +154,6 @@ class CapabilityContainer(service.Service):
             else:
                 log.info("Executing script %s ..." % self.config['script'])
                 execfile(script, {})
-        else:
-            log.error('Bad startup script path: %s' % self.config['script'])
 
     def run_boot_script(self):
         """

@@ -9,12 +9,12 @@
 import logging
 import logging.config
 import re
-import os
+import os, os.path
 
 from ion.core import ionconst as ic
 from ion.util.config import Config
 
-print "ION (Integrated Observatory Network) core packages initializing (ver. %s)" % (ic.VERSION)
+#print "ION (Integrated Observatory Network) core packages initializing (ver. %s)" % (ic.VERSION)
 
 # ION has a minimum required python version
 import sys
@@ -24,14 +24,22 @@ if sys.version_info > (3,0):
     raise RuntimeError("ioncore is not compatible with Python 3.0 or later.")
 del sys
 
+# The following code looking for a ION_ALTERNATE_LOGGING_CONF environment
+# variable can go away with the new ion environment directories 
+
 # Configure logging system (console, logfile, other loggers)
 # NOTE: Console logging is appended to Twisted log output prefix!!
+logconf = ic.LOGCONF_FILENAME
 if os.environ.has_key(ic.ION_ALTERNATE_LOGGING_CONF):
+    # make sure that path exists
     altpath = os.environ.get(ic.ION_ALTERNATE_LOGGING_CONF)
-    logging.config.fileConfig(altpath)
-else:
-    logging.config.fileConfig(ic.LOGCONF_FILENAME)
-    
+    if os.path.exists(altpath):
+        logconf = altpath
+    else:
+        print "Warning: ION_ALTERNATE_LOGGING_CONF specified (%s), but not found" % altpath
+
+logging.config.fileConfig(logconf)
+
 # Load configuration properties for any module to access
 ion_config = Config(ic.ION_CONF_FILENAME)
 

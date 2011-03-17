@@ -32,10 +32,13 @@ class AttributeStoreService(store_service.StoreService):
         # Service class initializer. Basic config, but no yields allowed.
         ServiceProcess.__init__(self, *args, **kwargs)
 
-        self.spawn_args['backend_class'] = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.services.dm.preservation.store.Store'))
+        self.spawn_args['backend_class'] = self.spawn_args.get('backend_class', CONF.getValue('backend_class', default='ion.data.store.Store'))
         self.spawn_args['backend_args'] = self.spawn_args.get('backend_args', CONF.getValue('backend_args', default={}))
 
+        log.info('AttributeStoreService - Spawn Args:' + str(self.spawn_args))
+
         log.info('AttributeStoreService.__init__()')
+
 
 
 

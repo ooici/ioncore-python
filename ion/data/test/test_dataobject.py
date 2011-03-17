@@ -17,7 +17,7 @@ from twisted.internet import defer
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.services.dm.preservation import cas
+from ion.data import cas
 
 """
 Define some data objects for testing
@@ -620,7 +620,8 @@ class ResponseServiceClient(ServiceClient):
         log.info('Sending Encoded resource:'+str(msg))
         (content, headers, msg) = yield self.rpc_send('respond', msg, {})
         log.info('Responder replied: '+str(content))
-        response = dataobject.DataObject.decode(content['value'])
+        #response = dataobject.DataObject.decode(content['value'])
+        response = dataobject.DataObject.decode(content)
         defer.returnValue(response)
 
 # Spawn of the process using the module name

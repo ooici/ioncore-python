@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
 """
-@file ion/core/process/test/test_baseprocess.py
+@file ion/core/process/test/test_process.py
 @author Michael Meisinger
 @brief test case for process base class
 """
 
 import os
-import sha
+import hashlib
 
 from twisted.trial import unittest
 from twisted.internet import defer
@@ -16,13 +16,17 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.process.process import Process, ProcessDesc, ProcessFactory
+from ion.core.messaging import ion_reply_codes
+from ion.core.process.process import Process, ProcessDesc, ProcessFactory, ProcessError
 from ion.core.cc.container import Container
 from ion.core.exception import ReceivedError
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.id import Id
 from ion.test.iontest import IonTestCase, ReceiverProcess
 import ion.util.procutils as pu
+
+from ion.core.process.test import life_cycle_process
+from ion.util import state_object
 
 class ProcessTest(IonTestCase):
     """
@@ -99,7 +103,8 @@ class ProcessTest(IonTestCase):
         log.info('Received echo message')
 
         self.assertEquals(msg.payload['op'], 'result')
-        self.assertEquals(msg.payload['content']['value'], 'content123')
+        #self.assertEquals(msg.payload['content']['value'], 'content123')
+        self.assertEquals(msg.payload['content'], 'content123')
 
         yield sup.terminate()
         self.assertEquals(sup._get_state(), "TERMINATED")
@@ -114,7 +119,9 @@ class ProcessTest(IonTestCase):
         pid2 = yield p1.spawn_child(child)
 
         (cont,hdrs,msg) = yield p1.rpc_send(pid2,'echo','content123')
-        self.assertEquals(cont['value'], 'content123')
+        #self.assertEquals(cont['value'], 'content123')
+        self.assertEqual(hdrs.get(p1.MSG_STATUS),'OK')
+        self.assertEquals(cont, 'content123')
 
         yield p1.terminate()
         self.assertEquals(p1._get_state(), "TERMINATED")
@@ -132,7 +139,8 @@ class ProcessTest(IonTestCase):
         log.info('Process 1 spawned and initd correctly')
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo','content123')
-        self.assertEquals(cont['value'], 'content123')
+        #self.assertEquals(cont['value'], 'content123')
+        self.assertEquals(cont, 'content123')
         log.info('Process 1 responsive correctly')
 
         # The following tests the process attaching a second receiver
@@ -142,7 +150,8 @@ class ProcessTest(IonTestCase):
         log.info('Created new receiver %s' % (msgName))
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(msgName,'echo','content456')
-        self.assertEquals(cont['value'], 'content456')
+        #self.assertEquals(cont['value'], 'content456')
+        self.assertEquals(cont, 'content456')
         log.info('Process 1 responsive correctly on second receiver')
 
 
@@ -171,7 +180,8 @@ class ProcessTest(IonTestCase):
         self.assertEquals(proc1.inbox_count, 1)
 
         (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid2,'echo','content123')
-        self.assertEquals(cont['value'], 'content123')
+        #self.assertEquals(cont['value'], 'content123')
+        self.assertEquals(cont, 'content123')
         log.info('Process 1 responsive correctly after init')
 
     @defer.inlineCallbacks
@@ -180,7 +190,7 @@ class ProcessTest(IonTestCase):
         pid1 = yield self.test_sup.spawn_child(child1)
 
         try:
-            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echofail2','content123')
+            (cont,hdrs,msg) = yield self.test_sup.rpc_send(pid1,'echo_exception','content123')
             self.fail("ReceivedError expected")
         except ReceivedError, re:
             log.info('Process 1 responded to error correctly')
@@ -200,15 +210,16 @@ class ProcessTest(IonTestCase):
         sup = yield self._spawn_processes(processes, sup=p1)
 
         pid2 = p1.get_child_id('echo')
-
-        byte_string = sha.sha('test').digest()
+        
+        byte_string = hashlib.sha1('test').digest()
 
         yield p1.send(pid2, 'echo', byte_string)
         log.info('Sent byte-string')
 
         msg = yield p1.await_message()
         log.info('Received byte-string')
-        self.assertEquals(msg.payload['content']['value'], byte_string)
+        #self.assertEquals(msg.payload['content']['value'], byte_string)
+        self.assertEquals(msg.payload['content'], byte_string)
 
         yield sup.shutdown()
 
@@ -232,31 +243,85 @@ class ProcessTest(IonTestCase):
         except defer.TimeoutError, te:
             log.info('Timeout received')
 
-
-class EchoProcess(Process):
-
     @defer.inlineCallbacks
-    def plc_noinit(self):
-        log.info("In init: "+self.proc_state)
-        yield pu.asleep(1)
-        log.info("Leaving init: "+self.proc_state)
+    def test_register_lco(self):
+        """
+        Test the registration of life cycle objects owned by a process
+        Do not spawn the process - want to manually move it through the FSM!
+        """
+        # Create a process which has an lco object in its init
+        lco1 = life_cycle_process.LifeCycleObject()
+        lcop = life_cycle_process.LCOProcess(lco1, spawnargs={'proc-name':'p1'})        
+        self.assertEquals(lcop._get_state(), state_object.BasicStates.S_INIT)
+        self.assertEquals(lco1._get_state(), state_object.BasicStates.S_INIT)
+        
+        lco2 = life_cycle_process.LifeCycleObject()
+        yield lcop.register_life_cycle_object(lco2)
+        self.assertEquals(lco2._get_state(), state_object.BasicStates.S_INIT)
+        
+        # Initialize the process and its objects
+        yield lcop.initialize()
+        self.assertEquals(lcop._get_state(), state_object.BasicStates.S_READY)
+        self.assertEquals(lco1._get_state(), state_object.BasicStates.S_READY)
+        self.assertEquals(lco2._get_state(), state_object.BasicStates.S_READY)
+        
+        lco3 = life_cycle_process.LifeCycleObject()
+        yield lcop.register_life_cycle_object(lco3)
+        self.assertEquals(lco3._get_state(), state_object.BasicStates.S_READY)
+        
+        # Check that using add after init causes an error
+        lcoa = life_cycle_process.LifeCycleObject()
+        self.assertRaises(ProcessError,lcop.add_life_cycle_object,lcoa)
+        
+        # Activate the process and its objects
+        yield lcop.activate()
+        
+        self.assertEquals(lcop._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.assertEquals(lco1._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.assertEquals(lco2._get_state(), state_object.BasicStates.S_ACTIVE)
+        self.assertEquals(lco3._get_state(), state_object.BasicStates.S_ACTIVE)
 
+        
+        lco4 = life_cycle_process.LifeCycleObject()
+        yield lcop.register_life_cycle_object(lco4)
+        self.assertEquals(lco4._get_state(), state_object.BasicStates.S_ACTIVE)
+
+        # Process does not currently implement for deactivate!
+                
+        # Terminate the process and its objects
+        yield lcop.terminate()
+        self.assertEquals(lcop._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.assertEquals(lco1._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.assertEquals(lco2._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.assertEquals(lco3._get_state(), state_object.BasicStates.S_TERMINATED)
+        self.assertEquals(lco4._get_state(), state_object.BasicStates.S_TERMINATED)
+        
+        # Can't seem to assert raises - not sure why not?
+        #lco5 = life_cycle_process.LifeCycleObject()
+        #self.assertRaises(ProcessError,lcop.register_life_cycle_object,lco5)
+        #yield lcop.register_life_cycle_object(lco5)
+        
+class EchoProcess(Process):
+        
     @defer.inlineCallbacks
     def op_echo(self, content, headers, msg):
         log.info("Message received: "+str(content))
-        yield self.reply_ok(msg, content)
+        yield self.reply(msg, content=content)
 
     @defer.inlineCallbacks
-    def op_echofail1(self, content, headers, msg):
+    def op_echo_fail(self, content, headers, msg):
         log.info("Message received: "+str(content))
         ex = RuntimeError("I'm supposed to fail")
-        yield self.reply_err(msg, ex)
+        # Reply as though we caught an exception!
+        yield self.reply(msg,content=None, exception=ex, response_code=self.APP_INVALID_KEY)
 
     @defer.inlineCallbacks
-    def op_echofail2(self, content, headers, msg):
+    def op_echo_exception(self, content, headers, msg):
         log.info("Message received: "+str(content))
         raise RuntimeError("I'm supposed to fail")
-        yield self.reply_ok(msg, content)
+        
+        # This is never reached!
+        yield self.reply(msg, content=content)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(EchoProcess)

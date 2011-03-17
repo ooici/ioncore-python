@@ -1,7 +1,7 @@
 <!-- Ant build file for LCAarch -->
-<project name="LCAarch" default="info" basedir=".">
+<project name="ioncore-python" default="info" basedir=".">
     <description>
-        This is the ANT build file for the LCAarch OOI CI Python capability
+        This is the ANT build file for the OOI CI Python capability
         container and service platform.
     </description>
 
@@ -14,7 +14,8 @@
   <property name="dist"  location="dist"/>
 
   <target name="info">
-    <echo message="LCAarch ant build file. Specify a target to build"/>
+    <echo message="ioncore-python ant build file. Specify a target to build."/>
+    <echo message="Run 'ant -p' to retrieve a list of targets."/>
   </target>
 
   <target name="init">
@@ -28,14 +29,8 @@
     <py-compile dir="${src}" pythonpath="${src}" optimize="0"/>
  </target>
 
-  <target name="dist" depends="compile"
-        description="generate the distribution" >
-    <!-- Create the distribution directory -->
-    <mkdir dir="${dist}/lib"/>
-  </target>
-
-  <target name="clean"
-        description="clean up" >
+ <target name="clean"
+     description="clean up"> 
     <delete>
       <fileset dir="${src}" includes="**/*.pyc"/>
     </delete>
@@ -43,56 +38,32 @@
     <delete dir="${dist}"/>
     <delete dir="ioncore.egg-info"/>
     <delete dir="_trial_temp"/>
+    <!--<antcall target="remeggs"/>-->
   </target>
 
-  <target name="install" depends="clean"
-        description="Install dependencies" >
-    <!-- Run new empty capability container without shell -->
-    <echo message="Installing dependencies"/>
-    <exec executable="python">
-      <arg value="setup.py"/>
-      <arg value="install"/>
-    </exec>
+  <target name="dir.check">
+      <condition property="dir.exists">
+          <available file="eggs" type="dir"/>
+      </condition>
   </target>
 
-  <target name="newcc" depends=""
-        description="start a Python CC" >
-    <!-- Run new empty capability container without shell -->
-    <echo message="Starting empty ION PyCC with sysname=${user.name}"/>
-    <exec executable="twistd">
-      <arg value="-n"/>
-      <arg value="--logfile=-"/>
-      <arg value="magnet"/>
-      <arg value="-h"/>
-      <arg value="amoeba.ucsd.edu"/>
-      <arg value="-a"/>
-      <arg value="sysname=${user.name}"/>
-      <arg value="-n"/>
-      <arg value="res/scripts/newcc.py"/>
-    </exec>
+  <target name="remeggs" depends="dir.check" if="dir.exists">
+      <echo message="Remove buildout eggs eggs/ionprot*"/>
+      <delete includeemptydirs="true">
+           <fileset dir="eggs" includes="**/ionproto*/" />
+       </delete>
+    <echo message="Use 'ant clean-buildout' if you want to completely clean out buildout directories."/>
+   </target>
+
+  <target name="clean-buildout"
+        description="clean up buildout dirs" depends="clean" >
+    <echo message="Clean up buildout directories.  Please run `python bootstrap.py` to start buildout."/>
+    <delete dir="parts"/>
+    <delete dir="develop-eggs"/>
+    <delete dir="bin"/>
+    <delete dir="downloads"/>
+    <delete dir="eggs"/>
+    <delete file=".installed.cfg"/>
   </target>
 
-  <target name="javalca" depends=""
-        description="start Python CC with Java Integration LCA Demo" >
-    <!-- Run new empty capability container without shell -->
-    <echo message="Starting ION PyCC with sysname=${user.name}"/>
-    <exec executable="twistd">
-      <arg value="-n"/>
-      <arg value="--logfile=-"/>
-      <arg value="magnet"/>
-      <arg value="-h"/>
-      <arg value="amoeba.ucsd.edu"/>
-      <arg value="-a"/>
-      <arg value="sysname=${user.name}"/>
-      <arg value="-n"/>
-      <arg value="res/scripts/javalca.py"/>
-    </exec>
-  </target>
-
-  <target name="test" depends="clean"
-        description="exdecutes all trial unit test cases" >
-    <exec executable="trial">
-      <arg value="${src}"/>
-    </exec>
-  </target>
 </project>

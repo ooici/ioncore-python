@@ -68,6 +68,7 @@ class SchedulerTest(IonTestCase):
 
         rc = yield sc.rm_task(task_id)
         self.failUnlessEqual(rc['value'], 'OK')
+        yield asleep(0.5)
 
     @defer.inlineCallbacks
     def test_add_remove(self):
@@ -86,16 +87,19 @@ class SchedulerTest(IonTestCase):
         reply = yield sc.add_task('scheduled_task', 1.0, 'pingtest')
         task_id = reply['value']
         rl = yield sc.query_tasks('.+')
-        self.failUnless(len(rl) == 2)
+        self.failUnless(len(rl['value']) == 2)
         self.failUnlessSubstring(str(task_id), str(rl['value']))
 
     @defer.inlineCallbacks
     def test_rm(self):
         sc = SchedulerServiceClient(proc=self.sup)
-
         reply = yield sc.add_task(self.dest, 1.0, 'pingtest')
         task_id = reply['value']
+        
         yield sc.rm_task(task_id)
+        
         rl = yield sc.query_tasks(task_id)
+        
         log.debug(rl)
         self.failUnlessEqual(len(rl['value']), 0)
+        yield asleep(0.5)

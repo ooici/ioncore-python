@@ -14,25 +14,15 @@ from twisted.internet import defer
 from ion.test.iontest import IonTestCase
 
 from ion.agents.instrumentagents.WHSentinelADCP_driver import WHSentinelADCPInstrumentDriverClient
-from ion.agents.instrumentagents.WHSentinelADCP_driver import WHSentinelADCPInstrumentDriver
 from ion.agents.instrumentagents.simulators.sim_WHSentinelADCP import Simulator
-from ion.core import bootstrap
 
 from ion.core.messaging.receiver import Receiver
-from ion.core.process.process import Process, ProcessDesc
-from ion.services.dm.distribution.pubsub_service import DataPubsubClient
-
-from ion.services.dm.distribution import base_consumer
-from ion.services.dm.distribution.consumers import forwarding_consumer
-from ion.services.dm.distribution.consumers import logging_consumer
-from ion.services.dm.distribution.consumers import example_consumer
+from ion.core.process.process import Process
+from ion.services.dm.distribution.pubsub_service import PubSubClient
 
 import ion.util.procutils as pu
-from ion.data import dataobject
-from ion.resources.dm_resource_descriptions import Publication, PublisherResource, PubSubTopicResource, SubscriptionResource
-
+from ion.resources.dm_resource_descriptions import PubSubTopicResource, SubscriptionResource
 from twisted.trial import unittest
-
 
 class TestWHSentinelADCP(IonTestCase):
     
@@ -45,14 +35,16 @@ class TestWHSentinelADCP(IonTestCase):
         
         log.debug("Starting simulator")
         self.simulator = Simulator("123", 9100)
-        self.SimulatorPort = self.simulator.start()
+        SimulatorPorts = self.simulator.start()
+        log.info("Simulator ports = %s" %SimulatorPorts)
+        self.SimulatorPort = SimulatorPorts[0]
+        self.CmdPort = SimulatorPorts[1]
         self.assertNotEqual(self.SimulatorPort, 0)
 
         services = [
-            {'name':'pubsub_registry','module':'ion.services.dm.distribution.pubsub_registry','class':'DataPubSubRegistryService'},
-            {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'DataPubsubService'},
+            {'name':'pubsub_service','module':'ion.services.dm.distribution.pubsub_service','class':'PubSubService'},
 
-            {'name':'WHSentinelADCP_Driver','module':'ion.agents.instrumentagents.WHSentinelADCP_driver','class':'WHSentinelADCPInstrumentDriver','spawnargs':{'ipport':self.SimulatorPort,'ipportCmd':967}}
+            {'name':'WHSentinelADCP_Driver','module':'ion.agents.instrumentagents.WHSentinelADCP_driver','class':'WHSentinelADCPInstrumentDriver','spawnargs':{'ipport':self.SimulatorPort,'ipportCmd':self.CmdPort}}
             ]
 
         self.sup = yield self._spawn_processes(services)
@@ -72,14 +64,15 @@ class TestWHSentinelADCP(IonTestCase):
 
     @defer.inlineCallbacks
     def test_create_topic(self):
+        raise unittest.SkipTest('Needs new PubSub services')
         #dpsc = DataPubsubClient(self.pubsubSuper)
 
-        dpsc = DataPubsubClient(self.sup)
+        dpsc = PubSubClient(self.sup)
         # Create and Register a topic
-        """
-        DHE: not sure the driver should be creating the topic; for right
-        now I'll have the test case do it.
-        """
+ 
+        #DHE: not sure the driver should be creating the topic; for right
+        #now I'll have the test case do it.
+      
         self.topic = PubSubTopicResource.create('WHSentinelADCP Topic',"oceans, oil spill")
         self.topic = yield dpsc.define_topic(self.topic)
 
@@ -88,7 +81,7 @@ class TestWHSentinelADCP(IonTestCase):
 
     @defer.inlineCallbacks
     def test_initialize(self):
-        result = yield self.driver_client.initialize('some arg')
+        yield self.driver_client.initialize('some arg')
         log.debug('TADA!')
 
     @defer.inlineCallbacks
@@ -103,7 +96,8 @@ class TestWHSentinelADCP(IonTestCase):
     @defer.inlineCallbacks
     def test_fetch_set(self):
         params = {'baudrate':'19200'}
-        result = yield self.driver_client.set_params(params)
+        yield self.driver_client.set_params(params)
+        yield pu.asleep(2)
 
         """
         params = {'outputformat':'2'}
@@ -122,16 +116,21 @@ class TestWHSentinelADCP(IonTestCase):
         """
 
         #raise unittest.SkipTest('Temporarily skipping')
+        # DHE: disconnecting; a connect would probably be good.
+        yield self.driver_client.disconnect(['some arg'])
 
 
     @defer.inlineCallbacks
     def test_execute(self):
+        raise unittest.SkipTest('Needs new PubSub services')
+        yield
+        
         """
         Test the execute command to the Instrument Driver
         """
         result = yield self.driver_client.initialize('some arg')
 
-        dpsc = DataPubsubClient(self.sup)
+        dpsc = PubSubClient(self.sup)
 
         """
         topicname = 'WHSentinelADCP Topic'
@@ -160,27 +159,41 @@ class TestWHSentinelADCP(IonTestCase):
         params = {'ipaddr':'127.0.0.1', 'ipport':self.SimulatorPort}   # for simulator
         #params['publish-to'] = topic.RegistryIdentity
         result = yield self.driver_client.configure_driver(params)
+        
+        """
+        result = yield self.driver_client.execute(['cr', '1'])         # set to factory defaults
+        result = yield self.driver_client.execute(['cf', '11211'])     # ascii data format
+        result = yield self.driver_client.execute(['wp', '2'])         # number of pings to avg
+        result = yield self.driver_client.execute(['te', '00000300'])  # 3 secs between ensembles
+        result = yield self.driver_client.execute(['tp', '000100'])    # 1 sec between pings
+        result = yield self.driver_client.execute(['ck', ''])          # save setup to RAM
+        result = yield self.driver_client.execute(['cs', ''])          # start pinging
+        """
+        result = yield self.driver_client.execute(['start', ''])       # start pinging
+       # wait a while...
+        yield pu.asleep(9)
+        result = yield self.driver_client.execute(['stop', ''])       # start pinging
+        """
+        result = yield self.driver_client.execute(['break', ''])       # wake up instrument
+        result = yield self.driver_client.execute(['cr', '1'])         # set to factory defaults
+        result = yield self.driver_client.execute(['cz', ''])          # power down instrument
+        """
 
-        cmd1 = [['cr', '1']]
-        cmd2 = [['ck', '']]
-
-        result = yield self.driver_client.execute(cmd1)
-        result = yield self.driver_client.execute(cmd2)
-         # wait a while...
-        yield pu.asleep(4)
-
-
+        yield pu.asleep(6)
         log.info("test_execute: disconnecting.")
         # DHE: disconnecting; a connect would probably be good.
-        result = yield self.driver_client.disconnect(['some arg'])
+        yield self.driver_client.disconnect(['some arg'])
         log.info("test_execute completed.")
 
 
     @defer.inlineCallbacks
     def test_sample(self):
+        raise unittest.SkipTest('Needs new PubSub services')
+        yield
+        
         result = yield self.driver_client.initialize('some arg')
 
-        dpsc = DataPubsubClient(self.sup)
+        dpsc = PubSubClient(self.sup)
         topicname = 'WHSentinelADCP Topic'
         topic = PubSubTopicResource.create(topicname,"")
 
@@ -206,8 +219,8 @@ class TestWHSentinelADCP(IonTestCase):
         params['publish-to'] = topic.RegistryIdentity
         yield self.driver_client.configure_driver(params)
 
-        cmd1 = [['cs', '']]
-        result = yield self.driver_client.execute(cmd1)
+        cmd1 = ['cs', '']
+        yield self.driver_client.execute(cmd1)
 
         log.info("getting current time")
         StartTime = pu.currenttime()
@@ -215,7 +228,7 @@ class TestWHSentinelADCP(IonTestCase):
         while StartTime + 5 > pu.currenttime():
             log.info("sleeping 5 seconds")
             yield pu.asleep(5)
-        result = yield self.driver_client.disconnect(['some arg'])
+        yield self.driver_client.disconnect(['some arg'])
 
 class DataConsumer(Process):
     """
@@ -240,6 +253,6 @@ class DataConsumer(Process):
         """
         Data has been received.  Increment the receive_cnt
         """
-        log.debug("@@@@@@@@@@@@@@@@@@@@@@@@ data received: %s" %s(str(self.received_msg)))
+        log.debug("@@@@@@@@@@@@@@@@@@@@@@@@ data received: %s", str(self.received_msg))
         self.receive_cnt += 1
         self.received_msg.append(content)

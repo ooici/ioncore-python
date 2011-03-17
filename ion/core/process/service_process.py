@@ -13,7 +13,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.process.process import Process, ProcessClient
+from ion.core.process.process import Process, ProcessClient, ProcessFactory
 from ion.core.cc.container import Container
 from ion.core.messaging.receiver import ServiceWorkerReceiver
 import ion.util.procutils as pu
@@ -60,6 +60,7 @@ class ServiceProcess(Process):
                 name=self.svc_name,
                 scope='system',
                 group=self.receiver.group,
+                process=self, # David added this - is it a good idea?
                 handler=self.receive)
         self.add_receiver(self.svc_receiver)
 
@@ -138,7 +139,6 @@ class ServiceProcess(Process):
         #yield defer.maybeDeferred(self.slc_stop)
         #yield defer.maybeDeferred(self.slc_shutdown)
 
-
     def slc_terminate(self):
         """
         Service life cycle event: final shutdown of service process. Will be
@@ -158,6 +158,7 @@ class ServiceProcess(Process):
         log.debug("Service-declare: %s" % (kwargs))
         return kwargs
 
+factory = ProcessFactory(ServiceProcess)
 
 class ServiceClient(ProcessClient):
     """

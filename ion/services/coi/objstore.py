@@ -13,8 +13,8 @@ from twisted.internet import defer
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.exception import ReceivedError
-from ion.services.dm.preservation import store
-from ion.services.dm.preservation import cas
+from ion.data import store
+from ion.data import cas
 from ion.data.datastore import objstore
 
 class Serializer(object):
@@ -193,7 +193,8 @@ class ObjectStoreClient(ServiceClient, cas.CAStore):
         encoded_baseClass = dataobject.DEncoder().encode(baseClass())
 
         (content, headers, msg) = yield self.rpc_send('create', [name, encoded_baseClass])
-        obj = content['value']
+        #obj = content['value']
+        obj = content
         defer.returnValue(obj)
 
 
@@ -207,7 +208,8 @@ class ObjectStoreClient(ServiceClient, cas.CAStore):
         @todo Change name to id.
         """
         (content, headers, msg) = yield self.rpc_send('clone', name)
-        obj = content['value']
+        #obj = content['value']
+        obj = content
         defer.returnValue(obj)
 
 
@@ -226,7 +228,8 @@ class ObjectStoreClient(ServiceClient, cas.CAStore):
     def _get_callback(self, (content, headers, msg), id):
         """
         """
-        data = content['value'] # This should not be content['value']
+        #data = content['value'] # This should not be content['value']
+        data = content # This should not be content['value']
         """@todo make 'ok' a bool instead
         """
         obj = self.decode(data)
@@ -258,7 +261,8 @@ class ObjectStoreClient(ServiceClient, cas.CAStore):
     def _put_callback(self, (content, headers, msg)):
         """
         """
-        id = content['value']
+        #id = content['value']
+        id = content
         return id
 
 factory = ProcessFactory(ObjectStoreService)

@@ -13,10 +13,14 @@ class instrument_prompts:
     INST_PROMPT = ">"
 
 instrument_commands = (
+    "start",
+    "stop",
+    "break",
     "cf",
     "ck",
     "cr",
     "cs",
+    "cz",
     "ea",
     "ed",
     "es",
@@ -39,6 +43,10 @@ instrument_commands = (
     "ws"
  )
 
+command_substitutions = {
+    "StartAcquisition":"start"
+}
+
 ci_commands = (
     "start_direct_access",
     "stop_direct_access",
@@ -49,7 +57,7 @@ Maybe some day these values are looked up from a registry of common
 controlled vocabulary
 """
 instrument_parameters = (
-    "baudrate"
+    "baudrate",
 )
 
 """

@@ -44,6 +44,10 @@ class IONMessageInterceptor(EnvelopeInterceptor):
         msg['format'] = headers.get('format','raw')
         # Ontology associated with the content of the message
         msg['ontology'] = headers.get('ontology','')
+        # OOI User id
+        msg['user-id'] = str(headers.get('user-id', 'ANONYMOUS'))
+        # Lifespan of user authority
+        msg['expiry'] = str(headers.get('expiry', '0'))
         # Conversation instance id
         msg['conv-id'] = headers.get('conv-id','')
         # Conversation message sequence number

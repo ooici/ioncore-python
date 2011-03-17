@@ -80,12 +80,12 @@ if __name__ == '__main__':
             print 'ERROR while trying to import Simulator from module {0}'.format(sys.argv[3])
             sys.exit(1)
         simulator = Simulator(sys.argv[1], int(sys.argv[2]))
-        Port = simulator.start()
-        if Port == NO_PORT_NUMBER_FOUND:
+        Ports = simulator.start()
+        if Ports[0] == NO_PORT_NUMBER_FOUND:
            print "Can't start simulator: no port available"
            sys.exit(1)
-        reactor.connectTCP(sys.argv[1], Port, StdioProxyFactory( ))
-        print 'Connected to %s simulator at %s:%s' %(sys.argv[3], sys.argv[1], Port)
+        reactor.connectTCP(sys.argv[1], Ports[0], StdioProxyFactory( ))
+        print 'Connected to %s simulator at %s:%s' %(sys.argv[3], sys.argv[1], Ports[0])
     else:
         try:
             reactor.connectTCP(sys.argv[1], int(sys.argv[2]), StdioProxyFactory( ))

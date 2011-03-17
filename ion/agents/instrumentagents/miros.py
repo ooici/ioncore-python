@@ -86,9 +86,7 @@ class Hsm():
 
 	def onStart(self, top):
 		# expandable table containing event parameters sent to HSM
-		log.debug("!!!!!!!!! instantiating tEvt!!!")
 		self.tEvt = {'sType': "entry", 'nFoo': 0}
-		log.debug("!!!!!!!!! done instantiating tEvt!!!")
 		
 		self.rCurr = self.hsm[top]
 		# self.pp.pprint(self.rCurr)
