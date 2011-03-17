@@ -34,7 +34,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
          'spawnargs':{'datastore_service':'datastore'}}
         ]
 
-    appsup_desc = ProcessDesc(name='app-supervisor-'+app_definition.name,
+    appsup_desc = ProcessDesc(name='app-supervisor-' + app_definition.name,
                               module=app_supervisor.__name__,
                               spawnargs={'spawn-procs':resource_proc})
     supid = yield appsup_desc.spawn()
@@ -43,7 +43,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
     
     
     # Check for command line argument to add some example data resources
-    if ioninit.cont_args.get('register',None) == 'demodata':
+    if ioninit.cont_args.get('register', None) == 'demodata':
 
         # Run script to create data objects
         data_resources = yield _bootstrap_objects(supid)
@@ -55,27 +55,30 @@ def start(container, starttype, app_definition, *args, **kwargs):
         print data_resources
         print 'The dataset IDs will be available in your localsOkay after the shell starts!'
         print '================================================================='
-        for k,v in data_resources.items():
-            control.add_term_name(k,v)
+        for k, v in data_resources.items():
+            control.add_term_name(k, v)
     
     defer.returnValue(res)
 
 @defer.inlineCallbacks
 def stop(container, state):
-    log.info("state:" +str(state) )
+    log.info("state:" + str(state))
     supdesc = state[0]
     log.info("Terminating CC agent")
     yield supdesc.terminate()
 
     
 # Create CDM Type Objects
+datasource_type = object_utils.create_type_identifier(object_id=4502, version=1)
 dataset_type = object_utils.create_type_identifier(object_id=10001, version=1)
 group_type = object_utils.create_type_identifier(object_id=10020, version=1)
 dimension_type = object_utils.create_type_identifier(object_id=10018, version=1)
 variable_type = object_utils.create_type_identifier(object_id=10024, version=1)
+bounded_array_type = object_utils.create_type_identifier(object_id=10021, version=1)
+array_structure_type = object_utils.create_type_identifier(object_id=10025, version=1)
+
 attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
 stringArray_type = object_utils.create_type_identifier(object_id=10015, version=1)
-boundedArray_type = object_utils.create_type_identifier(object_id=10021, version=1)
 float32Array_type = object_utils.create_type_identifier(object_id=10013, version=1)
 int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
 
@@ -178,20 +181,25 @@ def _bootstrap_objects(supid):
     _add_string_attribute(dataset, variable_z, '_CoordinateAxisType', ['Height'])
     _add_string_attribute(dataset, variable_z, '_CoordinateZisPositive', ['down'])
     # Add data values
-    variable_t.content.add()
-    variable_t.content[0] = dataset.CreateObject(boundedArray_type)
-    variable_t.content[0].bounds.add()
-    variable_t.content[0].bounds[0].origin = 0
-    variable_t.content[0].bounds[0].size = 2
-    variable_t.content[0].ndarray = dataset.CreateObject(int32Array_type) 
-    variable_t.content[0].ndarray.value.extend([1280102520, 1280106120])
-    variable_z.content.add()
-    variable_z.content[0] = dataset.CreateObject(boundedArray_type)
-    variable_z.content[0].bounds.add()
-    variable_z.content[0].bounds[0].origin = 0
-    variable_z.content[0].bounds[0].size = 3
-    variable_z.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-    variable_z.content[0].ndarray.value.extend([0.0, 0.1, 0.2])
+    variable_t.content = dataset.CreateObject(array_structure_type)
+    variable_t.content.bounded_arrays.add()
+    variable_t.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    variable_t.content.bounded_arrays[0].bounds.add()
+    variable_t.content.bounded_arrays[0].bounds[0].origin = 0
+    variable_t.content.bounded_arrays[0].bounds[0].size = 2
+    variable_t.content.bounded_arrays[0].ndarray = dataset.CreateObject(int32Array_type)
+    variable_t.content.bounded_arrays[0].ndarray.value.extend([1280102520, 1280106120])
+
+    variable_z.content = dataset.CreateObject(array_structure_type)
+    variable_z.content.bounded_arrays.add()
+    variable_z.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    variable_z.content.bounded_arrays[0].bounds.add()
+    variable_z.content.bounded_arrays[0].bounds[0].origin = 0
+    variable_z.content.bounded_arrays[0].bounds[0].size = 3
+    variable_z.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    variable_z.content.bounded_arrays[0].ndarray.value.extend([0.0, 0.1, 0.2])
     
     
     # Construct the Scalar Variables: lat, lon and station id
@@ -208,27 +216,37 @@ def _bootstrap_objects(supid):
     _add_string_attribute(dataset, scalar_sid, 'long_name', ['integer station identifier'])
     _add_string_attribute(dataset, scalar_sid, 'standard_name', ['station_id'])
     # Add data values
-    scalar_lat.content.add()
-    scalar_lat.content[0] = dataset.CreateObject(boundedArray_type)
-    scalar_lat.content[0].bounds.add()
-    scalar_lat.content[0].bounds[0].origin = 0
-    scalar_lat.content[0].bounds[0].size = 1
-    scalar_lat.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-    scalar_lat.content[0].ndarray.value.extend([-45.431])
-    scalar_lon.content.add()
-    scalar_lon.content[0] = dataset.CreateObject(boundedArray_type)
-    scalar_lon.content[0].bounds.add()
-    scalar_lon.content[0].bounds[0].origin = 0
-    scalar_lon.content[0].bounds[0].size = 1
-    scalar_lon.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-    scalar_lon.content[0].ndarray.value.extend([25.909])
-    scalar_sid.content.add()
-    scalar_sid.content[0] = dataset.CreateObject(boundedArray_type)
-    scalar_sid.content[0].bounds.add()
-    scalar_sid.content[0].bounds[0].origin = 0
-    scalar_sid.content[0].bounds[0].size = 1
-    scalar_sid.content[0].ndarray = dataset.CreateObject(int32Array_type) 
-    scalar_sid.content[0].ndarray.value.extend([10059])
+    scalar_lat.content= dataset.CreateObject(array_structure_type)
+    scalar_lat.content.bounded_arrays.add()
+    scalar_lat.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    scalar_lat.content.bounded_arrays[0].bounds.add()
+    scalar_lat.content.bounded_arrays[0].bounds[0].origin = 0
+    scalar_lat.content.bounded_arrays[0].bounds[0].size = 1
+    scalar_lat.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    scalar_lat.content.bounded_arrays[0].ndarray.value.extend([-45.431])
+
+
+    scalar_lon.content= dataset.CreateObject(array_structure_type)
+    scalar_lon.content.bounded_arrays.add()
+    scalar_lon.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    scalar_lon.content.bounded_arrays[0].bounds.add()
+    scalar_lon.content.bounded_arrays[0].bounds[0].origin = 0
+    scalar_lon.content.bounded_arrays[0].bounds[0].size = 1
+    scalar_lon.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    scalar_lon.content.bounded_arrays[0].ndarray.value.extend([25.909])
+
+
+    scalar_sid.content= dataset.CreateObject(array_structure_type)
+    scalar_sid.content.bounded_arrays.add()
+    scalar_sid.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    scalar_sid.content.bounded_arrays[0].bounds.add()
+    scalar_sid.content.bounded_arrays[0].bounds[0].origin = 0
+    scalar_sid.content.bounded_arrays[0].bounds[0].size = 1
+    scalar_sid.content.bounded_arrays[0].ndarray = dataset.CreateObject(int32Array_type)
+    scalar_sid.content.bounded_arrays[0].ndarray.value.extend([10059])
     
     
     # Construct the Data Variable: salinity
@@ -244,16 +262,18 @@ def _bootstrap_objects(supid):
     _add_string_attribute(dataset, variable_salinity, 'coordinates', ['time lon lat z'])
     _add_string_attribute(dataset, variable_salinity, 'standard_name', ['sea_water_salinity'])
     # Add data values
-    variable_salinity.content.add()
-    variable_salinity.content[0] = dataset.CreateObject(boundedArray_type)
-    variable_salinity.content[0].bounds.add()
-    variable_salinity.content[0].bounds[0].origin = 0
-    variable_salinity.content[0].bounds[0].size = 2 # time dimension
-    variable_salinity.content[0].bounds.add()
-    variable_salinity.content[0].bounds[1].origin = 0
-    variable_salinity.content[0].bounds[1].size = 3 # depth dimension
-    variable_salinity.content[0].ndarray = dataset.CreateObject(float32Array_type) 
-    variable_salinity.content[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
+    variable_salinity.content= dataset.CreateObject(array_structure_type)
+    variable_salinity.content.bounded_arrays.add()
+    variable_salinity.content.bounded_arrays[0] = dataset.CreateObject(bounded_array_type)
+
+    variable_salinity.content.bounded_arrays[0].bounds.add()
+    variable_salinity.content.bounded_arrays[0].bounds[0].origin = 0
+    variable_salinity.content.bounded_arrays[0].bounds[0].size = 2 # time dimension
+    variable_salinity.content.bounded_arrays[0].bounds.add()
+    variable_salinity.content.bounded_arrays[0].bounds[1].origin = 0
+    variable_salinity.content.bounded_arrays[0].bounds[1].size = 3 # depth dimension
+    variable_salinity.content.bounded_arrays[0].ndarray = dataset.CreateObject(float32Array_type)
+    variable_salinity.content.bounded_arrays[0].ndarray.value.extend([29.82, 29.74, 29.85, 30.14, 30.53, 30.85])
     
     
     # Attach variable and dimension objects to the root group
@@ -279,16 +299,30 @@ def _bootstrap_objects(supid):
     
     # Create and Attach global attributes to the root group
     #--------------------------------------------------------
-    attrib_feature_type =   _create_string_attribute(dataset, 'CF:featureType', ['stationProfile'])
-    attrib_conventions =    _create_string_attribute(dataset, 'Conventions',    ['CF-1.5'])
-    attrib_history =        _create_string_attribute(dataset, 'history',        ['Converted from CSV to OOI CDM compliant NC by net.ooici.agent.abstraction.impl.SosAgent', 'Reconstructed manually as a GPB composite for the resource registry tutorial'])
-    attrib_references =     _create_string_attribute(dataset, 'references',     ['http://sdf.ndbc.noaa.gov/sos/', 'http://www.ndbc.noaa.gov/', 'http://www.noaa.gov/'])
-    attrib_title =          _create_string_attribute(dataset, 'title',          ['NDBC Sensor Observation Service data from "http://sdf.ndbc.noaa.gov/sos/"'])
-    attrib_utc_begin_time = _create_string_attribute(dataset, 'utc_begin_time', ['2008-08-01T00:50:00Z'])
-    attrib_source =         _create_string_attribute(dataset, 'source',         ['NDBC SOS'])
-    attrib_utc_end_time =   _create_string_attribute(dataset, 'utc_end_time',   ['2008-08-01T23:50:00Z'])
-    attrib_institution =    _create_string_attribute(dataset, 'institution',    ["NOAA's National Data Buoy Center (http://www.ndbc.noaa.gov/)"])
+    attrib_feature_type = _create_string_attribute(dataset, 'CF:featureType', ['stationProfile'])
+    attrib_title = _create_string_attribute(dataset, 'title', ['NDBC Sensor Observation Service data from "http://sdf.ndbc.noaa.gov/sos/"'])
+    attrib_institution = _create_string_attribute(dataset, 'institution', ["NOAA's National Data Buoy Center (http://www.ndbc.noaa.gov/)"])
+    attrib_source = _create_string_attribute(dataset, 'source', ['NDBC SOS'])
+    attrib_history = _create_string_attribute(dataset, 'history', ['Converted from CSV to OOI CDM compliant NC by net.ooici.agent.abstraction.impl.SosAgent', 'Reconstructed manually as a GPB composite for the resource registry tutorial'])
+    attrib_references = _create_string_attribute(dataset, 'references', ['http://sdf.ndbc.noaa.gov/sos/', 'http://www.ndbc.noaa.gov/', 'http://www.noaa.gov/'])
+    attrib_conventions = _create_string_attribute(dataset, 'Conventions', ['CF-1.5'])
+    attrib_time_start = _create_string_attribute(dataset, 'ion_time_coverage_start', ['2008-08-01T00:50:00Z'])
+    attrib_time_end = _create_string_attribute(dataset, 'ion_time_coverage_end', ['2008-08-01T23:50:00Z'])
+    attrib_lat_max = _create_string_attribute(dataset, 'ion_geospatial_lat_max', ['-45.431'])
+    attrib_lat_min = _create_string_attribute(dataset, 'ion_geospatial_lat_min', ['-45.431'])
+    attrib_lon_max = _create_string_attribute(dataset, 'ion_geospatial_lon_max', ['25.909'])
+    attrib_lon_min = _create_string_attribute(dataset, 'ion_geospatial_lon_min', ['25.909'])
+    attrib_vert_max = _create_string_attribute(dataset, 'ion_geospatial_vertical_max', ['0.0'])
+    attrib_vert_min = _create_string_attribute(dataset, 'ion_geospatial_vertical_min', ['0.2'])
+    attrib_vert_pos = _create_string_attribute(dataset, 'ion_geospatial_vertical_positive', ['down'])
     
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
+    group.attributes.add()
     group.attributes.add()
     group.attributes.add()
     group.attributes.add()
@@ -300,21 +334,50 @@ def _bootstrap_objects(supid):
     group.attributes.add()
     
     group.attributes[0] = attrib_feature_type
-    group.attributes[1] = attrib_conventions
-    group.attributes[2] = attrib_history
-    group.attributes[3] = attrib_references
-    group.attributes[4] = attrib_title
-    group.attributes[5] = attrib_utc_begin_time
-    group.attributes[6] = attrib_source
-    group.attributes[7] = attrib_utc_end_time
-    group.attributes[8] = attrib_institution
+    group.attributes[1] = attrib_title
+    group.attributes[2] = attrib_institution
+    group.attributes[3] = attrib_source
+    group.attributes[4] = attrib_history
+    group.attributes[5] = attrib_references
+    group.attributes[6] = attrib_conventions
+    group.attributes[7] = attrib_time_start
+    group.attributes[8] = attrib_time_end
+    group.attributes[9] = attrib_lat_max
+    group.attributes[10] = attrib_lat_min
+    group.attributes[11] = attrib_lon_max
+    group.attributes[12] = attrib_lon_min
+    group.attributes[13] = attrib_vert_max
+    group.attributes[14] = attrib_vert_min
+    group.attributes[15] = attrib_vert_pos
     
     
     # 'put' the resource into the Resource Registry
     rc.put_instance(dataset, 'Testing put...')
     
     
-    data_resources ={'dataset1':dataset.ResourceIdentity}
+    #-------------------------------------------#
+    # Create the coresponding datasource object #
+    #-------------------------------------------#
+    datasource = yield rc.create_instance(datasource_type, ResourceName='Test CDM Resource datasource',
+                                       ResourceDescription='A test resource for retrieving dataset context (datasource)')
+    datasource.source_type = datasource.SourceType.SOS
+    datasource.property.append('sea_water_temperature')
+    datasource.station_id.append('41012')
+    datasource.request_type = datasource.RequestType.NONE
+    # datasource.top = *not used*
+    # datasource.bottom = *not used*
+    # datasource.left = *not used*
+    # datasource.right = *not used*
+#    datasource.base_url = 'http://sdf.ndbc.noaa.gov/sos/server.php?request=GetObservation&service=SOS&responseformat=text/csv&'
+    datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
+    # datasource.dataset_url = *not used*
+    # datasource.ncml_mask = *not used*
+    datasource.max_ingest_millis = 6000
+    
+    rc.put_instance(datasource, 'Commiting initial datasource...')
+    
+    data_resources = {'dataset1':dataset.ResourceIdentity,
+                     'datasource1':datasource.ResourceIdentity}
     defer.returnValue(data_resources)
     
 def _create_string_attribute(dataset, name, values):
@@ -323,7 +386,7 @@ def _create_string_attribute(dataset, name, values):
     '''
     atrib = dataset.CreateObject(attribute_type)
     atrib.name = name
-    atrib.data_type= atrib.DataType.STRING
+    atrib.data_type = atrib.DataType.STRING
     atrib.array = dataset.CreateObject(stringArray_type)
     atrib.array.value.extend(values)
     return atrib

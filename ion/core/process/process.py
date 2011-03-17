@@ -892,13 +892,13 @@ class ProcessClient(ProcessClientBase):
         if not self.target:
             self.target = self.proc.get_scoped_name('system', targetname)
 
-    def rpc_send(self, *args):
+    def rpc_send(self, *args, **kwargs):
         """
         Sends an RPC message to the specified target via originator process
         """
-        return self.proc.rpc_send(self.target, *args)
+        return self.proc.rpc_send(self.target, *args, **kwargs)
     
-    def rpc_send_protected(self, operation, content, user_id='ANONYMOUS', expiry='0'):
+    def rpc_send_protected(self, operation, content, user_id='ANONYMOUS', expiry='0', **kwargs):
         """
         Sends an RPC message to the specified target via originator process
         """
@@ -912,19 +912,19 @@ class ProcessClient(ProcessClientBase):
             assert False, 'Expiry must be string representation of int time value'
             
         headers = {'user-id':user_id, 'expiry':expiry}
-        return self.proc.rpc_send(self.target, operation, content, headers)
+        return self.proc.rpc_send(self.target, operation, content, headers, **kwargs)
 
-    def send(self, *args):
+    def send(self, *args, **kwargs):
         """
         Sends a message to the specified target via originator process
         """
-        return self.proc.send(self.target, *args)
+        return self.proc.send(self.target, *args, **kwargs)
 
-    def reply(self, *args):
+    def reply(self, *args, **kwargs):
         """
         Replies to a message via the originator process
         """
-        return self.proc.reply(*args)
+        return self.proc.reply(*args, **kwargs)
 
 # ============================================================================
 

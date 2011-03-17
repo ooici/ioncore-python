@@ -12,6 +12,7 @@ from net.ooici.core.type import type_pb2
 
 import hashlib
 import struct
+import os
 from google.protobuf import message
 
 # Globals
@@ -147,6 +148,8 @@ def build_gpb_lookup(rootpath):
                         if enum_type.name == ENUM_NAME:
                             for val in enum_type.values:
                                 if val.name == ENUM_ID_NAME:
+                                    if gpb_id_to_class.has_key(val.number):
+                                        raise ObjectUtilException('Duplicate _MessageTypeIdentifier for ID# %s' % str(val.number))
                                     gpb_id_to_class[val.number] = msg_class
                                 elif val.name == ENUM_VERSION_NAME:
                                     # Eventually this will implement versioning...
@@ -166,11 +169,57 @@ def get_gpb_class_from_type_id(typeid):
     @throws ObjectUtilException
     """
     try:
-        return gpb_id_to_class[typeid.object_id]
+        if isinstance(typeid, int):
+            return gpb_id_to_class[typeid]
+        else:
+            return gpb_id_to_class[typeid.object_id]
     except AttributeError, ex:
         raise ObjectUtilException('The type argument is not a valid type identifier object: "%s, type: %s "' % (str(typeid), type(typeid)))
     except KeyError, ex:
         raise ObjectUtilException('No Protocol Buffer Message class found for id "%s"' % (str(typeid)))
+
+type_name_cache = None
+def find_type_ids(query):
+    """
+    Fuzzy search for a GPB-defined type with the given text in the name.
+    Assumes that build_gpb_lookup() was called on package init.
+    """
+    import difflib
+
+    global type_name_cache
+    if type_name_cache is None:
+        type_name_cache = dict((cls.__name__.lower(), cls) for cls in gpb_id_to_class.itervalues())
+
+    matches = difflib.get_close_matches(query.lower(), type_name_cache.iterkeys(), cutoff=0.5)
+    clses = (type_name_cache[match] for match in matches)
+    return dict((cls._ID, cls) for cls in clses)
+
+def open_proto(typeid):
+    """ Developer utility to open either the .proto if found, or the generated .py, for a GPB typeid. """
+
+    def launch(path):
+        import platform
+
+        if platform.system() == 'Windows':
+            os.system('notepad %s' % path)
+        else:
+            os.system('open -t %s' % path)
+
+
+    gpb_root = os.path.join('..', 'ion-object-definitions', 'net')
+    cls = get_gpb_class_from_type_id(typeid)
+    proto_pieces = cls.__module__.split('.')[1:]
+    filename = proto_pieces.pop()
+    proto = '%s.proto' % (filename.replace('_pb2', ''))
+    proto_dir = os.sep.join(proto_pieces)
+    proto_path = os.path.join(gpb_root, proto_dir, proto)
+    if os.path.exists(proto_path):
+        launch(proto_path)
+    else:
+        py_dir = __import__(cls.__module__).__path__[0]
+        py_file = '%s.py' % (filename)
+        py_path = os.path.join(py_dir, proto_dir, py_file)
+        launch(py_path)
 
 # Build the lookup table on first import
 build_gpb_lookup('net')

@@ -58,6 +58,7 @@ class HelloTest(IonTestCase):
         delta_t = (time.time() - tzero)
         print('%f elapsed, %f per second' % (delta_t, float(count) / delta_t) )
 
+    @itv(CONF)
     @defer.inlineCallbacks
     def test_hello(self):
         services = [
