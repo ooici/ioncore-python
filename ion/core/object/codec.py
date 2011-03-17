@@ -194,7 +194,7 @@ def unpack_structure(serialized_container):
 
 
     # Now load the rest of the linked objects - down to the leaf nodes.
-    repo._load_links(root_obj)
+    repo.load_links(root_obj)
 
     log.debug('unpack_structure: returning root_obj:'+str(root_obj))
 

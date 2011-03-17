@@ -221,6 +221,10 @@ class Repository(object):
         The upstream source of this repository. 
         """
 
+        self._process=None
+        """
+        Need for access to sending messages!
+        """
 
         if not isinstance(persistent, bool):
             raise RepositoryError('Invalid argument type to set the persistent property of a repository')
@@ -334,7 +338,6 @@ class Repository(object):
         self._dotgit.Invalidate()
 
         self._workspace = None
-        self._workspace = None
         self.index_hash = None
         self._commit_index = None
         self._current_branch = None
@@ -342,6 +345,7 @@ class Repository(object):
         self._merge_from = None
         self._stash = None
         self._upstream = None
+        self._process = None
 
 
 
@@ -478,7 +482,7 @@ class Repository(object):
         Specify a branch, a branch and commit_id or a date
         Branch can be either a local nick name or a global branch key
         """
-        
+        log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s"' % (branchname, commit_id, older_than))
         if self.status == self.MODIFIED:
             raise RepositoryError('Can not checkout while the workspace is dirty')
             #What to do for uninitialized? 
@@ -607,13 +611,12 @@ class Repository(object):
             
         # Automatically fetch the object from the hashed dictionary
 
-        #print cref
-
         rootobj = yield self.get_remote_linked_object(cref.GetLink('objectroot'))
         self._workspace_root = rootobj
         
-        yield self._load_remote_links(rootobj)
-        
+        yield self.load_remote_links(rootobj)
+        # @TODO figure out if there is any point to checking the value of the result?
+
         
         self._detached_head = detached
         
@@ -625,9 +628,10 @@ class Repository(object):
             self._current_branch.branchkey = 'detached head'
             
             rootobj.SetStructureReadOnly()
-            
+
+        log.debug('Checkout Complete!')
         defer.returnValue(rootobj)
-        return
+
         
         
     def merge_by_date(self, branch):
@@ -703,7 +707,7 @@ class Repository(object):
         rootobj = cref.objectroot
         self._workspace_root = rootobj
         
-        self._load_links(rootobj)
+        self.load_links(rootobj)
                 
         return rootobj
         
@@ -860,7 +864,7 @@ class Repository(object):
             merge_root = rootobj
             merge_root.ReadOnly = True
             # The child objects inherit there ReadOnly setting from the root
-            yield self._load_remote_links(rootobj)
+            yield self.load_remote_links(rootobj)
             
             self._merge_root.append(merge_root)
         
@@ -1040,56 +1044,63 @@ class Repository(object):
          
     @defer.inlineCallbacks
     def _fetch_remote_objects(self, links):
-    
-        if not self._workbench:
-                raise RepositoryError('Object not found and not work bench is present!')
-                
-        proc = self._workbench._process
-        # Check for Iprocess once defined outside process module?
-        if not proc:
-            raise RepositoryError('Linked Obect not found and work bench has no process to get it with!')
+
+        if not self._process:
+            raise RepositoryError('Linked Object not found and repository has no process to get it with!')
             
-        if hasattr(proc, 'fetch_linked_objects'):
+        if hasattr(self._process, 'fetch_links'):
             # Get the method from the process if it overrides workbench
-            fetch_linked_objects = proc.fetch_linked_objects
+            fetch_links = self._process.fetch_links
         else:
-            fetch_linked_objects = self._workbench.fetch_linked_objects
+            fetch_links = self._process.workbench.fetch_links
+
+        #@TODO provide catch mechanism to use the service name instead of the process name if the process does not respond...
+        elements = yield fetch_links(self.upstream['process'], links)
+
+        for element in elements:
+            self.index_hash[element.key] = element
+
             
-        #@TODO provide catch mechanism to use the service name instead of the
-        # process name if the process does not respond...
-        result = yield fetch_linked_objects(self.upstream['process'], links)
-        
-        defer.returnValue(result)
             
-            
-    def _load_links(self, obj):
+    def load_links(self, obj):
         """
-        Load the child objects into the work space
+        Load the child objects into the work space recursively
         """
         for link in obj.ChildLinks:
             child = self.get_linked_object(link)  
-            self._load_links(child)
+            self.load_links(child)
             
 
     @defer.inlineCallbacks
-    def _load_remote_links(self, obj):
+    def load_remote_links(self, items):
         """
         Load links which may require remote (deferred) access
         """
+        if not hasattr(items, '__iter__'):
+            items = [items,]
+
         remote_objects = []
-        for link in obj.ChildLinks:
-            try:
-                child = self.get_linked_object(link)
-                yield self._load_remote_links(child)
-            except KeyError, ex:
-                log.info('"_load_remote_links": Caught object not found:'+str(ex))
-                remote_objects.append(link)
-            
+        local_objects = []
+        for item in items:
+            for link in item.ChildLinks:
+                try:
+                    child = self.get_linked_object(link)
+                    local_objects.append(child)
+                except KeyError, ex:
+                    log.info('"load_remote_links": Caught object not found:'+str(ex))
+                    remote_objects.append(link)
             
         if remote_objects:
             res = yield self._fetch_remote_objects(remote_objects)
-            res = yield self._load_remote_links(obj)
-        defer.returnValue(True)
+            local_objects.append(link.Root)
+            # Rerun Load_remote_links after getting the child objects
+
+        if len(local_objects) >0:
+            res = yield self.load_remote_links(local_objects)
+        else:
+            res = True
+
+        defer.returnValue(res)
             
     def _load_element(self, element):
         

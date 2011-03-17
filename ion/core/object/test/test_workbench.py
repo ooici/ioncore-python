@@ -193,7 +193,7 @@ class WorkBenchProcess(Process):
 
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
-        self.op_fetch_objects = self.workbench.op_fetch_objects
+        self.op_fetch_blobs = self.workbench.op_fetch_blobs
 
 
 
@@ -248,7 +248,7 @@ class WorkBenchProcessTest(IonTestCase):
 
         ab.title = 'an addressbook'
 
-        repo.commit('Made it - few!')
+        self.cref1 = repo.commit('Made it - few!')
 
         self.proc1 = workbench_process1
         self.proc2 = workbench_process2
@@ -300,6 +300,41 @@ class WorkBenchProcessTest(IonTestCase):
 
         self.assertNotIn(old_key, repo2.index_hash.keys())
 
+
+    @defer.inlineCallbacks
+    def test_pull_latest_checkout(self):
+
+        # Get the current head object key - it will not be sent in the pull
+        old_key = self.repo1.root_object.MyId
+
+        # update and commit an new head object
+        self.repo1.root_object.title = 'New Addressbook'
+        self.repo1.commit('An updated addressbook')
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key, get_head_content=False)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+        self.assertNotIn(old_key, repo2.index_hash.keys())
+
+
+        # Now check out the old version
+        yield repo2.checkout(branchname = 'master',commit_id=self.cref1)
+        yield self.repo1.checkout(branchname = 'master',commit_id=self.cref1)
+
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+        self.assertIn(old_key, repo2.index_hash.keys())
 
     @defer.inlineCallbacks
     def test_pull_twice(self):
@@ -354,7 +389,7 @@ class WorkBenchProcessTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_pull_diverge(self):
+    def test_pull_update(self):
 
         log.info('Pulling from: %s' % str(self.proc1.id.full))
         yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
@@ -398,7 +433,8 @@ class WorkBenchProcessTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_push(self):
+    def test_push_two(self):
+
 
         # update and commit an new head object
         self.repo1.root_object.title = 'New Addressbook'
@@ -415,6 +451,43 @@ class WorkBenchProcessTest(IonTestCase):
         self.assertEqual(self.repo1.commit_head, repo2.commit_head)
         self.assertEqual(self.repo1.root_object, repo2.root_object)
 
+
+        yield repo2.checkout(branchname = 'master',commit_id=self.cref1)
+        yield self.repo1.checkout(branchname = 'master',commit_id=self.cref1)
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+    @defer.inlineCallbacks
+    def test_push_update(self):
+
+
+        log.info('Pushing tpo: %s' % str(self.proc2.id.full))
+        yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+        # update and commit an new head object
+        self.repo1.root_object.title = 'New Addressbook'
+        self.repo1.commit('An updated addressbook')
+
+        log.info('Pushing tpo: %s' % str(self.proc2.id.full))
+        yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
 
 
 class WorkBenchMergeTest(unittest.TestCase):

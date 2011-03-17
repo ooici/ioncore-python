@@ -78,7 +78,6 @@ class WorkBench(object):
         A cache - shared between repositories for hashed objects
         """  
         self._workbench_cache = weakref.WeakValueDictionary()
-        #self._workbench_cache = {}
 
         #@TODO Consider using an index store in the Workbench to keep a cache of associations and keep track of objects
 
@@ -109,6 +108,7 @@ class WorkBench(object):
             repo._workspace_root = rootobj
         
         elif root_type is not None:
+            # Hard to test for either nothing or a GPBTYPE - this works pretty well
             raise WorkBenchError('Invalid root type argument passed in create_repository')
         
 
@@ -226,6 +226,7 @@ class WorkBench(object):
         
         self._repos[repo.repository_key] = repo
         repo.index_hash.cache = self._workbench_cache
+        repo._process = self._process
        
     def reference_repository(self, repo_key, current_state=False):
 
@@ -593,7 +594,7 @@ class WorkBench(object):
                 blobs_request.blob_keys.extend(need_keys)
 
                 try:
-                    blobs_msg = yield self.fetch_objects(headers.get('reply-to'), blobs_request)
+                    blobs_msg = yield self.fetch_blobs(headers.get('reply-to'), blobs_request)
                 except ReceivedError, re:
 
                    log.debug('ReceivedError', str(re))
@@ -625,28 +626,50 @@ class WorkBench(object):
         log.info('op_push: Complete!')
 
 
-
     @defer.inlineCallbacks
-    def fetch_objects(self, address, request):
+    def fetch_links(self, address, links):
         """
         Fetch the linked objects from another service
         Similar to the client pattern but must specify address!
 
         """
-        objs, headers, msg = yield self._process.rpc_send(address,'fetch_objects', request)
+        blobs_request = yield self._process.message_client.create_instance(BLOBS_REQUSET_MESSAGE_TYPE)
+
+        for link in links:
+            assert link.ObjectType == LINK_TYPE, 'Invalid link in list passed to Fetch Links!'
+            blobs_request.blob_keys.append(link.key)
+
+
+        blobs_msg, headers, msg = yield self._process.rpc_send(address,'fetch_blobs', blobs_request)
+
+        elements = []
+        for se in blobs_msg.blob_elements:
+            # Put the new objects in the repository
+            element = gpb_wrapper.StructureElement(se.GPBMessage)
+            elements.append(element)
+
+        defer.returnValue(elements)
+
+    @defer.inlineCallbacks
+    def fetch_blobs(self, address, request):
+        """
+        Fetch the objects by key from another service
+        Similar to the client pattern but must specify address!
+
+        """
+        objs, headers, msg = yield self._process.rpc_send(address,'fetch_blobs', request)
 
         defer.returnValue(objs)
 
 
     @defer.inlineCallbacks
-    def op_fetch_objects(self, request, headers, message):
+    def op_fetch_blobs(self, request, headers, message):
         """
         Send the object back to a requester if you have it!
-
         @TODO Update to new message pattern!
-
+        
         """
-        log.info('op_fetch_linked_objects')
+        log.info('op_fetch_blobs')
 
         if not hasattr(request, 'MessageType') or request.MessageType != BLOBS_REQUSET_MESSAGE_TYPE:
             raise WorkBenchError('Invalid fetch objects request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
@@ -665,7 +688,7 @@ class WorkBench(object):
 
         yield self._process.reply_ok(message, response)
 
-        log.info('op_fetch_linked_objects: Complete!')
+        log.info('op_fetch_blobs: Complete!')
 
 
         
