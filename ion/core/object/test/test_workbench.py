@@ -385,7 +385,26 @@ class WorkBenchProcessTest(IonTestCase):
     @defer.inlineCallbacks
     def test_push(self):
 
-        log.info('Pushing tp: %s' % str(self.proc2.id.full))
+        log.info('Pushing to: %s' % str(self.proc2.id.full))
+        yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+    @defer.inlineCallbacks
+    def test_push(self):
+
+        # update and commit an new head object
+        self.repo1.root_object.title = 'New Addressbook'
+        self.repo1.commit('An updated addressbook')
+
+        log.info('Pushing tpo: %s' % str(self.proc2.id.full))
         yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
 
         # use the value - the key of the first to get it from the workbench on the 2nd
