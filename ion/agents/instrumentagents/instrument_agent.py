@@ -224,7 +224,7 @@ ci_param_metadata = {
         {'META_DATATYPE':'CI_PUBSUB_TOPIC_DICT',
          'META_LAST_CHANGE_TIMESTAMP':(0,0),
          'META_FRIENDLY_NAME':'State Topics'},
-    'CI_PARAMS_DRIVER_ADDRESS' :
+    'CI_PARAM_DRIVER_ADDRESS' :
         {'META_DATATYPE':'CI_TYPE_ADDRESS',
          'META_LAST_CHANGE_TIMESTAMP':(0,0),
          'META_FRIENDLY_NAME':'Driver Address'},
@@ -299,6 +299,7 @@ errors = {
     'INVALID_PARAMETER'         : ['ERROR','INVALID_PARAMETER','The parameter is not available.'],
     'INVALID_PARAM_VALUE'       : ['ERROR','INVALID_PARAM_VALUE','The parameter value is out of range.'],
     'INVALID_METADATA'          : ['ERROR','INVALID_METADATA','The metadata parameter is not available.'],
+    'NO_PARAM_METADATA'         : ['ERROR','NO_PARAM_METADATA','The parameter has no associated metadata.'],
     'INVALID_STATUS'            : ['ERROR','INVALID_STATUS','The status parameter is not available.'],
     'INVALID_CAPABILITY'        : ['ERROR','INVALID_CAPABILITY','The capability parameter is not available.']
 }
@@ -1085,9 +1086,9 @@ class InstrumentAgent(ResourceAgent):
         """
         Retrieve metadata about the observatory configuration parameters.
         @param content A dict
-            {'params':[(param_arg,meta_arg),...,param_arg,meta_arg)],'transaction_id':transaction_id}
-        @retval A reply message with a dict {'success':success,'result':{(param_arg,meta_arg):(success,val),...,
-            param_arg,meta_arg):(success,val)},'transaction_id':transaction_id}.
+            {'params':[(param_arg,meta_arg),...,(param_arg,meta_arg)],'transaction_id':transaction_id}
+        @retval A reply message with a dict {'success':success,'result':{param_arg:{meta_arg):(success,val),...,
+            meta_arg:(success,val)},...param_arg:{meta_arg:(success,val),...,meta_arg:(success,val)}},'transaction_id':transaction_id}.
         """
         
         assert(isinstance(content,dict)), 'Expected a dict content.'
@@ -1126,43 +1127,78 @@ class InstrumentAgent(ResourceAgent):
         get_errors = False
         result = {}
         
+
+                
+                                
         # Do the work here.
         # Set up the result message.
         for (param_arg,meta_arg) in params:
-            if not param_arg in ci_params_list or param_arg != 'all':
-                get_errors = True
-                result[(param_arg,meta_arg)] = (errors['INVALID_PARAMETER'],None)
-                get_errors = True
-                continue
-            if not meta_arg in metadata_list or meta_arg != 'all':
-                result[(param_arg,meta_arg)] = (errors['INVALID_METADATA'],None)
-                get_errors = True
-                continue
+            
             
             if param_arg == 'all' and meta_arg == 'all':
-                for param_key in ci_metadata.keys():
-                    for meta_key in ci_metadata[param_key]:
-                        result[(param_key,meta_key)] = ci_metadata[param_key][meta_key]
-            elif param_arg == 'all' and meta_arg != 'all':
-                for param_key in ci_parameter_list.keys():
-                    try:
-                        val = ci_metadata[param_key][meta_arg]
-                    except:
-                        result[(param_key,meta_arg)] = (errors['INVALID_METADATA'],None)
+                for param_key in ci_param_list:
+                    if not result.has_key(param_key):
+                        result[param_key] = {}
+                    if param_key not in ci_param_metadata.keys():
+                        result[param_key].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
+                        get_errors = True
                     else:
-                        result[(param_key,meta_arg)] = (['OK'],val)
-                        
+                        for meta_key in ci_param_metadata[param_key]:
+                            val = ci_param_metadata[param_key][meta_key]
+                            result[param_key].update({meta_key:(['OK'],val)})
+                                                            
+            
+            elif param_arg == 'all' and meta_arg != 'all':
+                for param_key in ci_param_list:
+                    if not result.has_key(param_key):
+                        result[param_key] = {}
+                    if param_key not in ci_param_metadata.keys():
+                        result[param_key].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
+                        get_errors = True
+                    elif meta_arg not in metadata_list:
+                        result[param_key].update({meta_arg:(errors['INVALID_METADATA'],None)})
+                        get_errors = True
+                    else:
+                        try:
+                            val = ci_param_metadata[param_key][meta_arg]
+                        except:
+                            result[param_key].update({meta_arg:(errors['INVALID_METADATA'],None)})
+                            get_errors = True
+                        else:
+                            result[param_key].update({meta_arg:(['OK'],val)})
+                            
+                                        
             elif param_arg != 'all' and meta_arg == 'all':
-                for meta_key in ci_metadata[param_arg].keys():
-                    result[(param_arg,meta_arg)] = ci_metadata[param_arg][meta_arg]
-            else:
-                try:
-                    val = ci_metadata[param_arg][meta_arg]
-                except:
-                    result[(param_arg,meta_arg)] = (errors['INVALID_METADATA'],None)
+                if not result.has_key(param_arg):
+                    result[param_arg] = {}
+                if param_arg not in ci_param_list:
+                    result[param_arg].update({meta_arg:(errors['INVALID_PARAMETER'],None)})
+                    get_errors = True
+                elif param_arg not in ci_param_metadata.keys():
+                    result[param_arg].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
+                    get_errors = True
                 else:
-                    result[(param_arg,meta_arg)] = (['OK'],val)
-                        
+                    for meta_key in ci_param_metadata[param_arg].keys():
+                        val = ci_param_metadata[param_arg][meta_key]
+                        result[param_arg].update({meta_key:(['OK'],val)})
+                
+            else:
+                if not result.has_key(param_arg):
+                    result[param_arg] = {}
+                if param_arg not in ci_param_list:
+                    result[param_arg].update({meta_arg:(errors['INVALID_PARAMETER'],None)})
+                    get_errors = True
+                elif param_arg not in ci_param_metadata.keys():
+                    result[param_arg].update({meta_arg:(errors['NO_PARAM_METADATA'],None)})
+                    get_errors = True
+                else:
+                    try:
+                        val = ci_param_metadata[param_arg][meta_arg]
+                    except:
+                        result[param_arg].update({meta_arg:(errors['INVALID_METADATA'],None)})    
+                    else:
+                        result[param_arg].update({meta_arg:(['OK'],val)})
+        
         
         if get_errors:
             success = errors['GET_OBSERVATORY_ERR']
@@ -1346,7 +1382,7 @@ class InstrumentAgent(ResourceAgent):
                 result['CAP_OBSERVATORY_STATUSES'] = (['OK'],ci_status_list)
                 
             elif arg == 'CAP_METADATA' or arg == 'all':
-                result['CAP_METADATA'] = (['OK'],ci_metadata_list)
+                result['CAP_METADATA'] = (['OK'],metadata_list)
                 
             elif arg == 'CAP_DEVICE_COMMANDS' or arg == 'all':
                 dvr_content = {'params':'CAP_DEVICE_COMMANDS'}
@@ -1941,8 +1977,9 @@ class InstrumentAgentClient(ResourceAgentClient):
         Retrieve metadata about the observatory configuration parameters.
         @param params A metadata parameter list [(param_arg,meta_arg),...,(param_arg,meta_arg)].
         @param transaction_id A transaction ID uuid4 or string 'create,' 'none.'                
-        @retval A reply dict {'success':success,'result':{(param_arg,meta_arg):(success,val),...,
-            param_arg,meta_arg):(success,val)},'transaction_id':transaction_id}.        
+        @retval A reply dict {'success':success,'result':{param_arg:{meta_arg):(success,val),...,
+            meta_arg:(success,val)},...param_arg:{meta_arg:(success,val),...,meta_arg:(success,val)}},
+            'transaction_id':transaction_id}.
         """
         assert(isinstance(params,list)), 'Expected a parameter list.'
         assert(isinstance(transaction_id,str)), 'Expected a transaction_id str.'
