@@ -107,7 +107,8 @@ class AppIntegrationTest(IonTestCase):
 
         log.debug('DHE: Calling findDataResources!!...')
         outcome1 = yield self.aisc.findDataResources(reqMsg)
-        log.debug('DHE: findDataResources returned:\n'+str(outcome1))
+        #log.debug('DHE: findDataResources returned:\n'+str(outcome1))
+        log.debug('DHE: findDataResources returned:\n'+str(outcome1.message_parameters_reference[0].data_resource_id[0]))
 
     @defer.inlineCallbacks
     def test_getDataResourceDetail(self):
