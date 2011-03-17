@@ -45,6 +45,20 @@ COMMIT_TYPE = object_utils.create_type_identifier(object_id=8, version=1)
 PULL_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=46, version=1)
 PULL_RESPONSE_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=47, version=1)
 
+
+
+PUSH_MESSAGE_TYPE  = object_utils.create_type_identifier(object_id=41, version=1)
+#REPOSITORY_STATE_TYPE= object_utils.create_type_identifier(object_id=42, version=1)
+#PUSH_CONTENT_REQUEST_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=43, version=1)
+#HASHED_CONTENT_KEYS = object_utils.create_type_identifier(object_id=44, version=1)
+#REQUESTED_PUSH_CONTENT_MESSAGE = object_utils.create_type_identifier(object_id=45, version=1)
+#PUSHCONTENTELEMENTS = object_utils.create_type_identifier(object_id=53, version=1)
+
+BLOBS_REQUSET_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=51, version=1)
+BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=52, version=1)
+
+
+
 class WorkBenchError(ApplicationError):
     """
     An exception class for errors that occur in the Object WorkBench class
@@ -289,20 +303,19 @@ class WorkBench(object):
 
 
         # Add any new content to the repository:
-        for bytes in result.commit_elements:
+        for se in result.commit_elements:
             # Move over new commits
-            element = gpb_wrapper.StructureElement.parse_structure_element(bytes)
+            element = gpb_wrapper.StructureElement(se.GPBMessage)
 
             repo.index_hash[element.key] = element
 
-        for bytes in result.blob_elements:
+        for se in result.blob_elements:
             # Move over any blobs
-            element = gpb_wrapper.StructureElement.parse_structure_element(bytes)
+            element = gpb_wrapper.StructureElement(se.GPBMessage)
             repo.index_hash[element.key] = element
 
         # Move over the new head object
-        bytes = result.repo_head_element
-        head_element = gpb_wrapper.StructureElement.parse_structure_element(bytes)
+        head_element = gpb_wrapper.StructureElement(result.repo_head_element.GPBMessage)
         new_head = repo._load_element(head_element)
         new_head.Modified = True
         new_head.MyId = repo.new_id()
@@ -350,14 +363,19 @@ class WorkBench(object):
 
 
         head_element = self.serialize_mutable(repo._dotgit)
-        response.repo_head_element = head_element.serialize()
+        # Pull out the structure element and use it as the linked object in the message.
+        obj = response.Repository._wrap_message_object(head_element._element)
+
+        response.repo_head_element = obj
 
 
         for commit_key in puller_needs:
             commit_element = repo.index_hash.get(commit_key)
             if commit_element is None:
                 raise WorkBenchError('Repository commit object not found in op_pull', request.ResponseCodes.NOT_FOUND)
-            response.commit_elements.append(commit_element.serialize())
+            link = response.commit_elements.add()
+            obj = response.Repository._wrap_message_object(commit_element._element)
+            link.SetLink(obj)
 
 
         if request.get_head_content:
@@ -385,7 +403,10 @@ class WorkBench(object):
                     new_elements = children
 
             for element in blobs:
-                response.blob_elements.append(element.serialize())
+                link = response.blob_elements.add()
+                obj = response.Repository._wrap_message_object(element._element)
+
+                link.SetLink(obj)
 
         yield self._process.reply_ok(msg, content=response)
 
@@ -459,61 +480,143 @@ class WorkBench(object):
 
 
 
+    @defer.inlineCallbacks
+    def push_by_name(self, origin, name_or_names):
+
+        if hasattr(name_or_names, '__iter__'):
+
+            repo_or_repos = []
+            for name in name_or_names:
+                repo = self.get_repository(name)
+                if not repo:
+                    raise KeyError('Repository name %s not found in work bench to push!' % name)
+
+                repo_or_repos.append(repo)
+
+        else:
+            name = name_or_names
+            repo_or_repos = self.get_repository(name)
+            if not repo_or_repos:
+                raise KeyError('Repository name %s not found in work bench to push!' % name)
+
+        yield self.push(origin, repo_or_repos)
+
+
+
 
     @defer.inlineCallbacks
-    def push(self, origin, name_or_names):
+    def push(self, origin, repo_or_repos):
         """
         Push the current state of the repository.
         When the operation is complete - the transfer of all objects in the
         repository is complete.
         """
         targetname = self._process.get_scoped_name('system', origin)
-        
-        if hasattr(name_or_names, '__iter__'):
-            
-            repo_or_repos = []
-            for name in name_or_names:
-                repo = self.get_repository(name)
-                if not repo:
-                    raise KeyError('Repository name %s not found in work bench to push!' % name)
-                    
-                repo_or_repos.append(repo)
-                
-        else:
-            name = name_or_names
-            repo_or_repos = self.get_repository(name)
-            if not repo_or_repos:
-                    raise KeyError('Repository name %s not found in work bench to push!' % name)
 
-    
-        #print 'PUSH TARGET: ',targetname
+        # Make a list of the repositories to push if it is not already one
+        repos = repo_or_repos
+        if not hasattr(repo_or_repos, '__iter__'):
+            repos = [repo_or_repos,]
+
+
+        # Create push message
+        pushmsg = yield self._process.message_client.create_instance(PUSH_MESSAGE_TYPE)
+
+        #Iterate the list and build the message to send
+        for repo in repos:
+            repostate = pushmsg.repositories.add()
+
+            repostate.repository_key = repo.repository_key
+            # Set the head element
+            head_element = self.serialize_mutable(repo._dotgit)
+            # Pull out the structure element and use it as the linked object in the message.
+            obj = repo._wrap_message_object(head_element._element)
+            repostate.repo_head_element = obj
+
+            repostate.blob_keys.extend(self.list_repository_blobs(repo))
+
         try:
-            content, headers, msg = yield self._process.rpc_send(targetname,'push', repo_or_repos)
+            result, headers, msg = yield self._process.rpc_send(targetname,'push', pushmsg)
+
+            # @TODO Return more info about the result - detect divergence?
         except ReceivedError, re:
             
             log.debug('ReceivedError', str(re))
             raise WorkBenchError('Push returned an exception! "%s"' % re.msg_content)
-            
-        defer.returnValue(content)
+
+
+        # @TODO - check results?
 
         
     @defer.inlineCallbacks
-    def op_push(self, heads, headers, msg):
+    def op_push(self, pushmsg, headers, msg):
         """
         The Operation which responds to a push.
         
         Operation does not complete until transfer is complete!
         """
-        log.info('op_push: received content: %s' % heads)
-                
-        #@TODO Add try catch and return value to this method!
-                
-        for head in heads:
-            repo = self._load_repo_from_mutable(head)
-                
-            yield self._fetch_repo_objects(repo, headers.get('reply-to'))
+        log.info('op_push!')
+
+        if not hasattr(pushmsg, 'MessageType') or pushmsg.MessageType != PUSH_MESSAGE_TYPE:
+            raise WorkBenchError('Invalid push request. Bad Message Type!', pushmsg.ResponseCodes.BAD_REQUEST)
+
+        for repostate in pushmsg.repositories:
+
+            repo = self.get_repository(repostate.repository_key)
+            if repo is None:
+                #if it does not exist make a new one
+                repo = repository.Repository(repository_key=repostate.repository_key)
+                self.put_repository(repo)
+                repo_keys=set()
+            else:
+
+                if repo.status != repo.UPTODATE:
+                    raise WorkBenchError('Requested push to a repository is in an invalid state.', request.ResponseCodes.BAD_REQUEST)
+                repo_keys = set(self.list_repository_blobs(repo))
+
+            # Get the set of keys in repostate that are not in repo_keys
+            need_keys = set(repostate.blob_keys).difference(repo_keys)
+
+            workbench_keys = set(self._workbench_cache.keys())
+
+            local_keys = workbench_keys.intersection(need_keys)
+
+            for key in local_keys:
+                try:
+                    repo.index_hash.get(key)
+                    need_keys.remove(key)
+                except KeyError, ke:
+                    log.info('Key disappeared - get it from the remote after all')
+                    
+            if len(need_keys) > 0:
+                blobs_request = yield self._process.message_client.create_instance(BLOBS_REQUSET_MESSAGE_TYPE)
+                blobs_request.blob_keys.extend(need_keys)
+
+                try:
+                    blobs_msg = yield self.fetch_objects(headers.get('reply-to'), blobs_request)
+                except ReceivedError, re:
+
+                   log.debug('ReceivedError', str(re))
+                   raise WorkBenchError('Fetch Objects returned an exception! "%s"' % re.msg_content)
+
+
+                for se in blobs_msg.blob_elements:
+                    # Put the new objects in the repository
+                    element = gpb_wrapper.StructureElement(se.GPBMessage)
+                    repo.index_hash[element.key] = element
+
+
+            # Move over the new head object
+            head_element = gpb_wrapper.StructureElement(repostate.repo_head_element.GPBMessage)
+            new_head = repo._load_element(head_element)
+            new_head.Modified = True
+            new_head.MyId = repo.new_id()
+
+            # Now merge the state!
+            self._update_repo_to_head(repo,new_head)
             
-            
+
+
         response = yield self._process.message_client.create_instance(MessageContentTypeID=None)
         response.MessageResponseCode = response.ResponseCodes.OK            
             
@@ -521,7 +624,52 @@ class WorkBench(object):
         yield self._process.reply_ok(msg, response)
         log.info('op_push: Complete!')
 
+
+
+    @defer.inlineCallbacks
+    def fetch_objects(self, address, request):
+        """
+        Fetch the linked objects from another service
+        Similar to the client pattern but must specify address!
+
+        """
+        objs, headers, msg = yield self._process.rpc_send(address,'fetch_objects', request)
+
+        defer.returnValue(objs)
+
+
+    @defer.inlineCallbacks
+    def op_fetch_objects(self, request, headers, message):
+        """
+        Send the object back to a requester if you have it!
+
+        @TODO Update to new message pattern!
+
+        """
+        log.info('op_fetch_linked_objects')
+
+        if not hasattr(request, 'MessageType') or request.MessageType != BLOBS_REQUSET_MESSAGE_TYPE:
+            raise WorkBenchError('Invalid fetch objects request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+
+        response = yield self._process.message_client.create_instance(BLOBS_MESSAGE_TYPE)
+
+        for key in request.blob_keys:
+            element = self._workbench_cache.get(key)
+            if element is None:
+                raise WorkBenchError('Invalid fetch objects request. Key Not Found!', request.ResponseCodes.NOT_FOUND)
+
+            link = response.blob_elements.add()
+            obj = response.Repository._wrap_message_object(element._element)
+
+            link.SetLink(obj)
+
+        yield self._process.reply_ok(message, response)
+
+        log.info('op_fetch_linked_objects: Complete!')
+
+
         
+    '''
     @defer.inlineCallbacks
     def _fetch_repo_objects(self, repo, origin):
         """
@@ -584,7 +732,9 @@ class WorkBench(object):
                             new_links.add(child_link)
             
             objs_to_get = new_links
-    
+    '''
+
+    '''
     @defer.inlineCallbacks
     def fetch_linked_objects(self, address, links):
         """
@@ -658,7 +808,7 @@ class WorkBench(object):
         
         yield self._process.reply(message,content=cs)
         log.info('op_fetch_linked_objects: Complete!')
-        
+        '''
 
         
         
@@ -669,6 +819,7 @@ class WorkBench(object):
         """
 
         if not repo.status == repo.UPTODATE:
+            log.warn('Automatic commit called during pull. Commit should be called first!')
             comment='Commiting to send message with wrapper object'
             repo.commit(comment=comment)
 
@@ -698,6 +849,24 @@ class WorkBench(object):
         key_list = []
         key_list.extend(key_set)
         return key_list
+
+    def list_repository_blobs(self, repo):
+        """
+        This method creates a list of all the blobs that exist in a repository
+        The return value is a list of binary SHA1 keys
+
+        The method is a bit trivial - candidate for removal!
+        """
+
+        if not repo.status == repo.UPTODATE:
+            log.warn('Automatic commit called during push. Commit should be called first!')
+            comment='Commiting to push repo.'
+            repo.commit(comment=comment)
+
+
+        return repo.index_hash.keys()
+
+
 
 
     def _update_repo_to_head(self, repo, head):
@@ -749,60 +918,92 @@ class WorkBench(object):
                     bref = branch.commitrefs.add()
                     bref.SetLink(cref)
 
-        log.debug('_merge_repo_heads: returning merged repository:\n'+str(existing_repo))
-        return existing_repo
+        log.debug('_merge_repo_heads: merge repository complete')
 
 
-
-
-
-    '''
-    def _load_repo_from_mutable(self,head):
+    def _resolve_branch_state(self, existing_branch, new_branch):
         """
-        Load a repository from a mutable - helper for push and pull - methods
-        that send and receive an entire repo.
-        head is a raw (unwrapped) gpb message
+        Move everything in new into an updated existing!
         """
-        log.debug('_load_repo_from_mutable: Loading a repository!')
-        new_repo = repository.Repository(head=head)
-                
-        new_repo._workbench = self
-            
-        new_repo.index_hash.cache = self._workbench_cache
-        
-        
-        # Load all of the commit refs that came with this head.
-        
-        for branch in new_repo.branches:
+        log.debug('_resolve_branch_state: resolving branch state in repository heads!')
+        for new_link in new_branch.commitrefs.GetLinks():
 
-            # Check for merge on read condition!            
-            for link in branch.commitrefs.GetLinks():
-                self._load_commits(new_repo,link)
-            
-            
-        # Check and see if we already have one of these repositories
-        existing_repo = self.get_repository(new_repo.repository_key)
-        if existing_repo:
-            
-            # Merge the existing head with the new one.
-            repo = self._merge_repo_heads(existing_repo, new_repo)
-            
-        else:
-            repo = new_repo
-            
-        if not repo.branchnicknames.has_key('master'):
-            repo.branchnicknames['master']=repo.branches[0].branchkey
-        
-        self.put_repository(repo)
-        log.debug('_load_repo_from_mutable: returning repo:\n'+str(repo))
-        return repo
-    '''
-            
-    """
-    def _load_commits(self, repo, link):
+            # An indicator for a fast forward merge made on the existing branch
+            found = False
+            for existing_link in existing_branch.commitrefs.GetLinks():
+
+                # Get the repositories we are working from
+                repo = existing_branch.Repository
+
+                # test to see if we these are the same head ref!
+                if new_link == existing_link:
+                    # If these branches have the same state we are good - continue to the next new cref in the new branch.
+                    break
+
+                # Look in the commit index of the existing repo to see if the head of the received message is an old commit
+                # This works one way but not the other - it is a short cut!
+                elif repo._commit_index.has_key(new_link.key):
+                    # The branch in new_repo is out of date with what exists here.
+                    # We can completely ignore the new link!
+                    break
+
+                # Look in the commit index of the new repo to see if the existing link is an old commit in new repository
+                else:
+
+                    self._load_commits(new_link) # Load the new ancestors!
+                    existing_cref = repo.get_linked_object(existing_link)
+                    new_cref = repo.get_linked_object(new_link)
+
+                    if existing_cref.InParents(new_cref):
+
+                        # The existing repo can be fast forwarded to the new state!
+                        # But we must keep looking through the existing_links to see if the push merges our state!
+                        found = True
+                        existing_link.key = new_link.key # Cheat and just copy the key!
+
+                    # Anything state that is not caught by these three options is
+                    # resolved in the else of the for loop by adding this divergent
+                    # state to the existing (local) repositories branch
+
+            else:
+
+                # This is a non fastforward merge!
+                # The branch has diverged and must be reconciled!
+                if not found:
+                    bref = existing_branch.commitrefs.add()
+                    new_cref = new_repo._commit_index.get(new_link.key)
+                    bref.SetLink(new_cref)
+
+
+        key_set = set()
+        duplicates = []
+        # Merge any commit refs which have been resolved!
+        # If one branch has more than one apperent head but it is actually the same value - it is not a divergence
+        for i in range(len(existing_branch.commitrefs)):
+            ref_link = existing_branch.commitrefs.GetLink(i)
+            if ref_link.key in key_set:
+                duplicates.append(i)
+            else:
+                key_set.add(ref_link.key)
+
+        # Delete them in reverse order!
+        duplicates.sort(reverse= True)
+        for dup in duplicates:
+            del existing_branch.commitrefs[dup]
+
+        log.debug('_resolve_branch_state: resolved branch state in repository heads!')
+        # Note this in the branches merge on read field and punt this to some
+        # other part of the process.
+        return
+
+
+
+    def _load_commits(self, link):
                 
         log.debug('_load_commits: Loading all commits in the repository')
-        
+
+        repo = link.Repository
+
         try:
             cref = repo.get_linked_object(link)
         except repository.RepositoryError, ex:
@@ -816,10 +1017,9 @@ class WorkBench(object):
         for parent in cref.parentrefs:
             link = parent.GetLink('commitref')
             # Call this method recursively for each link
-            self._load_commits(repo, link)
+            self._load_commits(link)
         
         log.debug('_load_commits: Loaded all commits!')
-    """
 
 
     """
@@ -858,72 +1058,3 @@ class WorkBench(object):
         return existing_repo
     """
 
-    '''
-    def _resolve_branch_state(self, existing_branch, new_branch):
-        """
-        Move everything in new into an updated existing!
-        """
-        log.debug('_resolve_branch_state: resolving branch state in repository heads!')
-        for new_link in new_branch.commitrefs.GetLinks():
-            
-            # An indicator for a fast forward merge made on the existing branch
-            found = False
-            for existing_link in existing_branch.commitrefs.GetLinks():
-            
-                # Get the repositories we are working from
-                existing_repo = existing_branch.Repository
-                new_repo = new_branch.Repository
-            
-                # test to see if we these are the same head ref!
-                if new_link == existing_link:
-                    # If these branches have the same state we are good - continue to the next new cref in the new branch. 
-                    break
-                    
-                # Look in the commit index of the existing repo to see if the new link is an old commit to existing
-                elif existing_repo._commit_index.has_key(new_link.key):
-                    # The branch in new_repo is out of date with what exists here.
-                    # We can completely ignore the new link!
-                    break   
-                    
-                # Look in the commit index of the new repo to see if the existing link is an old commit in new repository 
-                elif new_repo._commit_index.has_key(existing_link.key):
-                    # The existing repo can be fast forwarded to the new state!
-                    # But we must keep looking through the existing_links to see if the push merges our state!
-                    found = True
-                    existing_link.key = new_link.key # Cheat and just copy the key!
-                    self._load_commits(existing_repo, new_link) # Load the new ancestors!
-                
-                # Anything state that is not caught by these three options is
-                # resolved in the else of the for loop by adding this divergent
-                # state to the existing (local) repositories branch
-                
-            else:
-                
-                # This is a non fastforward merge!  
-                # The branch has diverged and must be reconciled!
-                if not found:
-                    bref = existing_branch.commitrefs.add()
-                    new_cref = new_repo._commit_index.get(new_link.key)                    
-                    bref.SetLink(new_cref)
-                
-                
-        key_set = set()
-        duplicates = []
-        # Merge any commit refs which have been resolved!
-        for i in range(len(existing_branch.commitrefs)):
-            ref_link = existing_branch.commitrefs.GetLink(i)
-            if ref_link.key in key_set:
-                duplicates.append(i)
-            else:
-                key_set.add(ref_link.key)
-                
-        # Delete them in reverse order!
-        duplicates.sort(reverse= True)
-        for dup in duplicates:
-            del existing_branch.commitrefs[dup]
-            
-        log.debug('_resolve_branch_state: resolved branch state in repository heads!')
-        # Note this in the branches merge on read field and punt this to some
-        # other part of the process.
-        return
-    '''

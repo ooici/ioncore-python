@@ -192,6 +192,8 @@ class WorkBenchProcess(Process):
 
 
         self.op_pull = self.workbench.op_pull
+        self.op_push = self.workbench.op_push
+        self.op_fetch_objects = self.workbench.op_fetch_objects
 
 
 
@@ -256,6 +258,7 @@ class WorkBenchProcessTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        yield self._shutdown_processes()
         yield self._stop_container()
 
 
@@ -312,9 +315,6 @@ class WorkBenchProcessTest(IonTestCase):
         self.assertEqual(self.repo1.commit_head, repo2.commit_head)
         self.assertEqual(self.repo1.root_object, repo2.root_object)
 
-        print '========================================'
-        print '========================================'
-        print '========================================'
 
         yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
 
@@ -323,6 +323,78 @@ class WorkBenchProcessTest(IonTestCase):
         self.assertEqual(self.repo1.root_object, repo2.root_object)
 
 
+
+    @defer.inlineCallbacks
+    def test_pull_update(self):
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+        # update and commit an new head object
+        self.repo1.root_object.title = 'New Addressbook'
+        self.repo1.commit('An updated addressbook')
+
+
+        # Pull the repository again and watch the merge magic!
+        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        ab = yield repo2.checkout('master')
+
+        # Can't easily test that the messaging works properly - but make sure result is good
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+    @defer.inlineCallbacks
+    def test_pull_diverge(self):
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+        # update and commit an new head object
+        self.repo1.root_object.title = 'New Addressbook'
+        self.repo1.commit('An updated addressbook')
+
+
+        # Pull the repository again and watch the merge magic!
+        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        ab = yield repo2.checkout('master')
+
+        # Can't easily test that the messaging works properly - but make sure result is good
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+    @defer.inlineCallbacks
+    def test_push(self):
+
+        log.info('Pushing tp: %s' % str(self.proc2.id.full))
+        yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        ab = yield repo2.checkout('master')
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
 
 
 
