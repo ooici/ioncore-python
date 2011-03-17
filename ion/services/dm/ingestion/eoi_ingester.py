@@ -82,7 +82,7 @@ class EOIIngestionService(ServiceProcess):
 
         self._defer_ingest = defer.Deferred()       # waited on by op_ingest to signal end of ingestion
 
-        log.info('ResourceRegistryService.__init__()')
+        log.info('EOIIngestionService.__init__()')
 
     @defer.inlineCallbacks
     def op_ingest(self, content, headers, msg):
