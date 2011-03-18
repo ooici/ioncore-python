@@ -17,6 +17,15 @@ from ion.core.process.process import ProcessClient
 import ion.util.procutils as pu
 
 class TestOmsDriver(IonTestCase):
+    """
+    Tests from this class require a connection to the RSN OMS system. This may
+    require use of a VPN client that has been properly configured to access the
+    OMS software.
+    
+    This test case is also very much a basic prototype and tests should be
+    skipped until the software actually begins to do something useful.
+    """
+    
     @defer.inlineCallbacks
     def setUp(self):
         log.debug("Starting Setup...")
@@ -42,7 +51,7 @@ class TestOmsDriver(IonTestCase):
 
     @defer.inlineCallbacks
     def test_simple_call(self):
-        log.debug("***Testing call...%s", self.sup)
-        (content, headers, message) = yield self.proc_client.rpc_send('connect', "")
+        (content, headers, message) = yield self.proc_client.rpc_send('connect', ('Server', 'if1Speed'))
         log.debug("*** content: %s, message: %s", content, message)
-        self.assertTrue(False)
+        self.assertTrue(isinstance(content, dict))
+        self.assertTrue(len(content)>0)

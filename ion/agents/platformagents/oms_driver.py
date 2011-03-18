@@ -71,28 +71,41 @@ class OMSDriver(Process):
         list of devices. It uses a feature of deferreds which allows multiple
         callbacks methods to be called from the same deferred.
 
-        For this prototype the 'Server' device class is hard coded for the
-        query to ensure data is returned from the test OMS.
+        For this prototype the 'Server' device class is the only one understood
+        for the query to ensure data is returned from the test OMS.
         """
-        result = yield self._proxy.callRemote('getDeviceListByType', 'Server')
-        log.debug("connect result: %s", result)
-        yield self._make_single_connection(result)
+        assert(isinstance(content, (list, tuple)))
+        assert(isinstance(content[0], str)) # type of device
+        assert(isinstance(content[1], str)) # attribute name
+        
+        device_result = yield self._proxy.callRemote('getDeviceListByType', content[0])
+        log.debug("Device list result: %s", device_result)
+        attr_result = yield self._get_single_attribute(device_result, content[1])
+        yield self.reply_ok(msg, attr_result)
         
     @defer.inlineCallbacks
-    def _make_single_connection(self, devlist):
-        log.debug("***starting single connect")
+    def _get_single_attribute(self, devlist, attribute):
+        """
+        Make a connection to fetch a single attribute for the given list of
+        devices.
+        @param devlist A list of strings indicating devices
+            (ie ['1.2.3.4', '5.6.7.8']) to be queried for a given attribute.
+        @param attribute The attribute to query for
+        @retval A dictionary with server/attribute entities
+            ie {'10.180.80.202': '606', '10.180.80.201': '353'}
+        """
+        log.debug("Starting single connect, devlist: %s, attr: %s", devlist, attribute)
+        result = {}
         for dev in devlist:
-            result = yield self._proxy.callRemote('getDeviceAttribute', dev, 'if1Speed')
-            log.debug("single connect result: %s", result)
-        yield self._printValue(result)
+            log.debug("Asking for %s, %s", dev, attribute)
+            devresult = yield self._proxy.callRemote('getDeviceAttribute', dev, attribute)
+            log.debug("Single attribute result: %s", devresult)
+            assert(isinstance(devresult, list))
+            result[devresult[0][0]] = devresult[0][1]
         
-    @defer.inlineCallbacks
-    def _printValue(self, value, name):
-        """
-        Prints the value along with the name of which of the 20 asynchronous
-        query's returned the value.
-        """
-        log.debug("Value %s returned from asynchronous call %d", (value, name))
+        defer.returnValue(result)
+        
+
 
 # Spawn of the process using the module name
 factory = ProcessFactory(OMSDriver)
