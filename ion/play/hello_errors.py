@@ -94,7 +94,7 @@ class HelloErrors(ServiceProcess):
         # Check the type of the content received
         if person_msg.MessageType != PERSON_TYPE:
             # Use the response code property of the person message.
-            raise HelloErrors('Invalid message type recieved', person_msg.ResponseCodes.BAD_REQUEST)
+            raise HelloError('Invalid message type recieved', person_msg.ResponseCodes.BAD_REQUEST)
             
             
         # Simplest example - Just reply okay with no object
