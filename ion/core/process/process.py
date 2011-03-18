@@ -670,13 +670,13 @@ class Process(BasicLifecycleObject,ResponseCodes):
         """
         rpc_conv = self.conv_manager.new_conversation(RpcType.CONV_TYPE_RPC)
         rpc_conv.bind_role_local(RpcType.ROLE_INITIATOR.role_id, self)
-        rpc_conv.bind_role(RpcType.ROLE_PARTICIPANT.role_id, receiver)
+        rpc_conv.bind_role(RpcType.ROLE_PARTICIPANT.role_id, recv)
 
         if headers == None:
             headers = {}
         headers['protocol'] = RpcType.CONV_TYPE_RPC
         headers['performative'] = 'request'
-        return self._blocking_send(recv=receiver, operation=action, content=content, headers=headers, conv=rpc_conv, **kwargs)
+        return self._blocking_send(recv=recv, operation=operation, content=content, headers=headers, conv=rpc_conv, **kwargs)
 
     def request(self, receiver, action, content, headers=None, **kwargs):
         """

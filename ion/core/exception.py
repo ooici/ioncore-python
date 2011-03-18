@@ -23,7 +23,7 @@ class StartupError(IonError):
 class IllegalStateError(IonError):
     pass
 
-class ConversationError(IONError):
+class ConversationError(IonError):
     pass
 
 class ApplicationError(IonError):
