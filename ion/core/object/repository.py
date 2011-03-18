@@ -377,7 +377,10 @@ class Repository(object):
         """
         if self._detached_head:
             log.warn('This repository is currently a detached head. The current commit is not at the head of a branch.')
-        
+
+        if self._current_branch is None:
+            raise RepositoryError('No current branch in the repository. Must checkout first.')
+
         if len(self._current_branch.commitrefs) == 1:          
             return self._current_branch.commitrefs[0]
         else:
@@ -1155,11 +1158,6 @@ class Repository(object):
             # @TODO provide for transfer by serialization and re instantiation
             raise RepositoryError('You can not copy only part of a gpb composite, only the root!')
             
-        if value.ObjectType.object_id <= 1000 and value.ObjectType.object_id != 4:
-            # This is a core object other than an IDRef to another repository.
-            # Generally this should not happen...
-            log.warn('Copying core objects is not an error but unexpected results may occur. Use with caution')
-
 
         if value.Modified:
             structure={}

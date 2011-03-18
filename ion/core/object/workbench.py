@@ -330,6 +330,9 @@ class WorkBench(object):
         repo.upstream['service'] = origin
         repo.upstream['process'] = headers.get('reply-to')
 
+        defer.returnValue(result)
+
+
 
     @defer.inlineCallbacks
     def op_pull(self,request, headers, msg):
@@ -473,7 +476,9 @@ class WorkBench(object):
             if not repo_or_repos:
                 raise KeyError('Repository name %s not found in work bench to push!' % name)
 
-        yield self.push(origin, repo_or_repos)
+        result = yield self.push(origin, repo_or_repos)
+
+        defer.returnValue( result )
 
 
 
@@ -518,7 +523,7 @@ class WorkBench(object):
             log.debug('ReceivedError', str(re))
             raise WorkBenchError('Push returned an exception! "%s"' % re.msg_content)
 
-
+        defer.returnValue(result)
         # @TODO - check results?
 
         
@@ -670,7 +675,7 @@ class WorkBench(object):
         The return value is a list of binary SHA1 keys
         """
 
-        if not repo.status == repo.UPTODATE:
+        if repo.status == repo.MODIFIED:
             log.warn('Automatic commit called during pull. Commit should be called first!')
             comment='Commiting to send message with wrapper object'
             repo.commit(comment=comment)
@@ -710,7 +715,7 @@ class WorkBench(object):
         The method is a bit trivial - candidate for removal!
         """
 
-        if not repo.status == repo.UPTODATE:
+        if repo.status == repo.MODIFIED:
             log.warn('Automatic commit called during push. Commit should be called first!')
             comment='Commiting to push repo.'
             repo.commit(comment=comment)
@@ -730,7 +735,8 @@ class WorkBench(object):
         if len(repo.branches) == 0:
             # if we are doing a clone - pulling a new repository
             repo._dotgit = head
-            log.warn('Do not assume branch order in unchanged - setting master to branch 0 anyways!')
+            if len(repo.branches)>1:
+                log.warn('Do not assume branch order in unchanged - setting master to branch 0 anyways!')
             repo.branchnicknames['master']=repo.branches[0].branchkey
             return
         

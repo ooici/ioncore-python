@@ -2038,11 +2038,13 @@ class StructureElement(object):
         
     @classmethod
     def parse_structure_element(cls,blob):
+
         se = get_gpb_class_from_type_id(STRUCTURE_ELEMENT_TYPE)()
         se.ParseFromString(blob)
 
         instance = cls(se)
-        if instance.key != instance.sha1():
+
+        if instance.key != instance.sha1:
             log.error('The sha1 key does not match the value. The data is corrupted! \n' +\
             'Element key %s, Calculated key %s' % (sha1_to_hex(instance.key), sha1_to_hex(instance.sha1)))
             raise StructureElementError('Error reading serialized structure element. Sha1 value does not match.')

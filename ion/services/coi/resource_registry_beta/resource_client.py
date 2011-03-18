@@ -67,8 +67,8 @@ class ResourceClient(object):
         if not proc:
             proc = process.Process()
         
-        if not hasattr(proc, 'op_fetch_linked_objects'):
-            setattr(proc, 'op_fetch_linked_objects', proc.workbench.op_fetch_linked_objects)
+        if not hasattr(proc, 'op_fetch_blobs'):
+            setattr(proc, 'op_fetch_blobs', proc.workbench.op_fetch_blobs)
                         
         self.proc = proc
         
@@ -219,7 +219,7 @@ class ResourceClient(object):
             
         repository.commit(comment=comment)            
             
-        result = yield self.workbench.push(self.datastore_service, repository.repository_key)
+        result = yield self.workbench.push(self.datastore_service, repository)
 
         if not result.MessageResponseCode == result.ResponseCodes.OK :
             raise ResourceClientError('Push to datastore failed during put_instance')

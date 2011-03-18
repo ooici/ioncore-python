@@ -266,10 +266,19 @@ class WorkBenchProcessTest(IonTestCase):
     def test_pull(self):
 
         log.info('Pulling from: %s' % str(self.proc1.id.full))
-        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+        self.assertEqual(repo2._workspace_root, None)
+
+        # Objects are sent in the pull (get_head_content is True by default)
+        crefs = repo2.current_heads()
+        self.assertEqual(len(crefs), 1)
+        # The pull got the current head state...
+        self.assertEqual(crefs[0].objectroot.title, 'an addressbook')
 
         ab = yield repo2.checkout('master')
 
@@ -288,10 +297,22 @@ class WorkBenchProcessTest(IonTestCase):
         self.repo1.commit('An updated addressbook')
 
         log.info('Pulling from: %s' % str(self.proc1.id.full))
-        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+        
+        self.assertEqual(repo2._workspace_root, None)
+
+        # Objects are sent in the pull (get_head_content is True)
+        crefs = repo2.current_heads()
+        self.assertEqual(len(crefs), 1)
+        self.assertEqual(crefs[0].objectroot.title, 'New Addressbook')
+
+        # The old stuff is not there!
+        old_ref = crefs[0].parentrefs[0].commitref
+        self.assertRaises(KeyError, getattr, old_ref, 'objectroot')
 
         ab = yield repo2.checkout('master')
 
@@ -312,10 +333,18 @@ class WorkBenchProcessTest(IonTestCase):
         self.repo1.commit('An updated addressbook')
 
         log.info('Pulling from: %s' % str(self.proc1.id.full))
-        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key, get_head_content=False)
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key, get_head_content=False)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+
+        self.assertEqual(repo2._workspace_root, None)
+        # Objects are not sent in the pull (get_head_content is False)
+        crefs = repo2.current_heads()
+        self.assertEqual(len(crefs), 1)
+        self.assertRaises(KeyError, getattr, crefs[0], 'objectroot')
 
 
         ab = yield repo2.checkout('master')
@@ -340,7 +369,8 @@ class WorkBenchProcessTest(IonTestCase):
     def test_pull_twice(self):
 
         log.info('Pulling from: %s' % str(self.proc1.id.full))
-        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
@@ -351,8 +381,9 @@ class WorkBenchProcessTest(IonTestCase):
         self.assertEqual(self.repo1.root_object, repo2.root_object)
 
 
-        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
-
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+        
         # Can't easily test that the messaging works properly - but make sure result is good
         self.assertEqual(self.repo1.commit_head, repo2.commit_head)
         self.assertEqual(self.repo1.root_object, repo2.root_object)
@@ -363,7 +394,8 @@ class WorkBenchProcessTest(IonTestCase):
     def test_pull_update(self):
 
         log.info('Pulling from: %s' % str(self.proc1.id.full))
-        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
@@ -380,7 +412,9 @@ class WorkBenchProcessTest(IonTestCase):
 
 
         # Pull the repository again and watch the merge magic!
-        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
         ab = yield repo2.checkout('master')
 
         # Can't easily test that the messaging works properly - but make sure result is good
@@ -389,40 +423,46 @@ class WorkBenchProcessTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_pull_update(self):
+    def test_pull_branch(self):
+
+
+        self.branch_key = self.repo1.branch()
+
+        self.repo1.root_object.title = 'branch'
+
+        self.repo1.commit('Branched')
 
         log.info('Pulling from: %s' % str(self.proc1.id.full))
-        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
 
-        ab = yield repo2.checkout('master')
+
+        # Objects are sent in the pull (get_head_content is True)
+        crefs = repo2.current_heads()
+        self.assertEqual(len(crefs), 2)
+        # In this test we know the order but generally that is not true
+        self.assertEqual(crefs[0].objectroot.title, 'an addressbook')
+        self.assertEqual(crefs[1].objectroot.title, 'branch')
+
+
+        ab = yield repo2.checkout(branchname=self.branch_key)
 
         self.assertEqual(self.repo1.commit_head, repo2.commit_head)
         self.assertEqual(self.repo1.root_object, repo2.root_object)
 
 
-        # update and commit an new head object
-        self.repo1.root_object.title = 'New Addressbook'
-        self.repo1.commit('An updated addressbook')
-
-
-        # Pull the repository again and watch the merge magic!
-        yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
-        ab = yield repo2.checkout('master')
-
-        # Can't easily test that the messaging works properly - but make sure result is good
-        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
-        self.assertEqual(self.repo1.root_object, repo2.root_object)
 
 
     @defer.inlineCallbacks
     def test_push(self):
 
         log.info('Pushing to: %s' % str(self.proc2.id.full))
-        yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
-
+        result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+        
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
 
@@ -441,7 +481,8 @@ class WorkBenchProcessTest(IonTestCase):
         self.repo1.commit('An updated addressbook')
 
         log.info('Pushing tpo: %s' % str(self.proc2.id.full))
-        yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
@@ -464,7 +505,8 @@ class WorkBenchProcessTest(IonTestCase):
 
 
         log.info('Pushing tpo: %s' % str(self.proc2.id.full))
-        yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
@@ -479,8 +521,9 @@ class WorkBenchProcessTest(IonTestCase):
         self.repo1.commit('An updated addressbook')
 
         log.info('Pushing tpo: %s' % str(self.proc2.id.full))
-        yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
-
+        result = yield self.proc1.workbench.push(self.proc2.id.full, self.repo1)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+        
         # use the value - the key of the first to get it from the workbench on the 2nd
         repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
 

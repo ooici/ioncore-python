@@ -57,7 +57,7 @@ class DataStoreWorkbench(WorkBench):
 
     def __init__(self, process, blob_store, commit_store):
 
-        workbench.WorkBench.__init__(self, process)
+        WorkBench.__init__(self, process)
 
         self._blob_store = blob_store
         self._commit_store = commit_store
@@ -89,25 +89,27 @@ class DataStoreWorkbench(WorkBench):
         repo = self.get_repository(request.repository_key)
         if repo is None:
             #if it does not exist make a new one
-            repo = repository.Repository(repository_key=repo_name)
+            repo = repository.Repository(repository_key=request.repository_key)
             self.put_repository(repo)
 
         # Must reconstitute the head and merge with existing
         mutable_cls = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)
         new_head = repo._wrap_message_object(mutable_cls(), addtoworkspace=False)
-        new_head.repository_key = request.repository_key
+        new_head.repositorykey = request.repository_key
 
 
         q = Query()
-        q.add_predicate_eq(REPOSITORY_KEY, repo_key)
+        q.add_predicate_eq(REPOSITORY_KEY, request.repository_key)
 
         rows = yield self._commit_store.query(q)
 
         for key, columns in rows.items():
+
             blob = columns[VALUE]
             wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
             assert key == wse.key, 'Calculated key does not match the stored key!'
             repo.index_hash[key] = wse
+
 
             if columns[BRANCH_NAME]:
                 # If this appears to be a head commit
@@ -125,7 +127,7 @@ class DataStoreWorkbench(WorkBench):
 
                 cref = repo._load_element(wse)
                 repo._commit_index[cref.MyId]=cref
-                obj.ReadOnly = True
+                cref.ReadOnly = True
 
                 link.SetLink(cref)
 
@@ -133,7 +135,6 @@ class DataStoreWorkbench(WorkBench):
 
         # Do the update!
         self._update_repo_to_head(repo, new_head)
-
 
         ####
         # Back to boiler plate op_pull
@@ -154,7 +155,6 @@ class DataStoreWorkbench(WorkBench):
 
         response.repo_head_element = obj
 
-
         for commit_key in puller_needs:
             commit_element = repo.index_hash.get(commit_key)
             if commit_element is None:
@@ -162,7 +162,6 @@ class DataStoreWorkbench(WorkBench):
             link = response.commit_elements.add()
             obj = response.Repository._wrap_message_object(commit_element._element)
             link.SetLink(obj)
-
 
         if request.get_head_content:
             # Slightly different machinary here than in the workbench - Could be made more similar?
@@ -204,7 +203,7 @@ class DataStoreWorkbench(WorkBench):
                     blobs[wse.key]=wse
 
                     # Add it to the repository index
-                    self.index_hash[wse.key] = wse
+                    repo.index_hash[wse.key] = wse
 
                     # load the object so we can find its children
                     obj = repo.get_linked_object(link)
@@ -215,7 +214,6 @@ class DataStoreWorkbench(WorkBench):
                 for link in new_links_to_get:
                     if not blobs.has_key(link.key):
                         links_to_get.append(link)
-
 
             for element in blobs.values():
                 link = response.blob_elements.add()
@@ -351,7 +349,7 @@ class DataStoreWorkbench(WorkBench):
         new_head_list=[]
         for repo_key, commit_keys in new_commits.items():
             # Get the updated repository
-            repo = self.workbench.get_repository(repo_key)
+            repo = self.get_repository(repo_key)
 
             # any objects in the data structure that were transmitted have already
             # been updated during fetch linked objects.
@@ -368,9 +366,11 @@ class DataStoreWorkbench(WorkBench):
 
                 cref = repo._commit_index.get(key)
 
+                link = cref.GetLink('objectroot')
+                root_type = link.type
 
 
-                if cref.objectroot.ObjectType == ASSOCIATION_TYPE:
+                if root_type == ASSOCIATION_TYPE:
                     attributes[SUBJECT_KEY] = cref.objectroot.subject.key
                     attributes[SUBJECT_BRANCH] = cref.objectroot.subject.branch
                     attributes[SUBJECT_COMMIT] = cref.objectroot.subject.commit
@@ -383,7 +383,7 @@ class DataStoreWorkbench(WorkBench):
                     attributes[OBJECT_BRANCH] = cref.objectroot.object.branch
                     attributes[OBJECT_COMMIT] = cref.objectroot.object.commit
 
-                elif  cref.objectroot.ObjectType == TERMINOLOGY_TYPE:
+                elif  root_type == TERMINOLOGY_TYPE:
                     attributes[KEYWORD] = cref.objectroot.word
 
                 # get the wrapped structure element to put in...
@@ -465,15 +465,34 @@ class DataStoreWorkbench(WorkBench):
 
         response = yield self._process.message_client.create_instance(BLOBS_MESSAGE_TYPE)
 
+        def_list = []
         for key in request.blob_keys:
             element = self._workbench_cache.get(key)
-            if element is None:
+
+            if element is not None:
+                link = response.blob_elements.add()
+                obj = response.Repository._wrap_message_object(element._element)
+
+                link.SetLink(obj)
+
+                continue
+
+            def_list.append(self._blob_store.get(key))
+
+        res_list = yield defer.DeferredList(def_list)
+
+        for result, blob in res_list:
+
+            if blob is None:
                 raise WorkBenchError('Invalid fetch objects request. Key Not Found!', request.ResponseCodes.NOT_FOUND)
 
+            element = gpb_wrapper.StructureElement.parse_structure_element(blob)
             link = response.blob_elements.add()
             obj = response.Repository._wrap_message_object(element._element)
 
             link.SetLink(obj)
+            
+
 
         yield self._process.reply_ok(message, response)
 
@@ -543,267 +562,20 @@ class DataStoreService(ServiceProcess):
         
 
 
-        self.workbench = DataStoreWorkbench()
+        self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
 
 
     #@defer.inlineCallbacks
     def slc_activate(self):
-       pass
 
 
-        
-
-    '''
-    @defer.inlineCallbacks
-    def op_push(self, heads, headers, msg):
-        
-        pushed_repos = {}
-        
-        for head in heads:
-            
-            # Extract the repository key from the mutable
-            raw_mutable = object_utils.get_gpb_class_from_type_id(MUTABLE_TYPE)()
-            raw_mutable.ParseFromString(head.value)
-            repo_key = str(raw_mutable.repositorykey)
-            
-            # Get the mutable
-            store_commits = {}
-
-            # keep track of all the commits read during this push...
-            pushed_repos[repo_key] = store_commits
-
-            # Get the commits using the query interface
-            q = Query()
-            q.add_predicate_eq(REPOSITORY_KEY, repo_key)
-            rows = yield self.c_store.query(q)
-
-            if rows:
-
-                stored_repo = self.workbench.create_repository(repository_key=repo_key)
-
-
-            for key, columns in rows.items():
-                blob = columns["value"]
-                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-                assert key == wse.key, 'Calculated key does not match the stored key!'
-                store_commits[wse.key] = wse
-                    
-                    
-                # Load these commits into the workbench
-                self.workbench._hashed_elements.update(store_commits)
-
-
-                # Check to make sure the mutable is upto date with the commits...
-                #for commit_key in store_commits.keys():
-                #    if not commit_key in repo._commit_index:
-                #        raise DataStoreError('Can not handle divergence yet...')
-            
-            
-        yield self.workbench.op_push(heads, headers, msg)
-        
-        def_list = []
-        # First put the updated commits
-        for repo_key, store_commits in pushed_repos.items():
-            # Get the updated repository
-            repo = self.workbench.get_repository(repo_key)
-            
-            # any objects in the data structure that were transmitted have already
-            # been updated during fetch linked objects.
-            
-            
-            for key in repo._commit_index.keys():
-                if not key in store_commits:
-
-                    # Set the repository name for the commit
-                    attributes = {REPOSITORY_KEY : str(repo_key)}
-
-                    cref = repo._commit_index.get(key)
-                    
-                    for branch in  repo.branches:
-                        # If this is currently the head commit - set
-                        if cref in branch.commitrefs:
-                            attributes[BRANCH_NAME] = branch.branchkey
-                                        
-                    if cref.objectroot.ObjectType == ASSOCIATION_TYPE:
-                        attributes[SUBJECT_KEY] = cref.objectroot.subject.key
-                        attributes[SUBJECT_BRANCH] = cref.objectroot.subject.branch
-                        attributes[SUBJECT_COMMIT] = cref.objectroot.subject.commit
-                        
-                        attributes[PREDICATE_KEY] = cref.objectroot.predicate.key
-                        attributes[PREDICATE_BRANCH] = cref.objectroot.predicate.branch
-                        attributes[PREDICATE_COMMIT] = cref.objectroot.predicate.commit
-
-                        attributes[OBJECT_KEY] = cref.objectroot.object.key
-                        attributes[OBJECT_BRANCH] = cref.objectroot.object.branch
-                        attributes[OBJECT_COMMIT] = cref.objectroot.object.commit
-                        
-                    elif  cref.objectroot.ObjectType == TERMINOLOGY_TYPE:
-                        attributes[KEYWORD] = cref.objectroot.word
-                    
-                    # get the wrapped structure element to put in...
-                    wse = self.workbench._hashed_elements.get(key)
-                    
-                    # Should replace this with one put slice command
-                    defd = self.c_store.put(key = key,
-                                           value = wse.serialize(),
-                                           index_attributes = attributes)
-                    def_list.append(defd)
-            
-        yield defer.DeferredList(def_list)
-            
-        # Pretty useless to try and debug by reading, but its a start...   
-        #print 'KVS: \n', self.c_store.kvs, '\n\n'
-        
-        #print 'Index: \n', self.c_store.indices, '\n\n'
-            
-        '''
+        self.op_fetch_blobs = self.workbench.op_fetch_blobs
+        self.op_pull = self.workbench.op_pull
+        self.op_push = self.workbench.op_push
 
 
 
-            
-    '''
-        
-    @defer.inlineCallbacks
-    def op_pull(self, content, headers, msg):
-        """
-        Content is a string - the name of a mutable head for a repository
-        """
-        repo_key = str(content)
-        
-        store_commits ={}
-        
 
-
-        q = Query()
-        q.add_predicate_eq(REPOSITORY_KEY, repo_key)
-        q.add_predicate_gt(BRANCH_NAME, '')
-
-        rows = yield self.c_store.query(q)
-
-        for key, columns in rows.items():
-            blob = columns["value"]
-            wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-            assert key == wse.key, 'Calculated key does not match the stored key!'
-            store_commits[wse.key] = wse
-                    
-                    
-            # Load these commits into the workbench
-            self.workbench._hashed_elements.update(store_commits)
-
-
-            # Check to make sure the mutable is upto date with the commits...
-            for commit_key in store_commits.keys():
-                if not commit_key in repo._commit_index:
-                    raise DataStoreError('Can not handle divergence yet...')
-        
-        yield self.workbench.op_pull(content, headers, msg)
-    '''
-
-
-    '''
-    @defer.inlineCallbacks
-    def op_fetch_linked_objects(self, elements, headers, message):
-        """
-        The data store is getting objects for another process...
-        """
-        def_list=[]
-        # Elements is a dictionary of wrapped structure elements
-        for se in elements.values():
-            
-            assert se.type == LINK_TYPE, 'This is not a link element!'
-            link = object_utils.get_gpb_class_from_type_id(LINK_TYPE)()
-            link.ParseFromString(se.value)
-                
-            # if it is already in memory, don't worry about it...
-            if not link.key in self.workbench._hashed_elements:            
-                if link.type == COMMIT_TYPE:
-                    # Can get commits for a service in a fetch
-                    def_list.append(self.c_store.get(link.key))
-                else:
-                    def_list.append(self.b_store.get(link.key))
-
-        obj_list = yield defer.DeferredList(def_list)
-        #print 'OBJECT LIST:', obj_list
-            
-        # Load this list of objects from the store into memory for use in the datastores workbench
-        for result, blob in obj_list:
-            wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-            self.workbench._hashed_elements[wse.key]=wse
-            
-        yield self.workbench.op_fetch_linked_objects(elements, headers, message)
-
-    '''
-
-
-
-    '''
-    @defer.inlineCallbacks
-    def fetch_linked_objects(self, address, links):
-        """
-        The datastore is getting any objects it does not already have... 
-        """
-        
-        #Check and make sure it is not in the datastore
-        def_list = []
-        for link in links:
-            if not link.key in self.workbench._hashed_elements:            
-                # Can request to get commits in a fetch...
-                if link.type == COMMIT_TYPE:
-                    def_list.append(self.c_store.get(link.key))
-                else:
-                    def_list.append(self.b_store.get(link.key))
-        
-        #for defd in def_list:
-        #    print 'Defd type: %s; value: %s' % (type(defd), defd)
-        
-        # The list of requested objects that are in the store
-        obj_list = yield defer.DeferredList(def_list)
-        
-        #for obj in obj_list:
-        #    print 'obj type: %s; value: %s' % (type(obj), obj)
-        
-        
-        # If we have the object, put it in the work space, if not request it.
-        need_list = []
-        obj_dict = {}
-        
-        # For some reason the obj_list is a tuple not just the value of the result
-        for link, (result, blob)  in zip(links, obj_list):
-            if blob is None:
-                need_list.append(link)
-                obj_dict[link.key] = None
-            else:
-                #print 'BLOB type: %s; value: %s' % (type(blob), blob)
-                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-                self._hashed_elements[wse.key]=wse
-                obj_dict[link.key] = wse
-
-
-        # Get these from the other service
-        if need_list:
-            got_objs = yield self.workbench.fetch_linked_objects(address, need_list)
-        
-        def_list = []
-        for key, wse in got_objs.items():
-            #if wse.type == COMMIT_TYPE:
-            #    raise DataStoreError('Can not get commits in a fetch!')
-            #    def_list.append(self.c_store.put(key, wse.serialize()))
-            #else:
-            #    def_list.append(self.b_store.put(key, wse.serialize()))
-            
-            # Don't ever put commits out of context. This is done by push!
-            if wse.type != COMMIT_TYPE:
-                def_list.append(self.b_store.put(key, wse.serialize()))
-                
-            # Add it to the dictionary of objects 
-        
-        obj_dict.update(got_objs)
-        
-        yield defer.DeferredList(def_list)
-        
-        defer.returnValue(obj_dict.values())
-        
-        '''
         
 
 
