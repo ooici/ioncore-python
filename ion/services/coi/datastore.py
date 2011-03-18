@@ -432,7 +432,7 @@ class DataStoreWorkbench(WorkBench):
 
             def_list.append(self._commit_store.put(**new_head))
 
-         yield defer.DeferredList(def_list)
+        yield defer.DeferredList(def_list)
         #@TODO - check the return vals?
 
         def_list = []
