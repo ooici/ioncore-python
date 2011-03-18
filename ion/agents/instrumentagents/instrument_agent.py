@@ -35,6 +35,7 @@ instrument_parameters   = 'instrument_parameters'
 Observatory state names.
 """
 ci_state_list = [
+    'CI_STATE_UNKNOWN',
     'CI_STATE_POWERED_DOWN',
     'CI_STATE_UNINITIALIZED',
     'CI_STATE_INACTIVE',
@@ -466,99 +467,111 @@ class InstrumentAgent(ResourceAgent):
     getCapabilities.
     """
     
-    """
-    The driver client to communicate with the child driver
-    """
-    driver_client = None
-    
-    """
-    A dictionary of the topics where data is published, indexed by transducer
-    name or "Device" for the whole device. Gets set initially by
-    subclass, then at runtime by user as needed.
-    """
-    output_topics = None
-
-    """
-    A dictionary of the topics where events are published, indexed by
-    transducer name or "Device" for the whole device. Gets set initially by
-    subclass, then at runtime by user as needed.
-    """
-    event_topics = None
-
-    """
-    A dictionary of the topics where state changes are published, indexed by
-    transducer name or "Device" for the whole device. Gets set initially by
-    subclass, then at runtime by user as needed.
-    """
-    state_topics = None
-
-    """
-    A UUID specifying the current transaction. None
-    indicates no current transaction.
-    """
-    transaction_id = None
-    
-    """
-    An integer in seconds for how long to wait to acquire a new transaction if
-    a value is not explicitly given.
-    """
-    default_transaction_timeout = 10   
-    
-    """
-    An integer in seconds for the maximum allowable timeout to wait for a new transaction.
-    """
-    max_transaction_timeout = 120
-
-    """
-    An integer in seconds for the maximum time a transaction may be open.
-    """
-    transaction_expire_timeout = 300
-
-    """
-    A finite state machine to track and manage agent state according to the general
-    instrument state model.
-    """
-    agent_fsm = None
-
-    """
-    String indicating the source of time being used for the instrument.
-    See time_sources list for available values.
-    """
-    time_source = 'TIME_NOT_SPECIFIED'
-
-    """
-    String describing how the device is connected to the observatory.
-    See connection_methods list for available values.
-    """
-    connection_method = 'CONNECTION_NOT_SPECIFIED'
-    
-    """
-    Buffer to hold instrument data for periodic transmission.
-    """
-    data_buffer = []    # Should this be a dict or something else?
-
-    """
-    List of current alarm conditions. Tuple of (ID,description).
-    """
-    alarms = []
-    
-    """
-    Dictionary of time status values.
-    """
-    time_status = {
-        'Uncertainty': None,
-        'Peers' : None
-    }
     
     """
     The software version of the instrument agent.
     """
-    version = 0.1
+    version = '0.1'
+    
+    @classmethod
+    def get_version(cls):
+        """
+        Return the software version of the instrument agent.
+        """
+        return cls.version
     
     
     def plc_init(self):
+        
         ResourceAgent.plc_init(self)
         self.pubsub_client = PubSubClient(proc=self)
+
+        """
+        The driver client to communicate with the child driver
+        """
+        self.driver_client = None
+        
+        """
+        A dictionary of the topics where data is published, indexed by transducer
+        name or "Device" for the whole device. Gets set initially by
+        subclass, then at runtime by user as needed.
+        """
+        self.output_topics = None
+    
+        """
+        A dictionary of the topics where events are published, indexed by
+        transducer name or "Device" for the whole device. Gets set initially by
+        subclass, then at runtime by user as needed.
+        """
+        self.event_topics = None
+    
+        """
+        A dictionary of the topics where state changes are published, indexed by
+        transducer name or "Device" for the whole device. Gets set initially by
+        subclass, then at runtime by user as needed.
+        """
+        self.state_topics = None
+    
+        """
+        A UUID specifying the current transaction. None
+        indicates no current transaction.
+        """
+        self.transaction_id = None
+        
+        """
+        An integer in seconds for how long to wait to acquire a new transaction if
+        a value is not explicitly given.
+        """
+        self.default_transaction_timeout = 10   
+        
+        """
+        An integer in seconds for the maximum allowable timeout to wait for a new transaction.
+        """
+        self.max_transaction_timeout = 120
+    
+        """
+        An integer in seconds for the maximum time a transaction may be open.
+        """
+        self.transaction_expire_timeout = 300
+    
+        """
+        A finite state machine to track and manage agent state according to the general
+        instrument state model.
+        """
+        self.agent_fsm = None
+    
+        """
+        String indicating the source of time being used for the instrument.
+        See time_sources list for available values.
+        """
+        self.time_source = 'TIME_NOT_SPECIFIED'
+    
+        """
+        String describing how the device is connected to the observatory.
+        See connection_methods list for available values.
+        """
+        self.connection_method = 'CONNECTION_NOT_SPECIFIED'
+        
+        """
+        Buffer to hold instrument data for periodic transmission.
+        """
+        #TODO driver integration. I think this is a list of strings.
+        self.data_buffer = []
+    
+        """
+        List of current alarm conditions. Tuple of (ID,description).
+        """
+        self.alarms = []
+        
+        """
+        Dictionary of time status values.
+        """
+        self.time_status = {
+            'Uncertainty': None,
+            'Peers' : None
+        }
+
+
         
     @defer.inlineCallbacks
     def _register_publisher(self):
@@ -1228,6 +1241,8 @@ class InstrumentAgent(ResourceAgent):
             'transaction_id':transaction_id}
         """
         
+        
+        
         assert(isinstance(content,dict)), 'Expected a dict content.'
         assert(content.has_key('params')), 'Expected params.'
         assert(content.has_key('transaction_id')), 'Expected a transaction_id.'
@@ -1239,6 +1254,7 @@ class InstrumentAgent(ResourceAgent):
         assert(isinstance(tid,str)), 'Expected a transaction_id str.'
 
         reply = {'success':None,'result':None,'transaction_id':None}
+
 
         if tid != 'create' and tid != 'none' and len(tid) != 36:
             reply['success'] = errors['INVALID_TRANSACTION_ID']
@@ -1268,37 +1284,46 @@ class InstrumentAgent(ResourceAgent):
         # Set up the result message.
         for arg in params:
             if arg not in ci_status_list and arg != 'all':
-                result[arg] = errors['INVALID_STATUS']
+                result[arg] = (errors['INVALID_STATUS'],None)
                 get_errors = True
                 continue
-            elif arg == 'CI_STATUS_AGENT_STATE' or arg == 'all':
-                result['CI_STATUS_AGENT_STATE'] = (['OK'],self.agent_fsm.get_state())
-            elif arg == 'CI_STATUS_CHANNEL_NAMES' or arg == 'all':
-                dvr_msg_content = {'params':[('instrument','channel_names')]}
-                dvr_result = yield self.driver_client.rpc_send('get',dvr_msg_content)
-                dvr_success = dvr_result['success']
-                dvr_val = dvr_result['params'][('instrument','channel_names')]
-                result['CI_STATUS_CHANNEL_NAMES'] = (dvr_val[0],dvr_val[1])                    
-                if dvr_success[0] != 'OK':
+            
+            if arg == 'CI_STATUS_AGENT_STATE' or arg == 'all':
+                # TODO FSM integration.
+                #result['CI_STATUS_AGENT_STATE'] = (['OK'],self.agent_fsm.get_state())
+                result['CI_STATUS_AGENT_STATE'] = (['OK'],'CI_STATE_UNKNOWN')
+            if arg == 'CI_STATUS_CHANNEL_NAMES' or arg == 'all':
+                # TODO driver integration.
+                #dvr_msg_content = {'params':[('instrument','channel_names')]}
+                #dvr_result = yield self.driver_client.rpc_send('get',dvr_msg_content)
+                #dvr_success = dvr_result['success']
+                #dvr_val = dvr_result['params'][('instrument','channel_names')]
+                dvr_val = [['OK'],['CHAN_1','CHAN_2','CHAN_3']]
+                result['CI_STATUS_CHANNEL_NAMES'] = (dvr_val[0],dvr_val[1])                
+                if dvr_val[0][0] != 'OK':
                     get_errors = True
-            elif arg == 'CI_STATUS_INSTRUMENT_CONNECTION_STATE' or arg == 'all':
-                dvr_msg_content = {'params':[('instrument','connection_status')]}
-                dvr_result = yield self.driver_client.rpc_send('get_status',dvr_msg_content)
-                dvr_success = dvr_result['success']
-                dvr_val = dvr_result['params'][('instrument','connection_status')]
+            if arg == 'CI_STATUS_INSTRUMENT_CONNECTION_STATE' or arg == 'all':
+                #TODO driver integration.
+                #dvr_msg_content = {'params':[('instrument','connection_status')]}
+                #dvr_result = yield self.driver_client.rpc_send('get_status',dvr_msg_content)
+                #dvr_success = dvr_result['success']
+                #dvr_val = dvr_result['params'][('instrument','connection_status')]
+                dvr_val=[['OK'],'DRIVER_CONNECTION_STATE']
                 result['CI_STATUS_INSTRUMENT_CONNECTION_STATE'] = (dvr_val[0],dvr_val[1])                    
-                if dvr_success[0] != 'OK':
+                if dvr_val[0][0] != 'OK':
                     get_errors = True
-            elif arg == 'CI_STATUS_ALARMS' or arg == 'all':
+            if arg == 'CI_STATUS_ALARMS' or arg == 'all':
                 result['CI_STATUS_ALARMS'] = (['OK'],self.alarms)
-            elif arg == 'CI_STATUS_TIME_STATUS' or arg == 'all':
-                result['CI_STATUS_TIME_STATUS'] = (['OK'],time_status)
-            elif arg == 'CI_STATUS_BUFFER_SIZE' or arg == 'all':
-                pass    #TBD
-            elif arg == 'CI_STATUS_AGENT_VERSION' or arg == 'all':
+            if arg == 'CI_STATUS_TIME_STATUS' or arg == 'all':
+                result['CI_STATUS_TIME_STATUS'] = (['OK'],self.time_status)
+            if arg == 'CI_STATUS_BUFFER_SIZE' or arg == 'all':
+                result['CI_STATUS_BUFFER_SIZE'] = (['OK'],self._get_buffer_size())
+            if arg == 'CI_STATUS_AGENT_VERSION' or arg == 'all':
                 result['CI_STATUS_AGENT_VERSION'] = (['OK'],self.get_version())
-            elif arg == 'CI_STATUS_DRIVER_VERSION' or arg == 'all':
-                version = yield self.driver_client.get_version()
+            if arg == 'CI_STATUS_DRIVER_VERSION' or arg == 'all':
+                #TODO driver integration.
+                #version = yield self.driver_client.get_version()
+                version = '0.1'
                 result['CI_STATUS_DRIVER_VERSION'] = (['OK'],version)
                 
                 
@@ -1862,8 +1887,23 @@ class InstrumentAgent(ResourceAgent):
         if (type == publish_msg_type["StateChange"]):
                 yield self.pubsub_client.publish(self.sup,
                             self.state_topics["Agent"].reference(),value)
+
         
+    ############################################################################
+    #   Other.
+    ############################################################################
         
+    def _get_buffer_size(self):
+        """
+        Return the total size in characters of the data buffer.
+        """
+        return sum(map(lambda x: len(x),self.data_buffer))
+        
+
+
+
+
+
         
 class InstrumentAgentClient(ResourceAgentClient):
     """
