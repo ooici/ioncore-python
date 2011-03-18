@@ -391,6 +391,7 @@ class Repository(object):
 
         for branch in self.branches:
             heads.extend(branch.commitrefs)
+            # Do not error on multiple commit refs!
 
         return heads
 
@@ -476,11 +477,13 @@ class Repository(object):
         return branch
     
     @defer.inlineCallbacks
-    def checkout(self, branchname=None, commit_id=None, older_than=None):
+    def checkout(self, branchname=None, commit_id=None, older_than=None, exclude_types=[]):
         """
         Check out a particular branch
         Specify a branch, a branch and commit_id or a date
         Branch can be either a local nick name or a global branch key
+
+        @TODO implement exclude types list in fetching/loading objects!
         """
         log.debug('checkout: branchname - "%s", commit id - "%s", older_than - "%s"' % (branchname, commit_id, older_than))
         if self.status == self.MODIFIED:
@@ -1002,6 +1005,7 @@ class Repository(object):
             
         if not link.type.object_id == element.type.object_id and \
                 link.type.version == element.type.version:
+            #@TODO Consider removing this somewhat costly check...
             raise RepositoryError('The link type does not match the element type found!')
             
         obj = self._load_element(element)
@@ -1105,12 +1109,13 @@ class Repository(object):
     def _load_element(self, element):
         
         #log.debug('_load_element' + str(element))
-        
+
         # check that the calculated value in element.sha1 matches the stored value
         if not element.key == element.sha1:
+            #@TODO Consider removing this somewhat costly check - it is already done when an object is read from a message
             raise RepositoryError('The sha1 key does not match the value. The data is corrupted! \n' +\
             'Element key %s, Calculated key %s' % (object_utils.sha1_to_hex(element.key), object_utils.sha1_to_hex(element.sha1)))
-        
+
         cls = object_utils.get_gpb_class_from_type_id(element.type)
                                 
         # Do not automatically load it into a particular space...

@@ -66,9 +66,9 @@ class WorkBenchError(ApplicationError):
 
 class WorkBench(object):
     
-    def __init__(self, myprocess):   
+    def __init__(self, process):
     
-        self._process = myprocess
+        self._process = process
         
         self._repos = {}
         
@@ -96,6 +96,7 @@ class WorkBench(object):
             
         # Set the default branch
         repo.branch(nickname='master')
+        # There is no default branch - the branch order is no longer order preserving in the datastore!
            
         # Handle options in the root class argument
         if isinstance(root_type, object_utils.get_gpb_class_from_type_id(GPBTYPE_TYPE)):
@@ -410,34 +411,6 @@ class WorkBench(object):
                 link.SetLink(obj)
 
         yield self._process.reply_ok(msg, content=response)
-
-
-
-
-
-    '''
-    def _link_to_structure_element(self, link, element):
-        """
-        Utility method for use in push / pull methods to pass content without decoding it.
-        """
-
-        if link.key:
-            raise WorkBenchError('Unexpected condition - link already set in link_to_structure_element.')
-
-        # Set the id of the linked wrapper
-        link.key = element.key
-
-        # Set the type
-        link.type.GPBMessage.CopyFrom(element.type)
-
-        link.isleaf = element.isleaf
-
-        # Add this link to the list of childlinks in the root of the object
-        link.ChildLinks.add(link)
-
-        # Add this structure element to the objects owned by the message
-        link.Repository.index_hash[element.key] = element
-    '''
 
 
     def serialize_mutable(self, mutable):
@@ -757,6 +730,7 @@ class WorkBench(object):
         if len(repo.branches) == 0:
             # if we are doing a clone - pulling a new repository
             repo._dotgit = head
+            log.warn('Do not assume branch order in unchanged - setting master to branch 0 anyways!')
             repo.branchnicknames['master']=repo.branches[0].branchkey
             return
         

@@ -2014,7 +2014,12 @@ class ScalarContainerWrapper(object):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         return repr(self._gpbcontainer._values)
-    
+
+class StructureElementError(Exception):
+    """
+    An error class for structure elements
+    """
+
     
 class StructureElement(object):
     """
@@ -2035,7 +2040,14 @@ class StructureElement(object):
     def parse_structure_element(cls,blob):
         se = get_gpb_class_from_type_id(STRUCTURE_ELEMENT_TYPE)()
         se.ParseFromString(blob)
-        return cls(se)
+
+        instance = cls(se)
+        if instance.key != instance.sha1():
+            log.error('The sha1 key does not match the value. The data is corrupted! \n' +\
+            'Element key %s, Calculated key %s' % (sha1_to_hex(instance.key), sha1_to_hex(instance.sha1)))
+            raise StructureElementError('Error reading serialized structure element. Sha1 value does not match.')
+
+        return instance
         
     @property
     def sha1(self):
