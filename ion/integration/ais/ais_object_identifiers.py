@@ -46,6 +46,23 @@ message ApplicationIntegrationServiceError{
 }
 """
 
+# AisDataResourceSummaryMsg GPBs from ion-object-definitions/net/ooici/integration/ais/ais_data_resource_summary.proto
+AIS_DATA_RESOURCE_SUMMARY_MSG_TYPE = object_utils.create_type_identifier(object_id=9021, version=1)
+"""
+message AisDataResourceSummaryMsg {
+   enum _MessageTypeIdentifier {
+       _ID = 9021;
+       _VERSION = 1;	
+   }
+
+   optional string user_ooi_id      = 1;
+   optional string data_resource_id = 2; 
+   optional string title            = 3; 
+   optional string institution      = 4;
+   optional string source           = 5; 
+
+}"""
+
 # FindDataResources GPBs from ion-object-definitions/net/ooici/integration/ais/findDataResources/find_data_resources.proto
 FIND_DATA_RESOURCES_REQ_MSG_TYPE = object_utils.create_type_identifier(object_id=9031, version=1)
 """
@@ -55,9 +72,17 @@ message FindDataResourcesReqMsg {
        _VERSION = 1;	
    }
 
-   required Spatial  spatial  = 1;
-   required Temporal temporal = 2;
-}
+   optional string user_ooi_id = 1;
+   optional double minLatitude = 2;
+   optional double maxLatitude = 3;
+   optional double minLongitude = 4;
+   optional double maxLongitude = 5;
+   optional double minDepth = 6;
+   optional double maxDepth = 7;
+   optional double minTime = 8;
+   optional double maxTime = 9;
+   optional string identity = 10; // THIS FIELD IS TEMPORARY!!
+   }
 """
 
 # FindDataResources GPBs from ion-object-definitions/net/ooici/integration/ais/findDataResources/find_data_resources.proto
@@ -69,10 +94,35 @@ message FindDataResourcesRspMsg {
        _VERSION = 1;	
    }
 
-   //repeated <put payload here>
+   repeated string data_resource_id
 }
 """
 
+# GetDataResourceDetail GPBs from ion-object-definitions/net/ooici/integration/ais/getDataResourceDetail/get_data_resource_detail.proto
+GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE = object_utils.create_type_identifier(object_id=9033, version=1)
+"""
+message GetDataResourceDetailReqMsg {
+   enum _MessageTypeIdentifier {
+       _ID = 9033;
+       _VERSION = 1;	
+   }
+
+   optional string data_resource_id  = 1;
+}
+"""
+
+# GetDataResourceDetail GPBs from ion-object-definitions/net/ooici/integration/ais/findDataResources/get_data_resource_detail.proto
+GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE = object_utils.create_type_identifier(object_id=9034, version=1)
+"""
+message GetDataResourceDetailRspMsg {
+   enum _MessageTypeIdentifier {
+       _ID = 9034;
+       _VERSION = 1;	
+   }
+
+   //repeated <put payload here>
+}
+"""
 # RegisterUser GPBs from ion-object-definitions/net/ooici/integration/ais/registerUser/register_user.proto
 REGISTER_USER_TYPE = object_utils.create_type_identifier(object_id=9101, version=1)
 """

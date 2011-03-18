@@ -20,6 +20,8 @@ from ion.integration.ais.findDataResources.resourceStubs import DatasetControlle
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
 from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_REQ_MSG_TYPE
 from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_RSP_MSG_TYPE
+from ion.integration.ais.ais_object_identifiers import AIS_DATA_RESOURCE_SUMMARY_MSG_TYPE
+
 
 from ion.core.object import object_utils
 
@@ -58,7 +60,8 @@ class FindDataResources(object):
         This is currently a call to a stub; the msg contains the actual resource
         id.
         """
-        
+
+        userID = msg.message_parameters_reference.user_ooi_id        
         resID = self.dscc.find_dataset_resources(msg)
         log.debug('DHE: Stub find_data_resources returned identity: ' + str(resID))
         
@@ -103,7 +106,22 @@ class FindDataResources(object):
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
-        rspMsg.message_parameters_reference[0].data_resource_id.append(resID)
+        rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+        rspMsg.message_parameters_reference[0].dataResourceSummary[0] = \
+            rspMsg.CreateObject(AIS_DATA_RESOURCE_SUMMARY_MSG_TYPE)
+        self.__loadDataResources(rspMsg.message_parameters_reference[0].dataResourceSummary[0], ds, userID, resID)
+        #rspMsg.message_parameters_reference[0].dataResourceSummary[0].data_resource_id = resID
 
         defer.returnValue(rspMsg)
 
+    def __loadDataResources(self, resSummary, ds, userID, resID):
+        resSummary.user_ooi_id = userID
+        resSummary.data_resource_id = resID
+        resSummary.title = ds.root_group.FindAttributeByName('title').GetValue()
+        resSummary.institution = ds.root_group.FindAttributeByName('institution').GetValue()
+        resSummary.source = ds.root_group.FindAttributeByName('source').GetValue()
+        #resSummary.ion_geospatial_lat_min = ds.root_group.FindAttributeByName('ion_geospatial_lat_max').GetValue()
+        #unicode_name  = lat.GetStandardName()
+        #unicode_units = lat.GetUnits()
+        
+        

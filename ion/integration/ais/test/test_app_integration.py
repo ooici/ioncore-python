@@ -93,6 +93,7 @@ class AppIntegrationTest(IonTestCase):
         log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(FIND_DATA_RESOURCES_REQ_MSG_TYPE)
+        reqMsg.message_parameters_reference.user_ooi_id = 'Dr. Chew'
         reqMsg.message_parameters_reference.minLatitude = 32.87521
         reqMsg.message_parameters_reference.maxLatitude = 32.97521
         reqMsg.message_parameters_reference.minLongitude = -117.274609
@@ -108,7 +109,21 @@ class AppIntegrationTest(IonTestCase):
         log.debug('DHE: Calling findDataResources!!...')
         outcome1 = yield self.aisc.findDataResources(reqMsg)
         #log.debug('DHE: findDataResources returned:\n'+str(outcome1))
-        log.debug('DHE: findDataResources returned:\n'+str(outcome1.message_parameters_reference[0].data_resource_id[0]))
+        log.debug('DHE: findDataResources returned:\n' + \
+                  str('user_ooi_id: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].user_ooi_id) + \
+                  str('\n') + \
+                  str('resource_id: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id) + \
+                  str('\n') + \
+                  str('title: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].title) + \
+                  str('\n') + \
+                  str('institution: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].institution) + \
+                  str('\n') + \
+                  str('source: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].source))
 
     @defer.inlineCallbacks
     def test_getDataResourceDetail(self):
