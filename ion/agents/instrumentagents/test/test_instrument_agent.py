@@ -468,7 +468,9 @@ class TestInstrumentAgent(IonTestCase):
         
     @defer.inlineCallbacks
     def test_get_obsevatory_metadata(self):
-        
+        """
+        Test observatory get metadata and related variables.
+        """
         # Get current metadata without a transacton using 'all' syntax.
         params_1 = [('all','all')]
         reply_1 = yield self.ia_client.get_observatory_metadata(params_1,'none')
@@ -641,23 +643,12 @@ class TestInstrumentAgent(IonTestCase):
         success_12 = reply_12['success']
         self.assertEqual(success_12[0],'OK')
         
-        
-    """
-    ci_status_list = [
-        'CI_STATUS_AGENT_STATE',
-        'CI_STATUS_CHANNEL_NAMES',
-        'CI_STATUS_INSTRUMENT_CONNECTION_STATE',
-        'CI_STATUS_ALARMS',
-        'CI_STATUS_TIME_STATUS',
-        'CI_STATUS_BUFFER_SIZE',
-        'CI_STATUS_AGENT_VERSION',
-        'CI_STATUS_DRIVER_VERSION'    
-    ]    
-    """
-            
+                   
     @defer.inlineCallbacks
     def test_get_obsevatory_status(self):
-
+        """
+        Test observatory get status and related variables.
+        """
         # Get all observatory status vals using 'all' syntax.
         params_1 = ['all']
         reply_1 = yield self.ia_client.get_observatory_status(params_1,'none')
@@ -806,13 +797,152 @@ class TestInstrumentAgent(IonTestCase):
         self.assertEqual(len(transaction_id_11),36)
 
 
-
     """
+    capabilities_list = [
+    'CAP_OBSERVATORY_COMMANDS',         # Common and specific observatory command names.
+    'CAP_OBSERVATORY_PARAMS',           # Common and specific observatory parameter names.
+    'CAP_OBSERVATORY_STATUSES',         # Common and specific observatory status names.
+    'CAP_METADATA',                     # Common and specific metadata names.
+    'CAP_DEVICE_COMMANDS',              # Common and specific device command names.
+    'CAP_DEVICE_PARAMS',                # Common and specific device parameter names.
+    'CAP_DEVICE_STATUSES'               # Common and specific device status names.
+    ]
+    """
+    
     @defer.inlineCallbacks
     def test_get_capabilities(self):
-        raise unittest.SkipTest("To be done.")
+
+        # Get all capabilities with the 'all' syntax.
+        params = ['all']
+        reply = yield self.ia_client.get_capabilities(params,'none')
+        success = reply['success']
+        result = reply['result']
+        transaction_id = reply['transaction_id']
+        result_1 = result
+        
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(transaction_id,None)
+        self.assertEqual(type(result),dict)
+        self.assertEqual(result.keys().sort(),instrument_agent.capabilities_list.sort())
+        self.assertEqual(all(map(lambda x: x in instrument_agent.ci_command_list,result['CAP_OBSERVATORY_COMMANDS'][1])),True)
+        self.assertEqual(all(map(lambda x: x in instrument_agent.ci_param_list,result['CAP_OBSERVATORY_PARAMS'][1])),True)
+        self.assertEqual(all(map(lambda x: x in instrument_agent.ci_status_list,result['CAP_OBSERVATORY_STATUSES'][1])),True)
+        self.assertEqual(all(map(lambda x: x in instrument_agent.metadata_list,result['CAP_METADATA'][1])),True)
+        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result['CAP_DEVICE_COMMANDS'][1])),True)
+        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result['CAP_DEVICE_PARAMS'][1])),True)
+        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result['CAP_DEVICE_STATUSES'][1])),True)
+        
+
+        # Get all capabilities with an explicit list.
+        params = instrument_agent.capabilities_list
+        reply = yield self.ia_client.get_capabilities(params,'none')
+        success = reply['success']
+        result = reply['result']
+        transaction_id = reply['transaction_id']
+        result_2 = result
+        
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(transaction_id,None)
+        self.assertEqual(type(result),dict)
+        self.assertEqual(result_2,result_1)
+        
+        # Attempt to get some capabilities, including bad ones.
+        params = [
+            'CAP_OBSERVATORY_STATUSES',
+            'CAP_METADATA',
+            'CAP_DEVICE_COMMANDS',
+            'CAP_BAD_CAPABILITY_1',
+            'CAP_BAD_CAPABILITY_2'
+        ]
+        reply = yield self.ia_client.get_capabilities(params,'none')
+        success = reply['success']
+        result = reply['result']
+        transaction_id = reply['transaction_id']
+        result_3 = result
+        
+        self.assertEqual(success[0],'ERROR')
+        self.assertEqual(type(result),dict)
+        self.assertEqual(transaction_id,None)
+        self.assertEqual(result['CAP_OBSERVATORY_STATUSES'][0][0],'OK')
+        self.assertEqual(result['CAP_METADATA'][0][0],'OK')
+        self.assertEqual(result['CAP_DEVICE_COMMANDS'][0][0],'OK')
+        self.assertEqual(all(map(lambda x: x in instrument_agent.ci_status_list,result['CAP_OBSERVATORY_STATUSES'][1])),True)
+        self.assertEqual(all(map(lambda x: x in instrument_agent.metadata_list,result['CAP_METADATA'][1])),True)
+        self.assertEqual(all(map(lambda x: isinstance(x,(str,None)),result['CAP_DEVICE_COMMANDS'][1])),True)        
+        self.assertEqual(result['CAP_BAD_CAPABILITY_1'][0][0],'ERROR')
+        self.assertEqual(result['CAP_BAD_CAPABILITY_1'][1],None)
+        self.assertEqual(result['CAP_BAD_CAPABILITY_2'][0][0],'ERROR')
+        self.assertEqual(result['CAP_BAD_CAPABILITY_2'][1],None)
                 
+        # Start a transaction.
+        reply = yield self.ia_client.start_transaction(0)
+        success = reply['success']
+        transaction_id = reply['transaction_id']
+        transaction_id_4 = transaction_id
+        
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(type(transaction_id),str)
+        self.assertEqual(len(transaction_id),36)
+
+        # Try to get capabilities without a transaction.
+        params = ['all']
+        reply = yield self.ia_client.get_capabilities(params,'none')
+        success = reply['success']
+        result = reply['result']
+        transaction_id = reply['transaction_id']
+
+        self.assertEqual(success[0],'ERROR')
+        self.assertEqual(result,None)
+        self.assertEqual(transaction_id,None)
+        
+        
+        # Try to get capabilities with implicit transaction.
+        params = ['all']
+        reply = yield self.ia_client.get_capabilities(params,'create')
+        success = reply['success']
+        result = reply['result']
+        transaction_id = reply['transaction_id']
+
+        self.assertEqual(success[0],'ERROR')
+        self.assertEqual(result,None)
+        self.assertEqual(transaction_id,None)
+        
+        
+        # Try to get capabilities with bad transaction ID.
+        bad_tid = str(uuid.uuid4())
+        params = ['all']
+        reply = yield self.ia_client.get_capabilities(params,bad_tid)
+        success = reply['success']
+        result = reply['result']
+        transaction_id = reply['transaction_id']
+
+        self.assertEqual(success[0],'ERROR')
+        self.assertEqual(result,None)
+        self.assertEqual(transaction_id,None)
+        
+        
+        # Get capabilities with correct transaction ID.
+        params = ['all']
+        reply = yield self.ia_client.get_capabilities(params,transaction_id_4)
+        success = reply['success']
+        result = reply['result']
+        transaction_id = reply['transaction_id']
+        transaction_id_8 = transaction_id
+        result_8 = result
+
+        self.assertEqual(success[0],'OK')
+        self.assertEqual(result_8,result_1)
+        self.assertEqual(transaction_id_8,transaction_id_4)
+        
+        # End the transaction.
+        reply = yield self.ia_client.end_transaction(transaction_id_4)
+        success = reply['success']
+        
+        self.assertEqual(success[0],'OK')
+        
+        
                 
+    """                
     @defer.inlineCallbacks
     def test_execute_device(self):
         raise unittest.SkipTest("To be done.")

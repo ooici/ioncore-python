@@ -183,11 +183,11 @@ Names of observatory and device capability lists.
 """
 capabilities_list = [
     'CAP_OBSERVATORY_COMMANDS',         # Common and specific observatory command names.
-    'CAP_OBSERVATORY_PARAMETERS',       # Common and specific observatory parameter names.
+    'CAP_OBSERVATORY_PARAMS',           # Common and specific observatory parameter names.
     'CAP_OBSERVATORY_STATUSES',         # Common and specific observatory status names.
     'CAP_METADATA',                     # Common and specific metadata names.
     'CAP_DEVICE_COMMANDS',              # Common and specific device command names.
-    'CAP_DEVICE_PARAMETERS',            # Common and specific device parameter names.
+    'CAP_DEVICE_PARAMS',                # Common and specific device parameter names.
     'CAP_DEVICE_STATUSES'               # Common and specific device status names.
 ]
 
@@ -1394,46 +1394,54 @@ class InstrumentAgent(ResourceAgent):
         # Do the work here.
         # Set up the result message.
         for arg in params:
-            if arg not in capabilities_list or arg != 'all':
-                result[arg] = (errors['INVALID_CAP_PARAM'],None)
-                
-            elif arg == 'CAP_OBSERVATORY_COMMANDS' or arg == 'all':
+            if arg not in capabilities_list and arg != 'all':
+                result[arg] = (errors['INVALID_CAPABILITY'],None)
+                get_errors = True
+                continue
+            
+            if arg == 'CAP_OBSERVATORY_COMMANDS' or arg == 'all':
                 result['CAP_OBSERVATORY_COMMANDS'] = (['OK'],ci_command_list)
                 
-            elif arg == 'CAP_OBSERVATORY_PARAMS' or arg == 'all':
+            if arg == 'CAP_OBSERVATORY_PARAMS' or arg == 'all':
                 result['CAP_OBSERVATORY_PARAMS'] = (['OK'],ci_param_list)
                 
-            elif arg == 'CAP_OBSERVATORY_STATUSES' or arg == 'all':
+            if arg == 'CAP_OBSERVATORY_STATUSES' or arg == 'all':
                 result['CAP_OBSERVATORY_STATUSES'] = (['OK'],ci_status_list)
                 
-            elif arg == 'CAP_METADATA' or arg == 'all':
+            if arg == 'CAP_METADATA' or arg == 'all':
                 result['CAP_METADATA'] = (['OK'],metadata_list)
                 
-            elif arg == 'CAP_DEVICE_COMMANDS' or arg == 'all':
-                dvr_content = {'params':'CAP_DEVICE_COMMANDS'}
-                dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
-                dvr_success = dvr_result[0]
-                dvr_val = dvr_result[1]['CAP_DEVICE_COMMANDS']
-                result['CAP_DEVICE_COMMANDS'] = (dvr_val[0],dvr_val[1])
-                if dvr_success[0] != 'OK':
+            if arg == 'CAP_DEVICE_COMMANDS' or arg == 'all':
+                #TDOD driver integration.
+                #dvr_content = {'params':'CAP_DEVICE_COMMANDS'}
+                #dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
+                #dvr_success = dvr_result[0]
+                #dvr_val = dvr_result[1]['CAP_DEVICE_COMMANDS']
+                dvr_val = (['OK'],['device_command_1','device_command_2'])
+                result['CAP_DEVICE_COMMANDS'] = dvr_val
+                if dvr_val[0][0] != 'OK':
                     get_errors = True
                 
-            elif arg == 'CAP_DEVICE_PARAMS' or arg == 'all':
-                dvr_content = {'params':'CAP_DEVICE_PARAMS'}
-                dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
-                dvr_success = dvr_result[0]
-                dvr_val = dvr_result[1]['CAP_DEVICE_PARAMS']
-                result['CAP_DEVICE_PARAMS'] = (dvr_val[0],dvr_val[1])
-                if dvr_success[0] != 'OK':
+            if arg == 'CAP_DEVICE_PARAMS' or arg == 'all':
+                #TDOD driver integration.
+                #dvr_content = {'params':'CAP_DEVICE_PARAMS'}
+                #dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
+                #dvr_success = dvr_result[0]
+                #dvr_val = dvr_result[1]['CAP_DEVICE_PARAMS']
+                dvr_val = (['OK'],['device_param_1','device_param_2','device_param_3'])
+                result['CAP_DEVICE_PARAMS'] = dvr_val
+                if dvr_val[0][0] != 'OK':
                     get_errors = True
                 
-            elif arg == 'CAP_DEVICE_STATUSES' or arg == 'all':
-                dvr_content = {'params':'CAP_DEVICE_STATUSES'}
-                dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
-                dvr_success = dvr_result[0]
-                dvr_val = dvr_result[1]['CAP_DEVICE_STATUSES']
-                result['CAP_DEVICE_STATUSES'] = (dvr_val[0],dvr_val[1])
-                if dvr_success[0] != 'OK':
+            if arg == 'CAP_DEVICE_STATUSES' or arg == 'all':
+                #TODO driver integration.
+                #dvr_content = {'params':'CAP_DEVICE_STATUSES'}
+                #dvr_result = yield self.driver_client.rpc_send('get_capabilities',dvr_content)
+                #dvr_success = dvr_result[0]
+                #dvr_val = dvr_result[1]['CAP_DEVICE_STATUSES']
+                dvr_val = (['OK'],['device_status_1','device_status_2','device_status_3'])
+                result['CAP_DEVICE_STATUSES'] = dvr_val
+                if dvr_val[0][0] != 'OK':
                     get_errors = True
  
         
