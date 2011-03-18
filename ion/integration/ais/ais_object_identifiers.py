@@ -61,7 +61,8 @@ message AisDataResourceSummaryMsg {
    optional string institution      = 4;
    optional string source           = 5; 
 
-}"""
+}
+"""
 
 # FindDataResources GPBs from ion-object-definitions/net/ooici/integration/ais/findDataResources/find_data_resources.proto
 FIND_DATA_RESOURCES_REQ_MSG_TYPE = object_utils.create_type_identifier(object_id=9031, version=1)
@@ -94,7 +95,7 @@ message FindDataResourcesRspMsg {
        _VERSION = 1;	
    }
 
-   repeated string data_resource_id
+   repeated net.ooici.core.link.CASRef dataResourceSummary = 1;
 }
 """
 
