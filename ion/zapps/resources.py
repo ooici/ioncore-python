@@ -80,6 +80,7 @@ array_structure_type = object_utils.create_type_identifier(object_id=10025, vers
 attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
 stringArray_type = object_utils.create_type_identifier(object_id=10015, version=1)
 float32Array_type = object_utils.create_type_identifier(object_id=10013, version=1)
+float64Array_type = object_utils.create_type_identifier(object_id=10014, version=1)
 int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
 
 
@@ -308,12 +309,14 @@ def _bootstrap_objects(supid):
     attrib_conventions = _create_string_attribute(dataset, 'Conventions', ['CF-1.5'])
     attrib_time_start = _create_string_attribute(dataset, 'ion_time_coverage_start', ['2008-08-01T00:50:00Z'])
     attrib_time_end = _create_string_attribute(dataset, 'ion_time_coverage_end', ['2008-08-01T23:50:00Z'])
-    attrib_lat_max = _create_string_attribute(dataset, 'ion_geospatial_lat_max', ['-45.431'])
-    attrib_lat_min = _create_string_attribute(dataset, 'ion_geospatial_lat_min', ['-45.431'])
-    attrib_lon_max = _create_string_attribute(dataset, 'ion_geospatial_lon_max', ['25.909'])
-    attrib_lon_min = _create_string_attribute(dataset, 'ion_geospatial_lon_min', ['25.909'])
-    attrib_vert_max = _create_string_attribute(dataset, 'ion_geospatial_vertical_max', ['0.0'])
-    attrib_vert_min = _create_string_attribute(dataset, 'ion_geospatial_vertical_min', ['0.2'])
+    
+    attrib_lat_max = _create_double_attribute(dataset, 'ion_geospatial_lat_max', [-45.431])
+    attrib_lat_min = _create_double_attribute(dataset, 'ion_geospatial_lat_min', [-45.431])
+    attrib_lon_max = _create_double_attribute(dataset, 'ion_geospatial_lon_max', [25.909])
+    attrib_lon_min = _create_double_attribute(dataset, 'ion_geospatial_lon_min', [25.909])
+    attrib_vert_max = _create_double_attribute(dataset, 'ion_geospatial_vertical_max', [0.0])
+    attrib_vert_min = _create_double_attribute(dataset, 'ion_geospatial_vertical_min', [0.2])
+    
     attrib_vert_pos = _create_string_attribute(dataset, 'ion_geospatial_vertical_positive', ['down'])
     
     group.attributes.add()
@@ -380,6 +383,19 @@ def _bootstrap_objects(supid):
                      'datasource1':datasource.ResourceIdentity}
     defer.returnValue(data_resources)
     
+
+
+def _create_double_attribute(dataset, name, values):
+    '''
+    Helper method to create double (float64) attributes for variables and dataset groups
+    '''
+    atrib = dataset.CreateObject(attribute_type)
+    atrib.name = name
+    atrib.data_type = atrib.DataType.DOUBLE
+    atrib.array = dataset.CreateObject(float64Array_type)
+    atrib.array.value.extend(values)
+    return atrib
+
 def _create_string_attribute(dataset, name, values):
     '''
     Helper method to create string attributes for variables and dataset groups
