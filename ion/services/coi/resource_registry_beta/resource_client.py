@@ -67,8 +67,8 @@ class ResourceClient(object):
         if not proc:
             proc = process.Process()
         
-        if not hasattr(proc, 'op_fetch_linked_objects'):
-            setattr(proc, 'op_fetch_linked_objects', proc.workbench.op_fetch_linked_objects)
+        if not hasattr(proc, 'op_fetch_blobs'):
+            setattr(proc, 'op_fetch_blobs', proc.workbench.op_fetch_blobs)
                         
         self.proc = proc
         
@@ -178,21 +178,20 @@ class ResourceClient(object):
         else:
             raise ResourceClientError('''Illegal argument type in retrieve_resource_instance:
                                       \n type: %s \nvalue: %s''' % (type(resource_id), str(resource_id)))    
-            
+
         # Pull the repository
         result= yield self.workbench.pull(self.datastore_service, reference)
 
-        
         if result.MessageResponseCode == result.ResponseCodes.NOT_FOUND:
             raise ResourceClientError('Pull from datastore failed in resource client! Resource Not Found!')
         #elif :
-        
         
         # Get the repository
         repo = self.workbench.get_repository(reference)
         yield repo.checkout(branch)
         
         # Create a resource instance to return
+        # @TODO - Check and see if there is already one - what to do?
         resource = ResourceInstance(repo)
             
         self.workbench.set_repository_nickname(reference, resource.ResourceName)
@@ -218,7 +217,7 @@ class ResourceClient(object):
             
         repository.commit(comment=comment)            
             
-        result = yield self.workbench.push(self.datastore_service, repository.repository_key)
+        result = yield self.workbench.push(self.datastore_service, repository)
 
         if not result.MessageResponseCode == result.ResponseCodes.OK :
             raise ResourceClientError('Push to datastore failed during put_instance')

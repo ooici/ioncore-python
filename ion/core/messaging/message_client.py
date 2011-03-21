@@ -30,7 +30,7 @@ from ion.core.object import gpb_wrapper
 
 from ion.core.object import object_utils
 
-ion_message_type = object_utils.create_type_identifier(object_id=11, version=1)
+ION_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=11, version=1)
 idref_Type = object_utils.create_type_identifier(object_id=4, version=1)
 
 CONF = ioninit.config(__name__)
@@ -92,9 +92,9 @@ class MessageClient(object):
         yield self._check_init()
 
         # Create a sendable message object
-        msg_repo= self.workbench.create_repository(ion_message_type)
+        msg_repo= self.workbench.create_repository(ION_MESSAGE_TYPE)
         
-        msg_object = msg_repo._workspace_root
+        msg_object = msg_repo.root_object
         
         if MessageName:
             log.info('MessageName is a depricated architectural concept. Please do not use it!')
@@ -187,7 +187,7 @@ class MessageInstanceType(type):
         if message_repository.status == repository.Repository.NOTINITIALIZED:
             raise MessageInstanceError('MessageInstance init Repository argument is in an invalid state - checkout first!')
         
-        if message_repository.root_object.ObjectType != ion_message_type:
+        if message_repository.root_object.ObjectType != ION_MESSAGE_TYPE:
             raise MessageInstanceError('MessageInstance init Repository is not a message object!')
         
         message_obj = message_repository.root_object.message_object

@@ -16,6 +16,61 @@ from uuid import uuid4
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.attributestore import AttributeStoreClient
+from ion.core.messaging.message_client import MessageClient
+from ion.core.object import object_utils
+
+ADDTASK_REQ_TYPE  = object_utils.create_type_identifier(object_id=2601, version=1)
+"""
+message AddTaskRequest {
+    enum _MessageTypeIdentifier {
+      _ID = 2601;
+      _VERSION = 1;
+    }
+
+    // target is destination address
+    // interval is fractional seconds between messages
+    // payload is string
+
+    optional string target    = 1;
+    optional double interval  = 2;
+    optional string payload   = 3;
+}
+"""
+
+ADDTASK_RSP_TYPE  = object_utils.create_type_identifier(object_id=2602, version=1)
+"""
+message AddTaskResponse {
+    enum _MessageTypeIdentifier {
+      _ID = 2602;
+      _VERSION = 1;
+    }
+
+    // the string guid
+    // interval is fractional seconds between messages
+    // payload is string
+
+    optional string task_id = 1;
+}
+
+"""
+
+
+RMTASK_REQ_TYPE   = object_utils.create_type_identifier(object_id=2603, version=1)
+"""
+message RmTaskRequest {
+    enum _MessageTypeIdentifier {
+      _ID = 2603;
+      _VERSION = 1;
+    }
+
+    // task id is GUID
+    optional string task_id = 1;
+
+}
+"""
+
+RMTASK_RSP_TYPE   = object_utils.create_type_identifier(object_id=2604, version=1)
+
 
 
 class SchedulerService(ServiceProcess):
@@ -32,6 +87,7 @@ class SchedulerService(ServiceProcess):
     def slc_init(self):
         # @note Might want to start another AS instance with a different target name
         self.store = AttributeStoreClient(targetname='attributestore')
+        self.mc = MessageClient(proc=self)
 
     def slc_stop(self):
         log.debug('SLC stop of Scheduler')
@@ -51,14 +107,14 @@ class SchedulerService(ServiceProcess):
     def op_add_task(self, content, headers, msg):
         """
         @brief Add a new task to the crontab. Interval is in seconds, fractional.
-        @param content Message payload, must be a dictionary with 'target', 'interval' and 'payload' keys
+        @param content Message payload, must be a GPB #2601
         @param headers Ignored here
         @param msg Ignored here
         @retval reply_ok or reply_err
         """
         try:
             task_id = str(uuid4())
-            msg_interval = float(content['interval'])
+            msg_interval = content.interval
         except KeyError, ke:
             log.exception('Required keys in payload not found!')
             yield self.reply_err(msg, {'value': str(ke)})
@@ -67,7 +123,14 @@ class SchedulerService(ServiceProcess):
         log.debug('ok, gotta task to save')
 
         # Just drop the entire message payload in
-        rc = yield self.store.put(task_id, content)
+
+        # convert back to dictionary for now, but store.put should eventually 
+        #   take a protobuf
+        msg_dict = {'target':   content.target, 
+                    'interval': content.interval,
+                    'payload':  content.payload}
+
+        rc = yield self.store.put(task_id, msg_dict)
         if re.search('rror', rc):
             yield self.reply_err(msg, 'Error "%s" adding task to registry!' % rc)
             return
@@ -76,7 +139,11 @@ class SchedulerService(ServiceProcess):
         log.debug('Adding task to scheduler')
         reactor.callLater(msg_interval, self._send_and_reschedule, task_id)
         log.debug('Add completed OK')
-        yield self.reply_ok(msg, {'value':task_id})
+
+        resp = yield self.mc.create_instance(ADDTASK_RSP_TYPE)
+        resp.task_id = task_id
+
+        yield self.reply_ok(msg, resp)
 
     @defer.inlineCallbacks
     def op_rm_task(self, content, headers, msg):
@@ -84,7 +151,7 @@ class SchedulerService(ServiceProcess):
         Remove a task from the list/store. Will be dropped from the reactor
         when the timer fires and _send_and_reschedule checks the registry.
         """
-        task_id = content
+        task_id = content.task_id
 
         if not task_id:
             err = 'required argument task_id not found in message'
@@ -94,8 +161,12 @@ class SchedulerService(ServiceProcess):
 
         log.debug('Removing task_id %s from store...' % task_id)
         yield self.store.remove(task_id)
+
+        resp = yield self.mc.create_instance(RMTASK_RSP_TYPE)
+        resp.value = 'OK'
+
         log.debug('Removal completed')
-        yield self.reply_ok(msg, {'value': 'OK'})
+        yield self.reply_ok(msg, resp)
 
     @defer.inlineCallbacks
     def op_query_tasks(self, content, headers, msg):
@@ -153,6 +224,7 @@ class SchedulerServiceClient(ServiceClient):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = 'scheduler'
         ServiceClient.__init__(self, proc, **kwargs)
+        self.mc = MessageClient(proc=proc)
 
     @defer.inlineCallbacks
     def add_task(self, target, interval, payload):
@@ -164,9 +236,16 @@ class SchedulerServiceClient(ServiceClient):
         @retval Task ID, a GUID used as a key for rm_task
         """
         yield self._check_init()
-        msg_dict = {'target': target, 'payload': payload, 'interval': interval}
-        (content, headers, msg) = yield self.rpc_send('add_task', msg_dict)
-        defer.returnValue(content)
+
+        msg_buf = yield self.mc.create_instance(ADDTASK_REQ_TYPE,  
+                                                MessageName='Scheduler AddTask')
+
+        msg_buf.target    = target
+        msg_buf.payload   = payload
+        msg_buf.interval  = interval
+
+        (content, headers, msg) = yield self.rpc_send('add_task', msg_buf)
+        defer.returnValue(content.task_id)
 
     @defer.inlineCallbacks
     def rm_task(self, taskid):
@@ -178,7 +257,13 @@ class SchedulerServiceClient(ServiceClient):
         """
         #log.info("In SchedulerServiceClient: rm_task")
         yield self._check_init()
-        (content, headers, msg) = yield self.rpc_send('rm_task', taskid)
+
+        msg_buf = yield self.mc.create_instance(RMTASK_REQ_TYPE,  
+                                                MessageName='Scheduler RmTask')
+
+        msg_buf.task_id = taskid
+
+        (content, headers, msg) = yield self.rpc_send('rm_task', msg_buf)
         defer.returnValue(content)
 
     @defer.inlineCallbacks

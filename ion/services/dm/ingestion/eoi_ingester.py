@@ -4,15 +4,18 @@
 @file ion/services/coi/resource_registry/resource_registry.py
 @author Michael Meisinger
 @author David Stuebe
+@author Dave Foster <dfoster@asascience.com>
+@author Tim LaRocque (client changes only)
 @brief service for registering resources
 
 To test this with the Java CC!
 > scripts/start-cc -h amoeba.ucsd.edu -a sysname=eoitest res/scripts/eoi_demo.py
 """
 
+import time
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from twisted.python import reflect
 
 from ion.services.coi import datastore
@@ -29,7 +32,9 @@ import ion.util.procutils as pu
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry_beta.resource_client import \
     ResourceClient
+from ion.services.dm.distribution.publisher_subscriber import Subscriber
 
+from ion.core.exception import ApplicationError
 
 # For testing - used in the client
 from net.ooici.play import addressbook_pb2
@@ -46,6 +51,11 @@ addressbook_type = object_utils.create_type_identifier(object_id=20002, version=
 
 BEGIN_INGEST_TYPE = object_utils.create_type_identifier(object_id=2002, version=1)
 
+class EOIIngestionError(ApplicationError):
+    """
+    An error occured during the begin_ingest op of EOIIngestionService.
+    """
+    pass
 
 class EOIIngestionService(ServiceProcess):
     """
@@ -66,11 +76,12 @@ class EOIIngestionService(ServiceProcess):
 
         self.push = self.workbench.push
         self.pull = self.workbench.pull
-        self.fetch_linked_objects = self.workbench.fetch_linked_objects
-        self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
-        self.fetch_linked_objects = self.workbench.fetch_linked_objects
+        self.fetch_blobs = self.workbench.fetch_blobs
+        self.op_fetch_blobs = self.workbench.op_fetch_blobs
 
-        log.info('ResourceRegistryService.__init__()')
+        self._defer_ingest = defer.Deferred()       # waited on by op_ingest to signal end of ingestion
+
+        log.info('EOIIngestionService.__init__()')
 
     @defer.inlineCallbacks
     def op_ingest(self, content, headers, msg):
@@ -78,10 +89,11 @@ class EOIIngestionService(ServiceProcess):
         Push this dataset to the datastore
         """
         log.debug('op_ingest recieved content:'+ str(content))
-        
+
+       
         msg_repo = content.Repository
         
-        result = yield self.push('datastore', msg_repo.repository_key)
+        result = yield self.push('datastore', msg_repo)
         
         assert result.MessageResponseCode == result.ResponseCodes.OK, 'Push to datastore failed!'
         
@@ -107,25 +119,89 @@ class EOIIngestionService(ServiceProcess):
         yield self.reply(msg, content=head)
         
         
-        
+    class IngestSubscriber(Subscriber):
+        """
+        Specially derived Subscriber that routes received messages into the ingest service's
+        standard receive method, as if it is one of the process receivers.
+        """
+        @defer.inlineCallbacks
+        def _receive_handler(self, content, msg):
+            yield self._process.receive(content, msg)
+
     @defer.inlineCallbacks
-    def op_begin_ingest(self, content, headers, msg):
+    def op_perform_ingest(self, content, headers, msg):
         """
         Start the ingestion process by setting up neccessary
         """
         log.info('<<<---@@@ Incoming begin_ingest request with "Begin Ingest" message')
         log.debug("...Content:\t" + str(content))
-        
-        
+
+
         log.info('Setting up ingest topic for communication with a Dataset Agent: "%s"' % content.ds_ingest_topic)
+        self._subscriber = self.IngestSubscriber(xp_name="magnet.topic",
+                                                 binding_key=content.ds_ingest_topic,
+                                                 process=self)
+        yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
+
+        def _timeout():
+            # trigger execution to continue below with a False result
+            log.info("Timed out in op_perform_ingest")
+            self._defer_ingest.callback(False)
+
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
+        timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
+
         log.info('Notifying caller that ingest is ready by invoking RPC op_ingest_ready() using routing key: "%s"' % content.ready_routing_key)
-        
-        
-        yield self.reply(msg, content={'topic':content.ds_ingest_topic})
+        self.send(content.ready_routing_key, operation='ingest_ready', content=True)
+        #yield self.rpc_send(content.ready_routing_key, operation='ingest_ready', content=True)
 
+        log.info("Yielding in op_perform_ingest for receive loop to complete")
+        ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
 
-    
+        # common cleanup
+
+        # reset ingestion deferred so we can use it again
+        self._defer_ingest = defer.Deferred()
+
+        # remove subscriber, deactivate it
+        self._registered_life_cycle_objects.remove(self._subscriber)
+        yield self._subscriber.terminate()
+        self._subscriber = None
+
+        if ingest_res:
+            log.debug("Ingest succeeded, respond to original request")
+
+            # we succeeded, cancel the timeout
+            timeoutcb.cancel()
+
+            # now reply ok to the original message
+            yield self.reply_ok(msg, content={'topic':content.ds_ingest_topic})
+        else:
+            log.debug("Ingest failed, error back to original request")
+            raise EOIIngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
+            #yield self.reply_err(msg, content="dyde")
+
+    @defer.inlineCallbacks
+    def op_recv_shell(self, content, headers, msg):
+        log.info("op_recv_shell")
+        # this is NOT rpc
+        yield msg.ack()
+
+    @defer.inlineCallbacks
+    def op_recv_chunk(self, content, headers, msg):
+        log.info("op_recv_chunk")
+        # this is NOT rpc
+        yield msg.ack()
+
+    @defer.inlineCallbacks
+    def op_recv_done(self, content, headers, msg):
+        log.info("op_recv_done")
+        # this is NOT rpc
+        yield msg.ack()
+
+        # trigger the op_perform_ingest to complete!
+        self._defer_ingest.callback(True)
+
 class EOIIngestionClient(ServiceClient):
     """
     Class for the client accessing the resource registry.
@@ -184,7 +260,7 @@ class EOIIngestionClient(ServiceClient):
         
         
     @defer.inlineCallbacks
-    def begin_ingest(self, ds_ingest_topic, ready_routing_key, ingest_service_timeout):
+    def perform_ingest(self, ds_ingest_topic, ready_routing_key, ingest_service_timeout):
         """
         Start the ingest process by passing the Service a topic to communicate on, a
         routing key for intermediate replies (signaling that the ingest is ready), and
@@ -201,14 +277,23 @@ class EOIIngestionClient(ServiceClient):
         begin_msg.ready_routing_key       = ready_routing_key
         begin_msg.ingest_service_timeout = ingest_service_timeout
 
-        # Invoke [op_]update_request() on the target service 'dispatcher_svc' via RPC
-        log.info("@@@--->>> Sending 'begin_ingest' RPC message to eoi_ingest service")
-        (content, headers, msg) = yield self.rpc_send('begin_ingest', begin_msg)
+        # Invoke [op_]() on the target service 'dispatcher_svc' via RPC
+        log.info("@@@--->>> Sending 'perform_ingest' RPC message to eoi_ingest service")
+        content = ""
+        (content, headers, msg) = yield self.rpc_send('perform_ingest', begin_msg, timeout=ingest_service_timeout+30)
         
 
         defer.returnValue(content)
         
         
+    @defer.inlineCallbacks
+    def demo(self, ds_ingest_topic):
+        yield self.proc.send(ds_ingest_topic, operation='recv_shell', content='demo_start')
+
+        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='demo_data1')
+        yield self.proc.send(ds_ingest_topic, operation='recv_chunk', content='demo_data1')
+
+        yield self.proc.send(ds_ingest_topic, operation='recv_done', content='demo_done')
 
 # Spawn of the process using the module name
 factory = ProcessFactory(EOIIngestionService)
@@ -230,6 +315,7 @@ bin/twistd -n cc -h amoeba.ucsd.edu -a sysname=eoitest res/apps/resource.app
 from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
 client = EOIIngestionClient()
 spawn('eoi_ingest')
+
 client.begin_ingest('ingest.topic.123iu2yr82', 'ready_routing_key', 1234)
 
 '''

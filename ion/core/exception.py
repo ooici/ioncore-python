@@ -30,7 +30,7 @@ class ApplicationError(IonError):
     cause the process to terminate.
     """
     
-    def __init__(self, reason, response_code):
+    def __init__(self, reason, response_code=500):
         """
         @param reason a string explaining the cause of the exception
         @param response_code is an http style numerical error code. These are defined in the ION Message

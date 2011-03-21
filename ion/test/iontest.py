@@ -60,7 +60,7 @@ class IonTestCase(unittest.TestCase):
         mopt['broker_vhost'] = CONF['broker_vhost']
         mopt['broker_heartbeat'] = CONF['broker_heartbeat']
         mopt['no_shell'] = True
-        mopt['script'] = CONF['start_app']
+        mopt['scripts'] = [CONF['start_app']]
 
         # Little trick to have no consecutive failures if previous setUp() failed
         if Container._started:
