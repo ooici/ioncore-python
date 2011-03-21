@@ -209,9 +209,9 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         log.info("testing authentication")
         try:
-            ooi_id2 = yield self.irc.authenticate_user(IdentityRequest)
-            log.debug('OOI_ID2 = ' + ooi_id2)
-            self.assertEqual(ooi_id1, ooi_id2)
+            Response = yield self.irc.authenticate_user(IdentityRequest)
+            log.debug('OOI_ID2 = ' + Response.resource_reference.ooi_id)
+            self.assertEqual(ooi_id1, Response.resource_reference.ooi_id)
         except ReceivedApplicationError, ex:
             self.fail("Authenticate_user failed to find a registered user")
         
