@@ -16,6 +16,8 @@ from ion.core import ioninit
 from ion.core.intercept.interceptor import EnvelopeInterceptor
 import ion.util.procutils as pu
 
+from ion.core.process.cprocess import Invocation
+
 import time
 
 from ion.util.config import Config
@@ -55,8 +57,9 @@ class PolicyInterceptor(EnvelopeInterceptor):
         return self.is_authorized(msg, invocation)
 
     def after(self, invocation):
-        msg = invocation.message
-        return self.is_authorized(msg, invocation)
+        return invocation
+        # msg = invocation.message
+        # return self.is_authorized(msg, invocation)
 
     def is_authorized(self, msg, invocation):
         """
@@ -83,19 +86,19 @@ class PolicyInterceptor(EnvelopeInterceptor):
         # Reject improperly defined messages
         if not 'user-id' in msg:
             log.info("Policy Interceptor: Rejecting improperly defined message missing user-id [%s]." % str(msg))
-            invocation.drop('Error: no user-id defined in message header!')
+            invocation.drop(note='Error: no user-id defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             return invocation
         if not 'expiry' in msg:
             log.info("Policy Interceptor: Rejecting improperly defined message missing expiry [%s]." % str(msg))
-            invocation.drop('Error: no expiry defined in message header!')
+            invocation.drop(note='Error: no expiry defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             return invocation
         if not 'receiver' in msg:
             log.info("Policy Interceptor: Rejecting improperly defined message missing receiver [%s]." % str(msg))
-            invocation.drop('Error: no receiver defined in message header!')
+            invocation.drop(note='Error: no receiver defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             return invocation
         if not 'op'in msg:
             log.info("Policy Interceptor: Rejecting improperly defined message missing op [%s]." % str(msg))
-            invocation.drop('Error: no op defined in message header!')
+            invocation.drop(note='Error: no op defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             return invocation
         
         user_id = msg['user-id']
@@ -103,14 +106,14 @@ class PolicyInterceptor(EnvelopeInterceptor):
         
         if not type(expirystr) is str:
             log.info("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
-            invocation.drop('Error: expiry improperly defined in message header!')
+            invocation.drop(note='Error: expiry improperly defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             return invocation
 
         try:
             expiry = int(expirystr)
         except ValueError, ex:
             log.info("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
-            invocation.drop('Error: expiry improperly defined in message header!')
+            invocation.drop(note='Error: expiry improperly defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             return invocation
             
         rcvr = msg['receiver']
@@ -137,7 +140,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
                     log.info('Policy Interceptor: Authentication matches')
                 else:
                     log.info('Policy Interceptor: Authentication failed')
-                    invocation.drop('Not authorized')
+                    invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
                     return invocation
         else:
             log.info('Policy Interceptor: service not in policy dictionary.')
@@ -148,7 +151,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
         
             if current_time > expiry_time:
                 log.info('Policy Interceptor: Current time [%s] exceeds expiry [%s]. Returning Not Authorized.' % (str(current_time), expiry))
-                invocation.drop('Authentication expired')
+                invocation.drop(note='Authentication expired', code=Invocation.CODE_UNAUTHORIZED)
                 return invocation
 
         log.info('Policy Interceptor: Returning Authorized.')
