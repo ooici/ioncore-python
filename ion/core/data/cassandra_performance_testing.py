@@ -10,11 +10,14 @@ from twisted.internet import reactor
 
 import sha, time
 import random
+from optparse import OptionParser
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+KB = 1024
 MB = 1024 * 1024
+
 
 class CassandraPerformanceTester:
     
@@ -48,12 +51,13 @@ class CassandraPerformanceTester:
     @defer.inlineCallbacks    
     def runTests(self):
         yield  self.setUp()
-        
+       
         if self.index:
             yield self.update_index()
             yield self.query()
             
-        yield self.has_key()    
+        yield self.has_key()
+        yield self.gets()    
         yield  self.tearDown()    
     
     @defer.inlineCallbacks
@@ -85,7 +89,7 @@ class CassandraPerformanceTester:
         def run_query(query):
             num_preds = len(query.get_predicates())
             t1 = time.time()
-            num_queries = 10
+            num_queries = 1
             for i in range(num_queries):
                 rows = yield self.store.query(query)
             t2 = time.time()
@@ -109,6 +113,30 @@ class CassandraPerformanceTester:
         q4.add_predicate_eq("subject_key", self.index_values_dict[0])
         q4.add_predicate_eq("branch_name", self.index_values_dict[1])
         yield run_query(q4)
+        
+        keys = self.blobs.keys()
+        random.shuffle(keys)
+        k1 = keys.pop()
+        f = open("/dev/urandom")
+        blob = f.read(1024)
+        one_index_value = sha.sha(blob).digest()
+        yield self.store.update_index(k1, {"subject_key": one_index_value})
+        
+        q5 = Query()
+        q5.add_predicate_eq("subject_key", one_index_value)
+        yield run_query(q5)
+        
+        k2 = keys.pop()
+        blob = f.read(1024)
+        two_index_value = sha.sha(blob).digest()
+        yield self.store.update_index(k1, {"subject_commit": two_index_value})
+        yield self.store.update_index(k2, {"subject_commit": two_index_value})
+        
+        q6 = Query()
+        q6.add_predicate_eq("subject_commit", two_index_value)
+        yield run_query(q6)
+        
+        
         
     @defer.inlineCallbacks
     def update_index(self):
@@ -155,23 +183,16 @@ class CassandraPerformanceTester:
         the same number of keys that are not in the cluster.
         """
         
-        keys_fraction = .5
-        keys = self.blobs.keys()
-        random.shuffle(keys)
-        test_keys = []
-        num_has_keys = int(round(len(keys)* keys_fraction))
-        for i in range(num_has_keys):
-            test_keys.append(keys.pop())
-            
+        test_keys = self.get_key_fraction(.5)
+        num_has_keys = len(test_keys)    
         t1 = time.time()
         for k in test_keys:
             yield self.store.has_key(k)
         t2 = time.time()
         
         diff = t2 - t1
-        print "Time to do %s has_keys with positives: %s " % (num_has_keys, diff)    
-        
-        
+        print "Time to do %s has_keys with positives: %s " % (len(test_keys), diff)    
+             
         f = open("/dev/urandom")
         no_keys = []
         for i in range(num_has_keys):
@@ -184,8 +205,29 @@ class CassandraPerformanceTester:
             yield self.store.has_key(k)  
         t2 = time.time()
         diff = t2 - t1
-        print "Time to do %s has_keys with negatives: %s " % (num_has_keys, diff)      
+        print "Time to do %s has_keys with negatives: %s " % (len(no_keys), diff)   
+           
+    def get_key_fraction(self, keys_fraction):
+        
+        keys = self.blobs.keys()
+        random.shuffle(keys)
+        test_keys = []
+        num_has_keys = int(round(len(keys)* keys_fraction))
+        for i in range(num_has_keys):
+            test_keys.append(keys.pop())
             
+        return test_keys
+        
+    @defer.inlineCallbacks
+    def gets(self):
+        test_keys = self.get_key_fraction(.5)
+        t1 = time.time()
+        for k in test_keys:
+            val = yield self.store.get(k)
+        t2 = time.time()
+        diff = t2 - t1
+        print "Time to do %s gets: %s " % (len(test_keys), diff)
+                    
     @defer.inlineCallbacks
     def tearDown(self):
         keys = self.blobs.keys()
@@ -200,8 +242,13 @@ class CassandraPerformanceTester:
     
     
     
-def main(): 
-    tester = CassandraPerformanceTester(index=True,num_rows=1000)
+def main():
+    parser = OptionParser()
+    parser.add_option("-b", "--blobs", dest="blobs", default=100, help="The number of blobs or rows to put into Cassandra")
+    parser.add_option("-s", "--size", dest="size", default=MB, help="The number of blobs or rows to put into Cassandra")
+    opts, args = parser.parse_args()
+
+    tester = CassandraPerformanceTester(index=True,num_rows=int(opts.blobs),blob_size=int(opts.size))
     tester.runTests()
     reactor.run() 
     

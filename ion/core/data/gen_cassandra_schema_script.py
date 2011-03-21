@@ -12,7 +12,6 @@ def create_keyspace(pa_dict):
     """
     Create the keyspace definition
     """
-    print pa_dict
     name = pa_dict["name"]
     f = lambda x: "".join((x[0],"=",str(x[1])))
     attrs = " and ".join(map(f, pa_dict.items()))
@@ -24,7 +23,7 @@ def create_column_families(cache_dict):
     """
     Create the column family definitions
     """
-    column_dict = {"column_name": "", "validation_class": "UTF8Type", "index_type":"KEYS"} 
+    column_dict = {"column_name": "", "validation_class": "BytesType", "index_type":"KEYS"} 
     for cf in cache_dict.keys():
         indexed_cols = cache_dict[cf]['indexed columns']
         cols = []
@@ -32,7 +31,7 @@ def create_column_families(cache_dict):
             col_metadata = dict(column_dict)
             col_metadata.update({"column_name": col}) 
             cols.append(col_metadata)
-        attrs = " with comparator=UTF8Type " 
+        attrs = " with comparator=BytesType " 
         if len(cols) > 0:
            attrs = attrs + " and column_metadata=" + str(cols)
 
@@ -41,6 +40,5 @@ def create_column_families(cache_dict):
  
 if __name__ == "__main__":
     scu_dict = scu.STORAGE_CONF_DICTIONARY
-    print scu_dict
     create_keyspace(scu_dict[scu.PERSISTENT_ARCHIVE])
     create_column_families(scu_dict[scu.CACHE_CONFIGURATION]) 
