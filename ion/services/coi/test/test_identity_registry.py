@@ -5,9 +5,11 @@
 @author Roger Unwin, Bill Bollenbacher
 @brief test Idenity Registry Service
 """
+from ion.core import ioninit
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+
 from twisted.internet import defer
 from twisted.trial import unittest
 
@@ -20,7 +22,7 @@ from ion.resources import coi_resource_descriptions
 from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
 from ion.util.itv_decorator import itv
-from ion.core import ioninit
+
 CONF = ioninit.config(__name__)
 
 IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
@@ -108,7 +110,6 @@ class IdentityRegistryClientTest(IonTestCase):
         sup = yield self._spawn_processes(services)
 
         self.irc = IdentityRegistryClient(proc=sup)
-        self.mc = MessageClient(proc=self.test_sup)
         
         # initialize the user
         self.user_subject = "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254"
@@ -169,17 +170,22 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     @defer.inlineCallbacks
     def test_identity_registry(self):
 
+        # Create a message client
+        message_client = MessageClient(proc=self.test_sup)
+
         # build GPB for test case user
-        IdentityRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
+        IdentityRequest = yield message_client.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR register_user request')
         IdentityRequest.configuration = IdentityRequest.CreateObject(IDENTITY_TYPE)
         IdentityRequest.configuration.certificate = self.user_certificate
         IdentityRequest.configuration.rsa_private_key = self.user_rsa_private_key
 
         # test that user is not yet registered
+        log.info("testing for finding unregistered user")
         found = yield self.irc.is_user_registered(self.user_certificate, self.user_rsa_private_key)
         self.assertEqual(found, False)
         
         # test that user is not found
+        log.info("testing for user not found")
         try:
             ooi_id1 = yield self.irc.authenticate_user(IdentityRequest)
             self.fail("Authenticate_user found an unregistered user")
@@ -187,18 +193,22 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.assertEqual(ex.msg_content.MessageResponseCode, IdentityRequest.ResponseCodes.NOT_FOUND)
         
         # Register a user, this shouldn't fail
+        log.info("registering user")
         try:
             Response = yield self.irc.register_user(IdentityRequest)
-            ooi_id1 = Response.resource_reference
+            ooi_id1 = Response.resource_reference.ooi_id
             log.debug('OOI_ID1 = ' + ooi_id1)
+            print "OOI_ID = " + ooi_id1
         except ReceivedApplicationError, ex:
             self.fail("register_user failed")
         
         # Verify we can find it.
+        log.info("testing for finding registered user")
         found = yield self.irc.is_user_registered(self.user_certificate, self.user_rsa_private_key)
         self.assertEqual(found, True)
         
         # reset them to test authenticate
+        log.info("testing authentication")
         try:
             ooi_id2 = yield self.irc.authenticate_user(IdentityRequest)
             log.debug('OOI_ID2 = ' + ooi_id2)
@@ -207,7 +217,8 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail("Authenticate_user failed to find a registered user")
         
         # load the user back
-        OoiIdRequest = yield self.mc.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR get_user request')
+        log.info("testing get_user")
+        OoiIdRequest = yield message_client.create_instance(RESOURCE_CFG_REQUEST_TYPE, MessageName='IR get_user request')
         OoiIdRequest.configuration = IdentityRequest.CreateObject(USER_OOIID_TYPE)
         OoiIdRequest.configuration.ooi_id = ooi_id1
         try:
@@ -216,24 +227,23 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail("get_user failed to find a registered user")
              
         # Test that we got a IR GPB back
+        log.info("testing that GPB returned")
         self.assertNotEqual(user1, None)  
 
-        self.assertEqual(user1['subject'], "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254")
-
-        # Test the ooi_id was properly set within the Person object
-        self.assertEqual(user1['ooi_id'], ooi_id1)
-        
-        # Test for user not found handled properly.
-        OoiIdRequest.configuration.ooi_id = "bogus-ooi_id"
-        result = yield self.irc.get_user(OoiIdRequest)
-        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.NOT_FOUND)
-
+        # Test that subject is correct
+        log.info("testing subject is correct")
+        self.assertEqual(user1.resource_reference.subject, "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254")
+      
         # Test that update work
+        log.info("testing update")
         IdentityRequest.configuration.certificate = self.user_certificate + "\nA Small Change"
-        IdentityRequest.configuration.subject = self.user_certificate + "\nA Small Change"
-        ooi_id2 = yield self.irc.update_user(IdentityRequest)
-        user2 = yield self.irc.get_user(ooi_id2)
-        self.assertEqual(user2['user_cert'], self.user_certificate + "\nA Small Change")
+        IdentityRequest.configuration.subject = user1.resource_reference.subject
+        try:
+            response = yield self.irc.update_user(IdentityRequest)
+        except ReceivedApplicationError, ex:
+            self.fail("update_user failed for user %s"%IdentityRequest.configuration.subject)
+        user2 = yield self.irc.get_user(OoiIdRequest)
+        self.assertEqual(user2.resource_reference.certificate, self.user_certificate + "\nA Small Change")
        
         # Test if we can find the user we have stuffed in.
         user_description = coi_resource_descriptions.IdentityResource()
@@ -245,10 +255,18 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         #self.assertEqual("/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254 CHANGED", users1[0].subject)
              
         # Test if we can set the life cycle state
-        self.assertEqual(str(user1['lifecycle']), 'New') # Should start as new
+        result = yield self.irc.set_identity_lcstate_retired(ooi_id1) # Wishful thinking Roger!
+        try:
+            user2 = yield self.irc.get_user(OoiIdRequest)
+        except ReceivedApplicationError, ex:
+            self.fail("get_user failed to find a registered user")
+        self.assertEqual(user2.resource_reference.life_cycle_state, 'Retired') # Should be retired now
 
-        ooi_id = user1['ooi_id']
+        # Test for user not found handled properly.
+        OoiIdRequest.configuration.ooi_id = "bogus-ooi_id"
+        try:
+            result = yield self.irc.get_user(OoiIdRequest)
+            self.fail("get_user found an unregistered user")
+        except ReceivedApplicationError, ex:
+            self.assertEqual(ex.msg_content.MessageResponseCode, IdentityRequest.ResponseCodes.NOT_FOUND)
 
-        result = yield self.irc.set_identity_lcstate_retired(ooi_id) # Wishful thinking Roger!
-        user2 = yield self.irc.get_user(ooi_id)
-        self.assertEqual(str(user2['lifecycle']), 'Retired') # Should be retired now

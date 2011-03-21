@@ -37,6 +37,8 @@ message UserIdentity {
    optional string rsa_private_key=3;
    optional string dispatcher_queue=4
    optional string email=5
+   optional string subject=6;
+   optional string life_cycle_state=7;
 }
 """""
 
@@ -111,7 +113,7 @@ class IdentityRegistryClient(ServiceClient):
         log.debug("in register_user client")
         yield self._check_init()       
         (content, headers, msg) = yield self.rpc_send('register_user_credentials', Identity)
-        defer.returnValue(str(content))
+        defer.returnValue(content)
 
         
     @defer.inlineCallbacks
@@ -138,7 +140,7 @@ class IdentityRegistryClient(ServiceClient):
         log.debug('in authenticate_user client')
         yield self._check_init()       
         (content, headers, msg) = yield self.rpc_send('authenticate_user_credentials', Identity)
-        defer.returnValue( content )
+        defer.returnValue(content)
 
         
     @defer.inlineCallbacks
@@ -309,7 +311,6 @@ class IdentityRegistryService(ServiceProcess):
         
         # Can be called in __init__ or in slc_init... no yield required
         self.rc = ResourceClient(proc=self)
-        #self.mc = MessageClient(proc=self)
         #Response = yield self.mc.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
         
         self.instance_counter = 1
@@ -405,8 +406,11 @@ class IdentityRegistryService(ServiceProcess):
         self._user_dict[cert_info['subject']] = identity.ResourceIdentity
         # Above line needs to be altered when FIND is implemented
         
-        Response.resource_reference = identity.ResourceIdentity
-        Response.result = Response.ResponseCodes.OK
+        # Create the response object...
+        Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
+        Response.resource_reference = Response.CreateObject(USER_OOIID_TYPE)
+        Response.resource_reference.ooi_id = identity.ResourceIdentity
+        Response.result = "OK"
         defer.returnValue(Response)
  
 
@@ -423,6 +427,13 @@ class IdentityRegistryService(ServiceProcess):
             raise IdentityRegistryException("Required field [ooi_id] not found in message",
                                             request.ResponseCodes.BAD_REQUEST)
 
+        log.debug('in op_get_user:\n'+str(request))
+        log.debug('in op_get_user: request.configuration\n'+str(request.configuration))
+
+        response = yield self.get_user(request)
+        
+        yield self.reply_ok(msg, response)
+
 
     @defer.inlineCallbacks
     def get_user(self, request):
@@ -431,10 +442,20 @@ class IdentityRegistryService(ServiceProcess):
         log.debug('in get_user')
         if request.configuration.ooi_id in self._user_dict.values():
             identity = yield self.rc.get_instance(request.configuration.ooi_id)
-            defer.returnValue(identity)
+            # Create the response object...
+            Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
+            Response.resource_reference = Response.CreateObject(IDENTITY_TYPE)
+            Response.resource_reference.subject = identity.subject
+            Response.resource_reference.certificate = identity.certificate
+            Response.resource_reference.rsa_private_key = identity.rsa_private_key
+            Response.resource_reference.dispatcher_queue = identity.dispatcher_queue
+            Response.resource_reference.email = identity.email
+            Response.resource_reference.life_cycle_state = identity.ResourceLifeCycleState
+            Response.result = "OK"
+            defer.returnValue(Response)
         else:
            log.debug('get_user: no match')
-           raise IdentityRegistryException("user get_user] not found"%request.configuration.ooi_id,
+           raise IdentityRegistryException("user [%s] not found"%request.configuration.ooi_id,
                                            request.ResponseCodes.NOT_FOUND)
 
 
@@ -528,7 +549,9 @@ class IdentityRegistryService(ServiceProcess):
               identity.email = request.configuration.email
               
            self.rc.put_instance(identity, 'Updated user information')
-           defer.returnValue(identity)
+           # Create the response object...
+           Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
+           Response.result = "OK"
 
         else:
            log.debug('update_user: no match')
@@ -543,6 +566,7 @@ class IdentityRegistryService(ServiceProcess):
         It returns True or False
         """
 
+        print "8888888888888888888888888888888888888888888"
         log.info('in op_verify_registration')
 
         authentication = Authentication()
