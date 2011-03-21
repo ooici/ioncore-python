@@ -12,6 +12,7 @@ from ion.play.hello_policy import HelloPolicyClient
 from ion.test.iontest import IonTestCase
 import ion.util.ionlog
 from ion.core import ioninit
+from ion.core.exception import ReceivedApplicationError
 
 import time
 
@@ -82,9 +83,8 @@ class HelloPolicyTest(IonTestCase):
         try:
             result = yield self.hc.hello_request('hello_authenticated_request')
             sent = True
-        except:
+        except ReceivedApplicationError, ex:
             pass
-        # for now, expect timeout
         self.assertFalse(sent)
 
     @defer.inlineCallbacks
@@ -117,8 +117,7 @@ class HelloPolicyTest(IonTestCase):
         try:
             result = yield self.hc.hello_request('hello_authenticated_request', 'MYUSER', expiry)
             sent = True
-        except:
+        except ReceivedApplicationError, ex:
             pass
-        # for now, expect timeout
         self.assertFalse(sent)
 
