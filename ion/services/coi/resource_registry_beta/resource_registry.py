@@ -58,8 +58,8 @@ class ResourceRegistryService(ServiceProcess):
         
         self.push = self.workbench.push
         self.pull = self.workbench.pull
-        self.fetch_linked_objects = self.workbench.fetch_linked_objects
-        self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
+        self.fetch_blobs = self.workbench.fetch_blobs
+        self.op_fetch_blobs = self.workbench.op_fetch_blobs
         
         self.datastore_service = self.spawn_args.get('datastore_service', CONF.getValue('datastore_service', default='No Data Store service name provided!'))
         
@@ -91,8 +91,9 @@ class ResourceRegistryService(ServiceProcess):
         response = yield self.message_client.create_instance(MessageContentTypeID=None)
         
         # Create a new repository to hold this resource
-        resource_repository, resource = self.workbench.init_repository(resource_type)
-        
+        resource_repository = self.workbench.create_repository(resource_type)
+        resource = resource_repository.root_object
+
         # Set the identity of the resource
         resource.identity = resource_repository.repository_key
             
@@ -116,7 +117,7 @@ class ResourceRegistryService(ServiceProcess):
         resource_repository.commit('Created a new resource!')
 
         # push the new resource to the data store        
-        result = yield self.push(self.datastore_service, resource.identity)
+        result = yield self.push(self.datastore_service, resource_repository)
         assert result.MessageResponseCode == result.ResponseCodes.OK, 'Push to datastore failed!'
             
         

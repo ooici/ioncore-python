@@ -6,6 +6,8 @@
 @brief Abstracts from any form of logging in ION
 """
 
+from ion.core import ioninit
+
 class LogFactory(object):
     """
     Factory for producing logger objects with additional handlers.

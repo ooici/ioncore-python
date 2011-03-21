@@ -22,6 +22,7 @@ from ion.core.intercept.interceptor import Invocation
 from ion.core.messaging import messaging
 from ion.util.state_object import BasicLifecycleObject
 import ion.util.procutils as pu
+from ion.core.object.codec import ION_R1_GPB
 
 class IReceiver(Interface):
     """
@@ -197,13 +198,10 @@ class Receiver(BasicLifecycleObject):
 
         data = msg.payload
         if not self.raw:
-            wb = None
-            if hasattr(self.process, 'workbench'):
-                wb = self.process.workbench
             inv = Invocation(path=Invocation.PATH_IN,
                              message=msg,
                              content=data,
-                             workbench=wb)
+                             )
             inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
             msg = inv1.message
             data = inv1.content
@@ -217,6 +215,11 @@ class Receiver(BasicLifecycleObject):
                 finally:
                     del self.rec_messages[id(msg)]
             else:
+                if 'encoding' in data and data['encoding'] == ION_R1_GPB:
+                    # The Codec does not attach the repository to the process. That is done here.
+                    content = data.get('content')
+                    self.process.workbench.put_repository(content.Repository)
+
                 # Make the calls into the application code (e.g. process receive)
                 try:
                     for handler in self.handlers:
@@ -242,13 +245,10 @@ class Receiver(BasicLifecycleObject):
         #log.debug("Send message op="+operation+" to="+str(recv))
         try:
             if not self.raw:
-                wb = None
-                if hasattr(self.process, 'workbench'):
-                    wb = self.process.workbench
                 inv = Invocation(path=Invocation.PATH_OUT,
                                  message=msg,
                                  content=msg['content'],
-                                 workbench=wb)
+                                 )
                 inv1 = yield ioninit.container_instance.interceptor_system.process(inv)
                 msg = inv1.message
 

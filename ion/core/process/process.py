@@ -430,6 +430,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
                     log.info('>>> [%s] receive(): Set stashed user_id to ANONYMOUS' % (self.proc_name))
                 else:
                     log.info('>>> [%s] receive(): Kept stashed user_id the same: [%s]' % (self.proc_name, request.get('user_id')))
+
             if 'expiry' in payload:
                 request.expiry = payload.get('expiry')
                 log.info('>>> [%s] receive(): Set/updated stashed expiry: [%s]' % (self.proc_name, request.get('expiry')))
@@ -439,6 +440,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
                     log.info('>>> [%s] receive(): Set stashed expiry to 0' % (self.proc_name))
                 else:
                     log.info('>>> [%s] receive(): Kept stashed expiry the same: [%s]' % (self.proc_name, request.get('expiry')))
+
+
             # Check if this response is in reply to an outstanding RPC call
             if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
                 yield self._receive_rpc(payload, msg)
@@ -657,12 +660,16 @@ class Process(BasicLifecycleObject,ResponseCodes):
                 log.info('>>> [%s] send(): user-id not specified in headers <<<' % (self.proc_name))
         else:
             log.info('>>> [%s] send(): headers not specified <<<' % (self.proc_name))
+
         msgheaders = self._prepare_message(headers)
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders)
         if reply:
+            log.info('Process Reply: %s' % str(msgheaders))
             d = self.receiver.send(**message)
         else:
+            log.info('Process Send: %s' % str(msgheaders))
+
             d = self.backend_receiver.send(**message)
         return d
 
