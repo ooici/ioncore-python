@@ -17,6 +17,8 @@ from ion.core.id import Id
 import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject
 
+from ion.core.messaging.ion_reply_codes import ResponseCodes
+
 class IInvocation(Interface):
     pass
 
@@ -51,6 +53,12 @@ class Invocation(object):
     # An error has occurred and event processing should stop
     STATUS_ERROR = 'error'
 
+    # Malformed message
+    CODE_BAD_REQUEST = ResponseCodes.BAD_REQUEST
+
+    # Authorization error
+    CODE_UNAUTHORIZED = ResponseCodes.UNAUTHORIZED
+
     def __init__(self, **kwargs):
         """
         @param path A path designator str, e.g. a constant or other
@@ -67,9 +75,11 @@ class Invocation(object):
         self.route = str(kwargs.get('route', ""))
         self.workbench = kwargs.get('workbench',None)
         self.note = None
+        self.code = None
 
-    def drop(self, note=None):
+    def drop(self, note=None, code=None):
         self.note = note
+        self.code = code
         self.status = Invocation.STATUS_DROP
 
     def done(self, note=None):
