@@ -16,7 +16,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.exception import ReceivedError, ApplicationError, ReceivedApplicationError, ReceivedContainerError, AuthorizationError
+from ion.core.exception import ReceivedError, ApplicationError, ReceivedApplicationError, ReceivedContainerError
 from ion.core.id import Id
 from ion.core.intercept.interceptor import Interceptor
 from ion.core.messaging.receiver import ProcessReceiver
