@@ -235,26 +235,32 @@ class HelloDataUpdate(ServiceProcess):
             
         # Get the current state of the resource
         resource = yield self.rc.get_instance(request.resource_reference)
-        
+
         # Merge the requested state into the resource history
         yield resource.MergeResourceUpdate(resource.CLOBBER, request.configuration)
-            
+
+
         # Clobber the current state with the update
         resource.ResourceObject = resource.CompareToUpdates[0]
         # resource.ResourceObject is a property setter/getter for the resource object
         # resource.CompareToUpdates is a getter for the list of updated states that are being merged
             
         yield self.rc.put_instance(resource)
-            
+
         response = yield self.mc.create_instance(resource_response_type, MessageName='clobber_addressbook_resource response')
+
         
         # Create a reference to return to the caller
         # This is one pattern - it exposes the resource to the caller        
         response.resource_reference = self.rc.reference_instance(resource)
         response.configuration = resource.ResourceObject
         response.result = 'Clobbered'
-         
+
+
         yield self.reply_ok(msg, response)
+
+        log.info('op_clobber_addressbook_resource: Complete ')
+
 
     @defer.inlineCallbacks
     def op_merge_addressbook_resource(self, request, headers, msg):
@@ -264,7 +270,7 @@ class HelloDataUpdate(ServiceProcess):
         state of the resource which should be set.
         """
         
-        log.info('op_clobber_addressbook_resource: ')
+        log.info('op_merge_addressbook_resource: ')
             
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
@@ -272,13 +278,13 @@ class HelloDataUpdate(ServiceProcess):
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloResourceError('Expected message class ResourceConfigurationRequest, received %s'
                                      % str(request))
-            
+
         # Get the current state of the resource
         resource = yield self.rc.get_instance(request.resource_reference)
-        
+
         # Merge the requested state into the resource history
         yield resource.MergeResourceUpdate(resource.MERGE, request.configuration)
-            
+
         # Merge the current state with the update
         
         # Compare and resolve differences...
@@ -317,6 +323,8 @@ class HelloDataUpdate(ServiceProcess):
             
         yield self.reply_ok(msg, response)
 
+        log.info('op_merge_addressbook_resource: Complete')
+
 
 class HelloDataUpdateClient(ServiceClient):
     """
@@ -351,7 +359,7 @@ class HelloDataUpdateClient(ServiceClient):
     def merge_addressbook_resource(self, msg):
         yield self._check_init()
         
-        (content, headers, msg) = yield self.rpc_send('clobber_addressbook_resource', msg)
+        (content, headers, msg) = yield self.rpc_send('merge_addressbook_resource', msg)
         
         defer.returnValue(content)
 

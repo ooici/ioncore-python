@@ -369,7 +369,8 @@ class Repository(object):
         Convience method to access the branches from the mutable head (dotgit object)
         """
         return self._dotgit.branches
-    
+
+
     @property
     def commit_head(self):
         """
@@ -399,6 +400,16 @@ class Repository(object):
         return heads
 
 
+    def current_branch_key(self):
+
+        if self._detached_head:
+            log.warn('This repository is currently a detached head. The current commit is not at the head of a branch.')
+
+        if self._current_branch is None:
+            raise RepositoryError('No current branch in the repository. Must checkout first.')
+
+        return self._current_branch.branchkey
+
 
     def branch(self, nickname=None):
         """
@@ -414,13 +425,17 @@ class Repository(object):
             raise RepositoryError('The current branch is empty - a new one can not be created until there is a commit!')
         
         
-        brnch = self.branches.add()    
-        brnch.branchkey = pu.create_guid()
+        brnch = self.branches.add()
+        # Generate a short random string for the branch name
+        brnch.branchkey = object_utils.sha1hex(pu.create_guid())[:8]
         
         if nickname:
             if nickname in self.branchnicknames.keys():
                 raise RepositoryError('That branch nickname is already in use.')
             self.branchnicknames[nickname]=brnch.branchkey
+
+        #print 'EJEJEJEJEJEJEJEJEJEJEJEJ111111111', self._current_branch
+
 
         if self._current_branch:
             # Get the linked commit
@@ -431,7 +446,9 @@ class Repository(object):
                 cref = self._current_branch.commitrefs[0]
             
                 bref = brnch.commitrefs.add()
-            
+
+
+                #print 'EJEJEJEJEJEJEJEJEJEJEJEJ'
                 # Set the new branch to point at the commit
                 bref.SetLink(cref)
             
@@ -985,7 +1002,9 @@ class Repository(object):
             obj = self._workspace.get(link.key)
             # Make sure the parent is set...
             #self.set_linked_object(link, obj)
+
             obj.AddParentLink(link)
+
             return obj
 
         elif self._commit_index.has_key(link.key):
@@ -1151,6 +1170,8 @@ class Repository(object):
         created in a modified state. Copy can move from one repository to another.
         The deep_copy parameter determines whether all child objects are also copied.
         """
+
+        log.debug('Copy Object:')
         if not isinstance(value, gpb_wrapper.Wrapper):
             raise RepositoryError('Can not copy an object which is not an instance of Wrapper')    
         
@@ -1177,10 +1198,13 @@ class Repository(object):
             # Deep copy from the original!
             for link in new_obj.ChildLinks:
                 # Use the copies link to get the child - possibly from a different repo!
-                child = value.Repository.get_linked_object(link)
+
+                child = self.get_linked_object(link)
                 new_child = self.copy_object(child, True)
                 link.SetLink(new_child)
-        
+
+        log.debug('Copy Object: Complete')
+
         return new_obj
     
     

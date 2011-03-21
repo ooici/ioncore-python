@@ -76,9 +76,8 @@ class EOIIngestionService(ServiceProcess):
 
         self.push = self.workbench.push
         self.pull = self.workbench.pull
-        self.fetch_linked_objects = self.workbench.fetch_linked_objects
-        self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
-        self.fetch_linked_objects = self.workbench.fetch_linked_objects
+        self.fetch_blobs = self.workbench.fetch_blobs
+        self.op_fetch_blobs = self.workbench.op_fetch_blobs
 
         self._defer_ingest = defer.Deferred()       # waited on by op_ingest to signal end of ingestion
 
@@ -94,7 +93,7 @@ class EOIIngestionService(ServiceProcess):
        
         msg_repo = content.Repository
         
-        result = yield self.push('datastore', msg_repo.repository_key)
+        result = yield self.push('datastore', msg_repo)
         
         assert result.MessageResponseCode == result.ResponseCodes.OK, 'Push to datastore failed!'
         

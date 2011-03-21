@@ -110,7 +110,6 @@ class DataStoreWorkbench(WorkBench):
             assert key == wse.key, 'Calculated key does not match the stored key!'
             repo.index_hash[key] = wse
 
-
             if columns[BRANCH_NAME]:
                 # If this appears to be a head commit
 
@@ -363,6 +362,8 @@ class DataStoreWorkbench(WorkBench):
 
                 # Set the repository name for the commit
                 attributes = {REPOSITORY_KEY : str(repo_key)}
+                # Set a default branch name to empty
+                attributes[BRANCH_NAME] = ''
 
                 cref = repo._commit_index.get(key)
 
@@ -430,6 +431,7 @@ class DataStoreWorkbench(WorkBench):
         def_list = []
         for new_head in new_head_list:
 
+            #print 'Setting New Head:', new_head
             def_list.append(self._commit_store.put(**new_head))
 
         yield defer.DeferredList(def_list)
@@ -441,7 +443,12 @@ class DataStoreWorkbench(WorkBench):
             def_list.append(self._commit_store.update_index(key=key, index_attributes={BRANCH_NAME:''}))
 
         yield defer.DeferredList(def_list)
+
+        #import pprint
+        #print 'After update to heads'
+        #pprint.pprint(self._commit_store.kvs)
         
+
         response = yield self._process.message_client.create_instance(MessageContentTypeID=None)
         response.MessageResponseCode = response.ResponseCodes.OK
 

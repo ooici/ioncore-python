@@ -453,7 +453,41 @@ class WorkBenchProcessTest(IonTestCase):
         self.assertEqual(self.repo1.commit_head, repo2.commit_head)
         self.assertEqual(self.repo1.root_object, repo2.root_object)
 
+    '''
+    @defer.inlineCallbacks
+    def test_pull_branch_same_head(self):
+        """
+        Test that we can have more than one branch point to the same commit!
+        """
 
+
+        self.first_branch_key = self.repo1.current_branch_key()
+
+        print 'CALLING BRANCH'
+        self.second_branch_key = self.repo1.branch()
+        print 'REPO1', self.repo1
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        result = yield self.proc2.workbench.pull(self.proc1.id.full, self.repo1.repository_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo2 = self.proc2.workbench.get_repository(self.repo1.repository_key)
+
+
+        # Objects are sent in the pull (get_head_content is True)
+        ab = yield repo2.checkout(branchname=self.first_branch_key)
+
+        print 'REPO2', repo2
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+
+
+        ab = yield repo2.checkout(branchname=self.second_branch_key)
+
+        self.assertEqual(self.repo1.commit_head, repo2.commit_head)
+        self.assertEqual(self.repo1.root_object, repo2.root_object)
+        '''
 
 
     @defer.inlineCallbacks

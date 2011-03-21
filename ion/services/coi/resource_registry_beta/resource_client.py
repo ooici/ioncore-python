@@ -178,15 +178,13 @@ class ResourceClient(object):
         else:
             raise ResourceClientError('''Illegal argument type in retrieve_resource_instance:
                                       \n type: %s \nvalue: %s''' % (type(resource_id), str(resource_id)))    
-            
+
         # Pull the repository
         result= yield self.workbench.pull(self.datastore_service, reference)
 
-        
         if result.MessageResponseCode == result.ResponseCodes.NOT_FOUND:
             raise ResourceClientError('Pull from datastore failed in resource client! Resource Not Found!')
         #elif :
-        
         
         # Get the repository
         repo = self.workbench.get_repository(reference)

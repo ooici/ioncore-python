@@ -438,7 +438,6 @@ class IndexStoreTest(IStoreTest):
         for key in self.d2.keys():
             self.assertIn(key, rows['prothfuss'])
         
-        
     
     @defer.inlineCallbacks
     def test_update_index_value_error(self):
