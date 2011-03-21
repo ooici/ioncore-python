@@ -117,6 +117,6 @@ class RegisterUser(object):
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS RegisterUser response')
       Response.message_parameters_reference.add()
       Response.message_parameters_reference[0] = Response.CreateObject(OOI_ID_TYPE)
-      Response.message_parameters_reference[0].ooi_id = result.ooi_id
+      Response.message_parameters_reference[0].ooi_id = result.resource_reference.ooi_id
       defer.returnValue(Response)
       
