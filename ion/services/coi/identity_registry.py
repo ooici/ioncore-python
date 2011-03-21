@@ -502,7 +502,12 @@ class IdentityRegistryService(ServiceProcess):
            identity.rsa_private_key = request.configuration.rsa_private_key
            self.rc.put_instance(identity, 'Updated user credentials')
            log.debug(str(identity.ResourceIdentity))
-           defer.returnValue(identity.ResourceIdentity)
+           # Create the response object...
+           Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
+           Response.resource_reference = Response.CreateObject(USER_OOIID_TYPE)
+           Response.resource_reference.ooi_id = identity.ResourceIdentity
+           Response.result = "OK"
+           defer.returnValue(Response)
         else:
            log.debug('authenticate_user_credentials: no match')
            raise IdentityRegistryException("user [%s] not found"%cert_info['subject'],
