@@ -5,7 +5,6 @@
 @author David Stuebe
 @author Matt Rodriguez
 @TODO
-Deal with a commit that is the head of more than one branch!
 
 """
 
@@ -113,22 +112,28 @@ class DataStoreWorkbench(WorkBench):
             if columns[BRANCH_NAME]:
                 # If this appears to be a head commit
 
-                for branch in new_head.branches:
-                    # if the branch already exists in the new_head just add a commitref
-                    if branch.branchkey == columns[BRANCH_NAME]:
+                # Deal with the possiblity that more than one branch points to the same commit
+                branch_names = columns[BRANCH_NAME].split(',')
+
+
+                for name in branch_names:
+
+                    for branch in new_head.branches:
+                        # if the branch already exists in the new_head just add a commitref
+                        if branch.branchkey == name:
+                            link = branch.commitrefs.add()
+                            break
+                    else:
+                        # If not add a new branch
+                        branch = new_head.branches.add()
+                        branch.branchkey = name
                         link = branch.commitrefs.add()
-                        break
-                else:
-                    # If not add a new branch
-                    branch = new_head.branches.add()
-                    branch.branchkey = columns[BRANCH_NAME]
-                    link = branch.commitrefs.add()
 
-                cref = repo._load_element(wse)
-                repo._commit_index[cref.MyId]=cref
-                cref.ReadOnly = True
+                    cref = repo._load_element(wse)
+                    repo._commit_index[cref.MyId]=cref
+                    cref.ReadOnly = True
 
-                link.SetLink(cref)
+                    link.SetLink(cref)
 
                 # Check to make sure the mutable is upto date with the commits...
 
@@ -351,9 +356,13 @@ class DataStoreWorkbench(WorkBench):
             repo = self.get_repository(repo_key)
 
             # any objects in the data structure that were transmitted have already
-            # been updated during fetch linked objects.
-
+            # been updated now it is time to set update the commits
             #
+
+            branch_names = []
+            for branch in repo.branches:
+                branch_names.append(branch.branchkey)
+
             head_keys = []
             for cref in repo.current_heads():
                 head_keys.append( cref.MyId )
@@ -404,9 +413,12 @@ class DataStoreWorkbench(WorkBench):
                     for branch in  repo.branches:
                         # If this is currently the head commit - set the branch name attribute
                         if cref in branch.commitrefs:
-                            # If this is currently the head commit - set
-                            attributes[BRANCH_NAME] = branch.branchkey
-                            break
+                            # If this is currently the head commit - set the branch name
+                            if attributes[BRANCH_NAME] == '':
+                                attributes[BRANCH_NAME] = branch.branchkey
+                            else:
+                                attributes[BRANCH_NAME] = ','.join([attributes[BRANCH_NAME],branch.branchkey])
+
 
 
                     new_head_list.append({'key':key, 'value':wse.serialize(), 'index_attributes':attributes})
@@ -420,9 +432,12 @@ class DataStoreWorkbench(WorkBench):
 
             rows = yield self._commit_store.query(q)
 
-            for key in rows.keys():
+            for key, columns in rows.items():
                 if key not in head_keys:
                     clear_head_list.append(key)
+
+                    # Any commit which is currently a head will have the correct branch names set.
+                    # Just delete the branch names for the ones that are no longer heads.
 
 
         yield defer.DeferredList(def_list)

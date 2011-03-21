@@ -139,6 +139,9 @@ class DataStoreTest(IonTestCase):
         self.ds1.workbench.clear_non_persistent()
 
 
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+        self.assertEqual(repo,None)
+
         result = yield self.wb1.workbench.pull('datastore',self.repo_key)
 
         self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
@@ -150,6 +153,55 @@ class DataStoreTest(IonTestCase):
         ab = yield repo.checkout('master')
 
         self.assertEqual(ab.title,'Datastore Addressbook')
+
+
+
+    @defer.inlineCallbacks
+    def test_push_clear_pull_branched(self):
+
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        branch1_key = repo.current_branch_key()
+        branch2_key = repo.branch()
+
+        # Delete the reference
+        del repo
+
+        log.info('DataStore1 Push addressbook to DataStore1')
+        result = yield self.wb1.workbench.push_by_name('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        log.info('DataStore1 Push addressbook to DataStore1: complete')
+
+
+
+        self.wb1.workbench.clear_non_persistent()
+
+        self.ds1.workbench.clear_non_persistent()
+
+
+        result = yield self.wb1.workbench.pull('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        # Check that we got back both branches!
+        ab = yield repo.checkout(branchname=branch1_key)
+
+        ab = yield repo.checkout(branchname=branch2_key)
+
+
+
+        self.assertEqual(ab.title,'Datastore Addressbook')
+
+
+
+
 
 
     @defer.inlineCallbacks
@@ -200,6 +252,11 @@ class DataStoreTest(IonTestCase):
             repo.commit('repo %s commit' % str(n))
 
         return key_list
+
+
+
+
+
 
 
 

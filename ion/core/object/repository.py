@@ -434,21 +434,16 @@ class Repository(object):
                 raise RepositoryError('That branch nickname is already in use.')
             self.branchnicknames[nickname]=brnch.branchkey
 
-        #print 'EJEJEJEJEJEJEJEJEJEJEJEJ111111111', self._current_branch
-
-
         if self._current_branch:
             # Get the linked commit
-            
-            if len(brnch.commitrefs)>1:
+
+            if len(self._current_branch.commitrefs)>1:
                 raise RepositoryError('Branch should merge on read. Invalid state!')
-            elif len(brnch.commitrefs)==1:                
+            elif len(self._current_branch.commitrefs)==1:
                 cref = self._current_branch.commitrefs[0]
             
                 bref = brnch.commitrefs.add()
 
-
-                #print 'EJEJEJEJEJEJEJEJEJEJEJEJ'
                 # Set the new branch to point at the commit
                 bref.SetLink(cref)
             
@@ -457,7 +452,13 @@ class Repository(object):
             if self._detached_head:
                 self._workspace_root.SetStructureReadWrite()
                 self._detached_head = False
-                
+
+
+        else:
+            # This is a new repository with no commits yet!
+            pass
+
+
         self._current_branch = brnch
         return brnch.branchkey
     
