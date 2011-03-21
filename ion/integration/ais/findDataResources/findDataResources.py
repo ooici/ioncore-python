@@ -32,11 +32,14 @@ class FindDataResources(object):
         self.rc = ResourceClient()
         self.mc = ais.mc
         self.dscc = DatasetControllerClient()
+        self.dsID = None
 
+    def setTestDatasetID(self, dsID):
+        self.dsID = dsID
         
     @defer.inlineCallbacks
     def findDataResources(self, msg):
-        log.debug('findDataResources Worker Class got GPB: \n' + str(msg))
+        log.debug('findDataResources Worker Class')
 
         """
         Need to build up a GPB Message;
@@ -62,15 +65,14 @@ class FindDataResources(object):
         """
 
         userID = msg.message_parameters_reference.user_ooi_id        
-        resID = self.dscc.find_dataset_resources(msg)
+        # This is the way it will work normally
+        #resID = self.dscc.find_dataset_resources(msg)
+        resID = self.dsID
         log.debug('DHE: Stub find_data_resources returned identity: ' + str(resID))
         
         log.debug('DHE: findDataResources getting resource instance')
         ds = yield self.rc.get_instance(resID)
-        log.debug('DHE: get_instance returned ' + str(ds))
-
-        """
-        """
+        #log.debug('DHE: get_instance returned ' + str(ds))
 
         for atrib in ds.root_group.attributes:
             print 'Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue()))
@@ -90,7 +92,7 @@ class FindDataResources(object):
         unicode_units = lat.GetUnits()
         
         #dimensions    =  [str(dim.name) for dim in lat.shape]
-        print 'YO! %s units are %s' % (str(unicode_name), str(unicode_units))
+        #print 'YO! %s units are %s' % (str(unicode_name), str(unicode_units))
         #print 'YO YO! lat has %s contents' % (len(lat.content))
         #testvalue = lat.GetValue()
         #print 'YO YO YO! lat has value %s' % (str(testvalue))

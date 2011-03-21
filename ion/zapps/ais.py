@@ -1,4 +1,5 @@
 
+from ion.core import ioninit
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -9,8 +10,6 @@ from ion.core.process.process import ProcessDesc
 
 from ion.core.pack import app_supervisor
 
-#from ion.core.ioninit import ion_config
-from ion.core import ioninit
 from ion.core.cc.shell import control
 
 from ion.core.object import object_utils

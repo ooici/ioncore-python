@@ -19,6 +19,8 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 from ion.core.messaging.message_client import MessageClient
 
+from ion.integration.ais.loadDummyDataset import LoadDummyDataset
+
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
 from ion.integration.ais.ais_object_identifiers import UPDATE_USER_EMAIL_TYPE, UPDATE_USER_DISPATCH_QUEUE_TYPE
@@ -44,12 +46,16 @@ class AppIntegrationService(ServiceProcess):
                                              dependencies=[])
 
     def __init__(self, *args, **kwargs):
+
         ServiceProcess.__init__(self, *args, **kwargs)
+
+        # Test for loadDummyData argument
+        self.loadDummyData = self.spawn_args.get('loadDummyData', False)
         
         self.rc = ResourceClient(proc = self)
         self.mc = MessageClient(proc = self)
     
-        log.debug('AppIntegrationService.__init__()')
+        log.debug('AppIntegrationService.__init__(): loadDummyData == %s' % str(self.loadDummyData))
 
     def slc_init(self):
         pass
@@ -62,11 +68,20 @@ class AppIntegrationService(ServiceProcess):
         @retval GPB with list of resource IDs.
         """
         log.debug('op_findDataResources service method.')
+
+        log.debug('op_findDataResources calling LoadDummyDataset!!!.')
+        loader = LoadDummyDataset()
+        self.dsID = yield loader.loadDummyDataset(self.rc)
+        log.debug('op_findDataResources LoadDummyDataset!!! returned %s' % str(self.dsID))
+
         try:
 
             # Instantiate the worker class
             worker = FindDataResources(self)
 
+            # if test case, do this:
+            worker.setTestDatasetID(self.dsID)
+            
             returnValue = yield worker.findDataResources(content)
             #log.debug('worker returned: ' + returnValue)
             yield self.reply_ok(msg, returnValue)
