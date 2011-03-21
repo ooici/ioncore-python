@@ -49,7 +49,7 @@ class Receiver(BasicLifecycleObject):
     rec_messages = {}
     rec_shutoff = False
 
-    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, raw=False, consumer_config={}, publisher_config={}):
+    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, error_handler=None, raw=False, consumer_config={}, publisher_config={}):
         """
         @param label descriptive label for the receiver
         @param name the actual exchange name. Used for routing
@@ -77,10 +77,14 @@ class Receiver(BasicLifecycleObject):
         self.publisher_config = publisher_config
 
         self.handlers = []
+        self.error_handlers = []
         self.consumer = None
 
         if handler:
             self.add_handler(handler)
+
+        if error_handler:
+            self.add_error_handler(error_handler)
 
         self.xname = pu.get_scoped_name(self.name, self.scope)
 
@@ -161,6 +165,10 @@ class Receiver(BasicLifecycleObject):
 
     handle = add_handler
 
+
+    def add_error_handler(self, callback):
+        self.error_handlers.append(callback)
+
     def _receive(self, msg):
         """
         @brief entry point for received messages; callback from Carrot. All
@@ -200,11 +208,14 @@ class Receiver(BasicLifecycleObject):
             msg = inv1.message
             data = inv1.content
 
-            # TODO fix this
-            # For now, silently dropping message
-            if inv1.status == Invocation.STATUS_DROP:
-                log.info("Message dropped! to=%s op=%s" % (data.get('receiver',None), data.get('op',None)))
-                del self.rec_messages[id(msg)]
+            # Interceptor failed message.  Call error handler(s)
+            if inv1.status != Invocation.STATUS_PROCESS:
+                log.info("Message error! to=%s op=%s" % (data.get('receiver',None), data.get('op',None)))
+                try:
+                    for error_handler in self.error_handlers:
+                        yield defer.maybeDeferred(error_handler, data, msg, inv1.code)
+                finally:
+                    del self.rec_messages[id(msg)]
             else:
                 # Make the calls into the application code (e.g. process receive)
                 try:
