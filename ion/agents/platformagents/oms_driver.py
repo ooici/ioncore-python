@@ -10,6 +10,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
+from twisted.internet import task
 from twisted.web.xmlrpc import Proxy
 
 from ion.core.process.process import Process
@@ -80,32 +81,53 @@ class OMSDriver(Process):
         
         device_result = yield self._proxy.callRemote('getDeviceListByType', content[0])
         log.debug("Device list result: %s", device_result)
-        attr_result = yield self._get_single_attribute(device_result, content[1])
-        yield self.reply_ok(msg, attr_result)
+        
+        #for device in device_result
+        #   attr_result = yield self._get_single_attribute(device, content[1])
+        result = {}
+        finished = yield self._parallel_get_attribute(device_result,
+                                                      10,
+                                                      self._get_single_attribute,
+                                                      content[1],
+                                                      result)
+        log.debug(finished)
+        log.debug(result)
+        yield self.reply_ok(msg, result)
         
     @defer.inlineCallbacks
-    def _get_single_attribute(self, devlist, attribute):
+    def _get_single_attribute(self, dev, attribute, result):
         """
         Make a connection to fetch a single attribute for the given list of
         devices.
-        @param devlist A list of strings indicating devices
+        @param dev A list of strings indicating devices
             (ie ['1.2.3.4', '5.6.7.8']) to be queried for a given attribute.
         @param attribute The attribute to query for
+        @param result the dict to add finished values to
         @retval A dictionary with server/attribute entities
             ie {'10.180.80.202': '606', '10.180.80.201': '353'}
         """
-        log.debug("Starting single connect, devlist: %s, attr: %s", devlist, attribute)
-        result = {}
-        for dev in devlist:
-            log.debug("Asking for %s, %s", dev, attribute)
-            devresult = yield self._proxy.callRemote('getDeviceAttribute', dev, attribute)
-            log.debug("Single attribute result: %s", devresult)
-            assert(isinstance(devresult, list))
-            result[devresult[0][0]] = devresult[0][1]
-        
+        log.debug("Starting single connect, devlist: %s, attr: %s", dev, attribute)
+        log.debug("Asking for %s, %s", dev, attribute)
+        devresult = yield self._proxy.callRemote('getDeviceAttribute', dev, attribute)
+        log.debug("Single attribute result: %s", devresult)
+        assert(isinstance(devresult, list))
+        result[devresult[0][0]] = devresult[0][1]
+    
         defer.returnValue(result)
         
-
+    def _parallel_get_attribute(self, iterable, count, callable, *args, **named):
+        """
+        Get a number of attributes/hosts in parallel
+        @param iterable The list to iterate over for the callable
+        @param count The maximum number of simultaneous connections to track
+        @param The function name to perform in parallel
+        @param args Arguments to apply to the function being called
+        @retval A list of deferred
+        """
+        coop = task.Cooperator()
+        work = (callable(elem, *args, **named) for elem in iterable)
+        return defer.DeferredList([coop.coiterate(work) for i in xrange(count)])
+ 
 
 # Spawn of the process using the module name
 factory = ProcessFactory(OMSDriver)
