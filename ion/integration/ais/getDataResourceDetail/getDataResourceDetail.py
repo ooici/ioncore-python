@@ -14,6 +14,7 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 # DHE Temporarily pulling DatasetControllerClient from scaffolding
 from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient
+from ion.integration.ais.getDataResourceDetail.cfdata import cfData
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
