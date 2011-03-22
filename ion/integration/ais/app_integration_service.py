@@ -54,6 +54,7 @@ class AppIntegrationService(ServiceProcess):
         
         self.rc = ResourceClient(proc = self)
         self.mc = MessageClient(proc = self)
+        self.dsID = None
     
         log.debug('AppIntegrationService.__init__(): loadDummyData == %s' % str(self.loadDummyData))
 
@@ -75,16 +76,11 @@ class AppIntegrationService(ServiceProcess):
         log.debug('op_findDataResources LoadDummyDataset!!! returned %s' % str(self.dsID))
 
         try:
-
             # Instantiate the worker class
             worker = FindDataResources(self)
-
-            # if test case, do this:
-            worker.setTestDatasetID(self.dsID)
-            
             returnValue = yield worker.findDataResources(content)
-            #log.debug('worker returned: ' + returnValue)
             yield self.reply_ok(msg, returnValue)
+
         except KeyError:
             estr = 'Missing information in message!'
             log.exception(estr)
@@ -99,12 +95,29 @@ class AppIntegrationService(ServiceProcess):
         @param GPB containing resource ID.
         @retval GPB containing detailed metadata.
         """
-        log.info('op_getDataResourceDetail: '+str(content))
+        log.info('op_getDataResourceDetail service method')
+
+        """
+        Change this: provide a service call that the testing entity (either
+        trial or a capability container) can use to add a test dataset.  But
+        for now...
+        """
+        if content.message_parameters_reference.IsFieldSet('data_resource_id'):
+            self.dsID = content.message_parameters_reference.data_resource_id
+        else:
+            log.info('DHE: getDataResourceDetail getting test dataset instance.')
+            log.debug('op_getDataResourceDetail calling LoadDummyDataset!!!.')
+            loader = LoadDummyDataset()
+            self.dsID = yield loader.loadDummyDataset(self.rc)
+            log.debug('op_getDataResourceDetail LoadDummyDataset!!! returned %s' % str(self.dsID))
+
         try:
             
             worker = GetDataResourceDetail(self)
             
-            yield self.reply_ok(msg, {'value' : 'value'})
+            returnValue = yield worker.getDataResourceDetail(content)
+            
+            yield self.reply_ok(msg, returnValue)
         except KeyError:
             estr = 'Missing information in message!'
             log.exception(estr)
@@ -154,6 +167,9 @@ class AppIntegrationService(ServiceProcess):
         log.debug('op_updateUserDispatcherQueue: calling worker')
         response = yield worker.updateUserDispatcherQueue(content);
         yield self.reply_ok(msg, response)
+
+    def getTestDatasetID(self):
+        return self.dsID
                          
 
 class AppIntegrationServiceClient(ServiceClient):

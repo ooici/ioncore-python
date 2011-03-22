@@ -29,6 +29,7 @@ class FindDataResources(object):
     
     def __init__(self, ais):
         log.info('FindDataResources.__init__()')
+        self.ais = ais
         self.rc = ResourceClient()
         self.mc = ais.mc
         self.dscc = DatasetControllerClient()
@@ -65,39 +66,32 @@ class FindDataResources(object):
         """
 
         userID = msg.message_parameters_reference.user_ooi_id        
-        # This is the way it will work normally
-        #resID = self.dscc.find_dataset_resources(msg)
-        resID = self.dsID
+        # This is the way it will work normally:
+        # resID = self.dscc.find_dataset_resources(msg)
+        # but for until the dataset controller is ready, do this:
+        resID = self.ais.getTestDatasetID()
         log.debug('DHE: Stub find_data_resources returned identity: ' + str(resID))
         
         log.debug('DHE: findDataResources getting resource instance')
         ds = yield self.rc.get_instance(resID)
         #log.debug('DHE: get_instance returned ' + str(ds))
 
+        """
+        I think this should print out everything in the dataset
+        """
         for atrib in ds.root_group.attributes:
             print 'Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue()))
 
         for var in ds.root_group.variables:
-            #print 'Root Variable: %s' % str(var.GetStandardName())
             print 'Root Variable: %s' % str(var.name)
             for atrib in var.attributes:
                 print "Attribute: %s = %s" % (str(atrib.name), str(atrib.GetValue()))
             print "....Dimensions:"
             for dim in var.shape:
                 print "    ....%s (%s)" % (str(dim.name), str(dim.length))
-
-
-        lat = ds.root_group.FindVariableByName('lat')
-        unicode_name  = lat.GetStandardName()
-        unicode_units = lat.GetUnits()
         
         #dimensions    =  [str(dim.name) for dim in lat.shape]
-        #print 'YO! %s units are %s' % (str(unicode_name), str(unicode_units))
-        #print 'YO YO! lat has %s contents' % (len(lat.content))
-        #testvalue = lat.GetValue()
-        #print 'YO YO YO! lat has value %s' % (str(testvalue))
-
-
+ 
         """
         lat = ds.root_group.FindAttributeByName('latitude')
         log.debug("Here are the latitude values")
@@ -112,7 +106,6 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference[0].dataResourceSummary[0] = \
             rspMsg.CreateObject(AIS_DATA_RESOURCE_SUMMARY_MSG_TYPE)
         self.__loadDataResources(rspMsg.message_parameters_reference[0].dataResourceSummary[0], ds, userID, resID)
-        #rspMsg.message_parameters_reference[0].dataResourceSummary[0].data_resource_id = resID
 
         defer.returnValue(rspMsg)
 
@@ -122,8 +115,24 @@ class FindDataResources(object):
         resSummary.title = ds.root_group.FindAttributeByName('title').GetValue()
         resSummary.institution = ds.root_group.FindAttributeByName('institution').GetValue()
         resSummary.source = ds.root_group.FindAttributeByName('source').GetValue()
-        #resSummary.ion_geospatial_lat_min = ds.root_group.FindAttributeByName('ion_geospatial_lat_max').GetValue()
-        #unicode_name  = lat.GetStandardName()
-        #unicode_units = lat.GetUnits()
+        resSummary.references = ds.root_group.FindAttributeByName('references').GetValue()
+        resSummary.ion_time_coverage_start = ds.root_group.FindAttributeByName('ion_time_coverage_start').GetValue()
+        resSummary.ion_time_coverage_end = ds.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
+        #resSummary.summary = ds.root_group.FindAttributeByName('summary').GetValue()
+        #resSummary.comment = ds.root_group.FindAttributeByName('comment').GetValue()
+        resSummary.ion_geospatial_lat_min = float(ds.root_group.FindAttributeByName('ion_geospatial_lat_min').GetValue())
+        resSummary.ion_geospatial_lat_max = float(ds.root_group.FindAttributeByName('ion_geospatial_lat_max').GetValue())
+        resSummary.ion_geospatial_lon_min = float(ds.root_group.FindAttributeByName('ion_geospatial_lon_min').GetValue())
+        resSummary.ion_geospatial_lon_max = float(ds.root_group.FindAttributeByName('ion_geospatial_lon_max').GetValue())
+        resSummary.ion_geospatial_vertical_min = float(ds.root_group.FindAttributeByName('ion_geospatial_vertical_min').GetValue())
+        resSummary.ion_geospatial_vertical_max = float(ds.root_group.FindAttributeByName('ion_geospatial_vertical_max').GetValue())
+        resSummary.ion_geospatial_vertical_positive = ds.root_group.FindAttributeByName('ion_geospatial_vertical_positive').GetValue()
+        lat = ds.root_group.FindVariableByName('lat')
+        resSummary.standard_name  = lat.GetStandardName()
+        resSummary.units = lat.GetUnits()
         
-        
+
+"""
+   optional string long_name = 19;
+
+"""
