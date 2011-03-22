@@ -4,7 +4,7 @@ Thrift==0.2.0
 Twisted==10.2.0
 amqplib==0.6.1
 anyjson==0.2.5
-carrot==0.10.14-txamqp
+carrot==0.10.15-txamqp
 gviz-api.py==1.7.0
 httplib2==0.6.0
 msgpack-python==015final
