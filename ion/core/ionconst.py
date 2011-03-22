@@ -19,5 +19,5 @@ ION_CONF_FILENAME = 'res/config/ion.config'
 ION_LOCAL_CONF_FILENAME = 'res/config/ionlocal.config'
 
 # ION master version
-from ion.core._version import version
+from ion.core.version import version
 VERSION = version.base()

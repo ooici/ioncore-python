@@ -21,6 +21,8 @@ from ion.core.exception import ApplicationError
 
 from ion.core.object import object_utils
 
+from ion.core.intercept.policy import subject_has_admin_role, map_ooid_to_subject
+
 IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
 """
 from ion-object-definitions/net/ooici/services/coi/identity/identity_management.proto
@@ -89,7 +91,6 @@ message ResourceConfigurationResponse{
     optional string result = 3;
 }
 """
-
 
 class IdentityRegistryClient(ServiceClient):
     """
@@ -298,11 +299,6 @@ class IdentityRegistryException(ApplicationError):
     IdentityRegistryService exception class
     """
 
-class IdentityRegistryException(ApplicationError):
-    """
-    IdentityRegistryService exception class
-    """
-
 class IdentityRegistryService(ServiceProcess):
 
     # Declaration of service
@@ -386,7 +382,7 @@ class IdentityRegistryService(ServiceProcess):
         log.debug('in op_register_user_credentials: request.configuration\n'+str(request.configuration))
 
         response = yield self.register_user_credentials(request)
-        
+
         yield self.reply_ok(msg, response)
 
         
@@ -409,7 +405,11 @@ class IdentityRegistryService(ServiceProcess):
         # Now we store the subject/ResourceIdentity pair so we can get around not having find.
         self._user_dict[cert_info['subject']] = identity.ResourceIdentity
         # Above line needs to be altered when FIND is implemented
-        
+
+        # Optionally map OOID to subject in admin role dictionary
+        if subject_has_admin_role(identity.subject):
+            map_ooid_to_subject(identity.subject, identity.ResourceIdentity)
+
         # Create the response object...
         Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
         Response.resource_reference = Response.CreateObject(USER_OOIID_TYPE)
