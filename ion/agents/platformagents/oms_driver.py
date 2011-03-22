@@ -79,7 +79,8 @@ class OMSDriver(Process):
         assert(isinstance(content[0], str)) # type of device
         assert(isinstance(content[1], str)) # attribute name
         
-        device_result = yield self._proxy.callRemote('getDeviceListByType', content[0])
+        device_result = yield self._proxy.callRemote('getDeviceListByType',
+                                                     content[0])
         log.debug("Device list result: %s", device_result)
         
         #for device in device_result
@@ -108,7 +109,9 @@ class OMSDriver(Process):
         """
         log.debug("Starting single connect, devlist: %s, attr: %s", dev, attribute)
         log.debug("Asking for %s, %s", dev, attribute)
-        devresult = yield self._proxy.callRemote('getDeviceAttribute', dev, attribute)
+        devresult = yield self._proxy.callRemote('getDeviceAttribute',
+                                                 dev,
+                                                 attribute)
         log.debug("Single attribute result: %s", devresult)
         assert(isinstance(devresult, list))
         result[devresult[0][0]] = devresult[0][1]

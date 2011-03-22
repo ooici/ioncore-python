@@ -7,6 +7,7 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
+from twisted.trial import unittest
 
 from ion.util.itv_decorator import itv
 from ion.core import ioninit
@@ -54,7 +55,7 @@ class TestOmsDriver(IonTestCase):
 
     @defer.inlineCallbacks
     def test_simple_call(self):
-        raise unittest.SkipTest('Integration test requires VPN connection to RSN')
+        raise unittest.SkipTest('Integration test requires VPN into RSN')
         (content, headers, message) = \
             yield self.proc_client.rpc_send('connect', ('Server', 'if1Speed'))
         log.debug("*** content: %s, message: %s", content, message)
