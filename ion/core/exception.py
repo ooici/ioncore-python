@@ -9,6 +9,15 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+class FatalError(Exception):
+    """
+    Raise this exception from within a process/service op_ method when
+    things go really wrong for you. This gives you the ability to "fail
+    quickly"; the container will die, and it's monitoring system can take
+    action to start a replacement.
+    """
+
+# User-defined Exceptions should be derived from Exception
 class IonError(StandardError):
     pass
 

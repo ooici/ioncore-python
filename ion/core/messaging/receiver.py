@@ -134,7 +134,7 @@ class Receiver(BasicLifecycleObject):
         @brief Activate the consumer.
         @retval Deferred
         """
-        self.consumer.register_callback(self._receive)
+        self.consumer.register_callback(self.receive)
         yield self.consumer.iterconsume()
         #log.debug("Receiver %s activated (consumer enabled)" % self.xname)
 
