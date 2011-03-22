@@ -165,6 +165,15 @@ To compile all code to see if there are Python compile errors anywhere:
 ::  ant compile
 
 
+Local Configuration
+===================
+
+To override default configuration and logging config files (and in order to
+prevent changes to the global default), please make local changes in:
+    res/config/ionlocal.config   (eg. to set a local message broker)
+    res/logging/loglevelslocal.cfg   (eg. to increase/reduce log verbosity)
+
+
 ---------------------------------------------------------------------------
 Change log:
 ===========
