@@ -61,8 +61,26 @@ class Rpc(Conversation):
 class RpcInitiator(ConversationRole):
     factory = RpcFSMFactory()
 
+    def request(self, *args, **kwargs):
+        log.debug("In Rpc.request")
+    def failure(self, *args, **kwargs):
+        log.debug("In Rpc.failure")
+    def inform_done(self, *args, **kwargs):
+        log.debug("In Rpc.inform_done")
+    def inform_result(self, *args, **kwargs):
+        log.debug("In Rpc.inform_result")
+
 class RpcParticipant(ConversationRole):
     factory = RpcFSMFactory()
+
+    def request(self, *args, **kwargs):
+        log.debug("In Rpc.request")
+    def failure(self, *args, **kwargs):
+        log.debug("In Rpc.failure")
+    def inform_done(self, *args, **kwargs):
+        log.debug("In Rpc.inform_done")
+    def inform_result(self, *args, **kwargs):
+        log.debug("In Rpc.inform_result")
 
 class RpcType(ConversationType):
     """

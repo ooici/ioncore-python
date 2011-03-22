@@ -129,6 +129,7 @@ class ConversationRole(StateObject):
         return StateObject._so_process(self, event, *args, **kwargs)
 
     def error(self, *args, **kwargs):
+        print "#####", args, kwargs
         log.error("ERROR in Conversation: %s" % str(args))
 
 class ConversationTypeSpec(object):

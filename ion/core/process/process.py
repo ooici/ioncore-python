@@ -6,6 +6,7 @@
 @brief base classes for processes within a capability container
 """
 
+import traceback
 from twisted.internet import defer
 from twisted.internet import reactor
 from twisted.python import failure
@@ -61,7 +62,7 @@ class ProcessError(Exception):
     An exception class for errors that occur in Process
     """
 
-class Process(BasicLifecycleObject,ResponseCodes):
+class Process(BasicLifecycleObject, ResponseCodes):
     """
     This is the base class for all processes. Processes can be spawned and
     have a unique identifier. Each process has one main process receiver and can
@@ -134,21 +135,21 @@ class Process(BasicLifecycleObject,ResponseCodes):
         # Delegate class to manage all conversations of this process
         self.conv_manager = ProcessConversationManager(self)
 
-        # Dict of publishers and subscribers
+        # Dict of message publishers and subscribers
         self.publishers = {}
         self.subscribers = {}
 
         # List of ProcessDesc instances of defined and spawned child processes
         self.child_procs = []
 
-        #The Workbench for all object repositories used by this process
+        #The data object Workbench for all object repositories used by this process
         self.workbench = workbench.WorkBench(self)
 
         # Create a message Client
-        self.message_client = MessageClient(proc = self)
+        self.message_client = MessageClient(proc=self)
 
         # A list of other kinds of life cycle objects which are tied to the process
-        self._registered_life_cycle_objects=[]
+        self._registered_life_cycle_objects = []
 
         # TCP Connectors and Listening Ports
         self.connectors = []
@@ -164,16 +165,6 @@ class Process(BasicLifecycleObject,ResponseCodes):
     # initialize, activate, deactivate, terminate: (Super class) State management API
     # on_XXX: State management API action callbacks
     # plc_XXX: Callback hooks for subclass processes
-
-    def connectTCP(self, host, port, factory, timeout=30, bindAddress=None):
-        connector = reactor.connectTCP(host, port, factory, timeout, bindAddress)
-        self.connectors.append(connector)
-        return connector
-
-    def listenTCP(self, port, factory, backlog=50, interface=''):
-        port = reactor.listenTCP(port, factory, backlog, interface)
-        self.listeners.append(port)
-        return port
 
     @defer.inlineCallbacks
     def spawn(self):
@@ -191,7 +182,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
     @defer.inlineCallbacks
     def on_initialize(self, *args, **kwargs):
         """
-        Life cycle callback for the initialization "spawn" of the process.
+        LifeCycleObject callback for the initialization "spawn" of the process.
         @retval Deferred for the Id of the process (self.id)
         """
         assert not self.backend_receiver.consumer, "Process already initialized"
@@ -226,7 +217,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
         """
         Activate operation, on receive of the activate system message
         @note PROBLEM: Cannot receive activate if receiver not active.
-                Activation has to go through the container (agent)
+                Activation has to go through the container (agent) or backend.
         """
         try:
             yield self.activate(content, headers, msg)
@@ -234,11 +225,13 @@ class Process(BasicLifecycleObject,ResponseCodes):
                 yield self.reply_ok(msg)
         except Exception, ex:
             if msg != None:
-                yield self.reply_uncaught_err(msg, content=None, exception=ex, response_code = "Process %s ACTIVATE ERROR" % (self.id))
+                yield self.reply_uncaught_err(msg, content=None, exception=ex,
+                                              response_code="Process %s ACTIVATE ERROR" % (self.id))
 
     @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
         """
+        LifeCycleObject callback for activate
         @retval Deferred
         """
         log.debug('Process [%s] id=%s activate()' % (self.proc_name, self.id))
@@ -259,18 +252,11 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
     def plc_activate(self):
         """
-        Process life cycle event: on activate of process
+        Process life cycle event: on activate of process. Subclasses override.
         """
 
     def shutdown(self):
         return self.terminate()
-
-    @defer.inlineCallbacks
-    def op_ping(self, content, headers, msg):
-        """
-        Service operation: ping reply
-        """
-        yield self.reply_ok(msg, {'pong':'pong'}, {'quiet':True})
 
     @defer.inlineCallbacks
     def op_terminate(self, content, headers, msg):
@@ -343,6 +329,18 @@ class Process(BasicLifecycleObject,ResponseCodes):
         else:
             raise RuntimeError("Illegal process state change")
 
+    def is_spawned(self):
+        return self.receiver.consumer != None
+
+    # --- Non-lifecycle process interactions
+
+    @defer.inlineCallbacks
+    def op_ping(self, content, headers, msg):
+        """
+        Service operation: ping reply
+        """
+        yield self.reply_ok(msg, {'pong':'pong'}, {'quiet':True})
+
     #    @defer.inlineCallbacks
     def op_sys_procexit(self, content, headers, msg):
         """
@@ -351,7 +349,10 @@ class Process(BasicLifecycleObject,ResponseCodes):
         """
         pass
 
-    # -- publishers/subscribers
+    # --- Process resource management
+
+    def add_receiver(self, receiver):
+        self.receivers[receiver.name] = receiver
 
     def add_publisher(self, publisher):
         """
@@ -367,25 +368,29 @@ class Process(BasicLifecycleObject,ResponseCodes):
         """
         self.subscribers[subscriber.name] = subscriber
 
-     # --- Internal helper methods
+    def connectTCP(self, host, port, factory, timeout=30, bindAddress=None):
+        connector = reactor.connectTCP(host, port, factory, timeout, bindAddress)
+        self.connectors.append(connector)
+        return connector
 
-    def add_receiver(self, receiver):
-        self.receivers[receiver.name] = receiver
+    def listenTCP(self, port, factory, backlog=50, interface=''):
+        port = reactor.listenTCP(port, factory, backlog, interface)
+        self.listeners.append(port)
+        return port
 
     def add_life_cycle_object(self, lco):
         """
         Add a life cycle object to the process during init.
-        This method should only be used during init to add lco's which are also
-        in the init state.
+        This method can only be used during init to add lco's which are also
+        in the INIT state.
         """
         assert isinstance(lco, BasicLifecycleObject), \
-        'Can not add an instance that does not inherit from BasicLifecycleObject'
+            'Can not add an instance that does not inherit from BasicLifecycleObject'
 
         if self._get_state() != BasicStates.S_INIT:
             raise ProcessError, 'Can not use add_life_cycle_objects when the process is past the INIT state.'
 
         self._registered_life_cycle_objects.append(lco)
-
 
     @defer.inlineCallbacks
     def register_life_cycle_object(self, lco):
@@ -412,19 +417,18 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
         self._registered_life_cycle_objects.append(lco)
 
-    def is_spawned(self):
-        return self.receiver.consumer != None
-
     # --- Incoming message handling
 
     @defer.inlineCallbacks
     def receive(self, payload, msg):
         """
-        This is the first and MAIN entry point for received messages. Messages are
-        separated into RPC replies (by conversation ID) and other received
-        messages.
+        This is the first and MAIN entry point for received messages. Using the
+        conv-id header, an ongoing conversation is retrieved and checked for a
+        blocking condition (eg. RPC reply). Messages are separated whether
+        blocking or not.
         """
         try:
+            # Highest level message header handling and log output
             # Check if there is a user id in the header, stash if so
             if 'user-id' in payload:
                 log.info('>>> [%s] receive(): payload user id [%s] <<<' % (self.proc_name, payload['user-id']))
@@ -446,7 +450,9 @@ class Process(BasicLifecycleObject,ResponseCodes):
                     log.info('>>> [%s] receive(): Set stashed expiry to 0' % (self.proc_name))
                 else:
                     log.info('>>> [%s] receive(): Kept stashed expiry the same: [%s]' % (self.proc_name, request.get('expiry')))
+
             # Check if this response is in reply to an outstanding RPC call
+            # @todo: This should be the decision of a conversation instance
             if 'conv-id' in payload:
                 conv_id = payload['conv-id']
                 conv = self.conv_manager.get_conversation(conv_id)
@@ -456,8 +462,9 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
             # The global else case. No blocking call exists
             yield self._receive_msg(payload, msg)
+
         except Exception, ex:
-            log.exception('Error in process %s receive ' % self.proc_name)
+            log.exception('Error in Process [%s] receive()' % self.proc_name)
             if msg and msg.payload['reply-to']:
                 yield self.reply_err(msg, exception=ex)
 
@@ -518,15 +525,22 @@ class Process(BasicLifecycleObject,ResponseCodes):
         Handling of non-RPC messages. Messages are dispatched according to
         message attributes.
         """
+        # Extract some headers and make log statement.
+        request.proc_name = self.proc_name
         fromname = payload['sender']
         if 'sender-name' in payload:
             fromname = payload['sender-name']
         log.info('#####>>> [%s] receive(): Message from [%s], dispatching... >>>' % (
                  self.proc_name, fromname))
         convid = payload.get('conv-id', None)
+
+        # Retrieve ongoing conversation instance (by conv-id header) or create
+        # new conversation instance based on provided protocol header.
         conv = None
         if convid:
             conv = self.conv_manager.get_conversation(convid)
+
+            # If not existing, create new conversation instance
             if not conv:
                 conv_type = payload.get('protocol', GenericType.CONV_TYPE_GENERIC)
                 sender = payload.get('sender', None)
@@ -539,12 +553,14 @@ class Process(BasicLifecycleObject,ResponseCodes):
                     conv.bind_role_local(RequestType.ROLE_PARTICIPANT.role_id, self)
                     conv.bind_role(RequestType.ROLE_INITIATOR.role_id, sender)
 
+            # Compose in memory message object for callbacks
             message = dict(recipient=payload.get('receiver',None),
                            operation=payload.get('op',None),
                            headers=payload,
                            content=payload.get('content',None),
                            conversation=conv)
 
+            # Trigger conversation state machine
             self.conv_manager.msg_received(message)
 
         # Perform a dispatch of message by performative/operation
@@ -579,10 +595,9 @@ class Process(BasicLifecycleObject,ResponseCodes):
     def _handle_performative(self, payload, msg, conv, perf=False):
         if not self._get_state() == "ACTIVE":
 
-
             # Detect and handle request to terminate
             # This does not yet work properly with fail fast...
-            if 'op'in payload and payload['op'] == 'terminate':
+            if 'op' in payload and payload['op'] == 'terminate':
 
                 if self._get_state() != BasicStates.S_TERMINATED:
                     yield self.terminate()
@@ -629,7 +644,11 @@ class Process(BasicLifecycleObject,ResponseCodes):
         # dynamically invoke the operation in the given class
         if hasattr(self, opname):
             opf = getattr(self, opname)
-            yield defer.maybeDeferred(opf, content, payload, msg)
+            try:
+                yield defer.maybeDeferred(opf, content, payload, msg)
+            except Exception, ex:
+                traceback.print_exc()
+                raise ex
         elif hasattr(self,'op_none'):
             yield defer.maybeDeferred(self.op_none, content, payload, msg)
         else:
@@ -639,6 +658,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
     def perf_request(self, content, headers, msg):
         """
         @brief Receives a new request for action as "Participant" role.
+        @todo This should be in the ConvType class
         """
         # Send an agree if a request message
         conv_type = headers.get('protocol', GenericType.CONV_TYPE_GENERIC)
@@ -646,7 +666,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
             yield self.reply_agree(msg)
 
         # Check for operation/action
-        yield self._dispatch_message_op(payload, msg, None)
+        yield self._dispatch_message_op(headers, msg, None)
 
     def _dispatch_message_op(self, payload, msg, conv):
         if "op" in payload:
@@ -720,13 +740,13 @@ class Process(BasicLifecycleObject,ResponseCodes):
         @brief Sends a message and waits for conversation message reply.
         @retval a Deferred with the message value on receipt
         """
-        if headers:
-            if 'user-id' in headers:
-                log.info('>>> [%s] rpc_send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
-            else:
-                log.info('>>> [%s] rpc_send(): user-id not specified in headers <<<' % (self.proc_name))
-        else:
-            log.info('>>> [%s] rpc_send(): headers not specified <<<' % (self.proc_name))
+        #if headers:
+        #    if 'user-id' in headers:
+        #        log.info('>>> [%s] rpc_send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
+        #    else:
+        #        log.info('>>> [%s] rpc_send(): user-id not specified in headers <<<' % (self.proc_name))
+        #else:
+        #    log.info('>>> [%s] rpc_send(): headers not specified <<<' % (self.proc_name))
         msgheaders = {}
         if headers:
             msgheaders.update(headers)
@@ -746,6 +766,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
             callto = reactor.callLater(timeout, _timeoutf)
             conv.blocking_deferred.rpc_call = callto
 
+        # Call to send()
         d = self.send(recv, operation, content, msgheaders)
         # d is a deferred. The actual send of the request message will happen
         # after this method returns. This is OK, because functions are chained
@@ -760,11 +781,11 @@ class Process(BasicLifecycleObject,ResponseCodes):
         """
         if headers:
             if 'user-id' in headers:
-                log.info('>>> [%s] send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
+                log.debug('>>> [%s] send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
             else:
-                log.info('>>> [%s] send(): user-id not specified in headers <<<' % (self.proc_name))
+                log.debug('>>> [%s] send(): user-id not specified in headers <<<' % (self.proc_name))
         else:
-            log.info('>>> [%s] send(): headers not specified <<<' % (self.proc_name))
+            log.debug('>>> [%s] send(): headers not specified <<<' % (self.proc_name))
 
         msgheaders = {}
         msgheaders['sender-name'] = self.proc_name
@@ -774,7 +795,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
         log.debug("****SEND, headers %s" % str(msgheaders))
         if 'conv-id' in msgheaders:
             conv = self.conv_manager.get_conversation(msgheaders['conv-id'])
-            print "##########", conv, self.conv_manager.conversations
+            log.debug("Send conversation %r from %r" % ( conv, self.conv_manager.conversations))
         else:
             # Not a new and not a reply to a conversation
             conv = self.conv_manager.new_conversation(GenericType.CONV_TYPE_GENERIC)
@@ -783,14 +804,14 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
         if not 'user-id' in msgheaders:
             msgheaders['user-id'] = request.get('user_id', 'ANONYMOUS')
-            log.info('>>> [%s] _prepare_message(): set user id in msgheaders from stashed user_id [%s] <<<' % (self.proc_name, msgheaders['user-id']))
+            log.debug('>>> [%s] send(): set user id in msgheaders from stashed user_id [%s] <<<' % (self.proc_name, msgheaders['user-id']))
         else:
-            log.info('>>> [%s] _prepare_message(): using user id from msgheaders [%s] <<<' % (self.proc_name, msgheaders['user-id']))
+            log.debug('>>> [%s] send(): using user id from msgheaders [%s] <<<' % (self.proc_name, msgheaders['user-id']))
         if not 'expiry' in msgheaders:
             msgheaders['expiry'] = request.get('expiry', '0')
-            log.info('>>> [%s] _prepare_message(): set expiry in msgheaders from stashed expiry [%s] <<<' % (self.proc_name, msgheaders['expiry']))
+            log.debug('>>> [%s] send(): set expiry in msgheaders from stashed expiry [%s] <<<' % (self.proc_name, msgheaders['expiry']))
         else:
-            log.info('>>> [%s] _prepare_message(): using expiry from msgheaders [%s] <<<' % (self.proc_name, msgheaders['expiry']))
+            log.debug('>>> [%s] send(): using expiry from msgheaders [%s] <<<' % (self.proc_name, msgheaders['expiry']))
 
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders,
@@ -825,10 +846,10 @@ class Process(BasicLifecycleObject,ResponseCodes):
             headers['conv-seq'] = int(ionMsg.get('conv-seq',0)) + 1
         if not 'user-id' in headers:
             headers['user-id'] = request.get('user_id', 'ANONYMOUS')
-            log.info('>>> [%s] _prepare_message(): set user id [%s] <<<' % (self.proc_name, headers['user-id']))
+            log.debug('>>> [%s] reply(): set user id [%s] <<<' % (self.proc_name, headers['user-id']))
         if not 'expiry' in headers:
             headers['expiry'] = request.get('expiry', '0')
-            log.info('>>> [%s] _prepare_message(): set expiry [%s] <<<' % (self.proc_name, headers['expiry']))
+            log.debug('>>> [%s] reply(): set expiry [%s] <<<' % (self.proc_name, headers['expiry']))
 
         return self.send(pu.get_process_id(recv), operation, content, headers, reply=True)
 

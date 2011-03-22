@@ -17,6 +17,7 @@ from ion.core.cc.container import Container
 from ion.core.exception import ReceivedError, ConversationError
 from ion.interact.conversation import Conversation, ConversationType, conv_mgr_instance
 from ion.interact.request import RequestType, Request
+from ion.interact.rpc import RpcType, Rpc
 from ion.test.iontest import IonTestCase, ReceiverProcess
 import ion.util.procutils as pu
 
@@ -39,10 +40,13 @@ class ConversationTest(IonTestCase):
 
         ctypes = conv_mgr.conv_type_registry
         self.assertTrue(type(ctypes) is dict)
-        self.assertTrue(len(ctypes) >= 1)
+        self.assertTrue(len(ctypes) >= 2)
 
         req_type = conv_mgr.get_conversation_type(RequestType.CONV_TYPE_REQUEST)
         self.assertIsInstance(req_type, ConversationType)
+
+        rpc_type = conv_mgr.get_conversation_type(RpcType.CONV_TYPE_RPC)
+        self.assertIsInstance(rpc_type, ConversationType)
 
         try:
             other_type = conv_mgr.get_conversation_type("NON-EXISTING")

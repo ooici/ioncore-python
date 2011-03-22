@@ -6,14 +6,16 @@
 @brief test case for process base class
 """
 
+import ion.core.ioninit
+
+import ion.util.ionlog
+log = ion.util.ionlog.getLogger(__name__)
+
 import os
 import hashlib
 
 from twisted.trial import unittest
 from twisted.internet import defer
-
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
 from ion.core.messaging import ion_reply_codes
@@ -59,7 +61,7 @@ class ProcessTest(IonTestCase):
         self.assertTrue(p1.backend_id)
         self.assertTrue(p1.backend_receiver)
         self.assertEquals(len(p1.receivers), 2)
-        self.assertEquals(p1.conversations, {})
+#        self.assertEquals(p1.conversations, {})
         self.assertEquals(p1.child_procs, [])
 
         pid1 = yield p1.spawn()
@@ -96,6 +98,7 @@ class ProcessTest(IonTestCase):
         pid2 = p1.get_child_id('echo')
         proc2 = self._get_procinstance(pid2)
 
+        # This here simulates an RPC without calling the rpc_send(). Problem!
         yield p1.send(pid2, 'echo','content123')
         log.info('Sent echo message')
 
@@ -109,6 +112,7 @@ class ProcessTest(IonTestCase):
         yield sup.terminate()
         self.assertEquals(sup._get_state(), "TERMINATED")
         self.assertEquals(proc2._get_state(), "TERMINATED")
+
 
     @defer.inlineCallbacks
     def test_child_processes(self):
@@ -210,7 +214,7 @@ class ProcessTest(IonTestCase):
         sup = yield self._spawn_processes(processes, sup=p1)
 
         pid2 = p1.get_child_id('echo')
-        
+
         byte_string = hashlib.sha1('test').digest()
 
         yield p1.send(pid2, 'echo', byte_string)
@@ -251,43 +255,43 @@ class ProcessTest(IonTestCase):
         """
         # Create a process which has an lco object in its init
         lco1 = life_cycle_process.LifeCycleObject()
-        lcop = life_cycle_process.LCOProcess(lco1, spawnargs={'proc-name':'p1'})        
+        lcop = life_cycle_process.LCOProcess(lco1, spawnargs={'proc-name':'p1'})
         self.assertEquals(lcop._get_state(), state_object.BasicStates.S_INIT)
         self.assertEquals(lco1._get_state(), state_object.BasicStates.S_INIT)
-        
+
         lco2 = life_cycle_process.LifeCycleObject()
         yield lcop.register_life_cycle_object(lco2)
         self.assertEquals(lco2._get_state(), state_object.BasicStates.S_INIT)
-        
+
         # Initialize the process and its objects
         yield lcop.initialize()
         self.assertEquals(lcop._get_state(), state_object.BasicStates.S_READY)
         self.assertEquals(lco1._get_state(), state_object.BasicStates.S_READY)
         self.assertEquals(lco2._get_state(), state_object.BasicStates.S_READY)
-        
+
         lco3 = life_cycle_process.LifeCycleObject()
         yield lcop.register_life_cycle_object(lco3)
         self.assertEquals(lco3._get_state(), state_object.BasicStates.S_READY)
-        
+
         # Check that using add after init causes an error
         lcoa = life_cycle_process.LifeCycleObject()
         self.assertRaises(ProcessError,lcop.add_life_cycle_object,lcoa)
-        
+
         # Activate the process and its objects
         yield lcop.activate()
-        
+
         self.assertEquals(lcop._get_state(), state_object.BasicStates.S_ACTIVE)
         self.assertEquals(lco1._get_state(), state_object.BasicStates.S_ACTIVE)
         self.assertEquals(lco2._get_state(), state_object.BasicStates.S_ACTIVE)
         self.assertEquals(lco3._get_state(), state_object.BasicStates.S_ACTIVE)
 
-        
+
         lco4 = life_cycle_process.LifeCycleObject()
         yield lcop.register_life_cycle_object(lco4)
         self.assertEquals(lco4._get_state(), state_object.BasicStates.S_ACTIVE)
 
         # Process does not currently implement for deactivate!
-                
+
         # Terminate the process and its objects
         yield lcop.terminate()
         self.assertEquals(lcop._get_state(), state_object.BasicStates.S_TERMINATED)
@@ -295,33 +299,33 @@ class ProcessTest(IonTestCase):
         self.assertEquals(lco2._get_state(), state_object.BasicStates.S_TERMINATED)
         self.assertEquals(lco3._get_state(), state_object.BasicStates.S_TERMINATED)
         self.assertEquals(lco4._get_state(), state_object.BasicStates.S_TERMINATED)
-        
+
         # Can't seem to assert raises - not sure why not?
         #lco5 = life_cycle_process.LifeCycleObject()
         #self.assertRaises(ProcessError,lcop.register_life_cycle_object,lco5)
         #yield lcop.register_life_cycle_object(lco5)
-        
+
 class EchoProcess(Process):
-        
+
     @defer.inlineCallbacks
     def op_echo(self, content, headers, msg):
         log.info("Message received: "+str(content))
-        yield self.reply(msg, content=content)
+        yield self.reply_ok(msg, content=content)
 
     @defer.inlineCallbacks
     def op_echo_fail(self, content, headers, msg):
         log.info("Message received: "+str(content))
         ex = RuntimeError("I'm supposed to fail")
         # Reply as though we caught an exception!
-        yield self.reply(msg,content=None, exception=ex, response_code=self.APP_INVALID_KEY)
+        yield self.reply_err(msg,content=None, exception=ex, response_code=self.APP_INVALID_KEY)
 
     @defer.inlineCallbacks
     def op_echo_exception(self, content, headers, msg):
         log.info("Message received: "+str(content))
         raise RuntimeError("I'm supposed to fail")
-        
+
         # This is never reached!
-        yield self.reply(msg, content=content)
+        yield self.reply_ok(msg, content=content)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(EchoProcess)

@@ -7,6 +7,7 @@
 """
 
 from twisted.internet import defer
+import traceback
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -72,7 +73,7 @@ class StateObject(Actionable):
                 def _cb(result):
                     d1.callback(result)
                 def _err(result):
-                    #print "In exception processing, %r" % (result)
+                    log.error("In exception processing, event=%s, %r" % (event, result))
                     # @todo Improve the error catching, forwarding and reporting
                     try:
                         d2 = self._so_error(result)
@@ -89,6 +90,7 @@ class StateObject(Actionable):
                 res.addCallbacks(_cb,_err)
                 res = d1
         except StandardError, ex:
+            log.exception("Exception in StateObject processing of event %s" % (event))
             # This catches only if not deferred
             # @todo Improve the error catching, forwarding and reporting
             res = self._so_error(ex)

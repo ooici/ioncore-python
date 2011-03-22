@@ -10,7 +10,6 @@ import os
 import types
 
 from zope.interface import implements, Interface
-
 from twisted.internet import defer
 
 import ion.util.ionlog
@@ -201,6 +200,7 @@ class Receiver(BasicLifecycleObject):
         assert not id(msg) in self.processing_messages, "Message already consumed"
         self.processing_messages[id(msg)] = msg
 
+        # Put message through the container interceptor system
         org_msg = msg
         data = msg.payload
         if not self.raw:
@@ -322,4 +322,3 @@ class NameReceiver(Receiver):
 
 class ServiceWorkerReceiver(WorkerReceiver):
     pass
-

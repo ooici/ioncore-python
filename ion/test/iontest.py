@@ -49,27 +49,26 @@ class IonTestCase(unittest.TestCase):
     twisted_container_service = None #hack
 
     @defer.inlineCallbacks
-    def _start_container(self, sysname=None):
+    def _start_container(self, sysname=None, start_app=None):
         """
         Starting and initialzing the container with a connection to a broker.
         """
-        #mopt = {}
         mopt = service.Options()
         mopt['broker_host'] = CONF['broker_host']
         mopt['broker_port'] = CONF['broker_port']
         mopt['broker_vhost'] = CONF['broker_vhost']
         mopt['broker_heartbeat'] = CONF['broker_heartbeat']
         mopt['no_shell'] = True
-        mopt['script'] = CONF['start_app']
+        # This is where dependent apps can be included
+        mopt['script'] = CONF['start_app'] or start_app
 
         # Little trick to have no consecutive failures if previous setUp() failed
+        # @note This is not fail fast and does not always work. TEMPORARY.
         if Container._started:
             log.error("PROBLEM: Previous test did not stop container. Fixing...")
             yield self._stop_container()
 
-        #self.container = container.create_new_container()
-        #yield self.container.initialize(mopt)
-        #yield self.container.activate()
+        # Start container by simulating twistd service instantiation
         twisted_container_service = service.CapabilityContainer(mopt)
         yield twisted_container_service.startService()
         self.twisted_container_service = twisted_container_service
@@ -210,14 +209,14 @@ class IonTestCase(unittest.TestCase):
         """
         process = ioninit.container_instance.proc_manager.process_registry.kvs.get(pid, None)
         return process
-                
+
     def run(self, result):
         # TODO This is where we can inject user id and expiry into test case
         # stack to allow running of tests within the policy enforcement environment
         # as well as force certain policy enforcement failures, etc.
         #request.user_id = 'MYUSERID'
         #request.expiry = '999999999'
-        unittest.TestCase.run(self, result)        
+        unittest.TestCase.run(self, result)
 
 
 class ReceiverProcess(Process):
@@ -331,11 +330,9 @@ class ItvTestCase(IonTestCase):
 
     Important points:
     - The sysname parameter is required to get all the services and tests running on the same
-      system. itv_trial takes care of this for you, but if you want to deploy these tests vs 
+      system. itv_trial takes care of this for you, but if you want to deploy these tests vs
       a CEI spawned environment, you must set the environment variable ION_TEST_CASE_SYSNAME
       to be the same as the sysname the CEI environment was spawned with.
 
     """
     services = []
-
-
