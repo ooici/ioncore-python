@@ -115,7 +115,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
                                     name=self.id.full,
                                     group=self.proc_group,
                                     process=self,
-                                    handler=self.receive)
+                                    handler=self.receive,
+                                    error_handler=self.receive_error)
 
         # Create a backend receiver for outgoing RPC process interactions.
         # Needed to avoid deadlock when processing incoming messages
@@ -126,7 +127,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
                                     name=self.backend_id.full,
                                     group=self.proc_group,
                                     process=self,
-                                    handler=self.receive)
+                                    handler=self.receive,
+                                    error_handler=self.receive_error)
 
         # Dict of all receivers of this process. Key is the name
         self.receivers = {}
@@ -453,6 +455,17 @@ class Process(BasicLifecycleObject,ResponseCodes):
                 #@Todo How do we know if the message was ack'ed here?
 
     @defer.inlineCallbacks
+    def receive_error(self, payload, msg, response_code=None):
+        """
+        This is the entry point for handling messaging errors. As appropriate,
+        this method will attempt to respond with a meaningful error code to
+        the sender.
+        """
+        if msg and msg.payload['reply-to']:
+            yield self.reply_err(msg=msg, response_code=response_code)
+        msg.ack()
+
+    @defer.inlineCallbacks
     def _receive_rpc(self, payload, msg):
         """
         Handling of RPC reply messages.
@@ -753,7 +766,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
         
     @defer.inlineCallbacks
-    def reply_err(self, msg, content=None, headers=None, exception=None):
+    def reply_err(self, msg, content=None, headers=None, exception=None, response_code=None):
         """
         Boilerplate method for reply to a message which lead to an application
         level error. The result can include content, a caught exception and an
@@ -772,6 +785,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
                 
                 if isinstance(exception, ApplicationError):
                     content.MessageResponseCode = exception.response_code
+                elif response_code:
+                    content.MessageResponseCode = response_code
                 else:
                     content.MessageResponseCode = content.ResponseCodes.INTERNAL_SERVER_ERROR
                 
@@ -909,6 +924,15 @@ class ProcessClient(ProcessClientBase):
         """
         Sends an RPC message to the specified target via originator process
         """
+        
+        # Validate expiry value
+        assert type(expiry) is str, 'Expiry must be string representation of int time value'
+
+        try:
+            expiryval = int(expiry)
+        except ValueError, ex:
+            assert False, 'Expiry must be string representation of int time value'
+            
         headers = {'user-id':user_id, 'expiry':expiry}
         return self.proc.rpc_send(self.target, operation, content, headers, **kwargs)
 
