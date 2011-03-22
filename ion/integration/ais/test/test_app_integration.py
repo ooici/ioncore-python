@@ -23,7 +23,9 @@ from ion.test.iontest import IonTestCase
 from ion.core.object import object_utils
 
 # import GPB type identifiers for AIS
-from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
+from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
+                                                       AIS_RESPONSE_MSG_TYPE, \
+                                                       AIS_RESPONSE_ERROR_TYPE
 from ion.integration.ais.ais_object_identifiers import REGISTER_USER_TYPE, \
                                                        UPDATE_USER_EMAIL_TYPE,   \
                                                        UPDATE_USER_DISPATCH_QUEUE_TYPE, \
@@ -234,6 +236,30 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail("re-registration did not return the same OoiId as registration")
         log.info("test_registerUser: re-registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
         
+        # try to send registerUser the wrong GPB
+        # create a bad request GPBs
+        msg = yield mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS bad request')
+        reply = yield self.aisc.registerUser(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB is not an AIS_RESPONSE_ERROR_TYPE GPB')
+
+        # try to send registerUser incomplete GPBs
+        # create a bad GPB request w/o payload
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS bad request')
+        reply = yield self.aisc.registerUser(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
+        # create a bad GPB request w/o certificate
+        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
+        reply = yield self.aisc.registerUser(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
+        # create a bad GPB request w/o key
+        msg.message_parameters_reference.certificate = "dumming certificate"
+        reply = yield self.aisc.registerUser(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
+            
     @defer.inlineCallbacks
     def test_updateUserDispatcherQueue(self):
 
@@ -311,6 +337,30 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
 
+        # try to send updateUserDispatcherQueue the wrong GPB
+        # create a bad request GPBs
+        msg = yield mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS bad request')
+        reply = yield self.aisc.updateUserDispatcherQueue(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB to updateUserDispatcherQueue is not an AIS_RESPONSE_ERROR_TYPE GPB')
+
+        # try to send updateUserDispatcherQueue incomplete GPBs
+        # create a bad GPB request w/o payload
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS bad request')
+        reply = yield self.aisc.updateUserDispatcherQueue(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB to updateUserDispatcherQueue to is not an AIS_RESPONSE_ERROR_TYPE GPB')
+        # create a bad GPB request w/o ooi_id
+        msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_DISPATCH_QUEUE_TYPE)
+        reply = yield self.aisc.updateUserDispatcherQueue(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB to updateUserDispatcherQueue is not an AIS_RESPONSE_ERROR_TYPE GPB')
+        # create a bad GPB request w/o key
+        msg.message_parameters_reference.user_ooi_id = "Some-ooi_id"
+        reply = yield self.aisc.updateUserDispatcherQueue(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB to updateUserDispatcherQueue is not an AIS_RESPONSE_ERROR_TYPE GPB')
+
     @defer.inlineCallbacks
     def test_updateUserEmail(self):
 
@@ -387,6 +437,30 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('updateUserEmail returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
+
+        # try to send updateUserEmail the wrong GPB
+        # create a bad request GPBs
+        msg = yield mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS bad request')
+        reply = yield self.aisc.updateUserEmail(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB to updateUserDispatcherQueue is not an AIS_RESPONSE_ERROR_TYPE GPB')
+
+        # try to send updateUserDispatcherQueue incomplete GPBs
+        # create a bad GPB request w/o payload
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS bad request')
+        reply = yield self.aisc.updateUserEmail(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB to updateUserEmail to is not an AIS_RESPONSE_ERROR_TYPE GPB')
+        # create a bad GPB request w/o ooi_id
+        msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_EMAIL_TYPE)
+        reply = yield self.aisc.updateUserEmail(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB to updateUserEmail is not an AIS_RESPONSE_ERROR_TYPE GPB')
+        # create a bad GPB request w/o emsil address
+        msg.message_parameters_reference.user_ooi_id = "Some-ooi_id"
+        reply = yield self.aisc.updateUserEmail(msg)
+        if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
+            self.fail('response to bad GPB to updateUserEmail is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
     @defer.inlineCallbacks
     def createDataset(self, rc):
