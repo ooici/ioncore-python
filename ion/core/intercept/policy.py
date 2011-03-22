@@ -30,14 +30,16 @@ def construct_policy_lists(policydb):
         for policy_entry in policydb:
             role, action, resource = policy_entry
             service, opname = action.split('.', 1)
-            assert role in ('ANONYMOUS', 'AUTHENTICATED', 'OWNER')
+            assert role in ('ANONYMOUS', 'AUTHENTICATED', 'OWNER', 'ADMIN')
 
-            if role == 'OWNER':
-                role_set = set(['OWNER'])
+            if role == 'ADMIN':
+                role_set = set(['ADMIN'])
+            elif role == 'OWNER':
+                role_set = set(['OWNER', 'ADMIN'])
             elif role == 'AUTHENTICATED':
-                role_set = set(['AUTHENTICATED', 'OWNER'])            
-            else:
-                role_set = set(['ANONYMOUS', 'AUTHENTICATED', 'OWNER'])
+                role_set = set(['AUTHENTICATED', 'OWNER', 'ADMIN']) 
+            else:           
+                role_set = set(['ANONYMOUS', 'AUTHENTICATED', 'OWNER', 'ADMIN'])
 
             service_dict = thedict.setdefault(service, {})
             op_set = service_dict.setdefault(opname, set())
@@ -50,6 +52,36 @@ def construct_policy_lists(policydb):
 
 policydb_filename = ioninit.adjust_dir(CONF.getValue('policydecisionpointdb'))
 policy_dictionary = construct_policy_lists(Config(policydb_filename).getObject())
+
+def construct_admin_list(adminrolelist):
+    thelist = []
+    for role_entry in adminrolelist:
+        subject = role_entry
+        role_dict = {'subject': subject, 'ooid': None}
+        thelist.append(role_dict);
+    return thelist
+
+adminroledb_filename = ioninit.adjust_dir(CONF.getValue('adminroledb'))
+admin_role_list = construct_admin_list(Config(adminroledb_filename).getObject())
+
+def subject_has_admin_role(subject):
+    for role_entry in admin_role_list:
+        if role_entry['subject'] == subject:
+            return True
+    return False
+
+def user_has_admin_role(ooid):
+    for role_entry in admin_role_list:
+        if role_entry['ooid'] == ooid:
+            return True
+        else:
+            return False
+
+def map_ooid_to_subject(subject,ooid):
+    for role_entry in admin_role_list:
+        if role_entry['subject'] == subject:
+            role_entry['ooid'] = ooid
+            return
 
 class PolicyInterceptor(EnvelopeInterceptor):
     def before(self, invocation):
@@ -77,7 +109,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
         is made to ensure the user role is equal to or greater than the
         required role.
         Role precedence from lower to higher is:
-            ANONYMOUS, AUTHORIZED, OWNER
+            ANONYMOUS, AUTHORIZED, OWNER, ADMIN
         @param msg: message content from invocation
         @param invocation: invocation object passed on interceptor stack.
         @return: invocation object indicating status of authority check
@@ -126,8 +158,12 @@ class PolicyInterceptor(EnvelopeInterceptor):
             role = 'ANONYMOUS'
             # TODO figure out mechanism to map user id to role
             if user_id != None and user_id != 'ANONYMOUS':
-                log.info('Policy Interceptor: Using AUTHENTICATED role.')
-                role = 'AUTHENTICATED'
+                if user_has_admin_role(user_id) :
+                    log.info('Policy Interceptor: Using ADMIN role.')
+                    role = 'ADMIN'
+                else:
+                    log.info('Policy Interceptor: Using AUTHENTICATED role.')
+                    role = 'AUTHENTICATED'
             else:
                 log.info('Policy Interceptor: Using ANONYMOUS role.')
 
