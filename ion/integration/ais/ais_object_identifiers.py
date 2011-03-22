@@ -28,7 +28,7 @@ message ApplicationIntegrationServiceResponseMsg{
     // The message parameters object
     repeated net.ooici.core.link.CASRef message_parameters_reference = 1;
     
-    optional string result = 2;
+    optional int32 result = 2;
 }
 """
 
@@ -146,7 +146,8 @@ message UpdateUserEmail {
        _VERSION = 1;
    }
    // objects in a protofile are called messages
-   optional string email_address=1;
+   optional string user_ooi_id=1;
+   optional string email_address=2;
 }
 """
 
@@ -157,7 +158,8 @@ message UpdateUserDispatcherQueue {
        _ID = 9103;
        _VERSION = 1;
    }
-   optional string queue_name=1;
+   optional string user_ooi_id=1;
+   optional string queue_name=2;
 }
 """
 
