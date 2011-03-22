@@ -13,8 +13,10 @@ try:
 except ImportError:
     from distutils.core import setup
 
+from ion import __version__ as version
+
 setup( name = 'ioncore',
-       version = '0.4.4',
+       version = version,
        description = 'OOI ION Python Capability Container and Core Modules',
        url = 'http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project',
        download_url = 'http://ooici.net/releases',
