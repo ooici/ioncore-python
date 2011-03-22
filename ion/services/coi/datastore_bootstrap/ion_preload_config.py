@@ -12,10 +12,10 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core.object.object_utils import create_type_identifier
 
 ### Constants used in defining the basic configuration which is preloaded into the datastore:
-ID = ID
-TYPE = TYPE
-PREDICATE = PREDICATE
-DESCRIPTION = DESCRIPTION
+ID = 'ID'
+TYPE = 'TYPE'
+PREDICATE = 'PREDICATE'
+DESCRIPTION = 'DESCRIPTION'
 
 ### Defined Resource Types
 topic_res_type_name = 'TOPIC_RESOURCE_TYPE'
@@ -62,10 +62,10 @@ owned_by_name:{ID:'734CE3E6-90ED-4642-AD46-7C2E67BDA798'}
 
 
 # Extract Resource IDs for use in services and tests
-HAS_A = ION_PREDICATES[has_a_name][ID]
-IS_A = ION_PREDICATES[is_a_name][ID]
-TYPE_OF = ION_PREDICATES[type_of_name][ID]
-OWNED_BY = ION_PREDICATES[owned_by_name][ID]
+HAS_A_ID = ION_PREDICATES[has_a_name][ID]
+IS_A_ID = ION_PREDICATES[is_a_name][ID]
+TYPE_OF_ID = ION_PREDICATES[type_of_name][ID]
+OWNED_BY_ID = ION_PREDICATES[owned_by_name][ID]
 
 
 ##### Define Datasets and data sources #####:
@@ -78,18 +78,13 @@ profile_dataset_name = 'PROFILE_DATASET'
 ION_DATASETS={
 profile_dataset_name:{ID:'3319A67F-81F3-424F-8E69-4F28C4E047F1',
                       },
-is_a_name:{ID:'60029609-FD0C-4DE3-8E52-9F5DDAD9A9A8'},
-type_of_name:{ID:'F30A45F8-331D-4D44-AECC-746DA81B012F'},
-owned_by_name:{ID:'734CE3E6-90ED-4642-AD46-7C2E67BDA798'}
+grid_dataset_name:{},
 }
 
 
 # Extract Resource IDs for use in services and tests
-HAS_A = ION_PREDICATES[has_a_name][ID]
-IS_A = ION_PREDICATES[is_a_name][ID]
-TYPE_OF = ION_PREDICATES[type_of_name][ID]
-OWNED_BY = ION_PREDICATES[owned_by_name][ID]
-
+SAMPLE_PROFILE_DATASET_ID = ION_DATASETS[profile_dataset_name][ID]
+SAMPLE_GRID_DATASET_ID = ION_DATASETS[grid_dataset_name][ID]
 
 
 
