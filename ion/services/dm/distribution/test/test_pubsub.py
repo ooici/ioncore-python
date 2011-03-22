@@ -289,6 +289,16 @@ class PST(IonTestCase):
         self.failUnless(len(idlist.id_list) > 0)
 
     @defer.inlineCallbacks
+    def test_query_no_regex(self):
+        msg = yield self.create_message(REGEX_TYPE)
+        try:
+            idlist = yield self.psc.query_subscribers(msg)
+        except ReceivedApplicationError:
+            return
+
+        self.fail('Did not get the exception I expected on bad message')
+
+    @defer.inlineCallbacks
     def _declare_q(self):
         xs_id, xp_id, topic_id = yield self._declare_topic()
         msg = yield self.create_message(QUEUE_TYPE)
