@@ -9,13 +9,11 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from ion.util.itv_decorator import itv
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
 from ion.test.iontest import IonTestCase
 from ion.core.process.process import ProcessClient
-import ion.util.procutils as pu
 
 class TestOmsDriver(IonTestCase):
     """
