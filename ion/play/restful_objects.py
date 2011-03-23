@@ -30,12 +30,11 @@ import logging as log
 from twisted.web import resource
 from twisted.web.server import Site
 from twisted.internet import reactor
-from twisted.web.resource import NoResource
 
 from ion.core.object.object_utils import find_type_ids, return_proto_file
 
 TCP_PORT = 2312
-HOSTNAME = 'localhost'
+HOSTNAME = 'ooici.net'
 
 page_header = '''
 <html><head><title>Ion object locator</title></head><body>

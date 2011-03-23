@@ -705,6 +705,8 @@ class PubSubClient(ServiceClient):
         """
         @brief Declare an exchange space, ok to call more than once (idempotent)
         @param params GPB, 2313/1, with exchange_space_name set to the desired string
+        @gpb{Input,2313,1}
+        @gpb{Returns,2312,1}
         @retval XS ID, GPB 2312/1, if zero-length then an error occurred
         """
         yield self._check_init()
@@ -718,6 +720,8 @@ class PubSubClient(ServiceClient):
         @brief Remove an exchange space by ID
         @param params Exchange space ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @gpb{Input,10,1}
+        @gpb{Returns,11,1}
         """
         yield self._check_init()
 
@@ -731,6 +735,8 @@ class PubSubClient(ServiceClient):
         @param params GPB, 2306/1, with 'regex' filled in
         @retval GPB, 2312/1, maybe zero-length if no matches.
         @retval error return also possible
+        @gpb{Input,2306,1}
+        @gpb{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -744,6 +750,8 @@ class PubSubClient(ServiceClient):
         @note Must have parent exchange space id before calling this
         @param params GPB 2309/1, with exchange_point_name and exchange_space_id filled in
         @retval GPB 2312/1, zero length if error.
+        @gpb{Input,2309,1}
+        @gpb{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -756,6 +764,8 @@ class PubSubClient(ServiceClient):
         @brief Remove an exchange point by ID
         @param params Exchange point ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @gpb{Input,10,1}
+        @gpb{Returns,11,1}
         """
         yield self._check_init()
 
@@ -769,6 +779,8 @@ class PubSubClient(ServiceClient):
         @param params GPB, 2306/1, with 'regex' filled in
         @retval GPB, 2312/1, maybe zero-length if no matches.
         @retval error return also possible
+        @gpb{Input,2306,1}
+        @gpb{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -781,6 +793,8 @@ class PubSubClient(ServiceClient):
         @brief Declare/create a topic in a given xs.xp. A topic is usually a dataset name.
         @param params GPB 2307/1, with xs and xp_ids set
         @retval GPB 2312/1, zero-length if error
+        @gpb{Input,2307,1}
+        @gpb{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -793,6 +807,8 @@ class PubSubClient(ServiceClient):
         @brief Remove a topic by ID
         @param params Topic ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @gpb{Input,10,1}
+        @gpb{Returns,11,1}
         """
         yield self._check_init()
 
@@ -806,6 +822,8 @@ class PubSubClient(ServiceClient):
         @param params GPB, 2306/1, with 'regex' filled in
         @retval GPB, 2312/1, maybe zero-length if no matches.
         @retval error return also possible
+        @gpb{Input,2306,1}
+        @gpb{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -818,6 +836,8 @@ class PubSubClient(ServiceClient):
         @brief Declare/create a publisher in a given xs.xp.topic.
         @param params GPB 2310/1, with xs, xp and topic_ids set
         @retval GPB 2312/1, zero-length if error
+        @gpb{Input,2310,1}
+        @gpb{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -830,6 +850,8 @@ class PubSubClient(ServiceClient):
         @brief Remove a publisher by ID
         @param params Publisher ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @gpb{Input,10,1}
+        @gpb{Returns,11,1}
         """
         yield self._check_init()
 
@@ -843,6 +865,8 @@ class PubSubClient(ServiceClient):
         @param params GPB, 2306/1, with 'regex' filled in
         @retval GPB, 2312/1, maybe zero-length if no matches.
         @retval error return also possible
+        @gpb{Input,2306,1}
+        @gpb{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -855,6 +879,8 @@ class PubSubClient(ServiceClient):
         @brief Remove a publisher by ID
         @param params Publisher ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @gpb{Input,10,1}
+        @gpb{Returns,11,1}
         """
         yield self._check_init()
 
@@ -868,6 +894,8 @@ class PubSubClient(ServiceClient):
         @note Not fully fleshed out yet, interface subject to change
         @param params GPB 2311/1
         @retval GPB 2312/1, zero-length if a problem
+        @gpb{Input,2311,1}
+        @gpb{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -880,6 +908,7 @@ class PubSubClient(ServiceClient):
         @brief Remove a subscription by ID
         @param params Subscription ID, GPB 10/1, in field resource_reference
         @retval Generic return GPB 11/1
+        @gpb{Input,10,1}
         """
         yield self._check_init()
 
@@ -893,6 +922,8 @@ class PubSubClient(ServiceClient):
         @param params @GPB(2306, 1) with 'regex' filled in
         @retval GPB, 2312/1, maybe zero-length if no matches.
         @retval error return also possible
+        @gpb{Input,2306,1}
+        @gpb{Returns,2312,1}
         """
         yield self._check_init()
 
@@ -905,6 +936,7 @@ class PubSubClient(ServiceClient):
         @brief Create a listener queue for a subscription
         @param GPB 2308/1
         @retval None
+        @gpb{Input,2308,1}
         """
         yield self._check_init()
 
@@ -917,6 +949,7 @@ class PubSubClient(ServiceClient):
         @brief Undeclare (remove) a queue
         @param GPB 10/1, queue ID
         @retval OK or error
+        @gpb{Input,10,1}
         """
         yield self._check_init()
 
@@ -929,7 +962,7 @@ class PubSubClient(ServiceClient):
         """
         @brief Add a binding to an existing queue
         @param params GPB 2314/1
-        @GPB{Input,2314,1}
+        @gpb{Input,2314,1}
         @retval None
         """
         yield self._check_init()
