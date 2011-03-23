@@ -340,4 +340,3 @@ class IndexStoreServiceClient(ServiceClient):
         defer.returnValue(result.attributes)
         
         
-           

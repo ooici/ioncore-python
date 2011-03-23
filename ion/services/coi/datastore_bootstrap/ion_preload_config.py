@@ -72,13 +72,13 @@ OWNED_BY_ID = ION_PREDICATES[owned_by_name][ID]
 
 # Dataset names
 profile_dataset_name = 'PROFILE_DATASET'
+grid_dataset_name = 'GRID_DATASET'
 
 
 # Data structure used by datastore intialization
 ION_DATASETS={
-profile_dataset_name:{ID:'3319A67F-81F3-424F-8E69-4F28C4E047F1',
-                      },
-grid_dataset_name:{},
+profile_dataset_name:{ID:'3319A67F-81F3-424F-8E69-4F28C4E047F1'},
+grid_dataset_name:{ID:''},
 }
 
 

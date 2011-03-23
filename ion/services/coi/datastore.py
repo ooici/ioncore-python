@@ -35,6 +35,10 @@ from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANC
 
 from ion.core.data.storage_configuration_utility import KEYWORD, VALUE
 
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES
+
+
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
@@ -581,10 +585,13 @@ class DataStoreService(ServiceProcess):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
         else:
             self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE])
-        
 
 
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
+
+
+
+
 
 
     #@defer.inlineCallbacks

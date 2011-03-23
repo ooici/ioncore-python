@@ -32,18 +32,8 @@ class DataStoreTest(IonTestCase):
     """
     Testing example hello service.
     """
-
-    @defer.inlineCallbacks
-    def setUp(self):
-        yield self._start_container()
-
-        services = [
-            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
-                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
-
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'commit_store_class':'ion.core.data.index_store_service.IndexStoreServiceClient'}
-                },
+    services = [
+            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService'},
             {'name':'workbench_test1',
              'module':'ion.core.object.test.test_workbench',
              'class':'WorkBenchProcess',
@@ -51,7 +41,14 @@ class DataStoreTest(IonTestCase):
         ]
 
 
-        self.sup = yield self._spawn_processes(services)
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield self._start_container()
+
+
+
+
+        self.sup = yield self._spawn_processes(self.services)
 
 
         child_ds1 = yield self.sup.get_child_id('ds1')
@@ -254,8 +251,39 @@ class DataStoreTest(IonTestCase):
         return key_list
 
 
+class StoreServiceBackedDataStoreTest(DataStoreTest):
 
 
+    services = [
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
+                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
+
+            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+             'spawnargs':{'commit_store_class':'ion.core.data.index_store_service.IndexStoreServiceClient'}
+                },
+            {'name':'workbench_test1',
+             'module':'ion.core.object.test.test_workbench',
+             'class':'WorkBenchProcess',
+             'spawnargs':{'proc-name':'wb1'}},
+        ]
+
+
+
+class CassandraBackedDataStoreTest(DataStoreTest):
+
+
+    services = [
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
+                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
+
+            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+             'spawnargs':{'commit_store_class':'ion.core.data.index_store_service.IndexStoreServiceClient'}
+                },
+            {'name':'workbench_test1',
+             'module':'ion.core.object.test.test_workbench',
+             'class':'WorkBenchProcess',
+             'spawnargs':{'proc-name':'wb1'}},
+        ]
 
 
 
