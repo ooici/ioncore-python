@@ -26,10 +26,10 @@ from ion.core.object import object_utils
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE
-from ion.integration.ais.ais_object_identifiers import REGISTER_USER_TYPE, \
+from ion.integration.ais.ais_object_identifiers import REGISTER_USER_REQUEST_TYPE, \
                                                        UPDATE_USER_EMAIL_TYPE,   \
                                                        UPDATE_USER_DISPATCH_QUEUE_TYPE, \
-                                                       OOI_ID_TYPE, \
+                                                       REGISTER_USER_RESPONSE_TYPE, \
                                                        FIND_DATA_RESOURCES_REQ_MSG_TYPE, \
                                                        GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE
 
@@ -215,7 +215,7 @@ class AppIntegrationTest(IonTestCase):
 
         # create the register_user request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
-        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
+        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
         
         # fill in the certificate and key
         msg.message_parameters_reference.certificate = """-----BEGIN CERTIFICATE-----
@@ -269,7 +269,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
+        if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
         log.info("test_registerUser: first time registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
@@ -280,7 +280,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
+        if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
         if FirstOoiId != reply.message_parameters_reference[0].ooi_id:
             self.fail("re-registration did not return the same OoiId as registration")
@@ -300,7 +300,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
         # create a bad GPB request w/o certificate
-        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
+        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
         reply = yield self.aisc.registerUser(msg)
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to registerUser is not an AIS_RESPONSE_ERROR_TYPE GPB')
@@ -318,7 +318,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         # create the register_user request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
-        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
+        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
         
         # fill in the certificate and key
         msg.message_parameters_reference.certificate = """-----BEGIN CERTIFICATE-----
@@ -372,7 +372,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
+        if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
         log.info("test_registerUser: first time registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
@@ -419,7 +419,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         
         # create the register_user request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
-        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_TYPE)
+        msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
         
         # fill in the certificate and key
         msg.message_parameters_reference.certificate = """-----BEGIN CERTIFICATE-----
@@ -473,7 +473,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         log.debug('registerUser returned:\n'+str(reply.message_parameters_reference[0]))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
-        if reply.message_parameters_reference[0].ObjectType != OOI_ID_TYPE:
+        if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
         log.info("test_registerUser: first time registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))

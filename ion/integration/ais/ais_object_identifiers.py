@@ -125,9 +125,9 @@ message GetDataResourceDetailRspMsg {
 }
 """
 # RegisterUser GPBs from ion-object-definitions/net/ooici/integration/ais/registerUser/register_user.proto
-REGISTER_USER_TYPE = object_utils.create_type_identifier(object_id=9101, version=1)
+REGISTER_USER_REQUEST_TYPE = object_utils.create_type_identifier(object_id=9101, version=1)
 """
-message RegisterIonUser {
+message RegisterIonUserRequest {
    enum _MessageTypeIdentifier {
        _ID = 9101;
        _VERSION = 1;
@@ -163,15 +163,17 @@ message UpdateUserDispatcherQueue {
 }
 """
 
-OOI_ID_TYPE = object_utils.create_type_identifier(object_id=9104, version=1)
+REGISTER_USER_RESPONSE_TYPE = object_utils.create_type_identifier(object_id=9104, version=1)
 """
-message OoiId {
+message RegisterIonUserResponse {
    enum _MessageTypeIdentifier {
        _ID = 9104;
        _VERSION = 1;
    }
 
    optional string ooi_id=1;
+   optional bool user_is_admin=2;
+   optional bool user_already_registered=3;
 }
 """
 

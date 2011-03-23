@@ -13,11 +13,12 @@ from twisted.internet import defer
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.identity_registry import IdentityRegistryClient
 from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+from ion.core.intercept.policy import user_has_admin_role
 
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE, \
                                                        AIS_REQUEST_MSG_TYPE, \
                                                        AIS_RESPONSE_ERROR_TYPE, \
-                                                       OOI_ID_TYPE
+                                                       REGISTER_USER_RESPONSE_TYPE
 from ion.core.object import object_utils
 
 IDENTITY_TYPE = object_utils.create_type_identifier(object_id=1401, version=1)
@@ -259,12 +260,14 @@ class RegisterUser(object):
       try:
          result = yield self.irc.authenticate_user(Request)
          log.info('RegisterUser.registerUser(): user exists in IR with ooi_id = '+str(result))
+         UserAlreadyRegistered = True
       except ReceivedApplicationError, ex:
             log.info("RegisterUser.registerUser(): calling irc.register_user with\n"+str(Request.configuration))
             # user wasn't in Identity Registry, so register them now
             try:
                result = yield self.irc.register_user(Request)
                log.info('RegisterUser.registerUser(): added new user in IR with ooi_id = '+str(result))
+               UserAlreadyRegistered = False
             except ReceivedApplicationError, ex:
                log.info('RegisterUser.registerUser(): Error invoking Identity Registry Service: %s' %ex)
                # build AIS error response
@@ -276,8 +279,10 @@ class RegisterUser(object):
       # build AIS response with user's ooi_id
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS RegisterUser response')
       Response.message_parameters_reference.add()
-      Response.message_parameters_reference[0] = Response.CreateObject(OOI_ID_TYPE)
+      Response.message_parameters_reference[0] = Response.CreateObject(REGISTER_USER_RESPONSE_TYPE)
       Response.message_parameters_reference[0].ooi_id = result.resource_reference.ooi_id
+      Response.message_parameters_reference[0].user_already_registered = UserAlreadyRegistered
+      Response.message_parameters_reference[0].user_is_admin = user_has_admin_role(result.resource_reference.ooi_id)
       Response.result = Response.ResponseCodes.OK
       defer.returnValue(Response)
 
