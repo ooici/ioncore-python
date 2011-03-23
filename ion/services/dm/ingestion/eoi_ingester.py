@@ -50,7 +50,9 @@ person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
 
-BEGIN_INGEST_TYPE = object_utils.create_type_identifier(object_id=2002, version=1)
+BEGIN_INGEST_TYPE           = object_utils.create_type_identifier(object_id=2002, version=1)
+CREATE_DATASET_TOPICS_TYPE  = object_utils.create_type_identifier(object_id=2003, version=1)
+INGESTION_READY_TYPE        = object_utils.create_type_identifier(object_id=2004, version=1)
 
 class EOIIngestionError(ApplicationError):
     """
@@ -81,6 +83,8 @@ class EOIIngestionService(ServiceProcess):
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
 
         self._defer_ingest = defer.Deferred()       # waited on by op_ingest to signal end of ingestion
+
+        self.mc = MessageClient(proc=self)
 
         log.info('EOIIngestionService.__init__()')
 
@@ -119,7 +123,15 @@ class EOIIngestionService(ServiceProcess):
         
         yield self.reply(msg, content=head)
         
-        
+
+    @defer.inlineCallbacks
+    def op_create_dataset_topics(self, content, headers, msg):
+        """
+        Creates ingestion and notification topics that can be used to publish ingestion
+        data and notifications about ingestion.
+        """
+        yield self.reply_ok(msg)
+
     class IngestSubscriber(Subscriber):
         """
         Specially derived Subscriber that routes received messages into the ingest service's
@@ -129,6 +141,16 @@ class EOIIngestionService(ServiceProcess):
         def _receive_handler(self, content, msg):
             yield self._process.receive(content, msg)
 
+    def _ingest_data_topic_valid(self, ingest_data_topic):
+        """
+        Determines if the ingestion data topic is a valid topic for ingestion.
+        The topic should have been registered via op_create_dataset_topics prior to 
+        ingestion.
+        @TODO: this
+        """
+        log.debug("TODO: _ingest_data_topic_valid")
+        return True
+
     @defer.inlineCallbacks
     def op_perform_ingest(self, content, headers, msg):
         """
@@ -137,10 +159,17 @@ class EOIIngestionService(ServiceProcess):
         log.info('<<<---@@@ Incoming perform_ingest request with "Perform Ingest" message')
         log.debug("...Content:\t" + str(content))
 
+        # TODO: replace this from the msg itself with just dataset id
+        ingest_data_topic = content.ds_ingest_topic
 
-        log.info('Setting up ingest topic for communication with a Dataset Agent: "%s"' % content.ds_ingest_topic)
+        # TODO: validate ingest_data_topic
+        valid = self._ingest_data_topic_valid(ingest_data_topic)
+        if not valid:
+            log.error("Invalid data ingestion topic (%s), allowing it for now TODO" % ingest_data_topic)
+
+        log.info('Setting up ingest topic for communication with a Dataset Agent: "%s"' % ingest_data_topic)
         self._subscriber = self.IngestSubscriber(xp_name="magnet.topic",
-                                                 binding_key=content.ds_ingest_topic,
+                                                 binding_key=ingest_data_topic,
                                                  process=self)
         yield self.register_life_cycle_object(self._subscriber) # move subscriber to active state
 
@@ -152,8 +181,12 @@ class EOIIngestionService(ServiceProcess):
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
         timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
 
-        log.info('Notifying caller that ingest is ready by invoking RPC op_ingest_ready() using routing key: "%s"' % content.ready_routing_key)
-        self.send(content.ready_routing_key, operation='ingest_ready', content=True)
+        log.info('Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.ready_routing_key)
+        irmsg = yield self.mc.create_instance(INGESTION_READY_TYPE)
+        irmsg.xp_name = "magnet.topic"
+        irmsg.publish_topic = ingest_data_topic
+
+        self.send(content.ready_routing_key, operation='ingest_ready', content=irmsg)
         #yield self.rpc_send(content.ready_routing_key, operation='ingest_ready', content=True)
 
         log.info("Yielding in op_perform_ingest for receive loop to complete")
@@ -179,11 +212,10 @@ class EOIIngestionService(ServiceProcess):
             yield self._notify_ingest(content)
 
             # now reply ok to the original message
-            yield self.reply_ok(msg, content={'topic':content.ds_ingest_topic})
+            yield self.reply_ok(msg, content={})
         else:
             log.debug("Ingest failed, error back to original request")
             raise EOIIngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
-            #yield self.reply_err(msg, content="dyde")
 
     @defer.inlineCallbacks
     def _notify_ingest(self, content):
