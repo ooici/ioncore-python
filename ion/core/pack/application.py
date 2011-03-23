@@ -58,7 +58,7 @@ class AppLoader(object):
         except Exception, ex:
             log.exception("Application %s start failed" % appdef.name)
             appdef._state = None
-            return
+            raise FatalError("Application %s start failed" % appdef.name)
 
         if res and type(res) in (list,tuple) and len(res) == 2:
             (appdef._supid, appdef._state) = res

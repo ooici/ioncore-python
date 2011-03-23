@@ -98,7 +98,9 @@ class CapabilityContainer(service.Service):
         yield self.start_container()
         log.info("Container started.")
 
-        yield self.do_start_actions()
+        d = self.do_start_actions()
+        d.addErrback(self.container.fatalError)
+        yield d
 
         if not self.config['no_shell']:
             self.start_shell()
