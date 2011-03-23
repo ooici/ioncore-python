@@ -12,6 +12,7 @@ from carrot import connection
 from carrot import messaging
 from txamqp.client import TwistedDelegate
 
+from ion.core.exception import FatalError
 from ion.core.cc.store import Store
 from ion.util.state_object import BasicLifecycleObject
 import ion.util.ionlog
@@ -96,11 +97,12 @@ class MessageSpace(BasicLifecycleObject):
         self.connection = connection.BrokerConnection(*args, **kwargs)
         self.closing = False # State that determines if we expect a close event
 
-    @defer.inlineCallbacks
     def on_activate(self, *args, **kwargs):
         assert not self.connection._connection, "Already connected to broker"
         amqpEvents = AMQPEvents(self)
-        yield self.connection.connect(amqpEvents)
+        d = self.connection.connect(amqpEvents)
+        d.addErrback(self.connectionLost)
+        return d
 
     def on_deactivate(self, *args, **kwargs):
         raise NotImplementedError("Not implemented")
@@ -113,11 +115,18 @@ class MessageSpace(BasicLifecycleObject):
         #raise RuntimeError("Illegal state change for MessageSpace")
         self.exchange_manager.error(*args, **kwargs)
 
-    def delivery_error(self, msg):
+    def delivery_error(self, reason, msg):
         """
-        @param msg Message that resulted in a delivery error
-        @notes Is this always a fatal error?
+        @brief The processing of a message has the ability to raise a
+        FatalError exception. This lets the container know that the process
+        should be killed. Exceptions other than FatalError are ignored.
+        @note A configurable list of Exceptions could be added to this
+        class, to enable more types of fatal exceptions.
         """
+        log.warning('MessageSpace delivery error')
+        log.warning(str(reason))
+        if reason.check(FatalError):
+            self.exchange_manager.container.fatalError(reason)
 
     def connectionLost(self, reason):
         """

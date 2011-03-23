@@ -14,6 +14,8 @@ from twisted.internet import defer
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
+import time
+
 from ion.play.hello_identity import HelloIdentityClient
 
 class HelloIdentityDelegate(ServiceProcess):
@@ -83,7 +85,10 @@ class HelloIdentityDelegate(ServiceProcess):
                 if headers['user-id'] != 'ANONYMOUS':
                     # Nothing to do from an identity point of view.
                     # user id will automatically be added to outgoing request message
-                    result = yield self.hc.hello_request('hello_user_request','NEWUSER','11111111')
+                    current_time = int(time.time())
+                    expiry = str(current_time + 30)
+
+                    result = yield self.hc.hello_request('hello_user_request','NEWUSER',expiry)
                     yield self.reply_ok(msg, result, {})
                     return
                 

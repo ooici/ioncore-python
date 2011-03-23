@@ -55,7 +55,7 @@ class HelloIdentity(ServiceProcess):
         if headers:
             if 'user-id' in headers:
                 if headers['user-id'] != 'ANONYMOUS':
-                    yield self.reply_ok(msg, {'value':'Hello there '+str(headers['user-id'])+' expiry: '+str(headers['expiry'])}, {})
+                    yield self.reply_ok(msg, {'value':'Hello there '+str(headers['user-id'])}, {})
                     return
                 
         estr = 'Message not from user'
@@ -82,7 +82,7 @@ class HelloIdentityClient(ServiceClient):
             # the passing of a user id and expiry
             (content, headers, msg) = yield self.rpc_send_protected(request_op, {'data': 'some data'}, user, expiry)
         else:
-            content = 'Unexpected request type in delegate: %s' % request_op
+            content = 'Unexpected request type: %s' % request_op
         log.info('Service reply: '+str(content))
         #print 'Service reply: ' +str(content)
         defer.returnValue(str(content))

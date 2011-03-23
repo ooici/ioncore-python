@@ -490,6 +490,18 @@ class PubSubService(ServiceProcess):
         yield self.reply_ok(msg)
 
     @defer.inlineCallbacks
+    def op_query_publishers(self, request, headers, msg):
+        log.debug('QP starting')
+        self._check_msg_type(request, REGEX_TYPE)
+
+        if not request.IsFieldSet('regex'):
+            raise PSSException('Bad message, regex missing',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
+        yield self._do_query(request, self.pub_list, msg)
+
+    @defer.inlineCallbacks
     def op_subscribe(self, request, headers, msg):
         """
         @see PubSubClient.subscribe
@@ -558,6 +570,18 @@ class PubSubService(ServiceProcess):
         yield self.reply_ok(msg)
 
     @defer.inlineCallbacks
+    def op_query_subscribers(self, request, headers, msg):
+        log.debug('QS starting')
+        self._check_msg_type(request, REGEX_TYPE)
+
+        if not request.IsFieldSet('regex'):
+            raise PSSException('Bad message, regex missing',
+                               request.ResponseCodes.BAD_REQUEST)
+
+        # Look 'em up, queue 'em up, head 'em out, raw-hiiiide
+        yield self._do_query(request, self.sub_list, msg)
+
+    @defer.inlineCallbacks
     def op_declare_queue(self, request, headers, msg):
         """
         @see PubSubClient.declare_queue
@@ -609,6 +633,7 @@ class PubSubService(ServiceProcess):
     def op_undeclare_queue(self, request, headers, msg):
         """
         @see PubSubClient.undeclare_queue
+        @note Possible error if queue declared more than once and then deleted once
         """
         log.debug('Undeclare_q starting')
         self._check_msg_type(request, REQUEST_TYPE)
@@ -859,6 +884,19 @@ class PubSubClient(ServiceClient):
         yield self._check_init()
 
         (content, headers, msg) = yield self.rpc_send('unsubscribe', params)
+        defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def query_subscribers(self, params):
+        """
+        @brief List subscriber that match a regular expression
+        @param params GPB, 2306/1, with 'regex' filled in
+        @retval GPB, 2312/1, maybe zero-length if no matches.
+        @retval error return also possible
+        """
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('query_subscribers', params)
         defer.returnValue(content)
 
     @defer.inlineCallbacks

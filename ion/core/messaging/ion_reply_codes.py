@@ -22,4 +22,6 @@ class ResponseCodes():
     Generic OK message added 
     """
     ION_OK = 'OK' 
-    
+
+    BAD_REQUEST = 400
+    UNAUTHORIZED = 401
