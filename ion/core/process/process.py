@@ -447,11 +447,11 @@ class Process(BasicLifecycleObject,ResponseCodes):
                 yield self._receive_rpc(payload, msg)
             else:
                 yield self._receive_msg(payload, msg)
-        except Exception, ex:
+        except Exception, ex: # :( 
             log.exception('Error in process %s receive ' % self.proc_name)
             if msg and msg.payload['reply-to']:
-                yield self.reply_err(msg, exception=ex)
-                
+                yield self.reply_err(msg, exception=ex) # :( 
+            raise ex    
                 #@Todo How do we know if the message was ack'ed here?
 
     @defer.inlineCallbacks
@@ -539,11 +539,12 @@ class Process(BasicLifecycleObject,ResponseCodes):
             if msg and msg.payload['reply-to']:
                 yield self.reply_err(msg, exception = ex)
             
-        except Exception, ex:
+        except Exception, ex: #:(
             log.exception("*****Container Error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             if msg and msg.payload['reply-to']:
-                yield self.reply_err(msg, exception = ex)
+                yield self.reply_err(msg, exception = ex) #:(
+            raise ex
 
             # The supervisor will also call shutdown child procs. This causes a recursive error when using fail fast!
             #if CF_fail_fast:
