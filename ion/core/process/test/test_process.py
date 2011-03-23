@@ -123,12 +123,16 @@ class ProcessTest(IonTestCase):
         pid2 = yield p1.spawn_child(child)
 
         (cont,hdrs,msg) = yield p1.rpc_send(pid2,'echo','content123')
+        log.debug("Received RPC response from echo process: %s" % cont)
         #self.assertEquals(cont['value'], 'content123')
         self.assertEqual(hdrs.get(p1.MSG_STATUS),'OK')
         self.assertEquals(cont, 'content123')
 
+        log.info("Test successful, terminating echo process now")
+
         yield p1.terminate()
         self.assertEquals(p1._get_state(), "TERMINATED")
+        log.info("Echo terminated")
 
     @defer.inlineCallbacks
     def test_spawn_child(self):

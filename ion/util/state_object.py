@@ -74,7 +74,8 @@ class StateObject(Actionable):
                     #log.debug("FSM post-state" + str(self._get_state()))
                     d1.callback(result)
                 def _err(result):
-                    log.error("In exception processing, event=%s, %r" % (event, result))
+                    log.error("ERROR in StateObject process(event=%s): %r" % (event, result))
+                    print result
                     # @todo Improve the error catching, forwarding and reporting
                     try:
                         d2 = self._so_error(result)
@@ -86,7 +87,7 @@ class StateObject(Actionable):
                         else:
                             d1.errback(result)
                     except Exception, ex:
-                        log.exception("Exception in StateObject error() after exception %r" % result)
+                        log.exception("ERROR in StateObject error() after exception %r" % result)
                         d1.errback(result)
                 res.addCallbacks(_cb,_err)
                 res = d1
@@ -94,7 +95,7 @@ class StateObject(Actionable):
                 pass
                 #log.debug("FSM post-state" + str(self._get_state()))
         except StandardError, ex:
-            log.exception("Exception in StateObject processing of event %s" % (event))
+            log.exception("ERROR in StateObject process(event=%s)" % (event))
             # This catches only if not deferred
             # @todo Improve the error catching, forwarding and reporting
             res = self._so_error(ex)

@@ -161,7 +161,6 @@ class Receiver(BasicLifecycleObject):
         else:
             raise RuntimeError("Illegal state change")
 
-    @defer.inlineCallbacks
     def _await_message_processing(self):
         return self.completion_deferred
 
