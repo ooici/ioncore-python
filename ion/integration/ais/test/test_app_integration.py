@@ -271,8 +271,12 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
+        if reply.message_parameters_reference[0].user_already_registered != False:
+            self.fail("response does not indicate user wasn't already registered")
+        if reply.message_parameters_reference[0].user_is_admin != True:
+            self.fail("response does not indicate user is administrator")
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
-        log.info("test_registerUser: first time registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
+        log.info("test_registerUser: first time registration received GPB = "+str(reply.message_parameters_reference[0]))
             
         # try to re-register this user for a second time
         reply = yield self.aisc.registerUser(msg)
@@ -282,9 +286,13 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
         if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
+        if reply.message_parameters_reference[0].user_already_registered != True:
+            self.fail("response does not indicate user was already registered")
+        if reply.message_parameters_reference[0].user_is_admin != True:
+            self.fail("response does not indicate user is administrator")
         if FirstOoiId != reply.message_parameters_reference[0].ooi_id:
             self.fail("re-registration did not return the same OoiId as registration")
-        log.info("test_registerUser: re-registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
+        log.info("test_registerUser: re-registration received GPB = "+str(reply.message_parameters_reference[0]))
         
         # try to send registerUser the wrong GPB
         # create a bad request GPBs
