@@ -129,12 +129,11 @@ class ConversationRole(StateObject):
         self._so_set_fsm(fsm)
 
     def _so_process(self, event, *args, **kwargs):
-        log.debug("Processing Conversation event: %s" % event)
+        log.debug("Processing Conversation event='%s' in state='%s'" % (event,self._get_state()))
         return StateObject._so_process(self, event, *args, **kwargs)
 
     def error(self, *args, **kwargs):
-        print "#####", args, kwargs
-        log.error("ERROR in Conversation: %s" % str(args))
+        log.error("ERROR in Conversation: %r %r" % (args, kwargs))
 
 class ConversationTypeSpec(object):
     """
@@ -149,6 +148,11 @@ class ConversationTypeFSMFactory(FSMFactory):
     used (with different action behavior) for the state of the participant
     conversations.
     """
+
+    def create_fsm(self, target, memory=None):
+        fsm = FSMFactory.create_fsm(self, target, memory)
+        fsm.post_action = True
+        return fsm
 
     def _create_action_func(self, target, action):
         """
@@ -242,6 +246,7 @@ class ProcessConversationManager(object):
         """
         conv = self.get_conversation(message['headers']['conv-id'])
         perf = message['performative']
+        log.debug("msg_send(): Processing performative %s" % perf)
         return conv.local_fsm._so_process(perf, message)
 
     def msg_received(self, message):
@@ -250,10 +255,10 @@ class ProcessConversationManager(object):
             to the callback action function
         @param message An in-memory standard message object
         """
-        log.debug("Received %s" % message)
+        #log.debug("msg_received(): %s" % message)
         conv = message['conversation']
         perf = message['performative']
-        log.debug("Processing performative %s" % perf)
+        #log.debug("msg_received(): Processing performative %s" % perf)
         return conv.local_fsm._so_process(perf, message)
 
     def create_conversation_id(self):
@@ -279,19 +284,19 @@ class ProcessConversationManager(object):
 
         # If not existing, create new Conversation instance based on protocol header
         if not conv:
-            conv_type = message['headers'].get('protocol', GenericType.CONV_TYPE_GENERIC)
+            conv_type = message['headers'].get('protocol', 'generic')
             log.debug("Creating new local conversation for conv-id=%s: type=%s" % (conv_id, conv_type))
             conv = self.new_conversation(conv_type, conv_id)
 
             # Bind roles
             sender = message['headers'].get('sender', None)
             if initiator:
-                self.bind_role_local(conv_type.DEFAULT_ROLE_INITIATOR, self.process)
-                self.bind_role(conv_type.DEFAULT_ROLE_PARTICIPANT, sender)
+                conv.bind_role_local(conv.conv_type.DEFAULT_ROLE_INITIATOR, self.process)
+                conv.bind_role(conv.conv_type.DEFAULT_ROLE_PARTICIPANT, sender)
                 log.debug("Binding roles initiator(local)=%s, participant=%s" % (self.process.id, sender))
             else:
-                self.bind_role(conv_type.DEFAULT_ROLE_INITIATOR, sender)
-                self.bind_role_local(conv_type.DEFAULT_ROLE_PARTICIPANT, self.process)
+                conv.bind_role(conv.conv_type.DEFAULT_ROLE_INITIATOR, sender)
+                conv.bind_role_local(conv.conv_type.DEFAULT_ROLE_PARTICIPANT, self.process)
                 log.debug("Binding roles initiator=%s, participant(local)=%s" % (sender, self.process.id))
 
         return conv

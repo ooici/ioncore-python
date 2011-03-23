@@ -54,7 +54,7 @@ class RpcFSMFactory(ConversationTypeFSMFactory):
         fsm.add_transition(self.E_FAILURE, self.S_REQUESTED, actionfct, self.S_FAILED)
 
         # REQUESTED ^inform_result -->  DONE /inform_result
-        actionfct = self._create_action_func(actf, self.E_DONE)
+        actionfct = self._create_action_func(actf, self.E_RESULT)
         fsm.add_transition(self.E_RESULT, self.S_REQUESTED, actionfct, self.S_DONE)
 
         # ANY ^error -->  ERROR /error
@@ -129,6 +129,7 @@ class RpcInitiator(ConversationRole):
             #Cannot do the callback right away, because the message is not yet handled
             reactor.callLater(0, lambda: rpc_deferred.callback(res))
 
+        log.debug('[%s] RPC inform_result done.' % (process.proc_name))
 
 class RpcParticipant(ConversationRole):
     factory = RpcFSMFactory()
@@ -150,7 +151,7 @@ class RpcParticipant(ConversationRole):
         conv_type = headers.get('protocol', GenericType.CONV_TYPE_GENERIC)
 
         # Check for operation/action
-        res = yield self._dispatch_message_op(headers, msg, None)
+        res = yield process._dispatch_message_op(headers, msg, conv)
         defer.returnValue(res)
 
     def failure(self, message, *args, **kwargs):

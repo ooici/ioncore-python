@@ -81,7 +81,7 @@ class FSM(object):
     """This is a Finite State Machine (FSM).
 """
 
-    def __init__(self, initial_state, memory=None):
+    def __init__(self, initial_state, memory=None, post_action=False):
         """This creates the FSM. You set the initial state here. The "memory"
 attribute is any object that you want to pass along to the action
 functions. It is not used by the FSM. For parsing you would typically
@@ -99,6 +99,8 @@ pass a list to be used as a stack. """
         self.next_state = None
         self.action = None
         self.memory = memory
+        # If True, the action will be executed after the state change
+        self.post_action = post_action
 
     def reset(self):
         """This sets the current_state to the initial_state and sets
@@ -212,10 +214,14 @@ processes one complete input symbol. You can process a list of symbols
         self.input_symbol = input_symbol
         (self.action, self.next_state) = self.get_transition(self.input_symbol, self.current_state)
         res = None
+        if self.post_action:
+            self.current_state = self.next_state
+            self.next_state = None
         if self.action is not None:
             res = self.action(self)
-        self.current_state = self.next_state
-        self.next_state = None
+        if not self.post_action:
+            self.current_state = self.next_state
+            self.next_state = None
         return res
 
     def process_list(self, input_symbols):

@@ -276,8 +276,8 @@ class Process(BasicLifecycleObject, ResponseCodes):
 
     @defer.inlineCallbacks
     def on_terminate_active(self, *args, **kwargs):
-        # This is temporary while there is no deactivate for a process (don't)
-        # want to do this right now.
+        # This is temporary while there is no deactivate for a process (don't
+        # want to do this right now).
         yield self.receiver.deactivate()
         yield self.receiver._await_message_processing()
 
@@ -436,7 +436,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
             fromname = payload['sender']
             if 'sender-name' in payload:
                 fromname = payload['sender-name']   # Legible sender alias
-            log.info('#####>>> [%s] receive(): Message from [%s] ... >>>' % (
+            log.info('>>> [%s] receive(): Message from [%s] ... >>>' % (
                      self.proc_name, fromname))
             convid = payload.get('conv-id', None)
 
@@ -495,13 +495,13 @@ class Process(BasicLifecycleObject, ResponseCodes):
 
         except ApplicationError, ex:
             # In case of an application error - do not terminate the process!
-            log.exception("*****Application Error in message processing*****")
+            log.exception("*****Application error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             if msg and msg.payload['reply-to']:
                 yield self.reply_err(msg, exception = ex)
 
         except Exception, ex:
-            log.exception("*****Container Error in message processing*****")
+            log.exception("*****Container error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             if msg and msg.payload['reply-to']:
                 yield self.reply_err(msg, exception = ex)
@@ -525,26 +525,26 @@ class Process(BasicLifecycleObject, ResponseCodes):
         """
         # Check if there is a user id in the header, stash if so
         if 'user-id' in payload:
-            log.info('>>> [%s] receive(): payload user id [%s] <<<' % (self.proc_name, payload['user-id']))
+            log.info('[%s] receive(): payload user id [%s]' % (self.proc_name, payload['user-id']))
             request.user_id = payload.get('user-id')
-            log.info('>>> [%s] receive(): Set/updated stashed user_id: [%s]' % (self.proc_name, request.get('user_id')))
+            log.info('[%s] receive(): Set/updated stashed user_id: [%s]' % (self.proc_name, request.get('user_id')))
         else:
-            log.info('>>> [%s] receive(): payload anonymous request <<<' % (self.proc_name))
+            log.info('[%s] receive(): payload anonymous request' % (self.proc_name))
             if request.get('user_id', 'Not set') == 'Not set':
                 request.user_id = 'ANONYMOUS'
-                log.info('>>> [%s] receive(): Set stashed user_id to ANONYMOUS' % (self.proc_name))
+                log.info('[%s] receive(): Set stashed user_id to ANONYMOUS' % (self.proc_name))
             else:
-                log.info('>>> [%s] receive(): Kept stashed user_id the same: [%s]' % (self.proc_name, request.get('user_id')))
+                log.info('[%s] receive(): Kept stashed user_id the same: [%s]' % (self.proc_name, request.get('user_id')))
         # User session expiry.
         if 'expiry' in payload:
             request.expiry = payload.get('expiry')
-            log.info('>>> [%s] receive(): Set/updated stashed expiry: [%s]' % (self.proc_name, request.get('expiry')))
+            log.info('[%s] receive(): Set/updated stashed expiry: [%s]' % (self.proc_name, request.get('expiry')))
         else:
             if request.get('expiry', 'Not set') == 'Not set':
                 request.expiry = '0'
-                log.info('>>> [%s] receive(): Set stashed expiry to 0' % (self.proc_name))
+                log.info('[%s] receive(): Set stashed expiry to 0' % (self.proc_name))
             else:
-                log.info('>>> [%s] receive(): Kept stashed expiry the same: [%s]' % (self.proc_name, request.get('expiry')))
+                log.info('[%s] receive(): Kept stashed expiry the same: [%s]' % (self.proc_name, request.get('expiry')))
 
     def _dispatch_message_op(self, payload, msg, conv):
         if "op" in payload:
@@ -671,11 +671,11 @@ class Process(BasicLifecycleObject, ResponseCodes):
         """
         if headers:
             if 'user-id' in headers:
-                log.debug('>>> [%s] send(): headers user id [%s] <<<' % (self.proc_name, headers['user-id']))
+                log.debug('[%s] send(): headers user id [%s]' % (self.proc_name, headers['user-id']))
             else:
-                log.debug('>>> [%s] send(): user-id not specified in headers <<<' % (self.proc_name))
+                log.debug('[%s] send(): user-id not specified in headers' % (self.proc_name))
         else:
-            log.debug('>>> [%s] send(): headers not specified <<<' % (self.proc_name))
+            log.debug('[%s] send(): headers not specified' % (self.proc_name))
 
         msgheaders = {}
         msgheaders['sender-name'] = self.proc_name
@@ -685,7 +685,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
         log.debug("****SEND, headers %s" % str(msgheaders))
         if 'conv-id' in msgheaders:
             conv = self.conv_manager.get_conversation(msgheaders['conv-id'])
-            log.debug("Send conversation %r from %r" % ( conv, self.conv_manager.conversations))
+            log.debug("Send conversation %r from %r" % (conv, self.conv_manager.conversations))
         else:
             # Not a new and not a reply to a conversation
             conv = self.conv_manager.new_conversation(GenericType.CONV_TYPE_GENERIC)
@@ -694,14 +694,14 @@ class Process(BasicLifecycleObject, ResponseCodes):
 
         if not 'user-id' in msgheaders:
             msgheaders['user-id'] = request.get('user_id', 'ANONYMOUS')
-            log.debug('>>> [%s] send(): set user id in msgheaders from stashed user_id [%s] <<<' % (self.proc_name, msgheaders['user-id']))
+            log.debug('[%s] send(): set user id in msgheaders from stashed user_id [%s]' % (self.proc_name, msgheaders['user-id']))
         else:
-            log.debug('>>> [%s] send(): using user id from msgheaders [%s] <<<' % (self.proc_name, msgheaders['user-id']))
+            log.debug('[%s] send(): using user id from msgheaders [%s]' % (self.proc_name, msgheaders['user-id']))
         if not 'expiry' in msgheaders:
             msgheaders['expiry'] = request.get('expiry', '0')
-            log.debug('>>> [%s] send(): set expiry in msgheaders from stashed expiry [%s] <<<' % (self.proc_name, msgheaders['expiry']))
+            log.debug('[%s] send(): set expiry in msgheaders from stashed expiry [%s]' % (self.proc_name, msgheaders['expiry']))
         else:
-            log.debug('>>> [%s] send(): using expiry from msgheaders [%s] <<<' % (self.proc_name, msgheaders['expiry']))
+            log.debug('[%s] send(): using expiry from msgheaders [%s]' % (self.proc_name, msgheaders['expiry']))
 
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders,
@@ -737,10 +737,10 @@ class Process(BasicLifecycleObject, ResponseCodes):
             headers['conv-seq'] = int(ionMsg.get('conv-seq',0)) + 1
         if not 'user-id' in headers:
             headers['user-id'] = request.get('user_id', 'ANONYMOUS')
-            log.debug('>>> [%s] reply(): set user id [%s] <<<' % (self.proc_name, headers['user-id']))
+            log.debug('[%s] reply(): set user id [%s]' % (self.proc_name, headers['user-id']))
         if not 'expiry' in headers:
             headers['expiry'] = request.get('expiry', '0')
-            log.debug('>>> [%s] reply(): set expiry [%s] <<<' % (self.proc_name, headers['expiry']))
+            log.debug('[%s] reply(): set expiry [%s]' % (self.proc_name, headers['expiry']))
 
         return self.send(pu.get_process_id(recv), operation, content, headers, reply=True)
 
