@@ -36,10 +36,16 @@ from ion.core.object.object_utils import find_type_ids, return_proto_file
 TCP_PORT = 2312
 HOSTNAME = 'ooici.net'
 
-page_header = '''
-<html><head><title>Ion object locator</title></head><body>
-<img src="http://ooici.net/global.logo.jpeg">
+title = '<html><head><title>Ion object locator</title></head><body>'
+graphic = '<a href="http://%s:%d/"><img src="http://ooici.net/global.logo.jpeg" alt="logo"></a>' \
+    % (HOSTNAME, TCP_PORT)
+searchbox = '''
+<h3>Search for objects</h3>
+<form action="/search/" method="get" <input name="regex" value="topic" size="64" type="text"/> </form>
+<p>
 '''
+page_header = title + graphic + searchbox
+
 page_footer = '</body></html>'
 
 class IDResource(resource.Resource):
@@ -113,7 +119,11 @@ class RootPage(resource.Resource):
         if id_str == 'id':
             return IDResource(pstr[2], pstr[3])
         elif id_str == 'search':
-            return RegexResource(pstr[2])
+            try:
+                regex_arg = request.args.get('regex')[0]
+                return RegexResource(regex_arg)
+            except:
+                return RegexResource(pstr[2])
         elif id_str == '':
             return StaticNavPage()
         else:
