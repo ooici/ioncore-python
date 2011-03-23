@@ -98,16 +98,17 @@ class ProcessTest(IonTestCase):
         pid2 = p1.get_child_id('echo')
         proc2 = self._get_procinstance(pid2)
 
-        # This here simulates an RPC without calling the rpc_send(). Problem!
-        yield p1.send(pid2, 'echo','content123')
-        log.info('Sent echo message')
-
-        msg = yield p1.await_message()
-        log.info('Received echo message')
-
-        self.assertEquals(msg.payload['op'], 'result')
-        #self.assertEquals(msg.payload['content']['value'], 'content123')
-        self.assertEquals(msg.payload['content'], 'content123')
+        ## This here simulates an RPC without calling the rpc_send(). Problem!
+        #hrds = {'performative':'request', 'protocol':'rpc', 'conv-id':'#1'}
+        #yield p1.send(pid2, 'echo', 'content123', hrds)
+        #log.info('Sent echo message')
+        #
+        #msg = yield p1.await_message()
+        #log.info('Received echo message')
+        #
+        #self.assertEquals(msg.payload['op'], 'result')
+        ##self.assertEquals(msg.payload['content']['value'], 'content123')
+        #self.assertEquals(msg.payload['content'], 'content123')
 
         yield sup.terminate()
         self.assertEquals(sup._get_state(), "TERMINATED")
@@ -128,7 +129,7 @@ class ProcessTest(IonTestCase):
         self.assertEqual(hdrs.get(p1.MSG_STATUS),'OK')
         self.assertEquals(cont, 'content123')
 
-        log.info("Test successful, terminating echo process now")
+        log.info("--- Test successful, terminating echo process now")
 
         yield p1.terminate()
         self.assertEquals(p1._get_state(), "TERMINATED")
@@ -164,7 +165,7 @@ class ProcessTest(IonTestCase):
 
 
     @defer.inlineCallbacks
-    def test_message_before_activate(self):
+    def xtest_message_before_activate(self):
         p1 = ReceiverProcess(spawnargs={'proc-name':'p1'})
         pid1 = yield p1.spawn()
         proc1 = self._get_procinstance(pid1)
@@ -221,12 +222,8 @@ class ProcessTest(IonTestCase):
 
         byte_string = hashlib.sha1('test').digest()
 
-        yield p1.send(pid2, 'echo', byte_string)
-        log.info('Sent byte-string')
+        (cont,hdrs,msg) = yield p1.rpc_send(pid2, 'echo', byte_string)
 
-        msg = yield p1.await_message()
-        log.info('Received byte-string')
-        #self.assertEquals(msg.payload['content']['value'], byte_string)
         self.assertEquals(msg.payload['content'], byte_string)
 
         yield sup.shutdown()

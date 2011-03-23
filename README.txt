@@ -178,20 +178,28 @@ prevent changes to the global default), please make local changes in:
 Change log:
 ===========
 
-2011-1-28:
+2011-03-22:
+- Introduced Conversations framework. Two standard: RPC, Request
+- Refactored Process base class to use conversations
+- Process now supports graceful terminate from active state; Receiver can
+  gracefully handle deactivating the consumer followed by wait for all
+  processing completion.
+- TBD: Process errors as failures in conversations
+- TBD: Interaction observer and generic receiver
+
+2011-01-28:
 - Switched to binary sha1 keys in all objects.
 - Added @ITV decorator to skip itv tests when running 'trial ion'
 
-2011-1-26:
+2011-01-26:
 - Moved scripts in bin/ dir to scripts/ dir.
 
-2011-1-24:
+2011-01-24:
 - Removed IRODS as backend storage configureation option
 
-2011-1-21:
+2011-01-21:
 - ION is now using google protocol buffer objects in the resource object model
 - Bumped version number to 0.4.0 consistent with the setup.py file.
-
 
 2010-10-28:
 - Set RPC default timeout to 15 secs (see ion.config).

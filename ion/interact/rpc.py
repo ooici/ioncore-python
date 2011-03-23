@@ -14,6 +14,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core.exception import ReceivedError, ApplicationError, ReceivedApplicationError, ReceivedContainerError
+from ion.core.messaging.ion_reply_codes import ResponseCodes
 from ion.core.messaging.message_client import MessageInstance
 from ion.interact.conversation import ConversationType, Conversation, ConversationRole, ConversationTypeFSMFactory, RoleSpec
 from ion.util.state_object import BasicStates
@@ -108,18 +109,18 @@ class RpcInitiator(ConversationRole):
             #Cannot do the callback right away, because the message is not yet handled
             reactor.callLater(0, lambda: rpc_deferred.callback(res))
 
-        elif status == self.ION_ERROR:
+        elif status == process.ION_ERROR:
             code = -1
             if isinstance(content, MessageInstance):
                 code = content.MessageResponseCode
 
             if 400 <= code and code < 500:
-                err = failure.Failure(ReceivedApplicationError(payload, content))
+                err = failure.Failure(ReceivedApplicationError(headers, content))
             elif 500 <= code and code < 600:
-                err = failure.Failure(ReceivedContainerError(payload, content))
+                err = failure.Failure(ReceivedContainerError(headers, content))
             else:
                 # Received Error is still the catch all!
-                err = failure.Failure(ReceivedError(payload, content))
+                err = failure.Failure(ReceivedError(headers, content))
 
             # Cannot do the callback right away, because the message is not yet handled
             reactor.callLater(0, lambda: rpc_deferred.errback(err))

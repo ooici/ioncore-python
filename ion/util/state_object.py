@@ -68,38 +68,58 @@ class StateObject(Actionable):
             # This is the main invocation of the FSM. It will lead to calls to
             # the _action function in normal configuration.
             res = self.__fsm.process(event)
+
             if isinstance(res, defer.Deferred):
-                d1 = defer.Deferred()
                 def _cb(result):
-                    #log.debug("FSM post-state" + str(self._get_state()))
-                    d1.callback(result)
+                    return result
                 def _err(result):
-                    log.error("ERROR in StateObject process(event=%s): %r" % (event, result))
-                    print result
-                    # @todo Improve the error catching, forwarding and reporting
+                    log.error("ERROR in StateObject process(event=%s):\n%s" % (event, result))
                     try:
-                        d2 = self._so_error(result)
-                        if isinstance(d2, defer.Deferred):
+                        d1 = self._so_error(result)
+                        if isinstance(d1, defer.Deferred):
                             # FSM error action deferred too
-                            def _cb2(result1):
-                                d1.errback(result)
-                            d2.addCallbacks(_cb2,log.error)
+                            def _cb1(result1):
+                                return result1
+                            res.addCallbacks(_cb1,log.error)
                         else:
-                            d1.errback(result)
+                            return result
                     except Exception, ex:
-                        log.exception("ERROR in StateObject error() after exception %r" % result)
-                        d1.errback(result)
+                        log.exception("Subsequent ERROR in StateObject error()")
+                        return result
                 res.addCallbacks(_cb,_err)
-                res = d1
-            else:
-                pass
-                #log.debug("FSM post-state" + str(self._get_state()))
+
+            #if isinstance(res, defer.Deferred):
+            #    d1 = defer.Deferred()
+            #    def _cb(result):
+            #        #log.debug("FSM post-state" + str(self._get_state()))
+            #        d1.callback(result)
+            #    def _err(result):
+            #        log.error("ERROR in StateObject process(event=%s): %s" % (event, result))
+            #        # @todo Improve the error catching, forwarding and reporting
+            #        try:
+            #            d2 = self._so_error(result)
+            #            if isinstance(d2, defer.Deferred):
+            #                # FSM error action deferred too
+            #                def _cb2(result1):
+            #                    d1.errback(result)
+            #                d2.addCallbacks(_cb2,log.error)
+            #            else:
+            #                d1.errback(result)
+            #        except Exception, ex:
+            #            log.exception("ERROR in StateObject error() after exception %s" % result)
+            #            d1.errback(result)
+            #    res.addCallbacks(_cb,_err)
+            #    res = d1
+            #else:
+            #    pass
+            #    #log.debug("FSM post-state" + str(self._get_state()))
         except StandardError, ex:
             log.exception("ERROR in StateObject process(event=%s)" % (event))
             # This catches only if not deferred
             # @todo Improve the error catching, forwarding and reporting
             res = self._so_error(ex)
             raise ex
+
         return res
 
     def _so_error(self, error=None):

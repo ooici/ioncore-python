@@ -161,7 +161,14 @@ class Receiver(BasicLifecycleObject):
         else:
             raise RuntimeError("Illegal state change")
 
-    def _await_message_processing(self):
+    def _await_message_processing(self, term_msg_id=None):
+        # HACK: Ignore the current op_terminate message
+        if term_msg_id in self.processing_messages:
+            del self.processing_messages[term_msg_id]
+
+        if len(self.processing_messages) == 0:
+            return
+
         return self.completion_deferred
 
     def add_handler(self, callback):
@@ -222,7 +229,8 @@ class Receiver(BasicLifecycleObject):
             if org_msg._state == "RECEIVED":
                 log.error("Message has not been ACK'ed at the end of processing")
             del self.rec_messages[id(org_msg)]
-            del self.processing_messages[id(org_msg)]
+            if id(org_msg) in self.processing_messages:
+                del self.processing_messages[id(org_msg)]
             if self.completion_deferred and len(self.processing_messages) == 0:
                 self.completion_deferred.callback(None)
                 self.completion_deferred = None

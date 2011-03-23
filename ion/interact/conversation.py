@@ -246,8 +246,11 @@ class ProcessConversationManager(object):
         """
         conv = self.get_conversation(message['headers']['conv-id'])
         perf = message['performative']
-        log.debug("msg_send(): Processing performative %s" % perf)
-        return conv.local_fsm._so_process(perf, message)
+        if conv and conv.local_fsm:
+            log.debug("msg_send(): Processing performative '%s'" % perf)
+            return conv.local_fsm._so_process(perf, message)
+        else:
+            log.debug("msg_send(): NO FSM. Ignoring performative '%s'" % perf)
 
     def msg_received(self, message):
         """
@@ -258,7 +261,7 @@ class ProcessConversationManager(object):
         #log.debug("msg_received(): %s" % message)
         conv = message['conversation']
         perf = message['performative']
-        #log.debug("msg_received(): Processing performative %s" % perf)
+        #log.debug("msg_received(): Processing performative '%s'" % perf)
         return conv.local_fsm._so_process(perf, message)
 
     def create_conversation_id(self):

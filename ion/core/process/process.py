@@ -263,7 +263,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
         Shutdown operation, on receive of the init message
         """
         try:
-            yield self.terminate()
+            yield self.terminate(msg=msg)
             if msg != None:
                 yield self.reply_ok(msg)
         except Exception, ex:
@@ -279,9 +279,12 @@ class Process(BasicLifecycleObject, ResponseCodes):
         # This is temporary while there is no deactivate for a process (don't
         # want to do this right now).
         yield self.receiver.deactivate()
-        yield self.receiver._await_message_processing()
 
-        # @todo: What about messages still being processed?
+        term_msg = kwargs.get('msg', None)
+        if term_msg:
+            yield self.receiver._await_message_processing(term_msg_id=id(term_msg))
+        else:
+            yield self.receiver._await_message_processing()
 
         yield self.on_terminate(*args, **kwargs)
 
@@ -497,13 +500,15 @@ class Process(BasicLifecycleObject, ResponseCodes):
             # In case of an application error - do not terminate the process!
             log.exception("*****Application error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
-            if msg and msg.payload['reply-to']:
+            # @note We can only send a reply_err to an RPC
+            if msg and msg.payload['reply-to'] and msg.payload.get('performative',None)=='request':
                 yield self.reply_err(msg, exception = ex)
 
         except Exception, ex:
             log.exception("*****Container error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
-            if msg and msg.payload['reply-to']:
+            # @note We can only send a reply_err to an RPC
+            if msg and msg.payload['reply-to'] and msg.payload.get('performative',None)=='request':
                 yield self.reply_err(msg, exception = ex)
 
             #@Todo How do we know if the message was ack'ed here?
@@ -669,23 +674,23 @@ class Process(BasicLifecycleObject, ResponseCodes):
             Starts a new conversation.
         @retval Deferred for send of message
         """
-        if headers:
-            if 'user-id' in headers:
-                log.debug('[%s] send(): headers user id [%s]' % (self.proc_name, headers['user-id']))
-            else:
-                log.debug('[%s] send(): user-id not specified in headers' % (self.proc_name))
-        else:
-            log.debug('[%s] send(): headers not specified' % (self.proc_name))
+        #if headers:
+        #    if 'user-id' in headers:
+        #        log.debug('[%s] send(): headers user id [%s]' % (self.proc_name, headers['user-id']))
+        #    else:
+        #        log.debug('[%s] send(): user-id not specified in headers' % (self.proc_name))
+        #else:
+        #    log.debug('[%s] send(): headers not specified' % (self.proc_name))
 
         msgheaders = {}
         msgheaders['sender-name'] = self.proc_name
         if headers:
             msgheaders.update(headers)
 
-        log.debug("****SEND, headers %s" % str(msgheaders))
+        #log.debug("****SEND, headers %s" % str(msgheaders))
         if 'conv-id' in msgheaders:
             conv = self.conv_manager.get_conversation(msgheaders['conv-id'])
-            log.debug("Send conversation %r from %r" % (conv, self.conv_manager.conversations))
+            #log.debug("Send conversation %r from %r" % (conv, self.conv_manager.conversations))
         else:
             # Not a new and not a reply to a conversation
             conv = self.conv_manager.new_conversation(GenericType.CONV_TYPE_GENERIC)
@@ -709,6 +714,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
                        conversation=conv)
 
         # Put the message through the conversation FSM
+        # @todo Must support deferred
         self.conv_manager.msg_send(message)
 
         if reply:
@@ -817,7 +823,8 @@ class Process(BasicLifecycleObject, ResponseCodes):
                 content.MessageResponseBody = str(exception)
 
         reshdrs = {}
-        reshdrs['performative'] = 'failure'
+        #reshdrs['performative'] = 'failure'
+        reshdrs['performative'] = 'inform_result'
         reshdrs['protocol'] = msg.payload['protocol']
         reshdrs[self.MSG_STATUS] = self.ION_ERROR
 
