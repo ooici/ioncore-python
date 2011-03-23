@@ -86,7 +86,6 @@ message FindDataResourcesReqMsg {
    }
 """
 
-# FindDataResources GPBs from ion-object-definitions/net/ooici/integration/ais/findDataResources/find_data_resources.proto
 FIND_DATA_RESOURCES_RSP_MSG_TYPE = object_utils.create_type_identifier(object_id=9032, version=1)
 """
 message FindDataResourcesRspMsg {
@@ -112,7 +111,6 @@ message GetDataResourceDetailReqMsg {
 }
 """
 
-# GetDataResourceDetail GPBs from ion-object-definitions/net/ooici/integration/ais/findDataResources/get_data_resource_detail.proto
 GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE = object_utils.create_type_identifier(object_id=9034, version=1)
 """
 message GetDataResourceDetailRspMsg {
@@ -124,6 +122,31 @@ message GetDataResourceDetailRspMsg {
    //repeated <put payload here>
 }
 """
+
+# CreateDownloadURL GPB from ion-object-definitions/net/ooici/integration/ais/createDownloadURL/create_download_url.proto
+CREATE_DOWNLOAD_URL_REQ_MSG_TYPE = object_utils.create_type_identifier(object_id=9035, version=1)
+"""
+message CreateDownloadURLReqMsg {
+   enum _MessageTypeIdentifier {
+       _ID = 9035;
+       _VERSION = 1;	
+   }
+}
+"""
+
+CREATE_DOWNLOAD_URL_RSP_MSG_TYPE = object_utils.create_type_identifier(object_id=9036, version=1)
+"""
+message CreateDownloadURLRspMsg {
+   enum _MessageTypeIdentifier {
+       _ID = 9036;
+       _VERSION = 1;	
+   }
+
+   optional string download_url = 1;
+
+}
+"""
+
 # RegisterUser GPBs from ion-object-definitions/net/ooici/integration/ais/registerUser/register_user.proto
 REGISTER_USER_TYPE = object_utils.create_type_identifier(object_id=9101, version=1)
 """

@@ -6,9 +6,6 @@
 @brief Core service frontend for Application Integration Services 
 """
 
-import sys
-import traceback
-
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
@@ -16,15 +13,10 @@ from twisted.internet import defer
 from ion.core.object import object_utils
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 from ion.core.messaging.message_client import MessageClient
 
 from ion.integration.ais.loadDummyDataset import LoadDummyDataset
-
-# import GPB type identifiers for AIS
-from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
-from ion.integration.ais.ais_object_identifiers import UPDATE_USER_EMAIL_TYPE, UPDATE_USER_DISPATCH_QUEUE_TYPE
-from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_REQ_MSG_TYPE
 
 # import working classes for AIS
 from ion.integration.ais.findDataResources.findDataResources import FindDataResources
@@ -135,7 +127,10 @@ class AppIntegrationService(ServiceProcess):
         log.info('op_createDownloadURL: '+str(content))
         try:
             worker = CreateDownloadURL(self)
-            yield self.reply_ok(msg, {'value' : 'http://a.download.url.edu'})   
+
+            returnValue = yield worker.createDownloadURL(content)
+            
+            yield self.reply_ok(msg, returnValue)   
         except KeyError:
             estr = 'Missing information in message!'
             log.exception(estr)

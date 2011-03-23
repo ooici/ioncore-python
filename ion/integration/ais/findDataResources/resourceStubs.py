@@ -9,30 +9,20 @@
 Add methods to access the state of updates which are merging...
 """
 
-from twisted.internet import defer, reactor
-from twisted.python import failure
-from zope.interface import implements, Interface
+from twisted.internet import defer
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.exception import ReceivedError
-import ion.util.procutils as pu
-from ion.util.state_object import BasicLifecycleObject
-from ion.core.messaging.ion_reply_codes import ResponseCodes
 from ion.core.process import process
 from ion.core.object import workbench
 from ion.core.object import repository
-from ion.core.object.repository import RepositoryError
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
-from ion.core.exception import ReceivedError
+from ion.services.coi.resource_registry_beta.resource_client import ResourceInstance
 
 
-from google.protobuf import message
-from google.protobuf.internal import containers
 from ion.core.object import gpb_wrapper
 from ion.core.object import object_utils
 
@@ -73,7 +63,7 @@ class DatasetControllerClient(object):
         #yield self._check_init()
 
         #(content, headers, msg) = yield self.rpc_send('create_dataset_resource', msg)
-        rc = ResourceClient()
+        #rc = ResourceClient()
 
         #defer.returnValue(content)
         log.debug('DHE: Stub DatasetControllerClient.find_data_resources getting resource ID : \n' + \
@@ -201,7 +191,7 @@ class ResourceClient(object):
                 branch = resource_id.branch
                 
             reference = resource_id.key
-            commit = resource_id.commit
+            #commit = resource_id.commit
             
         elif isinstance(resource_id, (str, unicode)):
             # if it is a string, us it as an identity
