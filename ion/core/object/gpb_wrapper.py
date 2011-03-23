@@ -9,11 +9,11 @@ TODO:
 Finish test of new Invalid methods using weakrefs - make sure it is deleted!
 """
 
-from ion.util import procutils as pu
-from ion.util.cache import memoize
+
 from ion.core.object.object_utils import get_type_from_obj, sha1bin, sha1hex, \
     sha1_to_hex, ObjectUtilException, create_type_identifier, get_gpb_class_from_type_id
 
+import struct
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -21,10 +21,7 @@ from google.protobuf import message
 from google.protobuf.internal import containers
 from google.protobuf import descriptor
     
-from ion.util.cache import memoize
 
-import hashlib
-import types
 
 STRUCTURE_ELEMENT_TYPE = create_type_identifier(object_id=1, version=1)
 LINK_TYPE = create_type_identifier(object_id=3, version=1)
@@ -1235,9 +1232,8 @@ class Wrapper(object):
         for link in  self.ChildLinks:
                         
             # Test to see if it is already serialized!
-            
-            if  repo._hashed_elements.has_key(link.key):
-                child_se = repo._hashed_elements.get(link.key)
+            child_se = repo.index_hash.get(link.key, None)
+            if  child_se is not None:
 
                 # Set the links is leaf property
                 link.isleaf = child_se.isleaf
@@ -1482,7 +1478,12 @@ class Wrapper(object):
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
             
         if self.ObjectType == LINK_TYPE:
-            msg = '\nkey: %s \ntype { %s }' % (sha1_to_hex(self.GPBMessage.key), self.GPBMessage.type)
+            key = self.GPBMessage.key
+            try:
+                key = sha1_to_hex(self.GPBMessage.key)
+            except struct.error, er:
+                pass
+            msg = '\nkey: %s \ntype { %s }' % (key, self.GPBMessage.type)
         else:
             msg = '\n' +self.GPBMessage.__str__()
             
@@ -1523,7 +1524,14 @@ class Wrapper(object):
         """
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-        return self.GPBMessage.SerializeToString()
+
+        try:
+            serialized = self.GPBMessage.SerializeToString()
+        except message.EncodeError, ex:
+            log.info(ex)
+            raise OOIObjectError('Could not serialize object - likely due to unset required field in a core object: %s' % str(self))
+
+        return serialized
     
     def ParseFromString(self, serialized):
         """Clear the message and read from serialized."""
@@ -1552,14 +1560,29 @@ class Wrapper(object):
         #if self.Invalid:
         if self._invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
-            
+
+        GPBMessage = self.GPBMessage
+        # Get the raw GPB field
         try:
-            result = self.GPBMessage.HasField(field_name)
-        except ValueError, ex:
+            GPBField = getattr(GPBMessage, field_name)
+        except AttributeError, ex:
             raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
                     (str(self.ObjectClass), field_name))
-            
-        return result
+
+        if isinstance(GPBField, containers.RepeatedScalarFieldContainer):
+            return len(GPBField) > 0
+
+        elif isinstance(GPBField, containers.RepeatedCompositeFieldContainer):
+            if len(GPBField) == 0:
+                return False
+            for item in GPBField:
+                if len(item.ListFields())>0:
+                    return True
+            else:
+                return False
+
+        else:
+            return GPBMessage.HasField(field_name)
 
     def HasField(self, field_name):
         log.warn('HasField is depricated because the name is confusing. Use IsFieldSet')
@@ -1576,12 +1599,12 @@ class Wrapper(object):
         #    return
             
         # Get the raw GPB field
-        try: 
+        try:
             GPBField = getattr(GPBMessage, field_name)
         except AttributeError, ex:
             raise OOIObjectError('The "%s" object definition does not have a field named "%s"' % \
                     (str(self.ObjectClass), field_name))
-            
+
         if isinstance(GPBField, containers.RepeatedScalarFieldContainer):
             objhash = GPBField.__hash__()
             del self.DerivedWrappers[objhash]
@@ -1604,7 +1627,9 @@ class Wrapper(object):
             
             objhash = GPBField.__hash__()
             del self.DerivedWrappers[objhash]
-        
+
+        # Nothing to be done for scalar fields - just clear it.
+
         #Now clear the field
         self.GPBMessage.ClearField(field_name)
         # Set this object and it parents to be modified
@@ -1989,7 +2014,12 @@ class ScalarContainerWrapper(object):
         if self.Invalid:
             raise OOIObjectError('Can not access Invalidated Object which may be left behind after a checkout or reset.')
         return repr(self._gpbcontainer._values)
-    
+
+class StructureElementError(Exception):
+    """
+    An error class for structure elements
+    """
+
     
 class StructureElement(object):
     """
@@ -2008,9 +2038,18 @@ class StructureElement(object):
         
     @classmethod
     def parse_structure_element(cls,blob):
+
         se = get_gpb_class_from_type_id(STRUCTURE_ELEMENT_TYPE)()
         se.ParseFromString(blob)
-        return cls(se)
+
+        instance = cls(se)
+
+        if instance.key != instance.sha1:
+            log.error('The sha1 key does not match the value. The data is corrupted! \n' +\
+            'Element key %s, Calculated key %s' % (sha1_to_hex(instance.key), sha1_to_hex(instance.sha1)))
+            raise StructureElementError('Error reading serialized structure element. Sha1 value does not match.')
+
+        return instance
         
     @property
     def sha1(self):

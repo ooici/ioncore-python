@@ -21,31 +21,47 @@ def start(container, starttype, app_definition, *args, **kwargs):
     '''
     Required function:  Invoked during the startup of this app
     '''
-    # Step 1: Create the supervisor
-    appsup = yield ioninit.container_instance.create_supervisor()
-    
-    # Step 2: Spawn child processes
-    b_proc_list = yield defer.maybeDeferred(_bootstrap_procs)
-    for (desc, args, kwargs) in b_proc_list:
-        yield appsup.spawn_child(desc, *args, **kwargs)
-    
-    # Step 3: Add bootstrap objects to the shell
-    b_obj_list = yield defer.maybeDeferred(_bootstrap_objects)
-    b_obj_list_str = ''
-    for (id, obj) in b_obj_list:
-        control.add_term_name(id, obj)
-        b_obj_list_str += "\n'%s' = %s" % (str(id), str(obj))
-    print ''
-    print ''
-    print '================================================================='
-    print 'Added Bootstrap Objects:' + b_obj_list_str
-    print '================================================================='
-    print ''
-    print ''
-    
-    
-    res = (appsup.id, [None])
+    jaw_proc = [
+        {'name':'JavaWrapperAgent',
+         'module':'ion.integration.eoi.agent.java_agent_wrapper',
+         'class':'JavaAgentWrapper',
+        }, ]
+
+    appsup_desc = ProcessDesc(name='app-supervisor-' + app_definition.name,
+                              module=app_supervisor.__name__,
+                              spawnargs={'spawn-procs':jaw_proc})
+    supid = yield appsup_desc.spawn()
+
+    res = (supid.full, [appsup_desc])
     defer.returnValue(res)
+
+
+
+    # Step 1: Create the supervisor
+    #appsup = yield ioninit.container_instance.create_supervisor()
+
+    # Step 2: Spawn child processes
+    #b_proc_list = yield defer.maybeDeferred(_bootstrap_procs)
+    #for (desc, args, kwargs) in b_proc_list:
+    #    yield appsup.spawn_child(desc, *args, **kwargs)
+
+
+    # Step 3: Add bootstrap objects to the shell
+    #b_obj_list = yield defer.maybeDeferred(_bootstrap_objects)
+    #b_obj_list_str = ''
+    #for (id, obj) in b_obj_list:
+    #    control.add_term_name(id, obj)
+    #    b_obj_list_str += "\n'%s' = %s" % (str(id), str(obj))
+    #print ''
+    #print ''
+    #print '================================================================='
+    #print 'Added Bootstrap Objects:' + b_obj_list_str
+    #print '================================================================='
+    #print ''
+    #print ''
+
+    #res = (appsup.id, [appsup])
+    #defer.returnValue(res)
 
 
 @defer.inlineCallbacks
@@ -53,9 +69,8 @@ def stop(container, state):
     '''
     Required function:  Invoked during the termination of this app
     '''
-    log.info("state:" + str(state) )
     supdesc = state[0]
-    log.info("Terminating CC agent")
+    log.info("Stopping EOIAgent")
     yield supdesc.terminate()
 
 
@@ -73,7 +88,7 @@ def _bootstrap_procs(*args, **kw):
     java_wrapper_agent_desc  = ProcessDesc(name      = 'JavaWrapperAgent',
                                            module    = 'ion.integration.eoi.agent.java_agent_wrapper',
                                            procclass = 'JavaAgentWrapper',
-                                           spawnargs = None)
+                                           spawnargs = {})
 
     # Step 2: Return bootstrap procs as a tuple (process description then args)
     app_procs = [

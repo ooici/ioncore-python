@@ -15,7 +15,7 @@ from ion.core.cc.shell import control
 
 from ion.core.object import object_utils
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
-
+from ion.core.process.process import Process
 
 # --- CC Application interface
 
@@ -46,7 +46,7 @@ def start(container, starttype, app_definition, *args, **kwargs):
     if ioninit.cont_args.get('register', None) == 'demodata':
 
         # Run script to create data objects
-        data_resources = yield _bootstrap_objects(supid)
+        data_resources = yield _bootstrap_objects()
         
         ### Rather than print the data_resources object - how do we add it to locals?
         ### I can't find the control object for the shell from here?
@@ -85,14 +85,13 @@ int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1
 
 
 @defer.inlineCallbacks
-def _bootstrap_objects(supid):
-        
-    # We need to cheat - get the supervisor process from the container
-    # This is only for bootstrap in a demo application - do no do this in operational code!
-    sup = ioninit.container_instance.proc_manager.process_registry.kvs.get(supid, None)    
-    
-    # Instantiate the Resource Client using the supervisor
-    rc = ResourceClient(proc=sup)
+def _bootstrap_objects():
+
+    # Instantiate the Resource Client using an anonymous process
+    proc = Process()
+    yield proc.spawn()
+
+    rc = ResourceClient(proc=proc) #sup)
     
     # Create the dataset resource
     dataset = yield rc.create_instance(dataset_type, ResourceName='Test CDM Resource dataset',

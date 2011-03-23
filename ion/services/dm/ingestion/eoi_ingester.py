@@ -38,6 +38,7 @@ from ion.core.exception import ApplicationError
 
 # For testing - used in the client
 from net.ooici.play import addressbook_pb2
+from ion.services.dm.distribution.publisher_subscriber import Publisher
 
 
 from ion.core import ioninit
@@ -76,9 +77,8 @@ class EOIIngestionService(ServiceProcess):
 
         self.push = self.workbench.push
         self.pull = self.workbench.pull
-        self.fetch_linked_objects = self.workbench.fetch_linked_objects
-        self.op_fetch_linked_objects = self.workbench.op_fetch_linked_objects
-        self.fetch_linked_objects = self.workbench.fetch_linked_objects
+        self.fetch_blobs = self.workbench.fetch_blobs
+        self.op_fetch_blobs = self.workbench.op_fetch_blobs
 
         self._defer_ingest = defer.Deferred()       # waited on by op_ingest to signal end of ingestion
 
@@ -94,7 +94,7 @@ class EOIIngestionService(ServiceProcess):
        
         msg_repo = content.Repository
         
-        result = yield self.push('datastore', msg_repo.repository_key)
+        result = yield self.push('datastore', msg_repo)
         
         assert result.MessageResponseCode == result.ResponseCodes.OK, 'Push to datastore failed!'
         
@@ -175,12 +175,26 @@ class EOIIngestionService(ServiceProcess):
             # we succeeded, cancel the timeout
             timeoutcb.cancel()
 
+            # send notification we performed an ingest
+            yield self._notify_ingest(content)
+
             # now reply ok to the original message
             yield self.reply_ok(msg, content={'topic':content.ds_ingest_topic})
         else:
             log.debug("Ingest failed, error back to original request")
             raise EOIIngestionError("Ingestion failed", content.ResponseCodes.INTERNAL_SERVER_ERROR)
             #yield self.reply_err(msg, content="dyde")
+
+    @defer.inlineCallbacks
+    def _notify_ingest(self, content):
+        """
+        Generate a notification/event that an ingest succeeded.
+        @TODO: this is temporary, to be replaced
+        """
+        pub = Publisher(xp_name="event.topic", routing_key="_not.eoi_ingest.ingest")
+        yield pub.initialize()
+        yield pub.activate()
+        yield pub.publish(True)
 
     @defer.inlineCallbacks
     def op_recv_dataset(self, content, headers, msg):

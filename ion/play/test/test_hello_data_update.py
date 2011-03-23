@@ -93,7 +93,6 @@ class HelloDataUpdateTest(IonTestCase):
         ### request to clobber the state of the resource
         clobber_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='Clobber it!')
         
-        
         # Get the current and make some changes...
         clobber_request_msg.configuration = create_response_msg.configuration
         clobber_request_msg.configuration.title = 'Bad addresses'
@@ -104,11 +103,13 @@ class HelloDataUpdateTest(IonTestCase):
         
         
         clobber_result_msg = yield hc1.clobber_addressbook_resource(clobber_request_msg)
-        
+
+
         if clobber_result_msg.MessageType != resource_response_type:
             raise HelloDataUpdateError('Expected message type ResourceConfigurationResponse, received %s'
                                      % str(clobber_request_msg))
-        
+
+
         ### request to merge the state of the resource
         merge_request_msg = yield self.mc.create_instance(resource_request_type, MessageName='merge me!')
         
@@ -122,11 +123,16 @@ class HelloDataUpdateTest(IonTestCase):
         merge_request_msg.configuration.person[1] = merge_request_msg.configuration.owner
         
         merge_request_msg.configuration.person[0].name = 'Catch me if you can...'
-        
+
+
+
         merge_request_msg.resource_reference = create_response_msg.resource_reference
-        
+
+
         merge_result_msg = yield hc1.merge_addressbook_resource(merge_request_msg)
-        
+
+
+
         if merge_result_msg.MessageType != resource_response_type:
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise HelloDataUpdateError('Expected message type ResourceConfigurationResponse, received %s'

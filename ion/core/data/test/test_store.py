@@ -36,12 +36,16 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 from ion.util.itv_decorator import itv
 
+from ion.core.data.cassandra_bootstrap import CassandraStoreBootstrap, CassandraIndexedStoreBootstrap
 
 simple_password_type = object_utils.create_type_identifier(object_id=2502, version=1)
 columndef_type = object_utils.create_type_identifier(object_id=2508, version=1)
 column_family_type = object_utils.create_type_identifier(object_id=2507, version=1)
 cassandra_cluster_type = object_utils.create_type_identifier(object_id=2504, version=1)
 cassandra_keyspace_type = object_utils.create_type_identifier(object_id=2506, version=1)
+
+
+        
 
 class IStoreTest(unittest.TestCase):
 
@@ -99,17 +103,67 @@ class IStoreTest(unittest.TestCase):
         yield self.ds.remove(self.key)
         defer.returnValue(None)
 
+
     @defer.inlineCallbacks
     def test_has_key(self):
-        yield self.ds.put(self.key, self.value)  
+        yield self.ds.put(self.key, self.value)
         has_key = yield self.ds.has_key(self.key)
         self.failUnlessEqual(has_key, True)
 
     @defer.inlineCallbacks
     def test_does_not_have_key(self):
-        yield self.ds.put(self.key, self.value)  
+        yield self.ds.put(self.key, self.value)
         has_key = yield self.ds.has_key("I don't exist")
         self.failUnlessEqual(has_key, False)
+
+
+    @defer.inlineCallbacks
+    def test_has_deleted_key(self):
+        # Write, then read to verify same
+        yield self.ds.put(self.key, self.value)
+        b = yield self.ds.get(self.key)
+        self.failUnlessEqual(self.value, b)
+        yield self.ds.remove(self.key)
+
+        # Try to get the key we just deleted!
+        has_key = yield self.ds.has_key(self.key)
+        self.failUnlessEqual(has_key, False)
+
+
+
+
+class BootstrapStoreTest(IStoreTest):
+    
+    @itv(CONF)
+    def _setup_backend(self):
+        store = CassandraStoreBootstrap("ooiuser", "oceans11")
+        store.initialize()
+        store.activate()
+        return defer.succeed(store)
+        
+    @defer.inlineCallbacks
+    def tearDown(self):
+        try:
+            yield self.ds.terminate()
+        except Exception, ex:
+            log.info("Exception raised in tearDown %s" % (ex,))    
+            
+class BootstrapIndexedStoreTest(IStoreTest):
+    
+    @itv(CONF)
+    def _setup_backend(self):
+        store = CassandraIndexedStoreBootstrap("ooiuser", "oceans11")
+        store.initialize()
+        store.activate()
+        return defer.succeed(store)
+        
+    @defer.inlineCallbacks
+    def tearDown(self):
+        try:
+            yield self.ds.terminate()
+        except Exception, ex:
+            log.info("Exception raised in tearDown %s" % (ex,))               
+
 
 class CassandraStoreTest(IStoreTest):
     
@@ -384,7 +438,6 @@ class IndexStoreTest(IStoreTest):
         for key in self.d2.keys():
             self.assertIn(key, rows['prothfuss'])
         
-        
     
     @defer.inlineCallbacks
     def test_update_index_value_error(self):
@@ -436,7 +489,7 @@ class IndexStoreServiceTest(IndexStoreTest, IonTestCase):
         yield self._stop_container()
 
 
-class CassandraIndexStoreTest(IndexStoreTest):
+class CassandraIndexedStoreTest(IndexStoreTest):
 
     @itv(CONF)
     @defer.inlineCallbacks

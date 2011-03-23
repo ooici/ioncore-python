@@ -13,8 +13,10 @@ try:
 except ImportError:
     from distutils.core import setup
 
+from ion import __version__ as version
+
 setup( name = 'ioncore',
-       version = '0.4.4',
+       version = version,
        description = 'OOI ION Python Capability Container and Core Modules',
        url = 'http://www.oceanobservatories.org/spaces/display/CIDev/LCAARCH+Development+Project',
        download_url = 'http://ooici.net/releases',
@@ -35,7 +37,7 @@ setup( name = 'ioncore',
        test_suite = 'ion',
        install_requires = [
            'Twisted==10.2.0', 
-           'carrot==0.10.14-txamqp', 
+           'carrot==0.10.15-txamqp', 
            'txamqp==0.3',
            'simplejson==2.1.2', 
            'msgpack-python==015final',

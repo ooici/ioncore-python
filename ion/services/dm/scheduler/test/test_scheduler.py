@@ -56,8 +56,7 @@ class SchedulerTest(IonTestCase):
         """
         sc = SchedulerServiceClient(proc=self.sup)
 
-        reply = yield sc.add_task(self.dest, 0.3, 'pingtest bar')
-        task_id = reply['value']
+        task_id = yield sc.add_task(self.dest, 0.3, 'pingtest bar')
         log.debug(task_id)
         self.failIf(task_id == None)
 
@@ -67,7 +66,7 @@ class SchedulerTest(IonTestCase):
         self.failUnless(int(mc['value']) >= 1)
 
         rc = yield sc.rm_task(task_id)
-        self.failUnlessEqual(rc['value'], 'OK')
+        self.failUnlessEqual(rc.value, 'OK')
         yield asleep(0.5)
 
     @defer.inlineCallbacks
@@ -76,7 +75,7 @@ class SchedulerTest(IonTestCase):
 
         task_id = yield sc.add_task(self.dest, 10.5, 'pingtest foo')
         rc = yield sc.rm_task(task_id)
-        self.failUnlessEqual(rc['value'], 'OK')
+        self.failUnlessEqual(rc.value, 'OK')
         log.debug(rc)
 
     @defer.inlineCallbacks
@@ -84,8 +83,7 @@ class SchedulerTest(IonTestCase):
         sc = SchedulerServiceClient(proc=self.sup)
 
         yield sc.add_task(self.dest, 0.5, 'baz')
-        reply = yield sc.add_task('scheduled_task', 1.0, 'pingtest')
-        task_id = reply['value']
+        task_id = yield sc.add_task('scheduled_task', 1.0, 'pingtest')
         rl = yield sc.query_tasks('.+')
         self.failUnless(len(rl['value']) == 2)
         self.failUnlessSubstring(str(task_id), str(rl['value']))
@@ -93,8 +91,7 @@ class SchedulerTest(IonTestCase):
     @defer.inlineCallbacks
     def test_rm(self):
         sc = SchedulerServiceClient(proc=self.sup)
-        reply = yield sc.add_task(self.dest, 1.0, 'pingtest')
-        task_id = reply['value']
+        task_id = yield sc.add_task(self.dest, 1.0, 'pingtest')
         
         yield sc.rm_task(task_id)
         

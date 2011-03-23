@@ -59,7 +59,8 @@ class AppManager(BasicLifecycleObject):
             yield AppLoader.stop_application(self.container, app)
 
     def on_error(self, *args, **kwargs):
-        raise RuntimeError("Illegal state change for AppManager")
+        #raise RuntimeError("Illegal state change for AppManager")
+        self.container.error(*args, **kwargs)
 
     # API
 

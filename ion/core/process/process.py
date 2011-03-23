@@ -115,7 +115,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
                                     name=self.id.full,
                                     group=self.proc_group,
                                     process=self,
-                                    handler=self.receive)
+                                    handler=self.receive,
+                                    error_handler=self.receive_error)
 
         # Create a backend receiver for outgoing RPC process interactions.
         # Needed to avoid deadlock when processing incoming messages
@@ -126,7 +127,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
                                     name=self.backend_id.full,
                                     group=self.proc_group,
                                     process=self,
-                                    handler=self.receive)
+                                    handler=self.receive,
+                                    error_handler=self.receive_error)
 
         # Dict of all receivers of this process. Key is the name
         self.receivers = {}
@@ -428,6 +430,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
                     log.info('>>> [%s] receive(): Set stashed user_id to ANONYMOUS' % (self.proc_name))
                 else:
                     log.info('>>> [%s] receive(): Kept stashed user_id the same: [%s]' % (self.proc_name, request.get('user_id')))
+
             if 'expiry' in payload:
                 request.expiry = payload.get('expiry')
                 log.info('>>> [%s] receive(): Set/updated stashed expiry: [%s]' % (self.proc_name, request.get('expiry')))
@@ -437,17 +440,30 @@ class Process(BasicLifecycleObject,ResponseCodes):
                     log.info('>>> [%s] receive(): Set stashed expiry to 0' % (self.proc_name))
                 else:
                     log.info('>>> [%s] receive(): Kept stashed expiry the same: [%s]' % (self.proc_name, request.get('expiry')))
+
+
             # Check if this response is in reply to an outstanding RPC call
             if 'conv-id' in payload and payload['conv-id'] in self.rpc_conv:
                 yield self._receive_rpc(payload, msg)
             else:
                 yield self._receive_msg(payload, msg)
-        except Exception, ex:
+        except Exception, ex: # :( 
             log.exception('Error in process %s receive ' % self.proc_name)
             if msg and msg.payload['reply-to']:
-                yield self.reply_err(msg, exception=ex)
-                
+                yield self.reply_err(msg, exception=ex) # :( 
+            raise ex    
                 #@Todo How do we know if the message was ack'ed here?
+
+    @defer.inlineCallbacks
+    def receive_error(self, payload, msg, response_code=None):
+        """
+        This is the entry point for handling messaging errors. As appropriate,
+        this method will attempt to respond with a meaningful error code to
+        the sender.
+        """
+        if msg and msg.payload['reply-to']:
+            yield self.reply_err(msg=msg, response_code=response_code)
+        msg.ack()
 
     @defer.inlineCallbacks
     def _receive_rpc(self, payload, msg):
@@ -523,11 +539,12 @@ class Process(BasicLifecycleObject,ResponseCodes):
             if msg and msg.payload['reply-to']:
                 yield self.reply_err(msg, exception = ex)
             
-        except Exception, ex:
+        except Exception, ex: #:(
             log.exception("*****Container Error in message processing*****")
             # @todo Should we send an err or rather reject the msg?
             if msg and msg.payload['reply-to']:
-                yield self.reply_err(msg, exception = ex)
+                yield self.reply_err(msg, exception = ex) #:(
+            raise ex
 
             # The supervisor will also call shutdown child procs. This causes a recursive error when using fail fast!
             #if CF_fail_fast:
@@ -644,12 +661,16 @@ class Process(BasicLifecycleObject,ResponseCodes):
                 log.info('>>> [%s] send(): user-id not specified in headers <<<' % (self.proc_name))
         else:
             log.info('>>> [%s] send(): headers not specified <<<' % (self.proc_name))
+
         msgheaders = self._prepare_message(headers)
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders)
         if reply:
+            log.info('Process Reply: %s' % str(msgheaders))
             d = self.receiver.send(**message)
         else:
+            log.info('Process Send: %s' % str(msgheaders))
+
             d = self.backend_receiver.send(**message)
         return d
 
@@ -746,7 +767,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
 
         
     @defer.inlineCallbacks
-    def reply_err(self, msg, content=None, headers=None, exception=None):
+    def reply_err(self, msg, content=None, headers=None, exception=None, response_code=None):
         """
         Boilerplate method for reply to a message which lead to an application
         level error. The result can include content, a caught exception and an
@@ -765,6 +786,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
                 
                 if isinstance(exception, ApplicationError):
                     content.MessageResponseCode = exception.response_code
+                elif response_code:
+                    content.MessageResponseCode = response_code
                 else:
                     content.MessageResponseCode = content.ResponseCodes.INTERNAL_SERVER_ERROR
                 
@@ -902,6 +925,15 @@ class ProcessClient(ProcessClientBase):
         """
         Sends an RPC message to the specified target via originator process
         """
+        
+        # Validate expiry value
+        assert type(expiry) is str, 'Expiry must be string representation of int time value'
+
+        try:
+            expiryval = int(expiry)
+        except ValueError, ex:
+            assert False, 'Expiry must be string representation of int time value'
+            
         headers = {'user-id':user_id, 'expiry':expiry}
         return self.proc.rpc_send(self.target, operation, content, headers, **kwargs)
 

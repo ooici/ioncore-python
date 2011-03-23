@@ -124,7 +124,7 @@ class ExchangeManagementTest(IonTestCase):
             id = yield self.emc._create_object(msg)
             
             obj1 = msg.MessageObject
-            key = id.GPBMessage.key
+            key = id.resource_reference.key
             obj2 = yield self.emc._get_object(key)
             
             type1 = obj1.GPBMessage.configuration.type

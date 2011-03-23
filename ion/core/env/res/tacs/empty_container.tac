@@ -22,7 +22,7 @@ def makeContainerService():
     """
     config = ion_service.Options()
     config['no_shell'] = True #Don't need the shell
-    config['script'] = 'res/apps/ccagent.app' #Eww, this looks ugly!
+    config['scripts'] = ['res/apps/ccagent.app'] #Eww, this looks ugly!
     container = ion_service.CapabilityContainer(config)
     return container
 

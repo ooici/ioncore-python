@@ -14,7 +14,8 @@ from twisted.internet import defer
 
 from twisted.trial import unittest
 
-from ion.test.iontest import IonTestCase
+import weakref
+import gc
 
 from net.ooici.play import addressbook_pb2
 from ion.core.object import workbench
@@ -28,8 +29,230 @@ addresslink_type = object_utils.create_type_identifier(object_id=20003, version=
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
 
 
+class DummyClass(object):
+
+        def __init__(self, *args, **kwargs):
+
+            self.args = args
+            self.kwargs = kwargs
+
+class IndexHashTest(unittest.TestCase):
+
+    def setUp(self):
+
+        #self.cache = dict()
+        self.cache = weakref.WeakValueDictionary()
+
+
+
+    def test_bad_cache(self):
+
+        ih = repository.IndexHash()
+        # Must be a weak value Dictionary
+        self.assertRaises(AssertionError, ih._set_cache, dict())
+
+
+    def test_setitem_getitem(self):
+
+
+        ih = repository.IndexHash()
+        ih.cache = self.cache
+
+
+        ih['a']=DummyClass(5,3,david='abc')
+
+
+        # Get from the indexes objects
+        self.assertIsInstance(dict.__getitem__(ih,'a'), DummyClass)
+        self.assertRaises(KeyError, dict.__getitem__, ih,'v' )
+
+        # Get from the cache
+        self.assertIsInstance(self.cache['a'], DummyClass)
+        self.assertRaises(KeyError, self.cache.__getitem__, 'v')
+
+
+        # Get from the index hash
+        self.assertIsInstance(ih['a'], DummyClass)
+        self.assertRaises(KeyError, ih.__getitem__, 'v')
+
+
+    def test_putitem_1_getitem_2(self):
+
+
+        ih1 = repository.IndexHash()
+        ih1.cache = self.cache
+
+
+        ih1['a']=DummyClass(5,3,david='abc')
+
+
+        # Get from the indexes objects
+        self.assertIsInstance(dict.__getitem__(ih1,'a'), DummyClass)
+
+        # Get from the cache
+        self.assertIsInstance(self.cache['a'], DummyClass)
+
+        # Get from the index hash
+        self.assertIsInstance(ih1['a'], DummyClass)
+
+
+        # Create a second IndexHash and test the objects...
+        ih2 = repository.IndexHash()
+        ih2.cache = self.cache
+
+        # Get from the indexes objects - it does not have it yet...
+        self.assertRaises(KeyError, dict.__getitem__, ih2,'a' )
+
+        # Get from the cache
+        self.assertEqual(ih2['a'].args, (5,3))
+
+        # Now it has it!
+        self.assertIsInstance(dict.__getitem__(ih2,'a'), DummyClass)
+
+
+    def test_update_1_get_2(self):
+
+
+        ih1 = repository.IndexHash()
+        ih1.cache = self.cache
+
+        ih1.update({'a':DummyClass(5,3,david='abc'),'b':DummyClass(55,33,david='def')})
+
+
+        # Get from the indexes objects - test this first
+        self.assertEqual(dict.__getitem__(ih1,'a').args, (5,3))
+        self.assertEqual(dict.__getitem__(ih1,'b').args, (55,33))
+        self.assertEqual(dict.__len__(ih1),2)
+
+
+        # Get from the cache - make sure it got added
+        self.assertIsInstance(self.cache['a'], DummyClass)
+        self.assertIsInstance(self.cache['b'], DummyClass)
+        self.assertEqual(len(self.cache),2)
+
+        # Get from the index hash
+        self.assertIsInstance(ih1.get('a'), DummyClass)
+        self.assertEqual(ih1.get('b').args, (55,33))
+        self.assertEqual(ih1.get('c'), None)
+
+        # Make sure nothing got added...
+        self.assertEqual(len(self.cache),2)
+        self.assertEqual(len(ih1),2)
+        self.assertEqual(dict.__len__(ih1),2)
+
+
+        # Create a second IndexHash and test the objects...
+        ih2 = repository.IndexHash()
+        ih2.cache = self.cache
+
+        # Get from the indexes objects - it does not have it yet...
+        self.assertEqual(dict.get(ih2,'a'), None )
+        self.assertEqual(dict.get(ih2,'b'), None )
+        self.assertEqual(dict.get(ih2,'c'), None )
+
+        # Get from the cache
+        self.assertIsInstance(ih2.get('a'), DummyClass)
+        self.assertIsInstance(ih2.get('b'), DummyClass)
+        self.assertEqual(dict.get(ih2,'c'), None ) # Still None
+
+        # Now it has it!
+        self.assertEqual(dict.get(ih2,'a').args, (5,3) )
+        self.assertEqual(dict.get(ih2,'b').args, (55,33) )
+        self.assertEqual(dict.get(ih2,'c'), None ) # Still None
+
+        # Make sure nothing got added...
+        self.assertEqual(len(self.cache),2)
+        self.assertEqual(len(ih2),2)
+        self.assertEqual(dict.__len__(ih2),2)
+
+
+    def test_add_cache_later(self):
+
+        ih1 = repository.IndexHash()
+
+        ih1.update({'a':DummyClass(5,3,david='abc'),'b':DummyClass(55,33,david='def')})
+
+        # Get from the indexes objects - test this first
+        self.assertEqual(dict.__getitem__(ih1,'a').args, (5,3))
+        self.assertEqual(dict.__getitem__(ih1,'b').args, (55,33))
+        self.assertEqual(dict.__len__(ih1),2)
+
+
+        # Get from the cache - make sure it got added
+        self.assertEqual(self.cache.get('a'), None)
+        self.assertEqual(self.cache.get('b'), None)
+        self.assertEqual(len(self.cache),0)
+
+        # Get from the index hash
+        self.assertIsInstance(ih1.get('a'), DummyClass)
+        self.assertEqual(ih1.get('b').args, (55,33))
+        self.assertEqual(ih1.get('c'), None)
+
+        # Make sure nothing got added...
+        self.assertEqual(len(self.cache),0)
+        self.assertEqual(len(ih1),2)
+        self.assertEqual(dict.__len__(ih1),2)
+
+        # Now add the cache
+        ih1.cache = self.cache
+
+        # Get from the indexes objects - test this first
+        self.assertEqual(dict.__getitem__(ih1,'a').args, (5,3))
+        self.assertEqual(dict.__getitem__(ih1,'b').args, (55,33))
+        self.assertEqual(dict.__len__(ih1),2)
+
+
+        # Get from the cache - make sure it got added
+        self.assertIsInstance(self.cache['a'], DummyClass)
+        self.assertIsInstance(self.cache['b'], DummyClass)
+        self.assertEqual(len(self.cache),2)
+
+        # Get from the index hash
+        self.assertIsInstance(ih1.get('a'), DummyClass)
+        self.assertEqual(ih1.get('b').args, (55,33))
+        self.assertEqual(ih1.get('c'), None)
+
+        # Make sure nothing got added...
+        self.assertEqual(len(self.cache),2)
+        self.assertEqual(len(ih1),2)
+        self.assertEqual(dict.__len__(ih1),2)
+
+
+    def test_weakvalues(self):
+
+        ih1 = repository.IndexHash()
+        ih1.cache = self.cache
+
+        ih1.update({'a':DummyClass(5,3,david='abc'),'b':DummyClass(55,33,david='def')})
+
+
+        self.assertEqual(len(gc.get_referrers(self.cache['a'])),1)
+
+        del ih1['a']
+
+        self.assertEqual(self.cache.has_key('a'),False)
+
+
+        ih2 = repository.IndexHash()
+        ih2.cache = self.cache
+
+        # Bring the k,v into ih2
+        ih2.get('b')
+        self.assertEqual(len(gc.get_referrers(self.cache['b'])),2)
+
+        # Delete it from ih1
+        del ih1['b']
+
+        # Still in the cache!
+        self.assertEqual(self.cache.has_key('b'),True)
+        self.assertEqual(len(gc.get_referrers(self.cache['b'])),1)
+
+
+
+
+
 class RepositoryTest(unittest.TestCase):
-        
+
     def setUp(self):
         wb = workbench.WorkBench('No Process Test')
         self.wb = wb
@@ -300,34 +523,44 @@ class RepositoryTest(unittest.TestCase):
         ph1.number = '123 456 7890'
  
         ab1.owner = p1
+
+        ab1.person.add()
+
+        # Test copy to self = can't be done by assignment
+        ab1.person[0] = repo1.copy_object(p1)
+        self.assertNotIdentical(ab1.person[0],ab1.owner)
+        self.assertNotEqual(ab1.person[0].MyId, ab1.owner.MyId)
+        self.assertEqual(ab1.person[0], ab1.owner)
+
+        ab1.person[0].name = 'John'
+
         cref = repo1.commit(comment='testing commit')
- 
+
+
         # Create a second repository and copy p1 from repo1 to repo2
         repo2, ab2 = self.wb.init_repository(addresslink_type)
             
         ab2.person.add()
         
-        # move to a repeated link
+        # move to a repeated link by assignment
         ab2.person[0] = ab1.owner
-        
-        
-            
+
         # Test the person
         self.assertEqual(ab2.person[0].name, 'David')
             
-        self.assertEqual(ab2.person[0].MyId, ab1.owner.MyId)
+        self.assertNotEqual(ab2.person[0].MyId, ab1.owner.MyId)
         self.assertEqual(ab2.person[0], ab1.owner)
         self.assertNotIdentical(ab2.person[0], ab1.owner)
         self.assertNotIdentical(ab2.person[0].Repository, ab1.owner.Repository)
         
         self.assertIdentical(ab2.person[0].Repository, ab2.Repository)
         
-        # move to a link
+        # move to a link by assignment - uses copy_object!
         ab2.owner = ab1.owner
         
         # Test the owner
         self.assertEqual(ab2.owner.name, 'David')
-        self.assertEqual(ab2.owner.MyId, ab1.owner.MyId)
+        self.assertNotEqual(ab2.owner.MyId, ab1.owner.MyId)
         self.assertEqual(ab2.owner, ab1.owner)
         self.assertNotIdentical(ab2.owner, ab1.owner)
         self.assertNotIdentical(ab2.owner.Repository, ab1.owner.Repository)
@@ -404,11 +637,103 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(branch.commitrefs[0].parentrefs[0].commitref.MyId, cref1)
         self.assertEqual(branch.commitrefs[0].parentrefs[1].commitref.MyId, cref2)
         
+
+
+    def test_clear_repo(self):
+
+        def closure(workbench):
+
+            repo = self.wb.create_repository(addresslink_type)
+            # Create a weakref proxy to the repository
+            repo_ref = weakref.proxy(repo)
+
+            return repo_ref
+
+        repo1_ref = closure(self.wb)
+        repo2_ref = closure(self.wb)
+
+        # Check to make sure we can get to properties of both repositories
+        self.assertEqual(repo1_ref.persistent, False)
+        self.assertEqual(repo2_ref.persistent, False)
+        # Neither one has been GCd because it is in the workbench.
+
+        # Clear destroys the references too it.
+        self.wb.clear_repository_key(repo1_ref.repository_key)
+
+        # Make sure the test is deterministic - call garbage collection!
+        gc.collect()
+
+        # After clear the object is gone!
+        self.assertRaises(ReferenceError, getattr, repo1_ref, 'persistent')
+        self.assertEqual(repo2_ref.persistent, False)
+
+
+        # Clear the second one
+        self.wb.clear_repository_key(repo2_ref.repository_key)
+
+        # Make sure the test is deterministic - call garbage collection!
+        gc.collect()
+
+        # After clear the object is gone!
+        self.assertRaises(ReferenceError, getattr, repo2_ref, 'persistent')
         
-        
-        
- 
- 
- 
- 
- 
+
+
+
+
+    def test_clear(self):
+        """
+        In this test make weakrefs to a number of different objects in the repository and make sure all are GCd
+
+        @TODO add a test to make sure that 
+        """
+        def closure(workbench):
+            repo = workbench.create_repository(addresslink_type)
+
+            # Create a resource object
+            p1 = repo.create_object(person_type)
+            p1.name='David'
+            p1.id = 5
+            p1.email = 'd@s.com'
+            ph1 = p1.phone.add()
+            ph1.type = p1.PhoneType.WORK
+            ph1.number = '123 456 7890'
+            repo.root_object.owner = p1
+            repo.root_object.person.add()
+            repo.root_object.person[0] = p1
+
+            repo.root_object.title = 'Junk'
+
+            cref1 = repo.commit(comment='testing commit')
+
+            repo_refs=[]
+            repo_refs.append(weakref.ref(repo))
+            repo_refs.append(weakref.ref(repo.root_object.person[0]))
+            repo_refs.append(weakref.ref(repo.root_object.owner))
+            repo_refs.append(weakref.ref(repo.root_object.owner.GPBMessage))
+            repo_refs.append(weakref.ref(repo.root_object.owner.phone[0].GPBMessage))
+            repo_refs.append(weakref.ref(repo.root_object))
+            repo_refs.append(weakref.ref(repo._current_branch))
+            repo_refs.append(weakref.ref(repo._dotgit))
+
+            for value in repo._commit_index.values():
+                repo_refs.append(weakref.ref(value))
+
+            for value in repo.index_hash.values():
+                repo_refs.append(weakref.ref(value))
+
+
+            return repo_refs
+
+
+        repo_refs = closure(self.wb)
+
+        for item in repo_refs:
+            self.assertNotEqual(item(),None)
+
+        self.wb.clear_non_persistent()
+
+        gc.collect()
+
+        for item in repo_refs:
+            self.assertEqual(item(),None)

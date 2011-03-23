@@ -24,11 +24,14 @@ from ion.core.object import workbench
 from ion.core.object import object_utils
 
 
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
+PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
+ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
+ADDRESSBOOK_TYPE = object_utils.create_type_identifier(object_id=20002, version=1)
 
-attribute_type = object_utils.create_type_identifier(object_id=10017, version=1)
+ATTRIBUTE_TYPE = object_utils.create_type_identifier(object_id=10017, version=1)
+
+TEST_TYPE = object_utils.create_type_identifier(object_id=20010, version=1)
+
 
 
 class WrapperMethodsTest(unittest.TestCase):
@@ -38,7 +41,7 @@ class WrapperMethodsTest(unittest.TestCase):
         """
         Make sure that we can't mistakenly add attributes to wrapper objects
         """
-        ab = gpb_wrapper.Wrapper._create_object(addressbook_type)
+        ab = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
         
         # set a string field of the wrapper
         ab.title = 'String'
@@ -49,7 +52,7 @@ class WrapperMethodsTest(unittest.TestCase):
     
     def test_derived_wrappers(self):
         
-        ab = gpb_wrapper.Wrapper._create_object(addressbook_type)
+        ab = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
         # Derived wrappers is still empty
         self.assertEqual(ab.DerivedWrappers, {})
         
@@ -74,7 +77,7 @@ class WrapperMethodsTest(unittest.TestCase):
         
     def test_set_get_del(self):
         
-        ab = gpb_wrapper.Wrapper._create_object(addressbook_type)
+        ab = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
         
         # set a string field
         ab.title = 'String'
@@ -97,7 +100,7 @@ class WrapperMethodsTest(unittest.TestCase):
         
     def test_set_composite(self):
         
-        ab = gpb_wrapper.Wrapper._create_object(addressbook_type)
+        ab = gpb_wrapper.Wrapper._create_object(ADDRESSBOOK_TYPE)
             
         ab.person.add()
         ab.person.add()
@@ -121,7 +124,7 @@ class WrapperMethodsTest(unittest.TestCase):
         
     def test_enum_access(self):
         
-        p = gpb_wrapper.Wrapper._create_object(person_type)
+        p = gpb_wrapper.Wrapper._create_object(PERSON_TYPE)
         
         # Get an enum
         self.assertEqual(p.PhoneType.MOBILE,0)
@@ -134,7 +137,7 @@ class WrapperMethodsTest(unittest.TestCase):
     def test_imported_enum_access(self):
         
         
-        att = gpb_wrapper.Wrapper._create_object(attribute_type)
+        att = gpb_wrapper.Wrapper._create_object(ATTRIBUTE_TYPE)
         
         att.data_type = att.DataType.BOOLEAN
         
@@ -143,19 +146,110 @@ class WrapperMethodsTest(unittest.TestCase):
         self.assertRaises(AttributeError, setattr, att.DataType, 'BOOLEAN', 5)
         
         
-        
-    def test_listsetfields(self):
-        
-        p = gpb_wrapper.Wrapper._create_object(person_type)
+    def test_listsetfields_message_type(self):
+
+        p = gpb_wrapper.Wrapper._create_object(PERSON_TYPE)
+
+
+        flist = p.ListSetFields()
+        self.assertEqual(len(flist), 0)
 
         p.name = 'David'
         p.id = 5
-        
-        # get a list of the names which are set
-        mylist = p.ListSetFields()
-        # returned list is in order of field identifier
-        self.assertEqual(['name', 'id'], mylist)
-        
+
+        flist = p.ListSetFields()
+        self.assertIn('name',flist)
+        self.assertIn('id',flist)
+
+
+        p.phone.add()
+        flist = p.ListSetFields()
+        self.assertIn('phone',flist)
+
+        self.assertEqual(len(flist), 3)
+
+
+    def test_listsetfields_scalar_type(self):
+
+        p = gpb_wrapper.Wrapper._create_object(TEST_TYPE)
+
+        flist = p.ListSetFields()
+        self.assertEqual(len(flist), 0)
+
+        p.string = 'David'
+        p.integer = 5
+        p.float = 5.0
+
+        flist = p.ListSetFields()
+        self.assertIn('string',flist)
+        self.assertIn('integer',flist)
+        self.assertIn('float',flist)
+
+
+        p.strings.append('a string')
+        p.integers.append(5)
+        p.floats.append(5.0)
+
+        flist = p.ListSetFields()
+        self.assertIn('strings',flist)
+        self.assertIn('integers',flist)
+        self.assertIn('floats',flist)
+
+
+        self.assertEqual(len(flist), 6)
+
+
+    def test_isfieldset_message_type(self):
+
+        p = gpb_wrapper.Wrapper._create_object(PERSON_TYPE)
+
+        self.assertEqual(p.IsFieldSet('name'), False)
+        p.name = 'David'
+        self.assertEqual(p.IsFieldSet('name'), True)
+
+        self.assertEqual(p.IsFieldSet('id'), False)
+        p.id = 5
+        self.assertEqual(p.IsFieldSet('id'), True)
+
+        self.assertEqual(p.IsFieldSet('phone'), False)
+        p.phone.add()
+        self.assertEqual(p.IsFieldSet('phone'), False)
+        p.phone[0].number = '23232'
+        self.assertEqual(p.IsFieldSet('phone'), True)
+
+
+    def test_isfieldset_scalar_type(self):
+
+        p = gpb_wrapper.Wrapper._create_object(TEST_TYPE)
+
+        self.assertEqual(p.IsFieldSet('string'), False)
+        p.string = 'David'
+        self.assertEqual(p.IsFieldSet('string'), True)
+
+        self.assertEqual(p.IsFieldSet('integer'), False)
+        p.integer = 5
+        self.assertEqual(p.IsFieldSet('integer'), True)
+
+        self.assertEqual(p.IsFieldSet('float'), False)
+        p.float = 5.0
+        self.assertEqual(p.IsFieldSet('float'), True)
+
+
+        self.assertEqual(p.IsFieldSet('strings'), False)
+        p.strings.append( 'David')
+        self.assertEqual(p.IsFieldSet('strings'), True)
+
+        self.assertEqual(p.IsFieldSet('integers'), False)
+        p.integers.append(5)
+        self.assertEqual(p.IsFieldSet('integers'), True)
+
+        self.assertEqual(p.IsFieldSet('floats'), False)
+        p.floats.append(5.0)
+        self.assertEqual(p.IsFieldSet('floats'), True)
+
+
+
+
 
 class TestSpecializedCdmMethods(unittest.TestCase):
     """
@@ -918,18 +1012,66 @@ class TestWrapperMethodsRequiringRepository(unittest.TestCase):
     def setUp(self):
         wb = workbench.WorkBench('No Process Test')
         
-        repo, ab = wb.init_repository(addresslink_type)
+        repo, ab = wb.init_repository(ADDRESSLINK_TYPE)
         
         self.repo = repo
         self.ab = ab
         self.wb = wb
-        
+
+
+    def test_listsetfields_composite(self):
+
+
+        self.ab.title = 'foobar'
+
+        flist = self.ab.ListSetFields()
+        self.assertIn('title',flist)
+
+        self.ab.owner = self.ab.Repository.create_object(PERSON_TYPE)
+
+        flist = self.ab.ListSetFields()
+        self.assertIn('title',flist)
+        self.assertIn('owner',flist)
+
+        self.ab.person.add()
+        self.ab.person[0] = self.ab.Repository.create_object(PERSON_TYPE)
+
+        flist = self.ab.ListSetFields()
+        self.assertIn('title',flist)
+        self.assertIn('owner',flist)
+        self.assertIn('person',flist)
+
+        self.assertEqual(len(flist),3)
+
+
+
+    def test_isfieldset(self):
+
+
+
+        self.assertEqual(self.ab.IsFieldSet('title'),False)
+        self.ab.title = 'foobar'
+        self.assertEqual(self.ab.IsFieldSet('title'),True)
+
+        self.assertEqual(self.ab.IsFieldSet('owner'),False)
+        self.ab.owner = self.ab.Repository.create_object(PERSON_TYPE)
+        self.assertEqual(self.ab.IsFieldSet('owner'),True)
+
+
+        self.assertEqual(self.ab.IsFieldSet('person'),False)
+        self.ab.person.add()
+        self.assertEqual(self.ab.IsFieldSet('person'),False)
+        self.ab.person[0] = self.ab.Repository.create_object(PERSON_TYPE)
+        self.assertEqual(self.ab.IsFieldSet('person'),True)
+
+
+
     def test_clearfield(self):
         """
         Test clear field and the object accounting for parents and children
         """
         self.ab.person.add()
-        p = self.repo.create_object(person_type)
+        p = self.repo.create_object(PERSON_TYPE)
         p.name = 'David'
         p.id = 5
         self.ab.person[0] = p
@@ -1019,7 +1161,7 @@ class NodeLinkTest(unittest.TestCase):
         def setUp(self):
             wb = workbench.WorkBench('No Process Test')
             
-            repo, ab = wb.init_repository(addresslink_type)
+            repo, ab = wb.init_repository(ADDRESSLINK_TYPE)
             
             self.repo = repo
             self.ab = ab
@@ -1027,7 +1169,7 @@ class NodeLinkTest(unittest.TestCase):
             
         def test_link(self):
             
-            p = self.repo.create_object(person_type)
+            p = self.repo.create_object(PERSON_TYPE)
                         
             p.name = 'David'
             self.ab.owner = p
@@ -1039,7 +1181,7 @@ class NodeLinkTest(unittest.TestCase):
             
             self.assertEqual(wL.ObjectType, LINK_TYPE)
             
-            p = self.repo.create_object(person_type)
+            p = self.repo.create_object(PERSON_TYPE)
             
             p.name = 'David'
             
@@ -1051,7 +1193,7 @@ class NodeLinkTest(unittest.TestCase):
             
             self.ab.person.add()
             
-            p = self.repo.create_object(person_type)
+            p = self.repo.create_object(PERSON_TYPE)
             
             p.name = 'David'
             p.id = 5
@@ -1073,11 +1215,11 @@ class RecurseCommitTest(unittest.TestCase):
     def test_simple_commit(self):
         wb = workbench.WorkBench('No Process Test')
             
-        repo, ab = wb.init_repository(addresslink_type)
+        repo, ab = wb.init_repository(ADDRESSLINK_TYPE)
         
         ab.person.add()
         
-        p = repo.create_object(person_type)
+        p = repo.create_object(PERSON_TYPE)
         p.name='David'
         p.id = 5
         p.email = 'd@s.com'
@@ -1106,15 +1248,15 @@ class RecurseCommitTest(unittest.TestCase):
         
         wb = workbench.WorkBench('No Process Test')
             
-        repo = wb.create_repository(addresslink_type)
+        repo = wb.create_repository(ADDRESSLINK_TYPE)
         
         repo.root_object.person.add()
-        repo.root_object.person[0] = repo.create_object(person_type)
+        repo.root_object.person[0] = repo.create_object(PERSON_TYPE)
         repo.root_object.person[0].name = 'David'
         repo.root_object.person[0].id = 5
         
         repo.root_object.person.add()
-        repo.root_object.person[1] = repo.create_object(person_type)
+        repo.root_object.person[1] = repo.create_object(PERSON_TYPE)
         repo.root_object.person[1].name = 'David'
         repo.root_object.person[1].id = 5
         
@@ -1136,7 +1278,7 @@ class RecurseCommitTest(unittest.TestCase):
         self.assertEqual(p1.Invalid, True)
         
         # manually update the hashed elements...
-        wb._hashed_elements.update(strct)
+        repo.index_hash.update(strct)
         
         self.assertIn(repo.root_object.MyId, strct)
         self.assertIn(repo.root_object.person[0].MyId, strct)
@@ -1168,10 +1310,10 @@ class RecurseCommitTest(unittest.TestCase):
         
         wb = workbench.WorkBench('No Process Test')
             
-        repo = wb.create_repository(addresslink_type)
+        repo = wb.create_repository(ADDRESSLINK_TYPE)
         
         repo.root_object.person.add()
-        repo.root_object.person[0] = repo.create_object(person_type)
+        repo.root_object.person[0] = repo.create_object(PERSON_TYPE)
         repo.root_object.person[0].name = 'David'
         repo.root_object.person[0].id = 5
         

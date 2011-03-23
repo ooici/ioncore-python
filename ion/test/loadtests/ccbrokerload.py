@@ -128,7 +128,7 @@ class CCBrokerTest(LoadTest):
         mopt['broker_vhost'] = self.opts['vhost']
         mopt['broker_heartbeat'] = self.opts['heartbeat']
         mopt['no_shell'] = True
-        mopt['script'] = None
+        mopt['scripts'] = None
 
         # Little trick to have no consecutive failures if previous setUp() failed
         if Container._started:

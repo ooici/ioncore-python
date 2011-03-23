@@ -46,19 +46,19 @@ class Options(usage.Options):
 
     def __init__(self):
         usage.Options.__init__(self)
-        self['script'] = None
+        self['scripts'] = None
 
     def opt_version(self):
         from ion import version
         print "ION Capability Container version:", version.short()
         sys.exit(0)
 
-    def parseArgs(self, script=None):
+    def parseArgs(self, *args):
         """
-        name of prog (module) file to run
-        @todo better name; this is a first draft
+        Gets a list of apps/rels/scripts to run as additional arguments to the container.
+        @see CapabilityContainer.start_scripts
         """
-        self['script'] = script
+        self['scripts'] = args
 
 # Keep a reference to the CC service instance
 cc_instance = None
@@ -98,7 +98,9 @@ class CapabilityContainer(service.Service):
         yield self.start_container()
         log.info("Container started.")
 
-        yield self.do_start_actions()
+        d = self.do_start_actions()
+        d.addErrback(self.container.fatalError)
+        yield d
 
         if not self.config['no_shell']:
             self.start_shell()
@@ -130,30 +132,31 @@ class CapabilityContainer(service.Service):
         if self.config['boot_script']:
             yield self.run_boot_script()
 
-        if self.config['script']:
-            yield self.start_script()
+        if self.config['scripts']:
+            yield self.start_scripts()
 
     @defer.inlineCallbacks
-    def start_script(self):
+    def start_scripts(self):
         """
         given the path to a file, open that file and exec the code.
-        Assume the file contains Python source code.
+        The file may be an .app, a .rel, or a python code script.
         """
-        
+
         # Try two script locations, one for IDEs and another for shell. 
-        script = os.path.abspath(self.config['script'])
-        if not os.path.isfile(script):
-            script = os.path.join(os.path.dirname(ion.__file__), self.config['script'])
-        if not os.path.isfile(script):
-            log.error('Bad startup script path: %s' % self.config['script'])
-        else:
-            if script.endswith('.app'):
-                yield self.container.start_app(script)
-            elif script.endswith('.rel'):
-                yield self.container.start_rel(script)
+        for script in self.config['scripts']:
+            script = os.path.abspath(script)
+            if not os.path.isfile(script):
+                script = os.path.join(os.path.dirname(ion.__file__), script)
+            if not os.path.isfile(script):
+                log.error('Bad startup script path: %s' % script)
             else:
-                log.info("Executing script %s ..." % self.config['script'])
-                execfile(script, {})
+                if script.endswith('.app'):
+                    yield self.container.start_app(script)
+                elif script.endswith('.rel'):
+                    yield self.container.start_rel(script)
+                else:
+                    log.info("Executing script %s ..." % script)
+                    execfile(script, {})
 
     def run_boot_script(self):
         """

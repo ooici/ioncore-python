@@ -61,7 +61,8 @@ class ServiceProcess(Process):
                 scope='system',
                 group=self.receiver.group,
                 process=self, # David added this - is it a good idea?
-                handler=self.receive)
+                handler=self.receive,
+                error_handler=self.receive_error)
         self.add_receiver(self.svc_receiver)
 
     @defer.inlineCallbacks
