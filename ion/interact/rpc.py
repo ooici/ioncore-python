@@ -191,6 +191,38 @@ class RpcType(ConversationType):
         conv = Rpc(**kwargs)
         return conv
 
+class GenericFSMFactory(ConversationTypeFSMFactory):
+    """
+    A dummy FSM factory .
+    """
+
+    S_INIT = BasicStates.S_INIT
+    E_REQUEST = "request"
+
+    def create_fsm(self, target, memory=None):
+        fsm = ConversationTypeFSMFactory.create_fsm(self, target, memory)
+
+        actf = target._action
+        actionfct = self._create_action_func(actf, self.E_REQUEST)
+        fsm.add_transition(self.E_REQUEST, self.S_INIT, actionfct, self.S_INIT)
+        fsm.set_default_transition(actionfct, self.S_INIT)
+        return fsm
+
+class GenericInitiator(ConversationRole):
+    factory = GenericFSMFactory()
+
+    def request(self, message, *args, **kwargs):
+        log.debug("In Generic.request (IN)")
+
+class GenericParticipant(ConversationRole):
+    factory = GenericFSMFactory()
+
+    def request(self, message, *args, **kwargs):
+        log.debug("In Generic.request (OUT)")
+        # Check for operation/action
+        return message['process']._dispatch_message_op(message['headers'],
+                                            message['msg'], message['conversation'])
+
 class GenericType(ConversationType):
     """
     @brief Defines the conversation type of unspecified interactions.
@@ -198,7 +230,18 @@ class GenericType(ConversationType):
 
     CONV_TYPE_GENERIC = "generic"
 
-    roles = {}
+    ROLE_INITIATOR = RoleSpec(
+                        role_id="initiator",
+                        role_class=GenericInitiator)
+    ROLE_PARTICIPANT = RoleSpec(
+                        role_id="participant",
+                        role_class=GenericParticipant)
+
+    roles = {ROLE_INITIATOR.role_id:ROLE_INITIATOR,
+             ROLE_PARTICIPANT.role_id:ROLE_PARTICIPANT}
+
+    DEFAULT_ROLE_INITIATOR = ROLE_INITIATOR.role_id
+    DEFAULT_ROLE_PARTICIPANT = ROLE_PARTICIPANT.role_id
 
     def new_conversation(self, **kwargs):
         conv = Conversation(**kwargs)

@@ -711,7 +711,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders,
                        performative=msgheaders.get('performative','request'),
-                       conversation=conv)
+                       process=self, conversation=conv)
 
         # Put the message through the conversation FSM
         # @todo Must support deferred
