@@ -37,7 +37,6 @@ from ion.util.state_object import BasicLifecycleObject, BasicStates
 from ion.core.object import workbench
 
 CONF = ioninit.config(__name__)
-CF_conversation_log = CONF['conversation_log']
 CF_fail_fast = CONF['fail_fast']
 CF_rpc_timeout = CONF['rpc_timeout']
 
@@ -47,8 +46,8 @@ processes = {}
 # @todo CHANGE: Static store (kvs) to register process instances with names
 procRegistry = Store()
 
-# "thread local" context storage for
-# minimally retaining user-id from request message
+# Static entry point for "thread local" context storage during request
+# processing, eg. to retaining user-id from request message
 request = StackLocal()
 
 
@@ -417,6 +416,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
 
         self._registered_life_cycle_objects.append(lco)
 
+    ##########################################################################
     # --- Incoming message handling
 
     @defer.inlineCallbacks
@@ -428,144 +428,70 @@ class Process(BasicLifecycleObject, ResponseCodes):
         blocking or not.
         """
         try:
-            # Highest level message header handling and log output
-            # Check if there is a user id in the header, stash if so
-            if 'user-id' in payload:
-                log.info('>>> [%s] receive(): payload user id [%s] <<<' % (self.proc_name, payload['user-id']))
-                request.user_id = payload.get('user-id')
-                log.info('>>> [%s] receive(): Set/updated stashed user_id: [%s]' % (self.proc_name, request.get('user_id')))
+            # Establish security context for request processing
+            self._establish_request_context(payload, msg)
+
+            # Extract some headers and make log statement.
+            request.proc_name = self.proc_name
+            fromname = payload['sender']
+            if 'sender-name' in payload:
+                fromname = payload['sender-name']   # Legible sender alias
+            log.info('#####>>> [%s] receive(): Message from [%s] ... >>>' % (
+                     self.proc_name, fromname))
+            convid = payload.get('conv-id', None)
+
+            # Conversation handling.
+            conv = None
+            if convid:
+                # Compose in memory message object for callbacks
+                message = dict(recipient=payload.get('receiver',None),
+                               performative=payload.get('performative','request'),
+                               operation=payload.get('op',None),
+                               headers=payload,
+                               content=payload.get('content',None),
+                               process=self,
+                               msg=msg,
+                               conversation=None)
+
+                # Retrieve ongoing Conversation instance by conv-id header.
+                # If not existing, create new instance.
+                # @todo How do we find out we are the participant or initiator role?
+                initiator = False
+                conv = self.conv_manager.get_or_create_conversation(convid,
+                                                message, initiator=initiator)
+                message['conversation'] = conv
+
+                # Detect and handle request to terminate process.
+                # This does not yet work properly with fail fast...
+                if not self._get_state() == "ACTIVE":
+                    if 'op' in payload and payload['op'] == 'terminate':
+
+                        if self._get_state() != BasicStates.S_TERMINATED:
+                            yield self.terminate()
+                        else:
+                            yield self.reply_ok(msg)
+
+                    text = "Process %s in invalid state %s." % (self.proc_name, self._get_state())
+                    log.error(text)
+
+                    # @todo: Requeue would be ok, but does not work (Rabbit or client limitation)
+                    #d = msg.requeue()
+
+                    # Let the error back handle the exception
+                    raise ProcessError(text)
+
+                # Regular message handling in expected state
+                pu.log_message(msg)
+
+                # Delegate further message processing to conversation specific
+                # implementation. Trigger conversation FSM.
+                # @see ion.interact.rpc, ion.interact.request
+                res = yield self.conv_manager.msg_received(message)
+
             else:
-                log.info('>>> [%s] receive(): payload anonymous request <<<' % (self.proc_name))
-                if request.get('user_id', 'Not set') == 'Not set':
-                    request.user_id = 'ANONYMOUS'
-                    log.info('>>> [%s] receive(): Set stashed user_id to ANONYMOUS' % (self.proc_name))
-                else:
-                    log.info('>>> [%s] receive(): Kept stashed user_id the same: [%s]' % (self.proc_name, request.get('user_id')))
-            if 'expiry' in payload:
-                request.expiry = payload.get('expiry')
-                log.info('>>> [%s] receive(): Set/updated stashed expiry: [%s]' % (self.proc_name, request.get('expiry')))
-            else:
-                if request.get('expiry', 'Not set') == 'Not set':
-                    request.expiry = '0'
-                    log.info('>>> [%s] receive(): Set stashed expiry to 0' % (self.proc_name))
-                else:
-                    log.info('>>> [%s] receive(): Kept stashed expiry the same: [%s]' % (self.proc_name, request.get('expiry')))
-
-            # Check if this response is in reply to an outstanding RPC call
-            # @todo: This should be the decision of a conversation instance
-            if 'conv-id' in payload:
-                conv_id = payload['conv-id']
-                conv = self.conv_manager.get_conversation(conv_id)
-                if conv and conv.blocking_deferred:
-                    yield self._receive_rpc(payload, msg, conv)
-                    return
-
-            # The global else case. No blocking call exists
-            yield self._receive_msg(payload, msg)
-
-        except Exception, ex:
-            log.exception('Error in Process [%s] receive()' % self.proc_name)
-            if msg and msg.payload['reply-to']:
-                yield self.reply_err(msg, exception=ex)
-
-                #@Todo How do we know if the message was ack'ed here?
-
-    @defer.inlineCallbacks
-    def _receive_rpc(self, payload, msg, conv):
-        """
-        Handling of RPC reply messages.
-        """
-        fromname = payload['sender']
-        if 'sender-name' in payload:
-            fromname = payload['sender-name']
-        log.info('>>> [%s] receive(): RPC reply from [%s] <<<' % (self.proc_name, fromname))
-        rpc_deferred = conv.blocking_deferred
-        content = payload.get('content', None)
-        if conv.timeout:
-            log.error("Message received after process %s RPC conv-id=%s timed out=%s: %s" % (
-                self.proc_name, payload['conv-id'], rpc_deferred, payload))
-            return
-        rpc_deferred.rpc_call.cancel()
-        res = (content, payload, msg)
-
-        yield msg.ack()
-
-        status = payload.get(self.MSG_STATUS, None)
-        if status == self.ION_OK:
-            #Cannot do the callback right away, because the message is not yet handled
-            reactor.callLater(0, lambda: rpc_deferred.callback(res))
-
-        elif status == self.ION_ERROR:
-
-            code = -1
-            if isinstance(content, MessageInstance):
-                code = content.MessageResponseCode
-
-            if 400 <= code and code < 500:
-                err = failure.Failure(ReceivedApplicationError(payload, content))
-            elif 500 <= code and code < 600:
-                err = failure.Failure(ReceivedContainerError(payload, content))
-            else:
-                # Received Error is still the catch all!
-                err = failure.Failure(ReceivedError(payload, content))
-
-            #rpc_deferred.errback(err)
-            # Cannot do the callback right away, because the message is not yet handled
-            reactor.callLater(0, lambda: rpc_deferred.errback(err))
-
-
-        else:
-            log.error('RPC reply is not well formed. Header "status" must be set!')
-            #Cannot do the callback right away, because the message is not yet handled
-            reactor.callLater(0, lambda: rpc_deferred.callback(res))
-
-    @defer.inlineCallbacks
-    def _receive_msg(self, payload, msg):
-        """
-        Handling of non-RPC messages. Messages are dispatched according to
-        message attributes.
-        """
-        # Extract some headers and make log statement.
-        request.proc_name = self.proc_name
-        fromname = payload['sender']
-        if 'sender-name' in payload:
-            fromname = payload['sender-name']
-        log.info('#####>>> [%s] receive(): Message from [%s], dispatching... >>>' % (
-                 self.proc_name, fromname))
-        convid = payload.get('conv-id', None)
-
-        # Retrieve ongoing conversation instance (by conv-id header) or create
-        # new conversation instance based on provided protocol header.
-        conv = None
-        if convid:
-            conv = self.conv_manager.get_conversation(convid)
-
-            # If not existing, create new conversation instance
-            if not conv:
-                conv_type = payload.get('protocol', GenericType.CONV_TYPE_GENERIC)
-                sender = payload.get('sender', None)
-                log.debug("Creating new conversation on incoming message id=%s, type=%s" % (convid, conv_type))
-                conv = self.conv_manager.new_conversation(conv_type, convid)
-                if conv_type == RpcType.CONV_TYPE_RPC:
-                    conv.bind_role_local(RpcType.ROLE_PARTICIPANT.role_id, self)
-                    conv.bind_role(RpcType.ROLE_INITIATOR.role_id, sender)
-                elif conv_type == RequestType.CONV_TYPE_REQUEST:
-                    conv.bind_role_local(RequestType.ROLE_PARTICIPANT.role_id, self)
-                    conv.bind_role(RequestType.ROLE_INITIATOR.role_id, sender)
-
-            # Compose in memory message object for callbacks
-            message = dict(recipient=payload.get('receiver',None),
-                           operation=payload.get('op',None),
-                           headers=payload,
-                           content=payload.get('content',None),
-                           conversation=conv)
-
-            # Trigger conversation state machine
-            self.conv_manager.msg_received(message)
-
-        # Perform a dispatch of message by performative/operation
-        try:
-            res = yield self._handle_performative(payload, msg, conv)
+                # Legacy case of no conv-id set or one-off messages (events?)
+                log.warn("No conversation id in message")
+                res = yield self._dispatch_message_op(payload, msg, None)
 
         except ApplicationError, ex:
             # In case of an application error - do not terminate the process!
@@ -580,6 +506,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
             if msg and msg.payload['reply-to']:
                 yield self.reply_err(msg, exception = ex)
 
+            #@Todo How do we know if the message was ack'ed here?
             # The supervisor will also call shutdown child procs. This causes a recursive error when using fail fast!
             #if CF_fail_fast:
             #    yield self.terminate()
@@ -591,82 +518,33 @@ class Process(BasicLifecycleObject, ResponseCodes):
                 log.debug("<<< ACK msg")
                 yield msg.ack()
 
-    @defer.inlineCallbacks
-    def _handle_performative(self, payload, msg, conv, perf=False):
-        if not self._get_state() == "ACTIVE":
-
-            # Detect and handle request to terminate
-            # This does not yet work properly with fail fast...
-            if 'op' in payload and payload['op'] == 'terminate':
-
-                if self._get_state() != BasicStates.S_TERMINATED:
-                    yield self.terminate()
-                else:
-                    yield self.reply_ok(msg)
-
-            text = "Process %s in invalid state %s." % (self.proc_name, self._get_state())
-            log.error(text)
-
-            # @todo: Requeue would be ok, but does not work (Rabbit limitation)
-            #d = msg.requeue()
-
-            # Let the error back handle the exception
-            raise ProcessError(text)
-
-
-        # Regular message handling in expected state
-        pu.log_message(msg)
-
-        # Check for performative
-        perf = payload.get('performative', None)
-        convid = payload.get('conv-id', None)
-        assert not perf or (perf and convid)
-        conv = self.conv_manager.get_conversation(convid)
-
-        if not perf:
-            perf = "request"
-
-        res = yield self._dispatch_message_perf(payload, msg, conv, perf)
-
-    def _dispatch_message_perf(self, payload, msg, conv, perf):
-        opname = 'perf_' + str(perf)
-        return self._dispatch_message_call(payload, msg, conv, opname)
-
-    @defer.inlineCallbacks
-    def _dispatch_message_call(self, payload, msg, conv, opname):
+    def _establish_request_context(self, payload, msg):
         """
-        Dispatch of messages to operation handler functions  within this
-        process instance. The default behavior is to dispatch to 'op_*' functions,
-        where * is the 'op' message header.
-        @retval Deferred
+        @brief Establish security context for request processing.
+            Extract and set user-id, session expiry based on incoming headers
         """
-        content = payload.get('content','')
-        # dynamically invoke the operation in the given class
-        if hasattr(self, opname):
-            opf = getattr(self, opname)
-            try:
-                yield defer.maybeDeferred(opf, content, payload, msg)
-            except Exception, ex:
-                traceback.print_exc()
-                raise ex
-        elif hasattr(self,'op_none'):
-            yield defer.maybeDeferred(self.op_none, content, payload, msg)
+        # Check if there is a user id in the header, stash if so
+        if 'user-id' in payload:
+            log.info('>>> [%s] receive(): payload user id [%s] <<<' % (self.proc_name, payload['user-id']))
+            request.user_id = payload.get('user-id')
+            log.info('>>> [%s] receive(): Set/updated stashed user_id: [%s]' % (self.proc_name, request.get('user_id')))
         else:
-            log.error("receive() failed. Cannot dispatch to operation")
-
-    @defer.inlineCallbacks
-    def perf_request(self, content, headers, msg):
-        """
-        @brief Receives a new request for action as "Participant" role.
-        @todo This should be in the ConvType class
-        """
-        # Send an agree if a request message
-        conv_type = headers.get('protocol', GenericType.CONV_TYPE_GENERIC)
-        if conv_type == RequestType.CONV_TYPE_REQUEST:
-            yield self.reply_agree(msg)
-
-        # Check for operation/action
-        yield self._dispatch_message_op(headers, msg, None)
+            log.info('>>> [%s] receive(): payload anonymous request <<<' % (self.proc_name))
+            if request.get('user_id', 'Not set') == 'Not set':
+                request.user_id = 'ANONYMOUS'
+                log.info('>>> [%s] receive(): Set stashed user_id to ANONYMOUS' % (self.proc_name))
+            else:
+                log.info('>>> [%s] receive(): Kept stashed user_id the same: [%s]' % (self.proc_name, request.get('user_id')))
+        # User session expiry.
+        if 'expiry' in payload:
+            request.expiry = payload.get('expiry')
+            log.info('>>> [%s] receive(): Set/updated stashed expiry: [%s]' % (self.proc_name, request.get('expiry')))
+        else:
+            if request.get('expiry', 'Not set') == 'Not set':
+                request.expiry = '0'
+                log.info('>>> [%s] receive(): Set stashed expiry to 0' % (self.proc_name))
+            else:
+                log.info('>>> [%s] receive(): Kept stashed expiry the same: [%s]' % (self.proc_name, request.get('expiry')))
 
     def _dispatch_message_op(self, payload, msg, conv):
         if "op" in payload:
@@ -676,13 +554,30 @@ class Process(BasicLifecycleObject, ResponseCodes):
         else:
             log.error("Invalid message. No 'op' in header", payload)
 
+    @defer.inlineCallbacks
+    def _dispatch_message_call(self, payload, msg, conv, opname):
+        """
+        Dispatch of messages to handler callback functions within this
+        Process instance. If handler is not present, use op_none.
+        @retval Deferred
+        """
+        content = payload.get('content','')
+        # dynamically invoke the operation in the given class
+        if hasattr(self, opname):
+            opf = getattr(self, opname)
+            yield defer.maybeDeferred(opf, content, payload, msg)
+        elif hasattr(self,'op_none'):
+            yield defer.maybeDeferred(self.op_none, content, payload, msg)
+        else:
+            assert False, "Cannot dispatch to operation"
+
     def op_none(self, content, headers, msg):
         """
-        The method called if operation callback operation is not defined
+        The method called if operation callback handler is not existing
         """
         log.error('Process does not define op=%s' % headers.get('op',None))
 
-    # --- Interaction pattern
+    # --- Standard conversation type support: RPC, Request
 
     def rpc_send(self, recv, operation, content, headers=None, **kwargs):
         """
@@ -696,7 +591,9 @@ class Process(BasicLifecycleObject, ResponseCodes):
             headers = {}
         headers['protocol'] = RpcType.CONV_TYPE_RPC
         headers['performative'] = 'request'
-        return self._blocking_send(recv=recv, operation=operation, content=content, headers=headers, conv=rpc_conv, **kwargs)
+        return self._blocking_send(recv=recv, operation=operation,
+                                   content=content, headers=headers,
+                                   conv=rpc_conv, **kwargs)
 
     def request(self, receiver, action, content, headers=None, **kwargs):
         """
@@ -716,7 +613,9 @@ class Process(BasicLifecycleObject, ResponseCodes):
             headers = {}
         headers['protocol'] = RequestType.CONV_TYPE_REQUEST
         headers['performative'] = 'request'
-        return self._blocking_send(recv=receiver, operation=action, content=content, headers=headers, conv=req_conv, **kwargs)
+        return self._blocking_send(recv=receiver, operation=action,
+                                   content=content, headers=headers,
+                                   conv=req_conv, **kwargs)
 
     def request_async(self, message, **kwargs):
         """
@@ -724,15 +623,6 @@ class Process(BasicLifecycleObject, ResponseCodes):
         """
         pass
 
-    def perf_inform_done(self, message):
-        """
-        @brief Receives a new request for action as "Participant" role.
-            Instantiates the FIPA request interaction pattern.
-        """
-
-    #def _start_new_conversation(self, receiver, performative):
-    #    pass
-    #
     # --- Outgoing message handling
 
     def _blocking_send(self, recv, operation, content, headers=None, conv=None, **kwargs):
@@ -815,6 +705,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
 
         message = dict(recipient=recv, operation=operation,
                        content=content, headers=msgheaders,
+                       performative=msgheaders.get('performative','request'),
                        conversation=conv)
 
         # Put the message through the conversation FSM

@@ -116,6 +116,9 @@ class RequestType(ConversationType):
     roles = {ROLE_INITIATOR.role_id:ROLE_INITIATOR,
              ROLE_PARTICIPANT.role_id:ROLE_PARTICIPANT}
 
+    DEFAULT_ROLE_INITIATOR = ROLE_INITIATOR.role_id
+    DEFAULT_ROLE_PARTICIPANT = ROLE_PARTICIPANT.role_id
+
     def new_conversation(self, **kwargs):
         conv = Request(**kwargs)
         return conv

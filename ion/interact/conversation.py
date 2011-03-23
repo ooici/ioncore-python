@@ -40,6 +40,9 @@ class ConversationType(object):
     """
     implements(IConversationType)
 
+    DEFAULT_ROLE_INITIATOR = None
+    DEFAULT_ROLE_PARTICIPANT = None
+
     def __init__(self, id):
         """
         @param id    Unique registry identifier of a conversation type
@@ -70,7 +73,7 @@ class Conversation(object):
         self.local_role = None
         self.local_process = None
         self.local_fsm = None
-        # Spot for a Deferred for blocking (RPC style) send/receive
+        # Holder for a Deferred for blocking (RPC style) send/receive
         self.blocking_deferred = None
         # Marks a timeout in the conversation processing
         self.timeout = None
@@ -84,6 +87,7 @@ class Conversation(object):
         # Create an instance of the local role ConversationRole/StateObject
         role_spec = self.conv_type.roles[role_id]
         self.local_fsm = role_spec.role_class()
+        self.local_fsm.local_process = process
 
     def bind_role(self, role_id, process_id):
         """
@@ -231,14 +235,25 @@ class ProcessConversationManager(object):
         self.conv_mgr = conv_mgr_instance
 
     def msg_send(self, message):
+        """
+        @brief Trigger the FSM for a to-be-sent message and delegate all checking
+            to the callback action function
+        @param message An in-memory standard message object
+        """
         conv = self.get_conversation(message['headers']['conv-id'])
-        perf = message['headers'].get('performative', 'error')
+        perf = message['performative']
         return conv.local_fsm._so_process(perf, message)
 
     def msg_received(self, message):
-        #log.debug("Received %s" % message)
+        """
+        @brief Trigger the FSM for a received message and delegate all processing
+            to the callback action function
+        @param message An in-memory standard message object
+        """
+        log.debug("Received %s" % message)
         conv = message['conversation']
-        perf = message['headers'].get('performative', 'error')
+        perf = message['performative']
+        log.debug("Processing performative %s" % perf)
         return conv.local_fsm._so_process(perf, message)
 
     def create_conversation_id(self):
@@ -251,3 +266,32 @@ class ProcessConversationManager(object):
 
     def get_conversation(self, conv_id):
         return self.conversations.get(conv_id, None)
+
+    def get_or_create_conversation(self, conv_id, message, initiator=False):
+        """
+        @brief Gets cached Conversation instance by conv-id header or creates
+            new instance for for type by protocol header.
+        @param conv_id the conversation id extracted from a message
+        @param message the standard message callback object
+        @param initiator True of this message is being sent, False if received
+        """
+        conv = self.conversations.get(conv_id, None)
+
+        # If not existing, create new Conversation instance based on protocol header
+        if not conv:
+            conv_type = message['headers'].get('protocol', GenericType.CONV_TYPE_GENERIC)
+            log.debug("Creating new local conversation for conv-id=%s: type=%s" % (conv_id, conv_type))
+            conv = self.new_conversation(conv_type, conv_id)
+
+            # Bind roles
+            sender = message['headers'].get('sender', None)
+            if initiator:
+                self.bind_role_local(conv_type.DEFAULT_ROLE_INITIATOR, self.process)
+                self.bind_role(conv_type.DEFAULT_ROLE_PARTICIPANT, sender)
+                log.debug("Binding roles initiator(local)=%s, participant=%s" % (self.process.id, sender))
+            else:
+                self.bind_role(conv_type.DEFAULT_ROLE_INITIATOR, sender)
+                self.bind_role_local(conv_type.DEFAULT_ROLE_PARTICIPANT, self.process)
+                log.debug("Binding roles initiator=%s, participant(local)=%s" % (sender, self.process.id))
+
+        return conv
