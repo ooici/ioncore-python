@@ -890,7 +890,7 @@ class PubSubClient(ServiceClient):
     def query_subscribers(self, params):
         """
         @brief List subscriber that match a regular expression
-        @param params GPB, 2306/1, with 'regex' filled in
+        @param params @GPB(2306, 1) with 'regex' filled in
         @retval GPB, 2312/1, maybe zero-length if no matches.
         @retval error return also possible
         """
@@ -929,6 +929,7 @@ class PubSubClient(ServiceClient):
         """
         @brief Add a binding to an existing queue
         @param params GPB 2314/1
+        @GPB{Input,2314,1}
         @retval None
         """
         yield self._check_init()
