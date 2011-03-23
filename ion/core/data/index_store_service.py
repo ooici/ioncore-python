@@ -233,12 +233,12 @@ class IndexStoreServiceClient(ServiceClient):
         log.info("Called Index Store Service client: Query")
         
         request = yield self.mc.create_instance(QUERY_ATTRIBUTES_TYPE)
-        
+
         for attr_key,attr_value,pred_type in query_predicates.get_predicates():
             attr = request.attrs.add()                
-            attr.attribute_name = attr_key
-            attr.attribute_value = attr_value    
-            attr.predicate_type = pred_type
+            attr.attribute_name = str(attr_key)
+            attr.attribute_value = str(attr_value)
+            attr.predicate_type = str(pred_type)
 
         (result, headers, msg) = yield self.rpc_send('query', request)
 

@@ -20,6 +20,8 @@ from ion.util import procutils as pu
 from ion.core.object import object_utils
 
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
+from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
+
 
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -111,12 +113,24 @@ class DataStoreTest(IonTestCase):
         log.info('DataStore1 Push addressbook to DataStore1: complete')
 
 
-        
-        # Test to make sure pushing a non existent workbench fails
-        
-        # How do I test raises in a deferred call?
-        #self.assertRaises(KeyError,proc_ds1.push, 'ps2','NonExistentRepositoryName')
-        
+    @defer.inlineCallbacks
+    def test_existence(self):
+
+        is_there = yield self.ds1.workbench.test_existence(self.repo_key)
+        self.assertEqual(is_there,False)
+
+        log.info('DataStore1 Push addressbook to DataStore1')
+
+        result = yield self.wb1.workbench.push_by_name('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        log.info('DataStore1 Push addressbook to DataStore1: complete')
+
+        is_there = yield self.ds1.workbench.test_existence(self.repo_key)
+        self.assertEqual(is_there,True)
+
+
 
     @defer.inlineCallbacks
     def test_push_clear_pull(self):
@@ -258,8 +272,11 @@ class StoreServiceBackedDataStoreTest(DataStoreTest):
             {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
                 'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
 
+            {'name':'store_service','module':'ion.core.data.store_service','class':'StoreService'},
+
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'commit_store_class':'ion.core.data.index_store_service.IndexStoreServiceClient'}
+             'spawnargs':{COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient',
+                          BLOB_CACHE:'ion.core.data.store_service.StoreServiceClient'}
                 },
             {'name':'workbench_test1',
              'module':'ion.core.object.test.test_workbench',
@@ -268,7 +285,7 @@ class StoreServiceBackedDataStoreTest(DataStoreTest):
         ]
 
 
-
+'''
 class CassandraBackedDataStoreTest(DataStoreTest):
 
 
@@ -285,11 +302,10 @@ class CassandraBackedDataStoreTest(DataStoreTest):
              'spawnargs':{'proc-name':'wb1'}},
         ]
 
+'''
 
 
-
-
-    '''
+'''
     @defer.inlineCallbacks
     def test_push_associated(self):
 

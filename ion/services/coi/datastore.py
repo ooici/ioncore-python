@@ -427,8 +427,6 @@ class DataStoreWorkbench(WorkBench):
 
                     new_head_list.append({'key':key, 'value':wse.serialize(), 'index_attributes':attributes})
 
-
-
             # Get the current head list
             q = Query()
             q.add_predicate_eq(REPOSITORY_KEY, repo_key)
@@ -442,7 +440,6 @@ class DataStoreWorkbench(WorkBench):
 
                     # Any commit which is currently a head will have the correct branch names set.
                     # Just delete the branch names for the ones that are no longer heads.
-
 
         yield defer.DeferredList(def_list)
         #@TODO - check the return vals?
@@ -466,7 +463,7 @@ class DataStoreWorkbench(WorkBench):
         #import pprint
         #print 'After update to heads'
         #pprint.pprint(self._commit_store.kvs)
-        
+
 
         response = yield self._process.message_client.create_instance(MessageContentTypeID=None)
         response.MessageResponseCode = response.ResponseCodes.OK
@@ -523,6 +520,28 @@ class DataStoreWorkbench(WorkBench):
         yield self._process.reply_ok(message, response)
 
         log.info('op_fetch_blobs: Complete!')
+
+    @defer.inlineCallbacks
+    def flush_initialization_to_backend(self):
+        """
+        Flush any repositories in the backend to the the workbench backend storage
+        """
+
+
+    @defer.inlineCallbacks
+    def test_existence(self,repo_key):
+        """
+        For use in initialization - test to see if the repository already exists in the backend
+        """
+
+        q = Query()
+        q.add_predicate_eq(REPOSITORY_KEY, repo_key)
+
+        rows = yield self._commit_store.query(q)
+
+        defer.returnValue(len(rows)>0)
+
+
 
 
 
@@ -584,7 +603,7 @@ class DataStoreService(ServiceProcess):
         if issubclass(self._backend_classes[BLOB_CACHE], cassandra.CassandraStore):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
         else:
-            self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE])
+            self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE], self)
 
 
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
@@ -602,10 +621,6 @@ class DataStoreService(ServiceProcess):
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
 
-
-
-
-        
 
 
 # Spawn of the process using the module name
