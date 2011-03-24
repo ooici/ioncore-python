@@ -196,8 +196,7 @@ class DataStoreWorkbench(WorkBench):
                 for link in links_to_get:
                     # Short cut if we have already got it!
                     wse = repo.index_hash.get(link.key)
-                    print "Getting link:",link
-                    print 'WSE: "%s"' % str(wse)
+                    
                     if wse:
                         blobs[wse.key]=wse
                         # get the object
