@@ -19,8 +19,6 @@ NAME_CFG = 'name'
 PREDICATE_CFG = 'predicate'
 DESCRIPTION_CFG = 'description'
 CONTENT_CFG = 'content'
-
-
 PRELOAD_CFG = 'preload'
 
 
@@ -35,6 +33,7 @@ ION_IDENTITIES_CFG = 'ion_identities'
 topic_res_type_name = 'topic_resource_type'
 dataset_res_type_name = 'dataset_resource_type'
 identity_res_type_name = 'identity_resource_type'
+datasource_res_type_name = 'datasource_resource_type'
 
 resource_type_type = create_type_identifier(object_id=1103, version=1)
 # Data structure used by datastore intialization
@@ -64,6 +63,14 @@ identity_res_type_name:{ID_CFG:'9C457C32-5982-4044-A3ED-6DBDB5E3EB5C',
                        CONTENT_CFG:{'object_identifier':1401,
                                     'object_version':1,
                                     'meta_description':'protomessage?'}
+                        },
+datasource_res_type_name:{ID_CFG:'b8b7bb73-f578-4604-b3b3-088d28f9a7dc',
+                       TYPE_CFG:resource_type_type,
+                       NAME_CFG:datasource_res_type_name,
+                       DESCRIPTION_CFG:'A data source resource contains information about an source of data - metadata about the input to a dataset',
+                       CONTENT_CFG:{'object_identifier':4503,
+                                    'object_version':1,
+                                    'meta_description':'protomessage?'}
                         }
 }
 
@@ -71,6 +78,7 @@ identity_res_type_name:{ID_CFG:'9C457C32-5982-4044-A3ED-6DBDB5E3EB5C',
 TOPIC_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[topic_res_type_name][ID_CFG]
 DATASET_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[dataset_res_type_name][ID_CFG]
 IDENTITY_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[identity_res_type_name][ID_CFG]
+DATASOURCE_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[datasource_res_type_name][ID_CFG]
 
 
 ##### Define Predicates #####:
@@ -84,12 +92,33 @@ owned_by_name = 'owned_by'
 topic_for_name = 'topic_for'
 has_source_name = 'has_source'
 
+TERMINOLOGY_TYPE = create_type_identifier(object_id=14, version=1)
+
 # Data structure used by datastore intialization
 ION_PREDICATES={
-has_a_name:{ID_CFG:'C22A454D-389E-4BA6-88BC-CEDD93B5C87E'},
-is_a_name:{ID_CFG:'60029609-FD0C-4DE3-8E52-9F5DDAD9A9A8'},
-type_of_name:{ID_CFG:'F30A45F8-331D-4D44-AECC-746DA81B012F'},
-owned_by_name:{ID_CFG:'734CE3E6-90ED-4642-AD46-7C2E67BDA798'}
+has_a_name:{ID_CFG:'C22A454D-389E-4BA6-88BC-CEDD93B5C87E',
+            TYPE_CFG:TERMINOLOGY_TYPE,
+            PREDICATE_CFG:has_a_name},
+
+is_a_name:{ID_CFG:'60029609-FD0C-4DE3-8E52-9F5DDAD9A9A8',
+            TYPE_CFG:TERMINOLOGY_TYPE,
+            PREDICATE_CFG:is_a_name},
+
+type_of_name:{ID_CFG:'F30A45F8-331D-4D44-AECC-746DA81B012F',
+            TYPE_CFG:TERMINOLOGY_TYPE,
+            PREDICATE_CFG:type_of_name},
+
+owned_by_name:{ID_CFG:'734CE3E6-90ED-4642-AD46-7C2E67BDA798',
+            TYPE_CFG:TERMINOLOGY_TYPE,
+            PREDICATE_CFG:owned_by_name},
+
+topic_for_name:{ID_CFG:'ffe5c79e-58b5-493b-b409-0280c86ba0c7',
+            TYPE_CFG:TERMINOLOGY_TYPE,
+            PREDICATE_CFG:topic_for_name},
+
+has_source_name:{ID_CFG:'709a3879-0831-4e72-af77-3016ad9153af',
+            TYPE_CFG:TERMINOLOGY_TYPE,
+            PREDICATE_CFG:has_source_name},
 }
 
 
@@ -100,28 +129,81 @@ TYPE_OF_ID = ION_PREDICATES[type_of_name][ID_CFG]
 OWNED_BY_ID = ION_PREDICATES[owned_by_name][ID_CFG]
 
 
+
+##### Define Identities #####:
+
+# Dataset names
+anonymous_name = 'ANONYMOUS'
+root_name = 'ROOT'
+
+identity_type = create_type_identifier(object_id=1401, version=1)
+ION_IDENTITIES = {
+anonymous_name:{ID_CFG:'a3d5d4a0-7265-4ef2-b0ad-3ce2dc7252d8',
+                          TYPE_CFG:identity_type,
+                          NAME_CFG:anonymous_name,
+                          DESCRIPTION_CFG:'The anonymous user is the identity used by any unregistered user.',
+                          CONTENT_CFG:{'subject':'',
+                                       'certificate':'',
+                                       'rsa_private_key':'',
+                                       'dispatcher_queue':'',
+                                       'email':'',
+                                       'life_cycle_state':''}
+                        },
+
+root_name:{ID_CFG:'a3d5d4a0-7265-4ef2-b0ad-3ce2dc7252d8',
+                          TYPE_CFG:identity_type,
+                          NAME_CFG:root_name,
+                          DESCRIPTION_CFG:'The root user is the super administrator.',
+                          CONTENT_CFG:{'subject':'',
+                                       'certificate':'',
+                                       'rsa_private_key':'',
+                                       'dispatcher_queue':'',
+                                       'email':'',
+                                       'life_cycle_state':''}
+                        },
+
+
+}
+
+ROOT_USER_ID = ION_IDENTITIES[root_name][ID_CFG]
+ANONYMOUS_USER_ID = ION_IDENTITIES[anonymous_name][ID_CFG]
+
+
+
+
 ##### Define Datasets and data sources #####:
 
 # Dataset names
 profile_dataset_name = 'profile_dataset'
+profile_data_source_name = 'profile_data_source'
 grid_dataset_name = 'grid_dataset'
 
 
 DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
+DATASOURCE_TYPE = create_type_identifier(object_id=4503, version=1)
 # Data structure used by datastore intialization
 ION_DATASETS={
 profile_dataset_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F1',
                       TYPE_CFG:DATASET_TYPE,
                       NAME_CFG:profile_dataset_name,
-                      DESCRIPTION_CFG:'Some junk',
+                      DESCRIPTION_CFG:'An example of a profile dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_profile_dataset
                       },
+
+profile_data_source_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F1',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:profile_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for the profile dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_data_source_resource
+                      },
+
 #grid_dataset_name:{ID_CFG:''},
 }
 
 
 # Extract Resource ID_CFGs for use in services and tests
 SAMPLE_PROFILE_DATASET_ID = ION_DATASETS[profile_dataset_name][ID_CFG]
+SAMPLE_PROFILE_DATA_SOURCE_ID = ION_DATASETS[profile_data_source_name][ID_CFG]
 #SAMPLE_GRID_DATASET_ID = ION_DATASETS[grid_dataset_name][ID_CFG]
 
 

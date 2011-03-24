@@ -32,7 +32,6 @@ int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1
 
 
 
-@defer.inlineCallbacks
 def bootstrap_profile_dataset(dataset):
     """
     Pass in a link from the resource object which is created in the intialization of the datastore

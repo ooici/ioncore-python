@@ -23,6 +23,9 @@ from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
 from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
+# Pick three to test existence
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID
+
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -102,6 +105,8 @@ class DataStoreTest(IonTestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
+        log.info('Tearing Down Test Container')
+        yield self._shutdown_processes()
         yield self._stop_container()
 
     @defer.inlineCallbacks
@@ -119,6 +124,17 @@ class DataStoreTest(IonTestCase):
     @defer.inlineCallbacks
     def test_existence(self):
 
+        # Test preloaded stuff:
+        is_there = yield self.ds1.workbench.test_existence(HAS_A_ID)
+        self.assertEqual(is_there,True)
+
+        is_there = yield self.ds1.workbench.test_existence(DATASET_RESOURCE_TYPE_ID)
+        self.assertEqual(is_there,True)
+
+        is_there = yield self.ds1.workbench.test_existence(ROOT_USER_ID)
+        self.assertEqual(is_there,True)
+
+        # Test the repo we just made but have not pushed
         is_there = yield self.ds1.workbench.test_existence(self.repo_key)
         self.assertEqual(is_there,False)
 
@@ -130,6 +146,7 @@ class DataStoreTest(IonTestCase):
 
         log.info('DataStore1 Push addressbook to DataStore1: complete')
 
+        # Now test that after the push it exists!
         is_there = yield self.ds1.workbench.test_existence(self.repo_key)
         self.assertEqual(is_there,True)
 
