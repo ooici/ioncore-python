@@ -17,6 +17,10 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess
 from ion.core.exception import ReceivedError, ApplicationError
 
+from ion.services.coi.resource_registry_beta import resource_client
+
+from types import FunctionType
+
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper, repository
 from ion.core.object.workbench import WorkBench, WorkBenchError, PUSH_MESSAGE_TYPE, PULL_MESSAGE_TYPE, PULL_RESPONSE_MESSAGE_TYPE, BLOBS_REQUSET_MESSAGE_TYPE
@@ -37,6 +41,12 @@ from ion.core.data.storage_configuration_utility import KEYWORD, VALUE
 
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG
+
+from ion.services.coi.datastore_bootstrap import dataset_bootstrap
+
+
 
 
 from ion.core import ioninit
@@ -51,8 +61,8 @@ STRUCTURE_ELEMENT_TYPE = object_utils.create_type_identifier(object_id=1, versio
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 TERMINOLOGY_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
 
+RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
 
-# Set some constants based on the config file:
 
 
 class DataStoreWorkbench(WorkBench):
@@ -521,7 +531,7 @@ class DataStoreWorkbench(WorkBench):
 
         log.info('op_fetch_blobs: Complete!')
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def flush_initialization_to_backend(self):
         """
         Flush any repositories in the backend to the the workbench backend storage
@@ -575,6 +585,7 @@ class DataStoreService(ServiceProcess):
             
         self._backend_classes={}
 
+
         self._backend_classes[COMMIT_CACHE] = pu.get_class(self._backend_cls_names[COMMIT_CACHE])
         assert store.IIndexStore.implementedBy(self._backend_classes[COMMIT_CACHE]), \
             'The back end class to store commit objects passed to the data store does not implement the required IIndexSTORE interface.'
@@ -586,7 +597,18 @@ class DataStoreService(ServiceProcess):
         # Declare some variables to hold the store instances
         self.c_store = None
         self.b_store = None
-            
+
+
+        # Get the arguments for preloading the datastore
+        self.preload = {ION_PREDICATES_CFG:True,
+                        ION_RESOURCE_TYPES_CFG:True,
+                        ION_IDENTITIES_CFG:True,
+                        ION_DATASETS_CFG:False,}
+
+        self.preload.update(CONF.getValue(PRELOAD_CFG, default={}))
+        self.preload.update(self.spawn_args.get(PRELOAD_CFG, {}))
+
+
 
         log.info('DataStoreService.__init__()')
         
@@ -609,8 +631,7 @@ class DataStoreService(ServiceProcess):
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
 
 
-
-
+        yield self.initialize_datastore()
 
 
     #@defer.inlineCallbacks
@@ -620,6 +641,98 @@ class DataStoreService(ServiceProcess):
         self.op_fetch_blobs = self.workbench.op_fetch_blobs
         self.op_pull = self.workbench.op_pull
         self.op_push = self.workbench.op_push
+
+
+
+    @defer.inlineCallbacks
+    def initialize_datastore(self):
+        """
+        This method is used to preload required content into the datastore
+        """
+
+
+        if self.preload[ION_PREDICATES_CFG]:
+
+            pass
+
+
+        if self.preload[ION_IDENTITIES_CFG]:
+
+            pass
+
+        if self.preload[ION_RESOURCE_TYPES_CFG]:
+
+            for key, value in ION_RESOURCE_TYPES.items():
+
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    resource = self._create_resource(value)
+                    #print resource
+                    #yield self.workbench.flush_initialization_to_backend(resource)
+
+
+
+
+        if self.preload[ION_DATASETS_CFG]:
+
+            for key, value in ION_DATASETS.items():
+
+                #print 'K,V',key, value
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    resource = self._create_resource(value)
+                    #print 'DATASET', resource
+                    #yield self.workbench.flush_initialization_to_backend(resource)
+
+                
+
+
+
+    def _create_resource(self, description):
+        """
+        Helper method to create resource objects during initialization
+        """
+
+        # Create this resource with a constant ID from the config file
+        resource_repository = self.workbench.create_repository(root_type=RESOURCE_TYPE, repository_key=description[ID_CFG])
+        resource = resource_repository.root_object
+
+        assert resource_repository.repository_key == description[ID_CFG], 'Failure in repository creation!'
+        # Set the identity of the resource
+        resource.identity = resource_repository.repository_key
+
+        # Create the new resource object
+        res_obj = resource_repository.create_object(description[TYPE_CFG])
+
+        # Set the object as the child of the resource
+        resource.resource_object = res_obj
+
+        # Name and Description is set by the resource client
+        resource.name = description[NAME_CFG]
+        resource.description = description[DESCRIPTION_CFG]
+
+        object_utils.set_type_from_obj(res_obj, description[TYPE_CFG])
+
+        # State is set to new by default
+        resource.lcs = resource.LifeCycleState.NEW
+
+        resource_instance = resource_client.ResourceInstance(resource_repository)
+
+        # Set the content
+        content = description[CONTENT_CFG]
+        if isinstance(content, dict):
+            for k,v in content.items():
+                setattr(resource_instance,k,v)
+
+        elif isinstance(content, FunctionType):
+            #execute the function on the resource_instance!
+            content(resource_instance)
+
+
+        resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
+
+        return resource_instance
+
 
 
 

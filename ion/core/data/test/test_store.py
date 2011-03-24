@@ -36,6 +36,7 @@ from ion.core import ioninit
 CONF = ioninit.config(__name__)
 from ion.util.itv_decorator import itv
 
+
 from ion.core.data.cassandra_bootstrap import CassandraStoreBootstrap, CassandraIndexedStoreBootstrap
 
 simple_password_type = object_utils.create_type_identifier(object_id=2502, version=1)

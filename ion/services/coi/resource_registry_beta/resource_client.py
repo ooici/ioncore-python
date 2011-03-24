@@ -19,17 +19,12 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from ion.core import ioninit
-from ion.core.exception import ReceivedError
-import ion.util.procutils as pu
-from ion.util.state_object import BasicLifecycleObject
-from ion.core.messaging.ion_reply_codes import ResponseCodes
+
 from ion.core.process import process
 from ion.core.object import workbench
 from ion.core.object import repository
-from ion.core.object.repository import RepositoryError
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
-from ion.core.exception import ReceivedError
 
 
 from google.protobuf import message

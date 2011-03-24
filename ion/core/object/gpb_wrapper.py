@@ -1306,7 +1306,7 @@ class Wrapper(object):
                         msg +='Parent: %s' % (link.Root.Debug())
                     msg +='Old references to the object are now invalid!\n'
                     msg += '============================================='
-                    log.warn(msg)
+                    #log.warn(msg)
                     
                     # Force the object to be reloaded from the workbench!
                     del repo._workspace[se.key]

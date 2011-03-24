@@ -10,11 +10,10 @@
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+from twisted.internet import defer
 
-from ion.core.process import process
 
 from ion.core.object import object_utils
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 
 
 # Create CDM Type Objects
@@ -32,19 +31,14 @@ float32Array_type = object_utils.create_type_identifier(object_id=10013, version
 int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
 
 
+
 @defer.inlineCallbacks
-def bootstrap_datasets():
+def bootstrap_profile_dataset(dataset):
+    """
+    Pass in a link from the resource object which is created in the intialization of the datastore
 
-    proc = process.Process()
-    proc.spawn()
-
-    # Instantiate the Resource Client using the supervisor
-    rc = ResourceClient(proc=proc)
-
-    # Create the dataset resource
-    dataset = yield rc.create_instance(dataset_type, ResourceName='Test CDM Resource dataset',
-                                       ResourceDescription='A test resource')
-
+    """
+    
     # Attach the root group
     group = dataset.CreateObject(group_type)
     group.name = 'junk data'
@@ -299,15 +293,13 @@ def bootstrap_datasets():
     group.attributes[15] = attrib_vert_pos
 
 
-    # 'put' the resource into the Resource Registry
-    rc.put_instance(dataset, 'Testing put...')
+def bootstrap_data_source_resource(datasource):
 
 
     #-------------------------------------------#
     # Create the coresponding datasource object #
     #-------------------------------------------#
-    datasource = yield rc.create_instance(datasource_type, ResourceName='Test CDM Resource datasource',
-                                       ResourceDescription='A test resource for retrieving dataset context (datasource)')
+    
     datasource.source_type = datasource.SourceType.SOS
     datasource.property.append('sea_water_temperature')
     datasource.station_id.append('41012')
@@ -321,11 +313,6 @@ def bootstrap_datasets():
     # datasource.dataset_url = *not used*
     # datasource.ncml_mask = *not used*
 
-    rc.put_instance(datasource, 'Commiting initial datasource...')
-
-    data_resources = {'dataset1':dataset.ResourceIdentity,
-                     'datasource1':datasource.ResourceIdentity}
-    defer.returnValue(data_resources)
 
 def _create_string_attribute(dataset, name, values):
     '''

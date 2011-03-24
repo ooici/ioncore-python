@@ -22,7 +22,7 @@ from ion.core.object import object_utils
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
 from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
 
-
+from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -35,11 +35,14 @@ class DataStoreTest(IonTestCase):
     Testing example hello service.
     """
     services = [
-            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService'},
+            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:False}}
+                },
             {'name':'workbench_test1',
              'module':'ion.core.object.test.test_workbench',
              'class':'WorkBenchProcess',
-             'spawnargs':{'proc-name':'wb1'}},
+             'spawnargs':{'proc-name':'wb1'}
+                },
         ]
 
 
