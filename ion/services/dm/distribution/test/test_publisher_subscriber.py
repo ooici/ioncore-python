@@ -35,7 +35,32 @@ class TestPublisher(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
+        services = [
+            {
+                'name':'pubsub_service',
+                'module':'ion.services.dm.distribution.pubsub_service',
+                'class':'PubSubService'
+            },
+            {
+                'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                    'spawnargs':{'servicename':'datastore'}
+            },
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'class':'ResourceRegistryService',
+                    'spawnargs':{'datastore_service':'datastore'}},
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+            },
+
+            ]
         yield self._start_container()
+        self.sup = yield self._spawn_processes(services)
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -76,6 +101,15 @@ class TestPublisher(IonTestCase):
         yield proc.register_life_cycle_object(pub1)
 
         self.failUnless(pub1._get_state() == BasicStates.S_ACTIVE)      # register_life_cycle_object will move the publisher to match the proc's state
+
+    @defer.inlineCallbacks
+    def test_psc_plus_factory(self):
+        # a Publisher is attached to a process
+        proc = Process()
+        yield proc.spawn()
+
+        fact = PublisherFactory(xp_name='science_data', process=proc)
+        yield fact.build('fubar')
 
     @defer.inlineCallbacks
     def test_publisher_factory_create(self):
@@ -176,7 +210,32 @@ class TestSubscriber(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
+        services = [
+            {
+                'name':'pubsub_service',
+                'module':'ion.services.dm.distribution.pubsub_service',
+                'class':'PubSubService'
+            },
+            {
+                'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                    'spawnargs':{'servicename':'datastore'}
+            },
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'class':'ResourceRegistryService',
+                    'spawnargs':{'datastore_service':'datastore'}},
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+            },
+
+            ]
         yield self._start_container()
+        self.sup = yield self._spawn_processes(services)
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -290,7 +349,32 @@ class TestPublisherAndSubscriber(IonTestCase):
     """
     @defer.inlineCallbacks
     def setUp(self):
+        services = [
+            {
+                'name':'pubsub_service',
+                'module':'ion.services.dm.distribution.pubsub_service',
+                'class':'PubSubService'
+            },
+            {
+                'name':'ds1',
+                'module':'ion.services.coi.datastore',
+                'class':'DataStoreService',
+                    'spawnargs':{'servicename':'datastore'}
+            },
+            {
+                'name':'resource_registry1',
+                'module':'ion.services.coi.resource_registry_beta.resource_registry',
+                'class':'ResourceRegistryService',
+                    'spawnargs':{'datastore_service':'datastore'}},
+            {
+                'name':'exchange_management',
+                'module':'ion.services.coi.exchange.exchange_management',
+                'class':'ExchangeManagementService',
+            },
+
+            ]
         yield self._start_container()
+        self.sup = yield self._spawn_processes(services)
 
     @defer.inlineCallbacks
     def tearDown(self):
