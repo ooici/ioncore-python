@@ -87,12 +87,9 @@ int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1
 @defer.inlineCallbacks
 def _bootstrap_objects():
 
-    # Instantiate the Resource Client using an anonymous process
-    proc = Process()
-    yield proc.spawn()
+    # Instantiate the Resource Client (using an internal anonymous process)
+    rc = ResourceClient()
 
-    rc = ResourceClient(proc=proc) #sup)
-    
     # Create the dataset resource
     dataset = yield rc.create_instance(dataset_type, ResourceName='Test CDM Resource dataset',
                                        ResourceDescription='A test resource')

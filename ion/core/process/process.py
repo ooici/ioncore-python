@@ -700,8 +700,8 @@ class Process(BasicLifecycleObject,ResponseCodes):
         # Returns a new unique conversation id
         send = self.id.full
         Process.convIdCnt += 1
-        convid = "#" + str(Process.convIdCnt)
-        #convid = send + "#" + Process.convIdCnt
+        #convid = "#" + str(Process.convIdCnt)
+        convid = send + "#" + str(Process.convIdCnt)
         return convid
 
     def reply(self, msg, operation=None, content=None, headers={}):
