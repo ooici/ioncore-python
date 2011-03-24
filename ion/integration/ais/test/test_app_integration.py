@@ -126,12 +126,12 @@ class AppIntegrationTest(IonTestCase):
                   str('ion_time_coverage_end: ') + \
                   str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_time_coverage_end) + \
                   str('\n') + \
-                  #str('summary: ') + \
-                  #str(outcome1.message_parameters_reference[0].dataResourceSummary[0].summary) + \
-                  #str('\n') + \
-                  #str('comment: ') + \
-                  #str(outcome1.message_parameters_reference[0].dataResourceSummary[0].comment) + \
-                  #str('\n') + \
+                  str('summary: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].summary) + \
+                  str('\n') + \
+                  str('comment: ') + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].comment) + \
+                  str('\n') + \
                   str('ion_geospatial_lat_min: ') + \
                   str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_lat_min) + \
                   str('\n') + \
@@ -152,12 +152,7 @@ class AppIntegrationTest(IonTestCase):
                   str('\n') + \
                   str('ion_geospatial_vertical_positive: ') + \
                   str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_vertical_positive) + \
-                  str('\n') + \
-                  str('standard_name: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].variable[0].standard_name) + \
-                  str('\n') + \
-                  str('units: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].variable[0].units))
+                  str('\n'))
 
         
         self.dsID = outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
@@ -172,10 +167,8 @@ class AppIntegrationTest(IonTestCase):
         
         log.debug('DHE: testing getDataResourceDetail')
 
-        # Use the message client to create a message object
         log.debug('DHE: AppIntegrationService! instantiating GetDataResourceDetailMsg.\n')
         
-        # CHANGE THIS TO GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE)
         if self.dsID != None:
@@ -184,8 +177,17 @@ class AppIntegrationTest(IonTestCase):
         log.debug('DHE: Calling getDataResourceDetail!!...')
         outcome1 = yield self.aisc.getDataResourceDetail(reqMsg)
         #log.debug('DHE: getDataResourceDetail returned:\n'+str(outcome1))
-        log.debug('DHE: getDataResourceDetail returned.\n')
+        log.debug('DHE: getDataResourceDetail returned:\n' + \
+                  str('resource_id: ') + \
+                  str(outcome1.message_parameters_reference[0].data_resource_id) + \
+                  str('\n'))
 
+        log.debug('Variables:\n')
+        for var in outcome1.message_parameters_reference[0].variable:
+            #log.debug('  ' + str(var.standard_name) + ':' + str(var.units) + \
+            for attrib in var.other_attributes:
+                log.debug('  ' + str(attrib) + str('\n'))
+        
     @defer.inlineCallbacks
     def test_createDownloadURL(self):
 
@@ -532,30 +534,4 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     @defer.inlineCallbacks
     def test_createDataResource_failScheduling(self):
         raise unittest.SkipTest('This will be the test createDataResource when scheduling fails')
-
-
-
-
-
-
-
-def _create_string_attribute(dataset, name, values):
-    '''
-    Helper method to create string attributes for variables and dataset groups
-    '''
-    atrib = dataset.CreateObject(attribute_type)
-    atrib.name = name
-    atrib.data_type= atrib.DataType.STRING
-    atrib.array = dataset.CreateObject(stringArray_type)
-    atrib.array.value.extend(values)
-    return atrib
-
-def _add_string_attribute(dataset, variable, name, values):
-    '''
-    Helper method to add string attributes to variable instances
-    '''
-    atrib = _create_string_attribute(dataset, name, values)
-    
-    atrib_ref = variable.attributes.add()
-    atrib_ref.SetLink(atrib)        
 
