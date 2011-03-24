@@ -6,7 +6,7 @@
 @author David Everett
 """
 
-
+from twisted.trial import unittest
 
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
@@ -166,7 +166,7 @@ class AppIntegrationTest(IonTestCase):
     @defer.inlineCallbacks
     def test_getDataResourceDetail(self):
 
-        # Create a message client
+        # Create a message client        
         mc = MessageClient(proc=self.test_sup)
         rc = ResourceClient(proc=self.test_sup)
         
@@ -512,6 +512,33 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.MessageType != AIS_RESPONSE_ERROR_TYPE:
             self.fail('response to bad GPB to updateUserEmail is not an AIS_RESPONSE_ERROR_TYPE GPB')
 
+
+    @defer.inlineCallbacks
+    def test_createDataResource_success(self):
+        raise unittest.SkipTest('This will be the test for a normal successful createDataResource')
+
+    @defer.inlineCallbacks
+    def test_createDataResource_failSource(self):
+        raise unittest.SkipTest('This will be the test createDataResource when create source fails')
+    
+    @defer.inlineCallbacks
+    def test_createDataResource_failSet(self):
+        raise unittest.SkipTest('This will be the test createDataResource when create dataset fails')
+    
+    @defer.inlineCallbacks
+    def test_createDataResource_failAssociation(self):
+        raise unittest.SkipTest('This will be the test createDataResource when association fails')
+    
+    @defer.inlineCallbacks
+    def test_createDataResource_failScheduling(self):
+        raise unittest.SkipTest('This will be the test createDataResource when scheduling fails')
+
+
+
+
+
+
+
 def _create_string_attribute(dataset, name, values):
     '''
     Helper method to create string attributes for variables and dataset groups
@@ -531,3 +558,4 @@ def _add_string_attribute(dataset, variable, name, values):
     
     atrib_ref = variable.attributes.add()
     atrib_ref.SetLink(atrib)        
+

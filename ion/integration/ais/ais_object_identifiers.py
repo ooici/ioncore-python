@@ -11,7 +11,7 @@ message ApplicationIntegrationServiceRequestMsg{
       _ID = 9001;
       _VERSION = 1;
     }
-    
+
     // The message parameters object
     optional net.ooici.core.link.CASRef message_parameters_reference = 1;
 }
@@ -24,10 +24,10 @@ message ApplicationIntegrationServiceResponseMsg{
       _ID = 9002;
       _VERSION = 1;
     }
-    
+
     // The message parameters object
     repeated net.ooici.core.link.CASRef message_parameters_reference = 1;
-    
+
     optional int32 result = 2;
 }
 """
@@ -39,9 +39,9 @@ message ApplicationIntegrationServiceError{
       _ID = 9003;
       _VERSION = 1;
     }
-    
+
     optional int32 error_num = 1;
-    
+
     optional string error_str = 2;
 }
 """
@@ -52,14 +52,14 @@ AIS_DATA_RESOURCE_SUMMARY_MSG_TYPE = object_utils.create_type_identifier(object_
 message AisDataResourceSummaryMsg {
    enum _MessageTypeIdentifier {
        _ID = 9021;
-       _VERSION = 1;	
+       _VERSION = 1;
    }
 
    optional string user_ooi_id      = 1;
-   optional string data_resource_id = 2; 
-   optional string title            = 3; 
+   optional string data_resource_id = 2;
+   optional string title            = 3;
    optional string institution      = 4;
-   optional string source           = 5; 
+   optional string source           = 5;
 
 }
 """
@@ -70,7 +70,7 @@ FIND_DATA_RESOURCES_REQ_MSG_TYPE = object_utils.create_type_identifier(object_id
 message FindDataResourcesReqMsg {
    enum _MessageTypeIdentifier {
        _ID = 9031;
-       _VERSION = 1;	
+       _VERSION = 1;
    }
 
    optional string user_ooi_id = 1;
@@ -91,7 +91,7 @@ FIND_DATA_RESOURCES_RSP_MSG_TYPE = object_utils.create_type_identifier(object_id
 message FindDataResourcesRspMsg {
    enum _MessageTypeIdentifier {
        _ID = 9032;
-       _VERSION = 1;	
+       _VERSION = 1;
    }
 
    repeated net.ooici.core.link.CASRef dataResourceSummary = 1;
@@ -104,7 +104,7 @@ GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE = object_utils.create_type_identifier(obje
 message GetDataResourceDetailReqMsg {
    enum _MessageTypeIdentifier {
        _ID = 9033;
-       _VERSION = 1;	
+       _VERSION = 1;
    }
 
    optional string data_resource_id  = 1;
@@ -116,7 +116,7 @@ GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE = object_utils.create_type_identifier(obje
 message GetDataResourceDetailRspMsg {
    enum _MessageTypeIdentifier {
        _ID = 9034;
-       _VERSION = 1;	
+       _VERSION = 1;
    }
 
    //repeated <put payload here>
@@ -129,7 +129,7 @@ CREATE_DOWNLOAD_URL_REQ_MSG_TYPE = object_utils.create_type_identifier(object_id
 message CreateDownloadURLReqMsg {
    enum _MessageTypeIdentifier {
        _ID = 9035;
-       _VERSION = 1;	
+       _VERSION = 1;
    }
 }
 """
@@ -139,7 +139,7 @@ CREATE_DOWNLOAD_URL_RSP_MSG_TYPE = object_utils.create_type_identifier(object_id
 message CreateDownloadURLRspMsg {
    enum _MessageTypeIdentifier {
        _ID = 9036;
-       _VERSION = 1;	
+       _VERSION = 1;
    }
 
    optional string download_url = 1;
@@ -211,42 +211,66 @@ message SubscriptionInfo {
 }
 """
 
-CREATE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9211, version=1)
-UPDATE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9211, version=1)
+
+CREATE_DATA_RESOURCE_SIMPLE_REQ = object_utils.create_type_identifier(object_id=9217, version=1)
 """
-message DataResourceCreateUpdateRequest {
+message DataResourceCreateSimpleRequest {
+    enum _MessageTypeIdentifier {
+        _ID = 9217;
+        _VERSION = 1;
+    }
+
+    optional string user_id               = 1;
+    optional uint64 update_interval_msec  = 2;
+    optional string institution_id        = 3;
+
+}
+"""
+
+CREATE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9211, version=1)
+"""
+message DataResourceCreateRequest {
     enum _MessageTypeIdentifier {
         _ID = 9211;
         _VERSION = 1;
     }
-    optional string data_resource_id       = 1;
-    optional string provider               = 2;
-    optional string format                 = 3;
-    optional string protocol               = 4;
-    optional string type                   = 5;
-    optional string title                  = 6;
-    optional string data_format            = 7;
-    optional string data_type              = 8;
-    optional string naming_authority       = 9;
-    optional string summary                = 10;
-    optional string creator_user_id        = 11;
-    optional string publisher_id           = 12;
+
+    optional SourceType source_type       = 1;
+
+    // ISO8601 Date Format (yyyy-MM-dd'T'HH:mm:ss'Z'
+    optional string start_time            = 2;
+    optional string end_time              = 3;
+    optional uint64 update_interval_msec  = 4;
+    repeated string property              = 5;
+    repeated string station_id            = 6;
+
+    optional RequestType request_type     = 7;
+    optional double top                   = 8;
+    optional double bottom                = 9;
+    optional double left                  = 10;
+    optional double right                 = 11;
+    optional string base_url              = 12;
+    optional string dataset_url           = 13;
+    optional string ncml_mask             = 14;
+    optional string institution_id        = 15;
 
 }
 """
 
 CREATE_DATA_RESOURCE_RSP_TYPE = object_utils.create_type_identifier(object_id=9212, version=1)
-UPDATE_DATA_RESOURCE_RSP_TYPE = object_utils.create_type_identifier(object_id=9212, version=1)
 """
-message DataResourceCreateUpdateResponse {
+message DataResourceCreateResponse {
     enum _MessageTypeIdentifier {
         _ID = 9212;
         _VERSION = 1;
     }
 
-    optional string data_resource_id  = 1;
+    optional string data_source_id  = 1;
+    optional string data_set_id     = 2;
+    optional string association_id  = 3;
 }
 """
+
 
 DELETE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9213, version=1)
 """
@@ -272,3 +296,31 @@ message DataResourceDeleteResponse {
 }
 """
 
+
+
+UPDATE_DATA_RESOURCE_REQ_TYPE = object_utils.create_type_identifier(object_id=9215, version=1)
+"""
+message DataResourceUpdateRequest {
+    enum _MessageTypeIdentifier {
+        _ID = 9215;
+        _VERSION = 1;
+    }
+
+    optional string user_id               = 1;
+    optional uint64 update_interval_msec  = 2;
+    optional string institution_id        = 3;
+}
+"""
+
+
+UPDATE_DATA_RESOURCE_RSP_TYPE = object_utils.create_type_identifier(object_id=9216, version=1)
+"""
+message DataResourceCreateUpdateResponse {
+    enum _MessageTypeIdentifier {
+        _ID = 9216;
+        _VERSION = 1;
+    }
+
+    optional bool success = 1;
+}
+"""
