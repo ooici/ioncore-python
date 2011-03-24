@@ -347,7 +347,7 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         log.info("<<<---@@@ Service received operation 'update_request'.  Delegating to underlying dataset agent...")
         if not hasattr(content, 'MessageType') or content.MessageType != CHANGE_EVENT_TYPE:
-            raise TypeError('The given content must be an instance of or a wrapped instance of %s.  Given: %s' % (repr(CHANGE_EVENT_TYPE), type(content)))
+            raise TypeError('The given content must be an instance or a wrapped instance %s.  Given: %s' % (repr(CHANGE_EVENT_TYPE), type(content)))
         
         # Step 1: Grab the context for the given dataset ID
         try:
@@ -362,9 +362,9 @@ class JavaAgentWrapper(ServiceProcess):
         if self.__ingest_client is None:
             self.__ingest_client = EOIIngestionClient()
         
-        ingest_topic      = 'ingest.topic.' + str(uuid.uuid1())
+        ingest_topic      = self.agent_spawn_args[1][6] # @todo: the ingest should tell us which topic, not the other way around
         ready_routing_key = self.receiver.name
-        ingest_timeout    = context.max_ingest_millis # @todo: pull this from context (EoiDataContextMessage)
+        ingest_timeout    = context.max_ingest_millis
         
         log.debug('\n\ntopic:\t"%s"\nready_key:\t"%s"\ntimeout:/t%i' % (ingest_topic, ready_routing_key, ingest_timeout))
         
@@ -375,11 +375,10 @@ class JavaAgentWrapper(ServiceProcess):
         yield self.__ingest_ready_deferred
         
         
-        yield  self.__ingest_client.demo(ingest_topic)
-#        log.info("@@@--->>> Sending update request to Dataset Agent with context...")
-#        log.debug("..." + str(context))
-#        (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=30)
-
+#        yield  self.__ingest_client.demo(ingest_topic)
+        log.info("@@@--->>> Sending update request to Dataset Agent with context...")
+        log.debug("..." + str(context))
+        (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=30) # @attention: where should this timeout come from?
 
         
         # @todo: change reply based on response of the RPC send
@@ -396,7 +395,7 @@ class JavaAgentWrapper(ServiceProcess):
     def op_ingest_ready(self, content, headers, msg):
         '''
         '''
-        log.debug('entered op_ingest_ready()')
+        log.info('<<<---@@@ Incoming notification: Ingest is ready to receive data')
         if self.__ingest_ready_deferred is not None:
             self.__ingest_ready_deferred.callback(True)
         
@@ -434,56 +433,35 @@ class JavaAgentWrapper(ServiceProcess):
         # @todo: this method will be reimplemented so that dataset contexts can be retrieved dynamically
         log.debug(" -[]- Entered _get_dataset_context(datasetID=%s, dataSourceID=%s); state=%s" % (datasetID, dataSourceID, str(self._get_state())))
         
-        
+
         dataset = yield self.rc.get_instance(datasetID)
         datasource = yield self.rc.get_instance(dataSourceID)
+        msg = yield self.mc.create_instance(DATA_CONTEXT_TYPE)
         
+        
+        # @SEE ion.play.hello_message.py for create message object instances
+        # @SEE use msg_instance.MessageObject.SOS (example of accessing GPB enum fields)
+        # Create an instance of the EoiDataContext message
 
-        if (True):
-#        if (datasetID in self.__dataset_context_dict):
-#            context_args = self.__dataset_context_dict[datasetID]
-            # @SEE ion.play.hello_message.py for create message object instances
-            # @SEE use msg_instance.MessageObject.SOS (example of accessing GPB enum fields)
-            
-            # Create an instance of the EoiDataContext message
-            msg = yield self.mc.create_instance(DATA_CONTEXT_TYPE)
-            
-            # Fill in values
-#            msg.source_type = msg.SourceType.SOS
-#            msg.start_time = '2008-08-01T00:00:00Z'
-#            msg.end_time = '2008-08-02T00:00:00Z'
-#
-#            msg.property.append('sea_water_temperature')
-#            msg.station_id.append('41012')
-#            
-#            msg.request_type = msg.RequestType.CTD
-#            msg.top = 0.0
-#            msg.bottom = 0.0
-#            msg.left = 0.0
-#            msg.right = 0.0
-#            msg.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
-#            msg.dataset_url = ''
-#            msg.ncml_mask = ''
-            msg.source_type = datasource.source_type
-            msg.start_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
-            msg.end_time = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
-            msg.property.extend(datasource.property)
-            msg.station_id.extend(datasource.station_id)
+        msg.source_type = datasource.source_type
+        msg.start_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
+        msg.end_time = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
-            msg.request_type = datasource.request_type
-            msg.top = datasource.top
-            msg.bottom = datasource.bottom
-            msg.left = datasource.left
-            msg.right = datasource.right
-            msg.base_url = datasource.base_url
-            msg.dataset_url = datasource.dataset_url
-            msg.ncml_mask = datasource.ncml_mask
-            msg.max_ingest_millis = datasource.max_ingest_millis
-            
-            defer.returnValue(msg)
-        else:
-            raise KeyError("Invalid datasetID: %s" % (datasetID))
+        msg.property.extend(datasource.property)
+        msg.station_id.extend(datasource.station_id)
+
+        msg.request_type = datasource.request_type
+        msg.top = datasource.top
+        msg.bottom = datasource.bottom
+        msg.left = datasource.left
+        msg.right = datasource.right
+        msg.base_url = datasource.base_url
+        msg.dataset_url = datasource.dataset_url
+        msg.ncml_mask = datasource.ncml_mask
+        msg.max_ingest_millis = datasource.max_ingest_millis
+        
+        defer.returnValue(msg)
 
     @property
     def agent_phandle(self):
@@ -543,14 +521,19 @@ class JavaAgentWrapper(ServiceProcess):
         # @todo: Generate jar_pathname dynamically
         # jar_pathname = "/Users/tlarocque/Development/Java/Workspace_eclipse/EOI_dev/build/TryAgent.jar"   # STAR #
         jar_pathname = "res/apps/eoi_ds_agent/DatasetAgent.jar"   # STAR #
-        hostname = self.container.exchange_manager.message_space.connection.hostname
-        exchange = self.container.exchange_manager.exchange_space.name
-        wrapper = self.get_scoped_name("system", str(self.declare['name']))      # validate that 'system' is the correct scope
-        callback = "binding_key_callback"
+        
+        
+        parent_host_name = self.container.exchange_manager.message_space.connection.hostname
+        parent_xp_name = self.container.exchange_manager.exchange_space.name
+        parent_scoped_name = self.get_scoped_name("system", str(self.declare['name']))      # @todo: validate that 'system' is the correct scope
+        parent_callback_op = "binding_key_callback"
+        ingest_scoped_name = 'ingest.topic.' + str(uuid.uuid1())
+
+
 
         # Do not return anything.  Store spawn arguments in __agent_spawn_args
         binary = "java"
-        args = ["-jar", jar_pathname, hostname, exchange, wrapper, callback]
+        args = ["-jar", jar_pathname, parent_host_name, parent_xp_name, parent_scoped_name, parent_callback_op, ingest_scoped_name]
         log.debug("Acquired external process's spawn arguments:  %s %s" % (binary, " ".join(args)))
         self.__agent_spawn_args = (binary, args)
     
@@ -644,9 +627,11 @@ class JavaAgentWrapperClient(ServiceClient):
         
         # Invoke [op_]update_request() on the target service 'java_agent_wrapper' via RPC
         log.info("@@@--->>> Client sending 'update_request' message to java_agent_wrapper service")
-        (content, headers, msg) = yield self.send('update_request', (change_event))
+
+#        (content, headers, msg) = yield self.send('update_request', change_event)
+        yield self.send('update_request', change_event)
         
-        defer.returnValue(str(content))
+        defer.returnValue(None)
         
         
     

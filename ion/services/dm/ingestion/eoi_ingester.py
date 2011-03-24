@@ -38,6 +38,7 @@ from ion.core.exception import ApplicationError
 
 # For testing - used in the client
 from net.ooici.play import addressbook_pb2
+from ion.services.dm.distribution.publisher_subscriber import Publisher
 
 
 from ion.core import ioninit
@@ -133,7 +134,7 @@ class EOIIngestionService(ServiceProcess):
         """
         Start the ingestion process by setting up neccessary
         """
-        log.info('<<<---@@@ Incoming begin_ingest request with "Begin Ingest" message')
+        log.info('<<<---@@@ Incoming perform_ingest request with "Perform Ingest" message')
         log.debug("...Content:\t" + str(content))
 
 
@@ -174,6 +175,9 @@ class EOIIngestionService(ServiceProcess):
             # we succeeded, cancel the timeout
             timeoutcb.cancel()
 
+            # send notification we performed an ingest
+            yield self._notify_ingest(content)
+
             # now reply ok to the original message
             yield self.reply_ok(msg, content={'topic':content.ds_ingest_topic})
         else:
@@ -182,20 +186,31 @@ class EOIIngestionService(ServiceProcess):
             #yield self.reply_err(msg, content="dyde")
 
     @defer.inlineCallbacks
-    def op_recv_shell(self, content, headers, msg):
-        log.info("op_recv_shell")
+    def _notify_ingest(self, content):
+        """
+        Generate a notification/event that an ingest succeeded.
+        @TODO: this is temporary, to be replaced
+        """
+        pub = Publisher(xp_name="event.topic", routing_key="_not.eoi_ingest.ingest")
+        yield pub.initialize()
+        yield pub.activate()
+        yield pub.publish(True)
+
+    @defer.inlineCallbacks
+    def op_recv_dataset(self, content, headers, msg):
+        log.info("op_recv_dataset(%s)" % type(content))
         # this is NOT rpc
         yield msg.ack()
 
     @defer.inlineCallbacks
     def op_recv_chunk(self, content, headers, msg):
-        log.info("op_recv_chunk")
+        log.info("op_recv_chunk(%s)" % type(content))
         # this is NOT rpc
         yield msg.ack()
 
     @defer.inlineCallbacks
     def op_recv_done(self, content, headers, msg):
-        log.info("op_recv_done")
+        log.info("op_recv_done(%s)" % type(content))
         # this is NOT rpc
         yield msg.ack()
 

@@ -194,9 +194,10 @@ class DataStoreWorkbench(WorkBench):
                 def_list = []
                 #@TODO - put some error checking here so that we don't overflow due to a stupid request!
                 for link in links_to_get:
-
                     # Short cut if we have already got it!
                     wse = repo.index_hash.get(link.key)
+                    print "Getting link:",link
+                    print 'WSE: "%s"' % str(wse)
                     if wse:
                         blobs[wse.key]=wse
                         # get the object
@@ -220,7 +221,7 @@ class DataStoreWorkbench(WorkBench):
                     repo.index_hash[wse.key] = wse
 
                     # load the object so we can find its children
-                    obj = repo.get_linked_object(link)
+                    obj = repo._load_element(wse)
 
                     new_links_to_get.update(obj.ChildLinks)
 
@@ -746,6 +747,7 @@ class DataStoreService(ServiceProcess):
 
         if self.preload[ION_PREDICATES_CFG]:
 
+            log.info('Preloading Predicates')
             for key, value in ION_PREDICATES.items():
 
                 exists = yield self.workbench.test_existence(value[ID_CFG])
@@ -754,6 +756,7 @@ class DataStoreService(ServiceProcess):
 
 
         if self.preload[ION_RESOURCE_TYPES_CFG]:
+            log.info('Preloading Resource Types')
 
             for key, value in ION_RESOURCE_TYPES.items():
 
@@ -763,6 +766,7 @@ class DataStoreService(ServiceProcess):
 
 
         if self.preload[ION_IDENTITIES_CFG]:
+            log.info('Preloading Identities')
 
             for key, value in ION_IDENTITIES.items():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
@@ -770,6 +774,7 @@ class DataStoreService(ServiceProcess):
                     self._create_resource(value)
 
         if self.preload[ION_DATASETS_CFG]:
+            log.info('Preloading Data')
 
             for key, value in ION_DATASETS.items():
                 exists = yield self.workbench.test_existence(value[ID_CFG])
