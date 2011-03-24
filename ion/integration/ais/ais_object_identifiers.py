@@ -212,7 +212,7 @@ message SubscriptionInfo {
 """
 
 
-CREATE_DATA_RESOURCE_SIMPLE_REQ = object_utils.create_type_identifier(object_id=9217, version=1)
+CREATE_DATA_RESOURCE_SIMPLE_REQ_TYPE = object_utils.create_type_identifier(object_id=9217, version=1)
 """
 message DataResourceCreateSimpleRequest {
     enum _MessageTypeIdentifier {
