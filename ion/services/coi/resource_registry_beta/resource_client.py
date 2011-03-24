@@ -208,6 +208,7 @@ class ResourceClient(object):
 
         @TODO push the associations that go with this resource
         """
+        yield self._check_init()
         
         if not comment:
             comment = 'Resource client default commit message'
@@ -238,6 +239,8 @@ class ResourceClient(object):
         """
         This method is still experimental
         """
+        # @TODO  yield self._check_init() 
+
         association = self.workbench.create_association(subject, predicate, obj)
 
         # @TODO Now what - what should we do with the association? Stash it in the workbench?
@@ -266,6 +269,7 @@ class ResourceClient(object):
         @retval an Identity Reference object to the resource
         """
         
+        # @TODO  yield self._check_init() 
         return self.workbench.reference_repository(instance.ResourceIdentity, current_state)
         
 
