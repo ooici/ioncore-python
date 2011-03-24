@@ -154,10 +154,10 @@ class AppIntegrationTest(IonTestCase):
                   str(outcome1.message_parameters_reference[0].dataResourceSummary[0].ion_geospatial_vertical_positive) + \
                   str('\n') + \
                   str('standard_name: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].standard_name) + \
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].variable[0].standard_name) + \
                   str('\n') + \
                   str('units: ') + \
-                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].units))
+                  str(outcome1.message_parameters_reference[0].dataResourceSummary[0].variable[0].units))
 
         
         self.dsID = outcome1.message_parameters_reference[0].dataResourceSummary[0].data_resource_id
