@@ -220,7 +220,9 @@ class IndexStore(object):
         docstring for the description of the data structure.
         """
         predicates = query_predicates.get_predicates()
-        
+
+        print 'PREDICATES', predicates
+
         eq_filter = lambda x: x[2] == Query.EQ
         preds_eq = filter(eq_filter, predicates)
         keys = set()
@@ -231,12 +233,16 @@ class IndexStore(object):
             kindex = self.indices.get(k, None)
             if kindex:
                 keys.update(kindex.get(v,set()))
-        
+
         for k,v,p in predicates:
+            print 'k,v,p, SET', k,v,p,keys
+
             kindex = self.indices.get(k,None)
             if p == Query.EQ:
                 
                 if kindex:
+                    print 'Current Set',keys
+                    print 'Update Set', kindex.get(v,set())
                     keys.intersection_update(kindex.get(v,set()))
             elif p == Query.GT:
                 
@@ -245,7 +251,9 @@ class IndexStore(object):
                     if attr_val > v:
                         matches.update(kindex.get(attr_val,set()))
                 keys.intersection_update(matches)
-        
+
+        print 'SET', keys
+
         log.info("keys: "+ str(keys))
         result = {}
         for k in keys:

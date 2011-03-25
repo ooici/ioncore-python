@@ -19,10 +19,11 @@ from ion.core.object import object_utils
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
 from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
 
-from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
+from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG
 # Pick three to test existence
 from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID
 
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -36,7 +37,7 @@ class DataStoreTest(IonTestCase):
     """
     services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:False}}
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}
                 },
             {'name':'workbench_test1',
              'module':'ion.core.object.test.test_workbench',
@@ -280,6 +281,32 @@ class DataStoreTest(IonTestCase):
             repo.commit('repo %s commit' % str(n))
 
         return key_list
+
+    @defer.inlineCallbacks
+    def test_checkout_defaults(self):
+
+        defaults={}
+        defaults.update(ION_DATASETS)
+        defaults.update(ION_PREDICATES)
+        defaults.update(ION_RESOURCE_TYPES)
+        defaults.update(ION_IDENTITIES)
+
+        for key, value in defaults.items():
+
+            repo_name = value[ID_CFG]
+
+            result = yield self.wb1.workbench.pull('datastore',repo_name)
+            self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+            repo = self.wb1.workbench.get_repository(repo_name)
+
+            # Check that we got back both branches!
+            default_obj = yield repo.checkout(branchname='master')
+
+
+
+
+
 
 
 class StoreServiceBackedDataStoreTest(DataStoreTest):
