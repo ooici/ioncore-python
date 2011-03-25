@@ -224,7 +224,7 @@ class EOIIngestionService(ServiceProcess):
         Generate a notification/event that an ingest succeeded.
         @TODO: this is temporary, to be replaced
         """
-        pub = Publisher(xp_name="event.topic", routing_key="_not.eoi_ingest.ingest")
+        pub = Publisher(xp_name="event.topic", routing_key="_not.eoi_ingest.ingest", process=self)
         yield pub.initialize()
         yield pub.activate()
         yield pub.publish(True)
