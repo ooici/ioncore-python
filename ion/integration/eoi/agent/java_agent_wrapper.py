@@ -350,31 +350,34 @@ class JavaAgentWrapper(ServiceProcess):
             raise TypeError('The given content must be an instance or a wrapped instance %s.  Given: %s' % (repr(CHANGE_EVENT_TYPE), type(content)))
         
         # Step 1: Grab the context for the given dataset ID
+        log.debug('Retrieving dataset update context via self._get_dataset_context()')
         try:
             context = yield self._get_dataset_context(content.dataset_id, content.data_source_id)
         except KeyError, ex:
             yield self.reply_err(msg, "Could not grab the current context for the dataset with id: " + str(content))
         
         # Step 2: Setup a deferred so that we can wait for the Ingest Service to respond before sending data messages
+        log.debug('Setting up ingest ready deferred...')
         self.__ingest_ready_deferred = defer.Deferred()
         
         # Step 3: Tell the Ingest Service to get ready for ingestion (create a new topic and await data messages)
+        log.debug('Tell the ingest to start the ingestion procedure via op_perform_ingest()..')
         if self.__ingest_client is None:
             self.__ingest_client = EOIIngestionClient()
         
-        ingest_topic      = self.agent_spawn_args[1][6] # @todo: the ingest should tell us which topic, not the other way around
-        reply_to = self.receiver.name
-        ingest_timeout    = context.max_ingest_millis
+        reply_to        = self.receiver.name
+        ingest_timeout  = context.max_ingest_millis
         
-#        log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (content.dataset_id, reply_to, ingest_timeout))
-#        perform_ingest_deferred = self.__ingest_client.perform_ingest(content.dataset_id, reply_to, ingest_timeout)
-        log.debug('\n\ntopic:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (ingest_topic, reply_to, ingest_timeout))
-        perform_ingest_deferred = self.__ingest_client.perform_ingest(ingest_topic, reply_to, ingest_timeout)
+        log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (content.dataset_id, reply_to, ingest_timeout))
+        perform_ingest_deferred = self.__ingest_client.perform_ingest(content.dataset_id, reply_to, ingest_timeout)
         
         # Step 4: When the deferred comes back, tell the Dataset Agent instance to send data messages to the Ingest Service
         # @note: This deferred is called by when the ingest invokes op_ingest_ready()
-        yield self.__ingest_ready_deferred
-        
+        log.debug("Yielding on the ingest -- it'll callback when its ready to receive ingestion data")
+        irmsg = yield self.__ingest_ready_deferred
+        log.debug("Ingest is ready to receive data!")
+        context.xp_name = irmsg.xp_name
+        context.ingest_topic = irmsg.publish_topic
         
 #        yield  self.__ingest_client.demo(ingest_topic)
         log.info("@@@--->>> Sending update request to Dataset Agent with context...")
@@ -386,7 +389,7 @@ class JavaAgentWrapper(ServiceProcess):
         # yield self.reply_ok(msg, {"value":"Successfully dispatched update request"}, {})
 #        res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
         
-                  
+        log.debug('Yielding until ingestion is complete on the ingestion services side...')
         yield perform_ingest_deferred
         yield msg.ack()
         log.info('**** Ingestion COMPLETE! ****')
@@ -398,7 +401,7 @@ class JavaAgentWrapper(ServiceProcess):
         '''
         log.info('<<<---@@@ Incoming notification: Ingest is ready to receive data')
         if self.__ingest_ready_deferred is not None:
-            self.__ingest_ready_deferred.callback(True)
+            self.__ingest_ready_deferred.callback(content)
         
         yield msg.ack()
 
@@ -434,9 +437,11 @@ class JavaAgentWrapper(ServiceProcess):
         # @todo: this method will be reimplemented so that dataset contexts can be retrieved dynamically
         log.debug(" -[]- Entered _get_dataset_context(datasetID=%s, dataSourceID=%s); state=%s" % (datasetID, dataSourceID, str(self._get_state())))
         
-
+        log.debug("  |--->  Retrieving dataset instance")
         dataset = yield self.rc.get_instance(datasetID)
+        log.debug("  |--->  Retrieving datasource instance")
         datasource = yield self.rc.get_instance(dataSourceID)
+        log.debug("  |--->  Creating EoiDataContext instance")
         msg = yield self.mc.create_instance(DATA_CONTEXT_TYPE)
         
         
@@ -445,6 +450,7 @@ class JavaAgentWrapper(ServiceProcess):
         # Create an instance of the EoiDataContext message
 
 
+        log.debug("Storing data in EoiDataContext fields")
         msg.source_type = datasource.source_type
         msg.start_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
         msg.end_time = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
@@ -528,13 +534,12 @@ class JavaAgentWrapper(ServiceProcess):
         parent_xp_name = self.container.exchange_manager.exchange_space.name
         parent_scoped_name = self.get_scoped_name("system", str(self.declare['name']))      # @todo: validate that 'system' is the correct scope
         parent_callback_op = "binding_key_callback"
-        ingest_scoped_name = 'ingest.topic.' + str(uuid.uuid1())
 
 
 
         # Do not return anything.  Store spawn arguments in __agent_spawn_args
         binary = "java"
-        args = ["-jar", jar_pathname, parent_host_name, parent_xp_name, parent_scoped_name, parent_callback_op, ingest_scoped_name]
+        args = ["-jar", jar_pathname, parent_host_name, parent_xp_name, parent_scoped_name, parent_callback_op]
         log.debug("Acquired external process's spawn arguments:  %s %s" % (binary, " ".join(args)))
         self.__agent_spawn_args = (binary, args)
     
