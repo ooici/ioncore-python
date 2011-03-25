@@ -190,7 +190,7 @@ profile_dataset_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F1',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_profile_dataset
                       },
 
-profile_data_source_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F1',
+profile_data_source_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F2',
                       TYPE_CFG:DATASOURCE_TYPE,
                       NAME_CFG:profile_data_source_name,
                       DESCRIPTION_CFG:'An example of a data source for the profile dataset',

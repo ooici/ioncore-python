@@ -176,7 +176,8 @@ class EOIIngestionService(ServiceProcess):
             timeoutcb.cancel()
 
             # send notification we performed an ingest
-            yield self._notify_ingest(content)
+            # @todo: This causes an AssertionError, please fix
+            #yield self._notify_ingest(content)
 
             # now reply ok to the original message
             yield self.reply_ok(msg, content={'topic':content.ds_ingest_topic})
