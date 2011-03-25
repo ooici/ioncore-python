@@ -285,6 +285,12 @@ class WorkBenchProcessTest(IonTestCase):
         self.assertEqual(self.repo1.commit_head, repo2.commit_head)
         self.assertEqual(self.repo1.root_object, repo2.root_object)
 
+    #@defer.inlineCallbacks
+    def test_pull_invalid(self):
+
+        log.info('Pulling from: %s' % str(self.proc1.id.full))
+        self.failUnlessFailure(self.proc2.workbench.pull(self.proc1.id.full, 'foobar'), workbench.WorkBenchError)
+
 
     @defer.inlineCallbacks
     def test_pull_latest(self):

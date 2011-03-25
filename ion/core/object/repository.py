@@ -384,6 +384,8 @@ class Repository(object):
 
         if len(self._current_branch.commitrefs) == 1:          
             return self._current_branch.commitrefs[0]
+        elif len(self._current_branch.commitrefs) == 0:
+            return None
         else:
             raise RepositoryError('Branch should merge on read. Invalid state with more than one commit at the head of a branch!')
 

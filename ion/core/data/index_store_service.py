@@ -100,7 +100,6 @@ class IndexStoreService(ServiceProcess):
                 raise IndexStoreServiceException("Unhandled predicate type: %s " % (attr.predicate_type,))
                 
 
-
         results = yield self._indexed_store.query(query_predicates)
         #Now we have to put these back into a response
         response = yield self.message_client.create_instance(ROWS_TYPE)
