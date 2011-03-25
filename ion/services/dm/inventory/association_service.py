@@ -85,11 +85,15 @@ class AssociationService(ServiceProcess):
             q.add_predicate_gt(BRANCH_NAME,'')
 
             # Get only associations to the correct branch & key for the subject and object
-            q.add_predicate_eq(PREDICATE_KEY, pair.predicate.key)
+            #q.add_predicate_eq(PREDICATE_KEY, pair.predicate.key)
 
             q.add_predicate_eq(OBJECT_KEY, pair.object.key)
 
             rows = yield self.index_store.query(q)
+
+            print 'PK', pair.predicate.key
+            print 'OK', pair.object.key
+
 
             print 'ROWS',rows
             pair_subjects = set()

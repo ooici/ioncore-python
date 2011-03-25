@@ -378,6 +378,8 @@ class DataStoreWorkbench(WorkBench):
             for cref in repo.current_heads():
                 head_keys.append( cref.MyId )
 
+            print 'HEAD KEYS', head_keys
+
             for key in commit_keys:
 
                 # Set the repository name for the commit
@@ -391,6 +393,8 @@ class DataStoreWorkbench(WorkBench):
                 if not cref:
                     element = repo.index_hash.get(key)
                     cref = repo._load_element(element)
+
+                print 'THIS KEY:', key
 
 
                 link = cref.GetLink('objectroot')

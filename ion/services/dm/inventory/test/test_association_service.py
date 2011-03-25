@@ -71,6 +71,7 @@ class AssociationServiceTest(IonTestCase):
 
         assoc = self.rc.create_association(root_user, has_a, id_type)
 
+        print 'ASSOC STATUS', assoc.status
 
         yield self.rc.proc.workbench.push(self.rc.datastore_service, assoc)
 
