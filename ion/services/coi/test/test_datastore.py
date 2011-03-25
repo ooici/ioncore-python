@@ -15,6 +15,7 @@ CONF = ioninit.config(__name__)
 from ion.test.iontest import IonTestCase
 
 from ion.core.object import object_utils
+from ion.core.object import workbench
 
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS
 from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
@@ -324,7 +325,8 @@ class StoreServiceBackedDataStoreTest(DataStoreTest):
 
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
              'spawnargs':{COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient',
-                          BLOB_CACHE:'ion.core.data.store_service.StoreServiceClient'}
+                          BLOB_CACHE:'ion.core.data.store_service.StoreServiceClient',
+                          PRELOAD_CFG:{ION_DATASETS_CFG:True}}
                 },
             {'name':'workbench_test1',
              'module':'ion.core.object.test.test_workbench',

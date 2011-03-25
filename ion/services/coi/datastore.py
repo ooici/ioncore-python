@@ -59,6 +59,11 @@ TERMINOLOGY_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
 
 RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
 
+class DataStoreWorkBenchError(WorkBenchError):
+    """
+    An Exception class for errors in the data store workbench
+    """
+
 
 class DataStoreWorkbench(WorkBench):
 
@@ -92,7 +97,7 @@ class DataStoreWorkbench(WorkBench):
         log.info('op_pull!')
 
         if not hasattr(request, 'MessageType') or request.MessageType != PULL_MESSAGE_TYPE:
-            raise WorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+            raise DataStoreWorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
 
         repo = self.get_repository(request.repository_key)
@@ -111,6 +116,10 @@ class DataStoreWorkbench(WorkBench):
         q.add_predicate_eq(REPOSITORY_KEY, request.repository_key)
 
         rows = yield self._commit_store.query(q)
+
+        if len(rows) == 0:
+            raise DataStoreWorkBenchError('Repository Key "%s" not found in Datastore' % request.repository_key, request.ResponseCodes.NOT_FOUND)
+
 
         for key, columns in rows.items():
 
@@ -172,7 +181,7 @@ class DataStoreWorkbench(WorkBench):
         for commit_key in puller_needs:
             commit_element = repo.index_hash.get(commit_key)
             if commit_element is None:
-                raise WorkBenchError('Repository commit object not found in op_pull', request.ResponseCodes.NOT_FOUND)
+                raise DataStoreWorkBenchError('Repository commit object not found in op_pull', request.ResponseCodes.NOT_FOUND)
             link = response.commit_elements.add()
             obj = response.Repository._wrap_message_object(commit_element._element)
             link.SetLink(obj)
@@ -251,7 +260,7 @@ class DataStoreWorkbench(WorkBench):
         log.info('op_push!')
 
         if not hasattr(pushmsg, 'MessageType') or pushmsg.MessageType != PUSH_MESSAGE_TYPE:
-            raise WorkBenchError('Invalid push request. Bad Message Type!', pushmsg.ResponseCodes.BAD_REQUEST)
+            raise DataStoreWorkBenchError('Invalid push request. Bad Message Type!', pushmsg.ResponseCodes.BAD_REQUEST)
 
         # A dictionary of the new commits received in the push - sorted by repository
         new_commits={}
@@ -271,7 +280,7 @@ class DataStoreWorkbench(WorkBench):
             else:
 
                 if repo.status == repo.MODIFIED:
-                    raise WorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', request.ResponseCodes.BAD_REQUEST)
+                    raise DataStoreWorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', request.ResponseCodes.BAD_REQUEST)
                 repo_keys = set(self.list_repository_blobs(repo))
 
             # add a new entry in the new_commits dictionary to store the commits of the push for this repo
@@ -320,7 +329,7 @@ class DataStoreWorkbench(WorkBench):
                 except ReceivedError, re:
 
                    log.debug('ReceivedError', str(re))
-                   raise WorkBenchError('Fetch Objects returned an exception! "%s"' % re.msg_content)
+                   raise DataStoreWorkBenchError('Fetch Objects returned an exception! "%s"' % re.msg_content)
 
 
                 for se in blobs_msg.blob_elements:
@@ -505,7 +514,7 @@ class DataStoreWorkbench(WorkBench):
         log.info('op_fetch_blobs')
 
         if not hasattr(request, 'MessageType') or request.MessageType != BLOBS_REQUSET_MESSAGE_TYPE:
-            raise WorkBenchError('Invalid fetch objects request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+            raise DataStoreWorkBenchError('Invalid fetch objects request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
         response = yield self._process.message_client.create_instance(BLOBS_MESSAGE_TYPE)
 
@@ -528,7 +537,7 @@ class DataStoreWorkbench(WorkBench):
         for result, blob in res_list:
 
             if blob is None:
-                raise WorkBenchError('Invalid fetch objects request. Key Not Found!', request.ResponseCodes.NOT_FOUND)
+                raise DataStoreWorkBenchError('Invalid fetch objects request. Key Not Found!', request.ResponseCodes.NOT_FOUND)
 
             element = gpb_wrapper.StructureElement.parse_structure_element(blob)
             link = response.blob_elements.add()
@@ -669,7 +678,7 @@ class DataStoreWorkbench(WorkBench):
 
 
 
-class DataStoreError(Exception):
+class DataStoreError(ApplicationError):
     """
     An exception class for the data store
     """
