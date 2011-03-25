@@ -269,9 +269,11 @@ class WorkBench(object):
         commit_list = []
         if repo is None:
             #if it does not exist make a new one
+            cloning = True
             repo = repository.Repository(repository_key=repo_name)
             self.put_repository(repo)
-        else: 
+        else:
+            cloning = False
             # If we have a current version - get the list of commits
             commit_list = self.list_repository_commits(repo)
 
@@ -289,6 +291,11 @@ class WorkBench(object):
 
             ex_msg = re.msg_content
             msg_headers = re.msg_headers
+
+            if cloning:
+                # Clear the repository that was created for the clone
+                self.clear_repository(repo)
+                del repo
 
             if ex_msg.MessageResponseCode == ex_msg.ResponseCodes.NOT_FOUND:
 
@@ -351,7 +358,7 @@ class WorkBench(object):
 
         repo = self.get_repository(request.repository_key)
         if not repo:
-            raise WorkBenchError('Repository Key "%s" not found' % request.repo_head.repositorykey, request.ResponseCodes.NOT_FOUND)
+            raise WorkBenchError('Repository Key "%s" not found' % request.repository_key, request.ResponseCodes.NOT_FOUND)
 
         if repo.status != repo.UPTODATE:
             raise WorkBenchError('Invalid pull request. Requested Repository is in an invalid state.', request.ResponseCodes.BAD_REQUEST)

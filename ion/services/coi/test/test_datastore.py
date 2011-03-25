@@ -149,6 +149,10 @@ class DataStoreTest(IonTestCase):
         self.assertEqual(is_there,True)
 
 
+    def test_pull_invalid(self):
+
+        self.failUnlessFailure(self.wb1.workbench.pull('datastore', 'foobar'), workbench.WorkBenchError)
+
 
     @defer.inlineCallbacks
     def test_push_clear_pull(self):

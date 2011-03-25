@@ -175,11 +175,11 @@ class ResourceClient(object):
                                       \n type: %s \nvalue: %s''' % (type(resource_id), str(resource_id)))
 
             # Pull the repository
-        result = yield self.workbench.pull(self.datastore_service, reference)
-
-        if result.MessageResponseCode == result.ResponseCodes.NOT_FOUND:
-            raise ResourceClientError('Pull from datastore failed in resource client! Resource Not Found!')
-            #elif :
+        try:
+            result = yield self.workbench.pull(self.datastore_service, reference)
+        except workbench.WorkBenchError, ex:
+            log.warn(ex)
+            raise ResourceClientError('Could not pull the requested resource from the datastore. Workbench exception: \n %s' % ex)
 
         # Get the repository
         repo = self.workbench.get_repository(reference)

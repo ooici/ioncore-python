@@ -25,7 +25,7 @@ from ion.services.coi.resource_registry_beta.resource_registry import ResourceRe
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 from ion.test.iontest import IonTestCase
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE_TYPES, ION_IDENTITIES, ID_CFG, PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE_TYPES, ION_IDENTITIES, ID_CFG, PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, NAME_CFG
 
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -251,7 +251,12 @@ class ResourceClientTest(IonTestCase):
             defer.returnValue(True)
         
         self.fail('This test should raise an exception and return in the except!')
-        
+
+    def test_get_invalid(self):
+
+        self.failUnlessFailure(self.rc.get_instance('foobar'), ResourceClientError)
+
+
         
     @defer.inlineCallbacks
     def test_merge_update(self):
@@ -324,7 +329,8 @@ class ResourceClientTest(IonTestCase):
         for key, value in defaults.items():
 
             resource = yield self.rc.get_instance(value[ID_CFG])
-            print resource
+            self.assertEqual(resource.ResourceName, value[NAME_CFG])
+            #print resource
             
 
 
