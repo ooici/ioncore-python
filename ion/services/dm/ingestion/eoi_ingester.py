@@ -315,6 +315,7 @@ class EOIIngestionClient(ServiceClient):
         a custom timeout for the ingest service (since it may take much longer than the
         default timeout to complete an ingest)
         """
+        log.debug('-[]- Entered EOIIngestionClient.perform_ingest()')
         # Ensure a Process instance exists to send messages FROM...
         #   ...if not, this will spawn a new default instance.
         yield self._check_init()
