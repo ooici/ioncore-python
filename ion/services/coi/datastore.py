@@ -125,7 +125,6 @@ class DataStoreWorkbench(WorkBench):
 
             blob = columns[VALUE]
             wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-            assert key == wse.key, 'Calculated key does not match the stored key!'
             repo.index_hash[key] = wse
 
             if columns[BRANCH_NAME]:
@@ -282,6 +281,53 @@ class DataStoreWorkbench(WorkBench):
                 if repo.status == repo.MODIFIED:
                     raise DataStoreWorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', request.ResponseCodes.BAD_REQUEST)
                 repo_keys = set(self.list_repository_blobs(repo))
+
+            # Get the latest commits in the repository
+            q = Query()
+            q.add_predicate_eq(REPOSITORY_KEY, repostate.repository_key)
+
+            rows = yield self._commit_store.query(q)
+    
+            for key, columns in rows.items():
+
+                blob = columns[VALUE]
+                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                if wse.key in repo._commit_index.keys():
+                    # No thanks, he's already got one!
+                    continue
+
+                repo.index_hash[key] = wse
+
+                if columns[BRANCH_NAME]:
+                    # If this appears to be a head commit
+
+                    # Deal with the possibility that more than one branch points to the same commit
+                    branch_names = columns[BRANCH_NAME].split(',')
+
+                    for name in branch_names:
+
+                        for branch in repo.branches:
+                            # if the branch already exists in the new_head just add a commitref
+                            if branch.branchkey == name:
+                                link = branch.commitrefs.add()
+                                #  Link is set below...
+                                break
+                        else:
+                            # If not add a new branch
+                            branch = repo._dotgit.branches.add()
+                            branch.branchkey = name
+                            link = branch.commitrefs.add()
+                            # Link is set below...
+
+                        cref = repo._load_element(wse)
+                        repo._commit_index[cref.MyId]=cref
+                        cref.ReadOnly = True
+
+                        link.SetLink(cref)
+
+            # Now the repo is up to date on the data store side...
+
+
 
             # add a new entry in the new_commits dictionary to store the commits of the push for this repo
             new_commits[repo.repository_key] = []
