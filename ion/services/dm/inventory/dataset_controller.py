@@ -63,7 +63,7 @@ message QueryResult{
       _ID = 22;
       _VERSION = 1;
     }
-    repeated net.ooici.core.link.CASRef idref = 1;
+    repeated net.ooici.core.link.CASRef idrefs = 1;
 }
 """
 
@@ -140,11 +140,7 @@ class DatasetController(ServiceProcess):
 
         # Set a response code in the message envelope
         response.MessageResponseCode = response.ResponseCodes.OK
-
-        print response
         
-
-
         # The following line shows how to reply to a message
         yield self.reply_ok(msg, response)
 
@@ -182,7 +178,7 @@ class DatasetController(ServiceProcess):
 
 
         for item in self.dataset_dict.values():
-            link = response.idref.add()
+            link = response.idrefs.add()
             link.SetLink(item)
 
         self.reply_ok(msg, response)

@@ -114,5 +114,4 @@ class AssociationServiceTest(IonTestCase):
 
         result = yield self.asc.get_subjects(request)
 
-        print 'RESULT:',result
-        print 'ROOT_USER_ID:', ROOT_USER_ID
+        self.assertEqual(result.idrefs[0].key, ROOT_USER_ID)

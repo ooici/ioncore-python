@@ -60,17 +60,3 @@ class DateSetControllerTest(IonTestCase):
         log.info('Create returned resource reference:\n%s' % str(create_response_msg))
         
 
-    @defer.inlineCallbacks
-    def test_hello_dataset(self):
-
-        # Create a hello object client
-        dscc = DatasetControllerClient(proc=self.test_sup)
-
-        # Creating a new dataset is takes input - it is creating blank resource to be filled by ingestion
-        create_request_msg = yield self.mc.create_instance(None)
-
-        # You can send the root of the object or any linked composite part of it.
-        create_response_msg = yield dscc.create_dataset_resource(create_request_msg)
-
-        log.info('Create returned resource reference:\n%s' % str(create_response_msg))
-

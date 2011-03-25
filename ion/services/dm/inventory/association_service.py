@@ -16,7 +16,7 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory, Process, ProcessClient
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY, BRANCH_NAME
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY, BRANCH_NAME, SUBJECT_KEY, SUBJECT_COMMIT, SUBJECT_BRANCH
 
 from ion.core.data import store
 
@@ -91,16 +91,11 @@ class AssociationService(ServiceProcess):
 
             rows = yield self.index_store.query(q)
 
-            print 'PK', pair.predicate.key
-            print 'OK', pair.object.key
-
-
-            print 'ROWS',rows
             pair_subjects = set()
-            for row in rows:
+            for key, row in rows.items():
 
                 # Invert the index so we can find the associations by subject repository & key
-                totalkey = (row['subject_repository'] , row['subject_branch'])
+                totalkey = (row[SUBJECT_KEY] , row[SUBJECT_BRANCH])
 
                 # Check to make sure we did not hit an inconsistent state where there appear to be two head commits on the association!
                 pair_subjects.add(totalkey)
@@ -117,10 +112,14 @@ class AssociationService(ServiceProcess):
         list_of_subjects = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
 
         for subject in subjects:
-            idref = list_of_subjects.add()
-            idref.key = subject[0]
-            idref.branch = subject[1]
 
+            link = list_of_subjects.idrefs.add()
+
+            idref= list_of_subjects.CreateObject(IDREF_TYPE)
+            idref.key = subject[0]
+            idref.commit = subject[1]
+
+            link.SetLink(idref)
 
         yield self.reply_ok(msg, list_of_subjects)
 
