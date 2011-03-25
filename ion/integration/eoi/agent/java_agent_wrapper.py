@@ -345,7 +345,7 @@ class JavaAgentWrapper(ServiceProcess):
             3) The Dataset Agent performs the update assimilating data into CDM/CF compliant form,
                pushes that data to the Resource Registry, and returns the new DatasetID. 
         '''
-        log.info("<<<---@@@ Service received operation 'update_request'.  Delegating to underlying dataset agent...")
+        log.info("<<<---@@@ Service received operation 'update_request'.  Grabbing update context and Delegating to underlying dataset agent...")
         if not hasattr(content, 'MessageType') or content.MessageType != CHANGE_EVENT_TYPE:
             raise TypeError('The given content must be an instance or a wrapped instance %s.  Given: %s' % (repr(CHANGE_EVENT_TYPE), type(content)))
         
@@ -363,12 +363,13 @@ class JavaAgentWrapper(ServiceProcess):
             self.__ingest_client = EOIIngestionClient()
         
         ingest_topic      = self.agent_spawn_args[1][6] # @todo: the ingest should tell us which topic, not the other way around
-        ready_routing_key = self.receiver.name
+        reply_to = self.receiver.name
         ingest_timeout    = context.max_ingest_millis
         
-        log.debug('\n\ntopic:\t"%s"\nready_key:\t"%s"\ntimeout:/t%i' % (ingest_topic, ready_routing_key, ingest_timeout))
-        
-        perform_ingest_deferred = self.__ingest_client.perform_ingest(ingest_topic, ready_routing_key, ingest_timeout)
+#        log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (content.dataset_id, reply_to, ingest_timeout))
+#        perform_ingest_deferred = self.__ingest_client.perform_ingest(content.dataset_id, reply_to, ingest_timeout)
+        log.debug('\n\ntopic:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (ingest_topic, reply_to, ingest_timeout))
+        perform_ingest_deferred = self.__ingest_client.perform_ingest(ingest_topic, reply_to, ingest_timeout)
         
         # Step 4: When the deferred comes back, tell the Dataset Agent instance to send data messages to the Ingest Service
         # @note: This deferred is called by when the ingest invokes op_ingest_ready()
@@ -665,7 +666,7 @@ from ion.integration.eoi.agent.java_agent_wrapper import JavaAgentWrapperClient 
 client = jawc()
 spawn("ion.integration.eoi.agent.java_agent_wrapper")
 
-client.request_update(dataset1, datasource1)
+client.request_update(sample_profile_dataset, sample_profile_datasource)
 
 
 #----------------------------#
@@ -684,7 +685,7 @@ spawn('java_agent_wrapper')
 spawn('eoi_ingest')
 client = jawc()
 
-client.request_update(dataset1, datasource1)
+client.request_update(sample_profile_dataset, sample_profile_datasource)
 
 '''
 

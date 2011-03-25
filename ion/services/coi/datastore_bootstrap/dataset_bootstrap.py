@@ -311,6 +311,7 @@ def bootstrap_data_source_resource(datasource):
     datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
     # datasource.dataset_url = *not used*
     # datasource.ncml_mask = *not used*
+    datasource.max_ingest_millis = 6000
 
 
 def _create_string_attribute(dataset, name, values):
