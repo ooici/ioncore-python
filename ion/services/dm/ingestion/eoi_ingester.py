@@ -50,7 +50,7 @@ person_type = object_utils.create_type_identifier(object_id=20001, version=1)
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
 addressbook_type = object_utils.create_type_identifier(object_id=20002, version=1)
 
-BEGIN_INGEST_TYPE           = object_utils.create_type_identifier(object_id=2002, version=1)
+PERFORM_INGEST_TYPE           = object_utils.create_type_identifier(object_id=2002, version=1)
 CREATE_DATASET_TOPICS_TYPE  = object_utils.create_type_identifier(object_id=2003, version=1)
 INGESTION_READY_TYPE        = object_utils.create_type_identifier(object_id=2004, version=1)
 
@@ -155,12 +155,13 @@ class EOIIngestionService(ServiceProcess):
     def op_perform_ingest(self, content, headers, msg):
         """
         Start the ingestion process by setting up neccessary
+        @TODO NO MORE MAGNET.TOPIC
         """
         log.info('<<<---@@@ Incoming perform_ingest request with "Perform Ingest" message')
         log.debug("...Content:\t" + str(content))
 
         # TODO: replace this from the msg itself with just dataset id
-        ingest_data_topic = content.ds_ingest_topic
+        ingest_data_topic = content.dataset_id
 
         # TODO: validate ingest_data_topic
         valid = self._ingest_data_topic_valid(ingest_data_topic)
@@ -181,13 +182,12 @@ class EOIIngestionService(ServiceProcess):
         log.info('Setting up ingest timeout with value: %i' % content.ingest_service_timeout)
         timeoutcb = reactor.callLater(content.ingest_service_timeout, _timeout)
 
-        log.info('Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.ready_routing_key)
+        log.info('Notifying caller that ingest is ready by invoking op_ingest_ready() using routing key: "%s"' % content.reply_to)
         irmsg = yield self.mc.create_instance(INGESTION_READY_TYPE)
         irmsg.xp_name = "magnet.topic"
         irmsg.publish_topic = ingest_data_topic
 
-        self.send(content.ready_routing_key, operation='ingest_ready', content=irmsg)
-        #yield self.rpc_send(content.ready_routing_key, operation='ingest_ready', content=True)
+        self.send(content.reply_to, operation='ingest_ready', content=irmsg)
 
         log.info("Yielding in op_perform_ingest for receive loop to complete")
         ingest_res = yield self._defer_ingest    # wait for other commands to finish the actual ingestion
@@ -307,7 +307,7 @@ class EOIIngestionClient(ServiceClient):
         
         
     @defer.inlineCallbacks
-    def perform_ingest(self, ds_ingest_topic, ready_routing_key, ingest_service_timeout):
+    def perform_ingest(self, dataset_id, reply_to, ingest_service_timeout):
         """
         Start the ingest process by passing the Service a topic to communicate on, a
         routing key for intermediate replies (signaling that the ingest is ready), and
@@ -318,11 +318,11 @@ class EOIIngestionClient(ServiceClient):
         #   ...if not, this will spawn a new default instance.
         yield self._check_init()
         
-        # Create the BeginIngestMessage
-        begin_msg = yield self.mc.create_instance(BEGIN_INGEST_TYPE)
-        begin_msg.ds_ingest_topic        = ds_ingest_topic
-        begin_msg.ready_routing_key       = ready_routing_key
-        begin_msg.ingest_service_timeout = ingest_service_timeout
+        # Create the PerformIngestMessage
+        begin_msg = yield self.mc.create_instance(PERFORM_INGEST_TYPE)
+        begin_msg.dataset_id                = dataset_id
+        begin_msg.reply_to                  = reply_to
+        begin_msg.ingest_service_timeout    = ingest_service_timeout
 
         # Invoke [op_]() on the target service 'dispatcher_svc' via RPC
         log.info("@@@--->>> Sending 'perform_ingest' RPC message to eoi_ingest service")
