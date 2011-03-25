@@ -64,14 +64,14 @@ class AssociationServiceTest(IonTestCase):
 
         id_type = yield self.rc.get_instance(IDENTITY_RESOURCE_TYPE_ID)
 
-        has_a = yield self.rc.proc.workbench.pull(self.rc.datastore_service, HAS_A_ID)
+        yield self.rc.proc.workbench.pull(self.rc.datastore_service, HAS_A_ID)
+        has_a = self.rc.proc.workbench.get_repository(HAS_A_ID)
+        has_a.checkout('master')
 
         root_user = yield  self.rc.get_instance(ROOT_USER_ID)
 
-
         assoc = self.rc.create_association(root_user, has_a, id_type)
 
-        print 'ASSOC STATUS', assoc.status
 
         yield self.rc.proc.workbench.push(self.rc.datastore_service, assoc)
 
@@ -109,6 +109,7 @@ class AssociationServiceTest(IonTestCase):
         idref.key = IDENTITY_RESOURCE_TYPE_ID
 
         pair.object = idref
+
 
 
         result = yield self.asc.get_subjects(request)

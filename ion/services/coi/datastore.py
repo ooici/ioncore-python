@@ -378,8 +378,6 @@ class DataStoreWorkbench(WorkBench):
             for cref in repo.current_heads():
                 head_keys.append( cref.MyId )
 
-            print 'HEAD KEYS', head_keys
-
             for key in commit_keys:
 
                 # Set the repository name for the commit
@@ -394,16 +392,12 @@ class DataStoreWorkbench(WorkBench):
                     element = repo.index_hash.get(key)
                     cref = repo._load_element(element)
 
-                print 'THIS KEY:', key
-
-
                 link = cref.GetLink('objectroot')
                 # Extract the GPB Message for comparison with type objects!
                 root_type = link.type.GPBMessage
 
 
                 if root_type == ASSOCIATION_TYPE:
-                    print 'Associatoin', cref.objectroot
 
                     attributes[SUBJECT_KEY] = cref.objectroot.subject.key
                     attributes[SUBJECT_BRANCH] = cref.objectroot.subject.branch
@@ -453,10 +447,6 @@ class DataStoreWorkbench(WorkBench):
 
 
                     new_head_list.append({'key':key, 'value':wse.serialize(), 'index_attributes':attributes})
-
-                if root_type == ASSOCIATION_TYPE:
-
-                    print 'Attributes', attributes
 
             # Get the current head list
             q = Query()
