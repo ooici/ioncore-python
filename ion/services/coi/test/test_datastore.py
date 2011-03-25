@@ -9,14 +9,11 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.util.itv_decorator import itv
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 
 from ion.test.iontest import IonTestCase
 
-from net.ooici.play import addressbook_pb2
-from ion.util import procutils as pu
 from ion.core.object import object_utils
 
 from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS

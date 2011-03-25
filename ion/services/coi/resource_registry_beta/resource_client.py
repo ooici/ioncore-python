@@ -240,6 +240,7 @@ class ResourceClient(object):
 
         # @TODO Now what - what should we do with the association? Stash it in the workbench?
 
+        """
         # For now - put a reference to it in the resource instance
         if isinstance(subject, ResourceInstance):
             subject._associations.append(association)
@@ -251,7 +252,8 @@ class ResourceClient(object):
             object._associations.append(association)
 
         # No return val - don't touch the associations in the process!
-
+        """
+        return association
 
 
     def reference_instance(self, instance, current_state=False):

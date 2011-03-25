@@ -16,17 +16,21 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory, Process, ProcessClient
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 
-from ion.core.messaging.message_client import MessageClient
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, PREDICATE_KEY, OBJECT_KEY, BRANCH_NAME
+
+from ion.core.data import store
+
 from ion.core.object import object_utils
 
-from ion.core.data import index_store_service
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
 
 ### Need other objects here
 
 IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 SUBJECT_PREDICATE_QUERY_TYPE = object_utils.create_type_identifier(object_id=16, version=1)
-PREDICATE_OBJECT_QUERY_TYPE = object_utils.create_type_identifier(object_id=24, version=1)
+PREDICATE_OBJECT_QUERY_TYPE = object_utils.create_type_identifier(object_id=15, version=1)
 QUERY_RESULT_TYPE = object_utils.create_type_identifier(object_id=22, version=1)
 
 class AssociationServiceError(ApplicationError):
@@ -45,12 +49,19 @@ class AssociationService(ServiceProcess):
                                              version='0.1.0',
                                              dependencies=[])
 
-    COMMIT_STORE = 'commit_store_class'
-
+    @defer.inlineCallbacks
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
 
-        self.COMMIT_STORE = index_store_service.IndexStoreServiceClient(proc=self)
+        #index_store_class_name = self.spawn_args.get(COMMIT_CACHE, CONF.getValue(COMMIT_CACHE, default='ion.core.data.store.IndexStore'))
+        index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.index_store_service.IndexStoreServiceClient'))
+
+        index_store_class = pu.get_class(index_store_class_name)
+        assert store.IIndexStore.implementedBy(index_store_class), \
+            'The back end class for the index store passed to the association service does not implement the required IIndexStore interface.'
+
+
+        self.index_store = yield defer.maybeDeferred(index_store_class, self, **{'indices':COMMIT_INDEXED_COLUMNS})
 
         log.info('SLC_INIT Association Service')
 
@@ -68,20 +79,19 @@ class AssociationService(ServiceProcess):
 
         for pair in predicate_object_query.pairs:
 
+
+            q = store.Query()
             # Get only the latest version !
-            query_attributes_gt={'repository_branch':''}
+            q.add_predicate_gt(BRANCH_NAME,'')
 
             # Get only associations to the correct branch & key for the subject and object
-            query_attributes_eq={}
-            query_attributes_eq['predicate_repository']=pair.subject.key
-            query_attributes_eq['predicate_branch']=pair.subject.branch
+            q.add_predicate_eq(PREDICATE_KEY, pair.predicate.key)
 
-            query_attributes_eq['object_repository']=pair.object.key
-            query_attributes_eq['object_branch']=pair.object.branch
+            q.add_predicate_eq(OBJECT_KEY, pair.object.key)
 
-            rows = self.COMMIT_STORE.query(indexed_attributes_eq=query_attributes_eq,
-                                           indexed_attributes_gt=query_attributes_gt)
+            rows = yield self.index_store.query(q)
 
+            print 'ROWS',rows
             pair_subjects = set()
             for row in rows:
 
@@ -98,7 +108,7 @@ class AssociationService(ServiceProcess):
             else:
                 subjects.intersection_update(pair_subjects)
 
-        log.info('Found %n subjects!' % len(subjects))
+        log.info('Found %s subjects!' % len(subjects))
 
         list_of_subjects = yield self.message_client.create_instance(QUERY_RESULT_TYPE)
 

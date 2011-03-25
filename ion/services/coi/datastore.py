@@ -37,7 +37,7 @@ from ion.core.data.storage_configuration_utility import SUBJECT_KEY, SUBJECT_BRA
 from ion.core.data.storage_configuration_utility import PREDICATE_KEY, PREDICATE_BRANCH, PREDICATE_COMMIT
 from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT
 
-from ion.core.data.storage_configuration_utility import KEYWORD, VALUE
+from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE
 
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
@@ -387,11 +387,20 @@ class DataStoreWorkbench(WorkBench):
 
                 cref = repo._commit_index.get(key)
 
+                # it may not have been loaded during the update process - if not load it now.
+                if not cref:
+                    element = repo.index_hash.get(key)
+                    cref = repo._load_element(element)
+
+
                 link = cref.GetLink('objectroot')
-                root_type = link.type
+                # Extract the GPB Message for comparison with type objects!
+                root_type = link.type.GPBMessage
 
 
                 if root_type == ASSOCIATION_TYPE:
+                    print 'Associatoin', cref.objectroot
+
                     attributes[SUBJECT_KEY] = cref.objectroot.subject.key
                     attributes[SUBJECT_BRANCH] = cref.objectroot.subject.branch
                     attributes[SUBJECT_COMMIT] = cref.objectroot.subject.commit
@@ -403,6 +412,13 @@ class DataStoreWorkbench(WorkBench):
                     attributes[OBJECT_KEY] = cref.objectroot.object.key
                     attributes[OBJECT_BRANCH] = cref.objectroot.object.branch
                     attributes[OBJECT_COMMIT] = cref.objectroot.object.commit
+
+                elif root_type == RESOURCE_TYPE:
+
+
+                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.type.object_id
+                    attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
+
 
                 elif  root_type == TERMINOLOGY_TYPE:
                     attributes[KEYWORD] = cref.objectroot.word
@@ -433,6 +449,10 @@ class DataStoreWorkbench(WorkBench):
 
 
                     new_head_list.append({'key':key, 'value':wse.serialize(), 'index_attributes':attributes})
+
+                if root_type == ASSOCIATION_TYPE:
+
+                    print 'Attributes', attributes
 
             # Get the current head list
             q = Query()
@@ -591,6 +611,13 @@ class DataStoreWorkbench(WorkBench):
                     attributes[OBJECT_KEY] = cref.objectroot.object.key
                     attributes[OBJECT_BRANCH] = cref.objectroot.object.branch
                     attributes[OBJECT_COMMIT] = cref.objectroot.object.commit
+
+                elif root_type == RESOURCE_TYPE:
+
+
+                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.type.object_id
+                    attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
+
 
                 elif  root_type == TERMINOLOGY_TYPE:
                     attributes[KEYWORD] = cref.objectroot.word
