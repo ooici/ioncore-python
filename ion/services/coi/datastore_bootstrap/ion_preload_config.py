@@ -88,9 +88,7 @@ has_a_name = 'has_a'
 is_a_name = 'is_a'
 type_of_name = 'type_of'
 owned_by_name = 'owned_by'
-# specialized predicates
-topic_for_name = 'topic_for'
-has_source_name = 'has_source'
+has_life_cycle_state_name = 'has_life_cycle_state'
 
 TERMINOLOGY_TYPE = create_type_identifier(object_id=14, version=1)
 
@@ -112,13 +110,10 @@ owned_by_name:{ID_CFG:'734CE3E6-90ED-4642-AD46-7C2E67BDA798',
             TYPE_CFG:TERMINOLOGY_TYPE,
             PREDICATE_CFG:owned_by_name},
 
-topic_for_name:{ID_CFG:'ffe5c79e-58b5-493b-b409-0280c86ba0c7',
+has_life_cycle_state_name:{ID_CFG:'ffe5c79e-58b5-493b-b409-0280c86ba0c7',
             TYPE_CFG:TERMINOLOGY_TYPE,
-            PREDICATE_CFG:topic_for_name},
+            PREDICATE_CFG:has_life_cycle_state_name},
 
-has_source_name:{ID_CFG:'709a3879-0831-4e72-af77-3016ad9153af',
-            TYPE_CFG:TERMINOLOGY_TYPE,
-            PREDICATE_CFG:has_source_name},
 }
 
 
@@ -128,6 +123,7 @@ IS_A_ID = ION_PREDICATES[is_a_name][ID_CFG]
 TYPE_OF_ID = ION_PREDICATES[type_of_name][ID_CFG]
 OWNED_BY_ID = ION_PREDICATES[owned_by_name][ID_CFG]
 
+HAS_LIFE_CYCLE_STATE_ID = ION_PREDICATES[has_life_cycle_state_name][ID_CFG]
 
 
 ##### Define Identities #####:

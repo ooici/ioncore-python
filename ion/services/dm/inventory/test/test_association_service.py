@@ -23,7 +23,7 @@ from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, 
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 # Pick three to test existence
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID
 
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
@@ -60,26 +60,31 @@ class AssociationServiceTest(IonTestCase):
         self.sup = yield self._spawn_processes(self.services)
 
         # The resource client will make its own process
-        self.rc = ResourceClient()
+        self.proc = Process()
+        self.proc.op_fetch_blobs = self.proc.workbench.op_fetch_blobs
+        yield self.proc.spawn()
 
-        id_type = yield self.rc.get_instance(IDENTITY_RESOURCE_TYPE_ID)
+        yield self.proc.workbench.pull('datastore', IDENTITY_RESOURCE_TYPE_ID)
+        id_type = self.proc.workbench.get_repository(IDENTITY_RESOURCE_TYPE_ID)
+        id_type.checkout('master')
 
-        yield self.rc.proc.workbench.pull(self.rc.datastore_service, HAS_A_ID)
-        has_a = self.rc.proc.workbench.get_repository(HAS_A_ID)
-        has_a.checkout('master')
+        yield self.proc.workbench.pull('datastore', TYPE_OF_ID)
+        type_of = self.proc.workbench.get_repository(TYPE_OF_ID)
+        type_of.checkout('master')
 
-        root_user = yield  self.rc.get_instance(ROOT_USER_ID)
+        yield self.proc.workbench.pull('datastore', ROOT_USER_ID)
+        root_user = self.proc.workbench.get_repository(ROOT_USER_ID)
+        root_user.checkout('master')
 
-        assoc = self.rc.create_association(root_user, has_a, id_type)
+
+        assoc = self.proc.workbench.create_association(root_user, type_of, id_type)
 
 
-        yield self.rc.proc.workbench.push(self.rc.datastore_service, assoc)
+        yield self.proc.workbench.push('datastore', assoc)
 
 
         # run the tests in a completely separate process.
-        self.proc = Process()
-        yield self.proc.spawn()
-        self.asc = AssociationServiceClient(proc=self.proc)
+        self.asc = AssociationServiceClient()
 
 
 
@@ -99,7 +104,7 @@ class AssociationServiceTest(IonTestCase):
 
         # Set the predicate search term
         idref = request.CreateObject(IDREF_TYPE)
-        idref.key = HAS_A_ID
+        idref.key = TYPE_OF_ID
 
         pair.predicate = idref
 

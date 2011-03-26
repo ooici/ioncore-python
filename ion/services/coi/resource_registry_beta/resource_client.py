@@ -99,7 +99,9 @@ class ResourceClient(object):
         @param description is a string describing the resource
         @retval resource is a ResourceInstance object
 
+        @TODO Change the create method to take a Resource Type ID - change RR to look up object type!
         @TODO pull the associations that go with this resource
+
         """
         yield self._check_init()
 
@@ -574,6 +576,8 @@ class ResourceInstance(object):
         """
         @brief Returns the resource type - A type identifier object - not the wrapped object.
         """
+        # Resource type should be a Resource Identifier - UUID defined in preload_config and stored in the Resource Registry
+
         return self.Resource.type.GPBMessage
 
     def _set_life_cycle_state(self, state):
