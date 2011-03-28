@@ -465,6 +465,18 @@ class PubSubService(ServiceProcess):
         log.debug('Starting DP')
         self._check_msg_type(request, PUBLISHER_TYPE)
 
+        # Already declared?
+        try:
+            key = self._reverse_find(self.pub_list, request.publisher_name)
+            log.info('Publisher "%s" already created, returning' % request.publisher_name)
+            response = yield self.mc.create_instance(IDLIST_TYPE)
+            self._key_to_idref(key, response)
+            yield self.reply_ok(msg, response)
+            return
+        except KeyError:
+            log.debug('XS not found, will go ahead and create')
+
+
         # Verify that IDs exist - not sure if this is the correct order or not...
         try:
             xs_name = self.xs_list[request.exchange_space_id.key]
@@ -553,13 +565,6 @@ class PubSubService(ServiceProcess):
             log.exception('Error looking up subscription context!')
             raise PSSException('Bad subscription request, cannot locate context',
                                request.ResponseCodes.BAD_REQUEST)
-
-
-        # Hmm, is EMS gonna return a string queue name/address or what?
-        # Assume a string for now.
-        # We return a resource ref, which then must be looked up. Hmm. Change
-        # to string return?
-        # @todo Declare queue and binding??!
 
         # Save into registry
         log.debug('Saving subscription into registry')
