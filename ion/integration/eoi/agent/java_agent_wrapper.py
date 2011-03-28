@@ -636,7 +636,7 @@ class JavaAgentWrapperClient(ServiceClient):
         log.info("@@@--->>> Client sending 'update_request' message to java_agent_wrapper service")
 
 #        (content, headers, msg) = yield self.send('update_request', change_event)
-        yield self.rpc_send('update_request', change_event)
+        yield self.rpc_send('update_request', change_event, timeout=100)
         
         defer.returnValue(None)
         
