@@ -21,6 +21,7 @@ from ion.core import ioninit
 from ion.core.cc.shell import control
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, PRELOAD_CFG, ION_DATASETS_CFG
+#from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, SAMPLE_TRAJ_DATASET_ID, SAMPLE_STATION_DATASET_ID, PRELOAD_CFG, ION_DATASETS_CFG
 
 # --- CC Application interface
 
@@ -35,6 +36,10 @@ def start(container, starttype, app_definition, *args, **kwargs):
 
         # Run script to create data objects
         data_resources = {'sample_profile_dataset':SAMPLE_PROFILE_DATASET_ID, 'sample_profile_datasource':SAMPLE_PROFILE_DATA_SOURCE_ID}
+#        data_resources = {'sample_profile_dataset':SAMPLE_PROFILE_DATASET_ID,
+#                          'sample_profile_datasource':SAMPLE_PROFILE_DATA_SOURCE_ID,
+#                          'sample_traj_dataset':SAMPLE_TRAJ_DATASET_ID,
+#                          'sample_station_dataset':SAMPLE_STATION_DATASET_ID}
         
         ### Rather than print the data_resources object - how do we add it to locals?
         ### I can't find the control object for the shell from here?
