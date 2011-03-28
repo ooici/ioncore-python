@@ -223,4 +223,13 @@ def generate_reference_instance(proc=None, resource_id=None):
     #@ TODO Complete this method... Should be about ten lines.
     
 
+def create_type_map():
+    type_map={}
+
+    for type_name, description in ION_RESOURCE_TYPES.items():
+        type_cfg = description.get(CONTENT_CFG)
+        obj_type_id = type_cfg.get('object_identifier')
+        type_map[obj_type_id] = description.get(ID_CFG)
+
+    return type_map
 

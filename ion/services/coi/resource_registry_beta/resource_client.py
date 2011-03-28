@@ -26,6 +26,7 @@ from ion.core.object import workbench
 from ion.core.object import repository
 
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
+from ion.services.coi.datastore_bootstrap import ion_preload_config
 
 from google.protobuf import message
 from google.protobuf.internal import containers
@@ -33,9 +34,9 @@ from ion.core.object import gpb_wrapper
 from ion.core.object import object_utils
 
 
-resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
-resource_type = object_utils.create_type_identifier(object_id=1102, version=1)
-idref_Type = object_utils.create_type_identifier(object_id=4, version=1)
+RESOURCE_DESCRIPTION_TYPE = object_utils.create_type_identifier(object_id=1101, version=1)
+RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
+IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 CONF = ioninit.config(__name__)
 
@@ -51,6 +52,13 @@ class ResourceClient(object):
     instances. The resource instance provides the interface for working with resources.
     The client helps create and manage resource instances.
     """
+
+    # The type_map is a map from object type to resource type built from the ion_preload_configs
+    # this is a temporary device until the resource registry is fully architecturally operational.
+    type_map = ion_preload_config.create_type_map()
+
+
+
 
     def __init__(self, proc=None, datastore_service='datastore'):
         """
@@ -75,6 +83,8 @@ class ResourceClient(object):
         # What about the name of the index services to use?
 
         self.registry_client = ResourceRegistryClient(proc=self.proc)
+
+        print 'TYPE_MAP:',self.type_map
 
 
     @defer.inlineCallbacks
@@ -106,7 +116,7 @@ class ResourceClient(object):
         yield self._check_init()
 
         # Create a sendable resource object
-        description_repository = self.workbench.create_repository(resource_description_type)
+        description_repository = self.workbench.create_repository(RESOURCE_DESCRIPTION_TYPE)
 
         resource_description = description_repository.root_object
 
@@ -116,6 +126,18 @@ class ResourceClient(object):
 
         # This is breaking some abstractions - using the GPB directly...
         resource_description.type.GPBMessage.CopyFrom(type_id)
+
+        # Set the resource type - keep the object type above for now...
+        res_type = description_repository.create_object(IDREF_TYPE)
+        print 'TYPE_ID',type_id
+        print 'Mapped_type'
+
+        res_type.key = self.type_map.get(type_id.object_id)
+
+        resource_description.resource_type = res_type
+
+
+        print "RESOURCE DESC:", resource_description
 
         # Use the registry client to make a new resource
         result = yield self.registry_client.register_resource_instance(resource_description)
@@ -159,7 +181,7 @@ class ResourceClient(object):
         commit = None
 
         # Get the type of the argument and act accordingly
-        if hasattr(resource_id, 'ObjectType') and resource_id.ObjectType == idref_Type:
+        if hasattr(resource_id, 'ObjectType') and resource_id.ObjectType == IDREF_TYPE:
             # If it is a resource reference, unpack it.
             if resource_id.branch:
                 branch = resource_id.branch
@@ -332,7 +354,7 @@ class ResourceInstanceType(type):
             raise ResourceInstanceError(
                 'ResourceInstance init Repository argument is in an invalid state - checkout first!')
 
-        if resource_repository.root_object.ObjectType != resource_type:
+        if resource_repository.root_object.ObjectType != RESOURCE_TYPE:
             raise ResourceInstanceError('ResourceInstance init Repository is not a resource object!')
 
         resource_obj = resource_repository.root_object.resource_object
@@ -440,7 +462,7 @@ class ResourceInstance(object):
 
     def _set_resource_object(self, value):
         repo = self._repository
-        if value.ObjectType != self.ResourceType:
+        if value.ObjectType != self.ResourceObjectType:
             raise ResourceInstanceError('Can not change the type of a resource object!')
         repo._workspace_root.resource_object = value
 
@@ -508,7 +530,7 @@ class ResourceInstance(object):
 
         merge_branches = []
         for update in args:
-            if update.ObjectType != self.ResourceType:
+            if update.ObjectType != self.ResourceObjectType:
                 log.debug('Resource Type does not match update Type')
                 log.debug('Update type %s; Resource type %s' % (str(update.ObjectType), str(self.ResourceType)))
                 raise ResourceInstanceError(
@@ -572,13 +594,23 @@ class ResourceInstance(object):
         return str(self.Resource.identity)
 
     @property
-    def ResourceType(self):
+    def ResourceObjectType(self):
         """
         @brief Returns the resource type - A type identifier object - not the wrapped object.
         """
         # Resource type should be a Resource Identifier - UUID defined in preload_config and stored in the Resource Registry
 
-        return self.Resource.type.GPBMessage
+        return self.Resource.object_type.GPBMessage
+
+    @property
+    def ResourceTypeID(self):
+        """
+        @brief Returns the resource type identifier - the idref for the resource type instance.
+        """
+        # Resource type should be a Resource Identifier - UUID defined in preload_config and stored in the Resource Registry
+
+        return self.Resource.resource_type
+
 
     def _set_life_cycle_state(self, state):
         """
