@@ -150,7 +150,7 @@ anonymous_name:{ID_CFG:'a3d5d4a0-7265-4ef2-b0ad-3ce2dc7252d8',
                                        'life_cycle_state':''}
                         },
 
-root_name:{ID_CFG:'a3d5d4a0-7265-4ef2-b0ad-3ce2dc7252d8',
+root_name:{ID_CFG:'e15cadea-4605-4afd-af80-8fc3bc54d2a3',
                           TYPE_CFG:identity_type,
                           NAME_CFG:root_name,
                           DESCRIPTION_CFG:'The root user is the super administrator.',
@@ -190,7 +190,7 @@ profile_dataset_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F1',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_profile_dataset
                       },
 
-profile_data_source_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F1',
+profile_data_source_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F2',
                       TYPE_CFG:DATASOURCE_TYPE,
                       NAME_CFG:profile_data_source_name,
                       DESCRIPTION_CFG:'An example of a data source for the profile dataset',

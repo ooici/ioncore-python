@@ -37,7 +37,7 @@ from ion.core.data.storage_configuration_utility import SUBJECT_KEY, SUBJECT_BRA
 from ion.core.data.storage_configuration_utility import PREDICATE_KEY, PREDICATE_BRANCH, PREDICATE_COMMIT
 from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT
 
-from ion.core.data.storage_configuration_utility import KEYWORD, VALUE
+from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE
 
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
@@ -58,6 +58,11 @@ ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 TERMINOLOGY_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
 
 RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
+
+class DataStoreWorkBenchError(WorkBenchError):
+    """
+    An Exception class for errors in the data store workbench
+    """
 
 
 class DataStoreWorkbench(WorkBench):
@@ -92,7 +97,7 @@ class DataStoreWorkbench(WorkBench):
         log.info('op_pull!')
 
         if not hasattr(request, 'MessageType') or request.MessageType != PULL_MESSAGE_TYPE:
-            raise WorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+            raise DataStoreWorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
 
         repo = self.get_repository(request.repository_key)
@@ -111,6 +116,10 @@ class DataStoreWorkbench(WorkBench):
         q.add_predicate_eq(REPOSITORY_KEY, request.repository_key)
 
         rows = yield self._commit_store.query(q)
+
+        if len(rows) == 0:
+            raise DataStoreWorkBenchError('Repository Key "%s" not found in Datastore' % request.repository_key, request.ResponseCodes.NOT_FOUND)
+
 
         for key, columns in rows.items():
 
@@ -172,7 +181,7 @@ class DataStoreWorkbench(WorkBench):
         for commit_key in puller_needs:
             commit_element = repo.index_hash.get(commit_key)
             if commit_element is None:
-                raise WorkBenchError('Repository commit object not found in op_pull', request.ResponseCodes.NOT_FOUND)
+                raise DataStoreWorkBenchError('Repository commit object not found in op_pull', request.ResponseCodes.NOT_FOUND)
             link = response.commit_elements.add()
             obj = response.Repository._wrap_message_object(commit_element._element)
             link.SetLink(obj)
@@ -196,8 +205,7 @@ class DataStoreWorkbench(WorkBench):
                 for link in links_to_get:
                     # Short cut if we have already got it!
                     wse = repo.index_hash.get(link.key)
-                    print "Getting link:",link
-                    print 'WSE: "%s"' % str(wse)
+                    
                     if wse:
                         blobs[wse.key]=wse
                         # get the object
@@ -252,7 +260,7 @@ class DataStoreWorkbench(WorkBench):
         log.info('op_push!')
 
         if not hasattr(pushmsg, 'MessageType') or pushmsg.MessageType != PUSH_MESSAGE_TYPE:
-            raise WorkBenchError('Invalid push request. Bad Message Type!', pushmsg.ResponseCodes.BAD_REQUEST)
+            raise DataStoreWorkBenchError('Invalid push request. Bad Message Type!', pushmsg.ResponseCodes.BAD_REQUEST)
 
         # A dictionary of the new commits received in the push - sorted by repository
         new_commits={}
@@ -272,7 +280,7 @@ class DataStoreWorkbench(WorkBench):
             else:
 
                 if repo.status == repo.MODIFIED:
-                    raise WorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', request.ResponseCodes.BAD_REQUEST)
+                    raise DataStoreWorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', request.ResponseCodes.BAD_REQUEST)
                 repo_keys = set(self.list_repository_blobs(repo))
 
             # add a new entry in the new_commits dictionary to store the commits of the push for this repo
@@ -321,7 +329,7 @@ class DataStoreWorkbench(WorkBench):
                 except ReceivedError, re:
 
                    log.debug('ReceivedError', str(re))
-                   raise WorkBenchError('Fetch Objects returned an exception! "%s"' % re.msg_content)
+                   raise DataStoreWorkBenchError('Fetch Objects returned an exception! "%s"' % re.msg_content)
 
 
                 for se in blobs_msg.blob_elements:
@@ -388,11 +396,18 @@ class DataStoreWorkbench(WorkBench):
 
                 cref = repo._commit_index.get(key)
 
+                # it may not have been loaded during the update process - if not load it now.
+                if not cref:
+                    element = repo.index_hash.get(key)
+                    cref = repo._load_element(element)
+
                 link = cref.GetLink('objectroot')
-                root_type = link.type
+                # Extract the GPB Message for comparison with type objects!
+                root_type = link.type.GPBMessage
 
 
                 if root_type == ASSOCIATION_TYPE:
+
                     attributes[SUBJECT_KEY] = cref.objectroot.subject.key
                     attributes[SUBJECT_BRANCH] = cref.objectroot.subject.branch
                     attributes[SUBJECT_COMMIT] = cref.objectroot.subject.commit
@@ -404,6 +419,13 @@ class DataStoreWorkbench(WorkBench):
                     attributes[OBJECT_KEY] = cref.objectroot.object.key
                     attributes[OBJECT_BRANCH] = cref.objectroot.object.branch
                     attributes[OBJECT_COMMIT] = cref.objectroot.object.commit
+
+                elif root_type == RESOURCE_TYPE:
+
+
+                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.type.object_id
+                    attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
+
 
                 elif  root_type == TERMINOLOGY_TYPE:
                     attributes[KEYWORD] = cref.objectroot.word
@@ -492,7 +514,7 @@ class DataStoreWorkbench(WorkBench):
         log.info('op_fetch_blobs')
 
         if not hasattr(request, 'MessageType') or request.MessageType != BLOBS_REQUSET_MESSAGE_TYPE:
-            raise WorkBenchError('Invalid fetch objects request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+            raise DataStoreWorkBenchError('Invalid fetch objects request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
         response = yield self._process.message_client.create_instance(BLOBS_MESSAGE_TYPE)
 
@@ -515,7 +537,7 @@ class DataStoreWorkbench(WorkBench):
         for result, blob in res_list:
 
             if blob is None:
-                raise WorkBenchError('Invalid fetch objects request. Key Not Found!', request.ResponseCodes.NOT_FOUND)
+                raise DataStoreWorkBenchError('Invalid fetch objects request. Key Not Found!', request.ResponseCodes.NOT_FOUND)
 
             element = gpb_wrapper.StructureElement.parse_structure_element(blob)
             link = response.blob_elements.add()
@@ -593,6 +615,13 @@ class DataStoreWorkbench(WorkBench):
                     attributes[OBJECT_BRANCH] = cref.objectroot.object.branch
                     attributes[OBJECT_COMMIT] = cref.objectroot.object.commit
 
+                elif root_type == RESOURCE_TYPE:
+
+
+                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.type.object_id
+                    attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
+
+
                 elif  root_type == TERMINOLOGY_TYPE:
                     attributes[KEYWORD] = cref.objectroot.word
 
@@ -649,7 +678,7 @@ class DataStoreWorkbench(WorkBench):
 
 
 
-class DataStoreError(Exception):
+class DataStoreError(ApplicationError):
     """
     An exception class for the data store
     """
