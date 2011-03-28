@@ -184,12 +184,15 @@ class CassandraIndexedStore(CassandraStore):
         @param index_attributes The dictionary contains keys for the column name and the index value
         """
         if index_attributes is None:
-            index_attributes = {}
-        log.info("key: %s value: %s index_attributes %s" % (key,value,index_attributes))
+            index_cols = {}
+        else:
+            index_cols = dict(**index_attributes)
+            
+        log.info("key: %s value: %s index_attributes %s" % (key,value,index_cols))
         yield self._check_index(index_attributes)
-        index_attributes.update({"value":value, "has_key":"1"})
+        index_cols.update({"value":value, "has_key":"1"})
         log.info("Adding value to the row")
-        yield self.client.batch_insert(key, self._cache_name, index_attributes)
+        yield self.client.batch_insert(key, self._cache_name, index_cols)
 
     @defer.inlineCallbacks
     def update_index(self, key, index_attributes):
@@ -225,7 +228,7 @@ class CassandraIndexedStore(CassandraStore):
         defer.returnValue(None)
 
     @defer.inlineCallbacks    
-    def query(self, query_predicates):
+    def query(self, query_predicates, row_count=100):
         """
         Search for rows in the Cassandra instance.
     
@@ -251,8 +254,7 @@ class CassandraIndexedStore(CassandraStore):
         selection_predicates = map(fix_preds, predicates)
         log.info("selection_predicate %s " % (selection_predicates,))
 
-        rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicates)
-  
+        rows = yield self.client.get_indexed_slices(self._cache_name, selection_predicates, count=row_count)
         result ={}
         for row in rows:
             row_vals = {}
