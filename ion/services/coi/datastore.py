@@ -41,7 +41,7 @@ from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE
 
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG
 
 
@@ -731,8 +731,6 @@ class DataStoreService(ServiceProcess):
         self.preload.update(CONF.getValue(PRELOAD_CFG, default={}))
         self.preload.update(self.spawn_args.get(PRELOAD_CFG, {}))
 
-
-
         log.info('DataStoreService.__init__()')
         
 
@@ -852,9 +850,9 @@ class DataStoreService(ServiceProcess):
         # Name and Description is set by the resource client
         resource.name = description[NAME_CFG]
         resource.description = description[DESCRIPTION_CFG]
-
-        object_utils.set_type_from_obj(res_obj, description[TYPE_CFG])
-
+        
+        object_utils.set_type_from_obj(res_obj, resource.type)
+        
         # State is set to new by default
         resource.lcs = resource.LifeCycleState.NEW
 
@@ -869,8 +867,11 @@ class DataStoreService(ServiceProcess):
 
         elif isinstance(content, FunctionType):
             #execute the function on the resource_instance!
-            content(resource_instance)
-
+            kwargs = {}
+            if description.has_key(CONTENT_ARGS_CFG):
+                kwargs = description[CONTENT_ARGS_CFG]
+            content(resource_instance, self, **kwargs)
+            
 
         resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
 
