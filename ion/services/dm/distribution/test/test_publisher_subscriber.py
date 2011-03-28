@@ -284,9 +284,12 @@ class TestSubscriber(IonTestCase):
         args = [('xp_name','magnet.topic'),
                 ('process',proc)]
 
+        log.debug('This should fail')
         self.failUnlessFailure(sf.build(**dict([args[0]])), AssertionError)    # xp_name
+        log.debug('This should fail too')
         self.failUnlessFailure(sf.build(**dict([args[1]])), AssertionError)    # process
 
+        log.debug('this one should work')
         sub = yield sf.build(**dict(args))
         self.failUnlessIsInstance(sub, Subscriber)
         self.failUnless(sub._get_state() == BasicStates.S_ACTIVE)
@@ -295,6 +298,7 @@ class TestSubscriber(IonTestCase):
         # now lets make a factory where we can specify the xp_name and process as defaults
         sf2 = SubscriberFactory(**dict(args))
 
+        log.debug('this one should also work')
         sub2 = yield sf2.build()
 
         self.failUnlessIsInstance(sub2, Subscriber)
@@ -303,6 +307,7 @@ class TestSubscriber(IonTestCase):
         self.failUnless(sub2._process == proc)
 
         # use the same factory to override the default xp_name
+        log.debug('failure is not an option')
         sub3 = yield sf2.build(xp_name="afakeexchange")
 
         self.failUnlessIsInstance(sub3, Subscriber)

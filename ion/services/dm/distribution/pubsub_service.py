@@ -183,7 +183,19 @@ class PubSubService(ServiceProcess):
         log.debug('DXS starting')
         self._check_msg_type(request, XS_TYPE)
 
-        log.debug('Calling EMS to create the exchange space...')
+        # Already declared?
+        try:
+            key = self._reverse_find(self.xs_list, request.exchange_space_name)
+            log.info('Exchange space "%s" already created, returning' % request.exchange_space_name)
+            response = yield self.mc.create_instance(IDLIST_TYPE)
+            self._key_to_idref(key, response)
+            yield self.reply_ok(msg, response)
+            return
+        except KeyError:
+            log.debug('XS not found, will go ahead and create')
+
+        log.debug('Calling EMS to create the exchange space "%s"...'
+                % request.exchange_space_name)
         # For now, use timestamp as description
         description = str(time.time())
         xsid = yield self.ems.create_exchangespace(request.exchange_space_name, description)
@@ -264,6 +276,18 @@ class PubSubService(ServiceProcess):
 
         log.debug('Starting DXP')
         self._check_msg_type(request, XP_TYPE)
+
+        # Already declared?
+        try:
+            key = self._reverse_find(self.xp_list, request.exchange_point_name)
+            log.info('Exchange point "%s" already created, returning' %
+                     request.exchange_point_name)
+            response = yield self.mc.create_instance(IDLIST_TYPE)
+            self._key_to_idref(key, response)
+            yield self.reply_ok(msg, response)
+            return
+        except KeyError:
+            log.debug('XP not found, will go ahead and create')
 
         # Lookup the XS ID in the dictionary
         try:
@@ -348,6 +372,17 @@ class PubSubService(ServiceProcess):
         """
         log.debug('Declare topic starting')
         self._check_msg_type(request, TOPIC_TYPE)
+
+        # Already declared?
+        try:
+            key = self._reverse_find(self.topic_list, request.topic_name)
+            log.info('Topic "%s" already created, returning' % request.topic_name)
+            response = yield self.mc.create_instance(IDLIST_TYPE)
+            self._key_to_idref(key, response)
+            yield self.reply_ok(msg, response)
+            return
+        except KeyError:
+            log.debug('Topic not found, will go ahead and create')
 
         try:
             xs_name = self.xs_list[request.exchange_space_id.key]
