@@ -391,7 +391,8 @@ class JavaAgentWrapper(ServiceProcess):
         
         log.debug('Yielding until ingestion is complete on the ingestion services side...')
         yield perform_ingest_deferred
-        yield msg.ack()
+        res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
+        #yield msg.ack()
         log.info('**** Ingestion COMPLETE! ****')
         
 
@@ -635,7 +636,7 @@ class JavaAgentWrapperClient(ServiceClient):
         log.info("@@@--->>> Client sending 'update_request' message to java_agent_wrapper service")
 
 #        (content, headers, msg) = yield self.send('update_request', change_event)
-        yield self.send('update_request', change_event)
+        yield self.rpc_send('update_request', change_event)
         
         defer.returnValue(None)
         
