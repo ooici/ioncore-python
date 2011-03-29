@@ -25,6 +25,8 @@ from ion.services.coi.resource_registry_beta.resource_registry import ResourceRe
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 from ion.test.iontest import IonTestCase
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE_TYPES, ION_IDENTITIES, ID_CFG, PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, NAME_CFG, DEFAULT_RESOURCE_TYPE_ID
+
 
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -44,7 +46,7 @@ class ResourceClientTest(IonTestCase):
         #self.sup = yield self._start_core_services()
         services = [
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'servicename':'datastore'}},
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True}}},
             {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}}]
         sup = yield self._spawn_processes(services)
@@ -97,7 +99,10 @@ class ResourceClientTest(IonTestCase):
             
         resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
             
-        self.assertEqual(resource.ResourceType, addresslink_type)
+        self.assertEqual(resource.ResourceObjectType, addresslink_type)
+
+        # Address link is not a real resource - so the Type ID is a default type...
+        self.assertEqual(resource.ResourceTypeID.key, DEFAULT_RESOURCE_TYPE_ID)
             
             
         person = resource.CreateObject(person_type)
@@ -134,7 +139,52 @@ class ResourceClientTest(IonTestCase):
         my_resource._repository.log_commits('master')
             
         self.assertEqual(my_resource.person[0].name, 'David')
-        
+
+
+    @defer.inlineCallbacks
+    def test_bad_branch(self):
+
+        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
+
+        self.assertEqual(resource.ResourceObjectType, addresslink_type)
+
+
+        person = resource.CreateObject(person_type)
+        resource.person.add()
+        resource.person[0] = person
+
+        resource.owner = person
+
+        person.id=5
+        person.name='David'
+
+        self.assertEqual(resource.person[0].name, 'David')
+
+        yield self.rc.put_instance(resource, 'Testing write...')
+
+        res_ref = self.rc.reference_instance(resource)
+
+        # Spawn a completely separate resource client and see if we can retrieve the resource...
+        services = [
+            {'name':'my_process','module':'ion.core.process.process','class':'Process'}]
+
+        sup = yield self._spawn_processes(services)
+
+        child_ps1 = yield self.sup.get_child_id('my_process')
+        log.debug('Process ID:' + str(child_ps1))
+        proc_ps1 = self._get_procinstance(child_ps1)
+
+        my_rc = ResourceClient(proc=proc_ps1)
+
+        my_resource = yield my_rc.get_instance(res_ref)
+
+
+        res_ref.branch = 'foobar!'
+        # Fails
+        self.failUnlessFailure(my_rc.get_instance(res_ref),ResourceClientError)
+
+
+
         
     @defer.inlineCallbacks
     def test_version_resource(self):
@@ -205,7 +255,12 @@ class ResourceClientTest(IonTestCase):
             defer.returnValue(True)
         
         self.fail('This test should raise an exception and return in the except!')
-        
+
+    def test_get_invalid(self):
+
+        self.failUnlessFailure(self.rc.get_instance('foobar'), ResourceClientError)
+
+
         
     @defer.inlineCallbacks
     def test_merge_update(self):
@@ -265,4 +320,21 @@ class ResourceClientTest(IonTestCase):
         yield self.rc.put_instance(resource, resource.RESOLVED)
         
         resource.Repository.log_commits()
-    
+
+
+    @defer.inlineCallbacks
+    def test_checkout_defaults(self):
+
+        defaults={}
+        defaults.update(ION_RESOURCE_TYPES)
+        defaults.update(ION_IDENTITIES)
+        defaults.update(ION_DATASETS)
+
+        for key, value in defaults.items():
+
+            resource = yield self.rc.get_instance(value[ID_CFG])
+            self.assertEqual(resource.ResourceName, value[NAME_CFG])
+            #print resource
+            
+
+

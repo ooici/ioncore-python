@@ -12,7 +12,6 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.python import reflect
 
-from ion.services.coi import datastore
 
 from ion.core.object import gpb_wrapper
 
@@ -23,8 +22,8 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 import ion.util.procutils as pu
 
 from ion.core.object import object_utils
-resource_type = object_utils.create_type_identifier(object_id=1102, version=1)
-resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
+RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
+RESOURCE_DESCRIPTION_TYPE = object_utils.create_type_identifier(object_id=1101, version=1)
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -46,8 +45,8 @@ class ResourceRegistryService(ServiceProcess):
     declare = ServiceProcess.service_declare(name='resource_registry_2', version='0.1.0', dependencies=[])
 
     typeobject_type = object_utils.create_type_identifier(object_id=9, version=1)
-    resource_type = object_utils.create_type_identifier(object_id=1102, version=1)
-    resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
+    RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
+    RESOURCE_DESCRIPTION_TYPE = object_utils.create_type_identifier(object_id=1101, version=1)
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
@@ -76,7 +75,7 @@ class ResourceRegistryService(ServiceProcess):
         
         # Check that we got the correct kind of content!
         assert isinstance(content, gpb_wrapper.Wrapper)
-        assert content.ObjectType == self.resource_description_type
+        assert content.ObjectType == self.RESOURCE_DESCRIPTION_TYPE
         
        
         response = yield self._register_resource_instance(content)
@@ -91,7 +90,7 @@ class ResourceRegistryService(ServiceProcess):
         response = yield self.message_client.create_instance(MessageContentTypeID=None)
         
         # Create a new repository to hold this resource
-        resource_repository = self.workbench.create_repository(resource_type)
+        resource_repository = self.workbench.create_repository(RESOURCE_TYPE)
         resource = resource_repository.root_object
 
         # Set the identity of the resource
@@ -99,7 +98,7 @@ class ResourceRegistryService(ServiceProcess):
             
         # Create the new resource object
         try:
-            res_obj = resource_repository.create_object(resource_description.type)
+            res_obj = resource_repository.create_object(resource_description.object_type)
         except object_utils.ObjectUtilException, ex:
             raise ResourceRegistryError(ex, response.ResponseCodes.NOT_FOUND)
         # Set the object as the child of the resource
@@ -108,8 +107,13 @@ class ResourceRegistryService(ServiceProcess):
         # Name and Description is set by the resource client
         resource.name = resource_description.name
         resource.description = resource_description.description
-        
-        object_utils.set_type_from_obj(res_obj, resource.type)
+
+        # Set the object type
+        object_utils.set_type_from_obj(res_obj, resource.object_type)
+
+        # Set the resource type
+        resource.resource_type = resource_description.resource_type
+
         
         # State is set to new by default
         resource.lcs = resource.LifeCycleState.NEW
@@ -135,13 +139,13 @@ class ResourceRegistryService(ServiceProcess):
         """
         raise NotImplementedError, "Interface Method Not Implemented"
 
-    def op_register_resource_type(self,content, headers, msg):
+    def op_register_RESOURCE_TYPE(self,content, headers, msg):
         """
         Service operation: Create or update a resource definition with the registry.
         """
         raise NotImplementedError, "Interface Method Not Implemented"
 
-    def op_lookup_resource_type(self,content, headers, msg):
+    def op_lookup_RESOURCE_TYPE(self,content, headers, msg):
         """
         Service operation: Get a resource definition.
         """
@@ -171,16 +175,16 @@ class ResourceRegistryClient(ServiceClient):
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
-    def register_resource_instance(self,resource_type):
+    def register_resource_instance(self,RESOURCE_TYPE):
         """
         @brief Client method to Register a Resource Instance
         This method is used to generate a new resource instance of type
         Resource Type
-        @param resource_type
+        @param RESOURCE_TYPE
         """
         yield self._check_init()
         
-        content, headers, msg = yield self.rpc_send('register_resource_instance', resource_type)
+        content, headers, msg = yield self.rpc_send('register_resource_instance', RESOURCE_TYPE)
         
         log.info('Resource Registry Service reply with new resource ID: '+str(content))
         defer.returnValue(content)
@@ -196,7 +200,7 @@ class ResourceRegistryClient(ServiceClient):
         raise NotImplementedError, "Interface Method Not Implemented"
 
     #@defer.inlineCallbacks
-    def register_resource_type(self,resource):
+    def register_RESOURCE_TYPE(self,resource):
         """
         @brief Client method to register the definition of a Resource Type
         @param resource can be either an instance of a Resource Description or
@@ -213,7 +217,7 @@ class ResourceRegistryClient(ServiceClient):
         raise NotImplementedError, "Interface Method Not Implemented"
 
     #@defer.inlineCallbacks
-    def find_registered_resource_type(self, query):
+    def find_registered_RESOURCE_TYPE(self, query):
         """
         @brief find all registered resources which match the attributes of description
         @param query object

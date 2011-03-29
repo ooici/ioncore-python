@@ -25,7 +25,7 @@ from ion.test.iontest import IonTestCase
 from ion.core.data import store
 from ion.core.data import cassandra
 from ion.core.data import index_store_service
-
+from ion.core.data import store_service
 # Import the workbench and the Persistent Archive Resource Objects!
 from ion.core.object import workbench
 
@@ -35,6 +35,7 @@ from ion.core.data.store import Query
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
 from ion.util.itv_decorator import itv
+
 
 from ion.core.data.cassandra_bootstrap import CassandraStoreBootstrap, CassandraIndexedStoreBootstrap
 
@@ -128,6 +129,36 @@ class IStoreTest(unittest.TestCase):
         # Try to get the key we just deleted!
         has_key = yield self.ds.has_key(self.key)
         self.failUnlessEqual(has_key, False)
+
+
+class StoreServiceTest(IStoreTest, IonTestCase):
+
+
+    @defer.inlineCallbacks
+    def _setup_backend(self):
+        """
+        Start the service and setup the client to the backend for the test.
+        """
+
+        yield self._start_container()
+        self.timeout = 30
+        services = [
+            {'name':'store_service','module':'ion.core.data.store_service','class':'StoreService'},
+        ]
+        sup = yield self._spawn_processes(services)
+        client = store_service.StoreServiceClient(proc=sup)
+
+        defer.returnValue(client)
+
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        log.info("In tearDown")
+
+        yield self._shutdown_processes()
+        yield self._stop_container()
+
+
 
 
 

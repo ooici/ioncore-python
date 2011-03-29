@@ -345,50 +345,54 @@ class JavaAgentWrapper(ServiceProcess):
             3) The Dataset Agent performs the update assimilating data into CDM/CF compliant form,
                pushes that data to the Resource Registry, and returns the new DatasetID. 
         '''
-        log.info("<<<---@@@ Service received operation 'update_request'.  Delegating to underlying dataset agent...")
+        log.info("<<<---@@@ Service received operation 'update_request'.  Grabbing update context and Delegating to underlying dataset agent...")
         if not hasattr(content, 'MessageType') or content.MessageType != CHANGE_EVENT_TYPE:
-            raise TypeError('The given content must be an instance of or a wrapped instance of %s.  Given: %s' % (repr(CHANGE_EVENT_TYPE), type(content)))
+            raise TypeError('The given content must be an instance or a wrapped instance %s.  Given: %s' % (repr(CHANGE_EVENT_TYPE), type(content)))
         
         # Step 1: Grab the context for the given dataset ID
+        log.debug('Retrieving dataset update context via self._get_dataset_context()')
         try:
             context = yield self._get_dataset_context(content.dataset_id, content.data_source_id)
         except KeyError, ex:
             yield self.reply_err(msg, "Could not grab the current context for the dataset with id: " + str(content))
         
         # Step 2: Setup a deferred so that we can wait for the Ingest Service to respond before sending data messages
+        log.debug('Setting up ingest ready deferred...')
         self.__ingest_ready_deferred = defer.Deferred()
         
         # Step 3: Tell the Ingest Service to get ready for ingestion (create a new topic and await data messages)
+        log.debug('Tell the ingest to start the ingestion procedure via op_perform_ingest()..')
         if self.__ingest_client is None:
             self.__ingest_client = EOIIngestionClient()
         
-        ingest_topic      = 'ingest.topic.' + str(uuid.uuid1())
-        ready_routing_key = self.receiver.name
-        ingest_timeout    = context.max_ingest_millis # @todo: pull this from context (EoiDataContextMessage)
+        reply_to        = self.receiver.name
+        ingest_timeout  = context.max_ingest_millis
         
-        log.debug('\n\ntopic:\t"%s"\nready_key:\t"%s"\ntimeout:/t%i' % (ingest_topic, ready_routing_key, ingest_timeout))
-        
-        perform_ingest_deferred = self.__ingest_client.perform_ingest(ingest_topic, ready_routing_key, ingest_timeout)
+        log.debug('\n\ndataset_id:\t"%s"\nreply_to:\t"%s"\ntimeout:/t%i' % (content.dataset_id, reply_to, ingest_timeout))
+        perform_ingest_deferred = self.__ingest_client.perform_ingest(content.dataset_id, reply_to, ingest_timeout)
         
         # Step 4: When the deferred comes back, tell the Dataset Agent instance to send data messages to the Ingest Service
         # @note: This deferred is called by when the ingest invokes op_ingest_ready()
-        yield self.__ingest_ready_deferred
+        log.debug("Yielding on the ingest -- it'll callback when its ready to receive ingestion data")
+        irmsg = yield self.__ingest_ready_deferred
+        log.debug("Ingest is ready to receive data!")
+        context.xp_name = irmsg.xp_name
+        context.ingest_topic = irmsg.publish_topic
         
-        
-        yield  self.__ingest_client.demo(ingest_topic)
-#        log.info("@@@--->>> Sending update request to Dataset Agent with context...")
-#        log.debug("..." + str(context))
-#        (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=30)
-
+#        yield  self.__ingest_client.demo(ingest_topic)
+        log.info("@@@--->>> Sending update request to Dataset Agent with context...")
+        log.debug("..." + str(context))
+        (content, headers, msg1) = yield self.rpc_send(self.agent_binding, self.agent_update_op, context, timeout=30) # @attention: where should this timeout come from?
 
         
         # @todo: change reply based on response of the RPC send
         # yield self.reply_ok(msg, {"value":"Successfully dispatched update request"}, {})
 #        res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
         
-                  
+        log.debug('Yielding until ingestion is complete on the ingestion services side...')
         yield perform_ingest_deferred
-        yield msg.ack()
+        res = yield self.reply_ok(msg, {"value":"OOI DatasetID:" + str(content)}, {})
+        #yield msg.ack()
         log.info('**** Ingestion COMPLETE! ****')
         
 
@@ -396,9 +400,9 @@ class JavaAgentWrapper(ServiceProcess):
     def op_ingest_ready(self, content, headers, msg):
         '''
         '''
-        log.debug('entered op_ingest_ready()')
+        log.info('<<<---@@@ Incoming notification: Ingest is ready to receive data')
         if self.__ingest_ready_deferred is not None:
-            self.__ingest_ready_deferred.callback(True)
+            self.__ingest_ready_deferred.callback(content)
         
         yield msg.ack()
 
@@ -434,56 +438,38 @@ class JavaAgentWrapper(ServiceProcess):
         # @todo: this method will be reimplemented so that dataset contexts can be retrieved dynamically
         log.debug(" -[]- Entered _get_dataset_context(datasetID=%s, dataSourceID=%s); state=%s" % (datasetID, dataSourceID, str(self._get_state())))
         
-        
+        log.debug("  |--->  Retrieving dataset instance")
         dataset = yield self.rc.get_instance(datasetID)
+        log.debug("  |--->  Retrieving datasource instance")
         datasource = yield self.rc.get_instance(dataSourceID)
+        log.debug("  |--->  Creating EoiDataContext instance")
+        msg = yield self.mc.create_instance(DATA_CONTEXT_TYPE)
         
+        
+        # @SEE ion.play.hello_message.py for create message object instances
+        # @SEE use msg_instance.MessageObject.SOS (example of accessing GPB enum fields)
+        # Create an instance of the EoiDataContext message
 
-        if (True):
-#        if (datasetID in self.__dataset_context_dict):
-#            context_args = self.__dataset_context_dict[datasetID]
-            # @SEE ion.play.hello_message.py for create message object instances
-            # @SEE use msg_instance.MessageObject.SOS (example of accessing GPB enum fields)
-            
-            # Create an instance of the EoiDataContext message
-            msg = yield self.mc.create_instance(DATA_CONTEXT_TYPE)
-            
-            # Fill in values
-#            msg.source_type = msg.SourceType.SOS
-#            msg.start_time = '2008-08-01T00:00:00Z'
-#            msg.end_time = '2008-08-02T00:00:00Z'
-#
-#            msg.property.append('sea_water_temperature')
-#            msg.station_id.append('41012')
-#            
-#            msg.request_type = msg.RequestType.CTD
-#            msg.top = 0.0
-#            msg.bottom = 0.0
-#            msg.left = 0.0
-#            msg.right = 0.0
-#            msg.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
-#            msg.dataset_url = ''
-#            msg.ncml_mask = ''
-            msg.source_type = datasource.source_type
-            msg.start_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
-            msg.end_time = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
-            msg.property.extend(datasource.property)
-            msg.station_id.extend(datasource.station_id)
+        log.debug("Storing data in EoiDataContext fields")
+        msg.source_type = datasource.source_type
+        msg.start_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
+        msg.end_time = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
-            msg.request_type = datasource.request_type
-            msg.top = datasource.top
-            msg.bottom = datasource.bottom
-            msg.left = datasource.left
-            msg.right = datasource.right
-            msg.base_url = datasource.base_url
-            msg.dataset_url = datasource.dataset_url
-            msg.ncml_mask = datasource.ncml_mask
-            msg.max_ingest_millis = datasource.max_ingest_millis
-            
-            defer.returnValue(msg)
-        else:
-            raise KeyError("Invalid datasetID: %s" % (datasetID))
+        msg.property.extend(datasource.property)
+        msg.station_id.extend(datasource.station_id)
+
+        msg.request_type = datasource.request_type
+        msg.top = datasource.top
+        msg.bottom = datasource.bottom
+        msg.left = datasource.left
+        msg.right = datasource.right
+        msg.base_url = datasource.base_url
+        msg.dataset_url = datasource.dataset_url
+        msg.ncml_mask = datasource.ncml_mask
+        msg.max_ingest_millis = datasource.max_ingest_millis
+        
+        defer.returnValue(msg)
 
     @property
     def agent_phandle(self):
@@ -543,14 +529,18 @@ class JavaAgentWrapper(ServiceProcess):
         # @todo: Generate jar_pathname dynamically
         # jar_pathname = "/Users/tlarocque/Development/Java/Workspace_eclipse/EOI_dev/build/TryAgent.jar"   # STAR #
         jar_pathname = "res/apps/eoi_ds_agent/DatasetAgent.jar"   # STAR #
-        hostname = self.container.exchange_manager.message_space.connection.hostname
-        exchange = self.container.exchange_manager.exchange_space.name
-        wrapper = self.get_scoped_name("system", str(self.declare['name']))      # validate that 'system' is the correct scope
-        callback = "binding_key_callback"
+        
+        
+        parent_host_name = self.container.exchange_manager.message_space.connection.hostname
+        parent_xp_name = self.container.exchange_manager.exchange_space.name
+        parent_scoped_name = self.get_scoped_name("system", str(self.declare['name']))      # @todo: validate that 'system' is the correct scope
+        parent_callback_op = "binding_key_callback"
+
+
 
         # Do not return anything.  Store spawn arguments in __agent_spawn_args
         binary = "java"
-        args = ["-jar", jar_pathname, hostname, exchange, wrapper, callback]
+        args = ["-jar", jar_pathname, parent_host_name, parent_xp_name, parent_scoped_name, parent_callback_op]
         log.debug("Acquired external process's spawn arguments:  %s %s" % (binary, " ".join(args)))
         self.__agent_spawn_args = (binary, args)
     
@@ -644,9 +634,11 @@ class JavaAgentWrapperClient(ServiceClient):
         
         # Invoke [op_]update_request() on the target service 'java_agent_wrapper' via RPC
         log.info("@@@--->>> Client sending 'update_request' message to java_agent_wrapper service")
-        (content, headers, msg) = yield self.send('update_request', (change_event))
+
+#        (content, headers, msg) = yield self.send('update_request', change_event)
+        yield self.rpc_send('update_request', change_event, timeout=100)
         
-        defer.returnValue(str(content))
+        defer.returnValue(None)
         
         
     
@@ -680,7 +672,7 @@ from ion.integration.eoi.agent.java_agent_wrapper import JavaAgentWrapperClient 
 client = jawc()
 spawn("ion.integration.eoi.agent.java_agent_wrapper")
 
-client.request_update(dataset1, datasource1)
+client.request_update(sample_profile_dataset, sample_profile_datasource)
 
 
 #----------------------------#
@@ -699,7 +691,7 @@ spawn('java_agent_wrapper')
 spawn('eoi_ingest')
 client = jawc()
 
-client.request_update(dataset1, datasource1)
+client.request_update(sample_profile_dataset, sample_profile_datasource)
 
 '''
 

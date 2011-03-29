@@ -5,7 +5,6 @@
 @author David Stuebe
 @author Matt Rodriguez
 @TODO
-Deal with a commit that is the head of more than one branch!
 
 """
 
@@ -17,6 +16,10 @@ import ion.util.procutils as pu
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess
 from ion.core.exception import ReceivedError, ApplicationError
+
+from ion.services.coi.resource_registry_beta import resource_client
+
+from types import FunctionType
 
 from ion.core.object import object_utils
 from ion.core.object import gpb_wrapper, repository
@@ -34,7 +37,14 @@ from ion.core.data.storage_configuration_utility import SUBJECT_KEY, SUBJECT_BRA
 from ion.core.data.storage_configuration_utility import PREDICATE_KEY, PREDICATE_BRANCH, PREDICATE_COMMIT
 from ion.core.data.storage_configuration_utility import OBJECT_KEY, OBJECT_BRANCH, OBJECT_COMMIT
 
-from ion.core.data.storage_configuration_utility import KEYWORD, VALUE
+from ion.core.data.storage_configuration_utility import KEYWORD, VALUE, RESOURCE_OBJECT_TYPE, RESOURCE_LIFE_CYCLE_STATE
+
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -47,9 +57,14 @@ STRUCTURE_ELEMENT_TYPE = object_utils.create_type_identifier(object_id=1, versio
 
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 TERMINOLOGY_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
+IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
+RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
 
-# Set some constants based on the config file:
+class DataStoreWorkBenchError(WorkBenchError):
+    """
+    An Exception class for errors in the data store workbench
+    """
 
 
 class DataStoreWorkbench(WorkBench):
@@ -81,9 +96,10 @@ class DataStoreWorkbench(WorkBench):
         high heat... Not sure what to do.
         """
 
+        log.info('op_pull!')
 
         if not hasattr(request, 'MessageType') or request.MessageType != PULL_MESSAGE_TYPE:
-            raise WorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+            raise DataStoreWorkBenchError('Invalid pull request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
 
         repo = self.get_repository(request.repository_key)
@@ -103,32 +119,41 @@ class DataStoreWorkbench(WorkBench):
 
         rows = yield self._commit_store.query(q)
 
+        if len(rows) == 0:
+            raise DataStoreWorkBenchError('Repository Key "%s" not found in Datastore' % request.repository_key, request.ResponseCodes.NOT_FOUND)
+
+
         for key, columns in rows.items():
 
             blob = columns[VALUE]
             wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-            assert key == wse.key, 'Calculated key does not match the stored key!'
             repo.index_hash[key] = wse
 
             if columns[BRANCH_NAME]:
                 # If this appears to be a head commit
 
-                for branch in new_head.branches:
-                    # if the branch already exists in the new_head just add a commitref
-                    if branch.branchkey == columns[BRANCH_NAME]:
+                # Deal with the possiblity that more than one branch points to the same commit
+                branch_names = columns[BRANCH_NAME].split(',')
+
+
+                for name in branch_names:
+
+                    for branch in new_head.branches:
+                        # if the branch already exists in the new_head just add a commitref
+                        if branch.branchkey == name:
+                            link = branch.commitrefs.add()
+                            break
+                    else:
+                        # If not add a new branch
+                        branch = new_head.branches.add()
+                        branch.branchkey = name
                         link = branch.commitrefs.add()
-                        break
-                else:
-                    # If not add a new branch
-                    branch = new_head.branches.add()
-                    branch.branchkey = columns[BRANCH_NAME]
-                    link = branch.commitrefs.add()
 
-                cref = repo._load_element(wse)
-                repo._commit_index[cref.MyId]=cref
-                cref.ReadOnly = True
+                    cref = repo._load_element(wse)
+                    repo._commit_index[cref.MyId]=cref
+                    cref.ReadOnly = True
 
-                link.SetLink(cref)
+                    link.SetLink(cref)
 
                 # Check to make sure the mutable is upto date with the commits...
 
@@ -157,7 +182,7 @@ class DataStoreWorkbench(WorkBench):
         for commit_key in puller_needs:
             commit_element = repo.index_hash.get(commit_key)
             if commit_element is None:
-                raise WorkBenchError('Repository commit object not found in op_pull', request.ResponseCodes.NOT_FOUND)
+                raise DataStoreWorkBenchError('Repository commit object not found in op_pull', request.ResponseCodes.NOT_FOUND)
             link = response.commit_elements.add()
             obj = response.Repository._wrap_message_object(commit_element._element)
             link.SetLink(obj)
@@ -179,9 +204,9 @@ class DataStoreWorkbench(WorkBench):
                 def_list = []
                 #@TODO - put some error checking here so that we don't overflow due to a stupid request!
                 for link in links_to_get:
-
                     # Short cut if we have already got it!
                     wse = repo.index_hash.get(link.key)
+                    
                     if wse:
                         blobs[wse.key]=wse
                         # get the object
@@ -205,7 +230,7 @@ class DataStoreWorkbench(WorkBench):
                     repo.index_hash[wse.key] = wse
 
                     # load the object so we can find its children
-                    obj = repo.get_linked_object(link)
+                    obj = repo._load_element(wse)
 
                     new_links_to_get.update(obj.ChildLinks)
 
@@ -222,6 +247,7 @@ class DataStoreWorkbench(WorkBench):
 
         yield self._process.reply_ok(msg, content=response)
 
+        log.info('op_pull: Complete!')
 
 
 
@@ -235,7 +261,7 @@ class DataStoreWorkbench(WorkBench):
         log.info('op_push!')
 
         if not hasattr(pushmsg, 'MessageType') or pushmsg.MessageType != PUSH_MESSAGE_TYPE:
-            raise WorkBenchError('Invalid push request. Bad Message Type!', pushmsg.ResponseCodes.BAD_REQUEST)
+            raise DataStoreWorkBenchError('Invalid push request. Bad Message Type!', pushmsg.ResponseCodes.BAD_REQUEST)
 
         # A dictionary of the new commits received in the push - sorted by repository
         new_commits={}
@@ -255,8 +281,55 @@ class DataStoreWorkbench(WorkBench):
             else:
 
                 if repo.status == repo.MODIFIED:
-                    raise WorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', request.ResponseCodes.BAD_REQUEST)
+                    raise DataStoreWorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', request.ResponseCodes.BAD_REQUEST)
                 repo_keys = set(self.list_repository_blobs(repo))
+
+            # Get the latest commits in the repository
+            q = Query()
+            q.add_predicate_eq(REPOSITORY_KEY, repostate.repository_key)
+
+            rows = yield self._commit_store.query(q)
+    
+            for key, columns in rows.items():
+
+                blob = columns[VALUE]
+                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                if wse.key in repo._commit_index.keys():
+                    # No thanks, he's already got one!
+                    continue
+
+                repo.index_hash[key] = wse
+
+                if columns[BRANCH_NAME]:
+                    # If this appears to be a head commit
+
+                    # Deal with the possibility that more than one branch points to the same commit
+                    branch_names = columns[BRANCH_NAME].split(',')
+
+                    for name in branch_names:
+
+                        for branch in repo.branches:
+                            # if the branch already exists in the new_head just add a commitref
+                            if branch.branchkey == name:
+                                link = branch.commitrefs.add()
+                                #  Link is set below...
+                                break
+                        else:
+                            # If not add a new branch
+                            branch = repo._dotgit.branches.add()
+                            branch.branchkey = name
+                            link = branch.commitrefs.add()
+                            # Link is set below...
+
+                        cref = repo._load_element(wse)
+                        repo._commit_index[cref.MyId]=cref
+                        cref.ReadOnly = True
+
+                        link.SetLink(cref)
+
+            # Now the repo is up to date on the data store side...
+
+
 
             # add a new entry in the new_commits dictionary to store the commits of the push for this repo
             new_commits[repo.repository_key] = []
@@ -304,7 +377,7 @@ class DataStoreWorkbench(WorkBench):
                 except ReceivedError, re:
 
                    log.debug('ReceivedError', str(re))
-                   raise WorkBenchError('Fetch Objects returned an exception! "%s"' % re.msg_content)
+                   raise DataStoreWorkBenchError('Fetch Objects returned an exception! "%s"' % re.msg_content)
 
 
                 for se in blobs_msg.blob_elements:
@@ -351,9 +424,13 @@ class DataStoreWorkbench(WorkBench):
             repo = self.get_repository(repo_key)
 
             # any objects in the data structure that were transmitted have already
-            # been updated during fetch linked objects.
-
+            # been updated now it is time to set update the commits
             #
+
+            branch_names = []
+            for branch in repo.branches:
+                branch_names.append(branch.branchkey)
+
             head_keys = []
             for cref in repo.current_heads():
                 head_keys.append( cref.MyId )
@@ -367,11 +444,18 @@ class DataStoreWorkbench(WorkBench):
 
                 cref = repo._commit_index.get(key)
 
+                # it may not have been loaded during the update process - if not load it now.
+                if not cref:
+                    element = repo.index_hash.get(key)
+                    cref = repo._load_element(element)
+
                 link = cref.GetLink('objectroot')
-                root_type = link.type
+                # Extract the GPB Message for comparison with type objects!
+                root_type = link.type.GPBMessage
 
 
                 if root_type == ASSOCIATION_TYPE:
+
                     attributes[SUBJECT_KEY] = cref.objectroot.subject.key
                     attributes[SUBJECT_BRANCH] = cref.objectroot.subject.branch
                     attributes[SUBJECT_COMMIT] = cref.objectroot.subject.commit
@@ -383,6 +467,13 @@ class DataStoreWorkbench(WorkBench):
                     attributes[OBJECT_KEY] = cref.objectroot.object.key
                     attributes[OBJECT_BRANCH] = cref.objectroot.object.branch
                     attributes[OBJECT_COMMIT] = cref.objectroot.object.commit
+
+                elif root_type == RESOURCE_TYPE:
+
+
+                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
+                    attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
+
 
                 elif  root_type == TERMINOLOGY_TYPE:
                     attributes[KEYWORD] = cref.objectroot.word
@@ -404,14 +495,15 @@ class DataStoreWorkbench(WorkBench):
                     for branch in  repo.branches:
                         # If this is currently the head commit - set the branch name attribute
                         if cref in branch.commitrefs:
-                            # If this is currently the head commit - set
-                            attributes[BRANCH_NAME] = branch.branchkey
-                            break
+                            # If this is currently the head commit - set the branch name
+                            if attributes[BRANCH_NAME] == '':
+                                attributes[BRANCH_NAME] = branch.branchkey
+                            else:
+                                attributes[BRANCH_NAME] = ','.join([attributes[BRANCH_NAME],branch.branchkey])
+
 
 
                     new_head_list.append({'key':key, 'value':wse.serialize(), 'index_attributes':attributes})
-
-
 
             # Get the current head list
             q = Query()
@@ -420,10 +512,12 @@ class DataStoreWorkbench(WorkBench):
 
             rows = yield self._commit_store.query(q)
 
-            for key in rows.keys():
+            for key, columns in rows.items():
                 if key not in head_keys:
                     clear_head_list.append(key)
 
+                    # Any commit which is currently a head will have the correct branch names set.
+                    # Just delete the branch names for the ones that are no longer heads.
 
         yield defer.DeferredList(def_list)
         #@TODO - check the return vals?
@@ -431,7 +525,6 @@ class DataStoreWorkbench(WorkBench):
         def_list = []
         for new_head in new_head_list:
 
-            #print 'Setting New Head:', new_head
             def_list.append(self._commit_store.put(**new_head))
 
         yield defer.DeferredList(def_list)
@@ -447,7 +540,7 @@ class DataStoreWorkbench(WorkBench):
         #import pprint
         #print 'After update to heads'
         #pprint.pprint(self._commit_store.kvs)
-        
+
 
         response = yield self._process.message_client.create_instance(MessageContentTypeID=None)
         response.MessageResponseCode = response.ResponseCodes.OK
@@ -468,7 +561,7 @@ class DataStoreWorkbench(WorkBench):
         log.info('op_fetch_blobs')
 
         if not hasattr(request, 'MessageType') or request.MessageType != BLOBS_REQUSET_MESSAGE_TYPE:
-            raise WorkBenchError('Invalid fetch objects request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
+            raise DataStoreWorkBenchError('Invalid fetch objects request. Bad Message Type!', request.ResponseCodes.BAD_REQUEST)
 
         response = yield self._process.message_client.create_instance(BLOBS_MESSAGE_TYPE)
 
@@ -491,7 +584,7 @@ class DataStoreWorkbench(WorkBench):
         for result, blob in res_list:
 
             if blob is None:
-                raise WorkBenchError('Invalid fetch objects request. Key Not Found!', request.ResponseCodes.NOT_FOUND)
+                raise DataStoreWorkBenchError('Invalid fetch objects request. Key Not Found!', request.ResponseCodes.NOT_FOUND)
 
             element = gpb_wrapper.StructureElement.parse_structure_element(blob)
             link = response.blob_elements.add()
@@ -505,9 +598,137 @@ class DataStoreWorkbench(WorkBench):
 
         log.info('op_fetch_blobs: Complete!')
 
+    @defer.inlineCallbacks
+    def flush_initialization_to_backend(self):
+        """
+        Flush any repositories in the backend to the the workbench backend storage
+        """
+
+        # Put any blobs from the workbench
+        #@TODO - only put the blobs - not the commits or the heads...
+        def_list = []
+        for key, element in self._workbench_cache.items():
+
+            def_list.append(self._blob_store.put(key, element.serialize()))
+        yield defer.DeferredList(def_list)
+        # @TODO - check the results - for what?
 
 
-class DataStoreError(Exception):
+        # This is simpler than a push - all of these are guaranteed to be new objects!
+        # now put any new commits that are not at the head
+        def_list = []
+
+
+        for repo_key, repo in self._repos.items():
+
+            # any objects in the data structure that were transmitted have already
+            # been updated now it is time to set update the commits
+            #
+
+            commit_keys = repo._commit_index.keys()
+
+
+            branch_names = []
+            for branch in repo.branches:
+                branch_names.append(branch.branchkey)
+
+            head_keys = []
+            for cref in repo.current_heads():
+                head_keys.append( cref.MyId )
+
+            for key in commit_keys:
+
+                # Set the repository name for the commit
+                attributes = {REPOSITORY_KEY : str(repo_key)}
+                # Set a default branch name to empty
+                attributes[BRANCH_NAME] = ''
+
+                cref = repo._commit_index.get(key)
+
+                link = cref.GetLink('objectroot')
+                root_type = link.type.GPBMessage
+
+                if root_type == ASSOCIATION_TYPE:
+                    attributes[SUBJECT_KEY] = cref.objectroot.subject.key
+                    attributes[SUBJECT_BRANCH] = cref.objectroot.subject.branch
+                    attributes[SUBJECT_COMMIT] = cref.objectroot.subject.commit
+
+                    attributes[PREDICATE_KEY] = cref.objectroot.predicate.key
+                    attributes[PREDICATE_BRANCH] = cref.objectroot.predicate.branch
+                    attributes[PREDICATE_COMMIT] = cref.objectroot.predicate.commit
+
+                    attributes[OBJECT_KEY] = cref.objectroot.object.key
+                    attributes[OBJECT_BRANCH] = cref.objectroot.object.branch
+                    attributes[OBJECT_COMMIT] = cref.objectroot.object.commit
+
+                elif root_type == RESOURCE_TYPE:
+
+                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
+                    attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
+
+
+                elif  root_type == TERMINOLOGY_TYPE:
+                    attributes[KEYWORD] = cref.objectroot.word
+
+                # get the wrapped structure element to put in...
+                wse = self._workbench_cache.get(key)
+
+
+                if key not in head_keys:
+
+                    defd = self._commit_store.put(key = key,
+                                       value = wse.serialize(),
+                                       index_attributes = attributes)
+                    def_list.append(defd)
+
+                else:
+
+                    # We know it is a head - but we need to get the branch name again
+                    for branch in  repo.branches:
+                        # If this is currently the head commit - set the branch name attribute
+                        if cref in branch.commitrefs:
+                            # If this is currently the head commit - set the branch name
+                            if attributes[BRANCH_NAME] == '':
+                                attributes[BRANCH_NAME] = branch.branchkey
+                            else:
+                                attributes[BRANCH_NAME] = ','.join([attributes[BRANCH_NAME],branch.branchkey])
+
+
+                    # Now commit it!
+                    defd = self._commit_store.put(key = key,
+                                       value = wse.serialize(),
+                                       index_attributes = attributes)
+                    def_list.append(defd)
+
+        yield defer.DeferredList(def_list)
+
+        #import pprint
+        #print 'After update to heads'
+        #pprint.pprint(self._commit_store.kvs)
+
+
+        # Now clear the in memory workbench
+        self.clear_non_persistent()
+
+
+    @defer.inlineCallbacks
+    def test_existence(self,repo_key):
+        """
+        For use in initialization - test to see if the repository already exists in the backend
+        """
+
+        q = Query()
+        q.add_predicate_eq(REPOSITORY_KEY, repo_key)
+
+        rows = yield self._commit_store.query(q)
+
+        defer.returnValue(len(rows)>0)
+
+
+
+
+
+class DataStoreError(ApplicationError):
     """
     An exception class for the data store
     """
@@ -526,6 +747,12 @@ class DataStoreService(ServiceProcess):
                                              dependencies=[])
 
 
+    # The type_map is a map from object type to resource type built from the ion_preload_configs
+    # this is a temporary device until the resource registry is fully architecturally operational.
+    type_map = TypeMap()
+
+
+
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
         
@@ -536,6 +763,7 @@ class DataStoreService(ServiceProcess):
         self._backend_cls_names[BLOB_CACHE] = self.spawn_args.get(BLOB_CACHE, CONF.getValue(BLOB_CACHE, default='ion.core.data.store.Store'))
             
         self._backend_classes={}
+
 
         self._backend_classes[COMMIT_CACHE] = pu.get_class(self._backend_cls_names[COMMIT_CACHE])
         assert store.IIndexStore.implementedBy(self._backend_classes[COMMIT_CACHE]), \
@@ -548,7 +776,16 @@ class DataStoreService(ServiceProcess):
         # Declare some variables to hold the store instances
         self.c_store = None
         self.b_store = None
-            
+
+
+        # Get the arguments for preloading the datastore
+        self.preload = {ION_PREDICATES_CFG:True,
+                        ION_RESOURCE_TYPES_CFG:True,
+                        ION_IDENTITIES_CFG:True,
+                        ION_DATASETS_CFG:False,}
+
+        self.preload.update(CONF.getValue(PRELOAD_CFG, default={}))
+        self.preload.update(self.spawn_args.get(PRELOAD_CFG, {}))
 
         log.info('DataStoreService.__init__()')
         
@@ -565,11 +802,13 @@ class DataStoreService(ServiceProcess):
         if issubclass(self._backend_classes[BLOB_CACHE], cassandra.CassandraStore):
             raise NotImplementedError('Startup for cassandra store is not yet complete')
         else:
-            self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE])
-        
+            self.b_store = yield defer.maybeDeferred(self._backend_classes[BLOB_CACHE], self)
 
 
         self.workbench = DataStoreWorkbench(self, self.b_store, self.c_store)
+
+
+        yield self.initialize_datastore()
 
 
     #@defer.inlineCallbacks
@@ -582,8 +821,126 @@ class DataStoreService(ServiceProcess):
 
 
 
+    @defer.inlineCallbacks
+    def initialize_datastore(self):
+        """
+        This method is used to preload required content into the datastore
+        """
 
-        
+
+        if self.preload[ION_PREDICATES_CFG]:
+
+            log.info('Preloading Predicates')
+            for key, value in ION_PREDICATES.items():
+
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    self._create_predicate(value)
+
+
+        if self.preload[ION_RESOURCE_TYPES_CFG]:
+            log.info('Preloading Resource Types')
+
+            for key, value in ION_RESOURCE_TYPES.items():
+
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    self._create_resource(value)
+
+
+        if self.preload[ION_IDENTITIES_CFG]:
+            log.info('Preloading Identities')
+
+            for key, value in ION_IDENTITIES.items():
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    self._create_resource(value)
+
+        if self.preload[ION_DATASETS_CFG]:
+            log.info('Preloading Data')
+
+            for key, value in ION_DATASETS.items():
+                exists = yield self.workbench.test_existence(value[ID_CFG])
+                if not exists:
+                    self._create_resource(value)
+
+        yield self.workbench.flush_initialization_to_backend()
+
+
+
+    def _create_predicate(self,description):
+
+        predicate_type = description[TYPE_CFG]
+        predicate_key = description[ID_CFG]
+        predicate_word = description[PREDICATE_CFG]
+
+
+        predicate_repository = self.workbench.create_repository(root_type=predicate_type, repository_key=predicate_key)
+        predicate = predicate_repository.root_object
+        predicate.word = predicate_word
+
+        predicate_repository.commit('Predicate instantiated by datastore bootstrap')
+
+
+
+    def _create_resource(self, description):
+        """
+        Helper method to create resource objects during initialization
+        """
+
+        resource_key = description[ID_CFG]
+        # Create this resource with a constant ID from the config file
+        resource_repository = self.workbench.create_repository(root_type=RESOURCE_TYPE, repository_key=resource_key)
+        resource = resource_repository.root_object
+
+        assert resource_repository.repository_key == resource_key, 'Failure in repository creation!'
+        # Set the identity of the resource
+        resource.identity = resource_repository.repository_key
+
+        # Create the new resource object
+        res_obj = resource_repository.create_object(description[TYPE_CFG])
+
+        # Set the object as the child of the resource
+        resource.resource_object = res_obj
+
+        # Name and Description is set by the resource client
+        resource.name = description[NAME_CFG]
+        resource.description = description[DESCRIPTION_CFG]
+
+        # Set the type...
+        object_utils.set_type_from_obj(res_obj, resource.object_type)
+
+        res_type = resource_repository.create_object(IDREF_TYPE)
+        # Get the resource type if it exists - otherwise a default will be set!
+        res_type.key = self.type_map.get(description[TYPE_CFG].object_id)
+        resource.resource_type = res_type
+
+
+        # State is set to new by default
+        resource.lcs = resource.LifeCycleState.ACTIVE
+
+        resource_instance = resource_client.ResourceInstance(resource_repository)
+
+        # Set the content
+        content = description[CONTENT_CFG]
+        if isinstance(content, dict):
+            # If it is a dictionary, set the content of the resource
+            for k,v in content.items():
+                setattr(resource_instance,k,v)
+
+        elif isinstance(content, FunctionType):
+            #execute the function on the resource_instance!
+            kwargs = {}
+            if description.has_key(CONTENT_ARGS_CFG):
+                kwargs = description[CONTENT_ARGS_CFG]
+            content(resource_instance, self, **kwargs)
+            
+
+        resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
+
+        return resource_instance
+
+
 
 
 # Spawn of the process using the module name
