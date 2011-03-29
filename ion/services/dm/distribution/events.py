@@ -108,4 +108,87 @@ class EventPublisher(Publisher):
         msg = yield self.create_event(**kwargs)
         yield self.publish_event(msg, origin=origin)
 
+class ResourceLifecycleEventPublisher(EventPublisher):
+    """
+    Event Notification Publisher for Resource lifecycle events. Used as a concrete derived class, and as a base for
+    specializations such as ContainerLifecycleEvents and ProcessLifecycleEvents.
+
+    The "origin" parameter in this class' initializer should be the resource id (UUID).
+    """
+
+    msg_type = RESOURCE_LIFECYCLE_EVENT_MESSAGE_TYPE
+    event_id = RESOURCE_LIFECYCLE_EVENT_ID
+
+class ContainerLifecycleEventPublisher(ResourceLifecycleEventPublisher):
+    """
+    Event Notification Publisher for Container lifecycle events.
+
+    The "origin" parameter in this class' initializer should be the container name.
+    """
+    event_id = CONTAINER_LIFECYCLE_EVENT_ID
+
+class ProcessLifecycleEventPublisher(ResourceLifecycleEventPublisher):
+    """
+    Event Notification Publisher for Process lifecycle events.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name.
+    """
+    event_id = PROCESS_LIFECYCLE_EVENT_ID
+
+class TriggerEventPublisher(EventPublisher):
+    """
+    Base Publisher class for "triggered" Event Notifications.
+    """
+    msg_type = TRIGGER_EVENT_MESSAGE_TYPE
+
+class DatasourceUpdateEventPublisher(TriggerEventPublisher):
+    """
+    Event Notification Publisher for Datasource updates.
+
+    The "origin" parameter in this class' initializer should be the datasource resource id (UUID).
+    """
+    event_id = DATASOURCE_UPDATE_EVENT_ID
+
+class ResourceModifiedEventPublisher(EventPublisher):
+    """
+    Base Publisher class for resource modification Event Notifications. This is distinct from resource lifecycle state
+    Event Notifications.
+    """
+    msg_type = RESOURCE_MODIFICATION_EVENT_MESSAGE_TYPE
+
+class DatasetModificationEventPublisher(ResourceModifiedEventPublisher):
+    """
+    Event Notification Publisher for Dataset Modifications.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_id = DATASET_MODIFICATION_EVENT_ID
+
+class ScheduleEventPublisher(TriggerEventPublisher):
+    """
+    Event Notification Publisher for Scheduled events (ie from the Scheduler service).
+    """
+    event_id = SCHEDULE_EVENT_ID
+
+class LoggingEventPublisher(EventPublisher):
+    """
+    Base Publisher for logging Event Notifications.
+    """
+    msg_type = LOGGING_EVENT_MESSAGE_TYPE
+
+class CriticalLoggingEventPublisher(LoggingEventPublisher):
+    """
+    Event Notification Publisher for critical logging events.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    event_id = LOGGING_CRITICAL_EVENT_ID
+
+class ErrorLoggingEventPublisher(LoggingEventPublisher):
+    """
+    Event Notification Publisher for error logging events.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    event_id = LOGGING_ERROR_EVENT_ID
 
