@@ -114,8 +114,8 @@ class PubSubService(ServiceProcess):
 
     def _key_to_idref(self, key_string, object):
         """
-        From a CASref key, create a full-on casref.
-        @param key_string String, from casref key
+        From a CASref key, create a full-on casref and append into id_list array
+        @param key_string String, from casref key, e.g. 5A1E33DC-0B69-410F-B151-B7AC1D7E7C5D
         @param object Reply object we are modifying (in-place)
         @retval None
         """
@@ -140,6 +140,10 @@ class PubSubService(ServiceProcess):
         """
         @brief Query internal dictionaries, create reply message, send same. Helper for the
         various queries.
+        @param request Object containing a regex attribute
+        @param res_list Dictionary whose values we match against the regex
+        @param msg Ion message, with .reply_ok method to invoke
+        @retval None
         """
         # This is probably better written as a list comprehension. Or something.
         idlist = []
@@ -163,7 +167,7 @@ class PubSubService(ServiceProcess):
         """
         @brief Look for a given value in a provided dictionary, return key that corresponds.
         @note Probably a better way to solve this.
-        @note To emulate the python list, it raises KeyError if not found.
+        @note To emulate the python dictionary, it raises KeyError if not found.
         """
         rc = None
         if not search_value in data.values():
