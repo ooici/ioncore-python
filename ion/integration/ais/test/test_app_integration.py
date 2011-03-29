@@ -13,15 +13,16 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-#from ion.integration.r1integration_service import R1IntegrationServiceClient
-from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
+from ion.core.object import object_utils
 from ion.core.messaging.message_client import MessageClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
-from ion.services.coi.resource_registry_beta.resource_client import ResourceInstance
-from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
+from ion.core.exception import ReceivedApplicationError
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
+
+from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
+
 from ion.test.iontest import IonTestCase
 
-from ion.core.object import object_utils
+from ion.integration.ais.app_integration_service import AppIntegrationServiceClient
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, \
@@ -59,8 +60,12 @@ class AppIntegrationTest(IonTestCase):
         yield self._start_container()
         services = [
             {'name':'app_integration','module':'ion.integration.ais.app_integration_service','class':'AppIntegrationService'},
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
+                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS}},
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'servicename':'datastore'}},
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:False},
+                          COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}},
+            {'name':'association_service', 'module':'ion.services.dm.inventory.association_service', 'class':'AssociationService'},
             {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
             {'name':'identity_registry','module':'ion.services.coi.identity_registry','class':'IdentityRegistryService'}
@@ -70,8 +75,6 @@ class AppIntegrationTest(IonTestCase):
         self.sup = sup
 
         self.aisc = AppIntegrationServiceClient(proc=sup)
-        #self.aisc = R1IntegrationServiceClient(proc=sup)
-        #self.rc = ResourceClient(proc=sup)
         self.dsID = None
 
     @defer.inlineCallbacks
@@ -83,7 +86,6 @@ class AppIntegrationTest(IonTestCase):
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
-        rc = ResourceClient(proc=self.test_sup)
         
         # Use the message client to create a message object
         log.debug('DHE: AppIntegrationService! instantiating FindResourcesMsg.\n')
@@ -164,7 +166,6 @@ class AppIntegrationTest(IonTestCase):
 
         # Create a message client        
         mc = MessageClient(proc=self.test_sup)
-        rc = ResourceClient(proc=self.test_sup)
         
         log.debug('DHE: testing getDataResourceDetail')
 
@@ -194,7 +195,6 @@ class AppIntegrationTest(IonTestCase):
 
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
-        rc = ResourceClient(proc=self.test_sup)
         
         log.debug('DHE: testing createDownloadURL')
 
