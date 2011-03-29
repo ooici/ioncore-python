@@ -60,13 +60,17 @@ class Publisher(BasicLifecycleObject):
     def on_activate(self, *args, **kwargs):
         return self._recv.attach() # calls initialize/activate, gets receiver in correct state for publishing
 
-    def publish(self, data):
+    def publish(self, data, routing_key=None):
         """
         @brief Publish data on a specified resource id/topic
         @param data Data, OOI-format, protocol-buffer encoded
+        @param routing_key Routing key to publish data on. Normally the Publisher uses the routing key specified at construction time,
+                           but this param may be overriden here.
         @retval Deferred on send, not RPC
         """
-        kwargs = { 'recipient' : self._routing_key,
+        routing_key = routing_key or self._routing_key
+
+        kwargs = { 'recipient' : routing_key,
                    'content'   : data,
                    'headers'   : {},
                    'operation' : None } #,
