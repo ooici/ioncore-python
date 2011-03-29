@@ -185,24 +185,49 @@ class AppIntegrationServiceClient(ServiceClient):
         self.mc = MessageClient(proc)
         
     @defer.inlineCallbacks
-    def findDataResources(self, msg):
+    def findDataResources(self, message):
         yield self._check_init()
+        result = yield self.CheckRequest(message)
+        if result != None:
+            log.error('findDataResources: ' + result.error_str)
+            defer.returnValue(result)
         log.debug("AppIntegrationServiceClient: findDataResources(): sending msg to AppIntegrationService.")
-        (content, headers, payload) = yield self.rpc_send('findDataResources', msg)
+        (content, headers, payload) = yield self.rpc_send('findDataResources', message)
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def getDataResourceDetail(self, msg):
+    def getDataResourceDetail(self, message):
         yield self._check_init()
-        (content, headers, payload) = yield self.rpc_send('getDataResourceDetail', msg)
+        result = yield self.CheckRequest(message)
+        if result != None:
+            log.error('getDataResourceDetail: ' + result.error_str)
+            defer.returnValue(result)
+        log.debug("AppIntegrationServiceClient: getDataResourceDetail(): sending msg to AppIntegrationService.")
+        (content, headers, payload) = yield self.rpc_send('getDataResourceDetail', message)
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)
         
     @defer.inlineCallbacks
-    def createDownloadURL(self, msg):
+    def createDownloadURL(self, message):
         yield self._check_init()
-        (content, headers, payload) = yield self.rpc_send('createDownloadURL', msg)
+        result = yield self.CheckRequest(message)
+        if result != None:
+            defer.returnValue(result)
+        # check that ooi_id is present in GPB
+        if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
+            # build AIS error response
+            Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS error response')
+            Response.error_num = Response.ResponseCodes.BAD_REQUEST
+            Response.error_str = "Required field [user_ooi_id] not found in message"
+            log.error("Required field [user_ooi_id] not found in message")
+            defer.returnValue(Response)
+        log.debug("AppIntegrationServiceClient: createDownloadURL(): sending msg to AppIntegrationService.")
+        (content, headers, payload) = yield self.rpc_send_protected('createDownloadURL',
+                                                                    message,
+                                                                    message.message_parameters_reference.user_ooi_id,
+                                                                    "0")
+        (content, headers, payload) = yield self.rpc_send('createDownloadURL', message)
         log.info('Service reply: ' + str(content))
         defer.returnValue(content)
  
