@@ -525,7 +525,6 @@ class DataStoreWorkbench(WorkBench):
         def_list = []
         for new_head in new_head_list:
 
-            #print 'Setting New Head:', new_head
             def_list.append(self._commit_store.put(**new_head))
 
         yield defer.DeferredList(def_list)
@@ -702,6 +701,11 @@ class DataStoreWorkbench(WorkBench):
                     def_list.append(defd)
 
         yield defer.DeferredList(def_list)
+
+        #import pprint
+        #print 'After update to heads'
+        #pprint.pprint(self._commit_store.kvs)
+
 
         # Now clear the in memory workbench
         self.clear_non_persistent()
@@ -913,7 +917,7 @@ class DataStoreService(ServiceProcess):
 
 
         # State is set to new by default
-        resource.lcs = resource.LifeCycleState.NEW
+        resource.lcs = resource.LifeCycleState.ACTIVE
 
         resource_instance = resource_client.ResourceInstance(resource_repository)
 

@@ -35,7 +35,7 @@ SUBJECT_PREDICATE_QUERY_TYPE = object_utils.create_type_identifier(object_id=16,
 PREDICATE_OBJECT_QUERY_TYPE = object_utils.create_type_identifier(object_id=15, version=1)
 QUERY_RESULT_TYPE = object_utils.create_type_identifier(object_id=22, version=1)
 
-PredicateReference = object_utils.create_type_identifier(object_id=25, version=1)
+PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
 LifeCycleStateObject = object_utils.create_type_identifier(object_id=26, version=1)
 
@@ -97,7 +97,7 @@ class AssociationService(ServiceProcess):
             q.add_predicate_gt(BRANCH_NAME,'')
 
             # Build a query for the predicate of the search
-            if pair.predicate.ObjectType != PredicateReference:
+            if pair.predicate.ObjectType != PREDICATE_REFERENCE_TYPE:
                 raise AssociationServiceError('Invlalid predicate type in predicate object pairs request to get_subjects.', predicate_object_query.ResponseCodes.BAD_REQUEST)
 
 
@@ -115,7 +115,6 @@ class AssociationService(ServiceProcess):
                 continue
 
             elif pair.predicate.key == TYPE_OF_ID:
-                type_of_pair = pair
 
                 if not type_of_pair:
                     type_of_pair = pair
@@ -168,6 +167,7 @@ class AssociationService(ServiceProcess):
             if life_cycle_pair:
                 q.add_predicate_eq(RESOURCE_LIFE_CYCLE_STATE, life_cycle_pair.object.lcs)
 
+
             # Get all the results that meet the type / state query
             rows = yield self.index_store.query(q)
 
@@ -177,8 +177,6 @@ class AssociationService(ServiceProcess):
                 totalkey = (row[REPOSITORY_KEY] , row[BRANCH_NAME], key)
 
                 subjects.add(totalkey)
-
-
 
         elif len(subjects) > 0 and life_cycle_pair or type_of_pair:
             # Now apply search by type and state... if needed.
