@@ -136,9 +136,6 @@ class PublisherFactory(object):
         # Register does the PSC invocations
         yield pub.register(xp_name, topic_name, publisher_name, credentials)
 
-        # Begin pfh additions 3/24/11 - PSC integration
-        #yield _psc_setup(self, 'swapmeet', xp_name, routing_key, credentials)
-
         defer.returnValue(pub)
 
 # =================================================================================
@@ -255,6 +252,7 @@ class Subscriber(BasicLifecycleObject):
         self._credentials   = credentials
         self._process       = process
         self._subscriber_id = None
+        self._resource_id = None
 
         self._pubsub_client = PubSubClient(process=process)
 
@@ -289,10 +287,14 @@ class Subscriber(BasicLifecycleObject):
         yield self._recv.terminate()
 
     @defer.inlineCallbacks
+    def register(self):
+        yield _psc_setup_subscriber(self, xp_name=self._xp_name, binding_key=self._binding_key)
+
+    @defer.inlineCallbacks
     def subscribe(self):
         """
         """
-        # TODO: PSC interaction?
+        yield self.register()
         yield self._recv.attach()
 
     def unsubscribe(self):
@@ -395,8 +397,7 @@ class SubscriberFactory(object):
         if handler != None:
             sub.ondata = handler
 
-        yield _psc_setup_subscriber(self, xp_name=xp_name, binding_key=binding_key,
-                                    credentials=credentials)
+        yield sub.register()
 
         defer.returnValue(sub)
 
