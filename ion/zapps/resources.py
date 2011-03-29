@@ -20,8 +20,13 @@ from ion.core.pack import app_supervisor
 from ion.core import ioninit
 from ion.core.cc.shell import control
 
-from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, PRELOAD_CFG, ION_DATASETS_CFG
-#from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, SAMPLE_TRAJ_DATASET_ID, SAMPLE_STATION_DATASET_ID, PRELOAD_CFG, ION_DATASETS_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, CONTENT_ARGS_CFG, ID_CFG
+#from ion.services.coi.datastore_bootstrap.ion_preload_config import SAMPLE_PROFILE_DATASET_ID, SAMPLE_PROFILE_DATA_SOURCE_ID, \
+#                                                                    SAMPLE_TRAJ_DATASET_ID, SAMPLE_TRAJ_DATA_SOURCE_ID, \
+#                                                                    SAMPLE_STATION_DATASET_ID, SAMPLE_STATION_DATA_SOURCE_ID, \
+#                                                                    PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, CONTENT_ARGS_CFG, ID_CFG
+import os
+
 
 # --- CC Application interface
 
@@ -34,22 +39,35 @@ def start(container, starttype, app_definition, *args, **kwargs):
     # Check for command line argument to add some example data resources
     if ioninit.cont_args.get('register', None) == 'demodata':
 
-        # Run script to create data objects
-        data_resources = {'sample_profile_dataset':SAMPLE_PROFILE_DATASET_ID, 'sample_profile_datasource':SAMPLE_PROFILE_DATA_SOURCE_ID}
-#        data_resources = {'sample_profile_dataset':SAMPLE_PROFILE_DATASET_ID,
-#                          'sample_profile_datasource':SAMPLE_PROFILE_DATA_SOURCE_ID,
-#                          'sample_traj_dataset':SAMPLE_TRAJ_DATASET_ID,
-#                          'sample_station_dataset':SAMPLE_STATION_DATASET_ID}
+        # Determine which datasource resources 'should' be available
+        data_resources = []
+        for k, v in ION_DATASETS.items():
+            add_me = True
+            # If the Resource defines a filename in its content args,
+            #   ensure that the file exists.  If not, don't add the corresponding resource...
+            content_args = v.get(CONTENT_ARGS_CFG, None)
+            if content_args:
+                filename = content_args.get('filename', ':\0?')
+                if filename is not ':\0?':
+                    if filename is None or not os.path.exists(filename):
+                        add_me = False
+            
+            if add_me:
+                data_resources.append((str(k), str(v[ID_CFG])))
+        
+        data_resources.sort()
         
         ### Rather than print the data_resources object - how do we add it to locals?
         ### I can't find the control object for the shell from here?
         print '================================================================='
         print 'Added Data Resources:'
-        print data_resources
+        print '{'
+        for k, v in data_resources:
+            print "\t'%s': '%s'," % (k, v)
+            control.add_term_name(k, v)
+        print '}'
         print 'The dataset IDs will be available in your localsOkay after the shell starts!'
         print '================================================================='
-        for k, v in data_resources.items():
-            control.add_term_name(k, v)
 
         ds_spawn_args = {PRELOAD_CFG:{ION_DATASETS_CFG:True}}
 
