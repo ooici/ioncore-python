@@ -101,6 +101,7 @@ class AssociationServiceTest(IonTestCase):
 
         result = yield self.asc.get_subjects(request)
 
+        self.assertEqual(len(result.idrefs),2)
         self.assertIn(result.idrefs[0].key, [ANONYMOUS_USER_ID, ROOT_USER_ID])
         self.assertIn(result.idrefs[1].key, [ANONYMOUS_USER_ID, ROOT_USER_ID])
 
@@ -142,6 +143,7 @@ class AssociationServiceTest(IonTestCase):
 
         result = yield self.asc.get_subjects(request)
 
+        self.assertEqual(len(result.idrefs),2)
         self.assertIn(result.idrefs[0].key, [ANONYMOUS_USER_ID, ROOT_USER_ID])
         self.assertIn(result.idrefs[1].key, [ANONYMOUS_USER_ID, ROOT_USER_ID])
 
@@ -262,15 +264,14 @@ class GeneralizedAssociationTest(AssociationServiceTest):
 
         pair.object = type_ref
 
-
-
         result = yield self.asc.get_subjects(request)
 
+        self.assertEqual(len(result.idrefs),1)
         self.assertIn(result.idrefs[0].key, SAMPLE_PROFILE_DATASET_ID)
 
 
     @defer.inlineCallbacks
-    def test_association_by_owner_and_type(self):
+    def test_association_by_owner_and_type_find_1(self):
 
         request = yield self.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
 
@@ -308,9 +309,92 @@ class GeneralizedAssociationTest(AssociationServiceTest):
 
 
         result = yield self.asc.get_subjects(request)
+        self.assertEqual(len(result.idrefs),1)
 
         self.assertIn(result.idrefs[0].key, SAMPLE_PROFILE_DATASET_ID)
 
+    @defer.inlineCallbacks
+    def test_association_by_owner_and_type_find_none(self):
+
+        request = yield self.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = ANONYMOUS_USER_ID
+
+        pair.object = type_ref
+
+        # Add search by type
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = IDENTITY_RESOURCE_TYPE_ID
+
+        pair.object = type_ref
+
+        result = yield self.asc.get_subjects(request)
+
+        self.assertEqual(len(result.idrefs),0)
+
+
+    @defer.inlineCallbacks
+    def test_association_by_owner_and_state(self):
+
+        request = yield self.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = ANONYMOUS_USER_ID
+
+        pair.object = type_ref
+
+        # Add a life cycle state request
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = HAS_LIFE_CYCLE_STATE_ID
+
+        pair.predicate = pref
+
+
+        # Set the Object search term
+        state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
+        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
+        pair.object = state_ref
+
+
+
+        result = yield self.asc.get_subjects(request)
+        self.assertEqual(len(result.idrefs),1)
+
+        self.assertIn(result.idrefs[0].key, SAMPLE_PROFILE_DATASET_ID)
 
 
 
