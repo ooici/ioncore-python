@@ -63,7 +63,7 @@ class AppIntegrationTest(IonTestCase):
             {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
                 'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS}},
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:False},
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
                           COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}},
             {'name':'association_service', 'module':'ion.services.dm.inventory.association_service', 'class':'AssociationService'},
             {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
