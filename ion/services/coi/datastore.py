@@ -44,6 +44,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG
 
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -56,6 +57,7 @@ STRUCTURE_ELEMENT_TYPE = object_utils.create_type_identifier(object_id=1, versio
 
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 TERMINOLOGY_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
+IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
 
@@ -469,7 +471,7 @@ class DataStoreWorkbench(WorkBench):
                 elif root_type == RESOURCE_TYPE:
 
 
-                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.type.object_id
+                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
                     attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
 
 
@@ -645,8 +647,7 @@ class DataStoreWorkbench(WorkBench):
                 cref = repo._commit_index.get(key)
 
                 link = cref.GetLink('objectroot')
-                root_type = link.type
-
+                root_type = link.type.GPBMessage
 
                 if root_type == ASSOCIATION_TYPE:
                     attributes[SUBJECT_KEY] = cref.objectroot.subject.key
@@ -663,8 +664,7 @@ class DataStoreWorkbench(WorkBench):
 
                 elif root_type == RESOURCE_TYPE:
 
-
-                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.type.object_id
+                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
                     attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
 
 
@@ -741,6 +741,12 @@ class DataStoreService(ServiceProcess):
     declare = ServiceProcess.service_declare(name='datastore',
                                              version='0.1.0',
                                              dependencies=[])
+
+
+    # The type_map is a map from object type to resource type built from the ion_preload_configs
+    # this is a temporary device until the resource registry is fully architecturally operational.
+    type_map = TypeMap()
+
 
 
     def __init__(self, *args, **kwargs):
@@ -896,9 +902,16 @@ class DataStoreService(ServiceProcess):
         # Name and Description is set by the resource client
         resource.name = description[NAME_CFG]
         resource.description = description[DESCRIPTION_CFG]
-        
-        object_utils.set_type_from_obj(res_obj, resource.type)
-        
+
+        # Set the type...
+        object_utils.set_type_from_obj(res_obj, resource.object_type)
+
+        res_type = resource_repository.create_object(IDREF_TYPE)
+        # Get the resource type if it exists - otherwise a default will be set!
+        res_type.key = self.type_map.get(description[TYPE_CFG].object_id)
+        resource.resource_type = res_type
+
+
         # State is set to new by default
         resource.lcs = resource.LifeCycleState.NEW
 

@@ -98,7 +98,7 @@ class ResourceRegistryService(ServiceProcess):
             
         # Create the new resource object
         try:
-            res_obj = resource_repository.create_object(resource_description.type)
+            res_obj = resource_repository.create_object(resource_description.object_type)
         except object_utils.ObjectUtilException, ex:
             raise ResourceRegistryError(ex, response.ResponseCodes.NOT_FOUND)
         # Set the object as the child of the resource

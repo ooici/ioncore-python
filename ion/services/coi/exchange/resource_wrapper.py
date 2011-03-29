@@ -152,7 +152,7 @@ class ServiceHelper:
         provided.
         """
         object = yield self.rc.get_instance(id)
-        response = yield self.mc.create_instance(object.ResourceType, MessageName='get_object response')
+        response = yield self.mc.create_instance(object.ResourceObjectType, MessageName='get_object response')
         #response.resource_reference = self.rc.reference_instance(object)
         #response.configuration = object.ResourceObject
         # The resource does not have the fields?

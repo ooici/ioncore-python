@@ -25,7 +25,8 @@ from ion.services.coi.resource_registry_beta.resource_registry import ResourceRe
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClientError, ResourceInstanceError
 from ion.test.iontest import IonTestCase
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE_TYPES, ION_IDENTITIES, ID_CFG, PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, NAME_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE_TYPES, ION_IDENTITIES, ID_CFG, PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, NAME_CFG, DEFAULT_RESOURCE_TYPE_ID
+
 
 
 addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
@@ -98,7 +99,10 @@ class ResourceClientTest(IonTestCase):
             
         resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
             
-        self.assertEqual(resource.ResourceType, addresslink_type)
+        self.assertEqual(resource.ResourceObjectType, addresslink_type)
+
+        # Address link is not a real resource - so the Type ID is a default type...
+        self.assertEqual(resource.ResourceTypeID.key, DEFAULT_RESOURCE_TYPE_ID)
             
             
         person = resource.CreateObject(person_type)
@@ -142,7 +146,7 @@ class ResourceClientTest(IonTestCase):
 
         resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
 
-        self.assertEqual(resource.ResourceType, addresslink_type)
+        self.assertEqual(resource.ResourceObjectType, addresslink_type)
 
 
         person = resource.CreateObject(person_type)

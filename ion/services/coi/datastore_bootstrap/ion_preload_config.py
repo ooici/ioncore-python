@@ -35,10 +35,23 @@ topic_res_type_name = 'topic_resource_type'
 dataset_res_type_name = 'dataset_resource_type'
 identity_res_type_name = 'identity_resource_type'
 datasource_res_type_name = 'datasource_resource_type'
+resource_type_type_name = 'resource_type_type'
+default_resource_type_name = 'default_resource_type'
+
 
 resource_type_type = create_type_identifier(object_id=1103, version=1)
 # Data structure used by datastore intialization
 ION_RESOURCE_TYPES={
+resource_type_type_name:{ID_CFG:'173a3188-e290-42be-8776-8717077dd207',
+                     TYPE_CFG:resource_type_type,
+                     NAME_CFG:resource_type_type_name,
+                     DESCRIPTION_CFG:'The resource type is meta description of a class of resource',
+                     CONTENT_CFG:{'object_identifier':1103,
+                                  'object_version':1,
+                                  'meta_description':'protomessage?'}
+                     },
+
+
 topic_res_type_name:{ID_CFG:'3BD84B48-073E-4833-A62B-0DE4EC106A34',
                      TYPE_CFG:resource_type_type,
                      NAME_CFG:topic_res_type_name,
@@ -72,7 +85,17 @@ datasource_res_type_name:{ID_CFG:'b8b7bb73-f578-4604-b3b3-088d28f9a7dc',
                        CONTENT_CFG:{'object_identifier':4503,
                                     'object_version':1,
                                     'meta_description':'protomessage?'}
-                        }
+                        },
+
+default_resource_type_name:{ID_CFG:'422ade3c-d820-437f-8bd3-7d8793591eb0',
+                     TYPE_CFG:resource_type_type,
+                     NAME_CFG:default_resource_type_name,
+                     DESCRIPTION_CFG:'A type to catch unregistered types!',
+                     CONTENT_CFG:{'object_identifier':-1,
+                                  'object_version':-1,
+                                  'meta_description':'protomessage?'}
+                     },
+
 }
 
 # Extract Resource ID_CFGs for use in services and tests
@@ -80,6 +103,9 @@ TOPIC_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[topic_res_type_name][ID_CFG]
 DATASET_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[dataset_res_type_name][ID_CFG]
 IDENTITY_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[identity_res_type_name][ID_CFG]
 DATASOURCE_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[datasource_res_type_name][ID_CFG]
+RESOURCE_TYPE_TYPE_ID = ION_RESOURCE_TYPES[resource_type_type_name][ID_CFG]
+
+DEFAULT_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[default_resource_type_name][ID_CFG]
 
 
 ##### Define Predicates #####:
@@ -244,13 +270,27 @@ def generate_reference_instance(proc=None, resource_id=None):
     #@ TODO Complete this method... Should be about ten lines.
     
 
-def create_type_map():
-    type_map={}
+class TypeMap(dict):
 
-    for type_name, description in ION_RESOURCE_TYPES.items():
-        type_cfg = description.get(CONTENT_CFG)
-        obj_type_id = type_cfg.get('object_identifier')
-        type_map[obj_type_id] = description.get(ID_CFG)
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
 
-    return type_map
+        type_map = {}
+        for type_name, description in ION_RESOURCE_TYPES.items():
+            type_cfg = description.get(CONTENT_CFG)
+            obj_type_id = type_cfg.get('object_identifier')
+            type_map[obj_type_id] = description.get(ID_CFG)
+
+        self.update(type_map)
+
+
+    def get(self, key):
+        '''
+        Get the resource type given an object type id #
+        '''
+
+        return dict.get(self,key, DEFAULT_RESOURCE_TYPE_ID)
+
+
+
 

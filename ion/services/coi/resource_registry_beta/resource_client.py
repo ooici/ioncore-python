@@ -55,7 +55,7 @@ class ResourceClient(object):
 
     # The type_map is a map from object type to resource type built from the ion_preload_configs
     # this is a temporary device until the resource registry is fully architecturally operational.
-    type_map = ion_preload_config.create_type_map()
+    type_map = ion_preload_config.TypeMap()
 
 
 
@@ -83,8 +83,6 @@ class ResourceClient(object):
         # What about the name of the index services to use?
 
         self.registry_client = ResourceRegistryClient(proc=self.proc)
-
-        print 'TYPE_MAP:',self.type_map
 
 
     @defer.inlineCallbacks
@@ -125,19 +123,15 @@ class ResourceClient(object):
         resource_description.description = ResourceDescription
 
         # This is breaking some abstractions - using the GPB directly...
-        resource_description.type.GPBMessage.CopyFrom(type_id)
+        resource_description.object_type.GPBMessage.CopyFrom(type_id)
 
         # Set the resource type - keep the object type above for now...
         res_type = description_repository.create_object(IDREF_TYPE)
-        print 'TYPE_ID',type_id
-        print 'Mapped_type'
 
+        # Get the resource type if it exists - otherwise a default will be set!
         res_type.key = self.type_map.get(type_id.object_id)
 
         resource_description.resource_type = res_type
-
-
-        print "RESOURCE DESC:", resource_description
 
         # Use the registry client to make a new resource
         result = yield self.registry_client.register_resource_instance(resource_description)
