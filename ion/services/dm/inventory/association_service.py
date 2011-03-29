@@ -204,7 +204,7 @@ class AssociationService(ServiceProcess):
                 # Get all the results that meet the type / state query
                 rows = yield self.index_store.query(q)
 
-                for key, row in rows:
+                for key, row in rows.items():
 
                     totalkey = (row[REPOSITORY_KEY] , row[BRANCH_NAME], key)
 

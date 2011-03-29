@@ -24,7 +24,7 @@ from ion.services.coi.resource_registry_beta import resource_client
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
 # Pick three to test existence
-from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID
 
 from ion.services.dm.inventory.association_service import AssociationServiceClient
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
@@ -197,13 +197,23 @@ class AssociationServiceTest(IonTestCase):
         self.assertIn(result.idrefs[0].key, ROOT_USER_ID)
 
 
-
-
-
-
-
-
 class GeneralizedAssociationTest(AssociationServiceTest):
+
+
+    services = [
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
+                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
+
+            {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
+                          COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}
+                },
+
+            {'name':'association_service',
+             'module':'ion.services.dm.inventory.association_service',
+             'class':'AssociationService'
+              },
+        ]
 
 
     @defer.inlineCallbacks
@@ -211,31 +221,98 @@ class GeneralizedAssociationTest(AssociationServiceTest):
         """
         Override setup and add some associations to play with!
         """
-        AssociationServiceTest.setUp(self)
+        yield AssociationServiceTest.setUp(self)
 
-        yield self.proc.workbench.pull('datastore', IDENTITY_RESOURCE_TYPE_ID)
-        id_type = self.proc.workbench.get_repository(IDENTITY_RESOURCE_TYPE_ID)
-        id_type.checkout('master')
+        yield self.proc.workbench.pull('datastore', SAMPLE_PROFILE_DATASET_ID)
+        dataset = self.proc.workbench.get_repository(SAMPLE_PROFILE_DATASET_ID)
+        dataset.checkout('master')
 
-        yield self.proc.workbench.pull('datastore', TYPE_OF_ID)
-        type_of = self.proc.workbench.get_repository(TYPE_OF_ID)
-        type_of.checkout('master')
-
-
-        yield self.proc.workbench.pull('datastore', ROOT_USER_ID)
-
-        root_user = self.proc.workbench.get_repository(ROOT_USER_ID)
-        root_user.checkout('master')
-
+        yield self.proc.workbench.pull('datastore', OWNED_BY_ID)
+        owned_by = self.proc.workbench.get_repository(OWNED_BY_ID)
+        owned_by.checkout('master')
 
         yield self.proc.workbench.pull('datastore', ANONYMOUS_USER_ID)
-        annon_user = self.proc.workbench.get_repository(ANONYMOUS_USER_ID)
-        annon_user.checkout('master')
+        anon_user = self.proc.workbench.get_repository(ANONYMOUS_USER_ID)
+        anon_user.checkout('master')
 
-        assoc = self.proc.workbench.create_association(annon_user, type_of, id_type)
+        assoc = self.proc.workbench.create_association(dataset, owned_by, anon_user)
 
 
         yield self.proc.workbench.push('datastore', assoc)
+
+
+
+    @defer.inlineCallbacks
+    def test_association_by_owner(self):
+
+        request = yield self.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = ANONYMOUS_USER_ID
+
+        pair.object = type_ref
+
+
+
+        result = yield self.asc.get_subjects(request)
+
+        self.assertIn(result.idrefs[0].key, SAMPLE_PROFILE_DATASET_ID)
+
+
+    @defer.inlineCallbacks
+    def test_association_by_owner_and_type(self):
+
+        request = yield self.proc.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = OWNED_BY_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = ANONYMOUS_USER_ID
+
+        pair.object = type_ref
+
+        # Add search by type
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = DATASET_RESOURCE_TYPE_ID
+
+        pair.object = type_ref
+
+
+
+        result = yield self.asc.get_subjects(request)
+
+        self.assertIn(result.idrefs[0].key, SAMPLE_PROFILE_DATASET_ID)
+
+
+
 
 
 
