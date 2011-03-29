@@ -18,6 +18,7 @@ from ion.integration.ais.app_integration_service import AppIntegrationServiceCli
 from ion.core.messaging.message_client import MessageClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 from ion.services.coi.resource_registry_beta.resource_client import ResourceInstance
+from ion.core.exception import ReceivedApplicationError, ReceivedContainerError
 from ion.test.iontest import IonTestCase
 
 from ion.core.object import object_utils
@@ -324,6 +325,18 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
+        # test for authentication policy failure
+        # create the update dispatcher queue request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserEmail request')
+        msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_DISPATCH_QUEUE_TYPE)
+        msg.message_parameters_reference.user_ooi_id = "ANONYMOUS"
+        msg.message_parameters_reference.queue_name = "some_queue_name"
+        try:
+            reply = yield self.aisc.updateUserDispatcherQueue(msg)
+            self.fail('updateUserDispatcherQueue did not raise exception for ANONYMOUS ooi_id')
+        except ReceivedApplicationError, ex:
+            log.info("updateUserDispatcherQueue correctly raised exception for ANONYMOUS ooi_id")
+
         # create the register_user request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
         msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
@@ -383,13 +396,17 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
-        log.info("test_registerUser: first time registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
+        log.info("test_registerUser: first time registration received GPB = "+str(reply.message_parameters_reference[0]))
 
         # create the updateUserDispatcherQueue request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserDispatcherQueue request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_DISPATCH_QUEUE_TYPE)
         msg.message_parameters_reference.user_ooi_id = FirstOoiId
         msg.message_parameters_reference.queue_name = "some_dispatcher_queue"
+        try:
+            reply = yield self.aisc.updateUserDispatcherQueue(msg)
+        except ReceivedApplicationError, ex:
+            self.fail('updateUserDispatcherQueue incorrectly raised exception for an authenticated ooi_id')
         reply = yield self.aisc.updateUserDispatcherQueue(msg)
         log.debug('updateUserDispatcherQueue returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
@@ -425,6 +442,18 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         # Create a message client
         mc = MessageClient(proc=self.test_sup)
         
+        # test for authentication policy failure
+        # create the update Email request GPBs
+        msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserEmail request')
+        msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_EMAIL_TYPE)
+        msg.message_parameters_reference.user_ooi_id = "ANONYMOUS"
+        msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
+        try:
+            reply = yield self.aisc.updateUserEmail(msg)
+            self.fail('updateUserEmail did not raise exception for ANONYMOUS ooi_id')
+        except ReceivedApplicationError, ex:
+            log.info("updateUserEmail correctly raised exception for ANONYMOUS ooi_id")
+
         # create the register_user request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS RegisterUser request')
         msg.message_parameters_reference = msg.CreateObject(REGISTER_USER_REQUEST_TYPE)
@@ -484,14 +513,17 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
         if reply.message_parameters_reference[0].ObjectType != REGISTER_USER_RESPONSE_TYPE:
             self.fail('response does not contain an OOI_ID GPB')
         FirstOoiId = reply.message_parameters_reference[0].ooi_id
-        log.info("test_registerUser: first time registration received ooi_id = "+str(reply.message_parameters_reference[0].ooi_id))
-
+        log.info("test_registerUser: first time registration received GPB = "+str(reply.message_parameters_reference[0]))
+        
         # create the update Email request GPBs
         msg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE, MessageName='AIS updateUserEmail request')
         msg.message_parameters_reference = msg.CreateObject(UPDATE_USER_EMAIL_TYPE)
         msg.message_parameters_reference.user_ooi_id = FirstOoiId
         msg.message_parameters_reference.email_address = "some_person@some_place.some_domain"
-        reply = yield self.aisc.updateUserEmail(msg)
+        try:
+            reply = yield self.aisc.updateUserEmail(msg)
+        except ReceivedApplicationError, ex:
+            self.fail('updateUserEmail incorrectly raised exception for an authenticated ooi_id')
         log.debug('updateUserEmail returned:\n'+str(reply))
         if reply.MessageType != AIS_RESPONSE_MSG_TYPE:
             self.fail('response is not an AIS_RESPONSE_MSG_TYPE GPB')
