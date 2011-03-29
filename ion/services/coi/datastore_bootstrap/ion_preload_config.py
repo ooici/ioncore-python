@@ -19,6 +19,7 @@ NAME_CFG = 'name'
 PREDICATE_CFG = 'predicate'
 DESCRIPTION_CFG = 'description'
 CONTENT_CFG = 'content'
+CONTENT_ARGS_CFG = 'content_args'
 PRELOAD_CFG = 'preload'
 
 
@@ -172,6 +173,8 @@ ANONYMOUS_USER_ID = ION_IDENTITIES[anonymous_name][ID_CFG]
 # Dataset names
 profile_dataset_name = 'profile_dataset'
 profile_data_source_name = 'profile_data_source'
+#traj_dataset_name = 'traj_dataset'
+#station_dataset_name = 'station_dataset'
 grid_dataset_name = 'grid_dataset'
 
 
@@ -193,6 +196,22 @@ profile_data_source_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F2',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_data_source_resource
                       },
 
+#traj_dataset_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F3',
+#                      TYPE_CFG:DATASET_TYPE,
+#                      NAME_CFG:traj_dataset_name,
+#                      DESCRIPTION_CFG:'An example of a trajectory dataset',
+#                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+#                      CONTENT_ARGS_CFG:{'filename':'../ion/services/coi/SOS_Test.obj'},
+#                      },
+#
+#station_dataset_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F4',
+#                      TYPE_CFG:DATASET_TYPE,
+#                      NAME_CFG:station_dataset_name,
+#                      DESCRIPTION_CFG:'An example of a station dataset',
+#                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+#                      CONTENT_ARGS_CFG:{'filename':'../ion/services/coi/USGS_Test.obj'},
+#                      },
+
 #grid_dataset_name:{ID_CFG:''},
 }
 
@@ -200,6 +219,8 @@ profile_data_source_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F2',
 # Extract Resource ID_CFGs for use in services and tests
 SAMPLE_PROFILE_DATASET_ID = ION_DATASETS[profile_dataset_name][ID_CFG]
 SAMPLE_PROFILE_DATA_SOURCE_ID = ION_DATASETS[profile_data_source_name][ID_CFG]
+#SAMPLE_TRAJ_DATASET_ID = ION_DATASETS[traj_dataset_name][ID_CFG]
+#SAMPLE_STATION_DATASET_ID = ION_DATASETS[station_dataset_name][ID_CFG]
 #SAMPLE_GRID_DATASET_ID = ION_DATASETS[grid_dataset_name][ID_CFG]
 
 

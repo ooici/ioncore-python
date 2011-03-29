@@ -13,7 +13,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 
-from ion.core.object import object_utils
+from ion.core.object import object_utils, codec
 
 
 # Create CDM Type Objects
@@ -31,8 +31,22 @@ float32Array_type = object_utils.create_type_identifier(object_id=10013, version
 int32Array_type = object_utils.create_type_identifier(object_id=10009, version=1)
 
 
+def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
+    """
+    Example file: ion/services/coi/SOS_Test.arr
+    """
+    ds_svc = args[0]
+    filename = kwargs['filename']
+    
+    # @todo: Find out what errors can be raised and wrap this in a try/except
+    f = open(filename, 'r')
+    obj = codec.unpack_structure(f.read())
+    ds_svc.workbench.put_repository(obj.Repository)
+    
+    resource_instance.ResourceObject = obj
 
-def bootstrap_profile_dataset(dataset):
+    
+def bootstrap_profile_dataset(dataset, *args, **kwargs):
     """
     Pass in a link from the resource object which is created in the intialization of the datastore
 
@@ -292,7 +306,7 @@ def bootstrap_profile_dataset(dataset):
     group.attributes[15] = attrib_vert_pos
 
 
-def bootstrap_data_source_resource(datasource):
+def bootstrap_data_source_resource(datasource, *args, **kwargs):
 
 
     #-------------------------------------------#
