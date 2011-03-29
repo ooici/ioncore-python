@@ -23,7 +23,7 @@ RESOURCE_MODIFICATION_EVENT_MESSAGE_TYPE    = object_utils.create_type_identifie
 LOGGING_EVENT_MESSAGE_TYPE                  = object_utils.create_type_identifier(object_id=2326, version=1)
 
 # event IDs: https://confluence.oceanobservatories.org/display/syseng/CIAD+DM+SV+Notifications+and+Events
-RESOUCE_LIFECYCLE_EVENT_ID = 1001
+RESOURCE_LIFECYCLE_EVENT_ID = 1001
 CONTAINER_LIFECYCLE_EVENT_ID = 1051
 PROCESS_LIFECYCLE_EVENT_ID = 1052
 DATASOURCE_UPDATE_EVENT_ID = 1101
@@ -67,11 +67,29 @@ class EventPublisher(Publisher):
         @returns The event message.
         """
         assert self.msg_type
-        event_msg = yield self._mc.create_instance(EVENT_MESSAGE_TYPE)
-        # TODO: assign common vars from kwargs
 
+        # copy kwargs into local list
+        msgargs = kwargs.copy()
+
+        # create base event message, assign values from kwargs
+        event_msg = yield self._mc.create_instance(EVENT_MESSAGE_TYPE)
+        for k,v in msgargs.items():
+            if hasattr(event_msg, k):
+                setattr(event_msg, k, v)
+                msgargs.pop(k)
+
+        # create additional event msg (specific to this event notification), assign values from kwargs
         additional_event_msg = event_msg.CreateObject(self.msg_type)
-        # TODO: assign specific event msg vars
+        for k, v in msgargs.items():
+            if hasattr(additional_event_msg, k):
+                setattr(additional_event_msg, k, v)
+                msgargs.pop(k)
+
+        # error checking: see if we have any remaining kwargs
+        if len(msgargs) > 0:
+            raise Exception("create_event: unused kwargs remaining (%s), unused by base event message and msg type id %s" % (str(msgargs), str(self.msg_type)))
+
+        # TODO: perhaps check to make sure additional_event_msg and event_msg have exclusive attribute names, or we'll assign to one and not the other
 
         # link them
         event_msg.additional_data = additional_event_msg
