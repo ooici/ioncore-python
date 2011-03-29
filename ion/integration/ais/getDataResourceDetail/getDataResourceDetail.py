@@ -10,19 +10,15 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 # DHE Temporarily pulling DatasetControllerClient from scaffolding
 from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient
-from ion.integration.ais.getDataResourceDetail.cfdata import cfData
+#from ion.integration.ais.getDataResourceDetail.cfdata import cfData
 
 # import GPB type identifiers for AIS
-from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
-from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_REQ_MSG_TYPE
-from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_RSP_MSG_TYPE
+from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE
 from ion.integration.ais.ais_object_identifiers import GET_DATA_RESOURCE_DETAIL_RSP_MSG_TYPE
-
-from ion.core.object import object_utils
 
 class GetDataResourceDetail(object):
     
@@ -68,7 +64,30 @@ class GetDataResourceDetail(object):
 
         rspMsg.message_parameters_reference[0].data_resource_id = resID
         # Fill in the rest of the message with the CF metadata
+
+        i = 0
+        for var in ds.root_group.variables:
+            print 'Working on variable: %s' % str(var.name)
+            rspMsg.message_parameters_reference[0].variable.add()
+            self.__loadRootVariable(rspMsg.message_parameters_reference[0].variable[i], ds, var)
+            i = i + 1
         
         defer.returnValue(rspMsg)
+
+
+    def __loadRootVariable(self, rootVariable, ds, var):
+        for atrib in var.attributes:
+            tmpstr = str(atrib.name) + '::' + str(atrib.GetValue())
+            rootVariable.other_attributes.append(tmpstr)
+
+        """
+        try:
+            rootVariable.standard_name  = var.GetStandardName()
+            rootVariable.units = var.GetUnits()
+            
+        except:            
+            estr = 'Object ERROR!'
+            log.exception(estr)
+         """
 
 

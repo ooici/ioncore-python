@@ -11,19 +11,15 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
-from ion.services.coi.resource_registry_beta.resource_client import ResourceClient, ResourceInstance
+from ion.services.coi.resource_registry_beta.resource_client import ResourceClient
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 # DHE Temporarily pulling DatasetControllerClient from scaffolding
 from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient
 
 # import GPB type identifiers for AIS
-from ion.integration.ais.ais_object_identifiers import AIS_REQUEST_MSG_TYPE, AIS_RESPONSE_MSG_TYPE
-from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_REQ_MSG_TYPE
+from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE
 from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_RSP_MSG_TYPE
 from ion.integration.ais.ais_object_identifiers import AIS_DATA_RESOURCE_SUMMARY_MSG_TYPE
-
-
-from ion.core.object import object_utils
 
 class FindDataResources(object):
     
@@ -105,34 +101,54 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference[0].dataResourceSummary.add()
         rspMsg.message_parameters_reference[0].dataResourceSummary[0] = \
             rspMsg.CreateObject(AIS_DATA_RESOURCE_SUMMARY_MSG_TYPE)
-        self.__loadDataResources(rspMsg.message_parameters_reference[0].dataResourceSummary[0], ds, userID, resID)
+
+        self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[0], ds, userID, resID)
+
+        """
+        Moving this to getDataResourceDetail
+        i = 0
+        for var in ds.root_group.variables:
+            print 'Working on variable: %s' % str(var.name)
+            rspMsg.message_parameters_reference[0].dataResourceSummary[0].variable.add()
+            self.__loadRootVariable(rspMsg.message_parameters_reference[0].dataResourceSummary[0].variable[i], ds, var)
+            i = i + 1
+        """            
 
         defer.returnValue(rspMsg)
 
-    def __loadDataResources(self, resSummary, ds, userID, resID):
-        resSummary.user_ooi_id = userID
-        resSummary.data_resource_id = resID
-        resSummary.title = ds.root_group.FindAttributeByName('title').GetValue()
-        resSummary.institution = ds.root_group.FindAttributeByName('institution').GetValue()
-        resSummary.source = ds.root_group.FindAttributeByName('source').GetValue()
-        resSummary.references = ds.root_group.FindAttributeByName('references').GetValue()
-        resSummary.ion_time_coverage_start = ds.root_group.FindAttributeByName('ion_time_coverage_start').GetValue()
-        resSummary.ion_time_coverage_end = ds.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
-        #resSummary.summary = ds.root_group.FindAttributeByName('summary').GetValue()
-        #resSummary.comment = ds.root_group.FindAttributeByName('comment').GetValue()
-        resSummary.ion_geospatial_lat_min = float(ds.root_group.FindAttributeByName('ion_geospatial_lat_min').GetValue())
-        resSummary.ion_geospatial_lat_max = float(ds.root_group.FindAttributeByName('ion_geospatial_lat_max').GetValue())
-        resSummary.ion_geospatial_lon_min = float(ds.root_group.FindAttributeByName('ion_geospatial_lon_min').GetValue())
-        resSummary.ion_geospatial_lon_max = float(ds.root_group.FindAttributeByName('ion_geospatial_lon_max').GetValue())
-        resSummary.ion_geospatial_vertical_min = float(ds.root_group.FindAttributeByName('ion_geospatial_vertical_min').GetValue())
-        resSummary.ion_geospatial_vertical_max = float(ds.root_group.FindAttributeByName('ion_geospatial_vertical_max').GetValue())
-        resSummary.ion_geospatial_vertical_positive = ds.root_group.FindAttributeByName('ion_geospatial_vertical_positive').GetValue()
-        lat = ds.root_group.FindVariableByName('lat')
-        resSummary.standard_name  = lat.GetStandardName()
-        resSummary.units = lat.GetUnits()
+    def __loadRootAttributes(self, rootAttributes, ds, userID, resID):
+        try:
+            rootAttributes.user_ooi_id = userID
+            rootAttributes.data_resource_id = resID
+            rootAttributes.title = ds.root_group.FindAttributeByName('title').GetValue()
+            rootAttributes.institution = ds.root_group.FindAttributeByName('institution').GetValue()
+            rootAttributes.source = ds.root_group.FindAttributeByName('source').GetValue()
+            rootAttributes.references = ds.root_group.FindAttributeByName('references').GetValue()
+            rootAttributes.ion_time_coverage_start = ds.root_group.FindAttributeByName('ion_time_coverage_start').GetValue()
+            rootAttributes.ion_time_coverage_end = ds.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
+            rootAttributes.summary = ds.root_group.FindAttributeByName('summary').GetValue()
+            rootAttributes.comment = ds.root_group.FindAttributeByName('comment').GetValue()
+            rootAttributes.ion_geospatial_lat_min = float(ds.root_group.FindAttributeByName('ion_geospatial_lat_min').GetValue())
+            rootAttributes.ion_geospatial_lat_max = float(ds.root_group.FindAttributeByName('ion_geospatial_lat_max').GetValue())
+            rootAttributes.ion_geospatial_lon_min = float(ds.root_group.FindAttributeByName('ion_geospatial_lon_min').GetValue())
+            rootAttributes.ion_geospatial_lon_max = float(ds.root_group.FindAttributeByName('ion_geospatial_lon_max').GetValue())
+            rootAttributes.ion_geospatial_vertical_min = float(ds.root_group.FindAttributeByName('ion_geospatial_vertical_min').GetValue())
+            rootAttributes.ion_geospatial_vertical_max = float(ds.root_group.FindAttributeByName('ion_geospatial_vertical_max').GetValue())
+            rootAttributes.ion_geospatial_vertical_positive = ds.root_group.FindAttributeByName('ion_geospatial_vertical_positive').GetValue()
         
+        except:
+            estr = 'Object ERROR!'
+            log.exception(estr)
 
-"""
-   optional string long_name = 19;
-
-"""
+    """
+    def __loadRootVariable(self, rootVariable, ds, var):
+        #lat = ds.root_group.FindVariableByName('lat')
+        try:
+            rootVariable.standard_name  = var.GetStandardName()
+            rootVariable.units = var.GetUnits()
+            
+        except:            
+            estr = 'Object ERROR!'
+            log.exception(estr)
+         
+    """
