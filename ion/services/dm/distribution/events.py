@@ -236,3 +236,85 @@ class EventSubscriber(Subscriber):
 
         Subscriber.__init__(self, xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, credentials=credentials, process=process, *args, **kwargs)
 
+class ResourceLifecycleEventSubscriber(EventSubscriber):
+    """
+    Event Notification Subscriber for Resource lifecycle events. Used as a concrete derived class, and as a base for
+    specializations such as ContainerLifecycleEvents and ProcessLifecycleEvents.
+
+    The "origin" parameter in this class' initializer should be the resource id (UUID).
+    """
+    event_id = RESOURCE_LIFECYCLE_EVENT_ID
+
+class ContainerLifecycleEventSubscriber(ResourceLifecycleEventSubscriber):
+    """
+    Event Notification Subscriber for Container lifecycle events.
+
+    The "origin" parameter in this class' initializer should be the container name.
+    """
+    event_id = CONTAINER_LIFECYCLE_EVENT_ID
+
+class ProcessLifecycleEventSubscriber(ResourceLifecycleEventSubscriber):
+    """
+    Event Notification Subscriber for Process lifecycle events.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name.
+    """
+    event_id = PROCESS_LIFECYCLE_EVENT_ID
+
+class TriggerEventSubscriber(EventSubscriber):
+    """
+    Base Subscriber class for "triggered" Event Notifications.
+    """
+    pass
+
+class DatasourceUpdateEventSubscriber(TriggerEventSubscriber):
+    """
+    Event Notification Subscriber for Datasource updates.
+
+    The "origin" parameter in this class' initializer should be the datasource resource id (UUID).
+    """
+    event_id = DATASOURCE_UPDATE_EVENT_ID
+
+class ResourceModifiedEventSubscriber(EventSubscriber):
+    """
+    Base Subscriber class for resource modification Event Notifications. This is distinct from resource lifecycle state
+    Event Notifications.
+    """
+    pass
+
+class DatasetModificationEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Dataset Modifications.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_id = DATASET_MODIFICATION_EVENT_ID
+
+class ScheduleEventSubscriber(TriggerEventSubscriber):
+    """
+    Event Notification Subscriber for Scheduled events (ie from the Scheduler service).
+    """
+    event_id = SCHEDULE_EVENT_ID
+
+class LoggingEventSubscriber(EventSubscriber):
+    """
+    Base Subscriber for logging Event Notifications.
+    """
+    pass
+
+class CriticalLoggingEventSubscriber(LoggingEventSubscriber):
+    """
+    Event Notification Subscriber for critical logging events.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    event_id = LOGGING_CRITICAL_EVENT_ID
+
+class ErrorLoggingEventSubscriber(LoggingEventSubscriber):
+    """
+    Event Notification Subscriber for error logging events.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    event_id = LOGGING_ERROR_EVENT_ID
+
