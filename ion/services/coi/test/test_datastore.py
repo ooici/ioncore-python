@@ -22,7 +22,7 @@ from ion.core.data.storage_configuration_utility import BLOB_CACHE, COMMIT_CACHE
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG
 # Pick three to test existence
-from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES
 
@@ -344,12 +344,32 @@ class DataStoreTest(IonTestCase):
     def test_checkout_defaults(self):
 
         defaults={}
-        defaults.update(ION_DATASETS)
-        defaults.update(ION_PREDICATES)
         defaults.update(ION_RESOURCE_TYPES)
+        defaults.update(ION_DATASETS)
         defaults.update(ION_IDENTITIES)
 
         for key, value in defaults.items():
+
+            repo_name = value[ID_CFG]
+
+            c_args = value.get(CONTENT_ARGS_CFG)
+            if c_args and not c_args.get('filename'):
+                break
+
+
+
+            result = yield self.wb1.workbench.pull('datastore',repo_name)
+            self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+            repo = self.wb1.workbench.get_repository(repo_name)
+
+            # Check that we got back both branches!
+            default_obj = yield repo.checkout(branchname='master')
+
+            self.assertEqual(default_obj.name, value[NAME_CFG])
+
+
+        for key, value in ION_PREDICATES.items():
 
             repo_name = value[ID_CFG]
 
@@ -361,6 +381,7 @@ class DataStoreTest(IonTestCase):
             # Check that we got back both branches!
             default_obj = yield repo.checkout(branchname='master')
 
+            self.assertEqual(default_obj.word, value[PREDICATE_CFG])
 
 
 
