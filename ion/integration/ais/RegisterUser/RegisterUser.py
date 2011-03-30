@@ -148,7 +148,6 @@ class RegisterUser(object):
       try:
          result = yield self.irc.update_user(Request)
       except ReceivedApplicationError, ex:
-         self.fail("update_user failed [%s]"%msg.message_parameters_reference.user_ooi_id)
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserDispatcherQueue error response')
          Response.error_num = ex.msg_content.MessageResponseCode
@@ -195,7 +194,6 @@ class RegisterUser(object):
       try:
          user_info = yield self.irc.get_user(Request)
       except ReceivedApplicationError, ex:
-         self.fail("get_user failed to find the user [%s]"%msg.message_parameters_reference.user_ooi_id)
          # build AIS error response
          Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS updateUserEmail error response')
          Response.error_num = ex.msg_content.MessageResponseCode
