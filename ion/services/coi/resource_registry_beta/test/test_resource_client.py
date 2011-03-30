@@ -29,10 +29,10 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_RESOURCE
 
 
 
-addresslink_type = object_utils.create_type_identifier(object_id=20003, version=1)
-person_type = object_utils.create_type_identifier(object_id=20001, version=1)
-invalid_type = object_utils.create_type_identifier(object_id=-1, version=1)
-Update_Type = object_utils.create_type_identifier(object_id=10, version=1)
+ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
+PERSON_TYPE = object_utils.create_type_identifier(object_id=20001, version=1)
+INVALID_TYPE = object_utils.create_type_identifier(object_id=-1, version=1)
+UPDATE_TYPE = object_utils.create_type_identifier(object_id=10, version=1)
 
 class ResourceClientTest(IonTestCase):
     """
@@ -63,7 +63,7 @@ class ResourceClientTest(IonTestCase):
     @defer.inlineCallbacks
     def test_create_resource(self):
                 
-        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
+        resource = yield self.rc.create_instance(ADDRESSLINK_TYPE, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
         
         self.assertIsInstance(resource, ResourceInstance)
         self.assertEqual(resource.ResourceLifeCycleState, resource.NEW)
@@ -73,7 +73,7 @@ class ResourceClientTest(IonTestCase):
     @defer.inlineCallbacks
     def test_get_resource(self):
                         
-        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
+        resource = yield self.rc.create_instance(ADDRESSLINK_TYPE, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
             
         res_id = resource.ResourceIdentity
             
@@ -97,15 +97,15 @@ class ResourceClientTest(IonTestCase):
     @defer.inlineCallbacks
     def test_read_your_writes(self):
             
-        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
+        resource = yield self.rc.create_instance(ADDRESSLINK_TYPE, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
             
-        self.assertEqual(resource.ResourceObjectType, addresslink_type)
+        self.assertEqual(resource.ResourceObjectType, ADDRESSLINK_TYPE)
 
         # Address link is not a real resource - so the Type ID is a default type...
         self.assertEqual(resource.ResourceTypeID.key, DEFAULT_RESOURCE_TYPE_ID)
             
             
-        person = resource.CreateObject(person_type)
+        person = resource.CreateObject(PERSON_TYPE)
         resource.person.add()
         resource.person[0] = person
             
@@ -144,12 +144,12 @@ class ResourceClientTest(IonTestCase):
     @defer.inlineCallbacks
     def test_bad_branch(self):
 
-        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
+        resource = yield self.rc.create_instance(ADDRESSLINK_TYPE, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
 
-        self.assertEqual(resource.ResourceObjectType, addresslink_type)
+        self.assertEqual(resource.ResourceObjectType, ADDRESSLINK_TYPE)
 
 
-        person = resource.CreateObject(person_type)
+        person = resource.CreateObject(PERSON_TYPE)
         resource.person.add()
         resource.person[0] = person
 
@@ -191,9 +191,9 @@ class ResourceClientTest(IonTestCase):
             
         
         # Create the resource object    
-        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
+        resource = yield self.rc.create_instance(ADDRESSLINK_TYPE, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
                 
-        person = resource.CreateObject(person_type)
+        person = resource.CreateObject(PERSON_TYPE)
         
         resource.person.add()
         person.id=5
@@ -243,13 +243,13 @@ class ResourceClientTest(IonTestCase):
         
         
     @defer.inlineCallbacks
-    def test_invalid_type(self):
+    def test_INVALID_TYPE(self):
         
         # Create the resource object
-        #self.assertRaises(ResourceRegistryError, self.rc.create_instance, invalid_type, name='Test AddressLink Resource', description='A test resource')
+        #self.assertRaises(ResourceRegistryError, self.rc.create_instance, INVALID_TYPE, name='Test AddressLink Resource', description='A test resource')
         
         try:
-            resource = yield self.rc.create_instance(invalid_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
+            resource = yield self.rc.create_instance(INVALID_TYPE, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
         except ReceivedApplicationError, ex:
             log.info(ex)
             defer.returnValue(True)
@@ -266,9 +266,9 @@ class ResourceClientTest(IonTestCase):
     def test_merge_update(self):
         
         # Create the resource object    
-        resource = yield self.rc.create_instance(addresslink_type, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
+        resource = yield self.rc.create_instance(ADDRESSLINK_TYPE, ResourceName='Test AddressLink Resource', ResourceDescription='A test resource')
                 
-        person = resource.CreateObject(person_type)
+        person = resource.CreateObject(PERSON_TYPE)
         
         resource.person.add()
         person.id=5
@@ -285,9 +285,9 @@ class ResourceClientTest(IonTestCase):
         self.assertRaises(ResourceInstanceError, getattr, resource, 'CompareToUpdates')
         
         # Create an update to merge into it...
-        update_repo, ab = self.rc.workbench.init_repository(addresslink_type)
+        update_repo, ab = self.rc.workbench.init_repository(ADDRESSLINK_TYPE)
         
-        p2 = update_repo.create_object(person_type)
+        p2 = update_repo.create_object(PERSON_TYPE)
         p2.name = 'John'
         p2.id = 5
         

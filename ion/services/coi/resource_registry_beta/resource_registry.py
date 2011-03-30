@@ -79,7 +79,7 @@ class ResourceRegistryService(ServiceProcess):
         if not isinstance(request, message_client.MessageInstance) or request.MessageType != RESOURCE_DESCRIPTION_TYPE:
             # This will terminate the hello service. As an alternative reply okay with an error message
             raise ResourceRegistryError('Expected message type RESOURCE_DESCRIPTION_TYPE, received %s'
-                                     % str(request), request.ResponseCodes.BAD_REQUEST)
+                                     % type(request))#, request.ResponseCodes.BAD_REQUEST)
 
 
         response = yield self._register_resource_instance(request, headers)
