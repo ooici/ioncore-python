@@ -296,13 +296,16 @@ class Subscriber(BasicLifecycleObject):
 
     @defer.inlineCallbacks
     def register(self):
+        """
+        Registers this Subscriber with the PSC.
+        Call this prior to calling initialize, as default initialize will try to create a queue.
+        """
         yield _psc_setup_subscriber(self, xp_name=self._xp_name, binding_key=self._binding_key)
 
     @defer.inlineCallbacks
     def subscribe(self):
         """
         """
-        yield self.register()
         yield self._recv.attach()
 
     def unsubscribe(self):
@@ -400,12 +403,11 @@ class SubscriberFactory(object):
         credentials     = credentials or self._credentials
 
         sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, process=process, credentials=credentials, *args, **kwargs)
-        yield process.register_life_cycle_object(sub)
+        yield sub.register()
+        yield process.register_life_cycle_object(sub)        # brings the subscriber up to the same state as the process
 
         if not handler is None:
             sub.ondata = handler
-
-        yield sub.register()
 
         defer.returnValue(sub)
 
