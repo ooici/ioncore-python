@@ -104,9 +104,11 @@ class EventPublisher(Publisher):
         yield self.publish(event_msg, routing_key=self.topic(origin))
 
     @defer.inlineCallbacks
-    def create_and_publish_event(self, origin=None, **kwargs):
+    def create_and_publish_event(self, **kwargs):
+        """
+        """
         msg = yield self.create_event(**kwargs)
-        yield self.publish_event(msg, origin=origin)
+        yield self.publish_event(msg, origin=kwargs.get('origin', None))
 
 class ResourceLifecycleEventPublisher(EventPublisher):
     """
