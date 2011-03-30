@@ -10,12 +10,20 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-from ion.play.hello_resource import HelloResourceClient
+from ion.core.process import process
+
 from ion.test.iontest import IonTestCase
 
-from ion.core.messaging.message_client import MessageClient
+from ion.services.coi.resource_registry_beta import resource_client
 
-from ion.services.dm.inventory.dataset_controller import QUERYRESULTS_TYPE, FINDDATASETREQUEST_TYPE, IDREF_TYPE, DatasetControllerClient
+from ion.core.messaging.message_client import MessageClient
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
+from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
+
+# Message types
+from ion.services.dm.inventory.dataset_controller import QUERYRESULTS_TYPE, FINDDATASETREQUEST_TYPE, IDREF_TYPE, DatasetControllerClient, CMD_DATASET_RESOURCE_TYPE
+
+
 
 class DateSetControllerTest(IonTestCase):
     """
@@ -28,16 +36,34 @@ class DateSetControllerTest(IonTestCase):
         yield self._start_container()
 
         services = [
+            {'name':'index_store_service','module':'ion.core.data.index_store_service','class':'IndexStoreService',
+                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS} },
+
             {'name':'ds1','module':'ion.services.coi.datastore','class':'DataStoreService',
-             'spawnargs':{'servicename':'datastore'}},
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
+                          COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}
+                },
+
+            {'name':'association_service',
+             'module':'ion.services.dm.inventory.association_service',
+             'class':'AssociationService'
+              },
+
             {'name':'resource_registry1','module':'ion.services.coi.resource_registry_beta.resource_registry','class':'ResourceRegistryService',
              'spawnargs':{'datastore_service':'datastore'}},
+
             {'name':'dataset_controller','module':'ion.services.dm.inventory.dataset_controller','class':'DataSetController'},
         ]
 
         sup = yield self._spawn_processes(services)
 
-        self.mc = MessageClient(proc = self.test_sup)
+        # Creat an anonymous process for the tests
+        self.proc = process.Process()
+        yield self.proc.spawn()
+
+        self.mc = MessageClient(proc=self.proc)
+
+        self.rc = resource_client.ResourceClient(proc=self.proc)
 
 
     @defer.inlineCallbacks
@@ -48,8 +74,8 @@ class DateSetControllerTest(IonTestCase):
     @defer.inlineCallbacks
     def test_hello_dataset(self):
 
-        # Create a hello object client
-        dscc = DatasetControllerClient(proc=self.test_sup)
+        # Create a Dataset Controller client with an anonymous process
+        dscc = DatasetControllerClient(proc=self.proc)
 
         # Creating a new dataset is takes input - it is creating blank resource to be filled by ingestion
         create_request_msg = yield self.mc.create_instance(None)
@@ -59,4 +85,36 @@ class DateSetControllerTest(IonTestCase):
 
         log.info('Create returned resource reference:\n%s' % str(create_response_msg))
         
+
+
+    @defer.inlineCallbacks
+    def test_find_dataset(self):
+
+        # Create a Dataset Controller client with an anonymous process
+        dscc = DatasetControllerClient(proc=self.proc)
+
+        # Creating a new dataset is takes input - it is creating blank resource to be filled by ingestion
+        find_request_msg = yield self.mc.create_instance(FINDDATASETREQUEST_TYPE)
+
+        find_request_msg.only_mine = False
+        find_request_msg.by_life_cycle_state = find_request_msg.LifeCycleState.ACTIVE
+
+        # You can send the root of the object or any linked composite part of it.
+        find_response_msg = yield dscc.find_dataset_resources(find_request_msg)
+
+        log.info('Create returned resource reference:\n%s' % str(find_response_msg))
+
+        # This may fail if more datasets are preloaded
+
+        self.assertEqual(len(find_response_msg.idrefs)>=1,True)
+
+        for idref in find_response_msg.idrefs:
+
+            dataset = yield self.rc.get_instance(idref)
+
+            # Now you have got the dataset object!
+
+            self.assertEqual(dataset.ResourceObjectType, CMD_DATASET_RESOURCE_TYPE)
+
+            self.assertEqual(dataset.ResourceLifeCycleState, dataset.ACTIVE)
 
