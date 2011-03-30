@@ -201,6 +201,10 @@ class ErrorLoggingEventPublisher(LoggingEventPublisher):
 class EventSubscriber(Subscriber):
     """
     Base Subscriber for event notifications.
+
+    This base subscriber is capable of subscribing to any event notification type with any origin. You must assign
+    the on_data callable in your instance (to a callable taking a data param) or use a SubscriberFactory with
+    the subscriber_type set to this class and specify your handler to its build method.
     """
 
     event_id = None
@@ -216,7 +220,13 @@ class EventSubscriber(Subscriber):
         return "%s.%s" % (str(event_id), str(origin))
 
     def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None, event_id=None, origin=None, *args, **kwargs):
+        """
+        Initializer.
 
+        You may wish to set either event_id or origin. A normal SubscriberFactory, with this class specified
+        as the subscriber_type, will pass event_id or origin as kwargs here when specified to the build 
+        method.
+        """
         # only set this if the user specified something to this initializer and there's no class default
         if self.event_id is None and not event_id is None:
             self.event_id = event_id
