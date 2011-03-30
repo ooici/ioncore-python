@@ -44,6 +44,7 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ID_CFG, TYPE_CFG, PREDICATE_CFG, PRELOAD_CFG, NAME_CFG, DESCRIPTION_CFG, CONTENT_CFG, CONTENT_ARGS_CFG
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_PREDICATES_CFG, ION_DATASETS_CFG, ION_RESOURCE_TYPES_CFG, ION_IDENTITIES_CFG
 
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TypeMap
 
 from ion.core import ioninit
 CONF = ioninit.config(__name__)
@@ -56,6 +57,7 @@ STRUCTURE_ELEMENT_TYPE = object_utils.create_type_identifier(object_id=1, versio
 
 ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
 TERMINOLOGY_TYPE = object_utils.create_type_identifier(object_id=14, version=1)
+IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 RESOURCE_TYPE = object_utils.create_type_identifier(object_id=1102, version=1)
 
@@ -125,7 +127,6 @@ class DataStoreWorkbench(WorkBench):
 
             blob = columns[VALUE]
             wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
-            assert key == wse.key, 'Calculated key does not match the stored key!'
             repo.index_hash[key] = wse
 
             if columns[BRANCH_NAME]:
@@ -283,6 +284,53 @@ class DataStoreWorkbench(WorkBench):
                     raise DataStoreWorkBenchError('Requested push to a repository is in an invalid state: MODIFIED.', request.ResponseCodes.BAD_REQUEST)
                 repo_keys = set(self.list_repository_blobs(repo))
 
+            # Get the latest commits in the repository
+            q = Query()
+            q.add_predicate_eq(REPOSITORY_KEY, repostate.repository_key)
+
+            rows = yield self._commit_store.query(q)
+    
+            for key, columns in rows.items():
+
+                blob = columns[VALUE]
+                wse = gpb_wrapper.StructureElement.parse_structure_element(blob)
+                if wse.key in repo._commit_index.keys():
+                    # No thanks, he's already got one!
+                    continue
+
+                repo.index_hash[key] = wse
+
+                if columns[BRANCH_NAME]:
+                    # If this appears to be a head commit
+
+                    # Deal with the possibility that more than one branch points to the same commit
+                    branch_names = columns[BRANCH_NAME].split(',')
+
+                    for name in branch_names:
+
+                        for branch in repo.branches:
+                            # if the branch already exists in the new_head just add a commitref
+                            if branch.branchkey == name:
+                                link = branch.commitrefs.add()
+                                #  Link is set below...
+                                break
+                        else:
+                            # If not add a new branch
+                            branch = repo._dotgit.branches.add()
+                            branch.branchkey = name
+                            link = branch.commitrefs.add()
+                            # Link is set below...
+
+                        cref = repo._load_element(wse)
+                        repo._commit_index[cref.MyId]=cref
+                        cref.ReadOnly = True
+
+                        link.SetLink(cref)
+
+            # Now the repo is up to date on the data store side...
+
+
+
             # add a new entry in the new_commits dictionary to store the commits of the push for this repo
             new_commits[repo.repository_key] = []
 
@@ -423,7 +471,7 @@ class DataStoreWorkbench(WorkBench):
                 elif root_type == RESOURCE_TYPE:
 
 
-                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.type.object_id
+                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
                     attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
 
 
@@ -477,7 +525,6 @@ class DataStoreWorkbench(WorkBench):
         def_list = []
         for new_head in new_head_list:
 
-            #print 'Setting New Head:', new_head
             def_list.append(self._commit_store.put(**new_head))
 
         yield defer.DeferredList(def_list)
@@ -599,8 +646,7 @@ class DataStoreWorkbench(WorkBench):
                 cref = repo._commit_index.get(key)
 
                 link = cref.GetLink('objectroot')
-                root_type = link.type
-
+                root_type = link.type.GPBMessage
 
                 if root_type == ASSOCIATION_TYPE:
                     attributes[SUBJECT_KEY] = cref.objectroot.subject.key
@@ -617,8 +663,7 @@ class DataStoreWorkbench(WorkBench):
 
                 elif root_type == RESOURCE_TYPE:
 
-
-                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.type.object_id
+                    attributes[RESOURCE_OBJECT_TYPE] = cref.objectroot.resource_type.key
                     attributes[RESOURCE_LIFE_CYCLE_STATE] = cref.objectroot.lcs
 
 
@@ -656,6 +701,11 @@ class DataStoreWorkbench(WorkBench):
                     def_list.append(defd)
 
         yield defer.DeferredList(def_list)
+
+        #import pprint
+        #print 'After update to heads'
+        #pprint.pprint(self._commit_store.kvs)
+
 
         # Now clear the in memory workbench
         self.clear_non_persistent()
@@ -733,6 +783,12 @@ class DataStoreService(ServiceProcess):
 #        log.info("@@@--->>> DataStoreService: Sending preloaded datasets dictionary to sender")
 #        res = yield self.reply_ok(msg, self.preloaded_datasets_dict)
 ##        defer.returnValue(res)
+
+
+    # The type_map is a map from object type to resource type built from the ion_preload_configs
+    # this is a temporary device until the resource registry is fully architecturally operational.
+    type_map = TypeMap()
+
 
 
     def __init__(self, *args, **kwargs):
@@ -894,11 +950,18 @@ class DataStoreService(ServiceProcess):
         # Name and Description is set by the resource client
         resource.name = description[NAME_CFG]
         resource.description = description[DESCRIPTION_CFG]
-        
-        object_utils.set_type_from_obj(res_obj, resource.type)
-        
+
+        # Set the type...
+        object_utils.set_type_from_obj(res_obj, resource.object_type)
+
+        res_type = resource_repository.create_object(IDREF_TYPE)
+        # Get the resource type if it exists - otherwise a default will be set!
+        res_type.key = self.type_map.get(description[TYPE_CFG].object_id)
+        resource.resource_type = res_type
+
+
         # State is set to new by default
-        resource.lcs = resource.LifeCycleState.NEW
+        resource.lcs = resource.LifeCycleState.ACTIVE
 
         resource_instance = resource_client.ResourceInstance(resource_repository)
 

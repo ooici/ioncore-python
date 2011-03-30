@@ -39,10 +39,23 @@ topic_res_type_name = 'topic_resource_type'
 dataset_res_type_name = 'dataset_resource_type'
 identity_res_type_name = 'identity_resource_type'
 datasource_res_type_name = 'datasource_resource_type'
+resource_type_type_name = 'resource_type_type'
+default_resource_type_name = 'default_resource_type'
+
 
 resource_type_type = create_type_identifier(object_id=1103, version=1)
 # Data structure used by datastore intialization
 ION_RESOURCE_TYPES={
+resource_type_type_name:{ID_CFG:'173a3188-e290-42be-8776-8717077dd207',
+                     TYPE_CFG:resource_type_type,
+                     NAME_CFG:resource_type_type_name,
+                     DESCRIPTION_CFG:'The resource type is meta description of a class of resource',
+                     CONTENT_CFG:{'object_identifier':1103,
+                                  'object_version':1,
+                                  'meta_description':'protomessage?'}
+                     },
+
+
 topic_res_type_name:{ID_CFG:'3BD84B48-073E-4833-A62B-0DE4EC106A34',
                      TYPE_CFG:resource_type_type,
                      NAME_CFG:topic_res_type_name,
@@ -76,7 +89,17 @@ datasource_res_type_name:{ID_CFG:'b8b7bb73-f578-4604-b3b3-088d28f9a7dc',
                        CONTENT_CFG:{'object_identifier':4503,
                                     'object_version':1,
                                     'meta_description':'protomessage?'}
-                        }
+                        },
+
+default_resource_type_name:{ID_CFG:'422ade3c-d820-437f-8bd3-7d8793591eb0',
+                     TYPE_CFG:resource_type_type,
+                     NAME_CFG:default_resource_type_name,
+                     DESCRIPTION_CFG:'A type to catch unregistered types!',
+                     CONTENT_CFG:{'object_identifier':-1,
+                                  'object_version':-1,
+                                  'meta_description':'protomessage?'}
+                     },
+
 }
 
 # Extract Resource ID_CFGs for use in services and tests
@@ -84,6 +107,9 @@ TOPIC_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[topic_res_type_name][ID_CFG]
 DATASET_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[dataset_res_type_name][ID_CFG]
 IDENTITY_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[identity_res_type_name][ID_CFG]
 DATASOURCE_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[datasource_res_type_name][ID_CFG]
+RESOURCE_TYPE_TYPE_ID = ION_RESOURCE_TYPES[resource_type_type_name][ID_CFG]
+
+DEFAULT_RESOURCE_TYPE_ID = ION_RESOURCE_TYPES[default_resource_type_name][ID_CFG]
 
 
 ##### Define Predicates #####:
@@ -93,9 +119,7 @@ has_a_name = 'has_a'
 is_a_name = 'is_a'
 type_of_name = 'type_of'
 owned_by_name = 'owned_by'
-# specialized predicates
-topic_for_name = 'topic_for'
-has_source_name = 'has_source'
+has_life_cycle_state_name = 'has_life_cycle_state'
 
 TERMINOLOGY_TYPE = create_type_identifier(object_id=14, version=1)
 
@@ -117,13 +141,10 @@ owned_by_name:{ID_CFG:'734CE3E6-90ED-4642-AD46-7C2E67BDA798',
             TYPE_CFG:TERMINOLOGY_TYPE,
             PREDICATE_CFG:owned_by_name},
 
-topic_for_name:{ID_CFG:'ffe5c79e-58b5-493b-b409-0280c86ba0c7',
+has_life_cycle_state_name:{ID_CFG:'ffe5c79e-58b5-493b-b409-0280c86ba0c7',
             TYPE_CFG:TERMINOLOGY_TYPE,
-            PREDICATE_CFG:topic_for_name},
+            PREDICATE_CFG:has_life_cycle_state_name},
 
-has_source_name:{ID_CFG:'709a3879-0831-4e72-af77-3016ad9153af',
-            TYPE_CFG:TERMINOLOGY_TYPE,
-            PREDICATE_CFG:has_source_name},
 }
 
 
@@ -133,6 +154,7 @@ IS_A_ID = ION_PREDICATES[is_a_name][ID_CFG]
 TYPE_OF_ID = ION_PREDICATES[type_of_name][ID_CFG]
 OWNED_BY_ID = ION_PREDICATES[owned_by_name][ID_CFG]
 
+HAS_LIFE_CYCLE_STATE_ID = ION_PREDICATES[has_life_cycle_state_name][ID_CFG]
 
 
 ##### Define Identities #####:
@@ -147,7 +169,7 @@ anonymous_name:{ID_CFG:'a3d5d4a0-7265-4ef2-b0ad-3ce2dc7252d8',
                           TYPE_CFG:identity_type,
                           NAME_CFG:anonymous_name,
                           DESCRIPTION_CFG:'The anonymous user is the identity used by any unregistered user.',
-                          CONTENT_CFG:{'subject':'',
+                          CONTENT_CFG:{'subject':'ss',
                                        'certificate':'',
                                        'rsa_private_key':'',
                                        'dispatcher_queue':'',
@@ -159,7 +181,7 @@ root_name:{ID_CFG:'e15cadea-4605-4afd-af80-8fc3bc54d2a3',
                           TYPE_CFG:identity_type,
                           NAME_CFG:root_name,
                           DESCRIPTION_CFG:'The root user is the super administrator.',
-                          CONTENT_CFG:{'subject':'',
+                          CONTENT_CFG:{'subject':'aa',
                                        'certificate':'',
                                        'rsa_private_key':'',
                                        'dispatcher_queue':'',
@@ -274,5 +296,28 @@ def generate_reference_instance(proc=None, resource_id=None):
 
     #@ TODO Complete this method... Should be about ten lines.
     
+
+class TypeMap(dict):
+
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+
+        type_map = {}
+        for type_name, description in ION_RESOURCE_TYPES.items():
+            type_cfg = description.get(CONTENT_CFG)
+            obj_type_id = type_cfg.get('object_identifier')
+            type_map[obj_type_id] = description.get(ID_CFG)
+
+        self.update(type_map)
+
+
+    def get(self, key):
+        '''
+        Get the resource type given an object type id #
+        '''
+
+        return dict.get(self,key, DEFAULT_RESOURCE_TYPE_ID)
+
+
 
 

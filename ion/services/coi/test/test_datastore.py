@@ -188,6 +188,59 @@ class DataStoreTest(IonTestCase):
 
         self.assertEqual(ab.title,'Datastore Addressbook')
 
+    @defer.inlineCallbacks
+    def test_push_clear_pull_again(self):
+
+        log.info('DataStore1 Push addressbook to DataStore1')
+
+        result = yield self.wb1.workbench.push_by_name('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        log.info('DataStore1 Push addressbook to DataStore1: complete')
+
+
+
+        self.wb1.workbench.clear_non_persistent()
+
+        self.ds1.workbench.clear_non_persistent()
+
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+        self.assertEqual(repo,None)
+
+        result = yield self.wb1.workbench.pull('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        ab = yield repo.checkout('master')
+
+        self.assertEqual(ab.title,'Datastore Addressbook')
+
+        
+        self.wb1.workbench.clear_non_persistent()
+
+        self.ds1.workbench.clear_non_persistent()
+
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+        self.assertEqual(repo,None)
+
+        result = yield self.wb1.workbench.pull('datastore',self.repo_key)
+
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        # use the value - the key of the first to get it from the workbench on the 2nd
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+
+        ab = yield repo.checkout('master')
+
+        self.assertEqual(ab.title,'Datastore Addressbook')
 
 
     @defer.inlineCallbacks

@@ -25,7 +25,8 @@ from ion.services.coi.resource_registry_beta.resource_registry import ResourceRe
 from ion.test.iontest import IonTestCase
 
 from ion.core.object import object_utils
-resource_description_type = object_utils.create_type_identifier(object_id=1101, version=1)
+RESOURCE_DESCRIPTION_TYPE = object_utils.create_type_identifier(object_id=1101, version=1)
+IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
 
 
 class ResourceRegistryTest(IonTestCase):
@@ -67,12 +68,17 @@ class ResourceRegistryTest(IonTestCase):
         wb = proc_rr2.workbench
         
         # Create a sendable resource object
-        description_repository, resource_description = wb.init_repository(root_type=resource_description_type)
+        description_repository, resource_description = wb.init_repository(root_type=RESOURCE_DESCRIPTION_TYPE)
         
         # Set the description
         resource_description.name = 'Johns resource'
         resource_description.description = 'Lots of metadata'
-        object_utils.set_type_from_obj(addressbook_pb2.AddressLink, resource_description.type)
+        object_utils.set_type_from_obj(addressbook_pb2.AddressLink, resource_description.object_type)
+        
+        res_type = description_repository.create_object(IDREF_TYPE)
+        res_type.key = 'Some junk'
+        resource_description.resource_type = res_type
+
         
         # Test the business logic of the register resource instance operation
         result = yield proc_rr2._register_resource_instance(resource_description)
@@ -89,7 +95,7 @@ class ResourceRegistryTest(IonTestCase):
             
         self.assertEqual(resource.identity, res_id)
         
-        self.assertEqual(resource.type, resource_description.type)
+        self.assertEqual(resource.object_type, resource_description.object_type)
         
         
         
