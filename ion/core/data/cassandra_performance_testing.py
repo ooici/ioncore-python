@@ -431,10 +431,12 @@ def main():
     parser.add_option("-b", "--blobs", dest="blobs", default=100, help="The number of blobs or rows to put into Cassandra")
     parser.add_option("-s", "--size", dest="size", default=MB, help="The number of blobs or rows to put into Cassandra")
     parser.add_option("-i", "--indexed", action="store_true", dest="indexed", default=False, help="Use the indexed column family or the nonindexed column family")
+    parser.add_option("-q", "--query", action="store_true", dest="query", default=False, help="Run the query benchmarks, assumes we are using indexes")
     opts, args = parser.parse_args()
-    #tester = CassandraPerformanceTester(index=opts.indexed, num_rows=int(opts.blobs),blob_size=int(opts.size))
-    #tester.runBenchmarkTests()
-    tester = CassandraQueryBenchmarks(index=opts.indexed, num_rows=int(opts.blobs),blob_size=int(opts.size))
+    if opts.query:
+        tester = CassandraQueryBenchmarks(index=opts.indexed, num_rows=int(opts.blobs),blob_size=int(opts.size))
+    else:
+        tester = CassandraBenchmarkTests(index=True, num_rows=int(opts.blobs),blob_size=int(opts.size))
     tester.runQueryBenchMarks()
     reactor.run() 
     

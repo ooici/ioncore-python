@@ -12,6 +12,10 @@ log = ion.util.ionlog.getLogger(__name__)
 from ion.core.object.object_utils import create_type_identifier
 
 from ion.services.coi.datastore_bootstrap import dataset_bootstrap
+
+from ion.core import ioninit
+CONF = ioninit.config(__name__)
+
 ### Constants used in defining the basic configuration which is preloaded into the datastore:
 ID_CFG = 'id'
 TYPE_CFG = 'type'
@@ -197,46 +201,67 @@ ANONYMOUS_USER_ID = ION_IDENTITIES[anonymous_name][ID_CFG]
 ##### Define Datasets and data sources #####:
 
 # Dataset names
-profile_dataset_name = 'profile_dataset'
-profile_data_source_name = 'profile_data_source'
-#traj_dataset_name = 'traj_dataset'
-#station_dataset_name = 'station_dataset'
+profile_dataset_name = 'sample_profile_dataset'
+profile_data_source_name = 'sample_profile_datasource'
+traj_dataset_name = 'sample_traj_dataset'
+traj_data_source_name = 'sample_traj_datasource'
+station_dataset_name = 'sample_station_dataset'
+station_data_source_name = 'sample_station_datasource'
 grid_dataset_name = 'grid_dataset'
+
+# Resource Byte Array locations
+trj_dataset_loc = CONF.getValue(traj_dataset_name, None)
+stn_dataset_loc = CONF.getValue(station_dataset_name, None)
 
 
 DATASET_TYPE = create_type_identifier(object_id=10001, version=1)
 DATASOURCE_TYPE = create_type_identifier(object_id=4503, version=1)
 # Data structure used by datastore intialization
+TESTING_SIGNIFIER = '3319A67F'
 ION_DATASETS={
-profile_dataset_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F1',
+profile_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F1',
                       TYPE_CFG:DATASET_TYPE,
                       NAME_CFG:profile_dataset_name,
                       DESCRIPTION_CFG:'An example of a profile dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_profile_dataset
                       },
 
-profile_data_source_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F2',
+profile_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F2',
                       TYPE_CFG:DATASOURCE_TYPE,
                       NAME_CFG:profile_data_source_name,
                       DESCRIPTION_CFG:'An example of a data source for the profile dataset',
                       CONTENT_CFG:dataset_bootstrap.bootstrap_data_source_resource
                       },
 
-#traj_dataset_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F3',
-#                      TYPE_CFG:DATASET_TYPE,
-#                      NAME_CFG:traj_dataset_name,
-#                      DESCRIPTION_CFG:'An example of a trajectory dataset',
-#                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
-#                      CONTENT_ARGS_CFG:{'filename':'../ion/services/coi/SOS_Test.obj'},
-#                      },
-#
-#station_dataset_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F4',
-#                      TYPE_CFG:DATASET_TYPE,
-#                      NAME_CFG:station_dataset_name,
-#                      DESCRIPTION_CFG:'An example of a station dataset',
-#                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
-#                      CONTENT_ARGS_CFG:{'filename':'../ion/services/coi/USGS_Test.obj'},
-#                      },
+traj_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F3',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:traj_dataset_name,
+                      DESCRIPTION_CFG:'An example of a trajectory dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':trj_dataset_loc},
+                      },
+                      
+traj_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F5',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:traj_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for the trajectory dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_traj_data_source
+                      },
+
+station_dataset_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F4',
+                      TYPE_CFG:DATASET_TYPE,
+                      NAME_CFG:station_dataset_name,
+                      DESCRIPTION_CFG:'An example of a station dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_byte_array_dataset,
+                      CONTENT_ARGS_CFG:{'filename':stn_dataset_loc},
+                      },
+                      
+station_data_source_name:{ID_CFG:TESTING_SIGNIFIER + '-81F3-424F-8E69-4F28C4E047F6',
+                      TYPE_CFG:DATASOURCE_TYPE,
+                      NAME_CFG:station_data_source_name,
+                      DESCRIPTION_CFG:'An example of a data source for the station dataset',
+                      CONTENT_CFG:dataset_bootstrap.bootstrap_station_data_source
+                      },
 
 #grid_dataset_name:{ID_CFG:''},
 }
@@ -245,8 +270,10 @@ profile_data_source_name:{ID_CFG:'3319A67F-81F3-424F-8E69-4F28C4E047F2',
 # Extract Resource ID_CFGs for use in services and tests
 SAMPLE_PROFILE_DATASET_ID = ION_DATASETS[profile_dataset_name][ID_CFG]
 SAMPLE_PROFILE_DATA_SOURCE_ID = ION_DATASETS[profile_data_source_name][ID_CFG]
-#SAMPLE_TRAJ_DATASET_ID = ION_DATASETS[traj_dataset_name][ID_CFG]
-#SAMPLE_STATION_DATASET_ID = ION_DATASETS[station_dataset_name][ID_CFG]
+SAMPLE_TRAJ_DATASET_ID = ION_DATASETS[traj_dataset_name][ID_CFG]
+SAMPLE_TRAJ_DATA_SOURCE_ID = ION_DATASETS[traj_data_source_name][ID_CFG]
+SAMPLE_STATION_DATASET_ID = ION_DATASETS[station_dataset_name][ID_CFG]
+SAMPLE_STATION_DATA_SOURCE_ID = ION_DATASETS[station_data_source_name][ID_CFG]
 #SAMPLE_GRID_DATASET_ID = ION_DATASETS[grid_dataset_name][ID_CFG]
 
 

@@ -734,6 +734,35 @@ class DataStoreError(ApplicationError):
     """
 
 
+#class DataStoreClient(ServiceClient):
+#    """
+#    Client for retrieving datastore resources -- currently for retrieving the IDs of preloaded datasets
+#    """
+#    
+#    def __init__(self, *args, **kwargs):
+#        kwargs['targetname'] = 'datastore'
+#        ServiceClient.__init__(self, *args, **kwargs)
+#    
+#    @defer.inlineCallbacks
+#    def get_preloaded_datasets_dict(self):
+#        """
+#        Retrieve the dictionary of preloaded dataset IDs
+#        """
+##        yield self._check_init()
+#        
+#        log.info("@@@--->>> DataStoreClient: Sending RPC message.  OP = 'get_preloaded_datasets_dict'")
+##        (content, headers, msg) = yield self.rpc_send('get_preloaded_datasets_dict', None)
+##        
+##        log.info("<<<---@@@ DataStoreClient: Incoming rpc reply to op: 'get_preloaded_datasets_dict'")
+##        log.debug("... Content\t" + str(content))
+##        log.debug("... Headers\t" + str(headers))
+##        log.debug("... Message\t" + str(msg))
+##        
+##        defer.returnValue(content)
+#        yield
+#        defer.returnValue({})
+
+
 class DataStoreService(ServiceProcess):
     """
     The data store is not yet persistent. At the moment all its stored objects
@@ -745,6 +774,15 @@ class DataStoreService(ServiceProcess):
     declare = ServiceProcess.service_declare(name='datastore',
                                              version='0.1.0',
                                              dependencies=[])
+
+#    @defer.inlineCallbacks
+#    def op_get_preloaded_datasets_dict(self, content, headers, msg):
+#        log.info("<<<---@@@ DataStoreService: Incoming call to op_get_preloaded_datasets_dict()")
+#        log.debug('DataStoreService.op_get_preloaded_datasets_dict(): returning the preloaded datasets dictionary')
+##        return self.preloaded_datasets_dict
+#        log.info("@@@--->>> DataStoreService: Sending preloaded datasets dictionary to sender")
+#        res = yield self.reply_ok(msg, self.preloaded_datasets_dict)
+##        defer.returnValue(res)
 
 
     # The type_map is a map from object type to resource type built from the ion_preload_configs
@@ -786,6 +824,8 @@ class DataStoreService(ServiceProcess):
 
         self.preload.update(CONF.getValue(PRELOAD_CFG, default={}))
         self.preload.update(self.spawn_args.get(PRELOAD_CFG, {}))
+        
+#        self.preloaded_datasets_dict = {}
 
         log.info('DataStoreService.__init__()')
         
@@ -863,6 +903,10 @@ class DataStoreService(ServiceProcess):
                 exists = yield self.workbench.test_existence(value[ID_CFG])
                 if not exists:
                     self._create_resource(value)
+#                    if (self._create_resource(value) is not None):
+#                        res_name = key
+#                        res_id = value[ID_CFG]
+#                        self.preloaded_datasets_dict[res_name] = res_id
 
         yield self.workbench.flush_initialization_to_backend()
 
@@ -922,6 +966,7 @@ class DataStoreService(ServiceProcess):
         resource_instance = resource_client.ResourceInstance(resource_repository)
 
         # Set the content
+        set_content_ok = True
         content = description[CONTENT_CFG]
         if isinstance(content, dict):
             # If it is a dictionary, set the content of the resource
@@ -933,13 +978,17 @@ class DataStoreService(ServiceProcess):
             kwargs = {}
             if description.has_key(CONTENT_ARGS_CFG):
                 kwargs = description[CONTENT_ARGS_CFG]
-            content(resource_instance, self, **kwargs)
+            if not content(resource_instance, self, **kwargs):
+                set_content_ok = False
             
-
-        resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
-
-        return resource_instance
-
+        
+        if set_content_ok:
+            resource_instance.Repository.commit('Resource instantiated by datastore bootstrap')
+            return resource_instance
+        else:
+            self.workbench.clear_repository_key(resource_key)
+            log.info('Retrieving content for resource "%s" failed.  This resource instance will not be added to the repository!' % description[NAME_CFG])
+            return None
 
 
 
