@@ -61,6 +61,7 @@ class PSSException(ApplicationError):
     Exception class for the pubsub service.
     """
 
+#noinspection PyUnusedLocal
 class PubSubService(ServiceProcess):
     """
     @brief Refactored pubsub service
