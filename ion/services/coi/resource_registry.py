@@ -311,11 +311,12 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         else:
             defer.returnValue(None)
 
-    def find_registered_resource_definitions_from_description(self, description,regex=True,ignore_defaults=True,attnames=[]):
+    def find_registered_resource_definitions_from_description(self, description,regex=True,ignore_defaults=True,attnames=None):
         """
         @brief find all registered resources which match the attributes of description
         @param see the registry docs for params
         """
+        if attnames is None: attnames = []
         return self.base_find_resource('find_registered_resource_definitions_from_description',description,regex,ignore_defaults,attnames)
 
     @defer.inlineCallbacks
@@ -336,11 +337,12 @@ class ResourceRegistryClient(registry.BaseRegistryClient, registry.LCStateMixin)
         else:
             defer.returnValue(None)
 
-    def find_registered_resource_instance_from_description(self, description,regex=True,ignore_defaults=True,attnames=[]):
+    def find_registered_resource_instance_from_description(self, description,regex=True,ignore_defaults=True,attnames=None):
         """
         @brief find all registered resources which match the attributes of description
         @param see the registry docs for params
         """
+        if attnames is None: attnames = []
         return self.base_find_resource('find_registered_resource_instance_from_description',description,regex,ignore_defaults,attnames)
 
 # Spawn of the process using the module name

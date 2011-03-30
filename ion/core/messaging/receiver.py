@@ -50,7 +50,7 @@ class Receiver(BasicLifecycleObject):
     rec_messages = {}
     rec_shutoff = False
 
-    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, error_handler=None, raw=False, consumer_config={}, publisher_config={}):
+    def __init__(self, name, scope='global', label=None, xspace=None, process=None, group=None, handler=None, error_handler=None, raw=False, consumer_config=None, publisher_config=None):
         """
         @param label descriptive label for the receiver
         @param name the actual exchange name. Used for routing
@@ -74,8 +74,8 @@ class Receiver(BasicLifecycleObject):
         self.process = process
         self.group = group
         self.raw = raw
-        self.consumer_config  = consumer_config
-        self.publisher_config = publisher_config
+        self.consumer_config  = consumer_config if consumer_config is not None else {}
+        self.publisher_config = publisher_config if publisher_config is not None else {}
 
         self.handlers = []
         self.error_handlers = []

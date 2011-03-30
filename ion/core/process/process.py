@@ -704,13 +704,15 @@ class Process(BasicLifecycleObject,ResponseCodes):
         convid = send + "#" + str(Process.convIdCnt)
         return convid
 
-    def reply(self, msg, operation=None, content=None, headers={}):
+    def reply(self, msg, operation=None, content=None, headers=None):
         """
         @brief Replies to a given message, continuing the ongoing conversation
         @retval Deferred or None
         """
-        if not operation:
+        if operation is None:
             operation = self.MSG_RESULT
+        if headers is None:
+            headers = {}
                 
         ionMsg = msg.payload
         recv = ionMsg.get('reply-to', None)
@@ -738,7 +740,7 @@ class Process(BasicLifecycleObject,ResponseCodes):
         return self.send(pu.get_process_id(recv), operation, content, reshdrs, reply=True)
 
     @defer.inlineCallbacks
-    def reply_ok(self, msg, content=None, headers={}):
+    def reply_ok(self, msg, content=None, headers=None):
         """
         Boilerplate method that replies to a given message with a success
         message and a given result value
@@ -753,13 +755,14 @@ class Process(BasicLifecycleObject,ResponseCodes):
         # This is basically a pass through for the reply method interface - only
         # used for backward compatibility!
         #log.info('''REPLY_OK is depricated - please use "reply"''')
+
+        if headers is None:
+            headers = {}
         
         if content is None:
-            
             content = yield self.message_client.create_instance(MessageContentTypeID=None)
 
         if isinstance(content, MessageInstance):
-                
             if not content.Message.IsFieldSet('response_code'):
                 content.MessageResponseCode = content.ResponseCodes.OK
             

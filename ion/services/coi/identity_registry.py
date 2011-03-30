@@ -168,9 +168,10 @@ class IdentityRegistryClient(ServiceClient):
     #--#op_find_users = BaseRegistryService.base_find_resource
 
     @defer.inlineCallbacks
-    def find_users(self, user_description,regex=True,ignore_defaults=True, attnames=[]):
+    def find_users(self, user_description,regex=True,ignore_defaults=True, attnames=None):
         """
         """
+        #--if attnames is None: attnames = []
         #--#return self.base_find_resource('find_users',user_description,regex,ignore_defaults,attnames)
 
 
@@ -542,7 +543,7 @@ class IdentityRegistryService(ServiceProcess):
            identity = yield self.rc.get_instance(self._user_dict[request.configuration.subject])
            
            if request.configuration.IsFieldSet('certificate'):
-              log.debug('update_user: setting rsa key to %s'%request.configuration.certificate)
+              log.debug('update_user: setting certificate to %s'%request.configuration.certificate)
               identity.certificate = request.configuration.certificate
               
            if request.configuration.IsFieldSet('rsa_private_key'):
@@ -550,14 +551,14 @@ class IdentityRegistryService(ServiceProcess):
               identity.rsa_private_key = request.configuration.rsa_private_key
               
            if request.configuration.IsFieldSet('dispatcher_queue'):
-              log.debug('update_user: setting rsa key to %s'%request.configuration.dispatcher_queue)
+              log.debug('update_user: setting dispatcher queue to %s'%request.configuration.dispatcher_queue)
               identity.dispatcher_queue = request.configuration.dispatcher_queue
               
            if request.configuration.IsFieldSet('email'):
-              log.debug('update_user: setting rsa key to %s'%request.configuration.email)
+              log.debug('update_user: setting email to %s'%request.configuration.email)
               identity.email = request.configuration.email
               
-           self.rc.put_instance(identity, 'Updated user information')
+           yield self.rc.put_instance(identity, 'Updated user information')
            # Create the response object...
            Response = yield self.message_client.create_instance(RESOURCE_CFG_RESPONSE_TYPE, MessageName='IR response')
            Response.result = "OK"
