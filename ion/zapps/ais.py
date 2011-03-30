@@ -6,9 +6,14 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
+from ion.core.object import object_utils
+from ion.core.data.storage_configuration_utility import COMMIT_INDEXED_COLUMNS, COMMIT_CACHE
 from ion.core.process.process import ProcessDesc
-
 from ion.core.pack import app_supervisor
+
+from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG
+
+
 
 
 # --- CC Application interface
@@ -17,18 +22,23 @@ from ion.core.pack import app_supervisor
 @defer.inlineCallbacks
 def start(container, starttype, app_definition, *args, **kwargs):
     resource_proc = [
+        {'name':'app_integration',
+         'module':'ion.integration.ais.app_integration_service',
+         'class':'AppIntegrationService'},
+        {'name':'index_store_service',
+         'module':'ion.core.data.index_store_service',
+         'class':'IndexStoreService',
+                'spawnargs':{'indices':COMMIT_INDEXED_COLUMNS}},
         {'name':'ds1',
          'module':'ion.services.coi.datastore',
          'class':'DataStoreService',
-         'spawnargs':{'servicename':'datastore'}
-            },
+             'spawnargs':{PRELOAD_CFG:{ION_DATASETS_CFG:True},
+                          COMMIT_CACHE:'ion.core.data.index_store_service.IndexStoreServiceClient'}},
+        {'name':'association_service', 'module':'ion.services.dm.inventory.association_service', 'class':'AssociationService'},
         {'name':'resource_registry1',
          'module':'ion.services.coi.resource_registry_beta.resource_registry',
          'class':'ResourceRegistryService',
          'spawnargs':{'datastore_service':'datastore'}},
-        {'name':'app_integration',
-         'module':'ion.integration.ais.app_integration_service',
-         'class':'AppIntegrationService'},
         {'name':'identity_registry',
          'module':'ion.services.coi.identity_registry',
          'class':'IdentityRegistryService'}
@@ -40,15 +50,6 @@ def start(container, starttype, app_definition, *args, **kwargs):
     supid = yield appsup_desc.spawn()
 
     res = (supid.full, [appsup_desc])
-    
-    
-    # Check for command line argument to add some example data resources
-    if ioninit.cont_args.get('register',None) == 'dummydata':
-        print '================================================================='
-        print 'Dummy Dataset Resources added by the AIS Service:'
-        #print data_resources
-        print 'The dataset IDs will be available in your localsOkay after the shell starts!'
-        print '================================================================='
     
     defer.returnValue(res)
 
