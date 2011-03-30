@@ -111,7 +111,7 @@ class PublisherFactory(object):
         self._publisher_id = None
 
     @defer.inlineCallbacks
-    def build(self, routing_key, xp_name=None, credentials=None, process=None):
+    def build(self, routing_key, xp_name=None, credentials=None, process=None, *args, **kwargs):
         """
         Creates a publisher and calls register on it.
 
@@ -130,7 +130,7 @@ class PublisherFactory(object):
         topic_name      = routing_key or self._topic_name
         publisher_name  = 'Publisher'
 
-        pub = Publisher(xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process)
+        pub = Publisher(xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process, *args, **kwargs)
         yield process.register_life_cycle_object(pub)     # brings the publisher to whatever state the process is in
 
         # Register does the PSC invocations
@@ -358,7 +358,7 @@ class SubscriberFactory(object):
         self._credentials       = credentials
 
     @defer.inlineCallbacks
-    def build(self, xp_name=None, binding_key=None, queue_name=None, handler=None, subscriber_type=Subscriber, process=None, credentials=None):
+    def build(self, xp_name=None, binding_key=None, queue_name=None, handler=None, subscriber_type=Subscriber, process=None, credentials=None, *args, **kwargs):
         """
         Creates a subscriber.
 
@@ -391,7 +391,7 @@ class SubscriberFactory(object):
         process         = process or self._process
         credentials     = credentials or self._credentials
 
-        sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, process=process, credentials=credentials)
+        sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, process=process, credentials=credentials, *args, **kwargs)
         yield process.register_life_cycle_object(sub)
 
         if handler != None:
