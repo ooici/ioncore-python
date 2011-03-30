@@ -216,7 +216,7 @@ class EventSubscriber(Subscriber):
         Builds the topic that this event should be published to.
         If either side of the event_id.origin pair are missing, will subscribe to anything.
         """
-        event_id = self.event_id or "*"
+        event_id = self._event_id or "*"
         origin = origin or "*"
 
         return "%s.%s" % (str(event_id), str(origin))
@@ -229,9 +229,7 @@ class EventSubscriber(Subscriber):
         as the subscriber_type, will pass event_id or origin as kwargs here when specified to the build 
         method.
         """
-        # only set this if the user specified something to this initializer and there's no class default
-        if self.event_id is None and not event_id is None:
-            self.event_id = event_id
+        self._event_id = event_id or self.event_id
 
         xp_name = xp_name or EVENTS_EXCHANGE_POINT
         binding_key = binding_key or self.topic(origin)
