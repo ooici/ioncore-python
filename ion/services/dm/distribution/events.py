@@ -192,3 +192,37 @@ class ErrorLoggingEventPublisher(LoggingEventPublisher):
     """
     event_id = LOGGING_ERROR_EVENT_ID
 
+#
+#
+# ################################################################################
+#
+#
+
+class EventSubscriber(Subscriber):
+    """
+    Base Subscriber for event notifications.
+    """
+
+    event_id = None
+
+    def topic(self, origin):
+        """
+        Builds the topic that this event should be published to.
+        If either side of the event_id.origin pair are missing, will subscribe to anything.
+        """
+        event_id = self.event_id or "*"
+        origin = origin or "*"
+
+        return "%s.%s" % (str(event_id), str(origin))
+
+    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None, event_id=None, origin=None, *args, **kwargs):
+
+        # only set this if the user specified something to this initializer and there's no class default
+        if self.event_id is None and not event_id is None:
+            self.event_id = event_id
+
+        xp_name = xp_name or EVENTS_EXCHANGE_POINT
+        binding_key = binding_key or self.topic(origin)
+
+        Subscriber.__init__(self, xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, credentials=credentials, process=process, *args, **kwargs)
+
