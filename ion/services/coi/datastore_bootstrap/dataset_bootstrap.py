@@ -6,12 +6,14 @@
 @author Tim LaRocque
 @TODO
 """
-
+import tarfile
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+
 from twisted.internet import defer
 
+from ion.util import procutils as pu
 
 from ion.core.object import object_utils, codec
 
@@ -37,14 +39,90 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     """
     ds_svc = args[0]
     filename = kwargs['filename']
-    
-    # @todo: Find out what errors can be raised and wrap this in a try/except
-    f = open(filename, 'r')
-    obj = codec.unpack_structure(f.read())
-    ds_svc.workbench.put_repository(obj.Repository)
-    
-    resource_instance.ResourceObject = obj
+    log.debug('Bootstraping dataset from local byte array: "%s"' % filename)
 
+    assert ds_svc is not None, 'Invalid invocation of the bootstrap_byte_array_dataset function. Must pass the datastore svc instance!'
+
+
+    if filename is None:
+        log.info('Could not bootstrap dataset with using datastore service "%s" and filename "%s"' % (str(ds_svc), str(filename)))
+        return False
+    
+    result = False
+    f = None
+    try:
+
+        # Get an absolute path to the file
+        filename = pu.get_ion_path(filename)
+
+        if filename.endswith('.tar.gz'):
+            log.debug('Untaring file...')
+            outname = filename.replace('.tar.gz', '.obj')
+            tar = tarfile.open(filename, 'r')
+            try:
+                f = tar.extractfile(tar.next())
+            except:
+                pass
+        else:
+            f = open(filename, 'r')
+        result = True
+    except IOError, e:
+        log.error('dataset_bootstrap.bootstrap_byte_array_dataset(): Could not open the given filepath "%s" for read access: %s' % (filename, str(e)))
+        
+    if f is not None:
+        obj = codec.unpack_structure(f.read())
+        ds_svc.workbench.put_repository(obj.Repository)
+        resource_instance.ResourceObject = obj
+    
+    return result
+
+
+def bootstrap_traj_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the coresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: NDBC SOS Glider data
+    
+    datasource.source_type = datasource.SourceType.SOS
+    datasource.property.append('salinity')
+    datasource.station_id.append('48900')
+    datasource.request_type = datasource.RequestType.NONE
+    # datasource.top = *not used*
+    # datasource.bottom = *not used*
+    # datasource.left = *not used*
+    # datasource.right = *not used*
+    datasource.base_url = "http://sdf.ndbc.noaa.gov/sos/server.php?"
+    # datasource.dataset_url = *not used*
+    # datasource.ncml_mask = *not used*
+    datasource.max_ingest_millis = 10000
+    
+    return True
+    
+    
+def bootstrap_station_data_source(datasource, *args, **kwargs):
+
+    #-------------------------------------------#
+    # Create the coresponding datasource object #
+    #-------------------------------------------#
+    # Datasource: USGS waterservices
+    
+    datasource.source_type = datasource.SourceType.USGS
+    datasource.property.append('00010')
+    datasource.property.append('00060')
+    datasource.station_id.append('01463500')
+    datasource.request_type = datasource.RequestType.NONE # *not used*
+    # datasource.top = *not used*
+    # datasource.bottom = *not used*
+    # datasource.left = *not used*
+    # datasource.right = *not used*
+#    datasource.base_url = 'http://sdf.ndbc.noaa.gov/sos/server.php?request=GetObservation&service=SOS&responseformat=text/csv&'
+    datasource.base_url = "http://waterservices.usgs.gov/nwis/iv?"
+    # datasource.dataset_url = *not used*
+    # datasource.ncml_mask = *not used*
+    datasource.max_ingest_millis = 6000
+    
+    return True
     
 def bootstrap_profile_dataset(dataset, *args, **kwargs):
     """
@@ -304,6 +382,8 @@ def bootstrap_profile_dataset(dataset, *args, **kwargs):
     group.attributes[13] = attrib_vert_max
     group.attributes[14] = attrib_vert_min
     group.attributes[15] = attrib_vert_pos
+    
+    return True
 
 
 def bootstrap_data_source_resource(datasource, *args, **kwargs):
@@ -326,6 +406,8 @@ def bootstrap_data_source_resource(datasource, *args, **kwargs):
     # datasource.dataset_url = *not used*
     # datasource.ncml_mask = *not used*
     datasource.max_ingest_millis = 6000
+    
+    return True
 
 
 def _create_string_attribute(dataset, name, values):

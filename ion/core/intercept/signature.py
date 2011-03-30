@@ -80,7 +80,9 @@ class SystemSecurityPlugin(interceptor.EnvelopeInterceptor):
     included in the message headers.
     """
 
-    def __init__(self, name, system_priv_key_path=None, allowed_certs={}):
+    def __init__(self, name, system_priv_key_path=None, allowed_certs=None):
+        if allowed_certs is None: allowed_certs = {}
+        
         interceptor.EnvelopeInterceptor.__init__(self, name)
         #XXX @todo need to be able to properly configure this interceptor
         #during container startup
