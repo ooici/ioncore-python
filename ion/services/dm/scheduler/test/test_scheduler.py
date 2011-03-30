@@ -58,7 +58,7 @@ class SchedulerTest(IonTestCase):
 
         task_id = yield sc.add_task(self.dest, 0.3, 'pingtest bar')
         log.debug(task_id)
-        self.failIf(task_id == None)
+        self.failIf(task_id is None)
 
         # Wait for a message to go through the system
         yield asleep(0.5)

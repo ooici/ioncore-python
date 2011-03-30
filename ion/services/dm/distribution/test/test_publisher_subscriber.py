@@ -161,7 +161,7 @@ class TestPublisher(IonTestCase):
             binding_key = kwargs.pop('binding_key', None)
             self.msgs = []
             Receiver.__init__(self, *args, **kwargs)
-            if binding_key == None:
+            if binding_key is None:
                binding_key = self.xname
 
             self.binding_key = binding_key
