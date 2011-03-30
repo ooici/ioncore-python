@@ -328,7 +328,7 @@ class ResourceClientTest(IonTestCase):
         defaults={}
         defaults.update(ION_RESOURCE_TYPES)
         defaults.update(ION_IDENTITIES)
-        defaults.update(ION_DATASETS)
+        #defaults.update(ION_DATASETS)
 
         for key, value in defaults.items():
 
