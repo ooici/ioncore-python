@@ -60,6 +60,10 @@ class Publisher(BasicLifecycleObject):
     def on_activate(self, *args, **kwargs):
         return self._recv.attach() # calls initialize/activate, gets receiver in correct state for publishing
 
+    def register(self, xp_name, topic_name, publisher_name, credentials):
+        return _psc_setup_publisher(self, xp_name=xp_name, routing_key=topic_name,
+                                    credentials=credentials, publisher_name=publisher_name)
+
     def publish(self, data, routing_key=None):
         """
         @brief Publish data on a specified resource id/topic
@@ -100,6 +104,7 @@ class PublisherFactory(object):
         self._credentials       = credentials
         self._process           = process
 
+        self._topic_name = None
         self._xs_id = None
         self._xp_id = None
         self._topic_id = None
@@ -122,19 +127,20 @@ class PublisherFactory(object):
         xp_name         = xp_name or self._xp_name
         credentials     = credentials or self._credentials
         process         = process or self._process
+        topic_name      = routing_key or self._topic_name
+        publisher_name  = 'Publisher'
 
         pub = Publisher(xp_name=xp_name, routing_key=routing_key, credentials=credentials, process=process)
         yield process.register_life_cycle_object(pub)     # brings the publisher to whatever state the process is in
-        #yield pub.register(xp_name, topic_id, publisher_name, credentials)
 
-        # Begin pfh additions 3/24/11 - PSC integration
-        yield _psc_setup(self, 'swapmeet', xp_name, routing_key, credentials)
+        # Register does the PSC invocations
+        yield pub.register(xp_name, topic_name, publisher_name, credentials)
 
         defer.returnValue(pub)
 
 # =================================================================================
 @defer.inlineCallbacks
-def _psc_setup(self, xs_name, xp_name, routing_key, credentials, publisher=True):
+def _psc_setup(self, mc, psc, xs_name, xp_name, routing_key):
     """
     Workaround for lack of query in the registry: We need CASref IDs for
     exchange space, exchange point and topic to register as a publisher,
@@ -143,14 +149,6 @@ def _psc_setup(self, xs_name, xp_name, routing_key, credentials, publisher=True)
     to (for now) do this sequence of calls to setup the entries and save
     the IDs.
     """
-    if not self._process:
-        log.error('Cannot initialize message client without process!')
-        return
-
-    log.debug('Setting up the PSC and saving IDs...')
-    mc = MessageClient(proc=self._process)
-    psc = PubSubClient(proc=self._process)
-
     log.debug('xs')
     msg = yield mc.create_instance(XS_TYPE)
 
@@ -176,32 +174,64 @@ def _psc_setup(self, xs_name, xp_name, routing_key, credentials, publisher=True)
     rc = yield psc.declare_topic(msg)
     self._topic_id = rc.id_list[0]
 
-    if publisher:
-        log.debug('publisher')
-        msg = yield mc.create_instance(PUBLISHER_TYPE)
-        msg.exchange_space_id = self._xs_id
-        msg.exchange_point_id = self._xp_id
-        msg.topic_id = self._topic_id
-        msg.publisher_name = 'PublisherFactory'
-        if credentials:
-            msg.credentials = credentials
-
-        rc = yield psc.declare_publisher(msg)
-        self._publisher_id = rc.id_list[0]
-    else:
-        # Subscriber
-        log.debug('Subscriber')
-        msg = yield mc.create_instance(SUBSCRIBER_TYPE)
-        msg.exchange_space_id = self._xs_id
-        msg.exchange_point_id = self._xp_id
-        msg.topic_id = self._topic_id
-        msg.subscriber_name = 'SubscriberFactory'
-        if self._queue_name:
-            msg.queue_name = self._queue_name
-        rc = yield psc.subscribe(msg)
-        self._subscriber_id = rc.id_list[0]
-
     log.debug('PFactory PSC calls completed')
+
+@defer.inlineCallbacks
+def _psc_setup_publisher(self, xs_name='swapmeet', xp_name='science_data', routing_key=None,
+                         credentials=None, publisher_name='Unknown'):
+
+    if not self._process:
+        log.error('Cannot initialize message client without process!')
+        return
+
+    log.debug('Setting up the PSC and saving IDs...')
+    mc = MessageClient(proc=self._process)
+    psc = PubSubClient(proc=self._process)
+
+    # Call the common stuff first
+    yield _psc_setup(self, mc, psc, xs_name, xp_name, routing_key)
+
+    # Register the publisher and save the casref
+    msg = yield mc.create_instance(PUBLISHER_TYPE)
+    msg.exchange_space_id = self._xs_id
+    msg.exchange_point_id = self._xp_id
+    msg.topic_id = self._topic_id
+    msg.publisher_name = publisher_name
+    if credentials:
+        msg.credentials = credentials
+
+    log.debug('declaring publisher')
+    rc = yield psc.declare_publisher(msg)
+    self._publisher_id = rc.id_list[0]
+
+    log.debug('done setting up publisher')
+
+@defer.inlineCallbacks
+def _psc_setup_subscriber(self, xs_name='swapmeet', xp_name='science_data',
+                          binding_key=None, subscriber_name='Unknown', credentials=None):
+
+    log.debug('Setting up the PSC...')
+    if not self._process:
+        log.error('Cannot initialize message client without process!')
+        return
+
+    mc = MessageClient(proc=self._process)
+    psc = PubSubClient(proc=self._process)
+
+    yield _psc_setup(self, mc, psc, xs_name, xp_name, binding_key)
+    
+    # Subscriber
+    # @note Not using credentials yet
+    log.debug('Subscriber')
+    msg = yield mc.create_instance(SUBSCRIBER_TYPE)
+    msg.exchange_space_id = self._xs_id
+    msg.exchange_point_id = self._xp_id
+    msg.topic_id = self._topic_id
+    msg.subscriber_name = subscriber_name
+    if self._queue_name:
+        msg.queue_name = self._queue_name
+    rc = yield psc.subscribe(msg)
+    self._subscriber_id = rc.id_list[0]
 
 class Subscriber(BasicLifecycleObject):
     """
@@ -222,6 +252,7 @@ class Subscriber(BasicLifecycleObject):
         self._credentials   = credentials
         self._process       = process
         self._subscriber_id = None
+        self._resource_id = None
 
         self._pubsub_client = PubSubClient(process=process)
 
@@ -256,10 +287,14 @@ class Subscriber(BasicLifecycleObject):
         yield self._recv.terminate()
 
     @defer.inlineCallbacks
+    def register(self):
+        yield _psc_setup_subscriber(self, xp_name=self._xp_name, binding_key=self._binding_key)
+
+    @defer.inlineCallbacks
     def subscribe(self):
         """
         """
-        # TODO: PSC interaction?
+        yield self.register()
         yield self._recv.attach()
 
     def unsubscribe(self):
@@ -362,7 +397,7 @@ class SubscriberFactory(object):
         if handler != None:
             sub.ondata = handler
 
-        yield _psc_setup(self, 'swapmeet', xp_name, binding_key, credentials, publisher=False)            
+        yield sub.register()
 
         defer.returnValue(sub)
 
