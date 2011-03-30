@@ -26,12 +26,12 @@ from ion.core.messaging.message_client import MessageClient, MessageInstance
 
 from ion.core.process.cprocess import IContainerProcess, ContainerProcess
 from ion.data.store import Store
-from ion.interact.conversation import ProcessConversationManager
+from ion.interact.conversation import ProcessConversationManager, CONV_TYPE_NONE
 from ion.interact.message import Message
 from ion.interact.request import RequestType
 from ion.interact.rpc import RpcType, GenericType
-import ion.util.procutils as pu
 from ion.util.context import StackLocal
+import ion.util.procutils as pu
 from ion.util.state_object import BasicLifecycleObject, BasicStates
 
 from ion.core.object import workbench
@@ -435,17 +435,17 @@ class Process(BasicLifecycleObject, ResponseCodes):
             self._establish_request_context(payload, msg)
 
             # Extract some headers and make log statement.
-            request.proc_name = self.proc_name
             fromname = payload['sender']
             if 'sender-name' in payload:
                 fromname = payload['sender-name']   # Legible sender alias
             log.info('>>> [%s] receive(): Message from [%s] ... >>>' % (
                      self.proc_name, fromname))
             convid = payload.get('conv-id', None)
+            protocol = payload.get('protocol', None)
 
             # Conversation handling.
             conv = None
-            if convid:
+            if convid and protocol != CONV_TYPE_NONE:
                 # Compose in memory message object for callbacks
                 message = dict(recipient=payload.get('receiver',None),
                                performative=payload.get('performative','request'),
@@ -491,9 +491,16 @@ class Process(BasicLifecycleObject, ResponseCodes):
                 # @see ion.interact.rpc, ion.interact.request
                 res = yield self.conv_manager.msg_received(message)
 
+            elif convid and protocol == CONV_TYPE_NONE:
+                # Case of one-off messages
+                log.debug("Received simple protocol=='none' message")
+                #pu.log_message(msg)
+                res = yield self._dispatch_message_op(payload, msg, None)
+
             else:
                 # Legacy case of no conv-id set or one-off messages (events?)
                 log.warn("No conversation id in message")
+                #pu.log_message(msg)
                 res = yield self._dispatch_message_op(payload, msg, None)
 
         except ApplicationError, ex:
@@ -528,6 +535,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
         @brief Establish security context for request processing.
             Extract and set user-id, session expiry based on incoming headers
         """
+        request.proc_name = self.proc_name
         # Check if there is a user id in the header, stash if so
         if 'user-id' in payload:
             log.info('[%s] receive(): payload user id [%s]' % (self.proc_name, payload['user-id']))
@@ -674,14 +682,6 @@ class Process(BasicLifecycleObject, ResponseCodes):
             Starts a new conversation.
         @retval Deferred for send of message
         """
-        #if headers:
-        #    if 'user-id' in headers:
-        #        log.debug('[%s] send(): headers user id [%s]' % (self.proc_name, headers['user-id']))
-        #    else:
-        #        log.debug('[%s] send(): user-id not specified in headers' % (self.proc_name))
-        #else:
-        #    log.debug('[%s] send(): headers not specified' % (self.proc_name))
-
         msgheaders = {}
         msgheaders['sender-name'] = self.proc_name
         if headers:
@@ -693,9 +693,12 @@ class Process(BasicLifecycleObject, ResponseCodes):
             #log.debug("Send conversation %r from %r" % (conv, self.conv_manager.conversations))
         else:
             # Not a new and not a reply to a conversation
-            conv = self.conv_manager.new_conversation(GenericType.CONV_TYPE_GENERIC)
-            msgheaders['conv-id'] = conv.conv_id
-            msgheaders['protocol'] = GenericType.CONV_TYPE_GENERIC
+            #conv = self.conv_manager.new_conversation(GenericType.CONV_TYPE_GENERIC)
+            #msgheaders['conv-id'] = conv.conv_id
+            # One-off send message. Do not create a conversation instance.
+            conv = None
+            msgheaders['conv-id'] = self.conv_manager.create_conversation_id()
+            msgheaders['protocol'] = CONV_TYPE_NONE
 
         if not 'user-id' in msgheaders:
             msgheaders['user-id'] = request.get('user_id', 'ANONYMOUS')

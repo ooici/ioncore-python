@@ -20,6 +20,9 @@ from ion.util.state_object import FSMFactory, StateObject, BasicStates
 CONF = ioninit.config(__name__)
 CF_basic_conv_types = CONF['basic_conv_types']
 
+# Conversation type id for no conversation use.
+CONV_TYPE_NONE = "none"
+
 class IConversationType(Interface):
     """
     Interface for all conversation type instances
@@ -208,12 +211,10 @@ class ConversationManager(object):
         self.conv_types[conv_type_id] = ct_inst
         return ct_inst
 
-    def create_conversation_id(self):
+    def create_conversation_id(self, prefix=''):
         # Returns a new unique conversation id
         self.convIdCnt += 1
-        convid = "#" + str(self.convIdCnt)
-        #send = self.process.id.full
-        #convid = send + "#" + Process.convIdCnt
+        convid = str(prefix) + "#" + str(self.convIdCnt)
         return convid
 
     def new_conversation(self, conv_type_id, conv_id=None):
@@ -265,7 +266,7 @@ class ProcessConversationManager(object):
         return conv.local_fsm._so_process(perf, message)
 
     def create_conversation_id(self):
-        return self.conv_mgr.create_conversation_id()
+        return self.conv_mgr.create_conversation_id(prefix=self.process.id.full)
 
     def new_conversation(self, conv_type_id, conv_id=None):
         conv_inst = self.conv_mgr.new_conversation(conv_type_id, conv_id)
