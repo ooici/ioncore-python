@@ -429,7 +429,7 @@ class Commit(BaseNode):
     """
     type = 'commit'
 
-    def __init__(self, tree, parents=[], log="", **other):
+    def __init__(self, tree, parents=None, log="", **other):
         """
         @brief Context wrapper around a root node (formerly a tree).
         @param tree hash or object
@@ -442,7 +442,7 @@ class Commit(BaseNode):
             tree_obj = None
         self.tree = tree
         self.tree_obj = tree_obj
-        self.parents = parents
+        self.parents = parents if parents is not None else []
         self.log = str(log) #or unicode? or what?
         self.other = other
 

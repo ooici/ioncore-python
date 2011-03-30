@@ -118,3 +118,37 @@ class DateSetControllerTest(IonTestCase):
 
             self.assertEqual(dataset.ResourceLifeCycleState, dataset.ACTIVE)
 
+
+    @defer.inlineCallbacks
+    def test_find_dataset_by_owner(self):
+
+        # Create a Dataset Controller client with an anonymous process
+        dscc = DatasetControllerClient(proc=self.proc)
+
+        # Creating a new dataset is takes input - it is creating blank resource to be filled by ingestion
+        find_request_msg = yield self.mc.create_instance(FINDDATASETREQUEST_TYPE)
+
+        find_request_msg.only_mine = True
+        # This will default the the anonymous user who owns the default datasets!
+        
+        find_request_msg.by_life_cycle_state = find_request_msg.LifeCycleState.ACTIVE
+
+        # You can send the root of the object or any linked composite part of it.
+        find_response_msg = yield dscc.find_dataset_resources(find_request_msg)
+
+        log.info('Create returned resource reference:\n%s' % str(find_response_msg))
+
+        # This may fail if more datasets are preloaded
+
+        self.assertEqual(len(find_response_msg.idrefs)>=1,True)
+
+        for idref in find_response_msg.idrefs:
+
+            dataset = yield self.rc.get_instance(idref)
+
+            # Now you have got the dataset object!
+
+            self.assertEqual(dataset.ResourceObjectType, CMD_DATASET_RESOURCE_TYPE)
+
+            self.assertEqual(dataset.ResourceLifeCycleState, dataset.ACTIVE)
+
