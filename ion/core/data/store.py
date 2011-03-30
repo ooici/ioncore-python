@@ -105,7 +105,7 @@ class IIndexStore(IStore):
         @retval Deferred, for value associated with key, or None if not existing.
         """
 
-    def put(key, value, index_attributes={}):
+    def put(key, value, index_attributes=None):
         """
         @param key  an immutable key to be associated with a value
         @param value  an object to be associated with the key. The caller must
@@ -189,12 +189,15 @@ class IndexStore(object):
         else:
             return defer.maybeDeferred(row.get, "value")
 
-    def put(self, key, value, index_attributes={}):
+    def put(self, key, value, index_attributes=None):
         """
         @see IStore.put
         Raises an exception if index_attibutes contains attributes that are not indexed
         by the underlying store.
         """
+        if index_attributes is None:
+            index_attributes = {}
+            
         self._update_index(key, index_attributes)
                         
         return defer.maybeDeferred(self.kvs.update, {key: dict({"value":value},**index_attributes)})        

@@ -257,8 +257,11 @@ class IndexStoreServiceClient(ServiceClient):
         defer.returnValue(results)
         
     @defer.inlineCallbacks
-    def put(self, key, value, index_attributes={}):
+    def put(self, key, value, index_attributes=None):
         log.info("Called Index Store Service client: put")
+        
+        if index_attributes is None:
+            index_attributes = {}
         
         row = yield self.mc.create_instance(ROW_TYPE)
         row.key = key
