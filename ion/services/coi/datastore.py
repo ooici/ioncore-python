@@ -987,7 +987,7 @@ class DataStoreService(ServiceProcess):
             return resource_instance
         else:
             self.workbench.clear_repository_key(resource_key)
-            log.warn('Retrieving content for resource "%s" failed.  This resource instance will not be added to the repository!' % description[NAME_CFG])
+            log.info('Retrieving content for resource "%s" failed.  This resource instance will not be added to the repository!' % description[NAME_CFG])
             return None
 
 

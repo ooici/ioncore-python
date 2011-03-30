@@ -210,8 +210,8 @@ station_data_source_name = 'sample_station_datasource'
 grid_dataset_name = 'grid_dataset'
 
 # Resource Byte Array locations
-trj_dataset_loc = CONF.getValue('trj_dataset_loc', None)
-stn_dataset_loc = CONF.getValue('stn_dataset_loc', None)
+trj_dataset_loc = CONF.getValue(traj_dataset_name, None)
+stn_dataset_loc = CONF.getValue(station_dataset_name, None)
 
 
 DATASET_TYPE = create_type_identifier(object_id=10001, version=1)

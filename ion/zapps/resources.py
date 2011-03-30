@@ -11,6 +11,7 @@ import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
+import os
 
 from ion.core.process.process import ProcessDesc
 
@@ -25,7 +26,6 @@ from ion.services.coi.datastore_bootstrap.ion_preload_config import PRELOAD_CFG,
 #                                                                    SAMPLE_TRAJ_DATASET_ID, SAMPLE_TRAJ_DATA_SOURCE_ID, \
 #                                                                    SAMPLE_STATION_DATASET_ID, SAMPLE_STATION_DATA_SOURCE_ID, \
 #                                                                    PRELOAD_CFG, ION_DATASETS_CFG, ION_DATASETS, CONTENT_ARGS_CFG, ID_CFG
-import os
 
 
 # --- CC Application interface
@@ -39,34 +39,13 @@ def start(container, starttype, app_definition, *args, **kwargs):
     # Check for command line argument to add some example data resources
     if ioninit.cont_args.get('register', None) == 'demodata':
 
-        # Determine which datasource resources 'should' be available
-        data_resources = []
-        for k, v in ION_DATASETS.items():
-            add_me = True
-            # If the Resource defines a filename in its content args,
-            #   ensure that the file exists.  If not, don't add the corresponding resource...
-            content_args = v.get(CONTENT_ARGS_CFG, None)
-            if content_args:
-                filename = content_args.get('filename', ':\0?')
-                if filename is not ':\0?':
-                    if filename is None or not os.path.exists(filename):
-                        add_me = False
-            
-            if add_me:
-                data_resources.append((str(k), str(v[ID_CFG])))
-        
-        data_resources.sort()
         
         ### Rather than print the data_resources object - how do we add it to locals?
         ### I can't find the control object for the shell from here?
         print '================================================================='
-        print 'Added Data Resources:'
-        print '{'
-        for k, v in data_resources:
-            print "\t'%s': '%s'," % (k, v)
-            control.add_term_name(k, v)
-        print '}'
-        print 'The dataset IDs will be available in your localsOkay after the shell starts!'
+        print 'Addind Data Resources:'
+        print 'Data loaded from files may or may not be available depending on your configuration'
+        print 'Import Dataset IDs from "ion.services.coi.datastore_bootstrap.ion_preload_config"'
         print '================================================================='
 
         ds_spawn_args = {PRELOAD_CFG:{ION_DATASETS_CFG:True}}

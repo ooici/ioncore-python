@@ -105,7 +105,8 @@ class DateSetControllerTest(IonTestCase):
         log.info('Create returned resource reference:\n%s' % str(find_response_msg))
 
         # This may fail if more datasets are preloaded
-        self.assertEqual(len(find_response_msg.idrefs),1)
+
+        self.assertEqual(len(find_response_msg.idrefs)>=1,True)
 
         for idref in find_response_msg.idrefs:
 

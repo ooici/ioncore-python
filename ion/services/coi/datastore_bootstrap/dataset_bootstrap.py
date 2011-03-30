@@ -10,8 +10,10 @@ import tarfile
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+
 from twisted.internet import defer
 
+from ion.util import procutils as pu
 
 from ion.core.object import object_utils, codec
 
@@ -38,14 +40,21 @@ def bootstrap_byte_array_dataset(resource_instance, *args, **kwargs):
     ds_svc = args[0]
     filename = kwargs['filename']
     log.debug('Bootstraping dataset from local byte array: "%s"' % filename)
-    
-    if ds_svc is None or filename is None:
-        log.warn('Could not bootstrap dataset with using datastore service "%s" and filename "%s"' % (str(ds_svc), str(filename)))
+
+    assert ds_svc is not None, 'Invalid invocation of the bootstrap_byte_array_dataset function. Must pass the datastore svc instance!'
+
+
+    if filename is None:
+        log.info('Could not bootstrap dataset with using datastore service "%s" and filename "%s"' % (str(ds_svc), str(filename)))
         return False
     
     result = False
     f = None
     try:
+
+        # Get an absolute path to the file
+        filename = pu.get_ion_path(filename)
+
         if filename.endswith('.tar.gz'):
             log.debug('Untaring file...')
             outname = filename.replace('.tar.gz', '.obj')
