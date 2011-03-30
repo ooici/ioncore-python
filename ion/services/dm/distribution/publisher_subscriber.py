@@ -402,7 +402,7 @@ class SubscriberFactory(object):
         sub = subscriber_type(xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, process=process, credentials=credentials, *args, **kwargs)
         yield process.register_life_cycle_object(sub)
 
-        if handler != None:
+        if not handler is None:
             sub.ondata = handler
 
         yield sub.register()
