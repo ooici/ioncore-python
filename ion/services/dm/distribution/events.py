@@ -70,6 +70,7 @@ class EventPublisher(Publisher):
 
         # copy kwargs into local list
         msgargs = kwargs.copy()
+        log.debug("create_event has %d kwargs to set" % len(msgargs))
 
         # create base event message, assign values from kwargs
         event_msg = yield self._mc.create_instance(EVENT_MESSAGE_TYPE)
@@ -101,7 +102,10 @@ class EventPublisher(Publisher):
         origin = origin or self._origin
         assert origin and origin != "unknown"
 
-        yield self.publish(event_msg, routing_key=self.topic(origin))
+        routing_key=self.topic(origin)
+        log.debug("Publishing message to %s" % routing_key)
+
+        yield self.publish(event_msg, routing_key=routing_key)
 
     @defer.inlineCallbacks
     def create_and_publish_event(self, **kwargs):
@@ -235,6 +239,10 @@ class EventSubscriber(Subscriber):
         binding_key = binding_key or self.topic(origin)
 
         Subscriber.__init__(self, xp_name=xp_name, binding_key=binding_key, queue_name=queue_name, credentials=credentials, process=process, *args, **kwargs)
+
+    def on_activate(self, *args, **kwargs):
+        log.debug("Listening to events on %s" % self._binding_key)
+        Subscriber.on_activate(self, *args, **kwargs)
 
 class ResourceLifecycleEventSubscriber(EventSubscriber):
     """
