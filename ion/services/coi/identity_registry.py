@@ -168,9 +168,10 @@ class IdentityRegistryClient(ServiceClient):
     #--#op_find_users = BaseRegistryService.base_find_resource
 
     @defer.inlineCallbacks
-    def find_users(self, user_description,regex=True,ignore_defaults=True, attnames=[]):
+    def find_users(self, user_description,regex=True,ignore_defaults=True, attnames=None):
         """
         """
+        #--if attnames is None: attnames = []
         #--#return self.base_find_resource('find_users',user_description,regex,ignore_defaults,attnames)
 
 
