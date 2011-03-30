@@ -173,7 +173,7 @@ class AppIntegrationTest(IonTestCase):
         
         reqMsg = yield mc.create_instance(AIS_REQUEST_MSG_TYPE)
         reqMsg.message_parameters_reference = reqMsg.CreateObject(GET_DATA_RESOURCE_DETAIL_REQ_MSG_TYPE)
-        if self.dsID != None:
+        if self.dsID is not None:
             reqMsg.message_parameters_reference.data_resource_id = self.dsID
 
         log.debug('DHE: Calling getDataResourceDetail!!...')

@@ -15,6 +15,15 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 #from ion.services.dm.inventory.dataset_controller import DatasetControllerClient
 # DHE Temporarily pulling DatasetControllerClient from scaffolding
 from ion.integration.ais.findDataResources.resourceStubs import DatasetControllerClient
+from ion.services.dm.inventory.association_service import AssociationServiceClient
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, IDREF_TYPE
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, HAS_A_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, ANONYMOUS_USER_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, \
+            SAMPLE_PROFILE_DATASET_ID, DATASET_RESOURCE_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID
+
+from ion.core.object import object_utils
+ASSOCIATION_TYPE = object_utils.create_type_identifier(object_id=13, version=1)
+PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
+LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
 
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE
@@ -29,10 +38,53 @@ class FindDataResources(object):
         self.rc = ResourceClient()
         self.mc = ais.mc
         self.dscc = DatasetControllerClient()
+        self.asc = AssociationServiceClient()
+
         self.dsID = None
 
     def setTestDatasetID(self, dsID):
         self.dsID = dsID
+
+    @defer.inlineCallbacks
+    def __findResourcesOfType(self, resourceType):
+
+        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = request.CreateObject(IDREF_TYPE)
+        type_ref.key = resourceType
+        
+        pair.object = type_ref
+
+        # Add a life cycle state request
+        pair = request.pairs.add()
+
+        # Set the predicate search term
+        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = HAS_LIFE_CYCLE_STATE_ID
+
+        pair.predicate = pref
+
+
+        # Set the Object search term
+        state_ref = request.CreateObject(LCS_REFERENCE_TYPE)
+        state_ref.lcs = state_ref.LifeCycleState.ACTIVE
+        pair.object = state_ref
+
+        result = yield self.asc.get_subjects(request)
+        
+        #defer.returnValue(resID)
+        defer.returnValue(result)
+
         
     @defer.inlineCallbacks
     def findDataResources(self, msg):
@@ -62,14 +114,17 @@ class FindDataResources(object):
         """
 
         userID = msg.message_parameters_reference.user_ooi_id        
-        # This is the way it will work normally:
-        # resID = self.dscc.find_dataset_resources(msg)
-        # but for until the dataset controller is ready, do this:
-        resID = self.ais.getTestDatasetID()
-        log.debug('DHE: Stub find_data_resources returned identity: ' + str(resID))
+
+        #### TEST TEST TEST
+        #datasetResID = self.ais.getTestDatasetID()
+        result = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
+        datasetResID = result.idrefs[0].key
+
+
+        log.debug('DHE: Stub find_data_resources returned datasetResID: ' + datasetResID)
         
         log.debug('DHE: findDataResources getting resource instance')
-        ds = yield self.rc.get_instance(resID)
+        ds = yield self.rc.get_instance(datasetResID)
         #log.debug('DHE: get_instance returned ' + str(ds))
 
         """
@@ -102,7 +157,15 @@ class FindDataResources(object):
         rspMsg.message_parameters_reference[0].dataResourceSummary[0] = \
             rspMsg.CreateObject(AIS_DATA_RESOURCE_SUMMARY_MSG_TYPE)
 
-        self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[0], ds, userID, resID)
+        self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[0], ds, userID, datasetResID)
+
+        """
+        Now get the datasource resource
+        """
+        
+        result = yield self.__findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
+        datasourceResID = result.idrefs[0].key
+        log.debug('DHE: Stub find_data_resources returned datasourceResID: ' + datasourceResID)
 
         """
         Moving this to getDataResourceDetail

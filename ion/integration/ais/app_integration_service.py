@@ -188,7 +188,7 @@ class AppIntegrationServiceClient(ServiceClient):
     def findDataResources(self, message):
         yield self._check_init()
         result = yield self.CheckRequest(message)
-        if result != None:
+        if result is not None:
             log.error('findDataResources: ' + result.error_str)
             defer.returnValue(result)
         log.debug("AppIntegrationServiceClient: findDataResources(): sending msg to AppIntegrationService.")
@@ -200,7 +200,7 @@ class AppIntegrationServiceClient(ServiceClient):
     def getDataResourceDetail(self, message):
         yield self._check_init()
         result = yield self.CheckRequest(message)
-        if result != None:
+        if result is not None:
             log.error('getDataResourceDetail: ' + result.error_str)
             defer.returnValue(result)
         log.debug("AppIntegrationServiceClient: getDataResourceDetail(): sending msg to AppIntegrationService.")
@@ -212,7 +212,7 @@ class AppIntegrationServiceClient(ServiceClient):
     def createDownloadURL(self, message):
         yield self._check_init()
         result = yield self.CheckRequest(message)
-        if result != None:
+        if result is not None:
             defer.returnValue(result)
         # check that ooi_id is present in GPB
         if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
@@ -244,7 +244,7 @@ class AppIntegrationServiceClient(ServiceClient):
         yield self._check_init()
         # check that the GPB is correct type & has a payload
         result = yield self.CheckRequest(message)
-        if result != None:
+        if result is not None:
             defer.returnValue(result)
        # check that ooi_id is present in GPB
         if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
@@ -266,7 +266,7 @@ class AppIntegrationServiceClient(ServiceClient):
         yield self._check_init()
         # check that the GPB is correct type & has a payload
         result = yield self.CheckRequest(message)
-        if result != None:
+        if result is not None:
             defer.returnValue(result)
        # check that ooi_id is present in GPB
         if not message.message_parameters_reference.IsFieldSet('user_ooi_id'):
