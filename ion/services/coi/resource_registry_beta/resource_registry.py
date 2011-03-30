@@ -76,7 +76,8 @@ class ResourceRegistryService(ServiceProcess):
         # Check that we got the correct kind of content!
         assert isinstance(content, gpb_wrapper.Wrapper)
         assert content.ObjectType == self.RESOURCE_DESCRIPTION_TYPE
-        
+
+        print 'HEADERS!', headers
        
         response = yield self._register_resource_instance(content)
        
