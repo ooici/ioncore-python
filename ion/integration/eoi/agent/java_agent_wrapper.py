@@ -21,9 +21,10 @@ import ion.util.ionlog
 import ion.util.procutils as pu
 log = ion.util.ionlog.getLogger(__name__)
 from ion.services.dm.ingestion.eoi_ingester import EOIIngestionClient
+from ion.services.coi.datastore_bootstrap.ion_preload_config import TESTING_SIGNIFIER
 
-# Imports: General
-import time
+# Imports: Builtin
+import time, datetime
 import uuid
 
 # Imports: Message object creation
@@ -440,8 +441,10 @@ class JavaAgentWrapper(ServiceProcess):
         
         log.debug("  |--->  Retrieving dataset instance")
         dataset = yield self.rc.get_instance(datasetID)
+        
         log.debug("  |--->  Retrieving datasource instance")
         datasource = yield self.rc.get_instance(dataSourceID)
+        
         log.debug("  |--->  Creating EoiDataContext instance")
         msg = yield self.mc.create_instance(DATA_CONTEXT_TYPE)
         
@@ -452,9 +455,20 @@ class JavaAgentWrapper(ServiceProcess):
 
 
         log.debug("Storing data in EoiDataContext fields")
+        testing = False
+        if str(datasetID).startswith(TESTING_SIGNIFIER):
+            testing = True
         msg.source_type = datasource.source_type
         msg.start_time = dataset.root_group.FindAttributeByName('ion_time_coverage_end').GetValue()
-        msg.end_time = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        if testing:
+            log.debug('\n\n\n\nTESTING\n\n\n\n')
+            startTime = datetime.datetime.strptime(msg.start_time, '%Y-%m-%dT%H:%M:%SZ')
+            deltaTime = datetime.timedelta(days=3)
+            endTime = startTime + deltaTime
+        else:
+            log.debug('\n\n\n\nNOT TESTING\n\n\n\n')
+            endTime = datetime.datetime.utcnow()
+        msg.end_time = endTime.strftime('%Y-%m-%dT%H:%M:%SZ')
 
         msg.property.extend(datasource.property)
         msg.station_id.extend(datasource.station_id)
@@ -587,9 +601,9 @@ class JavaAgentWrapperClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('pretty_print', None)
         
         log.info("<<<---@@@ Incoming rpc reply...")
-        log.info("... Content\t" + str(content))
-        log.info("... Headers\t" + str(headers))
-        log.info("... Message\t" + str(msg))
+        log.debug("... Content\t" + str(content))
+        log.debug("... Headers\t" + str(headers))
+        log.debug("... Message\t" + str(msg))
         
         result = ""
         if 'value' in content:
@@ -692,6 +706,8 @@ spawn('eoi_ingest')
 client = jawc()
 
 client.request_update(sample_profile_dataset, sample_profile_datasource)
+client.request_update(sample_station_dataset, sample_station_datasource)
+client.request_update(sample_traj_dataset, sample_traj_datasource)
 
 '''
 
