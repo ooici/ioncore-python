@@ -19,6 +19,11 @@ from ion.services.coi.resource_registry_beta.resource_client import ResourceClie
 
 from ion.core.object import object_utils
 
+from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE
+from ion.services.dm.inventory.association_service import AssociationServiceClient
+
+from ion.services.coi.datastore_bootstrap.ion_preload_config import ROOT_USER_ID, IDENTITY_RESOURCE_TYPE_ID, TYPE_OF_ID, HAS_LIFE_CYCLE_STATE_ID, OWNED_BY_ID, DATASET_RESOURCE_TYPE_ID
+
 CMD_DATASET_RESOURCE_TYPE = object_utils.create_type_identifier(object_id=10001, version=1)
 """
 message Dataset {
@@ -68,6 +73,9 @@ message QueryResult{
 """
 
 
+PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
+LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1)
+
 
 class DatasetControllerError(ApplicationError):
     """
@@ -92,7 +100,7 @@ class DatasetController(ServiceProcess):
         # Can be called in __init__ or in slc_init... no yield required
         self.resource_client = ResourceClient(proc=self)
 
-        self.dataset_dict = {}
+        self.asc = AssociationServiceClient(proc=self)
 
         log.info('SLC_INIT Dataset Controller')
 
@@ -112,7 +120,7 @@ class DatasetController(ServiceProcess):
         #strongly typed in google protocol buffers!
         if request.MessageType != None:
             # This will terminate the hello service. As an alternative reply okay with an error message
-            raise DatasetControllerError('Expected message type ResourceConfigurationRequest, received %s'
+            raise DatasetControllerError('Expected Null message type, received %s'
                                      % str(request), request.ResponseCodes.BAD_REQUEST)
 
         # Use the resource client to create a resource!
@@ -125,10 +133,6 @@ class DatasetController(ServiceProcess):
         #yield self.rc.put_instance(resource)
 
         log.info(str(resource))
-
-        # Temporary - add to list of datasets...
-        self.dataset_dict[resource.ResourceIdentity] = self.resource_client.reference_instance(resource)
-
 
         response = yield self.message_client.create_instance(MessageContentTypeID = IDREF_TYPE)
 
@@ -155,7 +159,7 @@ class DatasetController(ServiceProcess):
         """
 
 
-        log.info('op_set_dataset_resource_life_cycle: ')
+        log.info('op_find_dataset_resources: ')
 
         # Check only the type recieved and linked object types. All fields are
         #strongly typed in google protocol buffers!
@@ -165,23 +169,48 @@ class DatasetController(ServiceProcess):
                                      % str(request), request.ResponseCodes.BAD_REQUEST)
 
         ### Check the type of the configuration request
-        if request.IsFieldSet('only_mine'):
-           pass
+        if request.IsFieldSet('only_mine') and request.only_mine == True:
+           raise NotImplementedError('Search by owner is not complete yet!')
+
+        query = yield self.message_client.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
+
+        pair = query.pairs.add()
+
+        # Set the predicate search term
+        pref = query.CreateObject(PREDICATE_REFERENCE_TYPE)
+        pref.key = TYPE_OF_ID
+
+        pair.predicate = pref
+
+        # Set the Object search term
+
+        type_ref = query.CreateObject(IDREF_TYPE)
+        type_ref.key = DATASET_RESOURCE_TYPE_ID
+
+        pair.object = type_ref
 
         ### Check the type of the configuration request
         if request.IsFieldSet('by_life_cycle_state'):
-            pass
 
-        # No acutal find yet - just return whatever items we have...
+            # Add a life cycle state request
+            pair = query.pairs.add()
 
-        response = yield self.message_client.create_instance(MessageContentTypeID = QUERYRESULTS_TYPE)
+            # Set the predicate search term
+            pref = query.CreateObject(PREDICATE_REFERENCE_TYPE)
+            pref.key = HAS_LIFE_CYCLE_STATE_ID
+
+            pair.predicate = pref
 
 
-        for item in self.dataset_dict.values():
-            link = response.idrefs.add()
-            link.SetLink(item)
+            # Set the Object search term
+            state_ref = query.CreateObject(LCS_REFERENCE_TYPE)
+            state_ref.lcs = request.by_life_cycle_state
+            pair.object = state_ref
 
-        self.reply_ok(msg, response)
+        result = yield self.asc.get_subjects(query)
+
+        # The result is the same type
+        self.reply_ok(msg, result)
 
 
 
@@ -210,6 +239,16 @@ class DatasetControllerClient(ServiceClient):
         (content, headers, msg) = yield self.rpc_send('set_dataset_resource_life_cycle', msg)
 
         defer.returnValue(content)
+
+    @defer.inlineCallbacks
+    def find_dataset_resources(self, msg):
+        yield self._check_init()
+
+        (content, headers, msg) = yield self.rpc_send('find_dataset_resources', msg)
+
+        defer.returnValue(content)
+
+
 
 # Spawn of the process using the module name
 factory = ProcessFactory(DatasetController)
