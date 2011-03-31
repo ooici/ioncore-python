@@ -193,6 +193,9 @@ message CreateDownloadURLReqMsg {
        _ID = 9035;
        _VERSION = 1;
    }
+
+   optional string user_ooi_id  = 1;
+
 }
 """
 
