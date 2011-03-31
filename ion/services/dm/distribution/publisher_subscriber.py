@@ -18,6 +18,7 @@ from twisted.internet import defer
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
+#noinspection PyUnusedLocal
 class Publisher(BasicLifecycleObject):
     """
     @brief This represents publishers of (mostly) science data. Intended use is
@@ -230,6 +231,9 @@ def _psc_setup_subscriber(self, xs_name='swapmeet', xp_name='science_data',
     
     # Subscriber
     # @note Not using credentials yet
+    if credentials:
+        log.debug('Sorry, ignoring the credentials!')
+
     log.debug('Subscriber')
     msg = yield mc.create_instance(SUBSCRIBER_TYPE)
     msg.exchange_space_id = self._xs_id
@@ -248,7 +252,7 @@ class Subscriber(BasicLifecycleObject):
     @todo Need a subscriber receiver that can hook into the topic xchg mechanism
     """
 
-    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None, *args, **kwargs):
+    def __init__(self, xp_name=None, binding_key=None, queue_name=None, credentials=None, process=None):
 
         BasicLifecycleObject.__init__(self)
 
@@ -326,6 +330,7 @@ class Subscriber(BasicLifecycleObject):
         msg.ack()
         return self.ondata(data)
 
+    #noinspection PyUnusedLocal
     def ondata(self, data):
         """
         @brief Data callback, in the pattern of the current subscriber code
@@ -406,7 +411,7 @@ class SubscriberFactory(object):
         yield sub.register()
         yield process.register_life_cycle_object(sub)        # brings the subscriber up to the same state as the process
 
-        if not handler is None:
+        if handler:
             sub.ondata = handler
 
         defer.returnValue(sub)

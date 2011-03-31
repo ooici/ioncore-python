@@ -134,7 +134,7 @@ class WorkBench(object):
         return repo, repo.root_object
 
 
-    def create_association(self, subject, predicate, obj):
+    def create_association(self, subject, predicate, obj, commit_msg=None):
         """
         @Brief Create an association repository object in your workbench
         @param subject is a resource instance or a repository object
@@ -149,7 +149,9 @@ class WorkBench(object):
         self._set_association(association_repo, predicate, 'predicate')
         self._set_association(association_repo, obj, 'object')
 
-        association_repo.commit('Created association')
+        if commit_msg is None:
+            commit_msg = 'Created association'
+        association_repo.commit(commit_msg)
 
         return association_repo
 

@@ -114,9 +114,7 @@ class ResourceClient(object):
         yield self._check_init()
 
         # Create a sendable resource object
-        description_repository = self.workbench.create_repository(RESOURCE_DESCRIPTION_TYPE)
-
-        resource_description = description_repository.root_object
+        resource_description = yield self.proc.message_client.create_instance(RESOURCE_DESCRIPTION_TYPE)
 
         # Set the description
         resource_description.name = ResourceName
@@ -126,7 +124,7 @@ class ResourceClient(object):
         resource_description.object_type.GPBMessage.CopyFrom(type_id)
 
         # Set the resource type - keep the object type above for now...
-        res_type = description_repository.create_object(IDREF_TYPE)
+        res_type = resource_description.CreateObject(IDREF_TYPE)
 
         # Get the resource type if it exists - otherwise a default will be set!
         res_type.key = self.type_map.get(type_id.object_id)

@@ -12,21 +12,14 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 from twisted.trial import unittest
 
-from net.ooici.core.type import type_pb2
-from net.ooici.play import addressbook_pb2
-from net.ooici.services.coi import resource_framework_pb2
-
-from ion.core.exception import ReceivedError
-
-from ion.core.object import object_utils
-from ion.core.object import gpb_wrapper
-
 from ion.services.coi.resource_registry_beta.resource_registry import ResourceRegistryClient
 from ion.test.iontest import IonTestCase
 
 from ion.core.object import object_utils
 RESOURCE_DESCRIPTION_TYPE = object_utils.create_type_identifier(object_id=1101, version=1)
 IDREF_TYPE = object_utils.create_type_identifier(object_id=4, version=1)
+
+ADDRESSLINK_TYPE = object_utils.create_type_identifier(object_id=20003, version=1)
 
 
 class ResourceRegistryTest(IonTestCase):
@@ -73,15 +66,17 @@ class ResourceRegistryTest(IonTestCase):
         # Set the description
         resource_description.name = 'Johns resource'
         resource_description.description = 'Lots of metadata'
-        object_utils.set_type_from_obj(addressbook_pb2.AddressLink, resource_description.object_type)
-        
+        # This is breaking some abstractions - using the GPB directly...
+        resource_description.object_type.GPBMessage.CopyFrom(ADDRESSLINK_TYPE)
+
+
         res_type = description_repository.create_object(IDREF_TYPE)
         res_type.key = 'Some junk'
         resource_description.resource_type = res_type
 
         
         # Test the business logic of the register resource instance operation
-        result = yield proc_rr2._register_resource_instance(resource_description)
+        result = yield proc_rr2._register_resource_instance(resource_description, headers={})
             
         if result.MessageResponseCode == result.ResponseCodes.NOT_FOUND:
             raise ResourceClientError('Pull from datastore failed in resource client! Requested Resource Type Not Found!')
