@@ -75,7 +75,7 @@ class NotificationAlertService(ServiceProcess):
 
         # create the register_user request GPBs
         respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='NAS Add Subscription result')
-        respMsg.result= 'success';
+        respMsg.result = respMsg.ResponseCodes.OK;
 
         log.info('op_addSubscription finished')
         yield self.reply_ok(msg, respMsg)
@@ -101,7 +101,7 @@ class NotificationAlertService(ServiceProcess):
 
         # create the register_user request GPBs
         respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='NAS Add Subscription result')
-        respMsg.result= 'success';
+        respMsg.result = respMsg.ResponseCodes.OK
 
         log.info('op_removeSubscription finished')
         yield self.reply_ok(msg, respMsg)

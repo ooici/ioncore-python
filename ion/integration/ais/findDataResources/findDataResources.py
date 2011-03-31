@@ -28,7 +28,6 @@ LCS_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=26, version=1
 # import GPB type identifiers for AIS
 from ion.integration.ais.ais_object_identifiers import AIS_RESPONSE_MSG_TYPE
 from ion.integration.ais.ais_object_identifiers import FIND_DATA_RESOURCES_RSP_MSG_TYPE
-from ion.integration.ais.ais_object_identifiers import AIS_DATA_RESOURCE_SUMMARY_MSG_TYPE
 
 class FindDataResources(object):
     
@@ -82,7 +81,6 @@ class FindDataResources(object):
 
         result = yield self.asc.get_subjects(request)
         
-        #defer.returnValue(resID)
         defer.returnValue(result)
 
         
@@ -115,69 +113,64 @@ class FindDataResources(object):
 
         userID = msg.message_parameters_reference.user_ooi_id        
 
-        #### TEST TEST TEST
-        #datasetResID = self.ais.getTestDatasetID()
-        result = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
-        datasetResID = result.idrefs[0].key
-
-
-        log.debug('DHE: Stub find_data_resources returned datasetResID: ' + datasetResID)
-        
-        log.debug('DHE: findDataResources getting resource instance')
-        ds = yield self.rc.get_instance(datasetResID)
-        #log.debug('DHE: get_instance returned ' + str(ds))
-
         """
-        I think this should print out everything in the dataset
+        Create the response message that we will attach the list of
+        resource IDs to
         """
-        for atrib in ds.root_group.attributes:
-            print 'Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue()))
-
-        for var in ds.root_group.variables:
-            print 'Root Variable: %s' % str(var.name)
-            for atrib in var.attributes:
-                print "Attribute: %s = %s" % (str(atrib.name), str(atrib.GetValue()))
-            print "....Dimensions:"
-            for dim in var.shape:
-                print "    ....%s (%s)" % (str(dim.name), str(dim.length))
-        
-        #dimensions    =  [str(dim.name) for dim in lat.shape]
- 
-        """
-        lat = ds.root_group.FindAttributeByName('latitude')
-        log.debug("Here are the latitude values")
-        for value in lat.GetValues():
-            log.debug(str(value))
-        """
-
         rspMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
         rspMsg.message_parameters_reference.add()
         rspMsg.message_parameters_reference[0] = rspMsg.CreateObject(FIND_DATA_RESOURCES_RSP_MSG_TYPE)
-        rspMsg.message_parameters_reference[0].dataResourceSummary.add()
-        rspMsg.message_parameters_reference[0].dataResourceSummary[0] = \
-            rspMsg.CreateObject(AIS_DATA_RESOURCE_SUMMARY_MSG_TYPE)
 
-        self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[0], ds, userID, datasetResID)
+        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
+        log.debug('Found ' + str(len(dSetResults.idrefs)) + 'datasets.')
 
-        """
-        Now get the datasource resource
-        """
-        
-        result = yield self.__findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
-        datasourceResID = result.idrefs[0].key
-        log.debug('DHE: Stub find_data_resources returned datasourceResID: ' + datasourceResID)
+        dSourceResults = yield self.__findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
+        log.debug('Found ' + str(len(dSourceResults.idrefs)) + 'datasources.')
 
-        """
-        Moving this to getDataResourceDetail
         i = 0
-        for var in ds.root_group.variables:
-            print 'Working on variable: %s' % str(var.name)
-            rspMsg.message_parameters_reference[0].dataResourceSummary[0].variable.add()
-            self.__loadRootVariable(rspMsg.message_parameters_reference[0].dataResourceSummary[0].variable[i], ds, var)
+        while i < len(dSetResults.idrefs):
+            dSetResID = dSetResults.idrefs[i].key
+            dSourceResID = dSourceResults.idrefs[i].key
+            log.debug('DHE: Working on datasetResID: ' + dSetResID + ' and dSourceResID:' + dSourceResID)
+            
+            dSet = yield self.rc.get_instance(dSetResID)
+            dSource = yield self.rc.get_instance(dSourceResID)
+    
+            self.__printRootAttributes(dSet)
+            self.__printRootVariables(dSet)
+            self.__printSourceMetadata(dSource)
+
+            rspMsg.message_parameters_reference[0].dataResourceSummary.add()
+    
+            self.__loadRootAttributes(rspMsg.message_parameters_reference[0].dataResourceSummary[i], dSet, userID, dSetResID)
+            
             i = i + 1
-        """            
+
 
         defer.returnValue(rspMsg)
+
+    def __printRootAttributes(self, ds):
+        for atrib in ds.root_group.attributes:
+            log.debug('Root Attribute: %s = %s'  % (str(atrib.name), str(atrib.GetValue())))
+    
+    def __printRootVariables(self, ds):
+        for var in ds.root_group.variables:
+            log.debug('Root Variable: %s' % str(var.name))
+            for atrib in var.attributes:
+                log.debug("Attribute: %s = %s" % (str(atrib.name), str(atrib.GetValue())))
+            print "....Dimensions:"
+            for dim in var.shape:
+                log.debug("    ....%s (%s)" % (str(dim.name), str(dim.length)))
+        
+    def __printSourceMetadata(self, dSource):
+        log.debug('source_type: ' + str(dSource.source_type))
+        for property in dSource.property:
+            log.debug('Property: ' + property)
+        for sid in dSource.station_id:
+            log.debug('Station ID: ' + sid)
+        log.debug('request_type: ' + str(dSource.request_type))
+        log.debug('base_url: ' + dSource.base_url)
+        log.debug('max_ingest_millis: ' + str(dSource.max_ingest_millis))
 
     def __loadRootAttributes(self, rootAttributes, ds, userID, resID):
         try:
@@ -203,6 +196,7 @@ class FindDataResources(object):
             estr = 'Object ERROR!'
             log.exception(estr)
 
+
     """
     def __loadRootVariable(self, rootVariable, ds, var):
         #lat = ds.root_group.FindVariableByName('lat')
@@ -213,5 +207,4 @@ class FindDataResources(object):
         except:            
             estr = 'Object ERROR!'
             log.exception(estr)
-         
     """
