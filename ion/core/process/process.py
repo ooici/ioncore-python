@@ -486,10 +486,7 @@ class Process(BasicLifecycleObject, ResponseCodes):
                     raise ProcessError(text)
 
                 # Regular message handling in expected state
-                try:
-                    pu.log_message(msg)
-                except Exception, ex:
-                    log.exception("ERROR LOGGING")
+                pu.log_message(msg)
 
                 # Delegate further message processing to conversation specific
                 # implementation. Trigger conversation FSM.

@@ -76,6 +76,7 @@ class ProcessManager(BasicLifecycleObject):
             sup = yield self.create_supervisor()
 
         assert IProcess.providedBy(sup), "Parent must provide IProcess"
+        print "#########", sup, sup._get_state()
         assert sup._get_state() in ("READY", "ACTIVE"), "Illegal parent process state"
 
         log.info("Spawning %s child processes for sup=[%s]" % (len(children), sup.proc_name))
