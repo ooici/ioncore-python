@@ -296,9 +296,11 @@ class ResourceInstanceError(Exception):
 
 
 class ResourceFieldProperty(object):
-    def __init__(self, name, doc=None):
+    def __init__(self, name, res_prop, doc=None):
         self.name = name
         if doc: self.__doc__ = doc
+        self.field_type = res_prop.field_type
+        self.field_enum = res_prop.field_enum
 
     def __get__(self, resource_instance, objtype=None):
         return getattr(resource_instance._repository.root_object.resource_object, self.name)
@@ -360,20 +362,17 @@ class ResourceInstanceType(type):
             clsName = '%s_%s' % (cls.__name__, msgType.__name__)
             clsDict = {}
 
-            # Now setup the properties to map through to the GPB object
-            resDict = msgType.__dict__
+            for propName, msgProp in msgType._Properties.items():
+                #print 'Key: %s; Type: %s' % (fieldName, type(message_field))
+                prop = ResourceFieldProperty(propName, msgProp)
+                clsDict[propName] = prop
 
-            for fieldName, resource_field in resDict.items():
-                #print 'Key: %s; Type: %s' % (fieldName, type(resource_field))
-                if isinstance(resource_field, gpb_wrapper.WrappedProperty):
-                    prop = ResourceFieldProperty(fieldName)
+            for enumName, enumProp in msgType._Enums.items():
+                enum = ResourceEnumProperty(enumName)
+                clsDict[enumName] = enum
 
-                    clsDict[fieldName] = prop
-
-                elif isinstance(resource_field, gpb_wrapper.EnumObject):
-                    prop = ResourceEnumProperty(fieldName)
-
-                    clsDict[fieldName] = prop
+            clsDict['_Properties'] = msgType._Properties
+            clsDict['_Enums'] = msgType._Enums
 
             # Try rewriting using slots - would be more efficient...
             def obj_setter(self, k, v):

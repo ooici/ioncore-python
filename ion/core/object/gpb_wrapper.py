@@ -117,10 +117,53 @@ class EnumObject(object):
 
 class WrappedProperty(object):
     
-    def __init__(self, name, doc=None):
+    def __init__(self, name, doc=None, field_type=None, field_enum=None):
         self.name = name
         if doc: self.__doc__ = doc
-        
+
+        if field_type is None:
+            pass
+        elif field_type == 8:
+            self.field_type = "TYPE_BOOL"
+        elif field_type == 12:
+            self.field_type = "TYPE_BYTES"
+        elif field_type == 1:
+            self.field_type = "TYPE_DOUBLE"
+        elif field_type == 14:
+            self.field_type = "TYPE_ENUM"
+        elif field_type == 7:
+            self.field_type = "TYPE_FIXED32"
+        elif field_type == 6:
+            self.field_type = "TYPE_FIXED64"
+        elif field_type == 2:
+            self.field_type = "TYPE_FLOAT"
+        elif field_type == 10:
+            self.field_type = "TYPE_GROUP"
+        elif field_type == 5:
+            self.field_type = "TYPE_INT32"
+        elif field_type == 3:
+            self.field_type = "TYPE_INT64"
+        elif field_type == 2:
+            self.field_type = "TYPE_FLOAT"
+        elif field_type == 11:
+            self.field_type = 'TYPE_MESSAGE'
+        elif field_type == 15:
+            self.field_type = 'TYPE_SFIXED32'
+        elif field_type == 16:
+            self.field_type = 'TYPE_SFIXED64'
+        elif field_type == 17:
+            self.field_type = 'TYPE_SINT32'
+        elif field_type == 18:
+            self.field_type = 'TYPE_SINT64'
+        elif field_type == 9:
+            self.field_type = 'TYPE_STRING'
+        elif field_type == 13:
+            self.field_type = 'TYPE_UINT32'
+        elif field_type == 4:
+            self.field_type = 'TYPE_UINT64'
+
+        self.field_enum = field_enum
+
     def __get__(self, wrapper, objtype=None):
         raise NotImplementedError('Abstract base class for property wrappers: __get__')
 
@@ -257,41 +300,52 @@ class WrapperType(type):
             # Get the class name
             clsName = '%s_%s' % (cls.__name__, msgType.__name__)
             clsDict = {}
+            properties = {}
+            enums = {}
 
             clsDict['_GPBClass'] = gpbMessage.__class__
-            
-                                
+            clsDict['_Properties'] = properties
+            clsDict['_Enums'] = enums
+
             # Now setup the properties to map through to the GPB object
             descriptor = msgType.DESCRIPTOR
 
             # Add the enums of the message class
             if hasattr(descriptor, 'enum_types_by_name'):
                 for enum_name, enum_desc in descriptor.enum_types_by_name.iteritems():
-                    clsDict[enum_name] = EnumObject(enum_desc)
+                    enum_obj            = EnumObject(enum_desc)
+                    clsDict[enum_name]  = enum_obj
+                    enums[enum_name]    = enum_obj
 
             # Add the property wrappers for each of the fields of the message
             for fieldName, field_desc in descriptor.fields_by_name.items():
                 fieldType = getattr(msgType, fieldName)
-                
+
+                 # Add any enums for the fields the message contains
+                enum_desc = field_desc.enum_type
+                field_enum = None
+                if enum_desc:
+                    field_enum              = EnumObject(enum_desc)
+                    clsDict[enum_desc.name] = field_enum
+                    enums[enum_desc.name]   = field_enum
+
+                field_type = field_desc.type
+
                 prop = None
                 if field_desc.label == field_desc.LABEL_REPEATED:
                     if field_desc.cpp_type == field_desc.CPPTYPE_MESSAGE:
-                        prop = WrappedRepeatedCompositeProperty(fieldName, doc=fieldType.__doc__)
+                        prop = WrappedRepeatedCompositeProperty(fieldName, doc=fieldType.__doc__, field_type=field_type, field_enum=field_enum)
                     else:
-                        prop = WrappedRepeatedScalarProperty(fieldName, doc=fieldType.__doc__)
+                        prop = WrappedRepeatedScalarProperty(fieldName, doc=fieldType.__doc__, field_type=field_type, field_enum=field_enum)
                 else:
                     if field_desc.cpp_type == field_desc.CPPTYPE_MESSAGE:
-                        prop = WrappedMessageProperty(fieldName, doc=fieldType.__doc__)
+                        prop = WrappedMessageProperty(fieldName, doc=fieldType.__doc__, field_type=field_type, field_enum=field_enum)
                     else:
-                        prop = WrappedScalarProperty(fieldName, doc=fieldType.__doc__)
+                        prop = WrappedScalarProperty(fieldName, doc=fieldType.__doc__, field_type=field_type, field_enum=field_enum)
 
                 clsDict[fieldName] = prop
+                properties[fieldName] = prop
 
-                # Add any enums for the fields the message contains
-                enum_desc = field_desc.enum_type
-                if enum_desc and not enum_desc.name in clsDict:
-                    clsDict[enum_desc.name] = EnumObject(enum_desc)
-            
             # Set the object type:
             if clsDict.has_key('_MessageTypeIdentifier'):
                 mti = clsDict['_MessageTypeIdentifier']

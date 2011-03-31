@@ -191,7 +191,7 @@ class SchedulerService(ServiceProcess):
         """
         log.debug('Worker activated for task %s' % task_id)
         tdef = yield self.store.get(task_id)
-        if tdef == None:
+        if tdef is None:
             log.info('Task ID missing in store, assuming removal and aborting')
             return
 
